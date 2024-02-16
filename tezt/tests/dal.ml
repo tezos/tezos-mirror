@@ -2934,7 +2934,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     let do_sum = String.make (number_of_dal_slots - 1) '+' in
     let* () = send_messages ~bake:false l1_client [do_sum ^ " value"] in
     (* Wait sufficiently many levels so that the PVM interprets the message. *)
-    let* _lvl = Node.wait_for_level l1_node (level + 2) in
+    let* _lvl = Node.wait_for_level l1_node (level + 5) in
     unit
   in
   Log.info
@@ -2982,7 +2982,7 @@ let e2e_tests =
     {
       constants = Protocol.Constants_test;
       attestation_lag = 3;
-      block_delay = 6;
+      block_delay = 12;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
       num_extra_nodes = 2;
@@ -2992,7 +2992,7 @@ let e2e_tests =
     {
       constants = Protocol.Constants_test;
       attestation_lag = 3;
-      block_delay = 2;
+      block_delay = 4;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
       num_extra_nodes = 2;
@@ -3060,7 +3060,7 @@ let register_end_to_end_tests ~protocols =
            origination and another to configure the PVM. Baker daemon is then
            started. *)
         let expected_bake_for_occurrences = 2 in
-        Ptime.Span.of_int_s (expected_bake_for_occurrences * block_delay)
+        Ptime.Span.of_int_s expected_bake_for_occurrences
       in
       (* Preparing the list of node operators for extra nodes. *)
       let extra_node_operators =
