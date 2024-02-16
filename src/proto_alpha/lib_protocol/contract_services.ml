@@ -304,6 +304,16 @@ module S = struct
       ~output:(list Contract.encoding)
       custom_root
 
+  let estimated_own_pending_slashed_amount =
+    RPC_service.get_service
+      ~description:
+        "Returns the estimated own pending slashed amount (in mutez) of a \
+         given contract."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(
+        custom_root /: Contract.rpc_arg / "estimated_own_pending_slashed_amount")
+
   module Sapling = struct
     (*
       Sapling: these RPCs are like Sapling RPCs (sapling_services.ml)
@@ -714,6 +724,12 @@ let register () =
                   script
               in
               {balance; delegate; script = Some script; counter = None})) ;
+  register1
+    ~chunked:false
+    S.estimated_own_pending_slashed_amount
+    (fun ctxt contract () () ->
+      Contract.For_RPC.get_estimated_own_pending_slashed_amount ctxt contract) ;
+
   S.Sapling.register ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
@@ -777,6 +793,16 @@ let script_opt ctxt block contract =
 let storage ctxt block contract =
   let contract = Contract.Originated contract in
   RPC_context.make_call1 S.storage ctxt block contract () ()
+
+let estimated_own_pending_slashed_amount ctxt block contract =
+  let contract = Contract.Implicit contract in
+  RPC_context.make_call1
+    S.estimated_own_pending_slashed_amount
+    ctxt
+    block
+    contract
+    ()
+    ()
 
 let entrypoint_type ctxt block contract entrypoint ~normalize_types =
   RPC_context.make_call2

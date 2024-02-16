@@ -398,6 +398,11 @@ module Contract = struct
 
   let get_delegate_status = Contract_delegate_storage.get_delegate_status
 
+  module For_RPC = struct
+    include Contract_storage.For_RPC
+    include Delegate_slashed_deposits_storage.For_RPC
+  end
+
   module Delegate = struct
     let find = Contract_delegate_storage.find
 
@@ -572,6 +577,7 @@ module Delegate = struct
 
   module For_RPC = struct
     include Delegate_storage.For_RPC
+    include Delegate_slashed_deposits_storage.For_RPC
     include Delegate_missed_attestations_storage.For_RPC
     include Pending_denunciations_storage.For_RPC
 
