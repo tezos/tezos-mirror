@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
+#
+# SPDX-License-Identifier: MIT
+
+[profile.default]
+src = "src"
+out = "build"
