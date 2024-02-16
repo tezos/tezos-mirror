@@ -87,7 +87,8 @@ struct
 
   (* Helper functions. *)
 
-  let get_history cache h = Hist.History_cache.find h cache |> Lwt.return
+  let get_history cache h =
+    Hist.History_cache.(Map.find h (view cache)) |> Lwt.return
 
   let dal_mk_polynomial_from_slot slot_data =
     let open Result_syntax in

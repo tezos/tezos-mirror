@@ -66,10 +66,17 @@ module type S = sig
 
   type key
 
+  module Map : Map.S with type key = key
+
   type value
+
+  type view = value Map.t
 
   (** [empty ~capacity] returns a new table whose maximum capacity is given. *)
   val empty : capacity:int64 -> t
+
+  (** Export a view of the given bounded cache *)
+  val view : t -> view
 
   (** Encoding for values of type {!t} *)
   val encoding : t Data_encoding.t
