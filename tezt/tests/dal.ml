@@ -4935,6 +4935,10 @@ let register ~protocols =
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
     ~pvm_name:"wasm_2_0_0"
+    ~number_of_shards:2048
+    ~slot_size:(1 lsl 15)
+    ~redundancy_factor:32
+    ~page_size:128
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
   scenario_with_all_nodes
