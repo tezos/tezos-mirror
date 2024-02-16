@@ -27,7 +27,7 @@ open Store_types
 open Block_repr
 open Store_errors
 
-let default_block_cache_limit = 100
+let default_block_cache_limit = 1_000
 
 type merge_status = Not_running | Running | Merge_failed of tztrace
 
