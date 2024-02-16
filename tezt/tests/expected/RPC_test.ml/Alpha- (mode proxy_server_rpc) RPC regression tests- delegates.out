@@ -22,9 +22,9 @@
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle": "3800000000000", "deactivated": false,
-  "grace_period": 5, "total_delegated_stake": "0",
-  "staking_denominator": "0", "voting_power": "4000000000000",
-  "remaining_proposals": 20,
+  "grace_period": 5, "pending_denunciations": false,
+  "total_delegated_stake": "0", "staking_denominator": "0",
+  "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/full_balance'

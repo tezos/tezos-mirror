@@ -157,9 +157,8 @@ let info_encoding =
           delegated_balance,
           min_delegated_in_current_cycle,
           deactivated,
-          grace_period,
-          pending_denunciations ),
-        ( (total_delegated_stake, staking_denominator),
+          grace_period ),
+        ( (pending_denunciations, total_delegated_stake, staking_denominator),
           (voting_info, (active_consensus_key, pending_consensus_keys)) ) ))
     (fun ( ( full_balance,
              current_frozen_deposits,
@@ -170,9 +169,8 @@ let info_encoding =
              delegated_balance,
              min_delegated_in_current_cycle,
              deactivated,
-             grace_period,
-             pending_denunciations ),
-           ( (total_delegated_stake, staking_denominator),
+             grace_period ),
+           ( (pending_denunciations, total_delegated_stake, staking_denominator),
              (voting_info, (active_consensus_key, pending_consensus_keys)) ) ) ->
       {
         full_balance;
@@ -203,10 +201,10 @@ let info_encoding =
           (req "delegated_balance" Tez.encoding)
           (req "min_delegated_in_current_cycle" Tez.encoding)
           (req "deactivated" bool)
-          (req "grace_period" Cycle.encoding)
-          (req "pending_denunciations" bool))
+          (req "grace_period" Cycle.encoding))
        (merge_objs
-          (obj2
+          (obj3
+             (req "pending_denunciations" bool)
              (req "total_delegated_stake" Tez.encoding)
              (req "staking_denominator" Staking_pseudotoken.For_RPC.encoding))
           (merge_objs
