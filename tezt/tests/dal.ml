@@ -4946,6 +4946,10 @@ let register ~protocols =
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
     ~pvm_name:"wasm_2_0_0"
+    ~number_of_shards:2048
+    ~slot_size:(1 lsl 15)
+    ~redundancy_factor:32
+    ~page_size:128
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
   scenario_with_all_nodes
