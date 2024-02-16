@@ -68,6 +68,9 @@ Data Availability Layer (ongoing)
 Adaptive Issuance (ongoing)
 ----------------------------
 
+- Active-delegates update and autostaking are now done before staking-rights computation
+  at cycle end. (MR :gl:`!11972`)
+
 - The staking balance is now explicitly initialized when a delegate is registered. (MR :gl:`!11197`)
 
 - The issuance reward coeff is now computed only once.
