@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-libs"
   "octez-protocol-alpha-libs"
+  "cohttp-lwt-unix" { >= "5.2.0" }
   "octez-l2-libs"
   "octez-version"
   "octez-smart-rollup-wasm-debugger-plugin"
