@@ -42,13 +42,14 @@ type config = {
   source : Tezos_crypto.Signature.public_key_hash;
   destination : Protocol.Alpha_context.Sc_rollup.t;
   preimage_directory : string;
+  preimage_endpoint : Uri.t option;
   dal_pages_directory : string;
   kernel_debug : bool;
 }
 
 let config ?(sender = default_sender) ?(source = default_source)
     ?(destination = default_destination)
-    ?(preimage_directory = default_preimage_directory)
+    ?(preimage_directory = default_preimage_directory) ?preimage_endpoint
     ?(dal_pages_directory = default_dal_pages_directory)
     ?(kernel_debug = default_kernel_debug) () =
   {
@@ -56,6 +57,7 @@ let config ?(sender = default_sender) ?(source = default_source)
     source;
     destination;
     preimage_directory;
+    preimage_endpoint;
     dal_pages_directory;
     kernel_debug;
   }
