@@ -453,6 +453,9 @@ val run :
     In particular it also supports events.
     One key difference is that the node will eventually stop.
 
+    Note that the `--network` argument is infered by the `node replay`
+    command itself, thanks to the configuration value.
+
     See {!run} for a description of the arguments. *)
 val replay :
   ?on_terminate:(Unix.process_status -> unit) ->
@@ -461,7 +464,6 @@ val replay :
   ?strict:bool ->
   ?blocks:string list ->
   t ->
-  argument list ->
   unit Lwt.t
 
 (** {2 Events} *)
