@@ -171,7 +171,7 @@ let update_block_denunciations_map_with delegate denunciations initial_block_map
     initial_block_map
     denunciations
 
-let get_block_and_remaining_denunciations ctxt current_cycle =
+let get_applicable_and_remaining_denunciations ctxt current_cycle =
   Storage.Pending_denunciations.fold
     ctxt
     ~order:`Undefined
@@ -219,7 +219,7 @@ let apply_and_clear_denunciations ctxt =
   in
   (* Split denunciations into two groups: to be applied, and to be delayed *)
   let*! block_denunciations_map, remaining_denunciations =
-    get_block_and_remaining_denunciations ctxt current_cycle
+    get_applicable_and_remaining_denunciations ctxt current_cycle
   in
   (* Processes the applicable denunciations *)
   let* ctxt, balance_updates =
