@@ -122,7 +122,7 @@ let finalisation ctxt =
   let open Lwt_result_syntax in
   only_if_dal_feature_enabled
     ctxt
-    ~default:(fun ctxt -> return (ctxt, None))
+    ~default:(fun ctxt -> return (ctxt, Dal.Attestation.empty))
     (fun ctxt ->
       let*! ctxt = Dal.Slot.finalize_current_slot_headers ctxt in
       (* The fact that slots confirmation is done at finalization is very
@@ -144,7 +144,7 @@ let finalisation ctxt =
       let+ ctxt, attestation =
         Dal.Slot.finalize_pending_slot_headers ctxt ~number_of_slots
       in
-      (ctxt, Some attestation))
+      (ctxt, attestation))
 
 let compute_committee ctxt level =
   let open Lwt_result_syntax in
