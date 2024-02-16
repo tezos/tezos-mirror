@@ -66,8 +66,10 @@ RUN cargo +stable install taplo-cli --version 0.8.1 && \
     taplo --version
 
 # install wabt: https://packages.debian.org/source/sid/wabt
+# Install a version of binutils which supports RISC-V and put symlink in PATH
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y wabt \
+    && apt-get install --no-install-recommends -y wabt binutils-riscv64-unknown-elf \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/bin/riscv64-unknown-elf-objdump /usr/local/bin/objdump

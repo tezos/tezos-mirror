@@ -6,12 +6,14 @@
 // specification.
 #![allow(non_upper_case_globals)]
 
+use strum::EnumString;
+
 use crate::machine_state::backend::{self, Region};
 
 /// Integer register index
 #[allow(non_camel_case_types)] // To make names consistent with specification
 #[repr(usize)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, EnumString)]
 pub enum XRegister {
     // The `usize` representation of these constructors shall be used as an
     // index into the 31-element array holding the registers.
