@@ -161,7 +161,6 @@ let constants_mainnet : Constants.Parametric.t =
               baking_reward_fixed_portion_weight;
               baking_reward_bonus_weight;
               attesting_reward_weight;
-              liquidity_baking_subsidy_weight;
               seed_nonce_revelation_tip_weight;
               vdf_revelation_tip_weight;
             };
@@ -221,15 +220,13 @@ let constants_mainnet : Constants.Parametric.t =
     issuance_weights =
       {
         base_total_issued_per_minute;
-        (* 85.007812 tez/minute *)
+        (* 80.007812 tez/minute *)
         baking_reward_fixed_portion_weight;
         (* 1/4th of total block rewards *)
         baking_reward_bonus_weight;
         (* all bonus rewards = fixed rewards *)
         attesting_reward_weight;
         (* all baking rewards = all attesting rewards *)
-        liquidity_baking_subsidy_weight;
-        (* 1/16th of block rewards *)
         seed_nonce_revelation_tip_weight;
         (* 1/20480 of block rewards *)
         vdf_revelation_tip_weight;
@@ -240,6 +237,7 @@ let constants_mainnet : Constants.Parametric.t =
     quorum_min = 20_00l;
     quorum_max = 70_00l;
     min_proposal_quorum = 5_00l;
+    liquidity_baking_subsidy = Tez.(mul_exn one 5);
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
     liquidity_baking_toggle_ema_threshold = 1_000_000_000l;

@@ -279,7 +279,6 @@ let context_init_tup tup ?(blocks_per_cycle = 4l) =
         baking_reward_fixed_portion_weight = 1;
         seed_nonce_revelation_tip_weight = 1;
         vdf_revelation_tip_weight = 1;
-        liquidity_baking_subsidy_weight = 1;
       }
     ~nonce_revelation_threshold:2l
 

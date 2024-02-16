@@ -235,7 +235,9 @@ let liquidity_baking_subsidy_param () =
   let*? total_rewards = baking_rewards +? validators_rewards in
   let expected_subsidy = total_rewards /! 16L in
   let*?@ liquidity_baking_subsidy =
-    get_reward ~reward_kind:Liquidity_baking_subsidy
+    Protocol.Alpha_context.Delegate.Rewards.For_RPC
+    .liquidity_baking_subsidy_from_constants
+      constants
   in
   let*? diff = liquidity_baking_subsidy -? expected_subsidy in
   let max_diff = 1000 (* mutez *) in
