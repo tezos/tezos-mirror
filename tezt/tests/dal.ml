@@ -4848,7 +4848,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~uses:(fun protocol -> [Protocol.baker protocol])
     ~attestation_threshold:100
-    ~attestation_lag:8
+    ~attestation_lag:16
     ~activation_timestamp:Now
     "dal attester with baker daemon"
     test_attester_with_daemon
