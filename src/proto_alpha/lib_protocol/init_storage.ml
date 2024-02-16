@@ -222,6 +222,23 @@ let cleanup_values_for_protocol_p ctxt
   in
   return ctxt
 
+(** Updates the total supply with refined estimation at the activation
+    of P using measures from
+    https://gitlab.com/tezos/tezos/-/merge_requests/11978.
+
+    Remove me in Q. *)
+let update_total_supply_for_p chain_id ctxt =
+  let open Lwt_result_syntax in
+  (* We only update the total supply for mainnet. *)
+  if Chain_id.equal Constants_repr.mainnet_id chain_id then
+    let* current_total_supply = Storage.Contract.Total_supply.get ctxt in
+    let*? updated_total_supply =
+      Tez_repr.(current_total_supply +? of_mutez_exn 16458634911983L)
+    in
+    let*! ctxt = Storage.Contract.Total_supply.add ctxt updated_total_supply in
+    return ctxt
+  else return ctxt
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
@@ -330,6 +347,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let*! ctxt =
           Delegate_slashed_deposits_storage.update_slashing_storage_for_p ctxt
         in
+        let* ctxt = update_total_supply_for_p chain_id ctxt in
         return (ctxt, [])
   in
   let* ctxt =
