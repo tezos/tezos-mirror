@@ -1,164 +1,164 @@
 
 trace
   - CAR (interp) @ location: 8
-    [ (Pair (Pair "[CONTRACT_HASH]" 17 3) Unit) ]
+    [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 3) Unit) ]
   - CAR (entry) @ location: 8
-    [ (Pair (Pair "[CONTRACT_HASH]" 17 3) Unit) ]
+    [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 3) Unit) ]
     - log/PUSH (exit) @ location: 8
-      [ (Pair "[CONTRACT_HASH]" 17 3) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 3) ]
   - PUSH (entry) @ location: 9
-    [ (Pair "[CONTRACT_HASH]" 17 3) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 3) ]
     - log/SWAP (exit) @ location: 9
       [ (Pair 1 2)
-        (Pair "[CONTRACT_HASH]" 17 3) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 3) ]
   - SWAP (entry) @ location: 16
     [ (Pair 1 2)
-      (Pair "[CONTRACT_HASH]" 17 3) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 3) ]
     - log/SPLIT_TICKET (exit) @ location: 16
-      [ (Pair "[CONTRACT_HASH]" 17 3)
+      [ (Ticket "[CONTRACT_HASH]" nat 17 3)
         (Pair 1 2) ]
   - SPLIT_TICKET (entry) @ location: 17
-    [ (Pair "[CONTRACT_HASH]" 17 3)
+    [ (Ticket "[CONTRACT_HASH]" nat 17 3)
       (Pair 1 2) ]
     - log/IF_NONE (exit) @ location: 17
-      [ (Some (Pair (Pair "[CONTRACT_HASH]" 17 1)
-                    (Pair "[CONTRACT_HASH]" 17 2))) ]
+      [ (Some (Pair (Ticket "[CONTRACT_HASH]" nat 17 1)
+                    (Ticket "[CONTRACT_HASH]" nat 17 2))) ]
   - IF_NONE (entry) @ location: 19
-    [ (Some (Pair (Pair "[CONTRACT_HASH]" 17 1)
-                  (Pair "[CONTRACT_HASH]" 17 2))) ]
+    [ (Some (Pair (Ticket "[CONTRACT_HASH]" nat 17 1)
+                  (Ticket "[CONTRACT_HASH]" nat 17 2))) ]
     - log/[halt] (exit) @ location: 19
-      [ (Pair (Pair "[CONTRACT_HASH]" 17 1)
-              (Pair "[CONTRACT_HASH]" 17 2)) ]
+      [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 1)
+              (Ticket "[CONTRACT_HASH]" nat 17 2)) ]
   - [halt] (entry) @ location: 25
-    [ (Pair (Pair "[CONTRACT_HASH]" 17 1)
-            (Pair "[CONTRACT_HASH]" 17 2)) ]
+    [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 1)
+            (Ticket "[CONTRACT_HASH]" nat 17 2)) ]
     - control: KCons
     - log/UNPAIR (exit) @ location: 19
-      [ (Pair (Pair "[CONTRACT_HASH]" 17 1)
-              (Pair "[CONTRACT_HASH]" 17 2)) ]
+      [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 1)
+              (Ticket "[CONTRACT_HASH]" nat 17 2)) ]
   - UNPAIR (entry) @ location: 25
-    [ (Pair (Pair "[CONTRACT_HASH]" 17 1)
-            (Pair "[CONTRACT_HASH]" 17 2)) ]
+    [ (Pair (Ticket "[CONTRACT_HASH]" nat 17 1)
+            (Ticket "[CONTRACT_HASH]" nat 17 2)) ]
     - log/READ_TICKET (exit) @ location: 25
-      [ (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - READ_TICKET (entry) @ location: 26
-    [ (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/CDR (exit) @ location: 26
       [ (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - CDR (entry) @ location: 28
     [ (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/CDR (exit) @ location: 28
       [ (Pair 17 1)
-        (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - CDR (entry) @ location: 29
     [ (Pair 17 1)
-      (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/PUSH (exit) @ location: 29
       [ 1
-        (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - PUSH (entry) @ location: 30
     [ 1
-      (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/COMPARE (exit) @ location: 30
       [ 1
         1
-        (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - COMPARE (entry) @ location: 35
     [ 1
       1
-      (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/EQ (exit) @ location: 35
       [ 0
-        (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - EQ (entry) @ location: 36
     [ 0
-      (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/IF (exit) @ location: 36
       [ True
-        (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - IF (entry) @ location: 37
     [ True
-      (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/[halt] (exit) @ location: 37
-      [ (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - [halt] (entry) @ location: 43
-    [ (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - control: KCons
     - log/DROP (exit) @ location: 37
-      [ (Pair "[CONTRACT_HASH]" 17 1)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 1)
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - DROP (entry) @ location: 43
-    [ (Pair "[CONTRACT_HASH]" 17 1)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 1)
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/READ_TICKET (exit) @ location: 43
-      [ (Pair "[CONTRACT_HASH]" 17 2) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - READ_TICKET (entry) @ location: 44
-    [ (Pair "[CONTRACT_HASH]" 17 2) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/CDR (exit) @ location: 44
       [ (Pair "[CONTRACT_HASH]" 17 2)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - CDR (entry) @ location: 46
     [ (Pair "[CONTRACT_HASH]" 17 2)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/CDR (exit) @ location: 46
       [ (Pair 17 2)
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - CDR (entry) @ location: 47
     [ (Pair 17 2)
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/PUSH (exit) @ location: 47
       [ 2
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - PUSH (entry) @ location: 48
     [ 2
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/COMPARE (exit) @ location: 48
       [ 2
         2
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - COMPARE (entry) @ location: 53
     [ 2
       2
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/EQ (exit) @ location: 53
       [ 0
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - EQ (entry) @ location: 54
     [ 0
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/IF (exit) @ location: 54
       [ True
-        (Pair "[CONTRACT_HASH]" 17 2) ]
+        (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - IF (entry) @ location: 55
     [ True
-      (Pair "[CONTRACT_HASH]" 17 2) ]
+      (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/[halt] (exit) @ location: 55
-      [ (Pair "[CONTRACT_HASH]" 17 2) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - [halt] (entry) @ location: 61
-    [ (Pair "[CONTRACT_HASH]" 17 2) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - control: KCons
     - log/DROP (exit) @ location: 55
-      [ (Pair "[CONTRACT_HASH]" 17 2) ]
+      [ (Ticket "[CONTRACT_HASH]" nat 17 2) ]
   - DROP (entry) @ location: 61
-    [ (Pair "[CONTRACT_HASH]" 17 2) ]
+    [ (Ticket "[CONTRACT_HASH]" nat 17 2) ]
     - log/UNIT (exit) @ location: 61
       [  ]
   - UNIT (entry) @ location: 62

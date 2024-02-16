@@ -1,8 +1,8 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint mint
 Node is bootstrapped.
-Estimated gas: 2222.033 units (will add 100 for safety)
-Estimated storage: 221 bytes added (will add 20 for safety)
+Estimated gas: 2221.617 units (will add 100 for safety)
+Estimated storage: 237 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -14,8 +14,8 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000494
     Expected counter: 3
-    Gas limit: 2323
-    Storage limit: 241 bytes
+    Gas limit: 2322
+    Storage limit: 257 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000494
       payload fees(the block proposer) ....... +ꜩ0.000494
@@ -26,14 +26,14 @@ This sequence of operations was run:
       Entrypoint: mint
       This transaction was successfully applied
       Updated storage:
-        { Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket2" 1) ;
-          Pair 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 (Pair "Ticket" 1) }
-      Storage size: 309 bytes
-      Paid storage size diff: 221 bytes
-      Consumed gas: 2222
+        { Ticket 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 string "Ticket2" 1 ;
+          Ticket 0x017a22a4e42f88383dbb327d548e263b53f4f3b91100 string "Ticket" 1 }
+      Storage size: 325 bytes
+      Paid storage size diff: 237 bytes
+      Consumed gas: 2221.584
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ0.05525
-        storage fees ........................... +ꜩ0.05525
+        [PUBLIC_KEY_HASH] ... -ꜩ0.05925
+        storage fees ........................... +ꜩ0.05925
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string

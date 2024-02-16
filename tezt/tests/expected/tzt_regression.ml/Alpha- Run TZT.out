@@ -22,7 +22,7 @@ tzt_reference_test_suite/ticket_00.tzt:
 Got output: StaticError "Error:\n  Contract_storage.Failure \"get_balance\"\n"
 Expected: { Stack_elt
     (option (ticket string))
-    (Some (Pair "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" "Blue" 42)) }
+    (Some (Ticket "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" string "Blue" 42)) }
 
 tzt_reference_test_suite/setdelegate_00.tzt:
 Got output: { Stack_elt

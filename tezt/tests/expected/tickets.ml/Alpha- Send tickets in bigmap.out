@@ -137,8 +137,8 @@ Contract memorized as send_tickets_in_big_map.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 30 --storage-limit 1000000 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 98835.369 units (will add 100 for safety)
-Estimated storage: 10767 bytes added (will add 20 for safety)
+Estimated gas: 98994.469 units (will add 100 for safety)
+Estimated storage: 11567 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -148,13 +148,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.01019
+    Fee to the baker: ꜩ0.010206
     Expected counter: 1
-    Gas limit: 98936
-    Storage limit: 10787 bytes
+    Gas limit: 99095
+    Storage limit: 11587 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.01019
-      payload fees(the block proposer) ....... +ꜩ0.01019
+      [PUBLIC_KEY_HASH] ... -ꜩ0.010206
+      payload fees(the block proposer) ....... +ꜩ0.010206
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -164,109 +164,109 @@ This sequence of operations was run:
       Updated storage: Unit
       Updated big_maps:
         New temp(1) of type (big_map int (ticket string))
-        Set temp(1)[22] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[48] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[20] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[67] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[30] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[33] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[42] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[13] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[50] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[84] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[44] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[41] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[4] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[73] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[5] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[28] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[19] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[9] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[86] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[76] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[8] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[97] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[80] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[45] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[87] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[1] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[26] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[38] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[65] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[99] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[69] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[2] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[81] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[82] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[64] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[92] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[90] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[98] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[37] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[66] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[32] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[71] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[51] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[56] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[14] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[12] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[85] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[47] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[74] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[18] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[10] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[35] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[96] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[27] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[77] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[62] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[58] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[25] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[94] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[60] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[7] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[53] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[11] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[17] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[83] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[72] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[6] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[88] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[75] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[3] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[70] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[52] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[95] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[68] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[78] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[23] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[79] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[59] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[100] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[24] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[21] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[49] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[93] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[39] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[63] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[55] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[15] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[16] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[31] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[43] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[29] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[54] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[89] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[36] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[46] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[91] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[61] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[34] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[57] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
-        Set temp(1)[40] to (Pair 0x010d30dc625f57274f300abc4af284934bc05fc46c00 (Pair "BLUE" 1))
+        Set temp(1)[22] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[48] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[20] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[67] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[30] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[33] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[42] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[13] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[50] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[84] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[44] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[41] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[4] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[73] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[5] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[28] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[19] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[9] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[86] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[76] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[8] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[97] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[80] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[45] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[87] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[1] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[26] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[38] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[65] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[99] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[69] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[2] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[81] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[82] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[64] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[92] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[90] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[98] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[37] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[66] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[32] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[71] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[51] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[56] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[14] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[12] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[85] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[47] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[74] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[18] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[10] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[35] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[96] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[27] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[77] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[62] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[58] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[25] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[94] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[60] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[7] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[53] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[11] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[17] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[83] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[72] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[6] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[88] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[75] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[3] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[70] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[52] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[95] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[68] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[78] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[23] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[79] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[59] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[100] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[24] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[21] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[49] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[93] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[39] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[63] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[55] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[15] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[16] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[31] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[43] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[29] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[54] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[89] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[36] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[46] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[91] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[61] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[34] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[57] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
+        Set temp(1)[40] to (Ticket 0x010d30dc625f57274f300abc4af284934bc05fc46c00 string "BLUE" 1)
       Storage size: 320 bytes
       Paid storage size diff: 67 bytes
-      Consumed gas: 49909.937
+      Consumed gas: 50082.437
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.01675
         storage fees ........................... +ꜩ0.01675
@@ -281,12 +281,12 @@ This sequence of operations was run:
           Updated big_maps:
             Clear map(4)
             Copy temp(1) to map(5)
-          Storage size: 10783 bytes
-          Paid storage size diff: 10700 bytes
-          Consumed gas: 48926.421
+          Storage size: 11583 bytes
+          Paid storage size diff: 11500 bytes
+          Consumed gas: 48913.021
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ2.675
-            storage fees ........................... +ꜩ2.675
+            [PUBLIC_KEY_HASH] ... -ꜩ2.875
+            storage fees ........................... +ꜩ2.875
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string
