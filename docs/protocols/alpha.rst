@@ -59,6 +59,12 @@ Data Availability Layer (ongoing)
 
 
 
+- An optional ``dal_attestation`` field is now present in the
+  ``block_metadata`` indicating the attested slots. The slots being
+  attested are the slots that were published ``attestation_lag`` blocks
+  ago (MR :gl:`!11903`) (see `DAL documentation
+  <https://tezos.gitlab.io/shell/dal.html>`_ for more context).
+
 Adaptive Issuance (ongoing)
 ----------------------------
 

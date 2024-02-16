@@ -2840,11 +2840,7 @@ let block_metadata_encoding ~use_legacy_attestation_name =
              (req "proposer_consensus_key" Signature.Public_key_hash.encoding)
              (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
-             (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3119
-                This varopt is here while the DAL is behind a feature
-                flag. This should be replaced by a required field once
-                the feature flag will be activated. *)
-             (varopt "dal_attestation" Dal.Attestation.encoding)))
+             (opt "dal_attestation" Dal.Attestation.encoding)))
 
 let block_metadata_encoding_with_legacy_attestation_name =
   block_metadata_encoding ~use_legacy_attestation_name:true
