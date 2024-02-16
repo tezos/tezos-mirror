@@ -313,23 +313,12 @@ pub fn check_skip(test_file_path: &Path) -> bool {
 
     matches!(
         file_name,
+        // Long tests (all passing)
+        | "CALLBlake2f_MaxRounds.json" // ✔
+        | "loopMul.json" // ✔
+
         // Reason: chainId is tested for ethereum mainnet (1) not for etherlink (1337)
         | "chainId.json"
-
-        // The following test(s) is/are failing they need in depth debugging
-        // Reason: memory allocation of X bytes failed | 73289 IOT instruction (core dumped)
-        | "sha3.json"
-
-        // Long tests ✔ (passing)
-        | "loopMul.json"
-
-        // Oddly long checks on a test that do no relevant check (passing)
-        | "intrinsic.json"
-
-        // Long tests ~ (outcome is unknown)
-        | "static_Call50000_sha256.json"
-        | "static_Call50000_ecrec.json"
-        | "static_Call50000.json"
 
         // Reason: EIP-2930 (https://eips.ethereum.org/EIPS/eip-2930) concerns optional
         // access lists and we don't intend to implement them for now

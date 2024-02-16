@@ -244,9 +244,7 @@ fn execute_transaction(
     )
 }
 
-const DATA_TO_SKIP: [&str; 2] = [
-    // Used in 'modexp'. Causing a [27035 IOT instruction (core dumped)]
-    "00000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000",
+const DATA_TO_SKIP: [&str; 1] = [
     // Used in 'creationTxInitCodeSizeLimit' (2nd data): it is marked as prone to
     // create an exception (TR_InitCodeLimitExceeded) when it's not.
     // Our code is simply catching the appropriate error and failing accordingly
