@@ -64,7 +64,9 @@ let () =
     ~pp:(fun ppf _ ->
       Format.fprintf
         ppf
-        "The prover SRS must be loaded before using proving functions.")
+        "The prover SRS must be loaded before using proving functions. Change \
+         the current profile of your DAL node to slot producer or observer to \
+         be able to compute proofs.")
     Data_encoding.empty
     (function No_prover_SRS -> Some () | _ -> None)
     (fun () -> No_prover_SRS)
@@ -146,11 +148,13 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
         shards)
   in
   if with_proof then
+    let*? precomputation =
+      match shards_proofs_precomputation with
+      | None -> Error (`Other [No_prover_SRS])
+      | Some precomputation -> Ok precomputation
+    in
     let shard_proofs =
-      Cryptobox.prove_shards
-        cryptobox
-        ~polynomial
-        ~precomputation:shards_proofs_precomputation
+      Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
     in
     Store.Legacy.save_shard_proofs node_store commitment shard_proofs |> return
   else return_unit

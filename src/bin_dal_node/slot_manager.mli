@@ -29,7 +29,9 @@
    migration is done. *)
 include module type of Slot_manager_legacy
 
-type error += Invalid_slot_size of {provided : int; expected : int}
+type error +=
+  | Invalid_slot_size of {provided : int; expected : int}
+  | No_prover_SRS
 
 (** [add_commitment node_store slot cryptobox] computes the given [slot]'s
     commitment and adds the association "commitment -> slot" in the DAL's
@@ -81,7 +83,7 @@ val get_commitment_slot :
     In addition to decoding errors, the function returns [`Not_found]
     if there is no slot content for [commitment] in [node_store]. *)
 val add_commitment_shards :
-  shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation ->
+  shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation option ->
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
