@@ -1020,9 +1020,9 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   (* With [consensus_committee_size = 1024] slots in total, the new baker should
      get roughly n / 64 = 16 TB slots on average. So the probability that it is
-     on TB committee is high. With [number_of_shards = 16] (which is the minimum
+     on TB committee is high. With [number_of_shards = 32] (which is the minimum
      possible without changing other parameters), the new baker should be
-     assigned roughly 16/64 = 1/4 shards on average. *)
+     assigned roughly 32/64 = 1/2 shards on average. *)
   let stake = Tez.of_mutez_int (Protocol.default_bootstrap_balance / 64) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =
@@ -4779,7 +4779,7 @@ let register ~protocols =
     (* We need to set the prevalidator's event level to [`Debug]
        in order to capture the errors thrown in the validation phase. *)
     ~event_sections_levels:[("prevalidator", `Debug)]
-    ~number_of_shards:16
+    ~number_of_shards:32
     ~consensus_committee_size:1024
     protocols ;
   scenario_with_layer1_node
