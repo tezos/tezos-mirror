@@ -582,6 +582,9 @@ module Delegate = struct
     include Pending_denunciations_storage.For_RPC
 
     let pending_denunciations = Pending_denunciations_storage.find
+
+    let has_pending_denunciations =
+      Pending_denunciations_storage.has_pending_denunciations
   end
 end
 
