@@ -12,7 +12,8 @@ RUN apt update && \
       libffi-dev libgmp-dev \
       libhidapi-dev pkg-config \
       zlib1g-dev debhelper debconf \
-      libprotobuf-dev protobuf-compiler && \
+      libprotobuf-dev protobuf-compiler \
+      libsqlite3-dev && \
     apt-get clean
 
 COPY scripts/version.sh /tmp/
