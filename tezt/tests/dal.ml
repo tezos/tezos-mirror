@@ -1894,10 +1894,10 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      and slot 1 has not been downloaded.
   *)
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let page_size = parameters.Dal.Parameters.cryptobox.page_size in
   let store_slot content =
     Helpers.(store_slot dal_node @@ make_slot ~slot_size content)
   in
-
   Log.info
     "Step 1: send three slots to DAL node and obtain corresponding headers" ;
   let slot_contents_0 = " 10 " in
@@ -1929,7 +1929,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
      and 6" ;
   let number_of_slots = parameters.number_of_slots in
   let attestation_lag = parameters.attestation_lag in
-  let number_of_pages = 256 in
+  let number_of_pages = slot_size / page_size in
   let subscribed_slots = "0:2:4:6" in
   let messages =
     [
