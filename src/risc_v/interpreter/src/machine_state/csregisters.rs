@@ -229,6 +229,12 @@ pub enum CSRegister {
     pmpaddr62 = 0x3EE,
     pmpaddr63 = 0x3EF,
 
+    // Machine Non-Maskable Interrupt Handling
+    mnscratch = 0x740,
+    mnepc = 0x741,
+    mncause = 0x742,
+    mnstatus = 0x744,
+
     // Machine Counter/Timers
     mcycle = 0xB00,
     minstret = 0xB02,
@@ -406,6 +412,11 @@ impl CSRegister {
 
     const WPRI_MASK_SENVCFG: CSRValue = !(ones(3) << 1 | ones(CSRegister::SXLEN - 8) << 8);
 
+    const WPRI_MASK_MNCAUSE: CSRValue = !(ones(1) << (CSRegister::MXLEN - 1));
+
+    const WPRI_MASK_MNSTATUS: CSRValue =
+        !(ones(3) << 0 | ones(3) << 4 | ones(3) << 8 | ones(CSRegister::MXLEN - 13) << 13);
+
     /// Return the mask of non reserved bits, (WPRI bits are 0)
     /// Relevant section 2.3 - privileged spec
     #[inline(always)]
@@ -416,6 +427,8 @@ impl CSRegister {
             CSRegister::mseccfg => CSRegister::WPRI_MASK_MSECCFG,
             CSRegister::sstatus => CSRegister::WPRI_MASK_SSTATUS,
             CSRegister::senvcfg => CSRegister::WPRI_MASK_SENVCFG,
+            CSRegister::mncause => CSRegister::WPRI_MASK_MNCAUSE,
+            CSRegister::mnstatus => CSRegister::WPRI_MASK_MNSTATUS,
             _ => CSRegister::WPRI_MASK_EMPTY,
         }
     }
@@ -557,7 +570,9 @@ impl CSRegister {
             CSRegister::mtvec | CSRegister::stvec => new_value & CSRegister::WARL_MASK_XTVEC,
             CSRegister::mip | CSRegister::mie => new_value & CSRegister::WARL_MASK_MIP_MIE,
             CSRegister::sip | CSRegister::sie => new_value & CSRegister::WARL_MASK_SIP_SIE,
-            CSRegister::mepc | CSRegister::sepc => new_value & CSRegister::WARL_MASK_XEPC,
+            CSRegister::mepc | CSRegister::sepc | CSRegister::mnepc => {
+                new_value & CSRegister::WARL_MASK_XEPC
+            }
             CSRegister::satp => {
                 let satp_mode = new_value >> CSRegister::SATP_MODE_OFFSET;
                 match satp_mode {
@@ -575,6 +590,7 @@ impl CSRegister {
             }
             CSRegister::mstatus => xstatus::apply_warl_mstatus(new_value),
             CSRegister::sstatus => xstatus::apply_warl_sstatus(new_value),
+            CSRegister::mnstatus => xstatus::apply_warl_mnstatus(new_value),
             _ => new_value,
         };
         Some(write_value)
@@ -645,7 +661,7 @@ impl CSRegister {
     const WARL_MASK_SIP_SIE: CSRValue =
         (CSRegister::SSIP_BIT | CSRegister::STIP_BIT | CSRegister::SEIP_BIT);
 
-    /// WARL mask for mepc/sepc addresses.
+    /// WARL mask for mepc/sepc/mnepc addresses.
     ///
     /// Since extension C is supported, we only make the low bit read-only 0
     const WARL_MASK_XEPC: CSRValue = !1;
@@ -664,6 +680,14 @@ impl CSRegister {
     /// Get the default value for the register.
     fn default_value(&self) -> u64 {
         match self {
+            CSRegister::mnscratch => 0,
+            CSRegister::mnepc => 0,
+            CSRegister::mnstatus => xstatus::apply_warl_mnstatus(0),
+            CSRegister::mncause => {
+                // The interrupt bit of mncause is always 1
+                ones(1) << 31
+            }
+
             CSRegister::cycle
             | CSRegister::time
             | CSRegister::instret
@@ -1329,11 +1353,13 @@ mod tests {
         assert!(check(csreg::sie, 0x0) == 0x0);
         assert!(check(csreg::sie, 0xFFFF_FFFF_FFFF_FFFF) == 0x0000_0000_0000_0222);
 
-        // mepc / sepc
+        // mepc / sepc / mnepc
         assert!(check(csreg::mepc, 0x0) == 0x0);
         assert!(check(csreg::mepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
         assert!(check(csreg::sepc, 0x0) == 0x0);
         assert!(check(csreg::sepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
+        assert!(check(csreg::mnepc, 0x0) == 0x0);
+        assert!(check(csreg::mnepc, 0xFFFF_FFFF_FFFF_FFFF) == 0xFFFF_FFFF_FFFF_FFFE);
 
         // satp
         assert_eq!(check_wrapped(csreg::satp, 0x0), Some(0x0));
@@ -1370,6 +1396,15 @@ mod tests {
         assert_eq!(
             check(csreg::sstatus, 0x0FFF_0000_0000_57FF),
             0x8000_0002_0000_4762
+        );
+
+        // mnstatus
+        // check NMIE bit is set
+        assert_eq!(check(csreg::mnstatus, 0x0), 0x0000_0000_0000_0008);
+        // check WPRI fields & MNPV read-only 0
+        assert_eq!(
+            check(csreg::mnstatus, 0xFFFF_FFFF_FFFF_FFFF),
+            0x0000_0000_0000_1808
         );
 
         // non warl register

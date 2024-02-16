@@ -162,6 +162,7 @@ macro_rules! create_field {
     };
 }
 
+// MSTATUS & SSTATUS fields
 create_field!(SD, bool, 63, 1);
 create_field!(MBE, bool, 37, 1);
 create_field!(SBE, bool, 36, 1);
@@ -183,6 +184,16 @@ create_field!(UBE, bool, 6, 1);
 create_field!(SPIE, bool, 5, 1);
 create_field!(MIE, bool, 3, 1);
 create_field!(SIE, bool, 1, 1);
+
+// MNSTATUS fields (SMRNMI extension)
+// MNPP field behaves similarly as MPP for mstatus
+create_field!(MNPP, MPPValue, 11, 2);
+// Field specifically used in mnstatus, holds previous virtualization mode,
+create_field!(MNPV, bool, 7, 1);
+// NMIE - Non-maskable interrupt enable bit
+// When 0 it disables all interrupts globally (absolutely no interrupts are handled)
+// When 1 - Non-maskable interrupts are enabled (and all other interrupts behave as normal)
+create_field!(NMIE, bool, 3, 1);
 
 const fn field_mask(field_data: (u64, u64)) -> CSRValue {
     ones(field_data.1) << field_data.0
@@ -235,6 +246,19 @@ pub fn apply_warl_sstatus(mstatus: CSRValue) -> CSRValue {
 
     // set UXL as 64 (our implementation fixes MXL, SXL, UXL as 64)
     set_UXL(mstatus, XLenValue::MXL64)
+}
+
+pub fn apply_warl_mnstatus(mnstatus: CSRValue) -> CSRValue {
+    // Since we don't support virtualization mode it is read-only 0 WARL
+    let mnstatus = set_MNPV(mnstatus, false);
+
+    // Our interpreter does not have any source of non-maskable interrupts
+    // but we still have other interrupts that need to be handled, so this is read-only 1
+    let mnstatus = set_NMIE(mnstatus, true);
+
+    // Similar to MPP field
+    let mnpp = get_MNPP(mnstatus);
+    set_MNPP(mnstatus, mnpp)
 }
 
 pub fn sstatus_from_mstatus(mstatus: u64) -> u64 {
