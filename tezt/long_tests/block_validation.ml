@@ -196,10 +196,7 @@ module Node = struct
   (** [replay_and_wait_for_termination blocks node] launches the [replay]
       command to start the validation of the given [blocks] on the given
       [node]. It then waits for the [node] to stop properly. *)
-  let replay_and_wait_for_termination ?strict ?network blocks node =
-    let node_cli_arguments =
-      match network with None -> [] | Some network -> [Node.Network network]
-    in
+  let replay_and_wait_for_termination ?strict blocks node =
     let callback, resolver = Lwt.wait () in
     let on_terminate status =
       match Process.validate_status status with
@@ -207,9 +204,7 @@ module Node = struct
       | Error (`Invalid_status reason) ->
           failwith @@ Format.sprintf "Node %s" reason
     in
-    let* () =
-      Node.replay ~on_terminate ~blocks ?strict node node_cli_arguments
-    in
+    let* () = Node.replay ~on_terminate ~blocks ?strict node in
     callback
 end
 
@@ -250,11 +245,11 @@ module Validation = struct
     let* _ = Node.wait_for_validation_start node in
     Node.wait_for_validation_subparts ~repeat:size node
 
-  let replay ?network blocks datadir =
+  let replay blocks datadir =
     let node = Node.create datadir in
     Lwt_seq.iter_s
       (fun range ->
-        Node.replay_and_wait_for_termination ~strict:true ?network range node)
+        Node.replay_and_wait_for_termination ~strict:true range node)
       (Lwt_seq.of_seq blocks)
 end
 
@@ -434,7 +429,7 @@ module Semantic = struct
       "458752";
     ]
 
-  let replay ?network ~seed ~chunk_size ~runtime () =
+  let replay ~seed ~chunk_size ~runtime () =
     if chunk_size < 0 then invalid_arg "replay: chunk_size must be >= 0" ;
     let datadir = Long_test.test_data_path () in
     Log.debug "Using seed: %d" seed ;
@@ -466,7 +461,7 @@ module Semantic = struct
       Log.debug "Blockrange: stitching blocks for each protocol" ;
       Seq.Cons (stitching_blocks, blocks)
     in
-    let* () = Validation.replay ?network blocks datadir in
+    let* () = Validation.replay blocks datadir in
     return ()
 end
 
@@ -560,8 +555,4 @@ let register_semantic_regression_test ~executors () =
     ~tags:["shell"; "validation"; "replay"]
     ~timeout:(Long_test.Hours 7)
     ~executors
-  @@ Semantic.replay
-       ~network:"mainnet"
-       ~seed
-       ~chunk_size:500
-       ~runtime:Mtime.Span.(6 * hour)
+  @@ Semantic.replay ~seed ~chunk_size:500 ~runtime:Mtime.Span.(6 * hour)

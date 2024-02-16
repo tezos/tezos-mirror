@@ -909,11 +909,12 @@ let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
     arguments
 
 let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
-    ?(blocks = ["head"]) node arguments =
+    ?(blocks = ["head"]) node =
+  (* Select the appropriated arguments as the replay command does not
+     support all the node default arguments. *)
   let strict = if strict then ["--strict"] else [] in
-  let arguments =
-    runlike_command_arguments node "replay" arguments @ strict @ blocks
-  in
+  let directory = ["--data-dir"; node.persistent_state.data_dir] in
+  let arguments = ["replay"] @ directory @ strict @ blocks in
   do_runlike_command
     ?on_terminate
     ?event_level
