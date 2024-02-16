@@ -111,7 +111,8 @@ let storage_invariant_broken published_level index =
     published_level
 
 let slot_id_is_valid ~dal_activation_level ~dal_attestation_lag
-    ~dal_number_of_slots ~origination_level ~inbox_level slot_id =
+    ~dal_number_of_slots ~origination_level ~inbox_level slot_id
+    ~dal_attested_slots_validity_lag =
   let origination_level_res = Raw_level.of_int32 origination_level in
   let commit_inbox_level_res = Raw_level.of_int32 inbox_level in
   match (origination_level_res, commit_inbox_level_res) with
@@ -122,11 +123,12 @@ let slot_id_is_valid ~dal_activation_level ~dal_attestation_lag
         ~origination_level
         ~commit_inbox_level
         ~dal_number_of_slots
+        ~dal_attested_slots_validity_lag
         slot_id
   | _ -> false
 
 let slot_pages ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
-    ~inbox_level node_ctxt slot_id =
+    ~inbox_level node_ctxt slot_id ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let Node_context.{genesis_info = {level = origination_level; _}; _} =
     node_ctxt
@@ -140,6 +142,7 @@ let slot_pages ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
          ~origination_level
          ~inbox_level
          ~dal_number_of_slots
+         ~dal_attested_slots_validity_lag
          slot_id
   then return_none
   else
@@ -163,7 +166,7 @@ let slot_pages ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
     | None -> storage_invariant_broken published_level index
 
 let page_content ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
-    ~inbox_level node_ctxt page_id =
+    ~inbox_level node_ctxt page_id ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let Dal.Page.{slot_id; page_index} = page_id in
   let Dal.Slot.Header.{published_level; index} = slot_id in
@@ -178,6 +181,7 @@ let page_content ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
          ~origination_level
          ~inbox_level
          ~dal_number_of_slots
+         ~dal_attested_slots_validity_lag
          slot_id
   then return_none
   else

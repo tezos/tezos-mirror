@@ -174,6 +174,7 @@ val valid :
   dal_attestation_lag:int ->
   dal_number_of_slots:int ->
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
+  dal_attested_slots_validity_lag:int ->
   'proof t ->
   (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult
   Lwt.t
@@ -239,6 +240,8 @@ module type PVM_with_context_and_state = sig
 
     (** The level at which the DAL got activated, [None] if the DAL has not yet been activated. *)
     val dal_activation_level : Raw_level_repr.t option
+
+    val dal_attested_slots_validity_lag : int
   end
 end
 
@@ -296,6 +299,7 @@ module Dal_helpers : sig
     origination_level:Raw_level_repr.t ->
     commit_inbox_level:Raw_level_repr.t ->
     Dal_slot_repr.Header.id ->
+    dal_attested_slots_validity_lag:int ->
     bool
 end
 

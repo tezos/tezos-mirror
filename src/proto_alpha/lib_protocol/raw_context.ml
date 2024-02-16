@@ -1074,6 +1074,13 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                tezt/tests/mockup.ml). *)
             Raw_level_repr.of_int32_exn Int32.(pred max_int)
         in
+        let dal_attested_slots_validity_lag =
+          (* A rollup node shouldn't import a page of an attested slot whose attested
+             level is too far in the past w.r.t. the current level. Importation window
+             is fixed to 241_920 levels below. It is the number of blocks produced
+             during 28 days (4 weeks) with a block time of 10 seconds. *)
+          241_920
+        in
         let reveal_activation_level :
             Constants_parametric_repr.sc_rollup_reveal_activation_level =
           let ({
@@ -1091,6 +1098,19 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             metadata;
             dal_page = dal_activation_level;
             dal_parameters = dal_activation_level;
+            (* Warning: the semantics of valid slots needs to be adapted if the
+               value of this parameter is changed in the future.
+               - If it is increased, some attested slots that were outdated with
+                 the old value will become valid again.
+               - If it is decreased, some attested slots that were valid with
+                 the old value will become outdated.
+
+               In both cases, the status of slots before and after the value
+               change is different. So, the behaviour if a valid slot is
+               imported before the value upgrade but a refutation game
+               targetting a page of that slot is started after the upgrade is
+               not the correct/expected one. *)
+            dal_attested_slots_validity_lag;
           }
         in
         let sc_rollup =

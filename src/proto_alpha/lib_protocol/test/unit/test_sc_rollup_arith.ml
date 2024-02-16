@@ -374,6 +374,8 @@ let test_reveal ~threshold ~inbox_level ~hash ~preimage_reveal_step
       metadata = Protocol.Raw_level_repr.root;
       dal_page = Protocol.Raw_level_repr.root;
       dal_parameters = Protocol.Raw_level_repr.root;
+      dal_attested_slots_validity_lag = 241_920;
+      (* 4 weeks with a 10 secs block time. *)
     }
   in
   let is_reveal_enabled =
@@ -677,6 +679,9 @@ let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
       Some constants.sc_rollup.reveal_activation_level.dal_parameters
     else None
   in
+  let dal_attested_slots_validity_lag =
+    constants.sc_rollup.reveal_activation_level.dal_attested_slots_validity_lag
+  in
   let ctxt = Sc_rollup_helpers.Arith_pvm.make_empty_context () in
 
   let is_reveal_enabled = Sc_rollup_helpers.is_reveal_enabled_default in
@@ -727,6 +732,7 @@ let test_serialized_reveal_proof ~hashed_preimage ~input_preimage () =
        dal_snapshot
        dal_parameters.cryptobox_parameters
        ~dal_activation_level
+       ~dal_attested_slots_validity_lag
        ~dal_attestation_lag:dal_parameters.attestation_lag
        ~dal_number_of_slots:dal_parameters.number_of_slots
        ~is_reveal_enabled

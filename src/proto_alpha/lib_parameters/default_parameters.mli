@@ -55,5 +55,8 @@ val json_of_parameters :
 
 module Internal_for_tests : sig
   val make_sc_rollup_parameter :
-    dal_activation_level:Raw_level.t -> int -> Constants.Parametric.sc_rollup
+    dal_activation_level:Raw_level.t ->
+    dal_attested_slots_validity_lag:int ->
+    int ->
+    Constants.Parametric.sc_rollup
 end

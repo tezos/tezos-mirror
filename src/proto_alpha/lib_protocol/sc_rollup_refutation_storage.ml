@@ -453,6 +453,9 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
       Some constants.sc_rollup.reveal_activation_level.dal_parameters
     else None
   in
+  let dal_attested_slots_validity_lag =
+    constants.sc_rollup.reveal_activation_level.dal_attested_slots_validity_lag
+  in
   let* check_result, ctxt = check_stakes ctxt rollup stakers in
   match check_result with
   | Some game_result -> return (Some game_result, ctxt)
@@ -474,6 +477,7 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
           ~is_reveal_enabled:
             (Sc_rollup_PVM_sig.is_reveal_enabled_predicate
                (Constants_storage.sc_rollup_reveal_activation_level ctxt))
+          ~dal_attested_slots_validity_lag
       in
       match move_result with
       | Either.Left game_result -> return (Some game_result, ctxt)

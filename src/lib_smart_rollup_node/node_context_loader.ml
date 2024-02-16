@@ -333,6 +333,7 @@ module Internal_for_tests = struct
                         metadata = 0l;
                         dal_page = 0l;
                         dal_parameters = 0l;
+                        dal_attested_slots_validity_lag = Int32.max_int;
                       };
                   max_number_of_stored_cemented_commitments = 0;
                 };

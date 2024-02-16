@@ -60,6 +60,7 @@ val slot_pages :
   inbox_level:int32 ->
   _ Node_context.t ->
   Dal.slot_id ->
+  dal_attested_slots_validity_lag:int ->
   Dal.Page.content list option tzresult Lwt.t
 
 (** Retrieve the content of the page identified by the given ID from the store.
@@ -79,4 +80,5 @@ val page_content :
   inbox_level:int32 ->
   _ Node_context.t ->
   Dal.Page.t ->
+  dal_attested_slots_validity_lag:int ->
   Dal.Page.content option tzresult Lwt.t

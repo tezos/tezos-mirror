@@ -161,6 +161,8 @@ types:
       type: s4
     - id: dal_parameters
       type: s4
+    - id: dal_attested_slots_validity_lag
+      type: int31
   z:
     seq:
     - id: has_tail

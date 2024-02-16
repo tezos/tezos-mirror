@@ -1012,5 +1012,10 @@ let make_pvm_with_context_and_state (type context state)
         if constants.dal.feature_enable then
           Some constants.sc_rollup.reveal_activation_level.dal_parameters
         else None
+
+      let dal_attested_slots_validity_lag =
+        let constants = Default_parameters.constants_test in
+        constants.sc_rollup.reveal_activation_level
+          .dal_attested_slots_validity_lag
     end
   end)

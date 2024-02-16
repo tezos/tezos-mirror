@@ -240,7 +240,8 @@ module Dal_helpers = struct
 
   let valid_slot_id ~dal_number_of_slots ~dal_activation_level
       ~dal_attestation_lag ~origination_level ~commit_inbox_level
-      Dal_slot_repr.Header.{published_level; index} =
+      Dal_slot_repr.Header.{published_level; index}
+      ~dal_attested_slots_validity_lag =
     (* [dal_attestation_lag] is supposed to be positive. *)
     let open Raw_level_repr in
     let dal_was_activated =
@@ -248,7 +249,9 @@ module Dal_helpers = struct
       | None -> false
       | Some dal_activation_level -> published_level >= dal_activation_level
     in
-    let not_too_old = published_level > origination_level in
+    let slot_published_after_origination =
+      published_level > origination_level
+    in
     let not_too_recent =
       add published_level dal_attestation_lag <= commit_inbox_level
     in
@@ -258,11 +261,22 @@ module Dal_helpers = struct
            ~number_of_slots:dal_number_of_slots
            index
     in
-    dal_was_activated && not_too_old && not_too_recent && index_is_valid
+    (* An attested slot is not expired if its attested level (equal to
+       [published_level + dal_attestation_lag]) is not further than
+       [dal_attested_slots_validity_lag] from the given inbox level. *)
+    let ttl_not_expired =
+      Raw_level_repr.(
+        add
+          (add published_level dal_attestation_lag)
+          dal_attested_slots_validity_lag
+        >= commit_inbox_level)
+    in
+    dal_was_activated && slot_published_after_origination && not_too_recent
+    && index_is_valid && ttl_not_expired
 
   let verify ~metadata ~dal_activation_level ~dal_attestation_lag
       ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id
-      dal_snapshot proof =
+      dal_snapshot proof ~dal_attested_slots_validity_lag =
     let open Result_syntax in
     if
       valid_slot_id
@@ -272,6 +286,7 @@ module Dal_helpers = struct
         ~commit_inbox_level
         ~dal_number_of_slots
         Dal_slot_repr.(page_id.Page.slot_id)
+        ~dal_attested_slots_validity_lag
     then
       let* input =
         Dal_slot_repr.History.verify_proof
@@ -285,7 +300,7 @@ module Dal_helpers = struct
 
   let produce ~metadata ~dal_activation_level ~dal_attestation_lag
       ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id ~page_info
-      ~get_history confirmed_slots_history =
+      ~get_history confirmed_slots_history ~dal_attested_slots_validity_lag =
     let open Lwt_result_syntax in
     if
       valid_slot_id
@@ -295,6 +310,7 @@ module Dal_helpers = struct
         ~dal_attestation_lag
         ~commit_inbox_level
         Dal_slot_repr.(page_id.Page.slot_id)
+        ~dal_attested_slots_validity_lag
     then
       let* proof, content_opt =
         Dal_slot_repr.History.produce_proof
@@ -314,7 +330,7 @@ let valid (type state proof output)
     ~(pvm : (state, proof, output) Sc_rollups.PVM.implementation) ~metadata
     snapshot commit_inbox_level dal_snapshot dal_parameters
     ~dal_activation_level ~dal_attestation_lag ~dal_number_of_slots
-    ~is_reveal_enabled (proof : proof t) =
+    ~is_reveal_enabled ~dal_attested_slots_validity_lag (proof : proof t) =
   let open Lwt_result_syntax in
   let (module P) = pvm in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
@@ -345,6 +361,7 @@ let valid (type state proof output)
           ~dal_number_of_slots
           ~metadata
           ~dal_activation_level
+          ~dal_attested_slots_validity_lag
           dal_parameters
           ~dal_attestation_lag
           ~commit_inbox_level
@@ -453,6 +470,8 @@ module type PVM_with_context_and_state = sig
     val dal_number_of_slots : int
 
     val dal_activation_level : Raw_level_repr.t option
+
+    val dal_attested_slots_validity_lag : int
   end
 end
 
@@ -527,6 +546,7 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           page_id
           ~page_info
           ~get_history
+          ~dal_attested_slots_validity_lag
           confirmed_slots_history
     | Needs_reveal Reveal_dal_parameters ->
         let open Dal_with_history in

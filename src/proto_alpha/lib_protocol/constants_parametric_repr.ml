@@ -90,6 +90,23 @@ type sc_rollup_reveal_activation_level = {
   metadata : Raw_level_repr.t;
   dal_page : Raw_level_repr.t;
   dal_parameters : Raw_level_repr.t;
+  (* Once a DAL slot is attested, a rollup can only import it within the range
+     of levels [attested_level; attested_level +
+     dal_attested_slots_validity_lag]. *)
+  (* Warning: the semantics of valid slots needs to be adapted if the
+     value of this parameter is changed in the future.
+     - If it is increased, some attested slots that were outdated with
+       the old value will become valid again.
+     - If it is decreased, some attested slots that were valid with
+       the old value will become outdated.
+
+     In both cases, the status of slots before and after the value change is
+     different. Said otherwise, the validity of the slot may differ depending on
+     the time of the check, in particular it may be different in the following
+     two cases: (a) the slot is imported before the value upgrade, (2) a
+     refutation game targeting a page of that slot is started after the
+     upgrade. *)
+  dal_attested_slots_validity_lag : int;
 }
 
 let sc_rollup_reveal_hashing_schemes_encoding =
@@ -103,14 +120,30 @@ let sc_rollup_reveal_activation_level_encoding :
     sc_rollup_reveal_activation_level Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun t -> (t.raw_data, t.metadata, t.dal_page, t.dal_parameters))
-    (fun (raw_data, metadata, dal_page, dal_parameters) ->
-      {raw_data; metadata; dal_page; dal_parameters})
-    (obj4
+    (fun t ->
+      ( t.raw_data,
+        t.metadata,
+        t.dal_page,
+        t.dal_parameters,
+        t.dal_attested_slots_validity_lag ))
+    (fun ( raw_data,
+           metadata,
+           dal_page,
+           dal_parameters,
+           dal_attested_slots_validity_lag ) ->
+      {
+        raw_data;
+        metadata;
+        dal_page;
+        dal_parameters;
+        dal_attested_slots_validity_lag;
+      })
+    (obj5
        (req "raw_data" sc_rollup_reveal_hashing_schemes_encoding)
        (req "metadata" Raw_level_repr.encoding)
        (req "dal_page" Raw_level_repr.encoding)
-       (req "dal_parameters" Raw_level_repr.encoding))
+       (req "dal_parameters" Raw_level_repr.encoding)
+       (req "dal_attested_slots_validity_lag" Data_encoding.int31))
 
 type sc_rollup = {
   arith_pvm_enable : bool;

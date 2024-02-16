@@ -838,6 +838,7 @@ module Constants : sig
       metadata : Raw_level.t;
       dal_page : Raw_level.t;
       dal_parameters : Raw_level.t;
+      dal_attested_slots_validity_lag : int;
     }
 
     type sc_rollup = {
@@ -3842,6 +3843,8 @@ module Sc_rollup : sig
         val dal_number_of_slots : int
 
         val dal_activation_level : Raw_level.t option
+
+        val dal_attested_slots_validity_lag : int
       end
     end
 
@@ -3858,6 +3861,7 @@ module Sc_rollup : sig
       dal_attestation_lag:int ->
       dal_number_of_slots:int ->
       is_reveal_enabled:is_reveal_enabled ->
+      dal_attested_slots_validity_lag:int ->
       'proof t ->
       (input option * input_request) tzresult Lwt.t
 
@@ -3876,6 +3880,7 @@ module Sc_rollup : sig
         origination_level:Raw_level.t ->
         commit_inbox_level:Raw_level.t ->
         Dal.Slot.Header.id ->
+        dal_attested_slots_validity_lag:int ->
         bool
     end
   end
@@ -3984,6 +3989,7 @@ module Sc_rollup : sig
       step:step ->
       choice:Tick.t ->
       is_reveal_enabled:is_reveal_enabled ->
+      dal_attested_slots_validity_lag:int ->
       (game_result, t) Either.t tzresult Lwt.t
 
     type timeout = {alice : int; bob : int; last_turn_level : Raw_level.t}
