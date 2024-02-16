@@ -12,6 +12,35 @@ type t = {db_uri : Uri.t}
 module Q = struct
   open Caqti_request.Infix
   open Caqti_type.Std
+  open Ethereum_types
+
+  let level =
+    custom
+      ~encode:(fun (Qty x) -> Ok Z.(to_int x))
+      ~decode:(fun x -> Ok (Qty Z.(of_int x)))
+      int
+
+  let payload =
+    custom
+      ~encode:(fun payload ->
+        Ok
+          (Data_encoding.Binary.to_string_exn
+             Blueprint_types.payload_encoding
+             payload))
+      ~decode:(fun bytes ->
+        Option.to_result ~none:"Not a valid blueprint payload"
+        @@ Data_encoding.Binary.of_string_opt
+             Blueprint_types.payload_encoding
+             bytes)
+      string
+
+  let context_hash =
+    custom
+      ~encode:(fun hash -> Ok (Context_hash.to_b58check hash))
+      ~decode:(fun bytes ->
+        Option.to_result ~none:"Not a valid b58check encoded hash"
+        @@ Context_hash.of_b58check_opt bytes)
+      string
 
   module Executable_blueprints = struct
     let create_table =
@@ -24,11 +53,11 @@ module Q = struct
     |eos}
 
     let insert =
-      (t2 int string ->. unit)
+      (t2 level payload ->. unit)
       @@ {eos|INSERT INTO executable_blueprints (id, payload) VALUES (?, ?)|eos}
 
     let select =
-      (int ->? string)
+      (level ->? payload)
       @@ {eos|SELECT (payload) FROM executable_blueprints WHERE id = ?|eos}
   end
 
@@ -43,11 +72,11 @@ module Q = struct
     |eos}
 
     let insert =
-      (t2 int string ->. unit)
+      (t2 level payload ->. unit)
       @@ {eos|INSERT INTO publishable_blueprints (id, payload) VALUES (?, ?)|eos}
 
     let select =
-      (int ->? string)
+      (level ->? payload)
       @@ {eos|SELECT (payload) FROM publishable_blueprints WHERE id = ?|eos}
   end
 
@@ -62,11 +91,11 @@ module Q = struct
     |eos}
 
     let insert =
-      (t2 int string ->. unit)
+      (t2 level context_hash ->. unit)
       @@ {eos|REPLACE INTO context_hashes (id, context_hash) VALUES (?, ?)|eos}
 
     let select =
-      (int ->? string)
+      (level ->? context_hash)
       @@ {eos|SELECT (context_hash) FROM context_hashes WHERE id = ?|eos}
   end
 end
@@ -98,87 +127,43 @@ let init ~data_dir =
   return {db_uri = uri}
 
 module Executable_blueprints = struct
-  open Ethereum_types
-
-  let store {db_uri} (Qty number) blueprint =
+  let store {db_uri} number blueprint =
     with_caqti_error
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
-    Db.exec
-      Q.Executable_blueprints.insert
-      ( Z.to_int number,
-        Data_encoding.Binary.to_string_exn
-          Blueprint_types.payload_encoding
-          blueprint )
+    Db.exec Q.Executable_blueprints.insert (number, blueprint)
 
-  let find {db_uri} (Qty number) =
-    let open Lwt_result_syntax in
+  let find {db_uri} number =
     with_caqti_error
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
-    let* blob = Db.find_opt Q.Executable_blueprints.select (Z.to_int number) in
-    match blob with
-    | Some blob ->
-        let payload =
-          Data_encoding.Binary.of_string_exn
-            Blueprint_types.payload_encoding
-            blob
-        in
-        return_some payload
-    | None -> return_none
+    Db.find_opt Q.Executable_blueprints.select number
 end
 
 module Publishable_blueprints = struct
-  open Ethereum_types
-
-  let store {db_uri} (Qty number) blueprint =
+  let store {db_uri} number blueprint =
     with_caqti_error
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
-    Db.exec
-      Q.Publishable_blueprints.insert
-      ( Z.to_int number,
-        Data_encoding.Binary.to_string_exn
-          Blueprint_types.payload_encoding
-          blueprint )
+    Db.exec Q.Publishable_blueprints.insert (number, blueprint)
 
-  let find {db_uri} (Qty number) =
-    let open Lwt_result_syntax in
+  let find {db_uri} number =
     with_caqti_error
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
-    let* blob = Db.find_opt Q.Publishable_blueprints.select (Z.to_int number) in
-    match blob with
-    | Some blob ->
-        let payload =
-          Data_encoding.Binary.of_string_exn
-            Blueprint_types.payload_encoding
-            blob
-        in
-        return_some payload
-    | None -> return_none
+    Db.find_opt Q.Publishable_blueprints.select number
 end
 
 module Context_hashes = struct
-  open Ethereum_types
-
-  let store {db_uri} (Qty number) hash =
+  let store {db_uri} number hash =
     with_caqti_error
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
-    Db.exec
-      Q.Context_hashes.insert
-      (Z.to_int number, Context_hash.to_b58check hash)
+    Db.exec Q.Context_hashes.insert (number, hash)
 
-  let find {db_uri} (Qty number) =
-    let open Lwt_result_syntax in
+  let find {db_uri} number =
     with_caqti_error
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
-    let* blob = Db.find_opt Q.Context_hashes.select (Z.to_int number) in
-    match blob with
-    | Some blob ->
-        let hash = Context_hash.of_b58check_exn blob in
-        return_some hash
-    | None -> return_none
+    Db.find_opt Q.Context_hashes.select number
 end
