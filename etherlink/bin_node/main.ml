@@ -694,7 +694,7 @@ let sequencer_command =
       let* configuration =
         Cli.create_or_read_sequencer_config
           ~data_dir
-          ~devmode:true
+          ~devmode
           ?rpc_addr
           ?rpc_port
           ?private_rpc_port
