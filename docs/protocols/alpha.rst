@@ -125,6 +125,12 @@ RPC Changes
   This changes the JSON from the RPC ``/chains/main/blocks/head/context/constants``
   and ``/chains/main/blocks/head/context/issuance/expected_issuance``.
 
+- Add RPC to get contract's estimated own pending slashed amount according to the currently available denunciations.
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/estimated_own_pending_slashed_amount``. (MR :gl:`!12016`)
+
+- Add RPC to get delegate's estimated shared pending slashed amount according to the currently available denunciations.
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/estimated_shared_pending_slashed_amount``. (MR :gl:`!12016`)
+
 Operation receipts
 ------------------
 
