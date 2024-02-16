@@ -168,12 +168,16 @@ let generate_proof (node_ctxt : _ Node_context.t)
       Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
     else return Dal.Slots_history.genesis
   in
-  let* dal_slots_history_cache =
-    if Node_context.dal_supported node_ctxt then
-      let* snapshot_head = get_snapshot_head () in
-      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
-    else return (Dal.Slots_history.History_cache.empty ~capacity:0L)
+  let* dal_slots_history_cache_view =
+    let* dal_slots_history_cache =
+      if Node_context.dal_supported node_ctxt then
+        let* snapshot_head = get_snapshot_head () in
+        Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
+      else return (Dal.Slots_history.History_cache.empty ~capacity:0L)
+    in
+    Dal.Slots_history.History_cache.view dal_slots_history_cache |> return
   in
+
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
   let* constants =
@@ -260,7 +264,9 @@ let generate_proof (node_ctxt : _ Node_context.t)
       let confirmed_slots_history = dal_slots_history
 
       let get_history ptr =
-        Dal.Slots_history.History_cache.find ptr dal_slots_history_cache
+        Dal.Slots_history.History_cache.Map.find
+          ptr
+          dal_slots_history_cache_view
         |> Lwt.return
 
       let dal_attestation_lag = dal_attestation_lag
