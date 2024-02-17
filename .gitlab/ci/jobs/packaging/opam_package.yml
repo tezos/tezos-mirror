@@ -878,8 +878,6 @@ opam:tezos-dal-node-services:
   variables:
     package: tezos-dal-node-services
 
-# Ignoring unreleased package tezos-injector-017-PtNairob.
-
 # Ignoring unreleased package tezos-injector-018-Proxford.
 
 # Ignoring unreleased package tezos-injector-alpha.
