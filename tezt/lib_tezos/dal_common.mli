@@ -127,7 +127,10 @@ module RPC : sig
   type commitment = string
 
   (** Profiles that operate on shards/slots. *)
-  type operator_profile = Attester of string | Producer of int
+  type operator_profile =
+    | Attester of string
+    | Producer of int
+    | Observer of int
 
   (** List of operator profiles.  *)
   type operator_profiles = operator_profile list
