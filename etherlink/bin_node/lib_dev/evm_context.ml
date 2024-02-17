@@ -17,90 +17,35 @@ type t = {
   store : Store.t;
 }
 
-type metadata = {
-  checkpoint : Context_hash.t;
-  next_blueprint_number : Ethereum_types.quantity;
-  current_block_hash : Ethereum_types.block_hash;
-}
-
 let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
-let metadata_path ~data_dir = Filename.Infix.(data_dir // "metadata")
-
-let metadata_encoding =
-  let open Data_encoding in
-  conv
-    (fun {checkpoint; next_blueprint_number; current_block_hash} ->
-      (checkpoint, next_blueprint_number, current_block_hash))
-    (fun (checkpoint, next_blueprint_number, current_block_hash) ->
-      {checkpoint; next_blueprint_number; current_block_hash})
-    (obj3
-       (req "checkpoint" Context_hash.encoding)
-       (req "next_blueprint_number" Ethereum_types.quantity_encoding)
-       (req "current_block_hash" Ethereum_types.block_hash_encoding))
-
-let store_metadata ~data_dir metadata =
-  let json = Data_encoding.Json.construct metadata_encoding metadata in
-  Lwt_utils_unix.Json.write_file (metadata_path ~data_dir) json
-
-type old_metadata = {
-  checkpoint : Context_hash.t;
-  next_blueprint_number : Ethereum_types.quantity;
-}
-
-let old_metadata_encoding =
-  let open Data_encoding in
-  conv
-    (fun {checkpoint; next_blueprint_number} ->
-      (checkpoint, next_blueprint_number))
-    (fun (checkpoint, next_blueprint_number) ->
-      {checkpoint; next_blueprint_number})
-    (obj2
-       (req "checkpoint" Context_hash.encoding)
-       (req "next_blueprint_number" Ethereum_types.quantity_encoding))
-
-let load_metadata ~data_dir index =
+let load ~data_dir index =
   let open Lwt_result_syntax in
-  let path = metadata_path ~data_dir in
-  let*! exists = Lwt_unix.file_exists path in
-  if exists then
-    let* content = Lwt_utils_unix.Json.read_file path in
-    Lwt.catch
-      (fun () ->
-        let {checkpoint; next_blueprint_number; current_block_hash} =
-          Data_encoding.Json.destruct metadata_encoding content
-        in
-        let*! context = Irmin_context.checkout_exn index checkpoint in
-        return (context, next_blueprint_number, current_block_hash, true))
-      (fun _exn ->
-        let {checkpoint; next_blueprint_number} =
-          Data_encoding.Json.destruct old_metadata_encoding content
-        in
-        let*! context = Irmin_context.checkout_exn index checkpoint in
-        let*! evm_state = Irmin_context.PVMState.get context in
-        let* current_block_hash = Evm_state.current_block_hash evm_state in
-        return (context, next_blueprint_number, current_block_hash, true))
-  else
-    let context = Irmin_context.empty index in
-    return
-      ( context,
-        Ethereum_types.Qty Z.zero,
-        Ethereum_types.genesis_parent_hash,
-        false )
+  let* store = Store.init ~data_dir in
+  let* latest = Store.Context_hashes.find_latest store in
+  match latest with
+  | Some (Qty latest_blueprint_number, checkpoint) ->
+      let*! context = Irmin_context.checkout_exn index checkpoint in
+      let*! evm_state = Irmin_context.PVMState.get context in
+      let+ current_block_hash = Evm_state.current_block_hash evm_state in
+      ( store,
+        context,
+        Ethereum_types.Qty Z.(succ latest_blueprint_number),
+        current_block_hash,
+        true )
+  | None ->
+      let context = Irmin_context.empty index in
+      return
+        ( store,
+          context,
+          Ethereum_types.Qty Z.zero,
+          Ethereum_types.genesis_parent_hash,
+          false )
 
 let commit ~number (ctxt : t) evm_state =
   let open Lwt_result_syntax in
   let*! context = Irmin_context.PVMState.set ctxt.context evm_state in
   let*! checkpoint = Irmin_context.commit context in
-  let* () =
-    store_metadata
-      ~data_dir:ctxt.data_dir
-      {
-        checkpoint;
-        next_blueprint_number = ctxt.next_blueprint_number;
-        current_block_hash = ctxt.current_block_hash;
-      }
-  in
   ctxt.context <- context ;
   Store.Context_hashes.store ctxt.store number checkpoint
 
@@ -194,10 +139,9 @@ let init ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
   let destination =
     Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
   in
-  let* context, next_blueprint_number, current_block_hash, loaded =
-    load_metadata ~data_dir index
+  let* store, context, next_blueprint_number, current_block_hash, loaded =
+    load ~data_dir index
   in
-  let* store = Store.init ~data_dir in
   let ctxt =
     {
       index;
@@ -271,6 +215,7 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
     Irmin_context.checkout_exn evm_node_index checkpoint
   in
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
+  (* Assert we can read the current blueprint number *)
   let* current_blueprint_number =
     let*! current_blueprint_number_opt =
       Evm_state.inspect evm_state Durable_storage_path.Block.current_number
@@ -279,22 +224,21 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
     | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
     | None -> failwith "The blueprint number was not found"
   in
-  let* current_block_hash =
+  (* Assert we can read the current block hash *)
+  let* () =
     let*! current_block_hash_opt =
       Evm_state.inspect evm_state Durable_storage_path.Block.current_hash
     in
     match current_block_hash_opt with
-    | Some bytes ->
-        return
-          (Ethereum_types.block_hash_of_string (Hex.of_bytes bytes |> Hex.show))
+    | Some _bytes -> return_unit
     | None -> failwith "The block hash was not found"
   in
-  let next_blueprint_number =
-    Ethereum_types.Qty Z.(add one current_blueprint_number)
+  (* Init the store *)
+  let* store = Store.init ~data_dir in
+  let* () =
+    Store.Context_hashes.store store (Qty current_blueprint_number) checkpoint
   in
-  store_metadata
-    ~data_dir
-    {checkpoint; next_blueprint_number; current_block_hash}
+  return_unit
 
 let execute_and_inspect ~input ctxt =
   let open Lwt_result_syntax in

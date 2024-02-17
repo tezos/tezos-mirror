@@ -97,6 +97,10 @@ module Q = struct
     let select =
       (level ->? context_hash)
       @@ {eos|SELECT (context_hash) FROM context_hashes WHERE id = ?|eos}
+
+    let get_latest =
+      (unit ->? t2 level context_hash)
+      @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id DESC LIMIT 1|eos}
   end
 end
 
@@ -166,4 +170,10 @@ module Context_hashes = struct
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
     Db.find_opt Q.Context_hashes.select number
+
+  let find_latest {db_uri} =
+    with_caqti_error
+    @@ Caqti_lwt_unix.with_connection db_uri
+    @@ fun (module Db : Caqti_lwt.CONNECTION) ->
+    Db.find_opt Q.Context_hashes.get_latest ()
 end
