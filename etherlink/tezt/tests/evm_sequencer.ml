@@ -973,6 +973,54 @@ let test_observer_applies_blueprint =
 
   unit
 
+let test_observer_forwards_transaction =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "observer"; "transaction"]
+    ~title:"Observer forwards transaction"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let tbb = 1. in
+  let* {sequencer = sequencer_node; sc_rollup_node; _} =
+    setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
+  in
+  let preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let* observer_node =
+    Evm_node.init
+      ~mode:
+        (Observer
+           {
+             initial_kernel = Evm_node.initial_kernel sequencer_node;
+             preimage_dir;
+           })
+      (Evm_node.endpoint sequencer_node)
+  in
+
+  let* txn =
+    Eth_cli.transaction_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~to_public_key:Eth_account.bootstrap_accounts.(2).address
+      ~value:Wei.one
+      ~endpoint:(Evm_node.endpoint observer_node)
+      ()
+  in
+
+  let* receipt =
+    Eth_cli.get_receipt ~endpoint:(Evm_node.endpoint sequencer_node) ~tx:txn
+  in
+
+  match receipt with
+  | Some receipt when receipt.status -> unit
+  | Some _ ->
+      Test.fail
+        "transaction receipt received from the sequenecer, but transaction \
+         failed"
+  | None ->
+      Test.fail
+        "Missing receipt in the sequencer node for transaction successfully \
+         injected in the observer"
+
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_upgrade_kernel_auto_sync =
@@ -1581,6 +1629,7 @@ let () =
   test_delayed_deposit_is_included [Alpha] ;
   test_init_from_rollup_node_data_dir [Alpha] ;
   test_observer_applies_blueprint [Alpha] ;
+  test_observer_forwards_transaction [Alpha] ;
   test_upgrade_kernel_auto_sync [Alpha] ;
   test_upgrade_kernel_sync [Alpha] ;
   test_force_kernel_upgrade [Alpha] ;

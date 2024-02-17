@@ -145,7 +145,8 @@ let install_finalizer_observer server =
   let* () = Internal_event.Simple.emit Event.event_shutdown_node exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
-  return_unit
+  let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
+  Evm_node_lib_dev.Tx_pool_events.shutdown ()
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -807,9 +808,21 @@ let observer_command =
   let observer_backend =
     (module Observer.Make (struct
       let ctxt = ctxt
+
+      let evm_node_endpoint = evm_node_endpoint
     end) : Services_backend_sig.S)
   in
 
+  let* () =
+    Tx_pool.start
+      {
+        rollup_node = observer_backend;
+        smart_rollup_address =
+          Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+            smart_rollup_address;
+        mode = Observer;
+      }
+  in
   let* directory =
     dev_directory config (observer_backend, smart_rollup_address)
   in

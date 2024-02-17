@@ -122,7 +122,7 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
-type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer
+type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer | Observer
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);
@@ -391,6 +391,19 @@ let on_head ~force ~timestamp state =
 module Handlers = struct
   type self = worker
 
+  let observer_self_inject_request w =
+    let open Lwt_result_syntax in
+    let state = Worker.state w in
+    match state.mode with
+    | Observer ->
+        let*! _ =
+          Worker.Queue.push_request
+            w
+            (Request.Inject_transactions (false, Helpers.now ()))
+        in
+        return_unit
+    | Sequencer | Proxy _ -> return_unit
+
   let on_request :
       type r request_error.
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
@@ -399,7 +412,11 @@ module Handlers = struct
     let state = Worker.state w in
     match request with
     | Request.Add_transaction transaction ->
-        protect @@ fun () -> on_transaction state transaction
+        protect @@ fun () ->
+        let open Lwt_result_syntax in
+        let* res = on_transaction state transaction in
+        let* () = observer_self_inject_request w in
+        return res
     | Request.Inject_transactions (force, timestamp) ->
         protect @@ fun () -> on_head ~force ~timestamp state
 
@@ -476,7 +493,7 @@ let start ({mode; _} as parameters) =
               Rollup_services.make_streamed_call ~rollup_node_endpoint
             in
             subscribe_l2_block ~stream_l2 worker
-        | Sequencer -> Lwt.return_unit)
+        | Sequencer | Observer -> Lwt.return_unit)
       (fun _ -> ())
   in
   Lwt.wakeup worker_waker worker
