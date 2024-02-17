@@ -35,6 +35,8 @@ let blocks_per_cycle = 4
 
 let nonce_revelation_threshold = 2
 
+let bootstrap_accounts = Constant.all_secret_keys
+
 module Helpers = struct
   let level_type : RPC.level Check.typ =
     Check.convert
@@ -51,6 +53,17 @@ module Helpers = struct
     Check.((level = expected_level) level_type)
       ~error_msg:"expected current_period = %R, got %L" ;
     unit
+
+  let bake ?ai_vote
+      ?(keys = List.map (fun x -> x.Account.alias) bootstrap_accounts) ~endpoint
+      ~protocol client =
+    Client.bake_for
+      ~endpoint
+      ~minimal_timestamp:true
+      ~protocol
+      ~keys
+      client
+      ?ai_vote
 
   let bake_n_cycles bake ?keys n client =
     let* current_level = get_current_level client in
@@ -135,8 +148,6 @@ let default_overrides =
     (["adaptive_issuance_launch_ema_threshold"], `Int 1);
   ]
 
-let bootstrap_accounts = Constant.all_secret_keys
-
 let launch_ema_threshold client =
   let* json =
     Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
@@ -171,13 +182,7 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
   assert (JSON.is_null launch_cycle) ;
   (* Make delegate vote for AI activation*)
   let bake ?keys client =
-    Client.bake_for
-      ~endpoint:sandbox_endpoint
-      ~minimal_timestamp:true
-      ~protocol
-      ?keys
-      client
-      ~ai_vote:On
+    Helpers.bake ~ai_vote:On ~endpoint:sandbox_endpoint ~protocol ?keys client
   in
   (* The vote should have passed during the first cycle *)
   let* () =
@@ -404,12 +409,21 @@ type bu_check = {
   msg : string;
 }
 
-(* some values might be slightly different (+-1 mutez) because of roundings and
+(* some values might be slightly different (+-[margin] mutez) because of roundings and
    randomness in baking rights that may affect the overall rewards coming from
    previous blocks, to avoid flakiness we test the "rounded range" of those
    values *)
-let check_with_roundings got expected =
-  got >= expected - 1 && got <= expected + 1
+let check_with_roundings ?(margin = 1) got expected =
+  got >= expected - margin && got <= expected + margin
+
+let assert_with_roundings ~__LOC__ ?margin got expected =
+  if not (check_with_roundings ?margin got expected) then
+    Test.fail
+      "@[<v 2>%s: Asserted equality (up to rounding) failed. got %d, expected \
+       %d.@]@."
+      __LOC__
+      got
+      expected
 
 let check_balance_updates balance_updates (predicates : bu_check list) =
   List.iter
@@ -426,11 +440,13 @@ let check_balance_updates balance_updates (predicates : bu_check list) =
              pre_filtered)
       then
         Test.fail
-          "Inconsistant balance update: %s, could it be a regression, got:  %s"
+          "@[<v 2>Inconsistant balance update, could it be a regression.@. \
+           Expected:@ @[%s, change amount: %d@]@.Got:@ @[%s@]@]"
           msg
+          change
           (List.fold_left
              (fun acc x ->
-               acc ^ "\n" ^ Operation_receipt.Balance_updates.to_string x)
+               acc ^ "@ " ^ Operation_receipt.Balance_updates.to_string x)
              ""
              pre_filtered))
     predicates
@@ -739,10 +755,7 @@ let test_staking =
          Constant.bootstrap2.public_key_hash
   in
   Log.info "Numerator/denominator before: %d/%d " numerator denominator ;
-
-  let bake ?keys client =
-    Client.bake_for ~endpoint ~minimal_timestamp:true ~protocol ?keys client
-  in
+  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
   let* () = Helpers.bake_n_cycles bake 1 client_1 in
 
   let stake0 =
@@ -1074,50 +1087,49 @@ let test_staking =
 
   (* check slashed and rewarded amounts *)
   (* total amounts *)
-  let total_amount_rewarded = 1450001824 in
-  let total_amount_slashed = 8700010946 in
+  let total_amount_rewarded = 1450001868 in
+  let total_amount_slashed = 8700011216 in
 
   (* slashed stakers (including baker) unstake deposit *)
   let amount_rewarded_from_unstake_stakers_deposits = 7142857 in
-  let amount_slashed_from_unstake_stakers_deposits = 42857144 in
+  let amount_slashed_from_unstake_stakers_deposits = 42857145 in
 
   (* slashed  stake *)
   let amount_rewarded_from_stakers_deposits = 7178393 in
   let amount_slashed_from_stakers_deposits = 43070362 in
 
   (* slashing baker (bootstrap2) stake*)
-  let amount_rewarded_from_baker_deposits = 1435680574 in
-  let amount_slashed_from_baker_deposits = 8614083440 in
+  let amount_rewarded_from_baker_deposits = 1435680618 in
+  let amount_slashed_from_baker_deposits = 8614083709 in
 
-  assert (
-    check_with_roundings
-      amount_rewarded_from_unstake_stakers_deposits
-      (int_of_float (float amount_slashed_from_unstake_stakers_deposits /. 6.))) ;
+  assert_with_roundings
+    ~__LOC__
+    amount_rewarded_from_unstake_stakers_deposits
+    (int_of_float (float amount_slashed_from_unstake_stakers_deposits /. 6.)) ;
 
-  assert (
-    check_with_roundings
-      amount_rewarded_from_stakers_deposits
-      (int_of_float (float amount_slashed_from_stakers_deposits /. 6.))) ;
+  assert_with_roundings
+    ~__LOC__
+    amount_rewarded_from_stakers_deposits
+    (int_of_float (float amount_slashed_from_stakers_deposits /. 6.)) ;
 
-  assert (
-    check_with_roundings
-      amount_rewarded_from_baker_deposits
-      (int_of_float (float amount_slashed_from_baker_deposits /. 6.))) ;
+  assert_with_roundings
+    ~__LOC__
+    amount_rewarded_from_baker_deposits
+    (int_of_float (float amount_slashed_from_baker_deposits /. 6.)) ;
 
-  assert (
-    check_with_roundings
-      (amount_rewarded_from_unstake_stakers_deposits
-     + amount_rewarded_from_stakers_deposits
-     + amount_rewarded_from_baker_deposits)
-      total_amount_rewarded) ;
-
-  assert (
-    check_with_roundings
-      (amount_slashed_from_unstake_stakers_deposits
-     + amount_slashed_from_stakers_deposits + amount_slashed_from_baker_deposits
-      )
-      total_amount_slashed) ;
-
+  assert_with_roundings
+    ~margin:3 (* as we sum 3 amounts *)
+    ~__LOC__
+    (amount_rewarded_from_unstake_stakers_deposits
+   + amount_rewarded_from_stakers_deposits + amount_rewarded_from_baker_deposits
+    )
+    total_amount_rewarded ;
+  assert_with_roundings
+    ~margin:3 (* as we sum 3 amounts *)
+    ~__LOC__
+    (amount_slashed_from_unstake_stakers_deposits
+   + amount_slashed_from_stakers_deposits + amount_slashed_from_baker_deposits)
+    total_amount_slashed ;
   let check_opr ~kind ~category ~change ~staker ~msg ~delayed_operation_hash =
     let open Operation_receipt.Balance_updates in
     {

@@ -483,8 +483,10 @@ let test_cannot_bake_with_zero_deposits_limit () =
     Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
   in
   let* b = Block.bake ~policy:(By_account account2) ~operation genesis in
+  (* autostaking happens before staking right computations,
+     so the limit will apply in  constants.consensus_rights_delay+1 *)
   let expected_number_of_cycles_with_rights_from_previous_deposit =
-    constants.consensus_rights_delay + Constants.max_slashing_period - 1
+    constants.consensus_rights_delay
   in
   let* b =
     Block.bake_until_n_cycle_end
@@ -513,8 +515,8 @@ let test_cannot_bake_with_zero_deposits_limit () =
         | Block.No_slots_found_for _ -> true
         | _ -> false)
   in
-  (* Unstaked frozen deposits are released one cycle later. *)
-  let* b = Block.bake_until_cycle_end b in
+  (* Unstaked frozen deposits are released two cycles later. *)
+  let* b = Block.bake_until_n_cycle_end 2 b in
   let* ufd =
     Context.Contract.unstaked_frozen_balance (B b) (Implicit account1)
   in
