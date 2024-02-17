@@ -31,9 +31,9 @@ This sequence of operations was run:
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle": "3800000000000", "deactivated": false,
-  "grace_period": 3, "total_delegated_stake": "0",
-  "staking_denominator": "0", "voting_power": "4000000000000",
-  "remaining_proposals": 20,
+  "grace_period": 3, "pending_denunciations": false,
+  "total_delegated_stake": "0", "staking_denominator": "0",
+  "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
@@ -42,9 +42,9 @@ This sequence of operations was run:
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle": "3799999999716", "deactivated": false,
-  "grace_period": 3, "total_delegated_stake": "0",
-  "staking_denominator": "0", "voting_power": "4000000000000",
-  "remaining_proposals": 20,
+  "grace_period": 3, "pending_denunciations": false,
+  "total_delegated_stake": "0", "staking_denominator": "0",
+  "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]",
   "pending_consensus_keys":
     [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
@@ -55,7 +55,7 @@ This sequence of operations was run:
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0",
   "min_delegated_in_current_cycle": "3800001595660", "deactivated": false,
-  "grace_period": 3, "total_delegated_stake": "0",
-  "staking_denominator": "0", "voting_power": "4000000000000",
-  "remaining_proposals": 20,
+  "grace_period": 3, "pending_denunciations": false,
+  "total_delegated_stake": "0", "staking_denominator": "0",
+  "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }

@@ -65,8 +65,8 @@ This sequence of operations was run:
   "frozen_deposits": "0", "staking_balance": "999999999385",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "min_delegated_in_current_cycle": "999999999385",
-  "deactivated": false, "grace_period": 3, "total_delegated_stake": "0",
-  "staking_denominator": "0",
+  "deactivated": false, "grace_period": 3, "pending_denunciations": false,
+  "total_delegated_stake": "0", "staking_denominator": "0",
   "active_consensus_key": "[PUBLIC_KEY_HASH]",
   "pending_consensus_keys":
     [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
@@ -79,6 +79,6 @@ This sequence of operations was run:
   "frozen_deposits": "0", "staking_balance": "999999999385",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "min_delegated_in_current_cycle": "949999999415",
-  "deactivated": false, "grace_period": 3, "total_delegated_stake": "0",
-  "staking_denominator": "0",
+  "deactivated": false, "grace_period": 3, "pending_denunciations": false,
+  "total_delegated_stake": "0", "staking_denominator": "0",
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
