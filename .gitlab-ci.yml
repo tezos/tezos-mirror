@@ -39,6 +39,12 @@ build:
     - if [ "$OCTEZ_BRANCH" == "v18.1" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
     - opam-2.1 install -y caqti.1.9.0 caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass
     - dune build archiver/main.exe server/main.exe
+    # directly build docker
+    - !reference [.docker-push, script]
+    # directly build docker manifest
+    - !reference [.manifest, script]
+
+
   artifacts:
     name: binaries-${ARCH}-${OCTEZ_BRANCH}
     expire_in: 1 week
@@ -100,15 +106,15 @@ release:
       when: manual
       allow_failure: true
 
-docker:
-  extends: .docker-push
-  parallel:
-    *default_matrix
-  needs: 
-    - job: build
-      artifacts: true
-      parallel:
-        *default_matrix
+# docker:
+#   extends: .docker-push
+#   parallel:
+#     *default_matrix
+#   needs: 
+#     - job: build
+#       artifacts: true
+#       parallel:
+#         *default_matrix
 
 
 .manifest:
@@ -132,12 +138,12 @@ docker:
       when: manual
       allow_failure: true
 
-manifest:
-  extends: .manifest
-  parallel:
-    *default_matrix
-  needs: 
-    - job: build
-      artifacts: true
-      parallel:
-        *default_matrix
+# manifest:
+#   extends: .manifest
+#   parallel:
+#     *default_matrix
+#   needs: 
+#     - job: build
+#       artifacts: true
+#       parallel:
+#         *default_matrix
