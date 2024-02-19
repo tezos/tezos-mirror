@@ -61,7 +61,7 @@ let save_zk_rollup ~force (cctxt : #Client_context.full) alias_name rollup =
   let*! () = cctxt#message "Epoxy rollup memorized as %s" alias_name in
   return_unit
 
-let encrypted_switch =
+let encrypted_switch : (_, Protocol_client_context.full) Tezos_clic.arg =
   Tezos_clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
 let normalize_types_switch =
@@ -847,6 +847,19 @@ let commands_ro () =
         return_unit);
   ]
 
+let dry_run_switch : (_, Protocol_client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"dry-run"
+    ~short:'D'
+    ~doc:"don't inject the operation, just display it"
+    ()
+
+let verbose_signing_switch : (_, Protocol_client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"verbose-signing"
+    ~doc:"display extra information before signing the operation"
+    ()
+
 (* ----------------------------------------------------------------------------*)
 (* After the activation of a new version of the protocol, the older protocols
    are only kept in the code base to replay the history of the chain and to query
@@ -871,19 +884,6 @@ let commands_ro () =
    At the end of the file, RO and RW commands are concatenated into one list that
    is then exported in the mli file. *)
 (* ----------------------------------------------------------------------------*)
-
-let dry_run_switch =
-  Tezos_clic.switch
-    ~long:"dry-run"
-    ~short:'D'
-    ~doc:"don't inject the operation, just display it"
-    ()
-
-let verbose_signing_switch =
-  Tezos_clic.switch
-    ~long:"verbose-signing"
-    ~doc:"display extra information before signing the operation"
-    ()
 
 let simulate_switch =
   Tezos_clic.switch
