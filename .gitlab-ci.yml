@@ -7,7 +7,9 @@ stages:
 .default_matrix: &default_matrix
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v19.1", "v19.0", "v18.1", "master"]
+        OCTEZ_BRANCH: ["v19.1", "master"]
+
+        # OCTEZ_BRANCH: ["v19.1", "v19.0", "v18.1", "master"]
 
 fmt:
   stage: build
@@ -64,18 +66,77 @@ build:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG != null
 
-release:
+# TODO requires differentiating artifacts, left for later
+# release:
+#   stage: deploy
+#   extends: .release
+#   parallel:
+#     *default_matrix
+#   needs: 
+#     - job: build
+#       artifacts: true
+#       parallel:
+#         *default_matrix       
+#   variables:
+#     ARCHIVE: "binaries-${ARCH}-${OCTEZ_BRANCH}.zip"
+
+
+# release:amd64:v18.1:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [amd64, v18.1]"]
+#   variables:
+#     ARCHIVE: "binaries-amd64-v18.1.zip"
+
+# release:amd64:v19.0:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [amd64, v19.0]"]
+#   variables:
+#     ARCHIVE: "binaries-amd64-v19.0.zip"
+
+release:amd64:v19.1:
   stage: deploy
   extends: .release
-  parallel:
-    *default_matrix
-  needs: 
-    - job: build
-      artifacts: true
-      parallel:
-        *default_matrix       
+  dependencies: ["build: [amd64, v19.1]"]
   variables:
-    ARCHIVE: "binaries-${ARCH}-${OCTEZ_BRANCH}.zip"
+    ARCHIVE: "binaries-amd64-v19.1.zip"
+
+release:amd64:master:
+  stage: deploy
+  extends: .release
+  dependencies: ["build: [amd64, master]"]
+  variables:
+    ARCHIVE: "binaries-amd64-master.zip"
+
+# release:arm64:v18.1:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [arm64, v18.1]"]
+#   variables:
+#     ARCHIVE: "binaries-arm64-v18.1.zip"
+
+# release:arm64:v19.0:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [arm64, v19.0]"]
+#   variables:
+#     ARCHIVE: "binaries-arm64-v19.0.zip"
+
+release:arm64:v19.1:
+  stage: deploy
+  extends: .release
+  dependencies: ["build: [arm64, v19.1]"]
+  variables:
+    ARCHIVE: "binaries-arm64-v19.1.zip"
+
+
+release:arm64:master:
+  stage: deploy
+  extends: .release
+  dependencies: ["build: [arm64, master]"]
+  variables:
+    ARCHIVE: "binaries-arm64-master.zip"
 
 
 .docker:
@@ -106,6 +167,7 @@ release:
       when: manual
       allow_failure: true
 
+# TODO requires differentiating artifacts, left for later
 # docker:
 #   extends: .docker-push
 #   parallel:
@@ -116,7 +178,63 @@ release:
 #       parallel:
 #         *default_matrix
 
+# docker:amd64:v18.1:
+#   extends: .docker-push
+#   dependencies: ["build: [amd64, v18.1]"]
+#   variables:
+#     ARCH: "amd64"
+#     OCTEZ_BRANCH: "v18.1"
 
+# docker:amd64:v19.0:
+#   extends: .docker-push
+#   dependencies: ["build: [amd64, v19.0]"]
+#   variables:
+#     ARCH: "amd64"
+#     OCTEZ_BRANCH: "v19.0"
+    
+docker:amd64:v19.0:
+  extends: .docker-push
+  dependencies: ["build: [amd64, v19.0]"]
+  variables:
+    ARCH: "amd64"
+    OCTEZ_BRANCH: "v19.1"
+
+docker:amd64:master:
+  extends: .docker-push
+  dependencies: ["build: [amd64, master]"]
+  variables:
+    ARCH: "amd64"
+    OCTEZ_BRANCH: "master"
+
+# docker:arm64:v18.1:
+#   extends: .docker-push
+#   dependencies: ["build: [arm64, v18.1]"]
+#   variables:
+#     ARCH: "arm64"
+#     OCTEZ_BRANCH: "v18.1"
+
+# docker:arm64:v19.0:
+#   extends: .docker-push
+#   dependencies: ["build: [arm64, v19.0]"]
+#   variables:
+#     ARCH: "arm64"
+#     OCTEZ_BRANCH: "v19.0"
+
+docker:arm64:v19.1:
+  extends: .docker-push
+  dependencies: ["build: [arm64, v19.1]"]
+  variables:
+    ARCH: "arm64"
+    OCTEZ_BRANCH: "v19.1"
+
+docker:arm64:master:
+  extends: .docker-push
+  dependencies: ["build: [arm64, master]"]
+  variables:
+    ARCH: "arm64"
+    OCTEZ_BRANCH: "master"
+
+# Create multiarch manifest 
 .manifest:
   stage: manifest
   image: docker
@@ -138,6 +256,7 @@ release:
       when: manual
       allow_failure: true
 
+# TODO requires differentiating artifacts, left for later
 # manifest:
 #   extends: .manifest
 #   parallel:
@@ -147,3 +266,43 @@ release:
 #       artifacts: true
 #       parallel:
 #         *default_matrix
+
+# manifest:v18.1:
+#   extends: .manifest
+#   needs:
+#     - job: "docker:amd64:v18.1"
+#       artifacts: false
+#     - job: "docker:arm64:v18.1"
+#       artifacts: false
+#   variables:
+#     OCTEZ_BRANCH: "v18.1"
+
+# manifest:v19.0:
+#   extends: .manifest
+#   needs:
+#     - job: "docker:amd64:v19.0"
+#       artifacts: false
+#     - job: "docker:arm64:v19.0"
+#       artifacts: false
+#   variables:
+#     OCTEZ_BRANCH: "v19.0"
+
+manifest:v19.1:
+  extends: .manifest
+  needs:
+    - job: "docker:amd64:v19.1"
+      artifacts: false
+    - job: "docker:arm64:v19.1"
+      artifacts: false
+  variables:
+    OCTEZ_BRANCH: "v19.1"
+
+manifest:master:
+  extends: .manifest
+  needs:
+    - job: "docker:amd64:master"
+      artifacts: false
+    - job: "docker:arm64:master"
+      artifacts: false
+  variables:
+    OCTEZ_BRANCH: "master"
