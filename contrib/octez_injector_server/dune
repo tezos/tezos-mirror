@@ -15,9 +15,6 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   data-encoding
-  (select void_for_linking-octez_injector_PtNairob from
-   (octez_injector_PtNairob -> void_for_linking-octez_injector_PtNairob.empty)
-   (-> void_for_linking-octez_injector_PtNairob.empty))
   (select void_for_linking-octez_injector_Proxford from
    (octez_injector_Proxford -> void_for_linking-octez_injector_Proxford.empty)
    (-> void_for_linking-octez_injector_Proxford.empty))
@@ -42,6 +39,5 @@
 (rule
  (action
   (progn
-   (write-file void_for_linking-octez_injector_PtNairob.empty "")
    (write-file void_for_linking-octez_injector_Proxford.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))

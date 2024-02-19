@@ -91,7 +91,6 @@
 (package (name tezos-dac-node-lib-test)(allow_empty))
 (package (name tezos-dal-node-lib))
 (package (name tezos-dal-node-services))
-(package (name tezos-injector-017-PtNairob)(allow_empty))
 (package (name tezos-injector-018-Proxford)(allow_empty))
 (package (name tezos-injector-alpha)(allow_empty))
 (package (name tezos-lazy-containers-tests)(allow_empty))
