@@ -330,13 +330,12 @@ mod tests {
     use evm_execution::account_storage::{
         account_path, init_account_storage, EthereumAccountStorage,
     };
-    use primitive_types::{H160, H256, U256};
+    use primitive_types::{H160, U256};
     use std::str::FromStr;
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
-    use tezos_ethereum::tx_signature::TxSignature;
     use tezos_smart_rollup_core::SmartRollupCore;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::RefPath;
@@ -352,11 +351,6 @@ mod tests {
     fn address_from_str(s: &str) -> Option<H160> {
         let data = &hex::decode(s).unwrap();
         Some(H160::from_slice(data))
-    }
-    fn string_to_h256_unsafe(s: &str) -> H256 {
-        let mut v: [u8; 32] = [0; 32];
-        hex::decode_to_slice(s, &mut v).expect("Could not parse to 256 hex value.");
-        H256::from(v)
     }
 
     fn set_balance<Host: KernelRuntime>(
@@ -401,9 +395,7 @@ mod tests {
 
     fn dummy_eth_gen_transaction(
         nonce: U256,
-        v: U256,
-        r: H256,
-        s: H256,
+        type_: TransactionType,
     ) -> EthereumTransactionCommon {
         let chain_id = Some(DUMMY_CHAIN_ID);
         let gas_price = U256::from(40000000u64);
@@ -417,7 +409,7 @@ mod tests {
         let value = U256::from(500000000u64);
         let data: Vec<u8> = vec![];
         EthereumTransactionCommon::new(
-            TransactionType::Legacy,
+            type_,
             chain_id,
             nonce,
             gas_price,
@@ -427,7 +419,7 @@ mod tests {
             value,
             data,
             vec![],
-            Some(TxSignature::new(v, r, s).unwrap()),
+            None,
         )
     }
 
@@ -437,32 +429,33 @@ mod tests {
         H160::from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap()
     }
 
+    fn sign_transaction(tx: EthereumTransactionCommon) -> EthereumTransactionCommon {
+        let private_key =
+            "e922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158";
+
+        tx.sign_transaction(private_key.to_string()).unwrap()
+    }
+
+    fn make_dummy_transaction(
+        nonce: U256,
+        type_: TransactionType,
+    ) -> EthereumTransactionCommon {
+        let tx = dummy_eth_gen_transaction(nonce, type_);
+        sign_transaction(tx)
+    }
+
     fn dummy_eth_transaction_zero() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
         let nonce = U256::zero();
-        let v = U256::from(37);
-        let r = string_to_h256_unsafe(
-            "4b0afbd9e1d9e8f9eb89dc0c97d9ef94a04ceea1fee1e96d5684bca317d4626b",
-        );
-        let s = string_to_h256_unsafe(
-            "49179e495aba03c815bacfb9e07b3abd69b752160fb85cb95ff1d7deda35bbe8",
-        );
-        dummy_eth_gen_transaction(nonce, v, r, s)
+        make_dummy_transaction(nonce, TransactionType::Legacy)
     }
 
     fn dummy_eth_transaction_one() -> EthereumTransactionCommon {
         // corresponding caller's address is 0xf95abdf6ede4c3703e0e9453771fbee8592d31e9
         // private key 0xe922354a3e5902b5ac474f3ff08a79cff43533826b8f451ae2190b65a9d26158
         let nonce = U256::one();
-        let v = U256::from(38);
-        let r = string_to_h256_unsafe(
-            "d9642333535b12060e81d94903cf9d73551e69723be1539ba558b06eaf0849cd",
-        );
-        let s = string_to_h256_unsafe(
-            "0c49afec0df5b4fe557624508369e6db825cab6fbebc0920ef6500b9f9aef849",
-        );
-        dummy_eth_gen_transaction(nonce, v, r, s)
+        make_dummy_transaction(nonce, TransactionType::Legacy)
     }
 
     fn dummy_eth_transaction_deploy_from_nonce_and_pk(
@@ -1699,5 +1692,77 @@ mod tests {
 
         assert_eq!(zero, zero_resigned);
         assert_eq!(one, one_resigned);
+    }
+
+    #[test]
+    // Test if a valid transaction is producing a receipt with a success status
+    fn test_type_propagation() {
+        let mut mock_host = MockHost::default();
+        let mut internal = MockInternal();
+        let mut host = SafeStorage {
+            host: &mut mock_host,
+            internal: &mut internal,
+        };
+
+        let tx_hash = [0; TRANSACTION_HASH_SIZE];
+        let tx_hash_eip1559 = [1; TRANSACTION_HASH_SIZE];
+        let tx_hash_eip2930 = [2; TRANSACTION_HASH_SIZE];
+
+        let valid_tx = Transaction {
+            tx_hash,
+            content: Ethereum(make_dummy_transaction(
+                U256::zero(),
+                TransactionType::Legacy,
+            )),
+        };
+
+        let valid_tx_eip1559 = Transaction {
+            tx_hash: tx_hash_eip1559,
+            content: Ethereum(make_dummy_transaction(
+                U256::one(),
+                TransactionType::Eip1559,
+            )),
+        };
+
+        let valid_tx_eip2930 = Transaction {
+            tx_hash: tx_hash_eip2930,
+            content: Ethereum(make_dummy_transaction(
+                U256::from(2_u8),
+                TransactionType::Eip2930,
+            )),
+        };
+
+        let transactions: Vec<Transaction> =
+            vec![valid_tx, valid_tx_eip1559, valid_tx_eip2930];
+        store_blueprints(&mut host, vec![blueprint(transactions)]);
+
+        let sender = dummy_eth_caller();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &sender,
+            U256::from(5000000000000000u64),
+        );
+
+        produce(
+            &mut host,
+            DUMMY_CHAIN_ID,
+            dummy_block_fees(),
+            &mut Configuration::default(),
+        )
+        .expect("The block production failed.");
+
+        let receipt = read_transaction_receipt(&mut host, &tx_hash)
+            .expect("Should have found receipt");
+        assert_eq!(receipt.type_, TransactionType::Legacy);
+
+        let receipt_eip1559 = read_transaction_receipt(&mut host, &tx_hash_eip1559)
+            .expect("Should have found receipt");
+        assert_eq!(receipt_eip1559.type_, TransactionType::Eip1559);
+
+        let receipt_eip2930 = read_transaction_receipt(&mut host, &tx_hash_eip2930)
+            .expect("Should have found receipt");
+        assert_eq!(receipt_eip2930.type_, TransactionType::Eip2930);
     }
 }
