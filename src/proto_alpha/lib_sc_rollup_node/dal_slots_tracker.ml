@@ -91,11 +91,7 @@ let slots_info constants node_ctxt (Layer1.{hash; _} as head) =
       (* `metadata.protocol_data.dal_attestation` is `None` if we are behind the
          `Dal feature flag`: in this case we return an empty slot
          attestation. *)
-      let confirmed_slots =
-        Option.value
-          ~default:Dal.Attestation.empty
-          metadata.protocol_data.dal_attestation
-      in
+      let confirmed_slots = metadata.protocol_data.dal_attestation in
       let* published_slots_indexes =
         Node_context.get_slot_indexes
           node_ctxt

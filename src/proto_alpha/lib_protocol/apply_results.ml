@@ -2741,7 +2741,7 @@ type block_metadata = {
   adaptive_issuance_vote_ema : Per_block_votes.Adaptive_issuance_launch_EMA.t;
   adaptive_issuance_launch_cycle : Cycle.t option;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  dal_attestation : Dal.Attestation.t option;
+  dal_attestation : Dal.Attestation.t;
 }
 
 let block_metadata_encoding ~use_legacy_attestation_name =
@@ -2840,7 +2840,7 @@ let block_metadata_encoding ~use_legacy_attestation_name =
              (req "proposer_consensus_key" Signature.Public_key_hash.encoding)
              (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
-             (opt "dal_attestation" Dal.Attestation.encoding)))
+             (req "dal_attestation" Dal.Attestation.encoding)))
 
 let block_metadata_encoding_with_legacy_attestation_name =
   block_metadata_encoding ~use_legacy_attestation_name:true

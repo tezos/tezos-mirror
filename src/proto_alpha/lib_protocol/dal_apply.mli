@@ -79,7 +79,7 @@ val apply_publish_commitment :
 
    [lag] is a parametric constant specific to the data-availability
    layer.  *)
-val finalisation : t -> (t * Dal.Attestation.t option) tzresult Lwt.t
+val finalisation : t -> (t * Dal.Attestation.t) tzresult Lwt.t
 
 (** [initialize ctxt ~level] should be executed at block
    initialisation time. It allows to cache the committee for [level]

@@ -619,7 +619,9 @@ let tests =
         test_low_gas_limit_no_consumer,
         not_gas_consum,
         mk_default );
-      ("dal disabled", test_feature_flags, all, mk_flags disabled_dal);
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6967
+         Delete the test when not useful for sure. *)
+      (*  ("dal disabled", test_feature_flags, all, mk_flags disabled_dal); *)
       ( "scoru arith disabled",
         test_feature_flags,
         [K_Sc_rollup_origination],

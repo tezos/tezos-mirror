@@ -120,11 +120,7 @@ module Plugin = struct
         ~none:
           (TzTrace.make @@ Layer1_services.Cannot_read_block_metadata block.hash)
     in
-    let confirmed_slots =
-      Option.value
-        ~default:Dal.Attestation.empty
-        metadata.protocol_data.dal_attestation
-    in
+    let confirmed_slots = metadata.protocol_data.dal_attestation in
     let* all_slots =
       Dal.Slot_index.slots_range
         ~number_of_slots

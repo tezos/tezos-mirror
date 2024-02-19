@@ -350,7 +350,7 @@ type block_metadata = {
   adaptive_issuance_vote_ema : Per_block_votes.Adaptive_issuance_launch_EMA.t;
   adaptive_issuance_launch_cycle : Cycle.t option;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  dal_attestation : Dal.Attestation.t option;
+  dal_attestation : Dal.Attestation.t;
 }
 
 val block_metadata_encoding_with_legacy_attestation_name :

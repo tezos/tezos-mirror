@@ -3190,7 +3190,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
               adaptive_issuance_vote_ema;
               adaptive_issuance_launch_cycle;
               implicit_operations_results;
-              dal_attestation = None;
+              dal_attestation = Dal.Attestation.empty;
             } )
   | Application
       {
