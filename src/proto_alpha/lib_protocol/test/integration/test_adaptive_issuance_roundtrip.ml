@@ -2561,7 +2561,7 @@ module Slashing = struct
                     else return_unit)
                --> check_snapshot_balances "before slash")
          --> exec_unit check_pending_slashings
-         --> next_block
+         --> next_cycle
         |+ Tag "denounce too late" --> next_cycle --> next_cycle
            --> assert_failure
                  ~expected_error:(fun (_block, state) ->
