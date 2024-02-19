@@ -76,7 +76,7 @@
       "radius_dz": { "numerator": "1", "denominator": "50" } },
   "adaptive_issuance_activation_vote_enable": true,
   "autostaking_enable": true, "adaptive_issuance_force_activation": false,
-  "ns_enable": false, "direct_ticket_spending_enable": false }
+  "ns_enable": true, "direct_ticket_spending_enable": false }
 
 ./octez-client rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",

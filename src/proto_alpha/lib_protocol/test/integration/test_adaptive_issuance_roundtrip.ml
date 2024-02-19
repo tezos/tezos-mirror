@@ -2561,7 +2561,7 @@ module Slashing = struct
                     else return_unit)
                --> check_snapshot_balances "before slash")
          --> exec_unit check_pending_slashings
-         --> next_block
+         --> next_cycle
         |+ Tag "denounce too late" --> next_cycle --> next_cycle
            --> assert_failure
                  ~expected_error:(fun (_block, state) ->
@@ -2884,12 +2884,14 @@ module Slashing = struct
              ["delegate"; "baker"])
     --> unstake "delegate" (Amount Tez.one_mutez)
     --> set_baker "baker" --> next_cycle
-    --> ((Tag "7% slash" --> double_bake "delegate" --> make_denunciations ()
-         |+ Tag "99% slash" --> next_cycle --> double_attest "delegate"
-            --> loop 7 (double_bake "delegate")
-            --> make_denunciations ())
-        --> next_cycle
-        --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero)
+    --> (Tag "5% slash" --> double_bake "delegate" --> make_denunciations ()
+        |+ Tag "95% slash" --> next_cycle --> double_attest "delegate"
+           --> loop 9 (double_bake "delegate")
+           --> make_denunciations ())
+    (* Wait two cycles because of ns_enable *)
+    --> next_cycle
+    --> next_cycle
+    --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
     --> wait_n_cycles (constants.consensus_rights_delay + 1)
 
   let test_slash_rounding =

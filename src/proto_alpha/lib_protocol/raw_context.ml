@@ -1177,7 +1177,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               activation_vote_enable = true;
               autostaking_enable = c.adaptive_issuance.autostaking_enable;
               force_activation = false;
-              ns_enable = false;
+              ns_enable = true;
             }
         in
         let liquidity_baking_subsidy = Tez_repr.(mul_exn one 5) in

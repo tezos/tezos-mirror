@@ -143,7 +143,7 @@ let test_valid_double_attestation_evidence () =
   let* frozen_deposits_right_after =
     Context.Delegate.current_frozen_deposits (B blk_final) delegate
   in
-  (* Check that the initial frozen deposits has not changed *)
+  (* Check that the initial frozen deposits have not changed *)
   let* () =
     Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
   in
@@ -156,8 +156,9 @@ let test_valid_double_attestation_evidence () =
       frozen_deposits_before
   in
   let* blk_eoc, metadata, _ =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker)
+      2
       blk_final
   in
   let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
@@ -335,8 +336,9 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   in
   (* Check that all frozen deposits have been slashed at the end of the cycle. *)
   let* b, metadata, _ =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker)
+      2
       blk_with_evidence2
   in
   let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
@@ -350,7 +352,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
     Adaptive_issuance_helpers.portion_of_rewards_to_liquid_for_cycle
       ~policy:(By_account baker)
       (B b)
-      (Block.current_cycle blk_with_evidence2)
+      (Block.current_cycle b)
       delegate
       base_reward
   in

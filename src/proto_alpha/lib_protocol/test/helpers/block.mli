@@ -370,7 +370,18 @@ val bake_until_cycle_end_with_metadata :
 
 (** Bakes enough blocks to end [n] cycles. *)
 val bake_until_n_cycle_end :
-  ?policy:baker_policy -> int -> t -> t tzresult Lwt.t
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  int ->
+  t ->
+  t tzresult Lwt.t
+
+val bake_until_n_cycle_end_with_metadata :
+  ?baking_mode:baking_mode ->
+  ?policy:baker_policy ->
+  int ->
+  block ->
+  (block * block_header_metadata option * block_header_metadata) tzresult Lwt.t
 
 (** Bakes enough blocks to reach the cycle. *)
 val bake_until_cycle :

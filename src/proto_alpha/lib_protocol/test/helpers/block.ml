@@ -1273,9 +1273,17 @@ let bake_until_cycle_end_with_metadata ?baking_mode ?policy b =
   in
   return (blk, eoc_metadata, nxt_metadata)
 
-let bake_until_n_cycle_end ?policy n b =
+let bake_until_n_cycle_end ?baking_mode ?policy n b =
   let cycle = current_cycle b in
-  bake_until_cycle ?policy (Cycle.add cycle n) b
+  bake_until_cycle ?baking_mode ?policy (Cycle.add cycle n) b
+
+let bake_until_n_cycle_end_with_metadata ?baking_mode ?policy n b =
+  let open Lwt_result_syntax in
+  let cycle = current_cycle b in
+  let* blk, (eoc_metadata, nxt_metadata) =
+    bake_until_cycle_with_metadata ?baking_mode ?policy (Cycle.add cycle n) b
+  in
+  return (blk, eoc_metadata, nxt_metadata)
 
 let debited_of_balance_update_item (it : Receipt.balance_update_item) :
     Tez.t option =
@@ -1309,6 +1317,5 @@ let autostaked_opt baker (metadata : block_header_metadata) =
     autostaked_bal_up_opt
 
 let autostaked ?(loc = __LOC__) baker metadata =
-  match autostaked_opt baker metadata with
-  | None -> raise (Failure (loc ^ ":No autostake found"))
-  | Some tez -> tez
+  ignore loc ;
+  match autostaked_opt baker metadata with None -> Tez.zero | Some tez -> tez
