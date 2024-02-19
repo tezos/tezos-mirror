@@ -728,7 +728,7 @@ let test_rpc_getBlockByHash =
   let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
   Check.((block.number = 0l) int32)
     ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
-  let* block' = get_block_by_hash evm_setup (Option.get block.hash) in
+  let* block' = get_block_by_hash evm_setup block.hash in
   assert (block = block') ;
   unit
 
@@ -867,8 +867,7 @@ let test_consistent_block_hashes =
   let* block4 = new_block () in
 
   let check_parent_hash parent block =
-    let parent_hash = Option.value ~default:"" parent.Block.hash in
-    Check.((block.Block.parent = parent_hash) string)
+    Check.((block.Block.parent = parent.Block.hash) string)
       ~error_msg:"Unexpected parent hash, should be %%R, but got %%L"
   in
 
@@ -1639,11 +1638,6 @@ let test_full_blocks =
         })
   in
   let block = block |> Evm_node.extract_result |> Block.of_json in
-  let block_hash =
-    match block.hash with
-    | Some hash -> hash
-    | None -> Test.fail "Expected a hash for the block"
-  in
   let block_number = block.number in
   (match block.Block.transactions with
   | Block.Empty -> Test.fail "Expected a non empty block"
@@ -1652,7 +1646,7 @@ let test_full_blocks =
         (fun index
              ({blockHash; blockNumber; transactionIndex; _} :
                Transaction.transaction_object) ->
-          Check.((block_hash = blockHash) string)
+          Check.((block.hash = blockHash) string)
             ~error_msg:
               (sf "The transaction should be in block %%L but found %%R") ;
           Check.((block_number = blockNumber) int32)
@@ -3151,7 +3145,7 @@ let test_rpc_getUncleCountByBlock =
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
   let* uncle_count =
-    get_uncle_count_by_block_arg evm_node ~by:`Hash (Option.get block.hash)
+    get_uncle_count_by_block_arg evm_node ~by:`Hash block.hash
   in
   Check.((uncle_count = Int64.zero) int64)
     ~error_msg:
@@ -3196,11 +3190,7 @@ let test_rpc_getUncleByBlockArgAndIndex =
   let block_id = "0" in
   let* block = Eth_cli.get_block ~block_id ~endpoint:evm_node_endpoint in
   let* uncle =
-    get_uncle_by_block_arg_and_index
-      ~by:`Hash
-      evm_node
-      (Option.get block.hash)
-      block_id
+    get_uncle_by_block_arg_and_index ~by:`Hash evm_node block.hash block_id
   in
   assert (Option.is_none uncle) ;
   let* uncle =
@@ -4280,7 +4270,7 @@ let test_migrate_proxy_to_sequencer =
     let*@ sequencer_head =
       Rpc.get_block_by_number ~block:"latest" sequencer_node
     in
-    Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+    Check.((sequencer_head.hash = rollup_node_head.hash) string)
       ~error_msg:"block hash is not equal (sequencer: %L; rollup: %R)" ;
     Check.((sequencer_head.number = expected_level) int32)
       ~error_msg:"block level is not equal (sequencer: %L; expected: %R)" ;

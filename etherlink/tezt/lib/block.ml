@@ -30,7 +30,7 @@ type transactions =
 
 type t = {
   number : int32;
-  hash : string option;
+  hash : string;
   parent : string;
   nonce : string;
   sha3Uncles : string;
@@ -75,7 +75,7 @@ let of_json json =
   in
   {
     number = json |-> "number" |> as_int32;
-    hash = json |-> "hash" |> as_string_opt;
+    hash = json |-> "hash" |> as_string;
     parent = json |?-> ("parent", "parentHash") |> as_string;
     nonce = json |-> "nonce" |> as_string;
     sha3Uncles = json |-> "sha3Uncles" |> as_string;

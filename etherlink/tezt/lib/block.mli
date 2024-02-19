@@ -34,7 +34,7 @@ type transactions =
 (** Simplified Ethereum block representation. *)
 type t = {
   number : int32;
-  hash : string option;
+  hash : string;
   parent : string;
   nonce : string;
   sha3Uncles : string;

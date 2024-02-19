@@ -374,7 +374,7 @@ let test_publish_blueprints =
      we put a small sleep to make the least flaky possible. *)
   let* () = Lwt_unix.sleep 2. in
   let*@ rollup_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_head.hash) (option string))
+  Check.((sequencer_head.hash = rollup_head.hash) string)
     ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
   unit
 
@@ -429,7 +429,7 @@ let test_resilient_to_rollup_node_disconnect =
   (* Check sequencer and rollup consistency *)
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+  Check.((sequencer_head.hash = rollup_node_head.hash) string)
     ~error_msg:"The head should be the same before the outage" ;
 
   (* Kill the rollup node *)
@@ -501,7 +501,7 @@ let test_resilient_to_rollup_node_disconnect =
   (* Check the consistency again *)
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+  Check.((sequencer_head.hash = rollup_node_head.hash) string)
     ~error_msg:"The head should be the same after the outage" ;
 
   unit
@@ -968,7 +968,7 @@ let test_observer_applies_blueprint =
   in
   let*@ observer_head = Rpc.get_block_by_number ~block:"latest" observer_node in
 
-  Check.((sequencer_head.hash = observer_head.hash) (option string))
+  Check.((sequencer_head.hash = observer_head.hash) string)
     ~error_msg:"head hash is not equal (sequencer: %L; rollup: %R)" ;
 
   unit
@@ -1030,7 +1030,7 @@ let test_upgrade_kernel_auto_sync =
 
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+  Check.((sequencer_head.hash = rollup_node_head.hash) string)
     ~error_msg:"The head should be the same before the upgrade" ;
 
   (* Produce a block after activation timestamp, both the rollup
@@ -1051,7 +1051,7 @@ let test_upgrade_kernel_auto_sync =
 
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+  Check.((sequencer_head.hash = rollup_node_head.hash) string)
     ~error_msg:"The head should be the same after upgrade" ;
   unit
 
@@ -1112,7 +1112,7 @@ let test_upgrade_kernel_sync =
   in
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+  Check.((sequencer_head.hash = rollup_node_head.hash) string)
     ~error_msg:"The head should be the same before the upgrade" ;
 
   (* Produce a block after activation timestamp, the rollup node and
@@ -1133,7 +1133,7 @@ let test_upgrade_kernel_sync =
 
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) (option string))
+  Check.((sequencer_head.hash = rollup_node_head.hash) string)
     ~error_msg:"The head shouldn't be the same after upgrade" ;
   unit
 
