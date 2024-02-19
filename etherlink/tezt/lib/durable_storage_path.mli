@@ -74,3 +74,7 @@ val delayed_inbox_timeout : path
 (** [delayed_inbox_min_levels] is the path to the minimum number of L1 levels
     needed to have passed to consider a timeout. *)
 val delayed_inbox_min_levels : path
+
+(** [config_root_hash] is the path to the root hash of the
+    storage configuration.  *)
+val config_root_hash : path

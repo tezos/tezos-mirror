@@ -62,3 +62,5 @@ let da_fee_per_byte_path = evm "/fees/da_fee_per_byte"
 let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
 
 let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"
+
+let config_root_hash = "/__tmp/config_root_hash"

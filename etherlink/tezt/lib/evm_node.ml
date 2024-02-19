@@ -478,3 +478,8 @@ let upgrade_payload ~root_hash ~activation_timestamp =
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
   let* payload = Process.check_and_read_stdout process in
   return (String.trim payload)
+
+let transform_dump ~dump_json ~dump_rlp =
+  let args = ["transform"; "dump"; dump_json; "to"; "rlp"; dump_rlp] in
+  let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
+  Process.check process
