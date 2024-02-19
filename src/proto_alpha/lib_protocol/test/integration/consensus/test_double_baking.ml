@@ -113,8 +113,9 @@ let test_valid_double_baking_evidence () =
   in
   (* Check that the frozen deposits have been slashed at the end of the cycle. *)
   let* blk_eoc, end_cycle_metadata, _next_cycle =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker2)
+      2
       blk_final
   in
   let end_cycle_metadata =
@@ -189,8 +190,9 @@ let test_valid_double_baking_followed_by_double_attesting () =
       frozen_deposits_right_after
   in
   let* blk_eoc, metadata, _ =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker2)
+      2
       blk_final
   in
   let metadata = Option.value_f ~default:(fun () -> assert false) metadata in
@@ -267,8 +269,9 @@ let test_valid_double_attesting_followed_by_double_baking () =
       frozen_deposits_right_after
   in
   let* blk_eoc, end_cycle_metadata, _ =
-    Block.bake_until_cycle_end_with_metadata
+    Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker2)
+      2
       blk_with_db_evidence
   in
   let end_cycle_metadata =
@@ -305,7 +308,9 @@ let test_valid_double_attesting_followed_by_double_baking () =
    the reward. *)
 let test_payload_producer_gets_evidence_rewards () =
   let open Lwt_result_syntax in
-  let* genesis, contracts = Context.init_n ~consensus_threshold:0 10 () in
+  let* genesis, contracts =
+    Context.init_n ~consensus_threshold:0 ~consensus_committee_size:64 10 ()
+  in
   let* c = Context.get_constants (B genesis) in
   let p =
     c.parametric.percentage_of_frozen_deposits_slashed_per_double_baking
@@ -375,13 +380,12 @@ let test_payload_producer_gets_evidence_rewards () =
   in
   (* Slashing and rewarding happen at the end of the cycle. *)
   let* b', end_cycle_metadata, _ =
-    Block.bake_until_cycle_end_with_metadata ~policy:(By_account baker2) b'
+    Block.bake_until_n_cycle_end_with_metadata ~policy:(By_account baker2) 2 b'
   in
   let end_cycle_metadata =
     Option.value_f ~default:(fun () -> assert false) end_cycle_metadata
   in
   let autostaked = Block.autostaked baker1 end_cycle_metadata in
-
   let* frozen_deposits_after =
     Context.Delegate.current_frozen_deposits (B b') baker1
   in

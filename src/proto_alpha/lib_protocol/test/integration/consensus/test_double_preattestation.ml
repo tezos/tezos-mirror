@@ -48,8 +48,8 @@ end = struct
 
   let bake_n = Block.bake_n ~baking_mode:Mode.baking_mode
 
-  let bake_until_cycle_end =
-    Block.bake_until_cycle_end ~baking_mode:Mode.baking_mode
+  let bake_until_n_cycle_end =
+    Block.bake_until_n_cycle_end ~baking_mode:Mode.baking_mode
 
   (****************************************************************)
   (*                    Utility functions                         *)
@@ -143,8 +143,8 @@ end = struct
     let* bal_bad = Context.Delegate.full_balance (B bbad) d1 in
     let* () = Assert.equal_tez ~loc:__LOC__ bal_good bal_bad in
     (* Slashing happens at the end of the cycle. *)
-    let* bgood = bake_until_cycle_end ~policy:(By_account baker) bgood in
-    let* bbad = bake_until_cycle_end ~policy:(By_account baker) bbad in
+    let* bgood = bake_until_n_cycle_end ~policy:(By_account baker) 2 bgood in
+    let* bbad = bake_until_n_cycle_end ~policy:(By_account baker) 2 bbad in
     (* Checking what the attester lost *)
     let* frozen_deposit =
       Context.Delegate.current_frozen_deposits (B pred) d1
@@ -231,6 +231,7 @@ end = struct
         ~issuance_weights
         ~adaptive_issuance
         ~consensus_threshold:0
+        ~consensus_committee_size:64
         10
         ()
     in
