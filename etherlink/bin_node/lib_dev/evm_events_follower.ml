@@ -76,7 +76,7 @@ let on_new_event ({backend; _} : Types.state) event =
   let open Ethereum_types in
   let (module Backend) = backend in
   match event with
-  | Evm_events.UpgradeEvent upgrade ->
+  | Evm_events.Upgrade_event upgrade ->
       let payload = Upgrade.to_bytes upgrade |> String.of_bytes in
       Backend.inject_kernel_upgrade ~payload
 
