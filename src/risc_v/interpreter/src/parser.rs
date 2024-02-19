@@ -19,6 +19,11 @@ fn bits(bytes: u32, pos: usize, n: usize) -> u32 {
 }
 
 #[inline(always)]
+fn bit(bytes: u32, pos: usize) -> bool {
+    bytes & (1 << pos) != 0
+}
+
+#[inline(always)]
 fn opcode(instr: u32) -> u32 {
     bits(instr, 0, 7)
 }
@@ -61,6 +66,11 @@ fn rs2(instr: u32) -> XRegister {
 #[inline(always)]
 fn imm_11_6(instr: u32) -> u32 {
     bits(instr, 26, 6) << 1
+}
+
+#[inline(always)]
+fn fm(instr: u32) -> u32 {
+    bits(instr, 28, 4)
 }
 
 fn csr(instr: u32) -> Option<CSRegister> {
@@ -166,6 +176,25 @@ macro_rules! j_instr {
     };
 }
 
+macro_rules! fence_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        $enum_variant(instruction::FenceArgs {
+            pred: FenceSet {
+                i: bit($instr, 27),
+                o: bit($instr, 26),
+                r: bit($instr, 25),
+                w: bit($instr, 24),
+            },
+            succ: FenceSet {
+                i: bit($instr, 23),
+                o: bit($instr, 22),
+                r: bit($instr, 21),
+                w: bit($instr, 20),
+            },
+        })
+    };
+}
+
 macro_rules! csr_instr {
     ($enum_variant:ident, $instr:expr) => {
         match csr($instr) {
@@ -224,6 +253,9 @@ const RS1_0: u32 = 0b0;
 const RS2_0: u32 = 0b0;
 const RS2_1: u32 = 0b1;
 const RS2_2: u32 = 0b10;
+
+const FM_0: u32 = 0b0;
+const FM_8: u32 = 0b1000;
 
 fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use Instr::*;
@@ -330,9 +362,11 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             _ => Unknown { instr },
         },
         OP_SYNCH => match funct3(instr) {
-            // TODO: finer-grained parsing of fence to extract FM, predecessor,
-            // and successor bits
-            F3_0 => i_instr!(Fence, instr),
+            F3_0 => match fm(instr) {
+                FM_0 => fence_instr!(Fence, instr),
+                FM_8 => fence_instr!(FenceTso, instr),
+                _ => Unknown { instr },
+            },
             _ => Unknown { instr },
         },
         OP_SYS => match funct3(instr) {

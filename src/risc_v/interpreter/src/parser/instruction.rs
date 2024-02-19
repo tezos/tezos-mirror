@@ -47,6 +47,20 @@ pub struct CsriArgs {
     pub csr: CSRegister,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FenceSet {
+    pub i: bool,
+    pub o: bool,
+    pub r: bool,
+    pub w: bool,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FenceArgs {
+    pub pred: FenceSet,
+    pub succ: FenceSet,
+}
+
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
@@ -90,7 +104,8 @@ pub enum Instr {
     Lhu(ITypeArgs),
     Lwu(ITypeArgs),
     Ld(ITypeArgs),
-    Fence(ITypeArgs),
+    Fence(FenceArgs),
+    FenceTso(FenceArgs),
     Ecall,
     Ebreak,
 
@@ -186,6 +201,12 @@ macro_rules! u_instr {
     };
 }
 
+macro_rules! fence_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{}", $op, $args.pred, $args.succ)
+    };
+}
+
 macro_rules! csr_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {:?},{},{:?}", $op, $args.rd, $args.csr, $args.rs1)
@@ -196,6 +217,29 @@ macro_rules! csri_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {:?},{},{}", $op, $args.rd, $args.csr, $args.imm)
     };
+}
+
+impl fmt::Display for FenceSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut out = String::new();
+        if self.i {
+            out.push('i')
+        };
+        if self.o {
+            out.push('o')
+        };
+        if self.r {
+            out.push('r')
+        };
+        if self.w {
+            out.push('w')
+        };
+        if out.is_empty() {
+            write!(f, "unknown")
+        } else {
+            write!(f, "{}", out)
+        }
+    }
 }
 
 /// An objdump-style prettyprinter for parsed instructions, used in testing
@@ -260,8 +304,10 @@ impl fmt::Display for Instr {
             Lhu(args) => i_instr_load!(f, "lhu", args),
             Lwu(args) => i_instr_load!(f, "lwu", args),
             Ld(args) => i_instr_load!(f, "ld", args),
-            // TODO: adjust printer once finer-grained parsing for fence is implemented
-            Fence(_) => write!(f, "fence iorw,iorw"),
+
+            Fence(args) => fence_instr!(f, "fence", args),
+            FenceTso(args) => fence_instr!(f, "fence.tso", args),
+
             Ecall => write!(f, "ecall"),
             Ebreak => write!(f, "ebreak"),
 

@@ -49,14 +49,20 @@ const OBJDUMP_OPTS: [&str; 3] = ["--disassemble", "-M", "no-aliases,numeric"];
 
 /// Disassemble a RISC-V binary using objdump and return a vector of tuples
 /// consisting of the address of the instruction, the parsed instruction, and
-/// the objdump output for the instruction.
-fn objdump(file_path: &str) -> Vec<(String, Instr, String)> {
-    let output = Command::new(OBJDUMP)
-        .args(OBJDUMP_OPTS)
-        .arg(file_path)
-        .output()
-        .expect("Failed to run objdump");
-    let contents = std::str::from_utf8(&output.stdout).unwrap();
+/// the objdump output for the instruction. When `disassembled` is true,
+/// `file_path` is expected to point to a file containing the output of
+/// a previous objdump run.
+fn objdump(file_path: &str, disassembled: bool) -> Vec<(String, Instr, String)> {
+    let contents = if disassembled {
+        std::fs::read_to_string(file_path).expect("Failed to read file")
+    } else {
+        let output = Command::new(OBJDUMP)
+            .args(OBJDUMP_OPTS)
+            .arg(file_path)
+            .output()
+            .expect("Failed to run objdump");
+        std::str::from_utf8(&output.stdout).unwrap().to_string()
+    };
 
     let mut instructions = Vec::new();
 
@@ -86,6 +92,20 @@ fn parse_encoded(encoded: &str) -> Instr {
     parse_block(&bytes)[0]
 }
 
+fn check_instructions(fname: &str, instructions: Vec<(String, Instr, String)>) {
+    for (address, parsed_instr, objdump_instr) in instructions {
+        let printed_instr = parsed_instr.to_string();
+        if printed_instr.starts_with("unknown") || objdump_instr == "unimp" {
+            continue;
+        }
+        assert_eq!(
+            printed_instr, objdump_instr,
+            "{} at address {}",
+            fname, address
+        );
+    }
+}
+
 #[test]
 fn parser_riscv_test_suite() {
     let tests_dir = "../../../tezt/tests/riscv-tests/generated/";
@@ -97,17 +117,19 @@ fn parser_riscv_test_suite() {
         }
         let path = file.path();
         let fname = path.to_string_lossy();
-        let instructions = objdump(&fname);
-        for (address, parsed_instr, objdump_instr) in instructions {
-            let printed_instr = parsed_instr.to_string();
-            if printed_instr.starts_with("unknown") || objdump_instr == "unimp" {
-                continue;
-            }
-            assert_eq!(
-                printed_instr, objdump_instr,
-                "{} at address {}",
-                fname, address
-            );
-        }
+        let instructions = objdump(&fname, false);
+        check_instructions(&fname, instructions)
     }
+}
+
+#[ignore]
+#[test]
+fn parser_riscv_jstz() {
+    // Test currently disabled in CI because running objdump on the jstz kernel
+    // is slow (~15 min) and the resulting file is very large (~110MB).
+    // To run locally, generate a dump on the compiled jstz kernel:
+    // `objdump -d -M no-aliases,numeric jstz/target/riscv64gc-unknown-hermit/release/jstz > interpreter/tests/jstz_objdump`
+    let fname = "tests/jstz_objdump";
+    let instructions = objdump(fname, true);
+    check_instructions(fname, instructions)
 }
