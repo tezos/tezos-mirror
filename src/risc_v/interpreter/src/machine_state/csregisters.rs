@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-mod xstatus;
+pub mod xstatus;
 
 use crate::machine_state::{
     backend::{self, Region},
