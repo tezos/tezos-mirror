@@ -9,6 +9,8 @@ open Ethereum_types
 
 module MakeBackend (Ctxt : sig
   val ctxt : Evm_context.t
+
+  val evm_node_endpoint : Uri.t
 end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
@@ -43,10 +45,53 @@ end) : Services_backend_sig.Backend = struct
   module Publisher = struct
     type messages = TxEncoder.messages
 
-    let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages:_ =
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6882
-         Forward transactions *)
-      failwith "Forwarding transactions is not implemented yet"
+    let check_response =
+      let open Rpc_encodings.JSONRPC in
+      let open Lwt_result_syntax in
+      function
+      | {value = Ok _; _} -> return_unit
+      | {value = Error {message; _}; _} ->
+          failwith "Send_raw_transaction failed with message \"%s\"" message
+
+    let check_batched_response =
+      let open Services in
+      function
+      | Batch l -> List.iter_es check_response l
+      | Singleton r -> check_response r
+
+    let send_raw_transaction_method txn =
+      let open Rpc_encodings in
+      let message =
+        Hex.of_string txn |> Hex.show |> Ethereum_types.hex_of_string
+      in
+      JSONRPC.
+        {
+          method_ = Send_raw_transaction.method_;
+          parameters =
+            Some
+              (Data_encoding.Json.construct
+                 Send_raw_transaction.input_encoding
+                 message);
+          id = None;
+        }
+
+    let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages =
+      let open Rollup_services in
+      let open Lwt_result_syntax in
+      let methods = List.map send_raw_transaction_method messages in
+
+      let* response =
+        call_service
+          ~base:Ctxt.evm_node_endpoint
+          (Services.dispatch_service ~path:Resto.Path.root)
+          ()
+          ()
+          (Batch methods)
+      in
+
+      let* () = check_batched_response response in
+
+      return_unit
   end
 
   module SimulatorBackend = struct
@@ -88,6 +133,9 @@ let main (ctxt : Evm_context.t) ~evm_node_endpoint =
     match candidate with
     | Some blueprint ->
         let* ctxt = on_new_blueprint ctxt blueprint in
+        let* _ =
+          Tx_pool.produce_block ~force:false ~timestamp:(Helpers.now ())
+        in
         loop ctxt stream
     | None -> return_unit
   in
@@ -104,5 +152,7 @@ let main (ctxt : Evm_context.t) ~evm_node_endpoint =
 
 module Make (Ctxt : sig
   val ctxt : Evm_context.t
+
+  val evm_node_endpoint : Uri.t
 end) : Services_backend_sig.S =
   Services_backend_sig.Make (MakeBackend (Ctxt))
