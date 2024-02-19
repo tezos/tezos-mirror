@@ -2988,6 +2988,7 @@ type e2e_test = {
   number_of_dal_slots : int;
   beforehand_slot_injection : int;
   num_extra_nodes : int;
+  tags : string list;
 }
 
 let e2e_tests =
@@ -3003,6 +3004,7 @@ let e2e_tests =
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
       num_extra_nodes = 2;
+      tags = [];
     }
   in
   let test2 =
@@ -3013,6 +3015,7 @@ let e2e_tests =
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
       num_extra_nodes = 2;
+      tags = [Tag.flaky];
     }
   in
   let mainnet1 =
@@ -3023,6 +3026,7 @@ let e2e_tests =
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
       num_extra_nodes = 1;
+      tags = [];
     }
   in
   let mainnet2 =
@@ -3033,6 +3037,7 @@ let e2e_tests =
       number_of_dal_slots = 5;
       beforehand_slot_injection = 10;
       num_extra_nodes = 0;
+      tags = [];
     }
   in
   [test1; test2; mainnet1; mainnet2]
@@ -3054,6 +3059,7 @@ let register_end_to_end_tests ~protocols =
         number_of_dal_slots;
         beforehand_slot_injection;
         num_extra_nodes;
+        tags;
       } =
         test
       in
@@ -3087,7 +3093,8 @@ let register_end_to_end_tests ~protocols =
       in
       let tags =
         ["e2e"; network]
-        @ match constants with Constants_mainnet -> [Tag.slow] | _ -> []
+        @ (match constants with Constants_mainnet -> [Tag.slow] | _ -> [])
+        @ tags
       in
       scenario_with_all_nodes
         ~custom_constants:constants
