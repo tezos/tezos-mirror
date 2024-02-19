@@ -23,7 +23,9 @@ use rlp::{Decodable, DecoderError, Encodable};
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
-use tezos_ethereum::transaction::{TransactionHash, TRANSACTION_HASH_SIZE};
+use tezos_ethereum::transaction::{
+    TransactionHash, TransactionType, TRANSACTION_HASH_SIZE,
+};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -110,6 +112,7 @@ impl Decodable for TransactionContent {
         }
     }
 }
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     pub tx_hash: TransactionHash,
@@ -146,6 +149,16 @@ impl Decodable for Transaction {
         let content: TransactionContent =
             decode_field(&next(&mut it)?, "Transaction content")?;
         Ok(Transaction { tx_hash, content })
+    }
+}
+
+impl Transaction {
+    pub fn type_(&self) -> TransactionType {
+        match &self.content {
+            // The deposit is considered arbitrarily as a legacy transaction
+            TransactionContent::Deposit(_) => TransactionType::Legacy,
+            TransactionContent::Ethereum(tx) => tx.type_,
+        }
     }
 }
 
