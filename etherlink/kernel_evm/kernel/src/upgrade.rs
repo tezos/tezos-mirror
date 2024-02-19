@@ -29,12 +29,16 @@ pub struct KernelUpgrade {
     pub activation_timestamp: Timestamp,
 }
 
+impl KernelUpgrade {
+    const RLP_LIST_SIZE: usize = 2;
+}
+
 impl Decodable for KernelUpgrade {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
-        if decoder.item_count()? != 2 {
+        if decoder.item_count()? != KernelUpgrade::RLP_LIST_SIZE {
             return Err(DecoderError::RlpIncorrectListLen);
         }
 
@@ -54,7 +58,7 @@ impl Decodable for KernelUpgrade {
 
 impl Encodable for KernelUpgrade {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
+        stream.begin_list(KernelUpgrade::RLP_LIST_SIZE);
         stream.append_iter(self.preimage_hash);
         append_timestamp(stream, self.activation_timestamp);
     }
