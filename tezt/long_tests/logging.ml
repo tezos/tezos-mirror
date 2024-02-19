@@ -71,6 +71,9 @@ let test_simple_event_logging_time ~executors title simple_event =
     ~title
     ~tags:["simple"; "event"; "logging"; "time"; title]
     ~timeout:(Seconds 10)
+    ~uses_node:true
+    ~uses_admin_client:true
+    ~uses_client:true
     ~executors
   @@ fun () ->
   Long_test.time_lwt title @@ fun () ->
