@@ -20,7 +20,7 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"evm_node_node_lost_connection"
+    ~id:"evm_node_prod_lost_connection"
     ~title:"Lost connection with rollup node"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)

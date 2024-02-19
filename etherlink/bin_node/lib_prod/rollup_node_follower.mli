@@ -5,10 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main ctxt ~evm_node_endpoint] starts the main event-loop of the Observer,
-    consuming the blueprints received from [evm_node_endpoint]. *)
-val main : Evm_context.t -> evm_node_endpoint:Uri.t -> unit tzresult Lwt.t
+type parameters = {
+  rollup_node_endpoint : Uri.t;
+      (** Rollup node endpoint used to monitor the stream of rollup
+          node block. *)
+}
 
-module Make (Ctxt : sig
-  val ctxt : Evm_context.t
-end) : Services_backend_sig.S
+(** [start parameters] starts the rollup node follower. *)
+val start : parameters -> unit tzresult Lwt.t
+
+(** [shutdown ()] stops the rollup node follower. *)
+val shutdown : unit -> unit Lwt.t

@@ -21,7 +21,8 @@ type t = {
   to_execute : Blueprint_types.payload;
 }
 
-(** [create ~secret_key ~timestamp ~smart_rollup_address ~number ~transactions]
+(** [create ~secret_key ~timestamp ~smart_rollup_address ~number
+    ~parent_hash ~delayed_transactions ~transactions]
     creates a sequencer blueprint at [timestamp] with a given [number]
     containing [transactions], signed with [secret_key].  Returns
     valid list of external messages inputs to put in the inbox.
@@ -31,6 +32,7 @@ val create :
   timestamp:Time.Protocol.t ->
   smart_rollup_address:string ->
   number:Ethereum_types.quantity ->
+  parent_hash:Ethereum_types.block_hash ->
   delayed_transactions:Ethereum_types.Delayed_transaction.t list ->
   transactions:string list ->
   t

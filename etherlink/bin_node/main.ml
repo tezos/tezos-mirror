@@ -725,6 +725,9 @@ let sequencer_command =
         Evm_node_lib_prod.Sequencer.main
           ~data_dir
           ~rollup_node_endpoint
+          ~max_blueprints_lag
+          ~max_blueprints_catchup
+          ~catchup_cooldown
           ?genesis_timestamp
           ~sequencer
           ~configuration

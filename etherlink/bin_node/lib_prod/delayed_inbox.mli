@@ -19,3 +19,8 @@ val start : parameters -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the delayed inbox worker. *)
 val shutdown : unit -> unit Lwt.t
+
+(** [new_rollup_block rollup_level] tells the worker that a new L2
+    head has been published and that the rollup head is now
+    [rollup_level]. *)
+val new_rollup_block : Int32.t -> unit tzresult Lwt.t

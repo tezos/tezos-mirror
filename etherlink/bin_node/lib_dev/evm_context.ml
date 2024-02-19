@@ -70,7 +70,7 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 let () =
   register_error_kind
     `Permanent
-    ~id:"cannot_apply_blueprint"
+    ~id:"evm_node_dev_cannot_apply_blueprint"
     ~title:"Cannot apply a blueprint"
     ~description:
       "The EVM node could not apply apply a blueprint on top of its local EVM \

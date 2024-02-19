@@ -12,6 +12,7 @@ module Request = struct
         payload : [`External of string] list;
       }
         -> (unit, error trace) t
+    | New_l2_head : {rollup_head : Z.t} -> (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -32,12 +33,27 @@ module Request = struct
              (req "level" n)
              (req "payload" (list external_encoding)))
           (function
-            | View (Publish {level; payload}) -> Some ((), level, payload))
+            | View (Publish {level; payload}) -> Some ((), level, payload)
+            | _ -> None)
           (fun ((), level, payload) -> View (Publish {level; payload}));
+        case
+          (Tag 1)
+          ~title:"New_l2_head"
+          (obj2 (req "request" (constant "new_l2_head")) (req "rollup_head" n))
+          (function
+            | View (New_l2_head {rollup_head}) -> Some ((), rollup_head)
+            | _ -> None)
+          (fun ((), rollup_head) -> View (New_l2_head {rollup_head}));
       ]
 
   let pp ppf (View r) =
     match r with
     | Publish {level; payload = _} ->
         Format.fprintf ppf "Publish { level = %a }" Z.pp_print level
+    | New_l2_head {rollup_head} ->
+        Format.fprintf
+          ppf
+          "New_l2_head { rollup_head = %a }"
+          Z.pp_print
+          rollup_head
 end
