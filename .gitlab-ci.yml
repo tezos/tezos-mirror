@@ -41,10 +41,6 @@ build:
     - if [ "$OCTEZ_BRANCH" == "v18.1" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
     - opam-2.1 install -y caqti.1.9.0 caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass
     - dune build archiver/main.exe server/main.exe
-    # directly build docker
-    - !reference [.docker-push, script]
-    # directly build docker manifest
-    - !reference [.manifest, script]
 
 
   artifacts:
@@ -192,9 +188,9 @@ release:arm64:master:
 #     ARCH: "amd64"
 #     OCTEZ_BRANCH: "v19.0"
     
-docker:amd64:v19.0:
+docker:amd64:v19.1:
   extends: .docker-push
-  dependencies: ["build: [amd64, v19.0]"]
+  dependencies: ["build: [amd64, v19.1]"]
   variables:
     ARCH: "amd64"
     OCTEZ_BRANCH: "v19.1"
