@@ -16,8 +16,6 @@ module Request : sig
 
   val produceBlock : ?timestamp:string -> unit -> Evm_node.request
 
-  val injectUpgrade : string -> Evm_node.request
-
   val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
 
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
@@ -54,10 +52,6 @@ end
 (** [produce_block ?timestamp evm_node] calls the private RPC [produceBlock]. If
     provided the block will have timestamp [timestamp] (in RFC3339) format. *)
 val produce_block : ?timestamp:string -> Evm_node.t -> int32 Lwt.t
-
-(** [inject_upgrade ~payload evm_node] calls the private RPC [injectUpgrade].
-    It will store the [payload] under the kernel upgrade path. *)
-val inject_upgrade : payload:string -> Evm_node.t -> unit Lwt.t
 
 (** [send_raw_transaction ~raw_tx evm_node] calls [eth_sendRawTransaction]
     with [raw_tx] as argument. *)

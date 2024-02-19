@@ -1030,7 +1030,7 @@ let test_upgrade_kernel_auto_sync =
   Protocol.register_test
     ~__FILE__
     ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
-    ~title:"Rollup-node kernel upgrade is applyed to the sequencer state."
+    ~title:"Rollup-node kernel upgrade is applied to the sequencer state."
     ~uses:(fun protocol -> Constant.WASM.debug_kernel :: uses protocol)
   @@ fun protocol ->
   (* Add a delay between first block and activation timestamp. *)
@@ -1061,7 +1061,6 @@ let test_upgrade_kernel_auto_sync =
       ~client
       ~upgrade_to:Constant.WASM.debug_kernel
       ~activation_timestamp
-      ~evm_node:None
   in
 
   (* Per the activation timestamp, the state will remain synchronised until
@@ -1104,88 +1103,6 @@ let test_upgrade_kernel_auto_sync =
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.((sequencer_head.hash = rollup_node_head.hash) string)
     ~error_msg:"The head should be the same after upgrade" ;
-  unit
-
-(** This tests the situation where the kernel has an upgrade and the
-    sequencer is notified via the private RPC. This is the opposite
-    test of {!test_upgrade_kernel_auto_sync}. *)
-let test_upgrade_kernel_sync =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "sequencer"; "upgrade"; "sync"]
-    ~title:"Synchronize upgrade with rollup-node"
-    ~uses:(fun protocol -> Constant.WASM.debug_kernel :: uses protocol)
-  @@ fun protocol ->
-  (* Add a delay between first block and activation timestamp. *)
-  let genesis_timestamp =
-    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
-  in
-  let activation_timestamp = "2020-01-01T00:00:10Z" in
-
-  let* {
-         sc_rollup_node;
-         l1_contracts;
-         sc_rollup_address;
-         client;
-         sequencer;
-         proxy;
-         node;
-         _;
-       } =
-    setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
-  in
-  (* Sends the upgrade to L1 and sequencer. *)
-  let* () =
-    upgrade
-      ~sc_rollup_node
-      ~sc_rollup_address
-      ~admin:Constant.bootstrap1.public_key_hash
-      ~admin_contract:l1_contracts.admin
-      ~client
-      ~upgrade_to:Constant.WASM.debug_kernel
-      ~activation_timestamp
-      ~evm_node:(Some sequencer)
-  in
-
-  (* Per the activation timestamp, the state will remain synchronised until
-     the kernel is upgraded. *)
-  let* _ =
-    repeat 2 (fun () ->
-        let* _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
-        in
-        unit)
-  in
-  let* () =
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
-        unit)
-  in
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) string)
-    ~error_msg:"The head should be the same before the upgrade" ;
-
-  (* Produce a block after activation timestamp, the rollup node and
-     the sequencer will both upgrade to debug kernel and therefore not
-     produce the block. *)
-  let* _ =
-    repeat 2 (fun () ->
-        let* _ =
-          Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
-        in
-        unit)
-  in
-  let* () =
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
-        unit)
-  in
-
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) string)
-    ~error_msg:"The head shouldn't be the same after upgrade" ;
   unit
 
 let test_delayed_transfer_timeout =
@@ -1388,7 +1305,6 @@ let test_force_kernel_upgrade_too_early =
       ~client
       ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
       ~activation_timestamp
-      ~evm_node:(Some sequencer)
   in
 
   (* Now we try force the kernel upgrade via an external message. *)
@@ -1458,7 +1374,6 @@ let test_force_kernel_upgrade =
       ~client
       ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
       ~activation_timestamp
-      ~evm_node:(Some sequencer)
   in
 
   (* We bake a few blocks. As the sequencer is not producing anything, the
@@ -1634,7 +1549,6 @@ let () =
   test_observer_applies_blueprint [Alpha] ;
   test_observer_forwards_transaction [Alpha] ;
   test_upgrade_kernel_auto_sync [Alpha] ;
-  test_upgrade_kernel_sync [Alpha] ;
   test_force_kernel_upgrade [Alpha] ;
   test_force_kernel_upgrade_too_early [Alpha] ;
   test_external_transaction_to_delayed_inbox_fails [Alpha] ;

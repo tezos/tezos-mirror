@@ -36,9 +36,6 @@ module Request = struct
     in
     {method_ = "produceBlock"; parameters}
 
-  let injectUpgrade payload =
-    {method_ = "injectUpgrade"; parameters = `String payload}
-
   let eth_sendRawTransaction ~raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
@@ -117,15 +114,6 @@ let produce_block ?timestamp evm_node =
       (Request.produceBlock ?timestamp ())
   in
   return JSON.(json |-> "result" |> as_string |> Int32.of_string)
-
-let inject_upgrade ~payload evm_node =
-  let* _json =
-    Evm_node.call_evm_rpc
-      ~private_:true
-      evm_node
-      (Request.injectUpgrade payload)
-  in
-  return ()
 
 let send_raw_transaction ~raw_tx evm_node =
   let* response =

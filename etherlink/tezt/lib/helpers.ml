@@ -99,7 +99,7 @@ let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client ~node =
   unit
 
 let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
-    ~upgrade_to ~activation_timestamp ~evm_node =
+    ~upgrade_to ~activation_timestamp =
   let preimages_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
@@ -118,6 +118,4 @@ let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  match evm_node with
-  | Some evm_node -> Rpc.inject_upgrade ~payload evm_node
-  | None -> unit
+  unit
