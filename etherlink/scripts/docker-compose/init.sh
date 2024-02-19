@@ -54,7 +54,7 @@ add_kernel_config_contract() {
   alias="$3"
   label="$4"
 
-  if address=$(run_in_docker octez-client --endpoint "$ENDPOINT" show known contract "$alias"); then
+  if address=$(run_in_docker octez-client --endpoint "$ENDPOINT" show known contract "$alias" 2> /dev/null); then
     hex=$(printf '%s' "${address}" | xxd -p -c 36)
     add_kernel_config_set "$file" "$key" "$hex" "${label}: ${address}"
   fi
@@ -95,11 +95,12 @@ create_kernel_config() {
 
 build_kernel() {
   mkdir -p "${HOST_TEZOS_DATA_DIR}/.tezos-client"
-  cp "${SEQUENCER_CONFIG}" evm_kernel_builder/evm_config.yaml
-  create_kernel_config evm_kernel_builder/evm_config.yaml
+  cp "${EVM_KERNEL_CONFIG}" "$script_dir"/evm_config_tmp.yaml
+  create_kernel_config "$script_dir"/evm_config_tmp.yaml
   # build kernel in an image (e.g. tezos/tezos-bare:master) with new chain id
-  docker build --no-cache -t etherlink_kernel:"${OCTEZ_TAG}" "${script_dir}"/evm_kernel_builder/
-  container_name=$(docker create etherlink_kernel:"${OCTEZ_TAG}")
+  commit="$(git rev-parse HEAD)"
+  docker build --no-cache -t etherlink_kernel:"$commit" --build-arg EVM_CONFIG="etherlink/scripts/docker-compose/evm_config_tmp.yaml" --build-arg CI_COMMIT_SHA="$commit" -f "$script_dir/evm_kernel_builder.Dockerfile" "${script_dir}/../../.."
+  container_name=$(docker create etherlink_kernel:"$commit")
   docker cp "${container_name}":/kernel/ "${HOST_TEZOS_DATA_DIR}/"
 }
 
@@ -191,7 +192,7 @@ originate_contracts() {
 init_rollup() {
   docker_update_images
   build_kernel
-  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
+  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/evm_installer.wasm
   originate_evm_rollup "${kernel}"
   init_rollup_node_config
 }
@@ -263,7 +264,7 @@ init_octez_node)
 build_kernel)
   docker_update_images
   build_kernel
-  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/sequencer.wasm
+  kernel="${HOST_TEZOS_DATA_DIR}"/kernel/evm_installer.wasm
   ;;
 init_rollup)
   if [[ -n ${OPERATOR_ALIAS} ]]; then
@@ -308,7 +309,7 @@ Available commands:
   - originate_contracts:
     originate contracts
   - build_kernel:
-    build lastest evm kernel
+    build latest evm kernel
   - init_rollup:
     build lastest evm kernel, originate the rollup, create operator, wait until operator balance
      is topped then create rollup node config.
