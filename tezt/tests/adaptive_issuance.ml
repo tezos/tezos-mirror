@@ -1082,6 +1082,15 @@ let test_staking =
     else Test.fail "Double baking evidence was not found"
   in
 
+  (* Bake a cycle to wait for the slashing *)
+  let* () =
+    Helpers.bake_n_cycles
+      bake
+      ~keys:[Constant.bootstrap1.public_key_hash]
+      1
+      client_1
+  in
+
   let* bu = Operation_receipt.get_block_metadata client_1 in
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
@@ -1323,7 +1332,7 @@ let test_staking =
   in
 
   assert (List.length finalizable == 0) ;
-  assert (List.length unfinalizable == 1) ;
+  assert (List.length unfinalizable == 0) ;
 
   let* balance2 = Client.get_balance_for ~account:staker0.alias client_1 in
   Log.info
