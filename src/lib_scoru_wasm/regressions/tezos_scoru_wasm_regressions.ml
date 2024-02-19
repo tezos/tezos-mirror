@@ -54,7 +54,12 @@ let rec eval_and_capture_many ?(fail_on_stuck = true) ~bunk
   match info.input_request with
   | No_input_required when max_steps > 0L ->
       let steps = Int64.min bunk max_steps in
-      let* tree, steps = Wasm_fast.compute_step_many ~max_steps:steps tree in
+      let* tree, steps =
+        Wasm_fast.compute_step_many
+          ~wasm_entrypoint:Constants.wasm_entrypoint
+          ~max_steps:steps
+          tree
+      in
       let max_steps = Int64.sub max_steps steps in
       eval_and_capture_many ~bunk ~max_steps tree
   | _ ->
@@ -150,7 +155,9 @@ let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
       match info.input_request with
       | No_input_required when checked_ticks < ticks_to_check ->
           let* () = k context s in
-          let* s = Wasm_fast.compute_step s in
+          let* s =
+            Wasm_fast.compute_step ~wasm_entrypoint:Constants.wasm_entrypoint s
+          in
           (eval [@tailcall]) Int64.(succ checked_ticks) s
       | No_input_required -> (skip [@tailcall]) s
       | _ -> return s
@@ -158,7 +165,12 @@ let register_gen ~from_binary ~fail_on_stuck ?ticks_per_snapshot ~tag ~inputs
       let* info = Wasm_fast.get_info s in
       match info.input_request with
       | No_input_required when 0L < skip_ticks ->
-          let* s, _ = Wasm_fast.compute_step_many ~max_steps:skip_ticks s in
+          let* s, _ =
+            Wasm_fast.compute_step_many
+              ~wasm_entrypoint:Constants.wasm_entrypoint
+              ~max_steps:skip_ticks
+              s
+          in
           (eval [@tailcall]) 0L s
       | No_input_required -> (eval [@tailcall]) 0L s
       | _ -> return s

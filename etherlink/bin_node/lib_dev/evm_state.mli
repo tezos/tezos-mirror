@@ -7,10 +7,15 @@
 
 type t = Irmin_context.PVMState.value
 
-(** [execute ~config evm_state messages] executes [messages] on the local
-    [evm_state]. *)
+(** [execute ~wasm_entrypoint ~config evm_state messages] executes the
+    [wasm_entrypoint] function (default to [kernel_run]) with [messages] within
+    the inbox of [evm_state]. *)
 val execute :
-  config:Config.config -> t -> [< `Input of string] list -> t tzresult Lwt.t
+  ?wasm_entrypoint:string ->
+  config:Config.config ->
+  t ->
+  [< `Input of string] list ->
+  t tzresult Lwt.t
 
 (** [init ~kernel] initializes the local [evm_state] with [kernel]. *)
 val init : kernel:string -> t tzresult Lwt.t
@@ -23,9 +28,11 @@ val modify : key:string -> value:string -> t -> t Lwt.t
     [evm_state], if any. *)
 val inspect : t -> string -> bytes option Lwt.t
 
-(** [execute_and_inspect ~config ~input evm_state] executes [input] within
-    [evm_state], and returns [input.insights_requests]. *)
+(** [execute_and_inspect ?wasm_entrypoint ~config ~input evm_state] executes
+    the [wasm_entrypoint] function (default to [kernel_run]) with [input]
+    within the inbox of [evm_state], and returns [input.insights_requests]. *)
 val execute_and_inspect :
+  ?wasm_entrypoint:string ->
   config:Config.config ->
   input:Simulation.Encodings.simulate_input ->
   t ->

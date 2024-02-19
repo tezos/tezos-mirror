@@ -52,6 +52,7 @@ module type Internal_for_tests = sig
     tree -> Tezos_webassembly_interpreter.Output_buffer.t Lwt.t
 
   val compute_step_many_until :
+    wasm_entrypoint:string ->
     ?max_steps:int64 ->
     ?reveal_builtins:Builtins.reveals ->
     ?write_debug:Builtins.write_debug ->

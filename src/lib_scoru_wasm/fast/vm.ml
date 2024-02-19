@@ -28,8 +28,9 @@ open Wasm_pvm_state.Internal_state
 
 include (Wasm_vm : Wasm_vm_sig.S)
 
-let compute_until_snapshot ~max_steps ?write_debug pvm_state =
+let compute_until_snapshot ~wasm_entrypoint ~max_steps ?write_debug pvm_state =
   Wasm_vm.compute_step_many_until
+    ~wasm_entrypoint
     ~max_steps
     ?write_debug
     (fun pvm_state ->
@@ -40,12 +41,13 @@ let compute_until_snapshot ~max_steps ?write_debug pvm_state =
       | _ -> Wasm_vm.should_compute pvm_state)
     pvm_state
 
-let compute_fast ~reveal_builtins ~write_debug pvm_state =
+let compute_fast ~wasm_entrypoint ~reveal_builtins ~write_debug pvm_state =
   let open Lwt.Syntax in
   let* version = Wasm_vm.get_wasm_version pvm_state in
   (* Execute! *)
   let* durable =
     Exec.compute
+      ~wasm_entrypoint
       ~version
       ~reveal_builtins
       ~write_debug
@@ -72,13 +74,13 @@ let compute_fast ~reveal_builtins ~write_debug pvm_state =
 
      As a consequence of these two facts, we call [compute_step] to
      avoid this penalty.*)
-  let* pvm_state = Wasm_vm.compute_step pvm_state in
+  let* pvm_state = Wasm_vm.compute_step ~wasm_entrypoint pvm_state in
 
   Lwt.return pvm_state
 
 let rec compute_step_many accum_ticks ?reveal_builtins
     ?(write_debug = Builtins.Noop) ?(after_fast_exec = fun () -> ())
-    ?(stop_at_snapshot = false) ~max_steps pvm_state =
+    ?(stop_at_snapshot = false) ~wasm_entrypoint ~max_steps pvm_state =
   let open Lwt.Syntax in
   assert (max_steps > 0L) ;
   let eligible_for_fast_exec =
@@ -94,6 +96,7 @@ let rec compute_step_many accum_ticks ?reveal_builtins
   let backup pvm_state =
     let+ pvm_state, ticks =
       Wasm_vm.compute_step_many
+        ~wasm_entrypoint
         ?reveal_builtins
         ~write_debug
         ~stop_at_snapshot
@@ -109,7 +112,11 @@ let rec compute_step_many accum_ticks ?reveal_builtins
   | Some reveal_builtins when eligible_for_fast_exec -> (
       let goto_snapshot_and_retry () =
         let* pvm_state, ticks =
-          compute_until_snapshot ~write_debug ~max_steps pvm_state
+          compute_until_snapshot
+            ~wasm_entrypoint
+            ~write_debug
+            ~max_steps
+            pvm_state
         in
         match pvm_state.tick_state with
         | Snapshot when not stop_at_snapshot ->
@@ -118,6 +125,7 @@ let rec compute_step_many accum_ticks ?reveal_builtins
             let may_compute_more = Wasm_vm.should_compute pvm_state in
             if may_compute_more && max_steps > 0L then
               (compute_step_many [@tailcall])
+                ~wasm_entrypoint
                 accum_ticks
                 ~reveal_builtins
                 ~write_debug
@@ -129,7 +137,9 @@ let rec compute_step_many accum_ticks ?reveal_builtins
         | _ -> Lwt.return (pvm_state, ticks)
       in
       let go_like_the_wind () =
-        let* pvm_state = compute_fast ~write_debug ~reveal_builtins pvm_state in
+        let* pvm_state =
+          compute_fast ~wasm_entrypoint ~write_debug ~reveal_builtins pvm_state
+        in
         let accum_ticks =
           Int64.add accum_ticks (Z.to_int64 pvm_state.max_nb_ticks)
         in
@@ -143,6 +153,7 @@ let rec compute_step_many accum_ticks ?reveal_builtins
           && not stop_at_snapshot
         then
           (compute_step_many [@tailcall])
+            ~wasm_entrypoint
             accum_ticks
             ~max_steps
             ~reveal_builtins

@@ -62,8 +62,12 @@ module Make_wrapped_tree (Tree : TreeS) :
   let wrap t = PVM_tree t
 end
 
-module Make_backend (Tree : TreeS) =
-  Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+module Make_backend (Tree : TreeS) = struct
+  include Tezos_scoru_wasm_fast.Pvm.Make (Make_wrapped_tree (Tree))
+
+  let compute_step =
+    compute_step ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+end
 
 (** Durable part of the storage of this PVM. *)
 module type Durable_state = sig
@@ -166,7 +170,10 @@ module Impl : Pvm_sig.S = struct
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
 
   let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
-    Backend.compute_step_many ~reveal_builtins ~write_debug
+    Backend.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
+      ~reveal_builtins
+      ~write_debug
 end
 
 include Impl

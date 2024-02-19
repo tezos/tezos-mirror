@@ -34,9 +34,13 @@ module Preimage_map = Map.Make (String)
 open Wasm_utils
 open Tztest_helper
 
-let run_fast = Wasm_fast.Internal_for_tests.compute_step_many_with_hooks
+let run_fast =
+  Wasm_fast.Internal_for_tests.compute_step_many_with_hooks
+    ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
 
-let run_slow = Wasm.compute_step_many
+let run_slow =
+  Wasm.compute_step_many
+    ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
 
 let apply_fast ?write_debug ?(fast_should_run = true)
     ?(images = Preimage_map.empty) ?metadata ?(stop_at_snapshot = false)
@@ -813,6 +817,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   let*! fast_tree, fast_ticks = apply_fast ~stop_at_snapshot:true 0l tree in
   let*! slow_tree, slow_ticks =
     Wasm_utils.Wasm.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~stop_at_snapshot:true
       ~max_steps:Int64.max_int
@@ -835,6 +840,7 @@ let test_compute_step_many_pauses_at_snapshot_when_flag_set ~version () =
   in
   let*! slow_tree, slow_ticks =
     Wasm_utils.Wasm.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~stop_at_snapshot:true
       ~max_steps:Int64.max_int
@@ -876,6 +882,7 @@ let test_check_nb_ticks ~version () =
   let*! _, fast_ticks = apply_fast ~stop_at_snapshot:false 0l tree in
   let*! _, slow_ticks =
     Wasm_utils.Wasm.compute_step_many
+      ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~reveal_builtins
       ~stop_at_snapshot:false
       ~max_steps:Int64.max_int

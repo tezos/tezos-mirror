@@ -50,13 +50,25 @@ val commit :
 (** [evm_state ctxt] returns the freshest EVM state stored under [ctxt]. *)
 val evm_state : t -> Evm_state.t Lwt.t
 
-(** [execute ctxt messages] executes [messages] on the freshest
-    EVM state stored in [ctxt]. *)
-val execute : t -> [< `Input of string] list -> (t * Evm_state.t) tzresult Lwt.t
+(** [execute ?wasm_entrypoint ?commit ctxt messages] executes the
+    [wasm_entrypoint] function with [messages] in the inbox of the freshest EVM
+    state stored in [ctxt].
+
+    If [wasm_entrypoint] is omitted, the [kernel_run] function of the kernel is
+    executed. *)
+val execute :
+  ?wasm_entrypoint:string ->
+  t ->
+  [< `Input of string] list ->
+  (t * Evm_state.t) tzresult Lwt.t
 
 (** [execute_and_inspect ~input ctxt] executes [input] using the freshest EVM
-    state, and returns [input.insights_requests]. *)
+    state, and returns [input.insights_requests].
+
+    If [wasm_entrypoint] is omitted, the [kernel_run] function of the kernel is
+    executed. *)
 val execute_and_inspect :
+  ?wasm_entrypoint:string ->
   input:Simulation.Encodings.simulate_input ->
   t ->
   bytes option list tzresult Lwt.t
