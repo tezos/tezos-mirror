@@ -35,6 +35,7 @@ use std::fmt::Debug;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_storage::StorageError;
 
 /// Extends ExitReason with our own errors. It avoids using
 /// ExitError::Other(<string>) and matching on strings.
@@ -1270,6 +1271,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .unwrap_or_default()
     }
 
+    fn reset_balance(&mut self, address: H160) -> Result<(), AccountStorageError> {
+        match self.get_account(address) {
+            Some(mut account) => account.set_balance(self.host, U256::zero()),
+            None => Err(AccountStorageError::StorageError(
+                StorageError::InvalidAccountsPath,
+            )),
+        }
+    }
+
     /// Completely delete an account including nonce, code, and data. This is for
     /// contract selfdestruct completion, ie, when contract selfdestructs takes final
     /// effect.
@@ -2046,23 +2056,31 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
-        let balance = self.balance(address);
-
-        self.execute_transfer(address, target, balance)
-            .map_err(|err| {
+        let new_deletion = match self.transaction_data.last_mut() {
+            Some(top_layer) => Ok(top_layer.deleted_contracts.insert(address)),
+            None => Err(ExitError::Other(Cow::from(
+                "No transaction data for delete",
+            ))),
+        }?;
+        if new_deletion && address == target {
+            self.reset_balance(address).map_err(|_| {
                 ExitError::Other(Cow::from(
-                    "Could not execute transfer on contract delete",
+                    "Could not reset balance when deleting contract",
                 ))
-            })?;
+            })
+        } else if new_deletion {
+            let balance = self.balance(address);
 
-        if let Some(top_data) = self.transaction_data.last_mut() {
-            top_data.deleted_contracts.insert(address);
-
+            self.execute_transfer(address, target, balance)
+                .map_err(|_| {
+                    ExitError::Other(Cow::from(
+                        "Could not execute transfer on contract delete",
+                    ))
+                })?;
             Ok(())
         } else {
-            Err(ExitError::Other(Cow::from(
-                "No transaction data for delete",
-            )))
+            log!(self.host, Debug, "Contract already marked to delete");
+            Ok(())
         }
     }
 

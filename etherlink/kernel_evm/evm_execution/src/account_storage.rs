@@ -315,6 +315,21 @@ impl EthereumAccount {
         }
     }
 
+    /// Set the balance of an account to an amount in Wei
+    pub fn set_balance(
+        &mut self,
+        host: &mut impl Runtime,
+        new_balance: U256,
+    ) -> Result<(), AccountStorageError> {
+        let path = concat(&self.path, &BALANCE_PATH)?;
+
+        let mut new_balance_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
+        new_balance.to_little_endian(&mut new_balance_bytes);
+
+        host.store_write_all(&path, &new_balance_bytes)
+            .map_err(AccountStorageError::from)
+    }
+
     /// Get the path to an index in durable storage for an account.
     fn storage_path(&self, index: &H256) -> Result<OwnedPath, AccountStorageError> {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
