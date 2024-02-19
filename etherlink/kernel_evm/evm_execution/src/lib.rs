@@ -282,6 +282,31 @@ mod test {
         }
     }
 
+    fn set_storage(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+        index: &H256,
+        value: &H256,
+    ) {
+        let mut account = evm_account_storage
+            .get_or_create(host, &account_path(address).unwrap())
+            .unwrap();
+        account.set_storage(host, index, value).unwrap();
+    }
+
+    fn get_storage(
+        host: &mut MockHost,
+        evm_account_storage: &mut EthereumAccountStorage,
+        address: &H160,
+        index: &H256,
+    ) -> H256 {
+        let account = evm_account_storage
+            .get_or_create(host, &account_path(address).unwrap())
+            .unwrap();
+        account.get_storage(host, index).unwrap()
+    }
+
     fn get_balance(
         host: &mut MockHost,
         evm_account_storage: &mut EthereumAccountStorage,
@@ -3596,6 +3621,86 @@ mod test {
         assert_eq!(balance_unknwown, U256::zero());
         assert_eq!(nonce_unknown, U256::zero());
         assert!(code_unknown.is_empty());
+
+        // The initial call succeeds
+        assert_eq!(
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
+            result.reason
+        )
+    }
+
+    #[test]
+    fn storage_is_cleared_before_contract_creation() {
+        // Test is taken from:
+        // ethereum/tests/GeneralStateTests/Shanghai/stSStoreTest/InitCollision.json
+        // with the second data.
+
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let address_1 =
+            H160::from_str("6295ee1b4f6dd65047762f924ecd367c17eabf8f").unwrap();
+        let address_2 =
+            H160::from_str("7b9f5332c245e5c60923427eeb34e5adfba6470e").unwrap();
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let one = H256::from_low_u64_be(0x01);
+
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            &caller,
+            U256::from(1000000000000u64),
+        );
+
+        set_storage(&mut host, &mut evm_account_storage, &address_1, &one, &one);
+        set_storage(&mut host, &mut evm_account_storage, &address_2, &one, &one);
+
+        // {  (seq   (CREATE2 0 0 (lll (seq (SSTORE 1 0) (SSTORE 1 1) ) 0) 0) (STOP) ) }
+        let call_data =
+            hex::decode("6000600b80601360003960006000f5500000fe6000600155600160015500")
+                .unwrap();
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            None,
+            caller,
+            call_data,
+            Some(200000),
+            U256::from(10),
+            None,
+            true,
+            DUMMY_ALLOCATED_TICKS,
+            false,
+            false,
+        )
+        .unwrap()
+        .unwrap();
+
+        let nonce_1 = get_nonce(&mut host, &mut evm_account_storage, &address_1);
+        let nonce_2 = get_nonce(&mut host, &mut evm_account_storage, &address_2);
+
+        // Nonce is at 2, because the contract is originated and start at 1 (EIP-161)
+        // and it internally creates an other contract in its initialisation code, so
+        // the nonce is 2.
+        assert_eq!(nonce_1, U256::from(2));
+        assert_eq!(nonce_2, U256::from(1));
+
+        let storage_1 =
+            get_storage(&mut host, &mut evm_account_storage, &address_1, &one);
+        let storage_2 =
+            get_storage(&mut host, &mut evm_account_storage, &address_2, &one);
+
+        // storage was set but is cleared on contract creation
+        assert_eq!(storage_1, H256::zero());
+        // storage was set during initialisation code when CREATE2 is called
+        assert_eq!(storage_2, one);
 
         // The initial call succeeds
         assert_eq!(
