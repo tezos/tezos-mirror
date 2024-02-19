@@ -128,10 +128,10 @@ type installer_result = {
    it by using the 'reveal_installer' kernel. This leverages the reveal
    preimage+DAC mechanism to install the tx kernel.
 *)
-let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
+let prepare_installer_kernel_with_arbitrary_file ?runner ~preimages_dir ?config
+    installee =
   let open Tezt.Base in
   let open Lwt.Syntax in
-  let installee = Uses.path installee in
   let installer =
     installee |> Filename.basename |> Filename.remove_extension |> fun base ->
     base ^ "-installer.hex"
@@ -190,6 +190,13 @@ let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
     | None -> Test.fail "Failed to parse the root hash"
   in
   {output; boot_sector = read_file output; root_hash}
+
+let prepare_installer_kernel ?runner ~preimages_dir ?config installee =
+  prepare_installer_kernel_with_arbitrary_file
+    ?runner
+    ~preimages_dir
+    ?config
+    (Uses.path installee)
 
 let default_boot_sector_of ~kind =
   match kind with

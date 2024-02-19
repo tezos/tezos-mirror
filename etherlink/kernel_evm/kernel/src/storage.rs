@@ -35,7 +35,7 @@ pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_versio
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
-const ADMIN: RefPath = RefPath::assert_from(b"/admin");
+pub const ADMIN: RefPath = RefPath::assert_from(b"/admin");
 pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
@@ -105,7 +105,7 @@ pub const WORD_SIZE: usize = 32usize;
 
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
-const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
+pub const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,

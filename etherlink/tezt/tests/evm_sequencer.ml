@@ -129,7 +129,8 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
     ?max_blueprints_lag ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(sequencer = Constant.bootstrap1) protocol =
+    ?(sequencer = Constant.bootstrap1) ?(kernel = Constant.WASM.evm_kernel)
+    ?preimages_dir protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -139,7 +140,11 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
       node
       ~base_dir:(Client.base_dir client)
   in
-  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let preimages_dir =
+    Option.value
+      ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
+      preimages_dir
+  in
   let base_config =
     Configuration.make_config
       ~bootstrap_accounts
@@ -161,9 +166,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
     | Some (`Config config), None -> Some (`Config config)
     | Some (`Path path), None -> Some (`Path path)
   in
-  let* {output; _} =
-    prepare_installer_kernel ~preimages_dir ?config Constant.WASM.evm_kernel
-  in
+  let* {output; _} = prepare_installer_kernel ~preimages_dir ?config kernel in
   let* sc_rollup_address =
     originate_sc_rollup
       ~kind:"wasm_2_0_0"

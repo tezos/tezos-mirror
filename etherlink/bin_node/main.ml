@@ -975,6 +975,49 @@ let init_from_rollup_node_command =
         ~data_dir
         ~rollup_node_data_dir)
 
+let dump_to_rlp =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:"Transforms the JSON list of instructions to a RLP list"
+    no_options
+    (prefixes ["transform"; "dump"]
+    @@ param ~name:"dump.json" ~desc:"Description" Params.string
+    @@ prefixes ["to"; "rlp"]
+    @@ param ~name:"dump.rlp" ~desc:"Description" Params.string
+    @@ stop)
+    (fun () dump_json dump_rlp () ->
+      let open Rlp in
+      let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
+      let config =
+        Data_encoding.Json.destruct
+          Octez_smart_rollup.Installer_config.encoding
+          dump_json
+      in
+
+      let instructions =
+        List.fold_left
+          (fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
+            if String.starts_with ~prefix:"/evm" to_ then
+              List [Value (String.to_bytes to_); Value (String.to_bytes value)]
+              :: acc
+            else acc)
+          []
+          config
+      in
+
+      let bytes = List instructions |> encode in
+
+      let write_bytes_to_file filename bytes =
+        let oc = open_out filename in
+        output_bytes oc bytes ;
+        close_out oc
+      in
+
+      write_bytes_to_file dump_rlp bytes ;
+
+      return_unit)
+
 (* List of program commands *)
 let commands =
   [
@@ -984,6 +1027,7 @@ let commands =
     chunker_command;
     make_upgrade_command;
     init_from_rollup_node_command;
+    dump_to_rlp;
   ]
 
 let global_options = Tezos_clic.no_options

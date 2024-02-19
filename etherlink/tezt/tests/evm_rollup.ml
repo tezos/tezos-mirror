@@ -333,7 +333,8 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(with_administrator = true) ?da_fee_per_byte ~admin ?sequencer_admin
     ?commitment_period ?challenge_window ?timestamp
-    ?(setup_mode = Setup_proxy {devmode = true}) protocol =
+    ?(setup_mode = Setup_proxy {devmode = true}) ?(force_install_kernel = true)
+    protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -403,9 +404,16 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   (* EVM Kernel installation level. *)
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-  let* level = Node.get_level node in
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
+  let* () =
+    if force_install_kernel then
+      let* () = Client.bake_for_and_wait ~keys:[] client in
+      let* level = Node.get_level node in
+      let* _ =
+        Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
+      in
+      unit
+    else unit
+  in
   let* mode =
     match setup_mode with
     | Setup_proxy {devmode} -> return (Evm_node.Proxy {devmode})
@@ -4489,6 +4497,99 @@ let test_transaction_exhausting_ticks_is_rejected =
   | Error _ -> ()) ;
   unit
 
+let test_reveal_storage =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "reveal_storage"]
+    ~title:"Reveal storage"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  (* Start a regular rollup. *)
+  let* {evm_node; sc_rollup_node; node; client; _} =
+    setup_evm_kernel ~admin:None protocol
+  in
+  let* _ =
+    repeat 6 (fun _ ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  let*@ first_rollup_head = Rpc.get_block_by_number ~block:"latest" evm_node in
+
+  (* Dump the storage of the smart rollup node and convert it into a RLP file
+     the kernel can read. *)
+  let dump_json = Temp.file "dump.json" in
+  let dump_rlp = Temp.file "dump.rlp" in
+  let* () =
+    Sc_rollup_node.dump_durable_storage ~sc_rollup_node ~dump:dump_json ()
+  in
+  let* () = Evm_node.transform_dump ~dump_json ~dump_rlp in
+
+  (* Get root hash of the storage configuration *)
+  let config_preimages_dir = Temp.dir "config_preimages" in
+  let* {root_hash = configuration_root_hash; _} =
+    prepare_installer_kernel_with_arbitrary_file
+      ~preimages_dir:config_preimages_dir
+      dump_rlp
+  in
+
+  (* Start a new EVM rollup chain, but this time, with a ad-hoc config that
+     allows to duplicate the state of the previous one.
+
+     The only way for this new rollup to see initialized balances is for the
+     duplication process to work. *)
+  let config =
+    `Config
+      Sc_rollup_helpers.Installer_kernel_config.
+        [
+          Set
+            {
+              value = Hex.of_string configuration_root_hash |> Hex.show;
+              to_ = Durable_storage_path.config_root_hash;
+            };
+        ]
+  in
+
+  (* Setup the new rollup, but do not force the installation of the kernel as
+     we need to setup the preimage directory first. *)
+  let* {evm_node; sc_rollup_node; node; client; _} =
+    setup_evm_kernel
+      ~admin:None
+      ~config
+      ~force_install_kernel:false
+      ~bootstrap_accounts:[||]
+      protocol
+  in
+
+  (* Copy the config preimages directory contents into the preimages directory
+     of the new rollup node. *)
+  let* _ =
+    Lwt_unix.system
+      Format.(
+        sprintf
+          "cp %s/* %s"
+          config_preimages_dir
+          (Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0"))
+  in
+
+  (* Force the installation of the kernel of the new chain *)
+  let* _ = next_evm_level ~evm_node ~node ~client ~sc_rollup_node in
+
+  (* Check the head. We produced one additional head with the bake above. *)
+  let*@ copied_rollup_head =
+    Rpc.get_block_by_number
+      ~block:(first_rollup_head.number |> Int32.to_string)
+      evm_node
+  in
+  Check.((copied_rollup_head.hash = first_rollup_head.hash) string)
+    ~error_msg:"Head should be the same in the copy" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4567,7 +4668,8 @@ let register_evm_node ~protocols =
   test_ghostnet_kernel protocols ;
   test_estimate_gas_out_of_ticks protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
-  test_transaction_exhausting_ticks_is_rejected protocols
+  test_transaction_exhausting_ticks_is_rejected protocols ;
+  test_reveal_storage protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;
