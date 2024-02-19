@@ -81,7 +81,6 @@
 # @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
 # @MarcBeunardeau = Marc Beunardeau
-# @mbouaziz = Mehdi Bouaziz
 # @MBourgoin = Mathias Bourgoin
 # @mebsout = Alain Mebsout
 # @murbard = Arthur B.
@@ -96,7 +95,6 @@
 # @romain.nl = Romain
 # @ryan.tan3 = Ryan Tan
 # @Saroupille = François Thiré
-# @satos---jp = Sota Sato
 # @sribaroud = Sylvain R.
 # @tomjack = Tom Jack
 # @vbotbol = vbot
@@ -105,7 +103,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MarcBeunardeau @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @satos---jp @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
+* @ACoquereau @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MarcBeunardeau @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
