@@ -9,6 +9,7 @@ use crate::machine_state::{
     mode::Mode,
     Exception,
 };
+use num_enum::TryFromPrimitive;
 use strum::IntoEnumIterator;
 
 /// Privilege required to access a CSR
@@ -27,7 +28,18 @@ pub const fn ones(n: u64) -> u64 {
 
 /// CSR index
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::EnumIter)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    strum::EnumIter,
+    TryFromPrimitive,
+    strum::Display,
+)]
 #[repr(usize)]
 pub enum CSRegister {
     // Unprivileged Floating-Point CSRs
@@ -233,9 +245,15 @@ pub enum CSRegister {
     pmpaddr63 = 0x3EF,
 
     // Machine Non-Maskable Interrupt Handling
+    // The draft `Smrnmi` extension is not supported in objdump, printing
+    // CSR address directly instead
+    #[strum(to_string = "0x740")]
     mnscratch = 0x740,
+    #[strum(to_string = "0x741")]
     mnepc = 0x741,
+    #[strum(to_string = "0x742")]
     mncause = 0x742,
+    #[strum(to_string = "0x744")]
     mnstatus = 0x744,
 
     // Machine Counter/Timers
@@ -308,6 +326,7 @@ pub enum CSRegister {
     tdata1 = 0x7A1,
     tdata2 = 0x7A2,
     tdata3 = 0x7A3,
+    tcontrol = 0x7A5,
     mcontext = 0x7A8,
 
     // Debug Mode Registers
@@ -315,6 +334,11 @@ pub enum CSRegister {
     dpc = 0x7B1,
     dscratch0 = 0x7B2,
     dscratch1 = 0x7B3,
+}
+
+/// Attempt to parse the 32-bit integer as a register identifier.
+pub fn try_parse_csregister(r: u32) -> Option<CSRegister> {
+    CSRegister::try_from(r as usize).ok()
 }
 
 // We want to allow shifts by 0 for clarity and consistency.
@@ -1031,6 +1055,7 @@ impl CSRegister {
             CSRegister::tdata1 => 0,
             CSRegister::tdata2 => 0,
             CSRegister::tdata3 => 0,
+            CSRegister::tcontrol => 0,
             CSRegister::mcontext => 0,
             CSRegister::dcsr => 0,
             CSRegister::dpc => 0,

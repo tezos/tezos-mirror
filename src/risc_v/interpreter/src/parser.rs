@@ -4,7 +4,10 @@
 
 pub mod instruction;
 
-use crate::machine_state::registers::{parse_register, XRegister};
+use crate::machine_state::{
+    csregisters::{try_parse_csregister, CSRegister},
+    registers::{parse_register, XRegister},
+};
 use core::ops::Range;
 use instruction::*;
 
@@ -36,18 +39,32 @@ fn rd(instr: u32) -> XRegister {
 }
 
 #[inline(always)]
+fn rs1_bits(instr: u32) -> u32 {
+    bits(instr, 15, 5)
+}
+
+#[inline(always)]
 fn rs1(instr: u32) -> XRegister {
-    parse_register(bits(instr, 15, 5))
+    parse_register(rs1_bits(instr))
+}
+
+#[inline(always)]
+fn rs2_bits(instr: u32) -> u32 {
+    bits(instr, 20, 5)
 }
 
 #[inline(always)]
 fn rs2(instr: u32) -> XRegister {
-    parse_register(bits(instr, 20, 5))
+    parse_register(rs2_bits(instr))
 }
 
 #[inline(always)]
 fn imm_11_6(instr: u32) -> u32 {
     bits(instr, 26, 6) << 1
+}
+
+fn csr(instr: u32) -> Option<CSRegister> {
+    try_parse_csregister(bits(instr, 20, 12))
 }
 
 // Immediates are produced by extracting the relevant bits according to the
@@ -149,13 +166,39 @@ macro_rules! j_instr {
     };
 }
 
+macro_rules! csr_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        match csr($instr) {
+            Some(csr) => $enum_variant(instruction::CsrArgs {
+                rd: rd($instr),
+                rs1: rs1($instr),
+                csr,
+            }),
+            None => Unknown { instr: $instr },
+        }
+    };
+}
+
+macro_rules! csri_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        match csr($instr) {
+            Some(csr) => $enum_variant(instruction::CsriArgs {
+                rd: rd($instr),
+                imm: bits($instr, 15, 5) as i64,
+                csr,
+            }),
+            None => Unknown { instr: $instr },
+        }
+    };
+}
+
 const OP_ARITH: u32 = 0b011_0011;
 const OP_ARITH_W: u32 = 0b011_1011;
 const OP_ARITH_I: u32 = 0b001_0011;
 const OP_LOAD: u32 = 0b000_0011;
 const OP_ARITH_IW: u32 = 0b001_1011;
 const OP_SYNCH: u32 = 0b000_1111;
-const OP_ENV: u32 = 0b111_0011;
+const OP_SYS: u32 = 0b111_0011;
 const OP_STORE: u32 = 0b010_0011;
 const OP_BRANCH: u32 = 0b110_0011;
 const OP_LUI: u32 = 0b011_0111;
@@ -173,7 +216,14 @@ const F3_6: u32 = 0b110;
 const F3_7: u32 = 0b111;
 
 const F7_0: u32 = 0b0;
+const F7_8: u32 = 0b000_1000;
 const F7_20: u32 = 0b10_0000;
+const F7_24: u32 = 0b001_1000;
+
+const RS1_0: u32 = 0b0;
+const RS2_0: u32 = 0b0;
+const RS2_1: u32 = 0b1;
+const RS2_2: u32 = 0b10;
 
 fn parse_uncompressed_instruction(instr: u32) -> Instr {
     use Instr::*;
@@ -285,12 +335,23 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             F3_0 => i_instr!(Fence, instr),
             _ => Unknown { instr },
         },
-        OP_ENV => match funct3(instr) {
-            F3_0 => match i_imm(instr) {
-                0b0 => Ecall,
-                0b1 => Ebreak,
+        OP_SYS => match funct3(instr) {
+            F3_0 => match rs1_bits(instr) {
+                RS1_0 => match (rs2_bits(instr), funct7(instr)) {
+                    (RS2_0, F7_0) => Ecall,
+                    (RS2_1, F7_0) => Ebreak,
+                    (RS2_2, F7_8) => Sret,
+                    (RS2_2, F7_24) => Mret,
+                    _ => Unknown { instr },
+                },
                 _ => Unknown { instr },
             },
+            F3_1 => csr_instr!(Csrrw, instr),
+            F3_2 => csr_instr!(Csrrs, instr),
+            F3_3 => csr_instr!(Csrrc, instr),
+            F3_5 => csri_instr!(Csrrwi, instr),
+            F3_6 => csri_instr!(Csrrsi, instr),
+            F3_7 => csri_instr!(Csrrci, instr),
             _ => Unknown { instr },
         },
 
@@ -389,9 +450,11 @@ mod tests {
 
         let expected = [
             Instr::Jal(UJTypeArgs { rd: x0, imm: 0x50 }),
-            Instr::Unknown {
-                instr: u32::from_le_bytes([0x73, 0x2f, 0x20, 0x34]),
-            },
+            Instr::Csrrs(CsrArgs {
+                rd: x30,
+                rs1: x0,
+                csr: crate::machine_state::csregisters::CSRegister::mcause,
+            }),
             Instr::Addi(ITypeArgs {
                 rd: x31,
                 rs1: x0,

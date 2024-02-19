@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use crate::machine_state::registers::XRegister;
+use crate::machine_state::{csregisters::CSRegister, registers::XRegister};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct RTypeArgs {
@@ -31,6 +31,20 @@ pub struct SBTypeArgs {
 pub struct UJTypeArgs {
     pub rd: XRegister,
     pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CsrArgs {
+    pub rd: XRegister,
+    pub rs1: XRegister,
+    pub csr: CSRegister,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CsriArgs {
+    pub rd: XRegister,
+    pub imm: i64,
+    pub csr: CSRegister,
 }
 
 /// RISC-V parsed instructions. Along with legal instructions, potentially
@@ -102,6 +116,18 @@ pub enum Instr {
     Jal(UJTypeArgs),
     Jalr(ITypeArgs),
 
+    // Zicsr instructions
+    Csrrw(CsrArgs),
+    Csrrs(CsrArgs),
+    Csrrc(CsrArgs),
+    Csrrwi(CsriArgs),
+    Csrrsi(CsriArgs),
+    Csrrci(CsriArgs),
+
+    // Privileged instructions
+    Mret,
+    Sret,
+
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
 }
@@ -157,6 +183,18 @@ macro_rules! b_instr {
 macro_rules! u_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {:?},{}", $op, $args.rd, $args.imm)
+    };
+}
+
+macro_rules! csr_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{},{:?}", $op, $args.rd, $args.csr, $args.rs1)
+    };
+}
+
+macro_rules! csri_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {:?},{},{}", $op, $args.rd, $args.csr, $args.imm)
     };
 }
 
@@ -263,6 +301,18 @@ impl fmt::Display for Instr {
             // RV64I jump instructions
             Jal(args) => u_instr!(f, "jal", args),
             Jalr(args) => i_instr_load!(f, "jalr", args),
+
+            // Zicsr instructions
+            Csrrw(args) => csr_instr!(f, "csrrw", args),
+            Csrrs(args) => csr_instr!(f, "csrrs", args),
+            Csrrc(args) => csr_instr!(f, "csrrc", args),
+            Csrrwi(args) => csri_instr!(f, "csrrwi", args),
+            Csrrsi(args) => csri_instr!(f, "csrrsi", args),
+            Csrrci(args) => csri_instr!(f, "csrrci", args),
+
+            // Privileged instructions
+            Mret => write!(f, "mret"),
+            Sret => write!(f, "sret"),
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
