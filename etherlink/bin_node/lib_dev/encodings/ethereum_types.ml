@@ -1260,7 +1260,7 @@ module Upgrade = struct
 end
 
 module Evm_events = struct
-  type t = UpgradeEvent of Upgrade.t
+  type t = Upgrade_event of Upgrade.t
 
   let of_bytes bytes =
     match bytes |> Rlp.decode with
@@ -1268,12 +1268,12 @@ module Evm_events = struct
         match Bytes.to_string tag with
         | "\x01" ->
             let upgrade = Upgrade.of_rlp rlp_content in
-            Option.map (fun u -> UpgradeEvent u) upgrade
+            Option.map (fun u -> Upgrade_event u) upgrade
         | _ -> None)
     | _ -> None
 
   let pp fmt = function
-    | UpgradeEvent {hash; timestamp = Qty timestamp} ->
+    | Upgrade_event {hash; timestamp = Qty timestamp} ->
         Format.fprintf
           fmt
           "upgrade:@ hash %a,@ timestamp %a"
