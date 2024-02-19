@@ -3887,7 +3887,6 @@ let test_l2_revert_returns_unused_gas =
       ()
   in
   let gas_used = transaction_receipt.gasUsed in
-  Format.printf "TXHASH: %s\n%!" transaction_hash ;
   let* () = check_tx_failed ~endpoint ~tx:transaction_hash in
   Check.((gas_used < 100000L) int64)
     ~error_msg:"Expected gas usage less than %R logs, got %L" ;
