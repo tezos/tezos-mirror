@@ -3854,6 +3854,70 @@ mod test {
         )
     }
 
+    #[test]
+    fn contract_selfdestruct_itself_has_no_balance_left() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let caller = H160::from_str("095e7baea6a6c7c4c2dfeb977efac326af552d87").unwrap();
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 10000,
+            gas_price,
+            false,
+        );
+
+        let target_destruct =
+            H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let contract = H160::from_low_u64_be(523_u64);
+
+        // Contract selfdestruct itself and then tries to selfdestruct to target_destruct.
+        // The second selfdestruct is ignored and the first remove the balance of contract
+        let code = hex::decode("60003560085730ff5b600080808080305af15073a94f5374fce5edbc8e2a8697c15331677e6ebf0bff").unwrap();
+
+        set_code(&mut handler, &contract, code);
+
+        set_balance(&mut handler, &contract, U256::from(100000_u32));
+
+        let result = handler.call_contract(
+            caller,
+            contract,
+            None,
+            vec![0xff],
+            Some(100_000),
+            false,
+        );
+
+        match result {
+            Ok(exec_out) if exec_out.is_success => {
+                assert_eq!(
+                    get_balance(&mut handler, &contract),
+                    U256::zero(),
+                    "Contract balance is not 0"
+                );
+
+                assert_eq!(
+                    get_balance(&mut handler, &target_destruct),
+                    U256::zero(),
+                    "target_destruct balance is not 0"
+                );
+            }
+            _ => panic!("Execution failed"),
+        }
+    }
+
     // According EIP-2929, the created address should still be hot even if the creation fails
     #[test]
     fn address_still_marked_as_hot_after_creation_fails() {
