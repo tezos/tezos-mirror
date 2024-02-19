@@ -5,19 +5,36 @@
 ### Features
 
 - Implement EIP-3860. (!11831)
+- Flush every transactions in the delayed inbox in case one is overdue. (!11914)
+- Require a minimal number of L1 blocks to have been backed before a delayed transaction is considered overdue. (!11811)
 
 ### Bug fixes
 
-- EVM call stack is now the number of internal transaction layers. (!11719)
 - Fix the nonce of the caller on contract creation. Callee's address remains hot even if creation fails. (!11634)
 - Fix the nonce of a new created contract. (!11767)
+- Fix the encoding of the upgrade event emitted by the kernel. (!12003)
+- Gas is now charged for inner create. (!11814)
+- Add missing checks on data integrity and signature overflows for the `ecrecover` precompile contract. (!11997)
+- Exit when there's a mod overflow when calling `modexp` precompiled contract. (!12005)
+
+## Version c5969505b81b52a779270b69f48b6a66c84da429
+
+### Features
+
+- Support forcing the execution of overdue transactions in the delayed inbox. (!11667)
+- Allow to force upgrade if no blueprints are submitted for 24h. (!11918)
+
+### Bug fixes
+
+- Fix external messages being added to the delayed inbox. (!11779)
+- EVM call stack is now the number of internal transaction layers. (!11719)
 - Fix bug where CALLCODE shouldn't send the balance to the "to" address. (!11907)
 - Fix a bug where precompiled failures were considered as `Fatal`. (!11947)
 - Fix a bug where validation would succeed, for a transaction that failed to pay da-fee. (!11992)
-- Gas is now charged for inner create. (!11814)
-- Add missing checks on data integrity and signature overflows for
-  the `ecrecover` precompile contract. (!11997)
-- Exit when there's a mod overflow when calling `modexp` precompiled contract. (!12005)
+
+### Internals
+
+- Make the stage-1 more resilient to internals errors, to improve the robustness of the upgrade process. (!11874 !11887)
 
 ### Breaking changes
 
@@ -25,6 +42,7 @@
 
 - `evm-evaluation-assessor` takes 'PREVRANDAO' in its computation. (!11907)
 - Implement warm/cold access for state access opcodes. (!11580)
+- Remove invalid blueprints. (!11607)
 
 ## Version a41f30ddb8787e5ff5c461d949a9ae3f71e4eea9
 
