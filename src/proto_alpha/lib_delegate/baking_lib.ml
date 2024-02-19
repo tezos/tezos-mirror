@@ -80,7 +80,10 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
       | Outdated_proposal -> cctxt#error "Cannot preattest an outdated proposal"
       | Valid_proposal -> return_unit
   in
-  let consensus_list = make_consensus_list state proposal in
+  let consensus_batch =
+    make_consensus_vote_batch state proposal Preattestation
+  in
+  let open Baking_actions in
   let*! () =
     cctxt#message
       "@[<v 2>Preattesting for:@ %a@]"
@@ -88,9 +91,14 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
         pp_print_list
           ~pp_sep:pp_print_space
           Baking_state.pp_consensus_key_and_delegate)
-      (List.map fst consensus_list)
+      (List.map
+         (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
+         consensus_batch.unsigned_consensus_votes)
   in
-  Baking_actions.inject_consensus_votes state consensus_list `Preattestation
+  let* signed_consensus_batch =
+    Baking_actions.sign_consensus_votes state consensus_batch
+  in
+  Baking_actions.inject_consensus_votes state signed_consensus_batch
 
 let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
@@ -114,7 +122,8 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
       | Outdated_proposal -> cctxt#error "Cannot attest an outdated proposal"
       | Valid_proposal -> return_unit
   in
-  let consensus_list = make_consensus_list state proposal in
+  let consensus_batch = make_consensus_vote_batch state proposal Attestation in
+  let open Baking_actions in
   let*! () =
     cctxt#message
       "@[<v 2>Attesting for:@ %a@]"
@@ -122,12 +131,17 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
         pp_print_list
           ~pp_sep:pp_print_space
           Baking_state.pp_consensus_key_and_delegate)
-      (List.map fst consensus_list)
+      (List.map
+         (fun ({delegate; _} : unsigned_consensus_vote) -> delegate)
+         consensus_batch.unsigned_consensus_votes)
+  in
+  let* signed_consensus_batch =
+    Baking_actions.sign_consensus_votes state consensus_batch
   in
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
   in
-  Baking_actions.inject_consensus_votes state consensus_list `Attestation
+  Baking_actions.inject_consensus_votes state signed_consensus_batch
 
 let bake_at_next_level state =
   let open Lwt_result_syntax in
@@ -496,7 +510,10 @@ let rec baking_minimal_timestamp ~count state
   let cctxt = state.global_state.cctxt in
   let latest_proposal = state.level_state.latest_proposal in
   let own_attestations =
-    State_transitions.make_consensus_list state latest_proposal
+    State_transitions.make_consensus_vote_batch
+      state
+      latest_proposal
+      Attestation
   in
   let current_mempool =
     Operation_worker.get_current_operations state.global_state.operation_worker
@@ -523,9 +540,10 @@ let rec baking_minimal_timestamp ~count state
   in
   let total_voting_power =
     List.fold_left
-      (fun attestations own -> snd own :: attestations)
+      (fun attestations own ->
+        own.Baking_actions.vote_consensus_content :: attestations)
       attestations_in_mempool
-      own_attestations
+      own_attestations.unsigned_consensus_votes
     |> attestations_attesting_power state
   in
   let consensus_threshold =
@@ -550,12 +568,15 @@ let rec baking_minimal_timestamp ~count state
     | Some first_potential_round -> return first_potential_round
   in
   let* signed_attestations =
-    Baking_actions.sign_consensus_votes state own_attestations `Attestation
+    Baking_actions.sign_consensus_votes state own_attestations
   in
   let pool =
+    let open Baking_actions in
     Operation_pool.add_operations
       current_mempool
-      (List.map (fun (_, x, _, _) -> x) signed_attestations)
+      (List.map
+         (fun signed_consensus -> signed_consensus.signed_operation)
+         signed_attestations.signed_consensus_votes)
   in
   let kind = Baking_actions.Fresh pool in
   let block_to_bake : Baking_actions.block_to_bake =
