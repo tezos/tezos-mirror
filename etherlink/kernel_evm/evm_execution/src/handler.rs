@@ -622,6 +622,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
+    /// Clear the entire storage located at [address].
+    pub fn clear_storage(&mut self, address: H160) -> Result<(), EthereumError> {
+        if let Some(account) = self.get_account(address) {
+            account.clear_storage(self.host)?
+        };
+        Ok(())
+    }
+
     /// Execute a SputnikVM run with this handler
     ///
     /// Never inlined when the kernel is compiled for benchmarks, to ensure the
@@ -962,7 +970,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 match self.execute_transfer(caller, address, value) {
                     Ok(TransferExitReason::Returned) => {
                         match self.increment_nonce(address) {
-                            Ok(()) => self.execute(&mut runtime),
+                            Ok(()) => {
+                                self.clear_storage(address)?;
+                                self.execute(&mut runtime)
+                            }
                             Err(eth_err) => Err(eth_err),
                         }
                     }
