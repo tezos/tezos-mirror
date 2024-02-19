@@ -63,6 +63,18 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
+(* Wait for 'new_head' event. Note that the DAL node processes a new head with a
+   delay of one level. Also, this event is emitted before block processing. *)
+let wait_for_layer1_head dal_node level =
+  Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
+      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
+
+(* Wait for 'new_final_block' event. This event is emitted after processing a
+   final block. *)
+let wait_for_layer1_final_block dal_node level =
+  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
+      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
+
 (* We use a custom [bake_for], which by default bakes with all delegates, unlike
    [Client.bake_for], to highlight the following: baking in the past with all
    delegates ensures that the baked block has round 0, which is the default
@@ -78,6 +90,23 @@ let bake_for ?(delegates = `All) ?count ?dal_node_endpoint client =
     | `For keys -> keys
   in
   Client.bake_for_and_wait client ~keys ?count ?dal_node_endpoint
+
+(* Bake until a block at some given [level] has been finalized and
+   processed by the given [dal_nodes]. The head level after this is
+   [level + 2]. *)
+let bake_until_processed ?dal_node_endpoint ~level client dal_nodes =
+  let* current_level = Client.level client in
+  let final_level = level + 2 in
+  assert (current_level < final_level) ;
+  let p =
+    List.map
+      (fun dal_node -> wait_for_layer1_final_block dal_node level)
+      dal_nodes
+  in
+  let* () =
+    bake_for ?dal_node_endpoint ~count:(final_level - current_level) client
+  in
+  Lwt.join p
 
 module Client = struct
   include Client
@@ -429,18 +458,6 @@ let wait_for_stored_slot ?shard_index dal_node commitment =
   in
   Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
       if check_slot_header e && check_shard_index e then Some () else None)
-
-(* Wait for 'new_head' event. Note that the DAL node processes a new head with a
-   delay of one level. Also, this event is emitted before block processing. *)
-let wait_for_layer1_head dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_head.v0" (fun e ->
-      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
-
-(* Wait for 'new_final_block' event. This event is emitted after processing a
-   final block. *)
-let wait_for_layer1_final_block dal_node level =
-  Dal_node.wait_for dal_node "dal_node_layer_1_new_final_block.v0" (fun e ->
-      if JSON.(e |-> "level" |> as_int) = level then Some () else None)
 
 (* Return the baker at round 0 at the given level. *)
 let baker_for_round_zero node ~level =
@@ -4225,18 +4242,13 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
 
   Log.info "Slot produced and published" ;
 
-  let final_level = publication_level + attestation_lag + 2 in
-  let* current_level = Client.level client in
-  let p =
-    wait_for_layer1_final_block attester (publication_level + attestation_lag)
-  in
   let* () =
-    bake_for
+    bake_until_processed
       ~dal_node_endpoint:attester_dal_node_endpoint
-      ~count:(final_level - current_level)
+      ~level:(publication_level + attestation_lag)
       client
+      [attester]
   in
-  let* () = p in
 
   let* slot_headers =
     Dal_RPC.(call attester @@ get_published_level_headers publication_level)
