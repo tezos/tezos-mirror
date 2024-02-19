@@ -706,7 +706,9 @@ let wrap_test ?(keep_dir = false) (name, g) =
     let store_dir = Naming.store_dir ~dir_path in
     let chain_dir = Naming.chain_dir store_dir Chain_id.zero in
     let*! () = Lwt_utils_unix.create_dir (Naming.dir_path chain_dir) in
-    let*! r = Block_store.create chain_dir ~genesis_block in
+    let*! r =
+      Block_store.create ~block_cache_limit:1 chain_dir ~genesis_block
+    in
     match r with
     | Error err ->
         Format.printf
