@@ -998,7 +998,7 @@ module Gas_limits = struct
     match protocol with
     | Alpha ->
         limits.hard_gas_limit_per_block - limits.hard_gas_limit_per_operation
-    | Nairobi | Oxford -> limits.hard_gas_limit_per_operation
+    | Oxford -> limits.hard_gas_limit_per_operation
 
   let block_below_ops_below =
     Protocol.register_test

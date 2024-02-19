@@ -1347,24 +1347,17 @@ let test_create_mockup_config_show_init_roundtrip protocols =
         protocol_constants = JSON.parse_file protocol_constants;
       }
   in
-  let compute_expected_amounts protocol bootstrap_accounts protocol_constants =
+  let compute_expected_amounts bootstrap_accounts protocol_constants =
     let convert =
-      if protocol > Protocol.Nairobi then
-        let limit_of_delegation_over_baking =
-          JSON.(
-            protocol_constants |-> "limit_of_delegation_over_baking" |> as_int)
-        in
-        let limit_of_delegation_over_baking_plus_1 =
-          Int64.of_int (limit_of_delegation_over_baking + 1)
-        in
-        fun amount ->
-          Tez.(amount - (amount /! limit_of_delegation_over_baking_plus_1))
-      else
-        let frozen_deposits_percentage =
-          JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
-        in
-        let pct = 100 - frozen_deposits_percentage in
-        fun amount -> Tez.(of_mutez_int (pct * to_mutez amount / 100))
+      let limit_of_delegation_over_baking =
+        JSON.(
+          protocol_constants |-> "limit_of_delegation_over_baking" |> as_int)
+      in
+      let limit_of_delegation_over_baking_plus_1 =
+        Int64.of_int (limit_of_delegation_over_baking + 1)
+      in
+      fun amount ->
+        Tez.(amount - (amount /! limit_of_delegation_over_baking_plus_1))
     in
     List.map
       (fun account -> {account with amount = convert account.amount})
@@ -1505,7 +1498,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
      | Some initial_bootstrap_accounts ->
          let expected_amounts =
            compute_expected_amounts
-             protocol
              initial_bootstrap_accounts
              initial_state.protocol_constants
          in
@@ -1559,7 +1551,6 @@ let test_create_mockup_config_show_init_roundtrip protocols =
 
    let expected_amounts =
      compute_expected_amounts
-       protocol
        initial_state.bootstrap_accounts
        initial_state.protocol_constants
    in

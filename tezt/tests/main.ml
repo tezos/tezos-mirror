@@ -225,9 +225,7 @@ let register_protocol_tests_that_use_supports_correctly () =
    Some do not. Those that do not are declared here. *)
 let register_protocol_specific_because_regression_tests () =
   Adaptive_issuance.register ~protocols:[Alpha] ;
-  Dal.register ~protocols:[Alpha] ;
-  (* This can be safely removed after Nairobi is frozen *)
-  Timelock_disabled.register ~protocols:[Nairobi]
+  Dal.register ~protocols:[Alpha]
 
 let () =
   register_protocol_independent_tests () ;

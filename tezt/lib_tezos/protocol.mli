@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Nairobi | Oxford | Alpha
+type t = Oxford | Alpha
 
 val encoding : t Data_encoding.t
 

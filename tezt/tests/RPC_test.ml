@@ -1673,7 +1673,6 @@ let register protocols =
       ~parameter_overrides:consensus_threshold ;
     check_rpc_regression
       "adaptive_issuance"
-      ~supports:Protocol.(From_protocol (number Nairobi + 1))
       ~test_function:test_adaptive_issuance ;
     check_rpc_regression
       "votes"
