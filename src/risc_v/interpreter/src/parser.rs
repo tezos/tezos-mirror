@@ -248,6 +248,7 @@ const F7_0: u32 = 0b0;
 const F7_8: u32 = 0b000_1000;
 const F7_20: u32 = 0b10_0000;
 const F7_24: u32 = 0b001_1000;
+const F7_56: u32 = 0b011_1000;
 
 const RS1_0: u32 = 0b0;
 const RS2_0: u32 = 0b0;
@@ -376,6 +377,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                     (RS2_1, F7_0) => Ebreak,
                     (RS2_2, F7_8) => Sret,
                     (RS2_2, F7_24) => Mret,
+                    (RS2_2, F7_56) => Mnret,
                     _ => Unknown { instr },
                 },
                 _ => Unknown { instr },
@@ -465,9 +467,9 @@ pub fn parse_segment(contents: &[u8], range: Range<usize>) -> Vec<Instr> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::machine_state::registers::XRegister::*;
-    use instruction::{ITypeArgs, SBTypeArgs, UJTypeArgs};
+    use super::instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs};
+    use super::parse_block;
+    use crate::machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*};
 
     // rv64ui-p-addiw
     // 0000000080000000 <_start>:
@@ -483,13 +485,13 @@ mod tests {
         ];
 
         let expected = [
-            Instr::Jal(UJTypeArgs { rd: x0, imm: 0x50 }),
-            Instr::Csrrs(CsrArgs {
+            Jal(UJTypeArgs { rd: x0, imm: 0x50 }),
+            Csrrs(CsrArgs {
                 rd: x30,
                 rs1: x0,
-                csr: crate::machine_state::csregisters::CSRegister::mcause,
+                csr: mcause,
             }),
-            Instr::Addi(ITypeArgs {
+            Addi(ITypeArgs {
                 rd: x31,
                 rs1: x0,
                 imm: 0x8,
@@ -515,32 +517,32 @@ mod tests {
             0x0, 0x9b, 0x83, 0x3, 0x34, 0x63, 0x10, 0x74, 0x12,
         ];
         let expected = [
-            Instr::Addi(ITypeArgs {
+            Addi(ITypeArgs {
                 rd: x3,
                 rs1: x0,
                 imm: 21,
             }),
-            Instr::UnknownCompressed {
+            UnknownCompressed {
                 instr: u16::from_le_bytes([0x05, 0x64]),
             },
-            Instr::Addiw(ITypeArgs {
+            Addiw(ITypeArgs {
                 rd: x8,
                 rs1: x8,
                 imm: 564,
             }),
-            Instr::UnknownCompressed {
+            UnknownCompressed {
                 instr: u16::from_le_bytes([0x12, 0x04]),
             },
-            Instr::Lui(UJTypeArgs {
+            Lui(UJTypeArgs {
                 rd: x7,
                 imm: 0x12 << 12,
             }),
-            Instr::Addiw(ITypeArgs {
+            Addiw(ITypeArgs {
                 rd: x7,
                 rs1: x7,
                 imm: 832,
             }),
-            Instr::Bne(SBTypeArgs {
+            Bne(SBTypeArgs {
                 rs1: x8,
                 rs2: x7,
                 imm: 288,
@@ -555,10 +557,10 @@ mod tests {
     fn test_3() {
         let bytes: [u8; 5] = [0x1, 0x5, 0x64, 0x1b, 0x4];
         let expected = [
-            Instr::UnknownCompressed {
+            UnknownCompressed {
                 instr: u16::from_le_bytes([0x1, 0x5]),
             },
-            Instr::UnknownCompressed {
+            UnknownCompressed {
                 instr: u16::from_le_bytes([0x64, 0x1b]),
             },
         ];
@@ -570,7 +572,7 @@ mod tests {
     #[test]
     fn test_4() {
         let bytes: [u8; 6] = [0x6f, 0x0, 0x0, 0x5, 0x73, 0x2f];
-        let expected = [Instr::Jal(UJTypeArgs { rd: x0, imm: 0x50 })];
+        let expected = [Jal(UJTypeArgs { rd: x0, imm: 0x50 })];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
     }
@@ -581,15 +583,24 @@ mod tests {
     fn test_5() {
         let bytes: [u8; 8] = [0x13, 0x15, 0xf5, 0x01, 0x13, 0x15, 0xf5, 0x21];
         let expected = [
-            Instr::Slli(ITypeArgs {
+            Slli(ITypeArgs {
                 rd: x10,
                 rs1: x10,
                 imm: 31,
             }),
-            Instr::Unknown {
+            Unknown {
                 instr: u32::from_le_bytes([0x13, 0x15, 0xf5, 0x21]),
             },
         ];
+        let instructions = parse_block(&bytes);
+        assert_eq!(instructions, expected)
+    }
+
+    // Instructions not covered in integration tests
+    #[test]
+    fn test_6() {
+        let bytes: [u8; 4] = [0x73, 0x00, 0x20, 0x70];
+        let expected = [Mnret];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)
     }
