@@ -75,6 +75,14 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
+(** [forge_event] type used to return the result of a task completion
+    in the forge worker. *)
+type forge_event
+
+(** [forge_request] type used to push a concurrent forging task in the
+    forge worker. *)
+type forge_request
+
 type global_state = {
   cctxt : Protocol_client_context.full;
   chain_id : Chain_id.t;

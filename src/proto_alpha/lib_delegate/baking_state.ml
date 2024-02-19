@@ -118,6 +118,10 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
+type forge_event
+
+type forge_request
+
 type global_state = {
   (* client context *)
   cctxt : Protocol_client_context.full;
