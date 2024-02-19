@@ -45,12 +45,8 @@
 /src/lib_aplonk               @MarcBeunardeau
 /src/lib_bls12_381*           @victor-dumitrescu
 /src/lib_crypto               @victor-dumitrescu
-/src/lib_distributed_internal @alocascio
-/src/lib_distributed_plonk    @alocascio
-/src/lib_epoxy_tx             @alocascio
 /src/lib_hacl                 @victor-dumitrescu
 /src/lib_mec                  @MarcBeunardeau
-/src/lib_plompiler            @alocascio
 /src/lib_plonk                @MarcBeunardeau
 /src/lib_polynomial           @MarcBeunardeau
 
@@ -71,7 +67,6 @@
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
 # @ACoquereau = Albin Coquereau
-# @alocascio = Antonio Locascio
 # @andrea.cerone = Andrea Cerone
 # @arvidnl = Arvid Jakobsson
 # @bsall = Boubacar Sall
@@ -110,7 +105,7 @@
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @alocascio @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MarcBeunardeau @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @satos---jp @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
+* @ACoquereau @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MarcBeunardeau @mbouaziz @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @satos---jp @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #

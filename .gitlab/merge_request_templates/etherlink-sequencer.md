@@ -4,7 +4,6 @@
 
 # Manually testing the MR
 
-
 # Checklist
 
 - [ ] Document the interface of any function added or modified (see the [coding guidelines](https://tezos.gitlab.io/developer/guidelines.html))
@@ -14,9 +13,9 @@
 - [X] Select suitable reviewers using the `Reviewers` field below.
 - [X] Select as `Assignee` the next person who should [take action on that MR](https://tezos.gitlab.io/developer/contributing.html#merge-request-assignees-field)
 
-/assign @alocascio @lthms @sribaroud @vch9
+/assign @lthms @sribaroud @vch9
 
-/assign_reviewer @alocascio @lthms @sribaroud @vch9
+/assign_reviewer @lthms @sribaroud @vch9
 
 /labels ~evm::sequencer
 
