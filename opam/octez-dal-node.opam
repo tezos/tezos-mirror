@@ -19,7 +19,6 @@ depends: [
   "octez-internal-libs"
   "prometheus-app" { >= "1.2" }
   "prometheus" { >= "1.2" }
-  "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
 ]
 depopts: [

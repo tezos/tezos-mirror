@@ -16,7 +16,6 @@ depends: [
   "tezos-dac-node-lib"
   "octez-l2-libs"
   "octez-internal-libs"
-  "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
 ]
 depopts: [

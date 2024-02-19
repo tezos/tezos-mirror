@@ -129,8 +129,12 @@
   (select void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer from
    (octez-protocol-016-PtMumbai-libs.plugin-registerer -> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer.empty)
    (-> void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer.empty))
-  tezos-protocol-017-PtNairob.embedded-protocol
-  octez-protocol-017-PtNairob-libs.plugin-registerer
+  (select void_for_linking-tezos-protocol-017-PtNairob-embedded-protocol from
+   (tezos-protocol-017-PtNairob.embedded-protocol -> void_for_linking-tezos-protocol-017-PtNairob-embedded-protocol.empty)
+   (-> void_for_linking-tezos-protocol-017-PtNairob-embedded-protocol.empty))
+  (select void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer from
+   (octez-protocol-017-PtNairob-libs.plugin-registerer -> void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer.empty)
+   (-> void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer.empty))
   tezos-protocol-018-Proxford.embedded-protocol
   octez-protocol-018-Proxford-libs.plugin-registerer
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
@@ -200,6 +204,8 @@
    (write-file void_for_linking-octez-protocol-015-PtLimaPt-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-016-PtMumbai-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-016-PtMumbai-libs-plugin-registerer.empty "")
+   (write-file void_for_linking-tezos-protocol-017-PtNairob-embedded-protocol.empty "")
+   (write-file void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer.empty "")
    (write-file void_for_linking-tezos-protocol-alpha-embedded-protocol.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin-registerer.empty ""))))
 

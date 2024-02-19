@@ -7042,7 +7042,7 @@ let hash = Protocol.hash
 
   let _016_PtMumbai = frozen (Name.v "PtMumbai" 016)
 
-  let _017_PtNairob = active (Name.v "PtNairob" 017)
+  let _017_PtNairob = frozen (Name.v "PtNairob" 017)
 
   let _018_Proxford = active (Name.v "Proxford" 018)
 

@@ -12,13 +12,10 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "octez-libs" {with-test}
-  "tezos-protocol-017-PtNairob" {with-test}
-  "octez-protocol-017-PtNairob-libs" {with-test}
-  "octez-smart-rollup-node-PtNairob" {with-test}
-  "octez-alcotezt" {with-test}
   "tezos-protocol-018-Proxford" {with-test}
   "octez-protocol-018-Proxford-libs" {with-test}
   "octez-smart-rollup-node-Proxford" {with-test}
+  "octez-alcotezt" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}

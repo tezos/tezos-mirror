@@ -1,7 +1,0 @@
-{ parameter string ;
-  storage (pair (option nat) (map string nat)) ;
-  code { { UNPAIR ; DIP { UNPAIR } } ;
-         GET_AND_UPDATE ;
-         PAIR ;
-         NIL operation ;
-         PAIR } }

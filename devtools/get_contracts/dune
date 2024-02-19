@@ -7,8 +7,6 @@
   octez-libs.micheline
   octez-libs.base
   octez-shell-libs.store
-  tezos-protocol-017-PtNairob.protocol
-  octez-protocol-017-PtNairob-libs.client
   tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.client
   tezos-protocol-alpha.protocol

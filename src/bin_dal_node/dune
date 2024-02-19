@@ -38,7 +38,6 @@
   octez-internal-libs.irmin
   prometheus-app
   prometheus
-  octez-protocol-017-PtNairob-libs.dal
   octez-protocol-018-Proxford-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)

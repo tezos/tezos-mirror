@@ -25,6 +25,8 @@ be documented here either.
 General
 -------
 
+- Removed binaries for Nairobi (MR :gl:`!12043`)
+
 Node
 ----
 

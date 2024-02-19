@@ -73,14 +73,6 @@ let smart_rollup_installer =
 let _octez_smart_rollup_wasm_debugger =
   Uses.make ~tag:"wasm_debugger" ~path:"./octez-smart-rollup-wasm-debugger"
 
-(* To be removed after Nairobi is frozen *)
-let _octez_accuser_PtNairob =
-  Uses.make ~tag:"accuser_ptnairob" ~path:"./octez-accuser-PtNairob"
-
-(* To be removed after Nairobi is frozen *)
-let _octez_baker_PtNairob =
-  Uses.make ~tag:"baker_ptnairob" ~path:"./octez-baker-PtNairob"
-
 module WASM = struct
   let dal_echo_kernel =
     Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm"
