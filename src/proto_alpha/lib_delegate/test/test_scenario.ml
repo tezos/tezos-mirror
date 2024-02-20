@@ -1834,7 +1834,7 @@ let test_scenario_m9 () =
               else
                 Stdlib.failwith
                   "time to forge emitted without observing qc event"
-          | Time_to_bake_next_level _ ->
+          | Time_to_prepare_next_level_block _ ->
               if !node_b_qc && !node_b_ttf then false
               else
                 Stdlib.failwith

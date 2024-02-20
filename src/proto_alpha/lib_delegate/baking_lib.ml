@@ -165,7 +165,9 @@ let bake_at_next_level state =
           ~default:Lwt.return_unit
           (Baking_scheduling.sleep_until timestamp)
       in
-      return (Baking_state.Timeout (Time_to_bake_next_level {at_round = round}))
+      return
+        (Baking_state.Timeout
+           (Time_to_prepare_next_level_block {at_round = round}))
 
 (* Simulate the end of the current round to bootstrap the automaton
    or attest the block if necessary *)

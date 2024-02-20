@@ -512,14 +512,16 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     | None ->
         let*! () = Events.(emit no_need_to_wait_for_proposal ()) in
         return
-          (Lwt.return (Time_to_bake_next_level {at_round = next_baking_round}))
+          (Lwt.return
+             (Time_to_prepare_next_level_block {at_round = next_baking_round}))
     | Some t ->
         let*! () =
           Events.(emit waiting_time_to_bake (delay, next_baking_time))
         in
         return
           (let*! () = t in
-           Lwt.return (Time_to_bake_next_level {at_round = next_baking_round}))
+           Lwt.return
+             (Time_to_prepare_next_level_block {at_round = next_baking_round}))
   in
   let delay_next_round_timeout next_round =
     (* we only delay if it's our turn to bake *)

@@ -704,7 +704,7 @@ let time_to_forge_block state =
       in
       return (state, action)
 
-let time_to_bake_at_next_level state at_round =
+let time_to_prepare_next_level_block state at_round =
   let open Lwt_syntax in
   (* It is now time to update the state level *)
   (* We need to keep track for which block we have 2f+1 *attestations*, that is,
@@ -713,7 +713,7 @@ let time_to_bake_at_next_level state at_round =
   let round_proposer_opt = round_proposer state ~level:`Next at_round in
   match (state.level_state.elected_block, round_proposer_opt) with
   | None, _ | _, None ->
-      (* Unreachable: the [Time_to_bake_next_level] event can only be
+      (* Unreachable: the [Time_to_prepare_next_level_block] event can only be
          triggered when we have a slot and an elected block *)
       assert false
   | Some elected_block, Some {consensus_key_and_delegate; _} ->
@@ -904,10 +904,10 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (* If the round is ending, stop everything currently going on and
          increment the round. *)
       end_of_round state ending_round
-  | _, Timeout (Time_to_bake_next_level {at_round}) ->
+  | _, Timeout (Time_to_prepare_next_level_block {at_round}) ->
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
-      time_to_bake_at_next_level state at_round
+      time_to_prepare_next_level_block state at_round
   | _, Timeout Time_to_forge_block -> time_to_forge_block state
   | Idle, New_head_proposal proposal ->
       let* () =
