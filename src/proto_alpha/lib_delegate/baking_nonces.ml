@@ -169,38 +169,33 @@ let filter_outdated_nonces state nonces =
 
 let blocks_from_previous_cycle {cctxt; chain; _} =
   let open Lwt_result_syntax in
-  let block = `Head 0 in
-  let*! result =
-    Plugin.RPC.levels_in_current_cycle cctxt ~offset:(-1l) (chain, block)
+  let current_head = `Head 0 in
+  let*! cycle_levels =
+    Plugin.RPC.levels_in_current_cycle cctxt ~offset:(-1l) (chain, current_head)
   in
-  match result with
+  match cycle_levels with
   | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) -> (
-      let* hash = Shell_services.Blocks.hash cctxt ~chain ~block () in
-      let* {level; _} =
-        Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
+      let first, last = (Raw_level.to_int32 first, Raw_level.to_int32 last) in
+      let* last_level_hash =
+        Shell_services.Blocks.hash cctxt ~chain ~block:(`Level last) ()
       in
-      (* FIXME: crappy algorithm, change this *)
-      (* Compute how many blocks below current level we should ask for *)
-      let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
+      (* Compute how many blocks there are between the first and last level of the
+         previous cycle *)
+      let length = Int32.to_int (Int32.sub last first) in
       let* blocks_list =
-        Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
+        Shell_services.Blocks.list
+          cctxt
+          ~chain
+          ~heads:[last_level_hash]
+          ~length
+          ()
         (* Looks like this function call retrieves a list of blocks ordered from
            latest to earliest - decreasing order of insertion in the chain *)
       in
       match blocks_list with
-      | [blocks] ->
-          if Int32.equal level (Raw_level.to_int32 last) then
-            (* We have just retrieved a block list of the right size starting at
-               first until last *)
-            return blocks
-          else
-            (* Remove all the latest blocks from last up to length*)
-            List.drop_n
-              (length - Int32.to_int (Raw_level.diff last first))
-              blocks
-            |> return
+      | [blocks] -> return blocks
       | l ->
           failwith
             "Baking_nonces.blocks_from_current_cycle: unexpected block list of \
