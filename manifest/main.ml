@@ -5420,11 +5420,12 @@ end = struct
             ("test_constants", true);
             ("test_frozen_bonds", true);
             ("test_adaptive_issuance_launch", N.(number >= 018));
-            ("test_adaptive_issuance_roundtrip", N.(number >= 018));
+            ("test_adaptive_issuance_roundtrip", N.(number == 018));
             ("test_scenario_base", N.(number >= 019));
             ("test_scenario_stake", N.(number >= 019));
             ("test_scenario_rewards", N.(number >= 019));
             ("test_scenario_autostaking", N.(number >= 019));
+            ("test_scenario_slashing", N.(number >= 019));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);

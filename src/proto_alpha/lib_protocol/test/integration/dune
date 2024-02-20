@@ -32,11 +32,11 @@
   test_constants
   test_frozen_bonds
   test_adaptive_issuance_launch
-  test_adaptive_issuance_roundtrip
   test_scenario_base
   test_scenario_stake
   test_scenario_rewards
   test_scenario_autostaking
+  test_scenario_slashing
   test_liquidity_baking
   test_storage_functions
   test_storage
