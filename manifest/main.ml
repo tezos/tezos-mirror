@@ -5422,6 +5422,7 @@ end = struct
             ("test_adaptive_issuance_launch", N.(number >= 018));
             ("test_adaptive_issuance_roundtrip", N.(number >= 018));
             ("test_scenario_base", N.(number >= 019));
+            ("test_scenario_stake", N.(number >= 019));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);

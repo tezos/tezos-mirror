@@ -34,6 +34,7 @@
   test_adaptive_issuance_launch
   test_adaptive_issuance_roundtrip
   test_scenario_base
+  test_scenario_stake
   test_liquidity_baking
   test_storage_functions
   test_storage
