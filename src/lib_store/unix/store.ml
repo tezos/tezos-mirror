@@ -252,14 +252,17 @@ module Block = struct
 
   (* I/O operations *)
 
-  let is_known_valid {block_store; _} hash =
+  let is_known_valid chain_store hash =
     let open Lwt_syntax in
-    let* r = Block_store.(mem block_store (Block (hash, 0))) in
-    match r with
-    | Ok k -> Lwt.return k
-    | Error _ ->
-        (* should never happen : (0 \in N) *)
-        Lwt.return_false
+    let* current_head = current_head chain_store in
+    if Block_repr.hash current_head = hash then return_true
+    else
+      let* r = Block_store.(mem chain_store.block_store (Block (hash, 0))) in
+      match r with
+      | Ok k -> return k
+      | Error _ ->
+          (* should never happen : (0 \in N) *)
+          return_false
 
   let locked_is_known_invalid chain_state hash =
     let open Lwt_syntax in
