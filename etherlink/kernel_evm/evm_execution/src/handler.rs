@@ -1072,9 +1072,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.config.memory_limit,
             );
 
-            let result = self.execute(&mut runtime);
+            let result = self.execute(&mut runtime)?;
 
-            return Ok((result?, None, runtime.machine().return_value()));
+            return Ok((result, None, runtime.machine().return_value()));
         }
     }
 
