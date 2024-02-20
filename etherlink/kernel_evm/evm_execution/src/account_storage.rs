@@ -161,7 +161,7 @@ fn read_u256(
     path: &impl Path,
     default: U256,
 ) -> Result<U256, AccountStorageError> {
-    match host.store_read(path, 0, WORD_SIZE) {
+    match host.store_read_all(path) {
         Ok(bytes) if bytes.len() == WORD_SIZE => Ok(U256::from_little_endian(&bytes)),
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(err) => Err(err.into()),
@@ -194,7 +194,7 @@ fn read_h256(
     path: &impl Path,
     default: H256,
 ) -> Result<H256, AccountStorageError> {
-    match host.store_read(path, 0, WORD_SIZE) {
+    match host.store_read_all(path) {
         Ok(bytes) if bytes.len() == WORD_SIZE => Ok(H256::from_slice(&bytes)),
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(err) => Err(err.into()),
@@ -249,7 +249,7 @@ impl EthereumAccount {
 
         let new_value_bytes: [u8; NONCE_ENCODING_SIZE] = new_value.to_le_bytes();
 
-        host.store_write(&path, &new_value_bytes, 0)
+        host.store_write_all(&path, &new_value_bytes)
             .map_err(AccountStorageError::from)
     }
 
@@ -278,7 +278,7 @@ impl EthereumAccount {
 
         let value_bytes: [u8; NONCE_ENCODING_SIZE] = nonce.to_le_bytes();
 
-        host.store_write(&path, &value_bytes, 0)
+        host.store_write_all(&path, &value_bytes)
             .map_err(AccountStorageError::from)
     }
 
@@ -303,7 +303,7 @@ impl EthereumAccount {
             let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
             new_value.to_little_endian(&mut new_value_bytes);
 
-            host.store_write(&path, &new_value_bytes, 0)
+            host.store_write_all(&path, &new_value_bytes)
                 .map_err(AccountStorageError::from)
         } else {
             Err(AccountStorageError::BalanceOverflow)
@@ -327,7 +327,7 @@ impl EthereumAccount {
             let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
             new_value.to_little_endian(&mut new_value_bytes);
 
-            host.store_write(&path, &new_value_bytes, 0)
+            host.store_write_all(&path, &new_value_bytes)
                 .map_err(AccountStorageError::from)
                 .map(|_| true)
         } else {
@@ -403,7 +403,7 @@ impl EthereumAccount {
         if !to_default {
             let value_bytes = value.to_fixed_bytes();
 
-            host.store_write(&path, &value_bytes, 0)?;
+            host.store_write_all(&path, &value_bytes)?;
         }
 
         Ok(StorageEffect {
@@ -424,7 +424,7 @@ impl EthereumAccount {
 
         let value_bytes = value.to_fixed_bytes();
 
-        host.store_write(&path, &value_bytes, 0)
+        host.store_write_all(&path, &value_bytes)
             .map_err(AccountStorageError::from)
     }
 
@@ -484,7 +484,7 @@ impl EthereumAccount {
         let code_hash_bytes: [u8; WORD_SIZE] = code_hash.into();
         let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
 
-        host.store_write(&code_hash_path, &code_hash_bytes, 0)?;
+        host.store_write_all(&code_hash_path, &code_hash_bytes)?;
 
         let code_path = concat(&self.path, &CODE_PATH)?;
 
@@ -531,7 +531,7 @@ impl EthereumAccount {
         host: &mut impl Runtime,
     ) -> Result<(), DurableStorageError> {
         let path = concat(&self.path, &INDEXED_PATH)?;
-        host.store_write(&path, &[0_u8; 0], 0)
+        host.store_write_all(&path, &[0_u8; 0])
             .map_err(DurableStorageError::from)
     }
 }
