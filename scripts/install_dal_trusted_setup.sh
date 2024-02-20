@@ -8,6 +8,15 @@ script_dir="$(cd "$(dirname "$0")" && pwd -P)"
 . "$script_dir"/version.sh
 
 # Install DAL trusted setup.
+
+# When executing this script within the Docker image, this variable
+# might not be initialized because the binaries have already been
+# compiled. This approach ensures compatibility and functionality with
+# respect to an environment compiling sources with opam.
+if [ -z "$OPAM_SWITCH_PREFIX" ]; then
+  OPAM_SWITCH_PREFIX="./_opam"
+fi
+
 DAL_TRUSTED_SETUP="${OPAM_SWITCH_PREFIX}/share/dal-trusted-setup"
 URL="https://assets.nomadic-labs.cloud/dal_trusted_setup"
 
