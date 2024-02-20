@@ -118,55 +118,6 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
-type block_kind =
-  | Fresh of Operation_pool.pool
-  | Reproposal of {
-      consensus_operations : packed_operation list;
-      payload_hash : Block_payload_hash.t;
-      payload_round : Round.t;
-      payload : Operation_pool.payload;
-    }
-
-type block_to_bake = {
-  predecessor : block_info;
-  round : Round.t;
-  delegate : consensus_key_and_delegate;
-  kind : block_kind;
-  force_apply : bool;
-}
-
-type forge_event = |
-
-type forge_request
-
-type forge_worker_hooks = {
-  push_request : forge_request -> unit;
-  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
-}
-
-type global_state = {
-  (* client context *)
-  cctxt : Protocol_client_context.full;
-  (* chain id *)
-  chain_id : Chain_id.t;
-  (* baker configuration *)
-  config : Baking_configuration.t;
-  (* protocol constants *)
-  constants : Constants.t;
-  (* round durations *)
-  round_durations : Round.round_durations;
-  (* worker that monitor and aggregates new operations *)
-  operation_worker : Operation_worker.t;
-  (* hooks to the consensus and block forge worker *)
-  mutable forge_worker_hooks : forge_worker_hooks;
-  (* the validation mode used by the baker*)
-  validation_mode : validation_mode;
-  (* the delegates on behalf of which the baker is running *)
-  delegates : consensus_key list;
-  cache : cache;
-  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
-}
-
 let prequorum_encoding =
   let open Data_encoding in
   conv
@@ -323,10 +274,10 @@ type elected_block = {
   attestation_qc : Kind.attestation Operation.t list;
 }
 
-type signed_block = {
+type prepared_block = {
+  signed_block_header : block_header;
   round : Round.t;
   delegate : consensus_key_and_delegate;
-  block_header : block_header;
   operations : Tezos_base.Operation.t list list;
 }
 
@@ -348,7 +299,7 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
-  next_forged_block : signed_block option;
+  next_forged_block : prepared_block option;
       (* Block that is preemptively forged for the next level when baker is
            round 0 proposer. *)
 }
@@ -394,6 +345,55 @@ type round_state = {
   current_round : Round.t;
   current_phase : phase;
   delayed_quorum : Kind.attestation operation list option;
+}
+
+type block_kind =
+  | Fresh of Operation_pool.pool
+  | Reproposal of {
+      consensus_operations : packed_operation list;
+      payload_hash : Block_payload_hash.t;
+      payload_round : Round.t;
+      payload : Operation_pool.payload;
+    }
+
+type block_to_bake = {
+  predecessor : block_info;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  kind : block_kind;
+  force_apply : bool;
+}
+
+type forge_event = |
+
+type forge_request
+
+type forge_worker_hooks = {
+  push_request : forge_request -> unit;
+  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+}
+
+type global_state = {
+  (* client context *)
+  cctxt : Protocol_client_context.full;
+  (* chain id *)
+  chain_id : Chain_id.t;
+  (* baker configuration *)
+  config : Baking_configuration.t;
+  (* protocol constants *)
+  constants : Constants.t;
+  (* round durations *)
+  round_durations : Round.round_durations;
+  (* worker that monitor and aggregates new operations *)
+  operation_worker : Operation_worker.t;
+  (* hooks to the consensus and block forge worker *)
+  mutable forge_worker_hooks : forge_worker_hooks;
+  (* the validation mode used by the baker*)
+  validation_mode : validation_mode;
+  (* the delegates on behalf of which the baker is running *)
+  delegates : consensus_key list;
+  cache : cache;
+  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
 
 type state = {
@@ -980,16 +980,16 @@ let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
             (List.filteri (fun i _ -> i < 10) all_slots)))
     (SlotMap.bindings (delegate_slots_for_pp own_delegate_slots))
 
-let pp_next_forged_block fmt
-    {delegate = consensus_key_and_delegate; block_header; _} =
+let pp_prepared_block fmt
+    {signed_block_header; delegate = consensus_key_and_delegate; _} =
   Format.fprintf
     fmt
     "predecessor block hash: %a, payload hash: %a, level: %ld, delegate: %a"
     Block_hash.pp
-    block_header.shell.predecessor
+    signed_block_header.shell.predecessor
     Block_payload_hash.pp_short
-    block_header.protocol_data.contents.payload_hash
-    block_header.shell.level
+    signed_block_header.protocol_data.contents.payload_hash
+    signed_block_header.shell.level
     pp_consensus_key_and_delegate
     consensus_key_and_delegate
 
@@ -1028,7 +1028,7 @@ let pp_level_state fmt
     next_level_delegate_slots
     (pp_option Round.pp)
     next_level_proposed_round
-    (pp_option pp_next_forged_block)
+    (pp_option pp_prepared_block)
     next_forged_block
 
 let pp_phase fmt = function

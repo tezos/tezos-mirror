@@ -31,10 +31,10 @@ type inject_block_kind =
   | Forge_and_inject of block_to_bake
       (** Forge and inject a freshly forged block. [block_to_bake] should be
           used in the forging process. *)
-  | Inject_only of signed_block
-      (** Inject [signed_block]. The baker can pre-emptively forge a signed
-          block with the [Forge_block] action if it knows it is the next baker
-          and it is idle. *)
+  | Inject_only of prepared_block
+      (** Inject [prepared_block]. The baker can pre-emptively forge a
+          signed block with the [Forge_block] action if it knows it is
+          the next baker and it is idle. *)
 
 type consensus_vote_kind = Attestation | Preattestation
 
@@ -108,7 +108,7 @@ val generate_seed_nonce_hash :
   (Nonce_hash.t * Nonce.t) option tzresult Lwt.t
 
 val inject_block :
-  updated_state:state -> state -> signed_block -> state tzresult Lwt.t
+  updated_state:state -> state -> prepared_block -> state tzresult Lwt.t
 
 val sign_consensus_votes :
   state ->

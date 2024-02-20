@@ -120,7 +120,7 @@ end
 
 type inject_block_kind =
   | Forge_and_inject of block_to_bake
-  | Inject_only of signed_block
+  | Inject_only of prepared_block
 
 type consensus_vote_kind = Attestation | Preattestation
 
@@ -431,16 +431,15 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
         Baking_nonces.register_nonce cctxt ~chain_id block_hash nonce
   in
   let* () = state_recorder ~new_state:updated_state in
-  let signed_block =
-    {round; delegate; operations; block_header = signed_block_header}
-  in
+  let signed_block = {signed_block_header; round; delegate; operations} in
   return (signed_block, updated_state)
 
-let inject_block ~updated_state state signed_block =
+let inject_block ~updated_state state prepared_block =
   let open Lwt_result_syntax in
-  let {round; delegate; block_header; operations} = signed_block in
+  let {signed_block_header; round; delegate; operations} = prepared_block in
   let*! () =
-    Events.(emit injecting_block (block_header.shell.level, round, delegate))
+    Events.(
+      emit injecting_block (signed_block_header.shell.level, round, delegate))
   in
   let cctxt = state.global_state.cctxt in
   let* bh =
@@ -448,11 +447,12 @@ let inject_block ~updated_state state signed_block =
       cctxt
       ~force:state.global_state.config.force
       ~chain:(`Hash state.global_state.chain_id)
-      block_header
+      signed_block_header
       operations
   in
   let*! () =
-    Events.(emit block_injected (bh, block_header.shell.level, round, delegate))
+    Events.(
+      emit block_injected (bh, signed_block_header.shell.level, round, delegate))
   in
   return updated_state
 
