@@ -14,7 +14,6 @@ branch of Octez.
 Environment Version
 -------------------
 
-
 This protocol requires a different protocol environment version than Oxford.
 It requires protocol environment V12, compared to V11 for Oxford.
 
@@ -22,6 +21,8 @@ Smart Rollups
 -------------
 
 - The unnecessary initial PVM state hash and its associated RPC are removed. (MR :gl:`!11472`)
+
+- Bumped Wasm PVM to V4. (MR :gl:`!11490`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
@@ -71,6 +72,8 @@ Adaptive Issuance (ongoing)
 
 - The minimal frozen stake is now checked before applying limits and then re-checked after applying limits and edge. (MR :gl:`!11086`)
 
+- Min/max issuance bounds evolve progressively over the first 6 months after the eventual activation of Adaptive Issuance. (MR :gl:`!11293`)
+
 - A delegate denounced for double baking or double attesting is now
   always forbidden from baking and attesting in the near future
   (previously, they were only forbidden if recent and incoming slashes
@@ -98,16 +101,17 @@ Adaptive Issuance (ongoing)
   a strong incentive against potential consensus attacks. (MR
   :gl:`!11854`)
 
-- Activating adaptive issuance per-block vote (MR :gl:`!11935`)
+- Activated per-block vote for Adaptive Issuance. (MR :gl:`!11935`)
 
-- Adjust total supply tracked for AI (estimated in O) so that it matches the
-  actual total supply. (MR :gl:`!11996`)
+- Added a feature flag which would force enabling Adaptive Issuance upon protocol activation. (MR :gl:`!11559`)
 
-- Add min_delegated_in_current_cycle field in delegates info obtained via ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]'``  (MR :gl:`!12018``)
+- Updated the estimation for Mainnet's total tez supply which would be used while eventually migrating from Oxford to protocol P. (cf. :gl: #6102, MR :gl:`!11996`)
 
-- Add RPC to get min_delegated_in_current_cycle for a delegate using ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'`` (MR :gl:`!12018`)
+- Added min_delegated_in_current_cycle field in delegates info obtained via ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]'``.  (MR :gl:`!12018`)
 
-- Activating new slashing flag (MR :gl:`!12013`)
+- Added RPC to get ``min_delegated_in_current_cycle`` for a delegate using ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'``. (MR :gl:`!12018`)
+
+- Activating new slashing flag. (MR :gl:`!12013`)
 
 Gas improvements
 ----------------
@@ -120,6 +124,11 @@ Breaking Changes
   attested are the slots that were published ``attestation_lag`` levels
   ago (MRs :gl:`!11903`, :gl:`!12063`) (see `DAL documentation
   <https://tezos.gitlab.io/shell/dal.html>`_ for more context).
+
+-  The protocol no longer relies on stake snapshots to compute rights. Instead:
+
+   * Rights originating from staked tez are computed from the value at the end of the cycle;
+   * Rights originating from delegated tez are computing using the minimum value over the cycle. (MR :gl:`!10455`)
 
 RPC Changes
 -----------
@@ -144,6 +153,7 @@ RPC Changes
 - New RPC to list the pending denunciations of a given delegate.
   ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/denunciations``. (MR :gl:`!11885`)
 
+- Removed RPC related to stake snapshot. ``GET /chains/<chain_id>/blocks/<block_id>/context/selected_snapshot``. (MR :gl:`!11390`)
 
 Operation receipts
 ------------------
@@ -151,14 +161,22 @@ Operation receipts
 Protocol parameters
 -------------------
 
-- replace ``preserved_cycles`` with 3 constants ``consensus_rights_delay``,
+- Replaced ``preserved_cycles`` with 3 constants ``consensus_rights_delay``,
   ``blocks_preservation_cycles`` and
   ``delegate_parameters_activation_delay``. (MR :gl:`!11188`, :gl:`!11280`,
-  :gl:`!11279`, :gl:`!11220`)
+  :gl:`!11279`, :gl:`!11220`, :gl:`!11562`)
+
+- Updated ``consensus_rights_delay`` from ``5`` to ``2``. (MR :gl:`!11568`)
 
 - Set the number of blocks preservation cycles to 1. (MR :gl:`!11325`)
 
 - Set ``liquidity_baking_subsidy`` to 5 tez issued per minute (MR :gl:`!11971`)
+
+- Removed ``blocks_per_stake_snapshot``. (MR :gl:`!11393`)
+
+- Adapted Smart Rollups constants to account for 10s minimal block time. (MR :gl:`!11445`)
+
+- Added feature flag to force AI activation at protocol activation. (MR :gl:`!11559`)
 
 Bug Fixes
 ---------
@@ -227,6 +245,8 @@ Minor Changes
   for the whole level, and one double operation (either attestion or
   preattestion) for the whole level. (MRs :gl:`!11826`, :gl:`!11844`)
 
+- Added the ``D_Ticket`` Michelson primitives. (MR :gl:`!11599`)
+
 Internal
 --------
 
@@ -237,3 +257,25 @@ Internal
   ``adaptive_issuance_activation_delay``, ``tolerated_inactivity_period``,
   ``consensus_key_activation_delay``, ``slashable_deposits_period`` (MR
   :gl:`!11188`, :gl:`!11280`, :gl:`!11279`, :gl:`!11629`)
+
+- The staking balance is now explicitly initialized when a delegate is registered. (MR :gl:`!11197`)
+
+- The issuance reward coefficient is now computed only once.
+  It used to be computed twice, once for the bonus, assuming a zero bonus, and once afterwards taking the bonus into account. (MR :gl:`!10935`)
+
+- The shell uses LPBL instead of LAFL to trigger history clean-up. LPBL is
+  ``blocks_preservation_cycles`` in the past.  (MR :gl:`!11201`)
+
+- Enforced the 2 blocks finality of Tenderbake in the storage. (MR :gl:`!11262`)
+
+- Frozen deposits are cleaned during stitching for ``P``. (MR :gl:`!11341`)
+
+- Removed stake snapshots. (MR :gl:`!11389`, :gl:`!11390`, :gl:`!11392`)
+
+- Moved context's subtree ``staking_balance/current`` to ``staking_balance`` at stiching for protocol P. (MR :gl:`!11391`)
+
+- During the eventual context stitching for protocol P's activation, the ``last_snapshot`` entry will be removed from the context, as it would be no longer needed. (MR :gl:`!11394`)
+
+- sc_rollup parametric constants update consistency is now checked. (MR :gl:`!11555`)
+
+- Changed misbeahviour's repr. (MR :gl:`!11575`)
