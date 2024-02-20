@@ -11,6 +11,8 @@ select_tezts:
     - eval $(opam env)
   script:
     - scripts/ci/select_tezts.sh
+  allow_failure:
+    exit_codes: 17
   artifacts:
     when: always
     paths:
