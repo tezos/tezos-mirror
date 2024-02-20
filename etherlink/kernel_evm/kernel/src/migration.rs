@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 use crate::error::Error;
@@ -35,6 +36,10 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+
+        // raise da fee from 2 to 4 mutez/byte
+        crate::storage::store_da_fee(host, crate::fees::DA_FEE_PER_BYTE.into())?;
+
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);
