@@ -33,6 +33,7 @@
 
 open Adaptive_issuance_helpers
 open State_account
+open Log_helper
 
 let fs = Format.asprintf
 
@@ -48,71 +49,6 @@ let default_param_wait, default_unstake_wait =
   let dpad = constants.delegate_parameters_activation_delay in
   let msp = Protocol.Constants_repr.max_slashing_period in
   (dpad, crd + msp)
-
-(** Contains the functions and constants relative to logging.*)
-module Log_module = struct
-  let begin_end_color = Log.Color.(BG.bright_white ++ FG.black ++ bold)
-
-  let time_color = Log.Color.FG.yellow
-
-  let action_color = Log.Color.FG.green
-
-  let event_color = Log.Color.FG.blue
-
-  let warning_color = Log.Color.FG.red
-
-  let low_debug_color = Log.Color.FG.gray
-
-  let assert_block_color = Log.Color.(BG.blue ++ FG.gray)
-
-  let tez_color = Log.Color.FG.bright_white
-
-  let log_debug_balance account_name account_map : unit =
-    let balance, total_balance =
-      balance_and_total_balance_of_account account_name account_map
-    in
-    Log.debug
-      "Model balance of %s:\n%aTotal balance: %a\n"
-      account_name
-      balance_pp
-      balance
-      Tez.pp
-      total_balance
-
-  let log_debug_rpc_balance name contract block : unit tzresult Lwt.t =
-    let open Lwt_result_syntax in
-    let* balance, total_balance = get_balance_from_context (B block) contract in
-    Log.debug
-      "RPC balance of %s:\n%aTotal balance: %a\n"
-      name
-      balance_pp
-      balance
-      Tez.pp
-      total_balance ;
-    return_unit
-
-  let log_debug_balance_update account_name old_account_map new_account_map :
-      unit =
-    let old_balance, old_total_balance =
-      balance_and_total_balance_of_account account_name old_account_map
-    in
-    let new_balance, new_total_balance =
-      balance_and_total_balance_of_account account_name new_account_map
-    in
-    Log.debug
-      "Balance update of %s:\n%aTotal balance: %a -> %a\n"
-      account_name
-      balance_update_pp
-      (old_balance, new_balance)
-      Tez.pp
-      old_total_balance
-      Tez.pp
-      new_total_balance
-
-  (* end module Log_module *)
-end
-
-open Log_module
 
 (** Aliases for tez values *)
 type tez_quantity =
@@ -1331,7 +1267,7 @@ let op_double_baking ?(correct_order = true) bh1 bh2 ctxt =
 
 let double_bake_ delegate_name (block, state) =
   let open Lwt_result_syntax in
-  Log.info ~color:Log_module.event_color "Double baking with %s" delegate_name ;
+  Log.info ~color:event_color "Double baking with %s" delegate_name ;
   let delegate = State.find_account delegate_name state in
   let* operation =
     Adaptive_issuance_helpers.unstake (B block) delegate.contract Tez.one_mutez
@@ -1363,7 +1299,7 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_name
     (block, state) =
   let open Lwt_result_syntax in
   Log.info
-    ~color:Log_module.event_color
+    ~color:event_color
     "Double %s with %s"
     (match kind with
     | Protocol.Misbehaviour_repr.Double_preattesting -> "preattesting"
@@ -1520,7 +1456,7 @@ let update_state_denunciation (block, state)
       in
       (* TODO: better log... *)
       Log.info
-        ~color:Log_module.event_color
+        ~color:event_color
         "Including denunciation (misbehaviour cycle %a)"
         Cycle.pp
         ds_cycle ;
@@ -2282,7 +2218,7 @@ module Autostaking = struct
     if List.mem ~equal:String.equal name for_accounts then
       if compare new_b old_b then return_unit
       else (
-        Log.debug ~color:Log_module.warning_color "Balances changes failed:@." ;
+        Log.debug ~color:warning_color "Balances changes failed:@." ;
         Log.debug "@[<v 2>Old Balance@ %a@]@." balance_pp old_balance ;
         Log.debug "@[<v 2>New Balance@ %a@]@." balance_pp new_balance ;
         failwith "%s Unexpected stake evolution for %s" loc name)

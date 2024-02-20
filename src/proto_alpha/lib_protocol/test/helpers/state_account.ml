@@ -1385,3 +1385,45 @@ let assert_balance_check ~loc ctxt account_name account_map =
           total_balance
       in
       join_errors r1 r2
+
+let log_debug_balance account_name account_map : unit =
+  let balance, total_balance =
+    balance_and_total_balance_of_account account_name account_map
+  in
+  Log.debug
+    "Model balance of %s:\n%aTotal balance: %a\n"
+    account_name
+    balance_pp
+    balance
+    Tez.pp
+    total_balance
+
+let log_debug_rpc_balance name contract block : unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* balance, total_balance = get_balance_from_context (B block) contract in
+  Log.debug
+    "RPC balance of %s:\n%aTotal balance: %a\n"
+    name
+    balance_pp
+    balance
+    Tez.pp
+    total_balance ;
+  return_unit
+
+let log_debug_balance_update account_name old_account_map new_account_map : unit
+    =
+  let old_balance, old_total_balance =
+    balance_and_total_balance_of_account account_name old_account_map
+  in
+  let new_balance, new_total_balance =
+    balance_and_total_balance_of_account account_name new_account_map
+  in
+  Log.debug
+    "Balance update of %s:\n%aTotal balance: %a -> %a\n"
+    account_name
+    balance_update_pp
+    (old_balance, new_balance)
+    Tez.pp
+    old_total_balance
+    Tez.pp
+    new_total_balance
