@@ -38,9 +38,10 @@
  (alias runtest)
  (package tezt-etherlink)
  (deps
-  etherlink/tezt/tests/evm_kernel_inputs
-  (glob_files etherlink/tezos_contracts/*)
-  (glob_files_rec etherlink/kernel_evm/*/*.rs))
+  (glob_files evm_kernel_inputs/*)
+  (glob_files ../../tezos_contracts/*)
+  (glob_files ../../config/*)
+  (glob_files_rec ../../kernel_evm/*))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

@@ -8525,9 +8525,9 @@ let _tezt_etherlink =
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
-    ~dep_files:["etherlink/tezt/tests/evm_kernel_inputs"]
-    ~dep_globs:["etherlink/tezos_contracts/*"]
-    ~dep_globs_rec:["etherlink/kernel_evm/*/*.rs"]
+    ~dep_globs:
+      ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
+    ~dep_globs_rec:["../../kernel_evm/*"]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 let _evm_node =
