@@ -838,6 +838,14 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   let new_state = update_current_phase new_state Idle in
   do_nothing new_state
 
+let handle_forge_event state forge_event =
+  match forge_event with
+  | Block_ready prepared_block ->
+      Lwt.return
+        ( state,
+          Inject_block
+            {prepared_block; force_injection = false; asynchronous = true} )
+
 (* Hypothesis:
    - The state is not to be modified outside this module
      (NB: there are exceptions in Baking_actions: the corner cases
@@ -920,6 +928,9 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
               proposal.block.round ))
       in
       handle_proposal ~is_proposal_applied:false state proposal
+  | _, New_forge_event (forge_event : forge_event) ->
+      let* () = Events.(emit new_forge_event forge_event) in
+      handle_forge_event state forge_event
   | Awaiting_application, New_valid_proposal proposal
   | Awaiting_attestations, New_valid_proposal proposal
   | Awaiting_preattestations, New_valid_proposal proposal ->
@@ -949,7 +960,6 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | Idle, (Prequorum_reached _ | Quorum_reached _)
   | Awaiting_preattestations, Quorum_reached _
   | (Awaiting_application | Awaiting_attestations), Prequorum_reached _
-  | Awaiting_application, Quorum_reached _
-  | _, New_forge_event _ ->
+  | Awaiting_application, Quorum_reached _ ->
       (* This cannot/should not happen *)
       do_nothing state
