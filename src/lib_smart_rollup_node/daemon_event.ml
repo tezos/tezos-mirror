@@ -154,6 +154,15 @@ module Simple = struct
       ~level:Error
       ()
 
+  let refutation_loop_retry =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_daemon_refutation_loop_retry"
+      ~msg:"[Refutation daemon error]: restarting refutation daemon in {delay}."
+      ~level:Warning
+      ("delay", Time.System.Span.encoding)
+      ~pp1:Ptime.Span.pp
+
   let exit_bailout_mode =
     declare_0
       ~section
@@ -207,5 +216,8 @@ let migration ~catching_up (old_protocol, old_protocol_level)
 let error e = Simple.(emit error) e
 
 let degraded_mode () = Simple.(emit degraded_mode) ()
+
+let refutation_loop_retry d =
+  Simple.(emit refutation_loop_retry) (Time.System.Span.of_seconds_exn d)
 
 let exit_bailout_mode () = Simple.(emit exit_bailout_mode) ()
