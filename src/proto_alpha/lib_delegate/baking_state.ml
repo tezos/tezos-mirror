@@ -365,9 +365,9 @@ type block_to_bake = {
   force_apply : bool;
 }
 
-type forge_event = |
+type forge_event = Block_ready of prepared_block
 
-type forge_request
+type forge_request = Forge_and_sign_block of block_to_bake
 
 type forge_worker_hooks = {
   push_request : forge_request -> unit;
@@ -497,6 +497,35 @@ let event_encoding =
         (tup2 (constant "Timeout") timeout_kind_encoding)
         (function Timeout tk -> Some ((), tk) | _ -> None)
         (fun ((), tk) -> Timeout tk);
+    ]
+
+let forge_event_encoding =
+  let open Data_encoding in
+  let prepared_block_encoding =
+    conv
+      (fun {signed_block_header; round; delegate; operations; baking_votes} ->
+        (signed_block_header, round, delegate, operations, baking_votes))
+      (fun (signed_block_header, round, delegate, operations, baking_votes) ->
+        {signed_block_header; round; delegate; operations; baking_votes})
+      (obj5
+         (req "header" (dynamic_size Block_header.encoding))
+         (req "round" Round.encoding)
+         (req "delegate" consensus_key_and_delegate_encoding)
+         (req
+            "operations"
+            (list (list (dynamic_size Tezos_base.Operation.encoding))))
+         (req "baking_votes" Per_block_votes.per_block_votes_encoding))
+  in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Block_ready"
+        (obj2
+           (req "kind" (constant "Block_ready"))
+           (req "signed_block" prepared_block_encoding))
+        (function Block_ready prepared_block -> Some ((), prepared_block))
+        (fun ((), prepared_block) -> Block_ready prepared_block);
     ]
 
 (* Disk state *)
@@ -1067,6 +1096,19 @@ let pp_timeout_kind fmt = function
       Format.fprintf fmt "time to bake next level at round %a" Round.pp at_round
   | Time_to_forge_block -> Format.fprintf fmt "time to forge block"
 
+let pp_forge_event fmt =
+  let open Format in
+  function
+  | Block_ready {signed_block_header; round; delegate; _} ->
+      fprintf
+        fmt
+        "block ready for delegate: %a at level %ld (round: %a)"
+        pp_consensus_key_and_delegate
+        delegate
+        signed_block_header.shell.level
+        Round.pp
+        round
+
 let pp_event fmt = function
   | New_valid_proposal proposal ->
       Format.fprintf
@@ -1098,6 +1140,7 @@ let pp_event fmt = function
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
-  | New_forge_event _event -> .
+  | New_forge_event forge_event ->
+      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
   | Timeout kind ->
       Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind

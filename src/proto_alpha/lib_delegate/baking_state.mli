@@ -193,11 +193,11 @@ type round_state = {
 
 (** [forge_event] type used to return the result of a task completion
     in the forge worker. *)
-type forge_event
+type forge_event = Block_ready of prepared_block
 
 (** [forge_request] type used to push a concurrent forging task in the
     forge worker. *)
-type forge_request
+type forge_request = Forge_and_sign_block of block_to_bake
 
 (** [forge_worker_hooks] type that allows interactions with the forge
     worker. Hooks are needed in order to break a circular dependency. *)
@@ -254,6 +254,8 @@ type event =
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t
+
+val forge_event_encoding : forge_event Data_encoding.t
 
 type state_data = {
   level_data : int32;
@@ -331,3 +333,5 @@ val pp : Format.formatter -> t -> unit
 val pp_timeout_kind : Format.formatter -> timeout_kind -> unit
 
 val pp_event : Format.formatter -> event -> unit
+
+val pp_forge_event : Format.formatter -> forge_event -> unit
