@@ -340,6 +340,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Batcher.produce_batches () in
   let*! () = Injector.inject ~header:head.header () in
+  state.degraded <- false ;
   return_unit
 
 let daemonize state =
@@ -499,7 +500,7 @@ let make_signers_for_injector operators =
          in
          (operators, strategy, operation_kinds))
 
-let process_daemon ({node_ctxt; _} as state) =
+let rec process_daemon ({node_ctxt; _} as state) =
   let open Lwt_result_syntax in
   let fatal_error_exit e =
     Format.eprintf "%!%a@.Exiting.@." pp_print_trace e ;
@@ -511,8 +512,11 @@ let process_daemon ({node_ctxt; _} as state) =
     state.degraded <- true ;
     if node_ctxt.config.no_degraded then fatal_error_exit e
     else
-      (* Delegate work to background refutation daemon *)
-      Lwt_utils.never_ending ()
+      let*! () =
+        Daemon_event.main_loop_retry node_ctxt.config.loop_retry_delay
+      in
+      let*! () = Lwt_unix.sleep node_ctxt.config.loop_retry_delay in
+      process_daemon state
   in
   let handle_preimage_not_found e =
     (* When running/initialising a rollup node with missing preimages
