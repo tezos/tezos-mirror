@@ -1084,6 +1084,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
         is_static: bool,
     ) -> Result<ExecutionOutcome, EthereumError> {
+        self.increment_nonce(caller)?;
         self.begin_initial_transaction(is_static, gas_limit)?;
 
         if self.mark_address_as_hot(caller).is_err() {
@@ -1128,6 +1129,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         input: Vec<u8>,
         gas_limit: Option<u64>,
     ) -> Result<ExecutionOutcome, EthereumError> {
+        let default_create_scheme = CreateScheme::Legacy { caller };
+        let address = self.create_address(default_create_scheme);
+        self.increment_nonce(caller)?;
+
         self.begin_initial_transaction(false, gas_limit)?;
 
         if self.mark_address_as_hot(caller).is_err() {
@@ -1143,10 +1148,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 vec![],
             )));
         }
-
-        let default_create_scheme = CreateScheme::Legacy { caller };
-
-        let address = self.create_address(default_create_scheme);
 
         if self.mark_address_as_hot(address).is_err() {
             return Err(EthereumError::InconsistentState(Cow::from(
@@ -1225,6 +1226,27 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     self.host,
                     Debug,
                     "Failed to increment nonce for account {:?}",
+                    address
+                );
+                Err(EthereumError::from(AccountStorageError::from(err)))
+            }
+        }
+    }
+
+    pub fn decrement_nonce(&mut self, address: H160) -> Result<(), EthereumError> {
+        match account_path(&address) {
+            Ok(path) => {
+                let mut account =
+                    self.evm_account_storage.get_or_create(self.host, &path)?;
+                account
+                    .decrement_nonce(self.host)
+                    .map_err(EthereumError::from)
+            }
+            Err(err) => {
+                log!(
+                    self.host,
+                    Debug,
+                    "Failed to decrement nonce for account {:?}",
                     address
                 );
                 Err(EthereumError::from(AccountStorageError::from(err)))

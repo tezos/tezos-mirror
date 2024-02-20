@@ -189,8 +189,12 @@ where
 
         match result {
             Ok(result) => {
-                if !(result.reason == ExtendedExitReason::OutOfTicks && retriable) {
-                    handler.increment_nonce(caller)?;
+                if result.reason == ExtendedExitReason::OutOfTicks && retriable {
+                    // The nonce must be incremented before the execution. Details here: https://gitlab.com/tezos/tezos/-/merge_requests/11998.
+                    // In the EVM logic, the nonce is never decremented
+                    // But with the ticks model, if the execution raises an 'out of ticks' error and if the transaction is 'retriable', the nonce must not be incremented
+                    // But we can only know that after the execution, which is why we must decrement the nonce here
+                    handler.decrement_nonce(caller)?;
                 }
 
                 if do_refund(&result, pay_for_gas) {
@@ -1938,7 +1942,7 @@ mod test {
             false,
         );
         let expected_gas = 21000 // base cost
-        + 30124; // execution gas cost (taken at face value from tests)
+        + 5124; // execution gas cost (taken at face value from tests)
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: expected_gas,
             is_success: true,
@@ -1947,7 +1951,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 23749485,
+            estimated_ticks_used: 4049485,
         }));
 
         assert_eq!(result, expected_result);
@@ -2066,7 +2070,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 9512509485,
+            estimated_ticks_used: 9742809485,
         }));
 
         assert_eq!(result, expected_result);
@@ -3707,5 +3711,49 @@ mod test {
             ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
             result.reason
         )
+    }
+
+    #[test]
+    fn nonce_bump_before_tx() {
+        let mut host = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_evm_account_storage().unwrap();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+        let callee = H160::from_str("b94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let code = hex::decode("323f60005260206000f3").unwrap(); // RETURN (EXTCODEHASH (ORIGIN))
+
+        set_account_code(&mut host, &mut evm_account_storage, &callee, &code);
+
+        let result = run_transaction(
+            &mut host,
+            &block,
+            &mut evm_account_storage,
+            &precompiles,
+            CONFIG,
+            Some(callee),
+            caller,
+            vec![],
+            None,
+            U256::one(),
+            None,
+            false,
+            DUMMY_ALLOCATED_TICKS,
+            false,
+            false,
+        );
+
+        // The origin address is empty but when you start a transaction the nonce is bump
+        // so the EXTCODEHASH return the following value (https://eips.ethereum.org/EIPS/eip-1052).
+        // If the nonce isn't bump before the transaction the return value is 0.
+
+        let return_expected = hex::decode(
+            "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+        )
+        .unwrap();
+
+        assert_eq!(result.unwrap().unwrap().result.unwrap(), return_expected);
     }
 }

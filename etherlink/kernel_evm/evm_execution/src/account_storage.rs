@@ -231,6 +231,23 @@ impl EthereumAccount {
             .map_err(AccountStorageError::from)
     }
 
+    pub fn decrement_nonce(
+        &mut self,
+        host: &mut impl Runtime,
+    ) -> Result<(), AccountStorageError> {
+        let path = concat(&self.path, &NONCE_PATH)?;
+
+        let old_value = self.nonce(host)?;
+
+        let new_value = old_value.checked_sub(U256::one()).unwrap_or_default();
+
+        let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
+        new_value.to_little_endian(&mut new_value_bytes);
+
+        host.store_write(&path, &new_value_bytes, 0)
+            .map_err(AccountStorageError::from)
+    }
+
     pub fn set_nonce(
         &mut self,
         host: &mut impl Runtime,
