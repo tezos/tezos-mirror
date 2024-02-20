@@ -190,18 +190,24 @@ let loop_sequencer :
   let open Lwt_result_syntax in
   let time_between_blocks = config.mode.time_between_blocks in
   let rec loop last_produced_block =
-    let now = Helpers.now () in
-    (* We force if the last produced block is older than [time_between_blocks]. *)
-    let force =
-      match time_between_blocks with
-      | Nothing -> false
-      | Time_between_blocks time_between_blocks ->
+    match time_between_blocks with
+    | Nothing ->
+        (* Bind on a never-resolved promise ensures this call never returns,
+           meaning no block will ever be produced. *)
+        let task, _resolver = Lwt.task () in
+        let*! () = task in
+        return_unit
+    | Time_between_blocks time_between_blocks ->
+        let now = Helpers.now () in
+        (* We force if the last produced block is older than [time_between_blocks]. *)
+        let force =
           let diff = Time.Protocol.(diff now last_produced_block) in
           diff >= Int64.of_float time_between_blocks
-    in
-    let* nb_transactions = Tx_pool.produce_block ~force ~timestamp:now in
-    let*! () = Lwt_unix.sleep 0.5 in
-    if nb_transactions > 0 || force then loop now else loop last_produced_block
+        in
+        let* nb_transactions = Tx_pool.produce_block ~force ~timestamp:now in
+        let*! () = Lwt_unix.sleep 0.5 in
+        if nb_transactions > 0 || force then loop now
+        else loop last_produced_block
   in
   let now = Helpers.now () in
   loop now
