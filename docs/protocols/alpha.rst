@@ -17,6 +17,8 @@ Environment Version
 This protocol requires a different protocol environment version than Oxford.
 It requires protocol environment V12, compared to V11 for Oxford.
 
+- Removed ``Z.extract`` and ``Z.extract_signed`` from unactive protocol environment.
+
 Smart Rollups
 -------------
 
@@ -55,8 +57,14 @@ Data Availability Layer (ongoing)
   enables kernel to read the DAL parameters. This should ease the
   writing of smart rollups kernels to make them generic over the
   values of those parameters. For more information on how it works,
-  please read the `DAL smart rollup integration
-  <https://tezos.gitlab.io/alpha/dal_support.html#smart-rollups-integration>`_.
+  please read the `Smart Rollups integration
+  <https://tezos.gitlab.io/alpha/dal_support.html#smart-rollups-integration>`_ section in the DAL's documentation.
+
+ - An optional ``dal_attestation`` field is now present in the
+   ``block_metadata`` indicating the attested slots. The slots being
+   attested are the slots that were published ``attestation_lag`` blocks
+   ago (MR :gl:`!11903`) (see `DAL documentation
+   <https://tezos.gitlab.io/shell/dal.html>`_ for more context).
 
 
 Adaptive Issuance (ongoing)
@@ -73,6 +81,8 @@ Adaptive Issuance (ongoing)
 - The minimal frozen stake is now checked before applying limits and then re-checked after applying limits and edge. (MR :gl:`!11086`)
 
 - Min/max issuance bounds evolve progressively over the first 6 months after the eventual activation of Adaptive Issuance. (MR :gl:`!11293`)
+
+- The slashing from denunciations is delayed to the end of the cycle ending the denunciation period. (MR :gl:`!11684`, :gl:`!11879`)
 
 - A delegate denounced for double baking or double attesting is now
   always forbidden from baking and attesting in the near future
@@ -101,13 +111,15 @@ Adaptive Issuance (ongoing)
   a strong incentive against potential consensus attacks. (MR
   :gl:`!11854`)
 
+- Autostaking now happens only after pending denunciations are applied. (MR :gl:`!11880`)
+
 - Activated per-block vote for Adaptive Issuance. (MR :gl:`!11935`)
 
 - Added a feature flag which would force enabling Adaptive Issuance upon protocol activation. (MR :gl:`!11559`)
 
 - Updated the estimation for Mainnet's total tez supply which would be used while eventually migrating from Oxford to protocol P. (cf. :gl: #6102, MR :gl:`!11996`)
 
-- Added min_delegated_in_current_cycle field in delegates info obtained via ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]'``.  (MR :gl:`!12018`)
+- Added a min_delegated_in_current_cycle field to the delegates' information reported via ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]'``. (MR :gl:`!12018`)
 
 - Added RPC to get ``min_delegated_in_current_cycle`` for a delegate using ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'``. (MR :gl:`!12018`)
 
@@ -130,6 +142,8 @@ Breaking Changes
    * Rights originating from staked tez are computed from the value at the end of the cycle;
    * Rights originating from delegated tez are computing using the minimum value over the cycle. (MR :gl:`!10455`)
 
+- ``Attestation`` is now the default for operations encoding. (MR :gl:`!11861`)
+
 RPC Changes
 -----------
 
@@ -150,10 +164,17 @@ RPC Changes
   specified delegate, and set to false otherwise.
   ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/``. (MR :gl:`!12042`)
 
-- New RPC to list the pending denunciations of a given delegate.
-  ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/denunciations``. (MR :gl:`!11885`)
+- Added min_delegated_in_current_cycle field in delegates info obtained via
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>``. (MR :gl:`!12018`)
+
+- Added RPC to get min_delegated_in_current_cycle for a delegate using ``GET '/chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/min_delegated_in_current_cycle'``. (MR :gl:`!12018`)
+
+- New RPC to list the pending denunciations of a given delegate. ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/denunciations``. (MR :gl:`!11885`)
 
 - Removed RPC related to stake snapshot. ``GET /chains/<chain_id>/blocks/<block_id>/context/selected_snapshot``. (MR :gl:`!11390`)
+
+- Updated the description of delegates' ``frozen_deposits`` queried via
+  ``GET '/chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/frozen_deposits'``. (MR :gl:`!12010`)
 
 Operation receipts
 ------------------
@@ -164,7 +185,7 @@ Protocol parameters
 - Replaced ``preserved_cycles`` with 3 constants ``consensus_rights_delay``,
   ``blocks_preservation_cycles`` and
   ``delegate_parameters_activation_delay``. (MR :gl:`!11188`, :gl:`!11280`,
-  :gl:`!11279`, :gl:`!11220`, :gl:`!11562`)
+  :gl:`!11279`, :gl:`!11220`, :gl:`!11562`, :gl:`!11629`)
 
 - Updated ``consensus_rights_delay`` from ``5`` to ``2``. (MR :gl:`!11568`)
 
@@ -243,7 +264,11 @@ Minor Changes
   per round, one double attesting per round, and one double
   preattesting per round. Previously, it was at most one double baking
   for the whole level, and one double operation (either attestion or
-  preattestion) for the whole level. (MRs :gl:`!11826`, :gl:`!11844`)
+  preattestion) for the whole level. (MRs :gl:`!11826`, :gl:`!11844`, :gl:`!11898`)
+
+- Added the ``D_Ticket`` Michelson primitives. (MR :gl:`!11599`)
+
+- ``set_deposits_limit`` operation is disabled when autostaking is off. (MR :gl:`!11866`)
 
 - Added the ``D_Ticket`` Michelson primitives. (MR :gl:`!11599`)
 
@@ -255,8 +280,8 @@ Internal
   which replace ``preserved_cycles``, we added pseudo-constants that derive from
   them : ``issuance_modification_delay``,
   ``adaptive_issuance_activation_delay``, ``tolerated_inactivity_period``,
-  ``consensus_key_activation_delay``, ``slashable_deposits_period`` (MR
-  :gl:`!11188`, :gl:`!11280`, :gl:`!11279`, :gl:`!11629`)
+  ``consensus_key_activation_delay``, ``slashable_deposits_period``. (MR
+  :gl:`!11188`, :gl:`!11280`, :gl:`!11279`, :gl:`!11627`, :gl:`!11629`)
 
 - The staking balance is now explicitly initialized when a delegate is registered. (MR :gl:`!11197`)
 
@@ -278,4 +303,8 @@ Internal
 
 - sc_rollup parametric constants update consistency is now checked. (MR :gl:`!11555`)
 
-- Changed misbeahviour's repr. (MR :gl:`!11575`)
+- Changed misbeahviour's repr. (MR :gl:`!11575`, :gl:`!12028`)
+
+- Pending denounciations are cleaned at sprotocol stitching. (MR :gl:`!11833`)
+
+- Add tooling to devtools to compute total tez supply offline. (MR :gl:`!11978`)
