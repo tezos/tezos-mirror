@@ -28,6 +28,7 @@ type l1_contracts = {
   exchanger : string;
   bridge : string;
   admin : string;
+  kernel_governance : string;
   sequencer_admin : string option;
 }
 
@@ -307,7 +308,7 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
   in
 
   (* Originates the administrator contract. *)
-  let* admin =
+  let* admin_contract =
     Client.originate_contract
       ~alias:"evm-admin"
       ~amount:Tez.zero
@@ -319,7 +320,27 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
 
-  return {exchanger; bridge; admin; sequencer_admin}
+  (* Originates the governance contract (using the administrator contract). *)
+  let* kernel_governance =
+    Client.originate_contract
+      ~alias:"kernel-governance"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(sf "%S" admin.Account.public_key_hash)
+      ~prg:(admin_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  return
+    {
+      exchanger;
+      bridge;
+      admin = admin_contract;
+      kernel_governance;
+      sequencer_admin;
+    }
 
 type setup_mode =
   | Setup_sequencer of {
@@ -355,6 +376,9 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
         Option.map (fun {admin; _} -> admin) l1_contracts
       else None
     in
+    let kernel_governance =
+      Option.map (fun {kernel_governance; _} -> kernel_governance) l1_contracts
+    in
     let sequencer =
       match setup_mode with
       | Setup_proxy _ -> None
@@ -366,6 +390,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       ?minimum_base_fee_per_gas
       ?ticketer
       ?administrator
+      ?kernel_governance
       ?sequencer
       ?sequencer_administrator:
         (Option.bind l1_contracts (fun {sequencer_admin; _} -> sequencer_admin))
@@ -2148,7 +2173,13 @@ let test_deposit_and_withdraw =
                  evm_node;
                  _;
                } ->
-  let {bridge; admin = _; exchanger = _; sequencer_admin = _} =
+  let {
+    bridge;
+    admin = _;
+    kernel_governance = _;
+    exchanger = _;
+    sequencer_admin = _;
+  } =
     match l1_contracts with
     | Some x -> x
     | None -> Test.fail ~__LOC__ "The test needs the L1 bridge"
@@ -2225,10 +2256,10 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?timestamp ?(activation_timestamp = "0") ?evm_setup
-    ?rollup_address ?(should_fail = false) ~installee ?with_administrator
-    ?expect_l1_failure ?(admin = Constant.bootstrap1) ?(upgrador = admin)
-    protocol =
+let gen_test_kernel_upgrade ?admin_contract ?timestamp
+    ?(activation_timestamp = "0") ?evm_setup ?rollup_address
+    ?(should_fail = false) ~installee ?with_administrator ?expect_l1_failure
+    ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
   let* {
          node;
          client;
@@ -2247,10 +2278,12 @@ let gen_test_kernel_upgrade ?timestamp ?(activation_timestamp = "0") ?evm_setup
           ~admin:(Some admin)
           protocol
   in
-  let l1_contracts =
-    match l1_contracts with
+  let admin_contract =
+    match admin_contract with
     | Some x -> x
-    | None -> Test.fail "The test requires the l1 contracts."
+    | None ->
+        let l1_contracts = Option.get l1_contracts in
+        l1_contracts.admin
   in
   let sc_rollup_address =
     Option.value ~default:sc_rollup_address rollup_address
@@ -2273,7 +2306,7 @@ let gen_test_kernel_upgrade ?timestamp ?(activation_timestamp = "0") ?evm_setup
         ?expect_failure:expect_l1_failure
         ~amount:Tez.zero
         ~giver:upgrador.public_key_hash
-        ~receiver:l1_contracts.admin
+        ~receiver:admin_contract
         ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
         ~burn_cap:Tez.one
         client
@@ -2431,6 +2464,34 @@ let test_kernel_upgrade_failing_migration =
     ~client
     ~endpoint
     ~expected_block_level:3
+
+let test_kernel_upgrade_via_governance =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["migration"; "upgrade"; "kernel_governance"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
+      ])
+    ~title:"Kernel upgrades using governance contract"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap1 in
+  let* evm_setup =
+    setup_evm_kernel ~with_administrator:true ~admin:(Some admin) protocol
+  in
+  let l1_contracts = Option.get evm_setup.l1_contracts in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~evm_setup
+      ~installee:Constant.WASM.debug_kernel
+      ~admin_contract:l1_contracts.kernel_governance
+      protocol
+  in
+  unit
 
 let test_rpc_sendRawTransaction =
   register_both
@@ -4738,6 +4799,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_no_administrator protocols ;
   test_kernel_upgrade_failing_migration protocols ;
   test_kernel_upgrade_version_change protocols ;
+  test_kernel_upgrade_via_governance protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;

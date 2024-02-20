@@ -8,7 +8,7 @@
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
-let make_config ?bootstrap_accounts ?ticketer ?administrator
+let make_config ?bootstrap_accounts ?ticketer ?administrator ?kernel_governance
     ?sequencer_administrator ?sequencer ?delayed_bridge
     ?(da_fee_per_byte = Wei.zero) ?minimum_base_fee_per_gas
     ?delayed_inbox_timeout ?delayed_inbox_min_levels () =
@@ -46,6 +46,15 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator
       ~none:[]
       administrator
   in
+  let kernel_governance =
+    Option.fold
+      ~some:(fun kernel_governance ->
+        let to_ = Durable_storage_path.kernel_governance in
+        let value = Hex.(of_string kernel_governance |> show) in
+        [Set {value; to_}])
+      ~none:[]
+      kernel_governance
+  in
   let sequencer_administrator =
     Option.fold
       ~some:(fun sequencer_administrator ->
@@ -62,7 +71,6 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator
         [Set {value; to_ = Durable_storage_path.sequencer}]
     | None -> []
   in
-
   let delayed_bridge =
     Option.fold
       ~some:(fun delayed_bridge ->
@@ -105,9 +113,10 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator
       minimum_base_fee_per_gas
   in
   match
-    ticketer @ bootstrap_accounts @ administrator @ sequencer_administrator
-    @ sequencer @ delayed_bridge @ da_fee_per_byte @ minimum_base_fee_per_gas
-    @ delayed_inbox_timeout @ delayed_inbox_min_levels
+    ticketer @ bootstrap_accounts @ administrator @ kernel_governance
+    @ sequencer_administrator @ sequencer @ delayed_bridge @ da_fee_per_byte
+    @ minimum_base_fee_per_gas @ delayed_inbox_timeout
+    @ delayed_inbox_min_levels
   with
   | [] -> None
   | res -> Some (`Config res)
