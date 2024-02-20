@@ -16,6 +16,7 @@
 - Gas is now charged for inner create. (!11814)
 - Add missing checks on data integrity and signature overflows for the `ecrecover` precompile contract. (!11997)
 - Exit when there's a mod overflow when calling `modexp` precompiled contract. (!12005)
+- Clear contract storage before execution on contract creation. (!12089)
 
 ## Version c5969505b81b52a779270b69f48b6a66c84da429
 

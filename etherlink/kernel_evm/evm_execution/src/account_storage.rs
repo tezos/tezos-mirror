@@ -305,6 +305,19 @@ impl EthereumAccount {
         concat(&storage_path, &index_path).map_err(AccountStorageError::from)
     }
 
+    /// Clear the entire storage in durable storage for an account.
+    pub fn clear_storage(
+        &self,
+        host: &mut impl Runtime,
+    ) -> Result<(), AccountStorageError> {
+        let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
+        if host.store_has(&storage_path)?.is_some() {
+            host.store_delete(&storage_path)
+                .map_err(AccountStorageError::from)?
+        };
+        Ok(())
+    }
+
     /// Get the value stored in contract permanent storage at a given index for an account.
     pub fn get_storage(
         &self,
