@@ -34,6 +34,7 @@
 open Adaptive_issuance_helpers
 open State_account
 open Log_helper
+open Test_tez.Ez_tez
 
 let fs = Format.asprintf
 
@@ -49,38 +50,6 @@ let default_param_wait, default_unstake_wait =
   let dpad = constants.delegate_parameters_activation_delay in
   let msp = Protocol.Constants_repr.max_slashing_period in
   (dpad, crd + msp)
-
-(** Aliases for tez values *)
-type tez_quantity =
-  | Half
-  | All
-  | All_but_one
-  | Nothing
-  | Max_tez
-  | Amount of Tez.t
-
-let tez_quantity_pp fmt value =
-  let s =
-    match value with
-    | Nothing -> "Zero"
-    | All -> "All"
-    | All_but_one -> "All but 1µꜩ"
-    | Half -> "Half"
-    | Max_tez -> "Maximum"
-    | Amount a -> Format.asprintf "%aꜩ" Tez.pp a
-  in
-  Format.fprintf fmt "%s" s
-
-(* [all] is the amount returned when [qty = All]. If [qty = Half], returns half of that. *)
-let quantity_to_tez all qty =
-  match qty with
-  | Nothing -> Tez.zero
-  | All -> all
-  | All_but_one ->
-      if Tez.(equal all zero) then Tez.zero else Tez.(all -! one_mutez)
-  | Half -> Test_tez.(all /! 2L)
-  | Max_tez -> Tez.max_tez
-  | Amount a -> a
 
 type double_signing_state = {
   culprit : Signature.Public_key_hash.t;

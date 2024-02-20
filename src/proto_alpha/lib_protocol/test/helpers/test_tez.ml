@@ -83,3 +83,36 @@ let mul_q tez portion =
   Q.(mul portion ~$$tez_z)
 
 module Compare = Tez
+
+module Ez_tez = struct
+  (** Aliases for tez values *)
+  type tez_quantity =
+    | Half
+    | All
+    | All_but_one
+    | Nothing
+    | Max_tez
+    | Amount of t
+
+  let tez_quantity_pp fmt value =
+    let s =
+      match value with
+      | Nothing -> "Zero"
+      | All -> "All"
+      | All_but_one -> "All but 1µꜩ"
+      | Half -> "Half"
+      | Max_tez -> "Maximum"
+      | Amount a -> Format.asprintf "%aꜩ" pp a
+    in
+    Format.fprintf fmt "%s" s
+
+  (* [all] is the amount returned when [qty = All]. If [qty = Half], returns half of that. *)
+  let quantity_to_tez all qty =
+    match qty with
+    | Nothing -> zero
+    | All -> all
+    | All_but_one -> if equal all zero then zero else all -! one_mutez
+    | Half -> all /! 2L
+    | Max_tez -> max_tez
+    | Amount a -> a
+end

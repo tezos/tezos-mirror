@@ -68,3 +68,22 @@ val of_q : round:[`Down | `Up] -> Q.t -> t
 val of_z : Z.t -> t
 
 val to_z : t -> Z.t
+
+(** Functions to manipulate Tez in a high level way *)
+module Ez_tez : sig
+  (** Aliases for tez values *)
+  type tez_quantity =
+    | Half
+    | All
+    | All_but_one
+    | Nothing
+    | Max_tez
+    | Amount of t
+
+  val tez_quantity_pp : Format.formatter -> tez_quantity -> unit
+
+  (** [quantity_to_tez max qty] returns a tez value corresponding to the given
+      [qty]. If [qty] is [All], then returns [max]. If [qty] is [All_but_one],
+      returns [max - one_mutez]. *)
+  val quantity_to_tez : t -> tez_quantity -> t
+end
