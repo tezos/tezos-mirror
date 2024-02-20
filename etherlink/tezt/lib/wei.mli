@@ -68,6 +68,12 @@ val of_eth_int : int -> t
     or a float - both denoting an amount of eth. *)
 val of_eth_string : string -> t
 
+(** Convert a [string] amount of gwei to a wei one.
+    This doesn't perform any bounds checks.
+    It assumes the string represents either an integer
+    or a float - both denoting an amount of gwei. *)
+val of_gwei_string : string -> t
+
 (** Addition. This doesn't perform any bounds checks. *)
 val ( + ) : t -> t -> t
 

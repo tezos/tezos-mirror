@@ -21,8 +21,8 @@ use reveal_storage::{is_revealed_storage, reveal_storage};
 use storage::{
     read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
     read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    store_base_fee_per_gas, store_chain_id, store_da_fee, store_kernel_version,
-    store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+    read_minimum_base_fee_per_gas, store_base_fee_per_gas, store_chain_id, store_da_fee,
+    store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
@@ -62,11 +62,6 @@ extern crate alloc;
 /// The chain id will need to be unique when the EVM rollup is deployed in
 /// production.
 pub const CHAIN_ID: u32 = 1337;
-
-/// Minimal base fee per gas
-///
-/// Distinct from 'intrinsic base fee' of a simple Eth transfer: which costs 21_000 gas.
-pub const BASE_FEE_PER_GAS: u32 = 21_000;
 
 /// The configuration for the EVM execution.
 pub const CONFIG: Config = Config::shanghai();
@@ -134,12 +129,16 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
+    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
+        .unwrap_or_else(|_| fees::MINIMUM_BASE_FEE_PER_GAS.into());
+
     let base_fee_per_gas = match read_base_fee_per_gas(host) {
-        Ok(base_fee_per_gas) => base_fee_per_gas,
-        Err(_) => {
-            let base_fee_per_gas = U256::from(BASE_FEE_PER_GAS);
-            store_base_fee_per_gas(host, base_fee_per_gas)?;
+        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
             base_fee_per_gas
+        }
+        _ => {
+            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+            minimum_base_fee_per_gas
         }
     };
 
@@ -311,6 +310,7 @@ mod tests {
 
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::configuration::Configuration;
+    use crate::fees;
     use crate::mock_internal::MockInternal;
     use crate::safe_storage::{KernelRuntime, SafeStorage};
     use crate::{
@@ -525,5 +525,48 @@ mod tests {
 
         // test reboot is set
         assert_marked_for_reboot(host.host)
+    }
+
+    #[test]
+    fn load_block_fees_new() {
+        // Arrange
+        let mut host = MockHost::default();
+
+        // Act
+        let result = crate::retrieve_block_fees(&mut host);
+
+        // Assert
+        let expected = BlockFees::new(
+            fees::MINIMUM_BASE_FEE_PER_GAS.into(),
+            fees::DA_FEE_PER_BYTE.into(),
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(expected, result.unwrap());
+    }
+
+    #[test]
+    fn load_block_fees_with_minimum() {
+        let min_path = RefPath::assert_from(b"/fees/minimum_base_fee_per_gas").into();
+
+        // Arrange
+        let mut host = MockHost::default();
+
+        let min_base_fee = U256::from(17);
+        storage::store_base_fee_per_gas(&mut host, U256::one()).unwrap();
+        storage::write_u256(&mut host, &min_path, min_base_fee).unwrap();
+
+        // Act
+        let result = crate::retrieve_block_fees(&mut host);
+        let base_fee = storage::read_base_fee_per_gas(&mut host);
+
+        // Assert
+        let expected = BlockFees::new(min_base_fee, fees::DA_FEE_PER_BYTE.into());
+
+        assert!(result.is_ok());
+        assert_eq!(expected, result.unwrap());
+
+        assert!(base_fee.is_ok());
+        assert_eq!(min_base_fee, base_fee.unwrap());
     }
 }

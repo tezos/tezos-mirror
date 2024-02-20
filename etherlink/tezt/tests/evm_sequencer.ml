@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -44,6 +45,8 @@ let uses _protocol =
   ]
 
 open Helpers
+
+let base_fee_for_hardcoded_tx = Wei.to_wei_z @@ Z.of_int 21000
 
 type l1_contracts = {
   delayed_transaction_bridge : string;
@@ -130,7 +133,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
     ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) ?(kernel = Constant.WASM.evm_kernel)
-    ?preimages_dir protocol =
+    ?minimum_base_fee_per_gas ?preimages_dir protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -153,6 +156,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
       ~ticketer:l1_contracts.exchanger
       ~administrator:l1_contracts.admin
       ~sequencer_administrator:l1_contracts.sequencer_admin
+      ?minimum_base_fee_per_gas
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
       ()
@@ -1417,6 +1421,7 @@ let test_external_transaction_to_delayed_inbox_fails =
   let* {client; node; sequencer; proxy; sc_rollup_node; _} =
     setup_sequencer
       protocol
+      ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
       ~time_between_blocks:Nothing
       ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
   in

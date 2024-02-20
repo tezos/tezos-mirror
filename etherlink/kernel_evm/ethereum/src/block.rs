@@ -18,7 +18,7 @@ use sha3::{Digest, Keccak256};
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// Container for fee calculation.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockFees {
     base_fee_per_gas: U256,
     da_fee_per_byte: U256,

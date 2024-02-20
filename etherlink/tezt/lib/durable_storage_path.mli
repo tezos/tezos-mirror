@@ -67,6 +67,9 @@ val delayed_bridge_path : path
 (** [da_fee_per_byte_path] is the path to the da fee per byte, charged on every transaction. *)
 val da_fee_per_byte_path : path
 
+(** [minimum_base_fee_per_gas] is the path to the minimum base fee per gas the kernel will charge. *)
+val minimum_base_fee_per_gas : path
+
 (** [delayed_inbox_timeout] is the path to the timeout for
     delayed transactions. *)
 val delayed_inbox_timeout : path
