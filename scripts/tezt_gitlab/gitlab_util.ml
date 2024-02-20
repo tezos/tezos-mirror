@@ -57,7 +57,7 @@ let get_last_merged_pipeline ~project ~default_branch () =
   in
   aux commits
 
-let get_last_successful_schedule_pipeline ?matching ~project () =
+let get_last_schedule_pipeline ?status ?matching ~project () =
   Log.info
     "Fetching successful scheduled pipeline for %s%s..."
     project
@@ -67,11 +67,11 @@ let get_last_successful_schedule_pipeline ?matching ~project () =
   let* pipelines =
     Gitlab.(
       project_pipelines
+        ?status
         ~project
         ~order_by:"id"
         ~sort:"desc"
         ~source:"schedule"
-        ~status:"success"
         ()
       |> get)
   in
@@ -83,8 +83,9 @@ let get_last_successful_schedule_pipeline ?matching ~project () =
     | Some pattern ->
         let pipelines =
           Fun.flip List.filter pipelines @@ fun pipeline ->
-          let name = JSON.(pipeline |-> "name" |> as_string) in
-          name =~ pattern
+          match JSON.(pipeline |-> "name" |> as_string_opt) with
+          | Some name when name =~ pattern -> true
+          | _ -> false
         in
         Log.debug "%d of those match the pattern." (List.length pipelines) ;
         pipelines
