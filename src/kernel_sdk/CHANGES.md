@@ -8,6 +8,8 @@
 - Add an `OutboxQueue` that can be used when more than 100 outbox messages are produced at a given level.
 - Add `From OutboxMessageTransaction`, `From OutboxMessageTransactionBatch` for `OutboxMessage` to simplify construction.
 - Fix the incomplete inbox on the first level of using `MockHost::default()`.
+- Add support for new michelson `Ticket` constructor.
+- Add michelson `nat`.
 
 ### Installer client/kernel
 
