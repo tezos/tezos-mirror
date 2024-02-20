@@ -322,3 +322,25 @@ let add_staked_frozen ~amount
     min_delegated_in_cycle;
     cycle_of_min_delegated;
   }
+
+module Internal_for_tests = struct
+  let min_delegated_in_cycle
+      {
+        own_frozen = _;
+        staked_frozen = _;
+        delegated = _;
+        min_delegated_in_cycle;
+        cycle_of_min_delegated = _;
+      } =
+    min_delegated_in_cycle
+
+  let cycle_of_min_delegated
+      {
+        own_frozen = _;
+        staked_frozen = _;
+        delegated = _;
+        min_delegated_in_cycle = _;
+        cycle_of_min_delegated;
+      } =
+    cycle_of_min_delegated
+end
