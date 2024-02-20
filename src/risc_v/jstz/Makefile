@@ -24,8 +24,9 @@ run:
 
 .PHONY: check
 check:
+	@cargo check --workspace --locked
 	@cargo fmt --check
-	cargo clippy -- --deny warnings
+	@cargo clippy -- --deny warnings
 
 .PHONY: clean
 clean:
