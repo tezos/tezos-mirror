@@ -212,11 +212,11 @@ let generate_seed_nonce_hash config delegate level =
     return_some seed_nonce
   else return_none
 
-let sign_block_header state proposer unsigned_block_header =
+let sign_block_header global_state proposer unsigned_block_header =
   let open Lwt_result_syntax in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  let force = state.global_state.config.force in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
+  let force = global_state.config.force in
   let {Block_header.shell; protocol_data = {contents; _}} =
     unsigned_block_header
   in
@@ -268,7 +268,8 @@ let sign_block_header state proposer unsigned_block_header =
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
-let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
+let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
+    =
   let open Lwt_result_syntax in
   let {
     predecessor;
@@ -285,10 +286,10 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
         prepare_forging_block
         (Int32.succ predecessor.shell.level, round, delegate))
   in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
-  let simulation_mode = state.global_state.validation_mode in
-  let round_durations = state.global_state.round_durations in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
+  let simulation_mode = global_state.validation_mode in
+  let round_durations = global_state.round_durations in
   let*? timestamp =
     Environment.wrap_tzresult
       (Round.timestamp_of_round
@@ -297,7 +298,7 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
          ~predecessor_round:predecessor.round
          ~round)
   in
-  let external_operation_source = state.global_state.config.extra_operations in
+  let external_operation_source = global_state.config.extra_operations in
   let*! extern_ops = Operations_source.retrieve external_operation_source in
   let simulation_kind, payload_round =
     match kind with
@@ -329,28 +330,26 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
     Plugin.RPC.current_level
       cctxt
       ~offset:1l
-      (`Hash state.global_state.chain_id, `Hash (predecessor.hash, 0))
+      (`Hash global_state.chain_id, `Hash (predecessor.hash, 0))
   in
   let* seed_nonce_opt =
     generate_seed_nonce_hash
-      state.global_state.config.Baking_configuration.nonce
+      global_state.config.Baking_configuration.nonce
       consensus_key
       injection_level
   in
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
-  let user_activated_upgrades =
-    state.global_state.config.user_activated_upgrades
-  in
+  let user_activated_upgrades = global_state.config.user_activated_upgrades in
   (* Set liquidity_baking_toggle_vote for this block *)
   let {
     Baking_configuration.vote_file;
     liquidity_baking_vote;
     adaptive_issuance_vote;
   } =
-    state.global_state.config.per_block_votes
+    global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
-  let*! ({liquidity_baking_vote; adaptive_issuance_vote} as baking_votes) =
+  let*! {liquidity_baking_vote; adaptive_issuance_vote} =
     let default =
       Protocol.Alpha_context.Per_block_votes.
         {liquidity_baking_vote; adaptive_issuance_vote}
@@ -362,31 +361,11 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
           ~per_block_vote_file
     | None -> Lwt.return default
   in
-  (* Cache last per-block votes to use in case of vote file errors *)
-  let updated_state =
-    {
-      updated_state with
-      global_state =
-        {
-          updated_state.global_state with
-          config =
-            {
-              updated_state.global_state.config with
-              per_block_votes =
-                {
-                  updated_state.global_state.config.per_block_votes with
-                  liquidity_baking_vote;
-                  adaptive_issuance_vote;
-                };
-            };
-        };
-    }
-  in
   let*! () =
     Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_vote
   in
   let*! () = Events.(emit vote_for_adaptive_issuance) adaptive_issuance_vote in
-  let chain = `Hash state.global_state.chain_id in
+  let chain = `Hash global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
   let* pred_resulting_context_hash =
     Shell_services.Blocks.resulting_context_hash
@@ -413,13 +392,13 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
       ~adaptive_issuance_vote
       ~user_activated_upgrades
       ~force_apply
-      state.global_state.config.fees
+      global_state.config.fees
       simulation_mode
       simulation_kind
-      state.global_state.constants.parametric
+      global_state.constants.parametric
   in
   let* signed_block_header =
-    sign_block_header state consensus_key unsigned_block_header
+    sign_block_header global_state consensus_key unsigned_block_header
   in
   let* () =
     match seed_nonce_opt with
@@ -430,7 +409,36 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
         let block_hash = Block_header.hash signed_block_header in
         Baking_nonces.register_nonce cctxt ~chain_id block_hash nonce
   in
-  let* () = state_recorder ~new_state:updated_state in
+  let baking_votes =
+    {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
+  in
+  return {signed_block_header; round; delegate; operations; baking_votes}
+
+let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
+  let open Lwt_result_syntax in
+  let* {signed_block_header; round; delegate; operations; baking_votes} =
+    prepare_block state.global_state block_to_bake
+  in
+  let new_state =
+    {
+      updated_state with
+      global_state =
+        {
+          state.global_state with
+          config =
+            {
+              state.global_state.config with
+              per_block_votes =
+                {
+                  state.global_state.config.per_block_votes with
+                  liquidity_baking_vote = baking_votes.liquidity_baking_vote;
+                  adaptive_issuance_vote = baking_votes.adaptive_issuance_vote;
+                };
+            };
+        };
+    }
+  in
+  let* () = state_recorder ~new_state in
   let signed_block =
     {signed_block_header; round; delegate; operations; baking_votes}
   in

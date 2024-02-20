@@ -107,6 +107,9 @@ val generate_seed_nonce_hash :
   Level.t ->
   (Nonce_hash.t * Nonce.t) option tzresult Lwt.t
 
+val prepare_block :
+  global_state -> block_to_bake -> prepared_block tzresult Lwt.t
+
 val inject_block :
   updated_state:state -> state -> prepared_block -> state tzresult Lwt.t
 
