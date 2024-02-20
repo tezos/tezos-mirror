@@ -35,7 +35,7 @@ pub const MINIMUM_BASE_FEE_PER_GAS: u64 = 5 * 10_u64.pow(7);
 // compensated by charging double the expected L1 gas fee for each byte.
 const ASSUMED_TX_ENCODED_SIZE: usize = 150;
 
-// 2 mutez per byte.
+// 4 mutez per byte.
 //
 // The fee for injection on L1 is composed of the following
 // (at default minimal nanotez per gas / default minimal fee):
@@ -49,7 +49,7 @@ const ASSUMED_TX_ENCODED_SIZE: usize = 150;
 // Since multiple messages are grouped up into a single operation of
 // 'add smart rollup messages', together they will cover the larger base
 // fee for this operation.
-pub(crate) const DA_FEE_PER_BYTE: u64 = 2 * 10_u64.pow(12);
+pub(crate) const DA_FEE_PER_BYTE: u64 = 4 * 10_u64.pow(12);
 
 /// Instructions for 'balancing the books'.
 #[derive(Debug)]
