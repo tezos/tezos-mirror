@@ -32,6 +32,7 @@
 *)
 
 open Adaptive_issuance_helpers
+module Cycle = Protocol.Alpha_context.Cycle
 
 let assert_level ~loc (blk : Block.t) expected =
   let current_level = blk.header.shell.level in
@@ -131,11 +132,11 @@ let test_launch threshold expected_vote_duration () =
         autostaking_enable = false;
       }
     in
-    let cost_per_byte = Tez.zero in
+    let cost_per_byte = Test_tez.zero in
     let issuance_weights =
       {
         Default_parameters.constants_test.issuance_weights with
-        base_total_issued_per_minute = Tez.zero;
+        base_total_issued_per_minute = Test_tez.zero;
       }
     in
     let consensus_threshold = 0 in
@@ -470,7 +471,7 @@ let test_launch_without_vote () =
     let issuance_weights =
       {
         Default_parameters.constants_test.issuance_weights with
-        base_total_issued_per_minute = Tez.zero;
+        base_total_issued_per_minute = Test_tez.zero;
       }
     in
     let adaptive_issuance =

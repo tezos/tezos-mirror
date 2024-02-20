@@ -32,6 +32,7 @@
 *)
 
 open Adaptive_issuance_helpers
+open State_account
 
 let fs = Format.asprintf
 
