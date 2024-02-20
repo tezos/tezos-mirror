@@ -28,7 +28,6 @@ RUN opam init --bare --disable-sandboxing
 # we copy the mininum amount of files to use
 # the caching mechanism more efficiently
 COPY --link scripts/install_build_deps.sh root/tezos/scripts/
-COPY --link scripts/install_build_deps.raw.sh root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh root/tezos/scripts/
 COPY --link scripts/version.sh root/tezos/scripts/
 COPY --link Makefile root/tezos/
