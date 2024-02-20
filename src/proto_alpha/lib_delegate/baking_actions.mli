@@ -27,15 +27,6 @@ open Protocol
 open Alpha_context
 open Baking_state
 
-type inject_block_kind =
-  | Forge_and_inject of block_to_bake
-      (** Forge and inject a freshly forged block. [block_to_bake] should be
-          used in the forging process. *)
-  | Inject_only of prepared_block
-      (** Inject [prepared_block]. The baker can pre-emptively forge a
-          signed block with the [Forge_block] action if it knows it is
-          the next baker and it is idle. *)
-
 type consensus_vote_kind = Attestation | Preattestation
 
 type unsigned_consensus_vote = {
@@ -75,8 +66,8 @@ type signed_consensus_vote_batch = private {
 
 type action =
   | Do_nothing
-  | Inject_block of {kind : inject_block_kind; updated_state : state}
-  | Forge_block of {block_to_bake : block_to_bake; updated_state : state}
+  | Prepare_block of {block_to_bake : block_to_bake}
+  | Inject_block of {prepared_block : prepared_block}
   | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
   | Update_to_level of level_update
@@ -110,8 +101,7 @@ val generate_seed_nonce_hash :
 val prepare_block :
   global_state -> block_to_bake -> prepared_block tzresult Lwt.t
 
-val inject_block :
-  updated_state:state -> state -> prepared_block -> state tzresult Lwt.t
+val inject_block : state -> prepared_block -> state tzresult Lwt.t
 
 val sign_consensus_votes :
   state ->

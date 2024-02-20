@@ -767,6 +767,23 @@ module Actions = struct
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
+  let delayed_block_injection =
+    declare_4
+      ~section
+      ~name:"delayed_block_injection"
+      ~level:Debug
+      ~msg:
+        "waiting {delay} before injecting block at level {level}, round \
+         {round} for {delegate}"
+      ("delay", Time.System.Span.encoding)
+      ~pp1:Time.System.Span.pp_hum
+      ("level", Data_encoding.int32)
+      ~pp2:pp_int32
+      ("round", Round.encoding)
+      ~pp3:Round.pp
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp4:Baking_state.pp_consensus_key_and_delegate
+
   let injecting_block =
     declare_3
       ~section
@@ -795,6 +812,17 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+
+  let block_injection_failed =
+    declare_2
+      ~section
+      ~name:"block_injection_failed"
+      ~level:Error
+      ~msg:"failed to inject block {block_hash} -- {trace}"
+      ("block_hash", Block_hash.encoding)
+      ~pp1:Block_hash.pp
+      ("trace", Error_monad.trace_encoding)
+      ~pp2:Error_monad.pp_print_trace
 
   let signing_preattestation =
     declare_1
