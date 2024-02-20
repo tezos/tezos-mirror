@@ -262,7 +262,9 @@ pub const ft11: FRegister = f31;
 // XXX: We probably want this wrapper around f64 to implement deterministic
 // floating-point arithmetic.
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, PartialOrd, Default)]
+#[derive(
+    Clone, Copy, PartialEq, PartialOrd, Default, Debug, derive_more::From, derive_more::Into,
+)]
 pub struct FValue(f64);
 
 impl backend::Elem for FValue {

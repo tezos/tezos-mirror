@@ -6,12 +6,15 @@
 //!
 //! Chapter 2 - Unprivileged spec
 
-use crate::machine_state::{
-    bus::Address,
-    registers::{XRegister, XRegisters},
-    HartState,
-};
 use crate::state_backend as backend;
+use crate::{
+    machine_state::{
+        bus::{main_memory::MainMemoryLayout, Address},
+        registers::{XRegister, XRegisters},
+        HartState, MachineState,
+    },
+    parser::instruction::FenceSet,
+};
 
 impl<M> XRegisters<M>
 where
@@ -241,14 +244,38 @@ where
     }
 }
 
+impl<ML, M> MachineState<ML, M>
+where
+    ML: MainMemoryLayout,
+    M: backend::Manager,
+{
+    /// `FENCE` I-Type instruction
+    ///
+    /// Orders Device I/O, Memory R/W operations. For all harts, for all instructions in the successor sets, instructions in the predecessor sets are visible.
+    /// NOTE: Since our interpreter is single-threaded (only one hart), the `FENCE` instruction is a no-op
+    #[inline(always)]
+    pub fn run_fence(&self, _pred: FenceSet, _succ: FenceSet) {
+        // no-op
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::{
-        registers::{a0, a1, a2, a3, a4, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout},
-        HartState, HartStateLayout,
-    };
     use crate::{backend_test, create_backend, create_state};
-    use proptest::{prelude::any, prop_assert_eq, prop_assume, proptest};
+    use crate::{
+        machine_state::{
+            bus::main_memory::tests::T1K,
+            registers::{
+                a0, a1, a2, a3, a4, fa0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
+            },
+            HartState, HartStateLayout, MachineState, MachineStateLayout,
+        },
+        parser::instruction::FenceSet,
+    };
+    use proptest::{
+        prelude::{any, prop},
+        prop_assert_eq, prop_assume, proptest,
+    };
 
     backend_test!(test_addi, F, {
         let imm_rs1_rd_res = [
@@ -495,6 +522,25 @@ mod tests {
             test_branch_instr!(state, run_bltu, 0, t1, r1_val, t1, r1_val, init_pc, next_pc);
             test_branch_instr!(state, run_bgeu, 0, t2, r1_val, t2, r1_val, init_pc, init_pc);
 
+        });
+    });
+
+    backend_test!(test_fence, F, {
+        proptest!(|(
+            pred in prop::array::uniform4(any::<bool>()),
+            succ in prop::array::uniform4(any::<bool>())
+        )| {
+            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+
+            let pred = FenceSet { i: pred[0], o: pred[1], r: pred[2], w: pred[3] };
+            let succ = FenceSet { i: succ[0], o: succ[1], r: succ[2], w: succ[3] };
+
+            state.hart.xregisters.write(t1, 123);
+            state.hart.fregisters.write(fa0, 0.1_f64.into());
+            state.run_fence(pred, succ);
+            assert_eq!(state.hart.xregisters.read(t1), 123);
+            assert_eq!(state.hart.fregisters.read(fa0), 0.1_f64.into());
         });
     });
 
