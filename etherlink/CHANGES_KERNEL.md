@@ -4,6 +4,8 @@
 
 ### Features
 
+- Da fee is sent to sequencer pool address. (!12113)
+
 ### Bug fixes
 
 - `BLOCKHASH` opcode now returns the actual block hash instead of `0x00..0`. (!12130)
