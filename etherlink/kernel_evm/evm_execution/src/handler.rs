@@ -2267,6 +2267,14 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                 }
             }
             Precondition::PreconditionErr(exit_reason) => {
+                if value > U256::zero() {
+                    if let Err(err) = self.record_stipend(self.config.call_stipend) {
+                        return Capture::Exit((
+                            ethereum_error_to_exit_reason(&err),
+                            vec![],
+                        ));
+                    }
+                }
                 Capture::Exit((exit_reason, vec![]))
             }
             Precondition::EthereumErr(err) => {
@@ -4222,5 +4230,81 @@ mod test {
             Capture::Exit((ExitReason::Error(ExitError::MaxNonce), ..)) => (),
             _ => panic!("Create doesn't fail with Error MaxNonce"),
         }
+    }
+
+    #[test]
+    fn record_call_stipend_when_balance_not_enough_for_inner_call() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+        let caller = H160::from_low_u64_be(523_u64);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 1000,
+            U256::from(21000),
+            false,
+        );
+
+        let address1 = H160::from_low_u64_be(210_u64);
+        let address2 = H160::from_low_u64_be(211_u64);
+
+        let code1: Vec<u8> = vec![
+            Opcode::PUSH1.as_u8(),
+            0, // return size
+            Opcode::PUSH1.as_u8(),
+            0, // return offset
+            Opcode::PUSH1.as_u8(),
+            0, // arg size
+            Opcode::PUSH1.as_u8(),
+            0, // arg offset
+            Opcode::PUSH1.as_u8(),
+            100, // value
+            Opcode::PUSH1.as_u8(),
+            211, // address
+            Opcode::PUSH1.as_u8(),
+            0,                    // gas
+            Opcode::CALL.as_u8(), // Call should fail due to insufficient balance, leaving a zero on the stack
+            Opcode::PUSH1.as_u8(),
+            0, // memory index for mstore
+            Opcode::MSTORE.as_u8(),
+            Opcode::PUSH1.as_u8(),
+            1, //  size of return
+            Opcode::PUSH1.as_u8(),
+            31, // memory index for return
+            Opcode::RETURN.as_u8(),
+        ];
+
+        let code2: Vec<u8> = vec![Opcode::STOP.as_u8()];
+
+        set_code(&mut handler, &address1, code1);
+        set_code(&mut handler, &address2, code2);
+        set_balance(&mut handler, &caller, U256::from(100_u32));
+
+        let result = handler
+            .call_contract(
+                caller,
+                address1,
+                Some(U256::from(99_u32)),
+                vec![],
+                Some(1000000),
+                false,
+            )
+            .unwrap();
+
+        // Gas cost: 21000(BASE) + 10 * 3(PUSH1) + 3(MSTORE) + 3(Memory expansion) + 100(Call) + 9000(Positive value cost) - 2300(Call Stipend)
+        assert_eq!(result.gas_used, 27836);
+
+        assert_eq!(
+            result.reason,
+            ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Returned))
+        );
     }
 }
