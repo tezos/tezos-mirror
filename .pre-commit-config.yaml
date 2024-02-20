@@ -22,3 +22,13 @@ repos:
     hooks:
       - id: ocamlformat
         args: [ "-i" ]
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.9.3
+    hooks:
+      - id: hadolint-docker
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.28.0
+    hooks:
+      - id: check-gitlab-ci
+        args: ["--verbose"]
+        files: '(\.gitlab-ci\.yml|\.gitlab/ci/.*\.yml)'
