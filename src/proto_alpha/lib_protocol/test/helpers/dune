@@ -6,6 +6,7 @@
  (public_name octez-protocol-alpha-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
   qcheck-alcotest
   octez-libs.test-helpers
   octez-libs.base
@@ -22,6 +23,8 @@
   octez-protocol-alpha-libs.smart-rollup)
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_micheline

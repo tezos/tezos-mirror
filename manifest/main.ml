@@ -6203,6 +6203,10 @@ let hash = Protocol.hash
         ~opam_only_deps:[octez_protocol_environment; parameters |> if_some]
         ~deps:
           [
+            (if N.(number >= 019) then
+             Some (tezt_core_lib |> open_ |> open_ ~m:"Base")
+            else None)
+            |> if_some;
             qcheck_alcotest;
             octez_test_helpers;
             octez_base |> open_ ~m:"TzPervasives"

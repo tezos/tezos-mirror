@@ -15,6 +15,7 @@ depends: [
   "tezos-protocol-alpha"
   "octez-shell-libs"
   "uri" { >= "3.1.0" }
+  "tezt" { >= "4.0.0" & < "5.0.0" }
   "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs"
   "octez-version"
@@ -22,7 +23,6 @@ depends: [
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "tezt" { >= "4.0.0" & < "5.0.0" }
   "octez-protocol-compiler"
   "tezos-dal-node-lib"
   "tezos-dac-lib"
