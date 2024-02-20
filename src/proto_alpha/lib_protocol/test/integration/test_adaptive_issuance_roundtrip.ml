@@ -142,7 +142,7 @@ let quantity_to_tez all qty =
   | All_but_one ->
       if Tez.(equal all zero) then Tez.zero else Tez.(all -! one_mutez)
   | Half -> Test_tez.(all /! 2L)
-  | Max_tez -> Tez.max_mutez
+  | Max_tez -> Tez.max_tez
   | Amount a -> a
 
 let default_params =
@@ -314,7 +314,7 @@ module State = struct
       let to_frozen = Tez.(delta_rewards -! to_liquid) in
       let state = update_map ~f:(add_liquid_rewards to_liquid baker) state in
       let state = update_map ~f:(add_frozen_rewards to_frozen baker) state in
-      let* total_supply = Tez.(total_supply + delta_rewards) in
+      let*? total_supply = Tez.(total_supply +? delta_rewards) in
       return {state with last_level_rewards = current_level; total_supply}
 
   let apply_slashing
@@ -403,7 +403,7 @@ module State = struct
       optimal
       op
       Tez.pp
-      (Tez.of_mutez_exn amount)
+      (Tez.of_mutez amount)
 
   let apply_autostake ~name ~old_cycle
       ({
@@ -475,7 +475,7 @@ module State = struct
             (Int64.neg autostaked) ;
           apply_unstake
             (Cycle.succ old_cycle)
-            (Test_tez.of_mutez_exn Int64.(neg autostaked))
+            (Test_tez.of_mutez Int64.(neg autostaked))
             name
             state)
         else (
@@ -492,7 +492,7 @@ module State = struct
 
   (** Applies when baking the last block of a cycle *)
   let apply_end_cycle current_cycle block state : t tzresult Lwt.t =
-    let open Lwt_result_wrap_syntax in
+    let open Lwt_result_syntax in
     Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
     let* launch_cycle_opt =
       Context.get_adaptive_issuance_launch_cycle (B block)
@@ -510,7 +510,7 @@ module State = struct
         state
     in
     (* Apply autostaking *)
-    let*?@ state =
+    let*? state =
       if not state.constants.adaptive_issuance.autostaking_enable then Ok state
       else
         match launch_cycle_opt with
@@ -1226,7 +1226,7 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
       let state =
         if Q.(equal balance.staked_b zero) then state
         else
-          let state = State.apply_unstake cycle Tez.max_mutez src_name state in
+          let state = State.apply_unstake cycle Tez.max_tez src_name state in
           (* Changing delegate applies finalize if unstake happened *)
           State.apply_finalize src_name state
       in

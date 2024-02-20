@@ -33,7 +33,6 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
 
 module Raw_context_tests = struct
   open Sapling_helpers.Common
@@ -997,7 +996,7 @@ module Interpreter_tests = struct
         ()
     in
     let fee = Test_tez.of_int 10 in
-    let*? amount_tez = Tez.one_mutez *? Int64.of_int 15 in
+    let*? amount_tez = Test_tez.(one_mutez *? Int64.of_int 15) in
     let* operation1 =
       Op.transaction
         ~gas_limit:High

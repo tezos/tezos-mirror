@@ -974,7 +974,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
     else
       let open Result_syntax in
       let* t = Test_tez.( *? ) minimal_stake 2L in
-      Test_tez.( +? ) (Test_tez.of_mutez_exn initial_balance) t
+      Test_tez.( +? ) (Test_tez.of_mutez initial_balance) t
   in
   let* op3 =
     Op.transaction
@@ -1039,7 +1039,7 @@ let test_quorum_in_proposal has_quorum () =
     else Int64.(sub (of_int32 min_proposal_quorum) 10L)
   in
   let bal =
-    Int64.(div (mul total_tokens quorum) 100_00L) |> Test_tez.of_mutez_exn
+    Int64.(div (mul total_tokens quorum) 100_00L) |> Test_tez.of_mutez
   in
   let* op2 = Op.transaction (B b) del2 del1 bal in
   let* b = Block.bake ~policy ~operation:op2 b in
@@ -1257,27 +1257,21 @@ let test_voting_power_updated_each_voting_period () =
     Context.Delegate.current_frozen_deposits (B genesis) baker1
   in
   let*? full_balance1 = balance1 +? frozen_deposits1 in
-  let* () =
-    Assert.equal_tez ~loc:__LOC__ full_balance1 (of_mutez_exn init_bal1)
-  in
+  let* () = Assert.equal_tez ~loc:__LOC__ full_balance1 (of_mutez init_bal1) in
   (* Retrieve balance of con2 *)
   let* balance2 = Context.Contract.balance (B genesis) con2 in
   let* frozen_deposits2 =
     Context.Delegate.current_frozen_deposits (B genesis) baker2
   in
   let*? full_balance2 = balance2 +? frozen_deposits2 in
-  let* () =
-    Assert.equal_tez ~loc:__LOC__ full_balance2 (of_mutez_exn init_bal2)
-  in
+  let* () = Assert.equal_tez ~loc:__LOC__ full_balance2 (of_mutez init_bal2) in
   (* Retrieve balance of con3 *)
   let* balance3 = Context.Contract.balance (B genesis) con3 in
   let* frozen_deposits3 =
     Context.Delegate.current_frozen_deposits (B genesis) baker3
   in
   let*? full_balance3 = balance3 +? frozen_deposits3 in
-  let* () =
-    Assert.equal_tez ~loc:__LOC__ full_balance3 (of_mutez_exn init_bal3)
-  in
+  let* () = Assert.equal_tez ~loc:__LOC__ full_balance3 (of_mutez init_bal3) in
   (* Auxiliary assert_voting_power *)
   let assert_voting_power ~loc n block baker =
     let* voting_power = get_voting_power block baker in
@@ -1317,7 +1311,7 @@ let test_voting_power_updated_each_voting_period () =
   (* Retrieve balance of con1 *)
   let* balance1 = Context.Contract.balance (B block) con1 in
   (* Assert balance has changed by deducing the amount *)
-  let*? balance1_after_deducing_amount = of_mutez_exn init_bal1 -? amount in
+  let*? balance1_after_deducing_amount = of_mutez init_bal1 -? amount in
   let* frozen_deposit1 =
     Context.Delegate.current_frozen_deposits (B block) baker1
   in
@@ -1328,7 +1322,7 @@ let test_voting_power_updated_each_voting_period () =
   (* Retrieve balance of con2 *)
   let* balance2 = Context.Contract.balance (B block) con2 in
   (* Assert balance has changed by adding amount *)
-  let*? balance2_after_adding_amount = of_mutez_exn init_bal2 +? amount in
+  let*? balance2_after_adding_amount = of_mutez init_bal2 +? amount in
   let* frozen_deposit2 =
     Context.Delegate.current_frozen_deposits (B block) baker2
   in
