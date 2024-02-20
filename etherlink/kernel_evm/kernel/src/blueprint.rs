@@ -66,7 +66,7 @@ mod tests {
         EthereumTransactionCommon::new(
             tezos_ethereum::transaction::TransactionType::Legacy,
             Some(U256::one()),
-            U256::from(i),
+            i,
             U256::from(40000000u64),
             U256::from(40000000u64),
             21000u64,

@@ -113,7 +113,12 @@ type CreateOutcome = (ExitReason, Option<H160>, Vec<u8>);
 /// SputnikVM execution. This is needed if an error occurs in a callback
 /// called by SputnikVM.
 fn ethereum_error_to_exit_reason(exit_reason: &EthereumError) -> ExitReason {
-    ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{:?}", exit_reason))))
+    match exit_reason {
+        EthereumError::EthereumAccountError(AccountStorageError::NonceOverflow) => {
+            ExitReason::Error(ExitError::MaxNonce)
+        }
+        _ => ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{:?}", exit_reason)))),
+    }
 }
 
 pub enum TransferExitReason {
@@ -278,7 +283,7 @@ mod benchmarks {
     }
 }
 
-pub fn create_address_legacy(caller: &H160, nonce: &U256) -> H160 {
+pub fn create_address_legacy(caller: &H160, nonce: &u64) -> H160 {
     let mut stream = rlp::RlpStream::new_list(2);
     stream.append(caller);
     stream.append(nonce);
@@ -499,9 +504,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         let has_code = account
             .code_size(self.borrow_host())
             .map(|s| s != U256::zero())?;
-        let non_zero_nonce = account
-            .nonce(self.borrow_host())
-            .map(|s| s != U256::zero())?;
+        let non_zero_nonce = account.nonce(self.borrow_host()).map(|s| s != 0)?;
 
         Ok(has_code || non_zero_nonce)
     }
@@ -1265,7 +1268,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_nonce(&self, address: H160) -> U256 {
+    fn get_nonce(&self, address: H160) -> u64 {
         self.get_account(address)
             .map(|account| account.nonce(self.host).unwrap_or_default())
             .unwrap_or_default()
@@ -1982,7 +1985,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
     fn exists(&self, address: H160) -> bool {
         self.code_size(address) > U256::zero()
-            || self.get_nonce(address) > U256::zero()
+            || self.get_nonce(address) > 0
             || self.balance(address) > U256::zero()
     }
 
@@ -2122,23 +2125,6 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     }
                 }
 
-                let gas_limit = self.nested_call_gas_limit(target_gas);
-
-                if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
-                    log!(
-                        self.host,
-                        Debug,
-                        "Not enough gas for create. Required at least: {:?}",
-                        gas_limit
-                    );
-
-                    return Capture::Exit((
-                        ExitReason::Error(ExitError::OutOfGas),
-                        None,
-                        vec![],
-                    ));
-                }
-
                 // The contract address is created before the increment of the nonce
                 // to generate a correct address when the scheme is `Legacy`.
                 let contract_address = self.create_address(scheme);
@@ -2172,6 +2158,24 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                         vec![],
                     ));
                 }
+
+                let gas_limit = self.nested_call_gas_limit(target_gas);
+
+                if let Err(err) = self.record_cost(gas_limit.unwrap_or_default()) {
+                    log!(
+                        self.host,
+                        Debug,
+                        "Not enough gas for create. Required at least: {:?}",
+                        gas_limit
+                    );
+
+                    return Capture::Exit((
+                        ExitReason::Error(ExitError::OutOfGas),
+                        None,
+                        vec![],
+                    ));
+                }
+
                 if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
                     log!(
                         self.host,
@@ -2316,6 +2320,11 @@ mod test {
     ) {
         let mut account = handler.get_or_create_account(*address).unwrap();
         account.set_code(handler.borrow_host(), &code).unwrap();
+    }
+
+    fn set_nonce<'a>(handler: &mut EvmHandler<'a, MockHost>, address: &H160, nonce: u64) {
+        let mut account = handler.get_or_create_account(*address).unwrap();
+        account.set_nonce(handler.borrow_host(), nonce).unwrap()
     }
 
     fn get_balance<'a>(handler: &mut EvmHandler<'a, MockHost>, address: &H160) -> U256 {
@@ -4172,5 +4181,46 @@ mod test {
             .unwrap();
 
         assert_eq!(result.0, ExitReason::Error(ExitError::CreateContractLimit));
+    }
+
+    #[test]
+    fn create_fails_with_max_nonce() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let caller = H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS,
+            U256::one(),
+            false,
+        );
+
+        set_balance(&mut handler, &caller, U256::from(1000000000));
+        set_nonce(&mut handler, &caller, u64::MAX);
+
+        let init_code = hex::decode("60006000fd").unwrap(); // Just revert
+
+        let capture = handler.create(
+            caller,
+            CreateScheme::Legacy { caller },
+            U256::zero(),
+            init_code,
+            None,
+        );
+
+        match capture {
+            Capture::Exit((ExitReason::Error(ExitError::MaxNonce), ..)) => (),
+            _ => panic!("Create doesn't fail with Error MaxNonce"),
+        }
     }
 }

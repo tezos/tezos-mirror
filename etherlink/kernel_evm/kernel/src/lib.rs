@@ -424,7 +424,7 @@ mod tests {
         let unsigned_tx = EthereumTransactionCommon::new(
             TransactionType::Eip1559,
             Some(DUMMY_CHAIN_ID),
-            U256::from(nonce),
+            nonce,
             gas_price,
             gas_price,
             gas_limit + gas_for_fees,
@@ -472,8 +472,7 @@ mod tests {
         // - call `loop(4600)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 3_000_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::handler::create_address_legacy(&sender, &U256::zero());
+        let loop_addr: H160 = evm_execution::handler::create_address_legacy(&sender, &0);
         let loop_1200_tx =
             create_and_sign_transaction(LOOP_1300, 1, 900_000, Some(loop_addr), TEST_SK);
         let loop_4600_tx = create_and_sign_transaction(

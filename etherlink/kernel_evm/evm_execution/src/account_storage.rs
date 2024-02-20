@@ -142,7 +142,10 @@ const STORAGE_DEFAULT_VALUE: H256 = H256::zero();
 const BALANCE_DEFAULT_VALUE: U256 = U256::zero();
 
 /// Default nonce value for an account.
-const NONCE_DEFAULT_VALUE: U256 = U256::zero();
+const NONCE_DEFAULT_VALUE: u64 = 0;
+
+/// Nonce is a u64 so its size is 8 bytes
+const NONCE_ENCODING_SIZE: usize = 8_usize;
 
 /// An account with no code - an "external" account, or an unused account has the zero
 /// hash as code hash.
@@ -160,6 +163,26 @@ fn read_u256(
 ) -> Result<U256, AccountStorageError> {
     match host.store_read(path, 0, WORD_SIZE) {
         Ok(bytes) if bytes.len() == WORD_SIZE => Ok(U256::from_little_endian(&bytes)),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Read a single unsigned 64 bit value from storage at the path given.
+fn read_u64(
+    host: &impl Runtime,
+    path: &impl Path,
+    default: u64,
+) -> Result<u64, AccountStorageError> {
+    match host.store_read(path, 0, 8) {
+        Ok(bytes) if bytes.len() == 8 => {
+            let bytes_array: [u8; 8] = bytes.try_into().map_err(|_| {
+                AccountStorageError::DurableStorageError(
+                    DurableStorageError::RuntimeError(RuntimeError::DecodingError),
+                )
+            })?;
+            Ok(u64::from_le_bytes(bytes_array))
+        }
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(err) => Err(err.into()),
     }
@@ -204,9 +227,9 @@ impl EthereumAccount {
 
     /// Get the **nonce** for the Ethereum account. Default value is zero, so an account will
     /// _always_ have this **nonce**.
-    pub fn nonce(&self, host: &impl Runtime) -> Result<U256, AccountStorageError> {
+    pub fn nonce(&self, host: &impl Runtime) -> Result<u64, AccountStorageError> {
         let path = concat(&self.path, &NONCE_PATH)?;
-        read_u256(host, &path, NONCE_DEFAULT_VALUE).map_err(AccountStorageError::from)
+        read_u64(host, &path, NONCE_DEFAULT_VALUE)
     }
 
     /// Increment the **nonce** by one. It is technically possible for this operation to overflow,
@@ -221,11 +244,10 @@ impl EthereumAccount {
         let old_value = self.nonce(host)?;
 
         let new_value = old_value
-            .checked_add(U256::one())
+            .checked_add(1)
             .ok_or(AccountStorageError::NonceOverflow)?;
 
-        let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
-        new_value.to_little_endian(&mut new_value_bytes);
+        let new_value_bytes: [u8; NONCE_ENCODING_SIZE] = new_value.to_le_bytes();
 
         host.store_write(&path, &new_value_bytes, 0)
             .map_err(AccountStorageError::from)
@@ -239,10 +261,9 @@ impl EthereumAccount {
 
         let old_value = self.nonce(host)?;
 
-        let new_value = old_value.checked_sub(U256::one()).unwrap_or_default();
+        let new_value = old_value.checked_sub(1).unwrap_or_default();
 
-        let mut new_value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
-        new_value.to_little_endian(&mut new_value_bytes);
+        let new_value_bytes: [u8; NONCE_ENCODING_SIZE] = new_value.to_le_bytes();
 
         host.store_write(&path, &new_value_bytes, 0)
             .map_err(AccountStorageError::from)
@@ -251,12 +272,11 @@ impl EthereumAccount {
     pub fn set_nonce(
         &mut self,
         host: &mut impl Runtime,
-        nonce: U256,
+        nonce: u64,
     ) -> Result<(), AccountStorageError> {
         let path = concat(&self.path, &NONCE_PATH)?;
 
-        let mut value_bytes: [u8; WORD_SIZE] = [0; WORD_SIZE];
-        nonce.to_little_endian(&mut value_bytes);
+        let value_bytes: [u8; NONCE_ENCODING_SIZE] = nonce.to_le_bytes();
 
         host.store_write(&path, &value_bytes, 0)
             .map_err(AccountStorageError::from)
@@ -551,10 +571,7 @@ mod test {
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
-        assert_eq!(
-            a1.nonce(&host).expect("Could not get nonce for account"),
-            U256::zero()
-        );
+        assert_eq!(a1.nonce(&host).expect("Could not get nonce for account"), 0);
 
         a1.increment_nonce(&mut host)
             .expect("Could not increment nonce");
@@ -569,10 +586,7 @@ mod test {
             .expect("Could not get account")
             .expect("Account does not exist");
 
-        assert_eq!(
-            a1.nonce(&host).expect("Could nnt get nonce for account"),
-            U256::one()
-        );
+        assert_eq!(a1.nonce(&host).expect("Could nnt get nonce for account"), 1);
     }
 
     #[test]
@@ -910,10 +924,7 @@ mod test {
             .expect("Could not create new account")
             .expect("Account already exists in storage");
 
-        assert_eq!(
-            a1.nonce(&host).expect("Could not get nonce for account"),
-            U256::zero()
-        );
+        assert_eq!(a1.nonce(&host).expect("Could not get nonce for account"), 0);
 
         a1.increment_nonce(&mut host)
             .expect("Could not increment nonce");

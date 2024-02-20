@@ -435,7 +435,7 @@ mod tests {
         EthereumTransactionCommon::new(
             TransactionType::Legacy,
             Some(U256::from(i)),
-            U256::from(i),
+            u64::from(i),
             U256::from(i),
             U256::from(i),
             i.into(),

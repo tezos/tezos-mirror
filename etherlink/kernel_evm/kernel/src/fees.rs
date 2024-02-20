@@ -413,7 +413,7 @@ mod tests {
         EthereumTransactionCommon::new(
             tezos_ethereum::transaction::TransactionType::Eip1559,
             None,
-            U256::zero(),
+            0,
             U256::zero(),
             max_fee_per_gas,
             0,

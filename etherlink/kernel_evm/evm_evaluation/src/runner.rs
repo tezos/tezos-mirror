@@ -132,7 +132,7 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
         let mut account =
             EthereumAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
         if info.nonce != 0 {
-            account.set_nonce(host, info.nonce.into()).unwrap();
+            account.set_nonce(host, info.nonce).unwrap();
             write_host!(host, "Nonce is set for {} : {}", address, info.nonce);
         }
         account.balance_add(host, info.balance).unwrap();

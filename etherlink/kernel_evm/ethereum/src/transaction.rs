@@ -255,7 +255,7 @@ pub struct TransactionObject {
     /// The data send along with the transaction.
     pub input: Vec<u8>,
     /// The number of transactions made by the sender prior to this one.
-    pub nonce: U256,
+    pub nonce: u64,
     /// Address of the receiver. null when its a contract creation transaction.
     pub to: Option<H160>,
     /// Integer of the transactions index position in the block.
@@ -278,7 +278,7 @@ impl Decodable for TransactionObject {
                 let gas_price: U256 = decode_field_u256_le(&next(&mut it)?, "gas_price")?;
                 let hash: TransactionHash = decode_transaction_hash(&next(&mut it)?)?;
                 let input: Vec<u8> = decode_field(&next(&mut it)?, "input")?;
-                let nonce: U256 = decode_field_u256_le(&next(&mut it)?, "nonce")?;
+                let nonce: u64 = decode_field_u64_le(&next(&mut it)?, "nonce")?;
                 let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
                 let index: u32 = decode_field(&next(&mut it)?, "index")?;
                 let value: U256 = decode_field_u256_le(&next(&mut it)?, "value")?;
@@ -314,7 +314,7 @@ impl Encodable for TransactionObject {
         append_u256_le(stream, &self.gas_price);
         stream.append(&self.hash.to_vec());
         stream.append(&self.input);
-        append_u256_le(stream, &self.nonce);
+        append_u64_le(stream, &self.nonce);
         match &self.to {
             Some(to) => stream.append(to),
             None => stream.append_empty_data(),
@@ -413,7 +413,7 @@ mod test {
             gas_price: U256::from(100432432),
             hash: [5; TRANSACTION_HASH_SIZE],
             input: vec![],
-            nonce: U256::from(8888),
+            nonce: 8888,
             to: Some(address_of_str("3635353535353535353535353535353535353536")),
             index: 15u32,
             value: U256::from(0),

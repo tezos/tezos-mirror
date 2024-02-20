@@ -104,7 +104,7 @@ fn check_should_not_exist(
         };
 
         let nonce_is_zero = if let Ok(nonce) = account.nonce(host) {
-            nonce == U256::zero()
+            nonce == 0
         } else {
             false
         };
@@ -179,7 +179,7 @@ fn check_nonce(
     if let Some(nonce) = nonce {
         match account.nonce(host) {
             Ok(current_nonce) => {
-                if current_nonce != (*nonce).into() {
+                if current_nonce != *nonce {
                     *invalid_state = true;
                     write_host!( host, "Account {}: nonce don't match current one, {} was expected, but got {}.", hex_address, nonce, current_nonce);
                 } else {

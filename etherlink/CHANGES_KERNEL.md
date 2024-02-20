@@ -5,6 +5,7 @@
 ### Features
 
 - Implement EIP-3860. (!11831)
+- Implement EIP-2681. (!11976)
 - Flush every transactions in the delayed inbox in case one is overdue. (!11914)
 - Require a minimal number of L1 blocks to have been backed before a delayed transaction is considered overdue. (!11811)
 - Raise minimum base fee per gas to 0.05 gwei. (!12001)

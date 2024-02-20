@@ -359,7 +359,7 @@ mod test {
         host: &mut MockHost,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
-    ) -> U256 {
+    ) -> u64 {
         let account = evm_account_storage
             .get_or_create(host, &account_path(address).unwrap())
             .unwrap();
@@ -2087,7 +2087,7 @@ mod test {
             U256::from(1_000_000)
         );
         assert_eq!(account.code(&mock_runtime).unwrap(), selfdestructing_code);
-        assert_eq!(account.nonce(&mock_runtime).unwrap(), U256::one());
+        assert_eq!(account.nonce(&mock_runtime).unwrap(), 1);
 
         assert_eq!(
             get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
@@ -2753,7 +2753,7 @@ mod test {
         let contract = EthereumAccount::from_address(&contract_address).unwrap();
         let original_contract_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
 
-        assert_eq!(U256::zero(), original_contract_nonce);
+        assert_eq!(0, original_contract_nonce);
 
         // Test the nonce of the sub contract that will be created within contract creation
         let sub_contract_account = EthereumAccount::from_address(&sub_contract).unwrap();
@@ -2761,7 +2761,7 @@ mod test {
             .nonce(&mock_runtime)
             .unwrap_or_default();
 
-        assert_eq!(U256::zero(), original_sub_nonce);
+        assert_eq!(0, original_sub_nonce);
 
         let result_init = run_transaction(
             &mut mock_runtime,
@@ -2789,7 +2789,7 @@ mod test {
                 let caller_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
                 // Check that even if the contract fails to create another contract (due to a collision),
                 // the nonce of contract_address is still bumped
-                assert_eq!(caller_nonce, U256::from(2));
+                assert_eq!(caller_nonce, 2);
 
                 // The sub contract has been created at 0xd807115ef18e7e9b8e54188b4e9ef514277a0740 and
                 // its nonce is incremented to 1
@@ -2798,7 +2798,7 @@ mod test {
                 let sub_contract_nonce = sub_contract_created
                     .nonce(&mock_runtime)
                     .unwrap_or_default();
-                assert_eq!(sub_contract_nonce, U256::from(1));
+                assert_eq!(sub_contract_nonce, 1);
             }
             exit_error => panic!(
                 "ExitReason: {:?}. Expect ExitReason::Succeed(ExitSucceed::Stopped)",
@@ -2862,7 +2862,7 @@ mod test {
         let contract = EthereumAccount::from_address(&contract_address).unwrap();
         let original_contract_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
 
-        assert_eq!(U256::zero(), original_contract_nonce);
+        assert_eq!(0, original_contract_nonce);
 
         // Test the nonce of the sub contract that will be created within contract creation
         let sub_contract_account = EthereumAccount::from_address(&sub_contract).unwrap();
@@ -2870,7 +2870,7 @@ mod test {
             .nonce(&mock_runtime)
             .unwrap_or_default();
 
-        assert_eq!(U256::zero(), original_sub_nonce);
+        assert_eq!(0, original_sub_nonce);
 
         let result_init = run_transaction(
             &mut mock_runtime,
@@ -2898,7 +2898,7 @@ mod test {
                 // the nonce of contract_address is still bumped
                 let contract = EthereumAccount::from_address(&contract_address).unwrap();
                 let caller_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
-                assert_eq!(caller_nonce, U256::from(2));
+                assert_eq!(caller_nonce, 2);
 
                 // The sub contract has a collision, so its nonce should not change
                 let sub_contract_created =
@@ -3022,7 +3022,7 @@ mod test {
         let address = new_address.unwrap();
         let smart_contract = EthereumAccount::from_address(&address).unwrap();
 
-        assert_eq!(smart_contract.nonce(&host).unwrap(), U256::one())
+        assert_eq!(smart_contract.nonce(&host).unwrap(), 1)
     }
 
     #[test]
@@ -3085,8 +3085,8 @@ mod test {
             ExtendedExitReason::Exit(ExitReason::Succeed(ExitSucceed::Stopped)),
             result.unwrap().unwrap().reason,
         );
-        assert_eq!(callee_nonce, U256::zero());
-        assert_eq!(caller_nonce, U256::one());
+        assert_eq!(callee_nonce, 0);
+        assert_eq!(caller_nonce, 1);
     }
 
     #[test]
@@ -3184,8 +3184,7 @@ mod test {
             exec_result.reason,
         );
         assert_eq!(
-            nonce_of_should_not_create,
-            U256::zero(),
+            nonce_of_should_not_create, 0,
             "Nonce of the contract that should not be created is not 0"
         );
         assert_eq!(
@@ -3194,8 +3193,7 @@ mod test {
             "Storage of the contract that should not be created is not 0"
         );
         assert_eq!(
-            nonce_of_should_create,
-            U256::one(),
+            nonce_of_should_create, 1,
             "Nonce of the contract that should be created is not 1"
         );
         assert_eq!(
@@ -3212,7 +3210,7 @@ mod test {
         Result<Option<ExecutionOutcome>, EthereumError>,
         EthereumAccount,
         U256,
-        U256,
+        u64,
     ) {
         let mut host = MockHost::default();
         let block = dummy_first_block();
@@ -3524,8 +3522,8 @@ mod test {
             result.unwrap().unwrap().reason,
         );
 
-        assert_eq!(caller_nonce, U256::one());
-        assert_eq!(internal_address_nonce, U256::from(2));
+        assert_eq!(caller_nonce, 1);
+        assert_eq!(internal_address_nonce, 2);
     }
 
     #[test]
@@ -3623,7 +3621,7 @@ mod test {
             get_code(&mut host, &mut evm_account_storage, &address_unknown);
 
         assert_eq!(balance_unknwown, U256::zero());
-        assert_eq!(nonce_unknown, U256::zero());
+        assert_eq!(nonce_unknown, 0);
         assert!(code_unknown.is_empty());
 
         // The initial call succeeds
@@ -3693,8 +3691,8 @@ mod test {
         // Nonce is at 2, because the contract is originated and start at 1 (EIP-161)
         // and it internally creates an other contract in its initialisation code, so
         // the nonce is 2.
-        assert_eq!(nonce_1, U256::from(2));
-        assert_eq!(nonce_2, U256::from(1));
+        assert_eq!(nonce_1, 2);
+        assert_eq!(nonce_2, 1);
 
         let storage_1 =
             get_storage(&mut host, &mut evm_account_storage, &address_1, &one);
