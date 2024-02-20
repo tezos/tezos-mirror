@@ -504,7 +504,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
     /// Check if an address has either a nonzero nonce, or a nonzero code length, i.e., if the address exists.
     fn is_colliding(&mut self, address: H160) -> Result<bool, EthereumError> {
-        let Some(account) = self.get_account(address) else {
+        let Some(account) = self.get_account(address)? else {
             return Ok(false);
         };
 
@@ -635,7 +635,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
     /// Clear the entire storage located at [address].
     pub fn clear_storage(&mut self, address: H160) -> Result<(), EthereumError> {
-        if let Some(account) = self.get_account(address) {
+        if let Some(account) = self.get_account(address)? {
             account.clear_storage(self.host)?
         };
         Ok(())
@@ -688,7 +688,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         }
     }
 
-    fn create_address(&mut self, scheme: CreateScheme) -> H160 {
+    fn create_address(
+        &mut self,
+        scheme: CreateScheme,
+    ) -> Result<H160, AccountStorageError> {
         match scheme {
             CreateScheme::Create2 {
                 caller,
@@ -700,13 +703,13 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 hasher.update(caller);
                 hasher.update(salt);
                 hasher.update(code_hash);
-                H256::from_slice(hasher.finalize().as_slice()).into()
+                Ok(H256::from_slice(hasher.finalize().as_slice()).into())
             }
             CreateScheme::Legacy { caller } => {
-                let nonce = self.get_nonce(caller);
-                create_address_legacy(&caller, &nonce)
+                let nonce = self.get_nonce(caller)?;
+                Ok(create_address_legacy(&caller, &nonce))
             }
-            CreateScheme::Fixed(address) => address,
+            CreateScheme::Fixed(address) => Ok(address),
         }
     }
 
@@ -737,7 +740,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         if value == U256::zero() {
             // Nothing to transfer so succeeds by default
             Ok(TransferExitReason::Returned)
-        } else if let Some(mut from_account) = self.get_account(from) {
+        } else if let Some(mut from_account) = self.get_account(from)? {
             let mut to_account = self.get_or_create_account(to)?;
 
             if from_account.balance_remove(self.host, value)? {
@@ -776,7 +779,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
     fn has_enough_fund(&self, from: H160, value: &U256) -> Result<bool, EthereumError> {
         if value.is_zero() {
             Ok(true)
-        } else if let Some(from_account) = self.get_account(from) {
+        } else if let Some(from_account) = self.get_account(from)? {
             let balance = from_account
                 .balance(self.host)
                 .map_err(EthereumError::from)?;
@@ -1135,7 +1138,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         gas_limit: Option<u64>,
     ) -> Result<ExecutionOutcome, EthereumError> {
         let default_create_scheme = CreateScheme::Legacy { caller };
-        let address = self.create_address(default_create_scheme);
+        let address = self.create_address(default_create_scheme)?;
         self.increment_nonce(caller)?;
 
         self.begin_initial_transaction(false, gas_limit)?;
@@ -1178,42 +1181,42 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_account(&self, address: H160) -> Option<EthereumAccount> {
+    fn get_account(
+        &self,
+        address: H160,
+    ) -> Result<Option<EthereumAccount>, StorageError> {
         // Note: if we get an error we cannot report this to SputnikVM as the return types
         // for functions that use _this_ function don't support errors. Rather than do
         // error handling in all those functions (and those we'll write in the future), we
         // do the error handling here.
         if let Ok(path) = account_path(&address) {
-            self.evm_account_storage
-                .get(self.host, &path)
-                .ok()
-                .flatten()
+            self.evm_account_storage.get(self.host, &path)
         } else {
             log!(
                 self.host,
                 Debug,
                 "Failed to get account path for EVM handler get_account"
             );
-            None
+            Ok(None)
         }
     }
 
-    fn get_original_account(&self, address: H160) -> Option<EthereumAccount> {
+    fn get_original_account(
+        &self,
+        address: H160,
+    ) -> Result<Option<EthereumAccount>, StorageError> {
         // Note, there is no way to recover from an error when creating the
         // account path. At this point we are being called from SputnikVM and
         // it does not allow for this to fail, so we just return None.
         if let Ok(path) = account_path(&address) {
-            self.evm_account_storage
-                .get_original(self.host, &path)
-                .ok()
-                .flatten()
+            self.evm_account_storage.get_original(self.host, &path)
         } else {
             log!(
                 self.host,
                 Debug,
                 "Failed to get account path for EVM handler get_original_account"
             );
-            None
+            Ok(None)
         }
     }
 
@@ -1269,14 +1272,14 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_nonce(&self, address: H160) -> u64 {
-        self.get_account(address)
-            .map(|account| account.nonce(self.host).unwrap_or_default())
-            .unwrap_or_default()
+    fn get_nonce(&self, address: H160) -> Result<u64, AccountStorageError> {
+        self.get_account(address)?
+            .map(|account| account.nonce(self.host))
+            .unwrap_or(Ok(0))
     }
 
     fn reset_balance(&mut self, address: H160) -> Result<(), AccountStorageError> {
-        match self.get_account(address) {
+        match self.get_account(address)? {
             Some(mut account) => account.set_balance(self.host, U256::zero()),
             None => Err(AccountStorageError::StorageError(
                 StorageError::InvalidAccountsPath,
@@ -1880,12 +1883,16 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
     fn balance(&self, address: H160) -> U256 {
         self.get_account(address)
+            .ok()
+            .flatten()
             .and_then(|a| a.balance(self.host).ok())
             .unwrap_or_default()
     }
 
     fn code_size(&self, address: H160) -> U256 {
         self.get_account(address)
+            .ok()
+            .flatten()
             .and_then(|a| a.code_size(self.host).ok())
             .unwrap_or_default()
     }
@@ -1898,24 +1905,32 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
         }
 
         self.get_account(address)
+            .ok()
+            .flatten()
             .and_then(|a| a.code_hash(self.host).ok())
             .unwrap_or(CODE_HASH_DEFAULT)
     }
 
     fn code(&self, address: H160) -> Vec<u8> {
         self.get_account(address)
+            .ok()
+            .flatten()
             .and_then(|a| a.code(self.host).ok())
             .unwrap_or_default()
     }
 
     fn storage(&self, address: H160, index: H256) -> H256 {
         self.get_account(address)
+            .ok()
+            .flatten()
             .and_then(|a| a.get_storage(self.host, &index).ok())
             .unwrap_or_default()
     }
 
     fn original_storage(&self, address: H160, index: H256) -> H256 {
         self.get_original_account(address)
+            .ok()
+            .flatten()
             .and_then(|a| a.get_storage(self.host, &index).ok())
             .unwrap_or_default()
     }
@@ -1982,7 +1997,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
     fn exists(&self, address: H160) -> bool {
         self.code_size(address) > U256::zero()
-            || self.get_nonce(address) > 0
+            || self.get_nonce(address).unwrap_or_default() > 0
             || self.balance(address) > U256::zero()
     }
 
@@ -2124,7 +2139,16 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
 
                 // The contract address is created before the increment of the nonce
                 // to generate a correct address when the scheme is `Legacy`.
-                let contract_address = self.create_address(scheme);
+                let contract_address = match self.create_address(scheme) {
+                    Ok(address) => address,
+                    Err(err) => {
+                        return Capture::Exit((
+                            ethereum_error_to_exit_reason(&err.into()),
+                            None,
+                            vec![],
+                        ));
+                    }
+                };
 
                 // This `mark_address_as_hot` must be before the `begin_inter_transaction`
                 // so the address will still be hot even if the creation fails
@@ -2409,7 +2433,9 @@ mod test {
             false,
         );
 
-        let result = handler.create_address(CreateScheme::Legacy { caller });
+        let result = handler
+            .create_address(CreateScheme::Legacy { caller })
+            .unwrap_or_default();
 
         let expected_result: H160 =
             H160::from_str("43a61f3f4c73ea0d444c5c1c1a8544067a86219b").unwrap();
@@ -2444,11 +2470,13 @@ mod test {
         let code_hash: H256 = CODE_HASH_DEFAULT;
         let salt: H256 = H256::zero();
 
-        let result = handler.create_address(CreateScheme::Create2 {
-            caller,
-            code_hash,
-            salt,
-        });
+        let result = handler
+            .create_address(CreateScheme::Create2 {
+                caller,
+                code_hash,
+                salt,
+            })
+            .unwrap_or_default();
 
         let expected_result: H160 =
             H160::from_str("0687a12da0ffa0a64a28c9512512b8ae8870b7ea").unwrap();
@@ -2487,11 +2515,13 @@ mod test {
         )
         .unwrap();
 
-        let result = handler.create_address(CreateScheme::Create2 {
-            caller,
-            code_hash,
-            salt,
-        });
+        let result = handler
+            .create_address(CreateScheme::Create2 {
+                caller,
+                code_hash,
+                salt,
+            })
+            .unwrap_or_default();
 
         let expected_result: H160 =
             H160::from_str("dbd0b036a125995a83d0ab020656a8355abac612").unwrap();
@@ -2940,7 +2970,7 @@ mod test {
         let create_scheme = CreateScheme::Legacy { caller };
         let init_code: Vec<u8> = hex::decode("608060405234801561001057600080fd5b50602a600081905550610150806100286000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea26469706673582212204d6c1853cec27824f5dbf8bcd0994714258d22fc0e0dc8a2460d87c70e3e57a564736f6c63430008120033").unwrap();
 
-        let expected_address = handler.create_address(create_scheme);
+        let expected_address = handler.create_address(create_scheme).unwrap_or_default();
 
         handler.begin_initial_transaction(false, None).unwrap();
 
@@ -3009,7 +3039,7 @@ mod test {
             Opcode::REVERT.as_u8(),
         ];
 
-        let contract_address = handler.create_address(create_scheme);
+        let contract_address = handler.create_address(create_scheme).unwrap_or_default();
         handler.begin_initial_transaction(false, None).unwrap();
 
         let result =
@@ -3527,7 +3557,7 @@ mod test {
         let scheme = CreateScheme::Legacy { caller };
         let code = hex::decode("600c60005566602060406000f060205260076039f3").unwrap();
 
-        let contract_address = handler.create_address(scheme);
+        let contract_address = handler.create_address(scheme).unwrap_or_default();
 
         handler
             .begin_initial_transaction(false, Some(10000))
@@ -3960,9 +3990,11 @@ mod test {
 
         let contrac_addr =
             H160::from_str("095e7baea6a6c7c4c2dfeb977efac326af552d87").unwrap();
-        let expected_address = handler.create_address(CreateScheme::Legacy {
-            caller: contrac_addr,
-        });
+        let expected_address = handler
+            .create_address(CreateScheme::Legacy {
+                caller: contrac_addr,
+            })
+            .unwrap_or_default();
 
         // Tries to CREATE a contract (that will revert)
         let contract_code = vec![
@@ -4176,7 +4208,7 @@ mod test {
         let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
 
         let scheme = CreateScheme::Legacy { caller };
-        let address = handler.create_address(scheme);
+        let address = handler.create_address(scheme).unwrap_or_default();
 
         handler
             .begin_initial_transaction(false, Some(150000))
