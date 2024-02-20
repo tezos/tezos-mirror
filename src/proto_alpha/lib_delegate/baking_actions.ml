@@ -350,7 +350,7 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
     state.global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
-  let*! {liquidity_baking_vote; adaptive_issuance_vote} =
+  let*! ({liquidity_baking_vote; adaptive_issuance_vote} as baking_votes) =
     let default =
       Protocol.Alpha_context.Per_block_votes.
         {liquidity_baking_vote; adaptive_issuance_vote}
@@ -431,12 +431,16 @@ let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
         Baking_nonces.register_nonce cctxt ~chain_id block_hash nonce
   in
   let* () = state_recorder ~new_state:updated_state in
-  let signed_block = {signed_block_header; round; delegate; operations} in
+  let signed_block =
+    {signed_block_header; round; delegate; operations; baking_votes}
+  in
   return (signed_block, updated_state)
 
 let inject_block ~updated_state state prepared_block =
   let open Lwt_result_syntax in
-  let {signed_block_header; round; delegate; operations} = prepared_block in
+  let {signed_block_header; round; delegate; operations; baking_votes = _} =
+    prepared_block
+  in
   let*! () =
     Events.(
       emit injecting_block (signed_block_header.shell.level, round, delegate))

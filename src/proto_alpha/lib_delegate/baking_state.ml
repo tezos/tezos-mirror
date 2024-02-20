@@ -279,6 +279,7 @@ type prepared_block = {
   round : Round.t;
   delegate : consensus_key_and_delegate;
   operations : Tezos_base.Operation.t list list;
+  baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
 (* The fields {current_level}, {delegate_slots}, {next_level_delegate_slots},

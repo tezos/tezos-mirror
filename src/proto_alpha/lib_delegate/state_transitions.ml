@@ -511,8 +511,13 @@ let propose_fresh_block_action ~attestations ?last_proposal
   let+ kind, updated_state =
     match state.level_state.next_forged_block with
     | Some
-        ({signed_block_header = _; delegate; round; operations = _} as
-        signed_block) ->
+        ({
+           signed_block_header = _;
+           delegate;
+           round;
+           operations = _;
+           baking_votes = _;
+         } as signed_block) ->
         let+ () =
           Events.(emit found_preemptively_forged_block (delegate, round))
         in

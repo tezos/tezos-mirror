@@ -161,6 +161,7 @@ type prepared_block = {
   round : Round.t;
   delegate : consensus_key_and_delegate;
   operations : Tezos_base.Operation.t list list;
+  baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
 type level_state = {
