@@ -5424,6 +5424,7 @@ end = struct
             ("test_scenario_base", N.(number >= 019));
             ("test_scenario_stake", N.(number >= 019));
             ("test_scenario_rewards", N.(number >= 019));
+            ("test_scenario_autostaking", N.(number >= 019));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
