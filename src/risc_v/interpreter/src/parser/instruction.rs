@@ -142,6 +142,7 @@ pub enum Instr {
     // Privileged instructions
     Mret,
     Sret,
+    Mnret,
 
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
@@ -359,6 +360,7 @@ impl fmt::Display for Instr {
             // Privileged instructions
             Mret => write!(f, "mret"),
             Sret => write!(f, "sret"),
+            Mnret => write!(f, "mnret"),
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),

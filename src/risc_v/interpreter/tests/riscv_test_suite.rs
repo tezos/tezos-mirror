@@ -82,6 +82,11 @@ fn objdump(file_path: &str, disassembled: bool) -> Vec<(String, Instr, String)> 
         let objdump_instr = transform_objdump_instr(address, instr, args);
         instructions.push((address.to_string(), parsed_instr, objdump_instr))
     }
+    assert!(
+        !instructions.is_empty(),
+        "Could not extract any instructions from {}",
+        file_path
+    );
     instructions
 }
 
