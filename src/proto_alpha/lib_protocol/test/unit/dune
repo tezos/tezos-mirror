@@ -74,7 +74,8 @@
   test_dal_slot_proof
   test_adaptive_issuance
   test_adaptive_issuance_ema
-  test_percentage))
+  test_percentage
+  test_full_staking_balance_repr))
 
 (executable
  (name main)
