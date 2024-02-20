@@ -106,10 +106,10 @@ case $(opam --version) in
   opam pin add -n -y octez-deps opam/virtual/ && opam depext octez-deps
   opam pin remove octez-deps
   ;;
-*) opam install --depext-only opam/virtual/octez-deps.opam ;;
+*) opam install --depext-only opam/virtual/octez-deps.opam.locked ;;
 esac
 
-opam install opam/virtual/octez-deps.opam --deps-only --criteria="-notuptodate,-changed,-removed"
+opam install opam/virtual/octez-deps.opam.locked --deps-only --criteria="-notuptodate,-changed,-removed"
 
 if [ "$1" = "--tps" ]; then
   opam install caqti-driver-postgresql
@@ -128,5 +128,5 @@ if [ -n "$dev" ]; then
   # enough (for [ppx_yojson_conv_lib] in particular), so we add a
   # minimal bound to ensure it won’t be picked by opam.
   # utop is constrained to avoid reinstalling in all the times.
-  opam install --yes opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam --deps-only --criteria="-changed,-removed"
+  opam install --yes opam/virtual/octez-deps.opam.locked opam/virtual/octez-dev-deps.opam --deps-only --criteria="-changed,-removed"
 fi
