@@ -542,8 +542,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     && Round.equal next_baking_round Round.zero
     && Option.is_none state.level_state.next_forged_block
   in
-
-  let waiting_to_forge_block (next_baking_time, _next_baking_round) =
+  let waiting_to_forge_block (next_baking_time, next_baking_round) =
     let*! () = Events.(emit first_baker_of_next_level ()) in
     let now = Time.System.now () in
     let next_baking_ptime = Time.System.of_protocol_exn next_baking_time in
@@ -562,7 +561,9 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     match sleep_until_ptime next_forging_ptime with
     | None ->
         let*! () = Events.(emit no_need_to_wait_to_forge_block ()) in
-        return (Lwt.return Time_to_forge_block)
+        return
+          (Lwt.return
+             (Time_to_prepare_next_level_block {at_round = next_baking_round}))
     | Some t ->
         let*! () =
           Events.(
@@ -572,7 +573,8 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
         in
         return
           (let*! () = t in
-           Lwt.return Time_to_forge_block)
+           Lwt.return
+             (Time_to_prepare_next_level_block {at_round = next_baking_round}))
   in
   (* TODO: re-use what has been done in round_synchronizer.ml *)
   (* Compute the timestamp of the next possible round. *)

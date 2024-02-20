@@ -487,21 +487,6 @@ let prepare_block_to_bake ~attestations ?last_proposal
   in
   return {predecessor; round; delegate; kind; force_apply}
 
-let forge_fresh_block_action ~attestations ?last_proposal
-    ~(predecessor : block_info) state delegate =
-  let open Lwt_syntax in
-  let* block_to_bake =
-    prepare_block_to_bake
-      ~attestations
-      ?last_proposal
-      ~predecessor
-      state
-      delegate
-      Round.zero
-  in
-  let updated_state = update_current_phase state Idle in
-  return @@ Forge_block {block_to_bake; updated_state}
-
 (** Create an inject action that will inject either a fresh block or the pre-emptively
     forged block if it exists. *)
 let propose_fresh_block_action ~attestations ?last_proposal
@@ -683,26 +668,6 @@ let end_of_round state current_round =
             ~last_proposal:state.level_state.latest_proposal
         in
         return (new_state, action)
-
-let time_to_forge_block state =
-  let open Lwt_syntax in
-  let at_round = Round.zero in
-  let round_proposer_opt = round_proposer state ~level:`Next at_round in
-  match (state.level_state.elected_block, round_proposer_opt) with
-  | None, _ | _, None ->
-      (* Unreachable: the [Time_to_forge_Block] event can only be
-         triggered when we have a slot and an elected block *)
-      assert false
-  | Some elected_block, Some {consensus_key_and_delegate; _} ->
-      let attestations = elected_block.attestation_qc in
-      let* action =
-        forge_fresh_block_action
-          ~attestations
-          ~predecessor:elected_block.proposal.block
-          state
-          consensus_key_and_delegate
-      in
-      return (state, action)
 
 let time_to_prepare_next_level_block state at_round =
   let open Lwt_syntax in
@@ -908,7 +873,6 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
       time_to_prepare_next_level_block state at_round
-  | _, Timeout Time_to_forge_block -> time_to_forge_block state
   | Idle, New_head_proposal proposal ->
       let* () =
         Events.(

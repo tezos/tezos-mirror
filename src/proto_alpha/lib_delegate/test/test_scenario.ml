@@ -1827,13 +1827,6 @@ let test_scenario_m9 () =
           false
       | Baking_state.Timeout timeout when !node_b_level = 1l -> (
           match timeout with
-          | Time_to_forge_block ->
-              if !node_b_qc then (
-                node_b_ttf := true ;
-                false)
-              else
-                Stdlib.failwith
-                  "time to forge emitted without observing qc event"
           | Time_to_prepare_next_level_block _ ->
               if !node_b_qc && !node_b_ttf then false
               else
@@ -1879,7 +1872,7 @@ let test_scenario_m10 () =
     include Default_hooks
 
     let stop_on_event = function
-      | Baking_state.Timeout Time_to_forge_block ->
+      | Baking_state.Timeout (Time_to_prepare_next_level_block _) ->
           node_b_ttf := true ;
           false
       (* When we get to level = 1, round = 1, the time to forge timeout should

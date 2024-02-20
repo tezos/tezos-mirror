@@ -239,7 +239,6 @@ val round_proposer :
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
   | Time_to_prepare_next_level_block of {at_round : Round.t}
-  | Time_to_forge_block
 
 val timeout_kind_encoding : timeout_kind Data_encoding.t
 

@@ -411,7 +411,6 @@ let update_current_phase state new_phase =
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
   | Time_to_prepare_next_level_block of {at_round : Round.t}
-  | Time_to_forge_block
 
 let timeout_kind_encoding =
   let open Data_encoding in
@@ -1098,7 +1097,6 @@ let pp_timeout_kind fmt = function
         "time to prepare next level block at round %a"
         Round.pp
         at_round
-  | Time_to_forge_block -> Format.fprintf fmt "time to forge block"
 
 let pp_forge_event fmt =
   let open Format in
