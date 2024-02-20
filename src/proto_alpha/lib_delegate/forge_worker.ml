@@ -110,10 +110,12 @@ let get_or_create_queue worker delegate =
       queue
   | Some queue -> queue
 
-let handle_forge_block worker _baking_state (block_to_bake : block_to_bake) =
+let handle_forge_block worker baking_state (block_to_bake : block_to_bake) =
   let open Lwt_result_syntax in
   let task () =
-    let* prepared_block = failwith "prepare block not implemented yet" in
+    let* prepared_block =
+      Baking_actions.prepare_block baking_state block_to_bake
+    in
     worker.push_event (Some (Block_ready prepared_block)) ;
     return_unit
   in
