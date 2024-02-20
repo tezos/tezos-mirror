@@ -35,6 +35,7 @@ use std::fmt::Debug;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_storage::StorageError;
 
 /// Extends ExitReason with our own errors. It avoids using
 /// ExitError::Other(<string>) and matching on strings.
@@ -1270,6 +1271,15 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .unwrap_or_default()
     }
 
+    fn reset_balance(&mut self, address: H160) -> Result<(), AccountStorageError> {
+        match self.get_account(address) {
+            Some(mut account) => account.set_balance(self.host, U256::zero()),
+            None => Err(AccountStorageError::StorageError(
+                StorageError::InvalidAccountsPath,
+            )),
+        }
+    }
+
     /// Completely delete an account including nonce, code, and data. This is for
     /// contract selfdestruct completion, ie, when contract selfdestructs takes final
     /// effect.
@@ -2046,23 +2056,31 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn mark_delete(&mut self, address: H160, target: H160) -> Result<(), ExitError> {
-        let balance = self.balance(address);
-
-        self.execute_transfer(address, target, balance)
-            .map_err(|err| {
+        let new_deletion = match self.transaction_data.last_mut() {
+            Some(top_layer) => Ok(top_layer.deleted_contracts.insert(address)),
+            None => Err(ExitError::Other(Cow::from(
+                "No transaction data for delete",
+            ))),
+        }?;
+        if new_deletion && address == target {
+            self.reset_balance(address).map_err(|_| {
                 ExitError::Other(Cow::from(
-                    "Could not execute transfer on contract delete",
+                    "Could not reset balance when deleting contract",
                 ))
-            })?;
+            })
+        } else if new_deletion {
+            let balance = self.balance(address);
 
-        if let Some(top_data) = self.transaction_data.last_mut() {
-            top_data.deleted_contracts.insert(address);
-
+            self.execute_transfer(address, target, balance)
+                .map_err(|_| {
+                    ExitError::Other(Cow::from(
+                        "Could not execute transfer on contract delete",
+                    ))
+                })?;
             Ok(())
         } else {
-            Err(ExitError::Other(Cow::from(
-                "No transaction data for delete",
-            )))
+            log!(self.host, Debug, "Contract already marked to delete");
+            Ok(())
         }
     }
 
@@ -3834,6 +3852,70 @@ mod test {
             Ok((ExitReason::Succeed(ExitSucceed::Returned), None, vec![1],)),
             result,
         )
+    }
+
+    #[test]
+    fn contract_selfdestruct_itself_has_no_balance_left() {
+        let mut mock_runtime = MockHost::default();
+        let block = dummy_first_block();
+        let precompiles = precompiles::precompile_set::<MockHost>();
+        let mut evm_account_storage = init_account_storage().unwrap();
+        let config = Config::shanghai();
+
+        let caller = H160::from_str("095e7baea6a6c7c4c2dfeb977efac326af552d87").unwrap();
+
+        let gas_price = U256::from(21000);
+
+        let mut handler = EvmHandler::new(
+            &mut mock_runtime,
+            &mut evm_account_storage,
+            caller,
+            &block,
+            &config,
+            &precompiles,
+            DUMMY_ALLOCATED_TICKS * 10000,
+            gas_price,
+            false,
+        );
+
+        let target_destruct =
+            H160::from_str("a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap();
+
+        let contract = H160::from_low_u64_be(523_u64);
+
+        // Contract selfdestruct itself and then tries to selfdestruct to target_destruct.
+        // The second selfdestruct is ignored and the first remove the balance of contract
+        let code = hex::decode("60003560085730ff5b600080808080305af15073a94f5374fce5edbc8e2a8697c15331677e6ebf0bff").unwrap();
+
+        set_code(&mut handler, &contract, code);
+
+        set_balance(&mut handler, &contract, U256::from(100000_u32));
+
+        let result = handler.call_contract(
+            caller,
+            contract,
+            None,
+            vec![0xff],
+            Some(100_000),
+            false,
+        );
+
+        match result {
+            Ok(exec_out) if exec_out.is_success => {
+                assert_eq!(
+                    get_balance(&mut handler, &contract),
+                    U256::zero(),
+                    "Contract balance is not 0"
+                );
+
+                assert_eq!(
+                    get_balance(&mut handler, &target_destruct),
+                    U256::zero(),
+                    "target_destruct balance is not 0"
+                );
+            }
+            _ => panic!("Execution failed"),
+        }
     }
 
     // According EIP-2929, the created address should still be hot even if the creation fails

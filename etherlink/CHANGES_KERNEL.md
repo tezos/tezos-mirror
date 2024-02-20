@@ -10,6 +10,7 @@
 
 ### Bug fixes
 
+- Fix selfdestruct behavior when target is itself. (!12081)
 - Fix the nonce of the caller on contract creation. Callee's address remains hot even if creation fails. (!11634)
 - Fix the nonce of a new created contract. (!11767)
 - Fix the encoding of the upgrade event emitted by the kernel. (!12003)
