@@ -118,7 +118,7 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
-type forge_event
+type forge_event = |
 
 type forge_request
 
@@ -427,6 +427,7 @@ type event =
       Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
       Operation_worker.candidate * Kind.attestation operation list
+  | New_forge_event of forge_event
   | Timeout of timeout_kind
 
 let event_encoding =
@@ -1079,5 +1080,6 @@ let pp_event fmt = function
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
+  | New_forge_event _event -> .
   | Timeout kind ->
       Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind

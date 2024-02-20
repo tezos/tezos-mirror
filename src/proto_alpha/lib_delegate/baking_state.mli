@@ -228,6 +228,7 @@ type event =
       Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
       Operation_worker.candidate * Kind.attestation operation list
+  | New_forge_event of forge_event
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t
