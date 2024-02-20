@@ -22,7 +22,7 @@ use tezos_ethereum::block::{BlockConstants, L2Block};
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
     IndexedLog, TransactionObject, TransactionReceipt, TransactionStatus,
-    TransactionType, TRANSACTION_HASH_SIZE,
+    TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, Level::*};
@@ -335,6 +335,7 @@ impl BlockInProgress {
             to,
             execution_outcome,
             effective_gas_price,
+            type_,
             ..
         } = receipt_info;
 
@@ -368,7 +369,7 @@ impl BlockInProgress {
                     contract_address: outcome.new_address,
                     logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
                     logs,
-                    type_: TransactionType::Legacy,
+                    type_,
                     status: if outcome.is_success {
                         TransactionStatus::Success
                     } else {
@@ -388,7 +389,7 @@ impl BlockInProgress {
                 contract_address: None,
                 logs: vec![],
                 logs_bloom: Bloom::default(),
-                type_: TransactionType::Legacy,
+                type_,
                 status: TransactionStatus::Failure,
             },
         }

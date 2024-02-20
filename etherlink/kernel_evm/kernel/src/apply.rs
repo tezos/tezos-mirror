@@ -16,7 +16,7 @@ use evm_execution::run_transaction;
 use primitive_types::{H160, U256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_ethereum::withdrawal::Withdrawal;
@@ -87,6 +87,7 @@ pub struct TransactionReceiptInfo {
     pub caller: H160,
     pub to: Option<H160>,
     pub effective_gas_price: U256,
+    pub type_: TransactionType,
 }
 
 #[derive(Debug)]
@@ -111,6 +112,7 @@ fn make_receipt_info(
     caller: H160,
     to: Option<H160>,
     effective_gas_price: U256,
+    type_: TransactionType,
 ) -> TransactionReceiptInfo {
     TransactionReceiptInfo {
         tx_hash,
@@ -119,6 +121,7 @@ fn make_receipt_info(
         caller,
         to,
         effective_gas_price,
+        type_,
     }
 }
 
@@ -530,6 +533,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         caller,
         to,
         object_info.gas_price,
+        transaction.type_(),
     );
 
     index_new_accounts(host, accounts_index, &receipt_info)?;
