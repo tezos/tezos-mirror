@@ -29,7 +29,7 @@ Description: Do you really want to remove all data ?
  configuration and all associated files. Otherwise,
  the node data will be left untouched, and only the
  packages will be removed.
-
+ .
  Enter "yes, please" to confirm.
 
 Template: octez-node/configure

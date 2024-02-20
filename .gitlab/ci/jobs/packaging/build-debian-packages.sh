@@ -31,9 +31,6 @@ cp octez-* scripts/packaging/octez/binaries/
 # Copy the zcash parametes to be packaged
 cp -a _opam/share/zcash-params scripts/packaging/octez/
 
-# Generate the octez-node manual to be included in the package
-./octez-node --help=groff > scripts/packaging/octez/manpages/octez-node.1
-
 # Build the debian packages
 cd scripts/packaging/octez/
 DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -b --no-sign -sa
