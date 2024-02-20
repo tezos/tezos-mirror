@@ -83,6 +83,13 @@ type forge_event
     forge worker. *)
 type forge_request
 
+(** [forge_worker_hooks] type that allows interactions with the forge
+    worker. Hooks are needed in order to break a circular dependency. *)
+type forge_worker_hooks = {
+  push_request : forge_request -> unit;
+  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+}
+
 type global_state = {
   cctxt : Protocol_client_context.full;
   chain_id : Chain_id.t;
@@ -90,6 +97,7 @@ type global_state = {
   constants : Constants.t;
   round_durations : Round.round_durations;
   operation_worker : Operation_worker.t;
+  mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
   delegates : consensus_key list;
   cache : cache;

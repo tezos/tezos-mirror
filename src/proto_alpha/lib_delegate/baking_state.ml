@@ -122,6 +122,11 @@ type forge_event
 
 type forge_request
 
+type forge_worker_hooks = {
+  push_request : forge_request -> unit;
+  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+}
+
 type global_state = {
   (* client context *)
   cctxt : Protocol_client_context.full;
@@ -135,6 +140,8 @@ type global_state = {
   round_durations : Round.round_durations;
   (* worker that monitor and aggregates new operations *)
   operation_worker : Operation_worker.t;
+  (* hooks to the consensus and block forge worker *)
+  mutable forge_worker_hooks : forge_worker_hooks;
   (* the validation mode used by the baker*)
   validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)

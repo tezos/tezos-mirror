@@ -676,6 +676,11 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       constants;
       round_durations;
       operation_worker;
+      forge_worker_hooks =
+        {
+          push_request = (fun _ -> assert false);
+          get_forge_event_stream = (fun _ -> assert false);
+        };
       validation_mode;
       delegates;
       cache;
@@ -685,6 +690,15 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
         Option.map create_dal_node_rpc_ctxt config.dal_node_endpoint;
     }
   in
+  (* Trick to provide the global state to the forge worker without
+     introducing a circular dependency. *)
+  let forge_worker = Forge_worker.start global_state in
+  global_state.forge_worker_hooks <-
+    {
+      push_request = Forge_worker.push_request forge_worker;
+      get_forge_event_stream =
+        (fun () -> Forge_worker.get_event_stream forge_worker);
+    } ;
   let chain = `Hash chain_id in
   let current_level = current_proposal.block.shell.level in
   let* delegate_slots =
