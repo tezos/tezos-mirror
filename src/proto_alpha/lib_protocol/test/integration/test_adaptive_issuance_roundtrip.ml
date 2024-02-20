@@ -82,21 +82,6 @@ let quantity_to_tez all qty =
   | Max_tez -> Tez.max_tez
   | Amount a -> a
 
-let default_params =
-  let Protocol.Staking_parameters_repr.
-        {
-          limit_of_staking_over_baking_millionth;
-          edge_of_baking_over_staking_billionth;
-        } =
-    Protocol.Staking_parameters_repr.default
-  in
-  {
-    limit_of_staking_over_baking =
-      Q.(Int32.to_int limit_of_staking_over_baking_millionth // 1_000_000);
-    edge_of_baking_over_staking =
-      Q.(Int32.to_int edge_of_baking_over_staking_billionth // 1_000_000_000);
-  }
-
 type double_signing_state = {
   culprit : Signature.Public_key_hash.t;
   evidence : Context.t -> Protocol.Alpha_context.packed_operation;
