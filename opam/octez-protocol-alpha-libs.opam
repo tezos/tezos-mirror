@@ -16,6 +16,7 @@ depends: [
   "octez-shell-libs"
   "uri" { >= "3.1.0" }
   "tezt" { >= "4.0.0" & < "5.0.0" }
+  "octez-alcotezt"
   "qcheck-alcotest" { >= "0.20" }
   "octez-proto-libs"
   "octez-version"
@@ -29,7 +30,6 @@ depends: [
   "tezos-dac-client-lib"
   "octez-injector"
   "octez-l2-libs"
-  "octez-alcotezt" {with-test}
   "tezos-dac-node-lib" {with-test}
 ]
 build: [

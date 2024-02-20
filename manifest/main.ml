@@ -6207,6 +6207,11 @@ let hash = Protocol.hash
              Some (tezt_core_lib |> open_ |> open_ ~m:"Base")
             else None)
             |> if_some;
+            (if N.(number >= 019) then Some alcotezt else None) |> if_some;
+            (if N.(number >= 019) then Some tezt_lib else None) |> if_some;
+            (if N.(number >= 019) then Some (octez_base_test_helpers |> open_)
+            else None)
+            |> if_some;
             qcheck_alcotest;
             octez_test_helpers;
             octez_base |> open_ ~m:"TzPervasives"
