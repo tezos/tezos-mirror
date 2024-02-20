@@ -118,23 +118,6 @@ module Operations_source = struct
                 Lwt.return_none))
 end
 
-type block_kind =
-  | Fresh of Operation_pool.pool
-  | Reproposal of {
-      consensus_operations : packed_operation list;
-      payload_hash : Block_payload_hash.t;
-      payload_round : Round.t;
-      payload : Operation_pool.payload;
-    }
-
-type block_to_bake = {
-  predecessor : block_info;
-  round : Round.t;
-  delegate : Baking_state.consensus_key_and_delegate;
-  kind : block_kind;
-  force_apply : bool;
-}
-
 type inject_block_kind =
   | Forge_and_inject of block_to_bake
   | Inject_only of signed_block

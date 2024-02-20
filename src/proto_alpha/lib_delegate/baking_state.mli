@@ -75,6 +75,27 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
+type block_kind =
+  | Fresh of Operation_pool.pool
+  | Reproposal of {
+      consensus_operations : packed_operation list;
+      payload_hash : Block_payload_hash.t;
+      payload_round : Round.t;
+      payload : Operation_pool.payload;
+    }
+
+type block_to_bake = {
+  predecessor : block_info;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  kind : block_kind;
+  force_apply : bool;
+      (** if true, while baking the block, try and apply the block and its
+          operations instead of only validating them. this can be permanently
+          set using the [--force-apply] flag (see [force_apply_switch_arg] in
+          [baking_commands.ml]). *)
+}
+
 (** [forge_event] type used to return the result of a task completion
     in the forge worker. *)
 type forge_event

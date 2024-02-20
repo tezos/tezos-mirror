@@ -118,6 +118,23 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
+type block_kind =
+  | Fresh of Operation_pool.pool
+  | Reproposal of {
+      consensus_operations : packed_operation list;
+      payload_hash : Block_payload_hash.t;
+      payload_round : Round.t;
+      payload : Operation_pool.payload;
+    }
+
+type block_to_bake = {
+  predecessor : block_info;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  kind : block_kind;
+  force_apply : bool;
+}
+
 type forge_event = |
 
 type forge_request

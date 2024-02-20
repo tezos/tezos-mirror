@@ -27,27 +27,6 @@ open Protocol
 open Alpha_context
 open Baking_state
 
-type block_kind =
-  | Fresh of Operation_pool.pool
-  | Reproposal of {
-      consensus_operations : packed_operation list;
-      payload_hash : Block_payload_hash.t;
-      payload_round : Round.t;
-      payload : Operation_pool.payload;
-    }
-
-type block_to_bake = {
-  predecessor : block_info;
-  round : Round.t;
-  delegate : consensus_key_and_delegate;
-  kind : block_kind;
-  force_apply : bool;
-      (** if true, while baking the block, try and apply the block and its
-          operations instead of only validating them. this can be permanently
-          set using the [--force-apply] flag (see [force_apply_switch_arg] in
-          [baking_commands.ml]). *)
-}
-
 type inject_block_kind =
   | Forge_and_inject of block_to_bake
       (** Forge and inject a freshly forged block. [block_to_bake] should be

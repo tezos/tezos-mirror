@@ -256,10 +256,10 @@ let propose_at_next_level ~minimal_timestamp state =
       Operation_worker.get_current_operations
         state.global_state.operation_worker
     in
-    let kind = Baking_actions.Fresh pool in
-    let block_to_bake : Baking_actions.block_to_bake =
+    let kind = Fresh pool in
+    let block_to_bake =
       {
-        Baking_actions.predecessor = state.level_state.latest_proposal.block;
+        predecessor = state.level_state.latest_proposal.block;
         round = minimal_round;
         delegate;
         kind;
@@ -578,10 +578,10 @@ let rec baking_minimal_timestamp ~count state
          (fun signed_consensus -> signed_consensus.signed_operation)
          signed_attestations.signed_consensus_votes)
   in
-  let kind = Baking_actions.Fresh pool in
-  let block_to_bake : Baking_actions.block_to_bake =
+  let kind = Fresh pool in
+  let block_to_bake =
     {
-      Baking_actions.predecessor = latest_proposal.block;
+      predecessor = latest_proposal.block;
       round = minimal_round;
       delegate;
       kind;
