@@ -1019,12 +1019,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             stack_depth
         );
 
-        // TODO: check gas
-        // issue: https://gitlab.com/tezos/tezos/-/issues/5120
-
-        // TODO: add transfer to gas (if it is there)
-        // issue: https://gitlab.com/tezos/tezos/-/issues/5121
-
         if let Some(ref transfer) = transfer {
             match self.execute_transfer(
                 transaction_context.context.caller,
@@ -1902,9 +1896,6 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn code(&self, address: H160) -> Vec<u8> {
-        // TODO: mark address as hot
-        // issue: https://gitlab.com/tezos/tezos/-/issues/4866
-
         self.get_account(address)
             .and_then(|a| a.code(self.host).ok())
             .unwrap_or_default()
@@ -2218,7 +2209,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     ) -> Capture<CallOutcome, Self::CallInterrupt> {
         let transaction_context = TransactionContext::from_context(context);
 
-        // Retrieve value from `Transfer` struct to check if caller has enough balanace
+        // Retrieve value from `Transfer` struct to check if caller has enough balance
         let value = match transfer {
             None => U256::zero(),
             Some(Transfer { value, .. }) => value,
