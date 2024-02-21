@@ -477,7 +477,7 @@ let may_get_dal_content state consensus_vote =
               in
               return_some {attestation = dal_attestation}))
 
-let is_authorized state highwatermarks consensus_vote =
+let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate = consensus_key, _; vote_consensus_content; _} =
     consensus_vote
   in
@@ -500,22 +500,23 @@ let is_authorized state highwatermarks consensus_vote =
           ~level
           ~round
   in
-  may_sign || state.global_state.config.force
+  may_sign || global_state.config.force
 
-let authorized_consensus_votes state
+let authorized_consensus_votes global_state
     (unsigned_consensus_vote_batch : unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   (* Hypothesis: all consensus votes have the same round and level *)
   let {
     batch_kind;
     batch_content = ({level; round; _} : batch_content);
+    batch_branch = _;
     unsigned_consensus_votes;
   } =
     unsigned_consensus_vote_batch
   in
   let level = Raw_level.to_int32 level in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
   let block_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
@@ -527,7 +528,7 @@ let authorized_consensus_votes state
         let authorized_votes, unauthorized_votes =
           List.partition
             (fun consensus_vote ->
-              is_authorized state highwatermarks consensus_vote)
+              is_authorized global_state highwatermarks consensus_vote)
             unsigned_consensus_votes
         in
         (* Record all consensus votes new highwatermarks as one batch *)
@@ -572,11 +573,11 @@ let authorized_consensus_votes state
   in
   return authorized_votes
 
-let forge_and_sign_consensus_vote state unsigned_consensus_vote :
+let forge_and_sign_consensus_vote global_state branch unsigned_consensus_vote :
     signed_consensus_vote option Lwt.t =
   let open Lwt_syntax in
-  let cctxt = state.global_state.cctxt in
-  let chain_id = state.global_state.chain_id in
+  let cctxt = global_state.cctxt in
+  let chain_id = global_state.chain_id in
   let {
     vote_kind;
     vote_consensus_content;
@@ -589,13 +590,7 @@ let forge_and_sign_consensus_vote state unsigned_consensus_vote :
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
-  let shell =
-    (* The branch is the latest finalized block. *)
-    {
-      Tezos_base.Operation.branch =
-        state.level_state.latest_proposal.predecessor.shell.predecessor;
-    }
-  in
+  let shell = {Tezos_base.Operation.branch} in
   let watermark =
     match vote_kind with
     | Preattestation -> Operation.(to_watermark (Preattestation chain_id))
@@ -638,12 +633,13 @@ let forge_and_sign_consensus_vote state unsigned_consensus_vote :
       let signed_operation : Operation.packed = {shell; protocol_data} in
       return_some {unsigned_consensus_vote; signed_operation}
 
-let sign_consensus_votes state
-    ({batch_kind; batch_content; _} as unsigned_consensus_vote_batch :
+let sign_consensus_votes (global_state : global_state)
+    ({batch_kind; batch_content; batch_branch; _} as
+     unsigned_consensus_vote_batch :
       unsigned_consensus_vote_batch) =
   let open Lwt_result_syntax in
   let* authorized_consensus_votes =
-    authorized_consensus_votes state unsigned_consensus_vote_batch
+    authorized_consensus_votes global_state unsigned_consensus_vote_batch
   in
   let event =
     match batch_kind with
@@ -654,29 +650,26 @@ let sign_consensus_votes state
     List.filter_map_es
       (fun ({delegate; _} as unsigned_consensus_vote) ->
         let*! () = Events.(emit event delegate) in
-        match batch_kind with
-        | Attestation ->
-            let*! signed_consensus_vote =
-              forge_and_sign_consensus_vote state unsigned_consensus_vote
-            in
-            return signed_consensus_vote
-        | Preattestation ->
-            let*! signed_consensus_vote =
-              forge_and_sign_consensus_vote state unsigned_consensus_vote
-            in
-            return signed_consensus_vote)
+        let*! signed_consensus_vote =
+          forge_and_sign_consensus_vote
+            global_state
+            batch_branch
+            unsigned_consensus_vote
+        in
+        return signed_consensus_vote)
       authorized_consensus_votes
   in
   let*? signed_consensus_vote_batch =
     make_signed_consensus_vote_batch
       batch_kind
       batch_content
+      ~batch_branch
       signed_consensus_votes
   in
   return signed_consensus_vote_batch
 
 let inject_consensus_votes state
-    {batch_kind; batch_content; signed_consensus_votes} =
+    {batch_kind; batch_content; signed_consensus_votes; batch_branch = _} =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
@@ -924,22 +917,18 @@ let prepare_block_request state block_to_bake =
 
 let prepare_preattestations_request state unsigned_preattestations =
   let open Lwt_result_syntax in
-  let branch = state.level_state.latest_proposal.predecessor.hash in
-  let request =
-    Forge_and_sign_preattestations {branch; unsigned_preattestations}
-  in
+  let request = Forge_and_sign_preattestations {unsigned_preattestations} in
   state.global_state.forge_worker_hooks.push_request request ;
   return state
 
 let prepare_attestations_request state unsigned_attestations =
   let open Lwt_result_syntax in
-  let branch = state.level_state.latest_proposal.predecessor.hash in
   let*! unsigned_attestations_with_dal =
     dal_content_map_p (may_get_dal_content state) unsigned_attestations
   in
   let request =
     Forge_and_sign_attestations
-      {branch; unsigned_attestations = unsigned_attestations_with_dal}
+      {unsigned_attestations = unsigned_attestations_with_dal}
   in
   state.global_state.forge_worker_hooks.push_request request ;
   return state
@@ -970,13 +959,15 @@ let rec perform_action ~state_recorder state (action : action) =
       return new_state
   | Inject_preattestations {preattestations} ->
       let* signed_preattestations =
-        sign_consensus_votes state preattestations
+        sign_consensus_votes state.global_state preattestations
       in
       let* () = inject_consensus_votes state signed_preattestations in
       perform_action ~state_recorder state Watch_proposal
   | Inject_attestations {attestations} ->
       let* () = state_recorder ~new_state:state in
-      let* signed_attestations = sign_consensus_votes state attestations in
+      let* signed_attestations =
+        sign_consensus_votes state.global_state attestations
+      in
       let* () = inject_consensus_votes state signed_attestations in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)

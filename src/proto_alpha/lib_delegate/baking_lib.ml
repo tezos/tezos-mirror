@@ -95,7 +95,7 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
          consensus_batch.unsigned_consensus_votes)
   in
   let* signed_consensus_batch =
-    Baking_actions.sign_consensus_votes state consensus_batch
+    Baking_actions.sign_consensus_votes state.global_state consensus_batch
   in
   Baking_actions.inject_consensus_votes state signed_consensus_batch
 
@@ -134,7 +134,7 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
          consensus_batch.unsigned_consensus_votes)
   in
   let* signed_consensus_batch =
-    Baking_actions.sign_consensus_votes state consensus_batch
+    Baking_actions.sign_consensus_votes state.global_state consensus_batch
   in
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
@@ -626,7 +626,9 @@ let rec baking_minimal_timestamp ~count state
         (Baking_actions.may_get_dal_content state)
         own_attestations
     in
-    Baking_actions.sign_consensus_votes state own_attestations_with_dal
+    Baking_actions.sign_consensus_votes
+      state.global_state
+      own_attestations_with_dal
   in
   let pool =
     Operation_pool.add_operations

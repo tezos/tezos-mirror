@@ -81,7 +81,7 @@ val may_get_dal_content :
   state -> unsigned_consensus_vote -> dal_content option tzresult Lwt.t
 
 val sign_consensus_votes :
-  state ->
+  global_state ->
   unsigned_consensus_vote_batch ->
   signed_consensus_vote_batch tzresult Lwt.t
 

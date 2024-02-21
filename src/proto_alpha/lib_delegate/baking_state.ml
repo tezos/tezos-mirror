@@ -380,11 +380,13 @@ type batch_content = {
 type unsigned_consensus_vote_batch = {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
+  batch_branch : Block_hash.t;
   unsigned_consensus_votes : unsigned_consensus_vote list;
 }
 
 let make_unsigned_consensus_vote_batch kind
-    ({level; round; block_payload_hash} as batch_content) delegates_and_slots =
+    ({level; round; block_payload_hash} as batch_content) ~batch_branch
+    delegates_and_slots =
   let unsigned_consensus_votes =
     List.map
       (fun (delegate, slot) ->
@@ -397,7 +399,7 @@ let make_unsigned_consensus_vote_batch kind
         })
       delegates_and_slots
   in
-  {batch_kind = kind; batch_content; unsigned_consensus_votes}
+  {batch_kind = kind; batch_branch; batch_content; unsigned_consensus_votes}
 
 let dal_content_map_p f unsigned_consensus_vote_batch =
   let open Lwt_syntax in
@@ -434,6 +436,7 @@ type signed_consensus_vote = {
 type signed_consensus_vote_batch = {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
+  batch_branch : Block_hash.t;
   signed_consensus_votes : signed_consensus_vote list;
 }
 
@@ -455,7 +458,7 @@ let () =
     (fun () -> Mismatch_signed_consensus_vote_in_batch)
 
 let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
-    signed_consensus_votes =
+    ~batch_branch signed_consensus_votes =
   let open Result_syntax in
   let* () =
     List.iter_e
@@ -474,7 +477,7 @@ let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
           Mismatch_signed_consensus_vote_in_batch)
       signed_consensus_votes
   in
-  return {batch_kind; batch_content; signed_consensus_votes}
+  return {batch_kind; batch_content; batch_branch; signed_consensus_votes}
 
 type forge_event =
   | Block_ready of prepared_block
@@ -484,11 +487,9 @@ type forge_event =
 type forge_request =
   | Forge_and_sign_block of block_to_bake
   | Forge_and_sign_preattestations of {
-      branch : Block_hash.t;
       unsigned_preattestations : unsigned_consensus_vote_batch;
     }
   | Forge_and_sign_attestations of {
-      branch : Block_hash.t;
       unsigned_attestations : unsigned_consensus_vote_batch;
     }
 

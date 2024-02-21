@@ -187,12 +187,14 @@ type batch_content = {
 type unsigned_consensus_vote_batch = {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
+  batch_branch : Block_hash.t;
   unsigned_consensus_votes : unsigned_consensus_vote list;
 }
 
 val make_unsigned_consensus_vote_batch :
   consensus_vote_kind ->
   batch_content ->
+  batch_branch:Block_hash.t ->
   (consensus_key_and_delegate * Slot.t) list ->
   unsigned_consensus_vote_batch
 
@@ -204,6 +206,7 @@ val dal_content_map_p :
 type signed_consensus_vote_batch = private {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
+  batch_branch : Block_hash.t;
   signed_consensus_votes : signed_consensus_vote list;
 }
 
@@ -212,6 +215,7 @@ type error += Mismatch_signed_consensus_vote_in_batch
 val make_signed_consensus_vote_batch :
   consensus_vote_kind ->
   batch_content ->
+  batch_branch:Block_hash.t ->
   signed_consensus_vote list ->
   signed_consensus_vote_batch tzresult
 
@@ -253,11 +257,9 @@ type forge_event =
 type forge_request =
   | Forge_and_sign_block of block_to_bake
   | Forge_and_sign_preattestations of {
-      branch : Block_hash.t;
       unsigned_preattestations : unsigned_consensus_vote_batch;
     }
   | Forge_and_sign_attestations of {
-      branch : Block_hash.t;
       unsigned_attestations : unsigned_consensus_vote_batch;
     }
 

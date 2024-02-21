@@ -88,9 +88,12 @@ let make_consensus_vote_batch state proposal kind =
         (delegate_slot.consensus_key_and_delegate, delegate_slot.first_slot))
       (Delegate_slots.own_delegates state.level_state.delegate_slots)
   in
+  (* The branch is the latest finalized block. *)
+  let batch_branch = state.level_state.latest_proposal.predecessor.hash in
   Baking_state.make_unsigned_consensus_vote_batch
     kind
     batch_content
+    ~batch_branch
     delegates_and_slots
 
 (* If we do not have any slots, we won't inject any operation but we
