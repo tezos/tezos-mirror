@@ -12,7 +12,7 @@ Installation
 
 Prerequisites:
 
-- ``python 3.11.6``. It is recommended to use `pyenv
+- ``python 3.11.8``. It is recommended to use `pyenv
   <https://github.com/pyenv/pyenv>`_ to manage the python versions.
   If you want to use ``pyenv``:
 
@@ -21,11 +21,11 @@ Prerequisites:
     has been executed first during the shell session, by adding this line to an
     environment script sourced automatically.
 
-  * You can use then ``pyenv install 3.11.6``, followed by:
+  * You can use then ``pyenv install 3.11.8``, followed by:
 
-    + ``pyenv local 3.11.6`` to use ``python 3.11.6`` only in the current directory (and its subdirectories, unless redefined)
-    + ``pyenv global 3.11.6`` to set the python version to ``3.11.6`` globally
-    + ``pyenv shell 3.11.6`` to use ``python 3.11.6`` only in the current shell
+    + ``pyenv local 3.11.8`` to use ``python 3.11.8`` only in the current directory (and its subdirectories, unless redefined)
+    + ``pyenv global 3.11.8`` to set the python version to ``3.11.8`` globally
+    + ``pyenv shell 3.11.8`` to use ``python 3.11.8`` only in the current shell
 
 - `poetry 1.2.2 <https://python-poetry.org/>`_ to manage the python dependencies and
   run the tests in a sandboxed python environment. Follow the `installation instructions <https://python-poetry.org/docs/#installation>`__.
@@ -39,8 +39,8 @@ A typical installation of the above prerequisites (including their own prerequis
   # 1. install pyenv
   # 2. restart shell, to ensure "pyenv init -" has been evaluated
   # 3. then install python using pyenv:
-  pyenv install 3.11.6
-  pyenv global 3.11.6
+  pyenv install 3.11.8
+  pyenv global 3.11.8
   # 4. install poetry
   # 5. restart shell, to activate the poetry setup
   # 6. then install dependencies for Octez using poetry:
@@ -88,7 +88,7 @@ executing ``pyenv``:
    :start-after: [print pyenv version]
    :end-before: [verify pyenv installation]
 
-Now we can use ``pyenv`` to install Python 3.11.6 and set it as the
+Now we can use ``pyenv`` to install Python 3.11.8 and set it as the
 default version:
 
 .. literalinclude:: install-python-debian-ubuntu.sh
