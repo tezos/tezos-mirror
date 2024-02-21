@@ -118,48 +118,6 @@ module Operations_source = struct
                 Lwt.return_none))
 end
 
-type consensus_vote_kind = Attestation | Preattestation
-
-type unsigned_consensus_vote = {
-  vote_kind : consensus_vote_kind;
-  vote_consensus_content : consensus_content;
-  delegate : consensus_key_and_delegate;
-}
-
-type batch_content = {
-  level : Raw_level.t;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-}
-
-type unsigned_consensus_vote_batch = {
-  batch_kind : consensus_vote_kind;
-  batch_content : batch_content;
-  unsigned_consensus_votes : unsigned_consensus_vote list;
-}
-
-let make_unsigned_consensus_vote_batch kind
-    ({level; round; block_payload_hash} as batch_content) delegates_and_slots =
-  let unsigned_consensus_votes =
-    List.map
-      (fun (delegate, slot) ->
-        let consensus_content = {level; round; slot; block_payload_hash} in
-        {vote_kind = kind; vote_consensus_content = consensus_content; delegate})
-      delegates_and_slots
-  in
-  {batch_kind = kind; batch_content; unsigned_consensus_votes}
-
-type signed_consensus_vote = {
-  unsigned_consensus_vote : unsigned_consensus_vote;
-  signed_operation : packed_operation;
-}
-
-type signed_consensus_vote_batch = {
-  batch_kind : consensus_vote_kind;
-  batch_content : batch_content;
-  signed_consensus_votes : signed_consensus_vote list;
-}
-
 type action =
   | Do_nothing
   | Prepare_block of {block_to_bake : block_to_bake}
@@ -713,7 +671,13 @@ let sign_consensus_votes state
             return signed_consensus_vote)
       authorized_consensus_votes
   in
-  return {batch_kind; batch_content; signed_consensus_votes}
+  let*? signed_consensus_vote_batch =
+    make_signed_consensus_vote_batch
+      batch_kind
+      batch_content
+      signed_consensus_votes
+  in
+  return signed_consensus_vote_batch
 
 let inject_consensus_votes state
     {batch_kind; batch_content; signed_consensus_votes} =

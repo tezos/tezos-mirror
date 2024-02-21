@@ -83,7 +83,6 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let consensus_batch =
     make_consensus_vote_batch state proposal Preattestation
   in
-  let open Baking_actions in
   let*! () =
     cctxt#message
       "@[<v 2>Preattesting for:@ %a@]"
@@ -123,7 +122,6 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
       | Valid_proposal -> return_unit
   in
   let consensus_batch = make_consensus_vote_batch state proposal Attestation in
-  let open Baking_actions in
   let*! () =
     cctxt#message
       "@[<v 2>Attesting for:@ %a@]"
@@ -596,7 +594,7 @@ let rec baking_minimal_timestamp ~count state
   let total_voting_power =
     List.fold_left
       (fun attestations own ->
-        own.Baking_actions.vote_consensus_content :: attestations)
+        own.Baking_state.vote_consensus_content :: attestations)
       attestations_in_mempool
       own_attestations.unsigned_consensus_votes
     |> attestations_attesting_power state
@@ -626,7 +624,6 @@ let rec baking_minimal_timestamp ~count state
     Baking_actions.sign_consensus_votes state own_attestations
   in
   let pool =
-    let open Baking_actions in
     Operation_pool.add_operations
       current_mempool
       (List.map

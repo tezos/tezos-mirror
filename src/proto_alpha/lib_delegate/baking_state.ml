@@ -362,6 +362,87 @@ type block_to_bake = {
   force_apply : bool;
 }
 
+type consensus_vote_kind = Attestation | Preattestation
+
+type unsigned_consensus_vote = {
+  vote_kind : consensus_vote_kind;
+  vote_consensus_content : consensus_content;
+  delegate : consensus_key_and_delegate;
+}
+
+type batch_content = {
+  level : Raw_level.t;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+}
+
+type unsigned_consensus_vote_batch = {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  unsigned_consensus_votes : unsigned_consensus_vote list;
+}
+
+let make_unsigned_consensus_vote_batch kind
+    ({level; round; block_payload_hash} as batch_content) delegates_and_slots =
+  let unsigned_consensus_votes =
+    List.map
+      (fun (delegate, slot) ->
+        let consensus_content = {level; round; slot; block_payload_hash} in
+        {vote_kind = kind; vote_consensus_content = consensus_content; delegate})
+      delegates_and_slots
+  in
+  {batch_kind = kind; batch_content; unsigned_consensus_votes}
+
+type signed_consensus_vote = {
+  unsigned_consensus_vote : unsigned_consensus_vote;
+  signed_operation : packed_operation;
+}
+
+type signed_consensus_vote_batch = {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  signed_consensus_votes : signed_consensus_vote list;
+}
+
+type error += Mismatch_signed_consensus_vote_in_batch
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Baking_state.mismatch_signed_consensus_vote_in_batch"
+    ~title:"Mismatch signed consensus vote in batch"
+    ~description:"Consensus votes mismatch while creating a batch."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "There are batched consensus votes which are not of the same kind or \
+         do not have the same consensus content as the rest.")
+    Data_encoding.unit
+    (function Mismatch_signed_consensus_vote_in_batch -> Some () | _ -> None)
+    (fun () -> Mismatch_signed_consensus_vote_in_batch)
+
+let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
+    signed_consensus_votes =
+  let open Result_syntax in
+  let* () =
+    List.iter_e
+      (fun {unsigned_consensus_vote; signed_operation = _} ->
+        error_when
+          (unsigned_consensus_vote.vote_kind <> batch_kind
+          || Raw_level.(
+               unsigned_consensus_vote.vote_consensus_content.level
+               <> batch_content.level)
+          || Round.(
+               unsigned_consensus_vote.vote_consensus_content.round
+               <> batch_content.round)
+          || Block_payload_hash.(
+               unsigned_consensus_vote.vote_consensus_content.block_payload_hash
+               <> batch_content.block_payload_hash))
+          Mismatch_signed_consensus_vote_in_batch)
+      signed_consensus_votes
+  in
+  return {batch_kind; batch_content; signed_consensus_votes}
+
 type forge_event = Block_ready of prepared_block
 
 type forge_request = Forge_and_sign_block of block_to_bake

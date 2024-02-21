@@ -88,7 +88,7 @@ let make_consensus_vote_batch state proposal kind =
         (delegate_slot.consensus_key_and_delegate, delegate_slot.first_slot))
       (Delegate_slots.own_delegates state.level_state.delegate_slots)
   in
-  Baking_actions.make_unsigned_consensus_vote_batch
+  Baking_state.make_unsigned_consensus_vote_batch
     kind
     batch_content
     delegates_and_slots
@@ -97,7 +97,7 @@ let make_consensus_vote_batch state proposal kind =
    will still participate to determine an elected block *)
 let make_preattest_action state proposal =
   let preattestations : unsigned_consensus_vote_batch =
-    make_consensus_vote_batch state proposal Baking_actions.Preattestation
+    make_consensus_vote_batch state proposal Baking_state.Preattestation
   in
   Inject_preattestations {preattestations}
 
@@ -680,7 +680,7 @@ let update_locked_round state round payload_hash =
 
 let make_attest_action state proposal =
   let attestations : unsigned_consensus_vote_batch =
-    make_consensus_vote_batch state proposal Baking_actions.Attestation
+    make_consensus_vote_batch state proposal Baking_state.Attestation
   in
   Inject_attestations {attestations}
 
