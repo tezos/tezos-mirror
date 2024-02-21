@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
+derive_more = "0.99.17"
 num_enum = "0.7.2"
 paste = "1.0.14"
 thiserror = "1.0.57"
