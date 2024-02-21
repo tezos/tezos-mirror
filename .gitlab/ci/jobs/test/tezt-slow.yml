@@ -2,7 +2,7 @@ include: .gitlab/ci/jobs/test/common.yml
 
 # Runs Tezts tagged as 'slow' in the 'schedule_extended_test'
 # pipeline.
-tezt-slow:
+.tezt-slow:
   extends:
     - .tezt_tests
   variables:
