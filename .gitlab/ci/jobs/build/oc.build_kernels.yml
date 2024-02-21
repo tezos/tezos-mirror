@@ -8,8 +8,6 @@ oc.build_kernels:
     # cached files are in a sub-folder of the checkout.
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     RUSTC_WRAPPER: "sccache"
-  dependencies: [oc.docker:rust-toolchain]
-  needs: [oc.docker:rust-toolchain]
   script:
     - make -f kernels.mk build
     - make -f etherlink.mk evm_kernel.wasm
