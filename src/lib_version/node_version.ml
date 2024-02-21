@@ -72,14 +72,20 @@ let additional_info_encoding =
         (fun n -> RC_dev n);
     ]
 
+let suite_encoding =
+  let open Data_encoding in
+  string_enum [("octez", Version.Octez); ("etherlink", Version.Etherlink)]
+
 (* The encoding is defined here to keep [Version] "Data_encoding free"*)
 let version_encoding =
   let open Data_encoding in
   conv
-    (fun ({major; minor; additional_info} : Version.t) ->
-      (major, minor, additional_info))
-    (fun (major, minor, additional_info) -> {major; minor; additional_info})
-    (obj3
+    (fun ({suite; major; minor; additional_info} : Version.t) ->
+      (suite, major, minor, additional_info))
+    (fun (suite, major, minor, additional_info) ->
+      {suite; major; minor; additional_info})
+    (obj4
+       (dft "suite" suite_encoding Octez)
        (req "major" int31)
        (req "minor" int31)
        (req "additional_info" additional_info_encoding))

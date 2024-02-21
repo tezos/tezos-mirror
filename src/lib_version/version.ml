@@ -31,7 +31,10 @@ type additional_info = Tezos_version_parser.additional_info =
   | RC_dev of int
   | Release
 
+type suite = Tezos_version_parser.suite = Octez | Etherlink
+
 type t = Tezos_version_parser.t = {
+  suite : suite;
   major : int;
   minor : int;
   additional_info : additional_info;
@@ -47,10 +50,11 @@ let string_of_additional_info = function
   | RC_dev n -> Format.asprintf "~rc%d+dev" n
   | Release -> ""
 
-let pp f {major; minor; additional_info} =
+let pp f {suite; major; minor; additional_info} =
   Format.fprintf
     f
-    "%i.%i%s"
+    "%s%i.%i%s"
+    (match suite with Octez -> "" | Etherlink -> "etherlink-")
     major
     minor
     (string_of_additional_info additional_info)

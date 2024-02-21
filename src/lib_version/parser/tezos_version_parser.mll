@@ -27,14 +27,19 @@
     | RC_dev of int
     | Release [@@deriving show]
 
+  type suite =
+    | Octez
+    | Etherlink [@@deriving show]
+
   type t = {
+    suite : suite;
     major : int;
     minor : int;
     additional_info : additional_info} [@@deriving show]
 
   let int s = int_of_string_opt s |> Option.value ~default: 0
 
-  let default = { major = 0 ; minor = 0 ; additional_info = Dev }
+  let default = { suite = Octez; major = 0 ; minor = 0 ; additional_info = Dev }
 }
 
 let num = ['0'-'9']+
@@ -42,6 +47,14 @@ let num = ['0'-'9']+
 rule version_tag = parse
   | 'v'? (num as major) '.' (num as minor) ".0"?
       { Some {
+        suite = Octez;
+        major = int major;
+        minor = int minor;
+        additional_info = extra lexbuf }
+      }
+  | "etherlink-" (num as major) '.' (num as minor) ".0"?
+      { Some {
+        suite = Etherlink;
         major = int major;
         minor = int minor;
         additional_info = extra lexbuf }

@@ -64,6 +64,8 @@ type additional_info = Tezos_version_parser.additional_info =
     The result is a string of the form ["+dev"], ["~rcX"], ["~rcX+dev"] or [""]. *)
 val string_of_additional_info : additional_info -> string
 
+type suite = Tezos_version_parser.suite = Octez | Etherlink
+
 (** Version information.
 
     Major versions include significant new features and are usually
@@ -73,6 +75,7 @@ val string_of_additional_info : additional_info -> string
     branches which start from the previous release.
     When the major version is incremented, the minor version is reset to 0. *)
 type t = Tezos_version_parser.t = {
+  suite : suite;
   major : int;
   minor : int;
   additional_info : additional_info;
@@ -81,10 +84,10 @@ type t = Tezos_version_parser.t = {
 (** Convert a version to a string.
 
     Examples:
-    - [to_string { major = 7; minor = 0; additional_info = Release } = "7.0"]
-    - [to_string { major = 7; minor = 0; additional_info = Dev } = "7.0+dev"]
-    - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"]
-    - [to_string { major = 7; minor = 0; additional_info = RC_dev 1 } = "7.0~rc1+dev"] *)
+    - [to_string { suite = Octez; major = 7; minor = 0; additional_info = Release } = "7.0"]
+    - [to_string { suite = Octez; major = 7; minor = 0; additional_info = Dev } = "7.0+dev"]
+    - [to_string { suite = Octez; major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"]
+    - [to_string { suite = Octez; major = 7; minor = 0; additional_info = RC_dev 1 } = "7.0~rc1+dev"] *)
 val to_string : t -> string
 
 (** Version printer.
