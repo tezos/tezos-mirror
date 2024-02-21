@@ -128,8 +128,8 @@ type action =
       force_injection : bool;
       asynchronous : bool;
     }
-  | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
-  | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
+  | Inject_preattestation of {signed_preattestation : signed_consensus_vote}
+  | Inject_attestation of {signed_attestation : signed_consensus_vote}
   | Update_to_level of level_update
   | Synchronize_round of round_update
   | Watch_proposal
@@ -156,8 +156,8 @@ let pp_action fmt = function
   | Prepare_preattestations _ -> Format.fprintf fmt "prepare preattestations"
   | Prepare_attestations _ -> Format.fprintf fmt "prepare attestations"
   | Inject_block _ -> Format.fprintf fmt "inject block"
-  | Inject_preattestations _ -> Format.fprintf fmt "inject preattestations"
-  | Inject_attestations _ -> Format.fprintf fmt "inject attestations"
+  | Inject_preattestation _ -> Format.fprintf fmt "inject preattestation"
+  | Inject_attestation _ -> Format.fprintf fmt "inject attestation"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
   | Watch_proposal -> Format.fprintf fmt "watch proposal"
@@ -668,41 +668,43 @@ let sign_consensus_votes (global_state : global_state)
   in
   return signed_consensus_vote_batch
 
-let inject_consensus_votes state
-    {batch_kind; batch_content; signed_consensus_votes; batch_branch = _} =
+let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
+    =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
+  let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
+  let delegate = unsigned_consensus_vote.delegate in
+  let vote_consensus_content = unsigned_consensus_vote.vote_consensus_content in
   let level, round =
-    (Raw_level.to_int32 batch_content.level, batch_content.round)
+    ( Raw_level.to_int32 vote_consensus_content.level,
+      vote_consensus_content.round )
   in
-  (* TODO: add a RPC to inject multiple operations *)
   let fail_inject_event, injected_event =
-    match batch_kind with
+    match unsigned_consensus_vote.vote_kind with
     | Preattestation ->
         (Events.failed_to_inject_preattestation, Events.preattestation_injected)
     | Attestation ->
         (Events.failed_to_inject_attestation, Events.attestation_injected)
   in
+  protect
+    ~on_error:(fun err ->
+      let*! () = Events.(emit fail_inject_event (delegate, err)) in
+      return_unit)
+    (fun () ->
+      let* oph =
+        Node_rpc.inject_operation
+          cctxt
+          ~chain:(`Hash chain_id)
+          signed_consensus_vote.signed_operation
+      in
+      let*! () = Events.(emit injected_event (oph, delegate, level, round)) in
+      return_unit)
+
+let inject_consensus_votes state signed_consensus_vote_batch =
   List.iter_ep
-    (fun {unsigned_consensus_vote; signed_operation} ->
-      let delegate = unsigned_consensus_vote.delegate in
-      protect
-        ~on_error:(fun err ->
-          let*! () = Events.(emit fail_inject_event (delegate, err)) in
-          return_unit)
-        (fun () ->
-          let* oph =
-            Node_rpc.inject_operation
-              cctxt
-              ~chain:(`Hash chain_id)
-              signed_operation
-          in
-          let*! () =
-            Events.(emit injected_event (oph, delegate, level, round))
-          in
-          return_unit))
-    signed_consensus_votes
+    (inject_consensus_vote state)
+    signed_consensus_vote_batch.signed_consensus_votes
 
 let inject_block ?(force_injection = false) ?(asynchronous = true) state
     prepared_block =
@@ -957,18 +959,12 @@ let rec perform_action ~state_recorder state (action : action) =
       in
       let* () = state_recorder ~new_state in
       return new_state
-  | Inject_preattestations {preattestations} ->
-      let* signed_preattestations =
-        sign_consensus_votes state.global_state preattestations
-      in
-      let* () = inject_consensus_votes state signed_preattestations in
+  | Inject_preattestation {signed_preattestation} ->
+      let* () = inject_consensus_vote state signed_preattestation in
       perform_action ~state_recorder state Watch_proposal
-  | Inject_attestations {attestations} ->
+  | Inject_attestation {signed_attestation} ->
       let* () = state_recorder ~new_state:state in
-      let* signed_attestations =
-        sign_consensus_votes state.global_state attestations
-      in
-      let* () = inject_consensus_votes state signed_attestations in
+      let* () = inject_consensus_vote state signed_attestation in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
       let*! () = start_waiting_for_attestation_quorum state in

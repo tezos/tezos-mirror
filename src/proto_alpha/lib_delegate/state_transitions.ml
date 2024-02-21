@@ -98,11 +98,11 @@ let make_consensus_vote_batch state proposal kind =
 
 (* If we do not have any slots, we won't inject any operation but we
    will still participate to determine an elected block *)
-let make_preattest_action state proposal =
+let prepare_preattest_action state proposal =
   let preattestations : unsigned_consensus_vote_batch =
     make_consensus_vote_batch state proposal Baking_state.Preattestation
   in
-  Inject_preattestations {preattestations}
+  Prepare_preattestations {preattestations}
 
 let update_proposal ~is_proposal_applied state proposal =
   let open Lwt_syntax in
@@ -147,7 +147,7 @@ let preattest state proposal =
          We switch to the `Awaiting_preattestations` phase. *)
       update_current_phase state Awaiting_preattestations
     in
-    return (new_state, make_preattest_action state proposal)
+    return (new_state, prepare_preattest_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
@@ -681,11 +681,11 @@ let update_locked_round state round payload_hash =
   let new_level_state = {state.level_state with locked_round} in
   {state with level_state = new_level_state}
 
-let make_attest_action state proposal =
+let prepare_attest_action state proposal =
   let attestations : unsigned_consensus_vote_batch =
     make_consensus_vote_batch state proposal Baking_state.Attestation
   in
-  Inject_attestations {attestations}
+  Prepare_attestations {attestations}
 
 let prequorum_reached_when_awaiting_preattestations state candidate
     preattestations =
@@ -736,7 +736,7 @@ let prequorum_reached_when_awaiting_preattestations state candidate
         latest_proposal.block.payload_hash
     in
     let new_state = update_current_phase new_state Awaiting_attestations in
-    return (new_state, make_attest_action new_state latest_proposal)
+    return (new_state, prepare_attest_action new_state latest_proposal)
 
 let quorum_reached_when_waiting_attestations state candidate attestation_qc =
   let open Lwt_syntax in
@@ -831,8 +831,10 @@ let handle_forge_event state forge_event =
         ( state,
           Inject_block
             {prepared_block; force_injection = false; asynchronous = true} )
-  | Preattestation_ready _ | Attestation_ready _ ->
-      Stdlib.failwith "(Pre)Attestation_ready not implemented yet"
+  | Preattestation_ready signed_preattestation ->
+      Lwt.return (state, Inject_preattestation {signed_preattestation})
+  | Attestation_ready signed_attestation ->
+      Lwt.return (state, Inject_attestation {signed_attestation})
 
 (* Hypothesis:
    - The state is not to be modified outside this module
