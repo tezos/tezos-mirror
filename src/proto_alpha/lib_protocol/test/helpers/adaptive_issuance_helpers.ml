@@ -55,7 +55,7 @@ let stake ctxt contract amount =
   Op.transaction
     ctxt
     ~entrypoint:Protocol.Alpha_context.Entrypoint.stake
-    ~fee:Test_tez.zero
+    ~fee:Tez_helpers.zero
     contract
     contract
     amount
@@ -81,25 +81,25 @@ let set_delegate_parameters ctxt delegate
     ctxt
     ~entrypoint
     ~parameters
-    ~fee:Test_tez.zero
+    ~fee:Tez_helpers.zero
     delegate
     delegate
-    Test_tez.zero
+    Tez_helpers.zero
 
 let unstake ctxt contract amount =
   Op.transaction
     ctxt
     ~entrypoint:Protocol.Alpha_context.Entrypoint.unstake
-    ~fee:Test_tez.zero
+    ~fee:Tez_helpers.zero
     contract
     contract
     amount
 
-let finalize_unstake ctxt ?(amount = Test_tez.zero) contract =
+let finalize_unstake ctxt ?(amount = Tez_helpers.zero) contract =
   Op.transaction
     ctxt
     ~entrypoint:Protocol.Alpha_context.Entrypoint.finalize_unstake
-    ~fee:Test_tez.zero
+    ~fee:Tez_helpers.zero
     contract
     contract
     amount
@@ -110,7 +110,7 @@ let portion_of_rewards_to_liquid_for_cycle ?policy ctxt cycle pkh rewards =
     Context.Delegate.stake_for_cycle ?policy ctxt cycle pkh
   in
   let portion =
-    Test_tez.(ratio weighted_delegated (frozen +! weighted_delegated))
+    Tez_helpers.(ratio weighted_delegated (frozen +! weighted_delegated))
   in
-  let to_liquid = Test_tez.mul_q rewards portion in
-  return (Test_tez.of_q ~round:`Down to_liquid)
+  let to_liquid = Tez_helpers.mul_q rewards portion in
+  return (Tez_helpers.of_q ~round:`Down to_liquid)

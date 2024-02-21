@@ -33,7 +33,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 let constants =
   {
@@ -87,7 +87,7 @@ let test_invariants () =
     Assert.equal_tez
       ~loc:__LOC__
       full_balance
-      Test_tez.(spendable_balance +! frozen_deposits)
+      Tez_helpers.(spendable_balance +! frozen_deposits)
   in
   (* to see how delegation plays a role, let's delegate to account1;
      N.B. account2 represents a delegate so it cannot delegate to account1; this is
@@ -126,16 +126,16 @@ let test_invariants () =
     Assert.equal_tez
       ~loc:__LOC__
       new_staking_balance
-      Test_tez.(new_full_balance +! new_account_balance)
+      Tez_helpers.(new_full_balance +! new_account_balance)
   in
   let* () =
     Assert.equal_tez
       ~loc:__LOC__
       new_full_balance
-      Test_tez.(new_spendable_balance +! new_frozen_deposits)
+      Tez_helpers.(new_spendable_balance +! new_frozen_deposits)
   in
   let expected_new_frozen_deposits =
-    Test_tez.(
+    Tez_helpers.(
       (* in this particular example, if we follow the calculation of the active
          stake, it is precisely the new_staking_balance *)
       new_staking_balance
@@ -196,9 +196,9 @@ let test_limit_with_overdelegation () =
   let* initial_staking_balance' =
     Context.Delegate.staking_balance (B genesis) account2
   in
-  let amount = Test_tez.(initial_staking_balance *! 8L /! 10L) in
-  let amount' = Test_tez.(initial_staking_balance' *! 8L /! 10L) in
-  let limit = Test_tez.(initial_staking_balance *! 15L /! 100L) in
+  let amount = Tez_helpers.(initial_staking_balance *! 8L /! 10L) in
+  let amount' = Tez_helpers.(initial_staking_balance' *! 8L /! 10L) in
+  let limit = Tez_helpers.(initial_staking_balance *! 15L /! 100L) in
   let new_account = (Account.new_account ()).pkh in
   let new_contract = Contract.Implicit new_account in
   let* transfer1 =
@@ -209,7 +209,7 @@ let test_limit_with_overdelegation () =
   in
   let* b = Block.bake ~operations:[transfer1; transfer2] genesis in
   let expected_new_staking_balance =
-    Test_tez.(initial_staking_balance -! amount)
+    Tez_helpers.(initial_staking_balance -! amount)
   in
   let* new_staking_balance = Context.Delegate.staking_balance (B b) account1 in
   let* () =
@@ -219,7 +219,7 @@ let test_limit_with_overdelegation () =
       expected_new_staking_balance
   in
   let expected_new_staking_balance' =
-    Test_tez.(initial_staking_balance' -! amount')
+    Tez_helpers.(initial_staking_balance' -! amount')
   in
   let* new_staking_balance' = Context.Delegate.staking_balance (B b) account2 in
   let* () =
@@ -401,7 +401,7 @@ let test_set_limit balance_percentage () =
   let* () = Assert.equal_tez ~loc:__LOC__ frozen_deposits expected_deposits in
   (* set deposits limit to balance_percentage out of the balance *)
   let limit =
-    Test_tez.(full_balance *! Int64.of_int balance_percentage /! 100L)
+    Tez_helpers.(full_balance *! Int64.of_int balance_percentage /! 100L)
   in
   let* operation = Op.set_deposits_limit (B genesis) contract1 (Some limit) in
   let* b = Block.bake ~policy:(By_account account2) ~operation b in
@@ -537,7 +537,7 @@ let test_deposits_after_stake_removal () =
   in
   (* Move half the account1's balance to account2 *)
   let* full_balance = Context.Delegate.full_balance (B genesis) account1 in
-  let half_balance = Test_tez.(full_balance /! 2L) in
+  let half_balance = Tez_helpers.(full_balance /! 2L) in
   let* operation =
     Op.transaction (B genesis) contract1 contract2 half_balance
   in
@@ -556,7 +556,7 @@ let test_deposits_after_stake_removal () =
   in
   (* Bake a cycle. *)
   let expected_new_frozen_deposits_2 =
-    Test_tez.(initial_frozen_deposits_2 *! 3L /! 2L)
+    Tez_helpers.(initial_frozen_deposits_2 *! 3L /! 2L)
   in
   let* b = Block.bake_until_cycle_end b in
   let* frozen_deposits_2 =
@@ -697,7 +697,7 @@ let test_frozen_deposits_with_delegation () =
   let* b = Block.bake ~operation:transfer genesis in
   let* new_staking_balance = Context.Delegate.staking_balance (B b) account2 in
   let expected_new_staking_balance =
-    Test_tez.(initial_staking_balance -! delegated_amount)
+    Tez_helpers.(initial_staking_balance -! delegated_amount)
   in
   let* () =
     Assert.equal_tez
@@ -710,7 +710,7 @@ let test_frozen_deposits_with_delegation () =
   in
   let* b = Block.bake ~operation:delegation b in
   let expected_new_staking_balance =
-    Test_tez.(initial_staking_balance +! delegated_amount)
+    Tez_helpers.(initial_staking_balance +! delegated_amount)
   in
   let* new_staking_balance = Context.Delegate.staking_balance (B b) account1 in
   let* () =
@@ -722,7 +722,7 @@ let test_frozen_deposits_with_delegation () =
   (* Bake one cycle. *)
   let* b = Block.bake_until_cycle_end b in
   let expected_new_frozen_deposits =
-    Test_tez.(
+    Tez_helpers.(
       initial_frozen_deposits
       +! delegated_amount
          /! Int64.of_int (constants.limit_of_delegation_over_baking + 1))
@@ -788,7 +788,7 @@ let test_frozen_deposits_with_overdelegation () =
   in
   let* b = Block.bake ~operations:[transfer1; transfer2] genesis in
   let expected_new_staking_balance =
-    Test_tez.(initial_staking_balance -! amount)
+    Tez_helpers.(initial_staking_balance -! amount)
   in
   let* new_staking_balance = Context.Delegate.staking_balance (B b) account1 in
   let* () =
@@ -798,7 +798,7 @@ let test_frozen_deposits_with_overdelegation () =
       expected_new_staking_balance
   in
   let expected_new_staking_balance' =
-    Test_tez.(initial_staking_balance' -! amount')
+    Tez_helpers.(initial_staking_balance' -! amount')
   in
   let* new_staking_balance' = Context.Delegate.staking_balance (B b) account2 in
   let* () =
@@ -813,7 +813,7 @@ let test_frozen_deposits_with_overdelegation () =
   let* b = Block.bake ~operation:delegation b in
   let* new_staking_balance = Context.Delegate.staking_balance (B b) account1 in
   let expected_new_staking_balance =
-    Test_tez.(initial_frozen_deposits +! amount +! amount')
+    Tez_helpers.(initial_frozen_deposits +! amount +! amount')
   in
   let* () =
     Assert.equal_tez
@@ -884,9 +884,9 @@ let test_set_limit_with_overdelegation () =
   let* initial_staking_balance' =
     Context.Delegate.staking_balance (B genesis) account2
   in
-  let amount = Test_tez.(initial_staking_balance *! 8L /! 10L) in
-  let amount' = Test_tez.(initial_staking_balance' *! 8L /! 10L) in
-  let limit = Test_tez.(initial_staking_balance *! 15L /! 100L) in
+  let amount = Tez_helpers.(initial_staking_balance *! 8L /! 10L) in
+  let amount' = Tez_helpers.(initial_staking_balance' *! 8L /! 10L) in
+  let limit = Tez_helpers.(initial_staking_balance *! 15L /! 100L) in
   let new_account = (Account.new_account ()).pkh in
   let new_contract = Contract.Implicit new_account in
   let* transfer1 =
@@ -899,7 +899,7 @@ let test_set_limit_with_overdelegation () =
   let* set_deposits = Op.set_deposits_limit (B b) contract1 (Some limit) in
   let* b = Block.bake ~operation:set_deposits b in
   let expected_new_staking_balance =
-    Test_tez.(initial_staking_balance -! amount)
+    Tez_helpers.(initial_staking_balance -! amount)
   in
   let* new_staking_balance = Context.Delegate.staking_balance (B b) account1 in
   let* () =
@@ -909,7 +909,7 @@ let test_set_limit_with_overdelegation () =
       expected_new_staking_balance
   in
   let expected_new_staking_balance' =
-    Test_tez.(initial_staking_balance' -! amount')
+    Tez_helpers.(initial_staking_balance' -! amount')
   in
   let* new_staking_balance' = Context.Delegate.staking_balance (B b) account2 in
   let* () =

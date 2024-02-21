@@ -34,7 +34,7 @@
 open Protocol
 open Alpha_context
 
-let ten_tez = Test_tez.of_int 10
+let ten_tez = Tez_helpers.of_int 10
 
 let dummy_script =
   "{parameter unit; storage unit; code { CAR ; NIL operation ; PAIR }}"
@@ -80,7 +80,7 @@ let test_balances ~amount =
   (* check that after the block has been baked, the source was debited of all
      the burned tez *)
   let* {parametric = {cost_per_byte; _}; _} = Context.get_constants (I inc) in
-  let burned_tez = Test_tez.(cost_per_byte *! Z.to_int64 amount) in
+  let burned_tez = Tez_helpers.(cost_per_byte *! Z.to_int64 amount) in
   let* () =
     Assert.balance_was_debited
       ~loc:__LOC__
@@ -144,7 +144,7 @@ let test_no_tez_to_pay () =
     Z.div (Z.of_int 2_000_000) (Z.of_int64 (Tez.to_mutez cost_per_byte))
   in
   let* balance = Context.Contract.balance (I inc) source in
-  let*? tez_to_substract = Test_tez.(balance -? Tez.one) in
+  let*? tez_to_substract = Tez_helpers.(balance -? Tez.one) in
   let* op =
     Op.transaction (I inc) ~fee:Tez.zero source receiver tez_to_substract
   in

@@ -970,11 +970,11 @@ let test_supermajority_in_proposal there_is_a_winner () =
       minimal_stake
   in
   let*? bal3 =
-    if there_is_a_winner then Test_tez.( *? ) minimal_stake 3L
+    if there_is_a_winner then Tez_helpers.( *? ) minimal_stake 3L
     else
       let open Result_syntax in
-      let* t = Test_tez.( *? ) minimal_stake 2L in
-      Test_tez.( +? ) (Test_tez.of_mutez initial_balance) t
+      let* t = Tez_helpers.( *? ) minimal_stake 2L in
+      Tez_helpers.( +? ) (Tez_helpers.of_mutez initial_balance) t
   in
   let* op3 =
     Op.transaction
@@ -1039,7 +1039,7 @@ let test_quorum_in_proposal has_quorum () =
     else Int64.(sub (of_int32 min_proposal_quorum) 10L)
   in
   let bal =
-    Int64.(div (mul total_tokens quorum) 100_00L) |> Test_tez.of_mutez
+    Int64.(div (mul total_tokens quorum) 100_00L) |> Tez_helpers.of_mutez
   in
   let* op2 = Op.transaction (B b) del2 del1 bal in
   let* b = Block.bake ~policy ~operation:op2 b in
@@ -1251,7 +1251,7 @@ let test_voting_power_updated_each_voting_period () =
   let baker2 = Context.Contract.pkh con2 in
   let baker3 = Context.Contract.pkh con3 in
   (* Retrieve balance of con1 *)
-  let open Test_tez in
+  let open Tez_helpers in
   let* balance1 = Context.Contract.balance (B genesis) con1 in
   let* frozen_deposits1 =
     Context.Delegate.current_frozen_deposits (B genesis) baker1

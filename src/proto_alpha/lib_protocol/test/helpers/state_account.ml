@@ -9,8 +9,8 @@ open Adaptive_issuance_helpers
 module Cycle = Protocol.Alpha_context.Cycle
 
 module Tez = struct
-  include Test_tez
-  include Test_tez.Compare
+  include Tez_helpers
+  include Tez_helpers.Compare
 end
 
 let join_errors e1 e2 =

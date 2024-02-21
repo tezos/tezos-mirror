@@ -228,7 +228,9 @@ let test_revelation_early_wrong_right_twice () =
       pkh
       baking_reward_fixed_portion
   in
-  let reward_to_liquid = Test_tez.(baking_reward_to_liquid +! tip_to_liquid) in
+  let reward_to_liquid =
+    Tez_helpers.(baking_reward_to_liquid +! tip_to_liquid)
+  in
 
   let* () =
     balance_was_credited ~loc:__LOC__ (B b) baker baker_bal reward_to_liquid
@@ -457,7 +459,9 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       pkh
       baking_reward_fixed_portion
   in
-  let reward_to_liquid = Test_tez.(tip_to_liquid +! baking_reward_to_liquid) in
+  let reward_to_liquid =
+    Tez_helpers.(tip_to_liquid +! baking_reward_to_liquid)
+  in
   let* () =
     balance_was_credited ~loc:__LOC__ (B b) baker baker_bal reward_to_liquid
   in
@@ -554,7 +558,7 @@ let test_early_incorrect_unverified_correct_already_vdf () =
           baking_reward_fixed_portion
       in
       let reward_to_liquid =
-        Test_tez.(tip_to_liquid +! baking_reward_to_liquid)
+        Tez_helpers.(tip_to_liquid +! baking_reward_to_liquid)
       in
       let* () =
         balance_was_credited ~loc:__LOC__ (B b) baker baker_bal reward_to_liquid

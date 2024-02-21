@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Log_helper
+open Log_helpers
 
 (** A scenario is a succession of actions. We define a branching path as a way to create multiple tests
     from the same point. This allows easy compositionality of behaviors with minimal code sharing.

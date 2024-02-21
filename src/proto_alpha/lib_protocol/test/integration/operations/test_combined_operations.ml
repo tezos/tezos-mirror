@@ -45,7 +45,7 @@
 open Protocol
 open Alpha_context
 
-let ten_tez = Test_tez.of_int 10
+let ten_tez = Tez_helpers.of_int 10
 
 let gas_limit = Op.Custom_gas (Alpha_context.Gas.Arith.integral_of_int_exn 3000)
 
@@ -72,7 +72,7 @@ let test_multiple_transfers () =
       (I inc)
       c1
       c1_old_balance
-      (Test_tez.of_int 10)
+      (Tez_helpers.of_int 10)
   in
   let* () =
     Assert.balance_was_credited
@@ -80,7 +80,7 @@ let test_multiple_transfers () =
       (I inc)
       c2
       c2_old_balance
-      (Test_tez.of_int 10)
+      (Tez_helpers.of_int 10)
   in
   return_unit
 
@@ -103,7 +103,7 @@ let test_multiple_origination_and_delegation () =
           ~counter:(Manager_counter.Internal_for_tests.of_int i)
           ~fee:Tez.zero
           ~script:Op.dummy_script
-          ~credit:(Test_tez.of_int 10)
+          ~credit:(Tez_helpers.of_int 10)
           (B blk)
           c1)
       (1 -- n)
@@ -148,21 +148,21 @@ let test_multiple_origination_and_delegation () =
   in
   (* Previous balance - (Credit (n * 10tz) + Origination cost (n tz)) *)
   let*? origination_burn =
-    Test_tez.(cost_per_byte *? Int64.of_int origination_size)
+    Tez_helpers.(cost_per_byte *? Int64.of_int origination_size)
   in
   let*? origination_total_cost =
-    Test_tez.(origination_burn *? Int64.of_int n)
+    Tez_helpers.(origination_burn *? Int64.of_int n)
   in
-  let*? t = Test_tez.( *? ) Op.dummy_script_cost 10L in
-  let*? t = Test_tez.( +? ) (Test_tez.of_int (10 * n)) t in
-  let*? total_cost = Test_tez.( +? ) origination_total_cost t in
+  let*? t = Tez_helpers.( *? ) Op.dummy_script_cost 10L in
+  let*? t = Tez_helpers.( +? ) (Tez_helpers.of_int (10 * n)) t in
+  let*? total_cost = Tez_helpers.( +? ) origination_total_cost t in
   let* () =
     Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   in
   List.iter_es
     (fun c ->
       let c = Contract.Originated c in
-      Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
+      Assert.balance_is ~loc:__LOC__ (I inc) c (Tez_helpers.of_int 10))
     new_contracts
 
 let expect_apply_failure =
@@ -185,7 +185,7 @@ let test_failing_operation_in_the_middle () =
   let* blk, (c1, c2) = Context.init2 () in
   let* op1 = Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one in
   let* op2 =
-    Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Test_tez.max_tez
+    Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez_helpers.max_tez
   in
   let* op3 = Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one in
   let operations = [op1; op2; op3] in
@@ -232,7 +232,7 @@ let test_failing_operation_in_the_middle_with_fees () =
   let open Lwt_result_syntax in
   let* blk, (c1, c2) = Context.init2 () in
   let* op1 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one in
-  let* op2 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Test_tez.max_tez in
+  let* op2 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez_helpers.max_tez in
   let* op3 = Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one in
   let operations = [op1; op2; op3] in
   let* operation = Op.combine_operations ~source:c1 (B blk) operations in
@@ -274,7 +274,7 @@ let test_failing_operation_in_the_middle_with_fees () =
       (I inc)
       c1
       c1_old_balance
-      (Test_tez.of_int 3)
+      (Tez_helpers.of_int 3)
   in
   let* () = Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance in
   return_unit

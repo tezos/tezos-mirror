@@ -33,7 +33,7 @@
 
 open Adaptive_issuance_helpers
 open State_account
-open Test_tez.Ez_tez
+open Tez_helpers.Ez_tez
 open Scenario_dsl
 open Scenario_base
 open Scenario_op

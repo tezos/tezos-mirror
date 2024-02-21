@@ -7,7 +7,7 @@
 
 open Adaptive_issuance_helpers
 open State_account
-open Log_helper
+open Log_helpers
 
 type double_signing_state = {
   culprit : Signature.Public_key_hash.t;
@@ -145,7 +145,7 @@ let apply_rewards ~(baker : string) block (state : t) : t tzresult Lwt.t =
       |> Int64.of_int32
     in
     let {parameters = _; pkh; _} = find_account baker state in
-    let delta_rewards = Test_tez.(rewards_per_block *! delta_time) in
+    let delta_rewards = Tez_helpers.(rewards_per_block *! delta_time) in
     if delta_time = 1L then
       Log.info ~color:tez_color "+%aꜩ" Tez.pp rewards_per_block
     else assert false ;
@@ -314,7 +314,7 @@ let apply_autostake ~name ~old_cycle
           (Int64.neg autostaked) ;
         apply_unstake
           (Cycle.succ old_cycle)
-          (Test_tez.of_mutez Int64.(neg autostaked))
+          (Tez_helpers.of_mutez Int64.(neg autostaked))
           name
           state)
       else (

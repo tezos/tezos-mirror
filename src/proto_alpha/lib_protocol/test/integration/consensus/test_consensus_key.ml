@@ -178,7 +178,7 @@ let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
       in
       let expected_final_balance =
         if exclude_ck then Tez.zero
-        else Tez.(max one) Test_tez.(delegate_balance /! 100L)
+        else Tez.(max one) Tez_helpers.(delegate_balance /! 100L)
       in
       drain_delegate
         ~policy

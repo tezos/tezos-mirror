@@ -34,7 +34,7 @@
 
 open Liquidity_baking_machine
 open Protocol
-open Test_tez
+open Tez_helpers
 
 let generate_init_state () =
   let open Lwt_result_syntax in

@@ -132,11 +132,11 @@ let test_launch threshold expected_vote_duration () =
         autostaking_enable = false;
       }
     in
-    let cost_per_byte = Test_tez.zero in
+    let cost_per_byte = Tez_helpers.zero in
     let issuance_weights =
       {
         Default_parameters.constants_test.issuance_weights with
-        base_total_issued_per_minute = Test_tez.zero;
+        base_total_issued_per_minute = Tez_helpers.zero;
       }
     in
     let consensus_threshold = 0 in
@@ -471,7 +471,7 @@ let test_launch_without_vote () =
     let issuance_weights =
       {
         Default_parameters.constants_test.issuance_weights with
-        base_total_issued_per_minute = Test_tez.zero;
+        base_total_issued_per_minute = Tez_helpers.zero;
       }
     in
     let adaptive_issuance =

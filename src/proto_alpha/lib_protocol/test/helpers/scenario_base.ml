@@ -8,7 +8,7 @@
 open State_account
 open State
 open Scenario_dsl
-open Log_helper
+open Log_helpers
 open Adaptive_issuance_helpers
 
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
