@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module gathers the basic operations used in test scenarios. This
+    includes starting a scenario, baking, checking and manipulating the state,
+    and various wait functions *)
+
 open State_account
 open State
 open Scenario_dsl

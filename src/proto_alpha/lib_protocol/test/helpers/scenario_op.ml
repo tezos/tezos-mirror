@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module gathers many protocol operations in the form of scenarios.
+    This includes (but is not limited to) transfers and such (stake,
+    unstake...), as well as various ways to forge double signings. *)
+
 open Log_helpers
 open State_account
 open Adaptive_issuance_helpers
