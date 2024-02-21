@@ -29,7 +29,7 @@
 module Request : sig
   (** Type of requests accepted by the batcher worker. *)
   type ('a, 'b) t =
-    | Register : string list -> (L2_message.hash list, error trace) t
+    | Register : string list -> (L2_message.id list, error trace) t
         (** Request to register new L2 messages in the queue. *)
     | Produce_batches : (unit, error trace) t
         (** Request to produce new messages batches and submit them to

@@ -121,51 +121,6 @@ module type BATCHER_CONSTANTS = sig
   val protocol_max_batch_size : int
 end
 
-(** Protocol specific batcher. NOTE: The batcher has to be stopped and the new
-    one restarted on protocol change. *)
-module type BATCHER = sig
-  (** The type for the status of messages in the batcher.  *)
-  type status =
-    | Pending_batch  (** The message is in the queue of the batcher. *)
-    | Batched of Injector.Inj_operation.id
-        (** The message has already been batched and sent to the injector in an
-            L1 operation whose hash is given. *)
-
-  (** [init config ~signer node_ctxt] initializes and starts the batcher for
-      [signer]. If [config.simulation] is [true] (the default), messages added
-      to the batcher are simulated in an incremental simulation context. *)
-  val init :
-    Configuration.batcher ->
-    signer:Signature.public_key_hash ->
-    _ Node_context.t ->
-    unit tzresult Lwt.t
-
-  (** [new_head head] create batches of L2 messages from the queue and pack each
-      batch in an L1 operation. The L1 operations (i.e. L2 batches) are queued
-      in the injector for injection on the Tezos node.  *)
-  val new_head : Layer1.head -> unit tzresult Lwt.t
-
-  (** [shutdown ()] stops the batcher, waiting for the ongoing request to be
-      processed. *)
-  val shutdown : unit -> unit Lwt.t
-
-  (** List all queued messages in the order they appear in the queue, i.e. the
-      message that were added first to the queue are at the end of list. *)
-  val get_queue : unit -> (L2_message.hash * L2_message.t) list tzresult
-
-  (** [register_messages messages] registers new L2 [messages] in the queue of
-      the batcher for future injection on L1. If the batcher was initialized
-      with [simualte = true], the messages are evaluated the batcher's
-      incremental simulation context. In this case, when the application fails,
-      the messages are not queued.  *)
-  val register_messages : string list -> L2_message.hash list tzresult Lwt.t
-
-  (** The status of a message in the batcher. Returns [None] if the message is
-      not known by the batcher (the batcher only keeps the batched status of the
-      last 500000 messages). *)
-  val message_status : L2_message.hash -> (status * string) option tzresult
-end
-
 (** Protocol specific functions to interact with the L1 node. *)
 module type LAYER1_HELPERS = sig
   (** [prefetch_tezos_blocks l1_ctxt blocks] prefetches the blocks

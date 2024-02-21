@@ -68,12 +68,12 @@ let get_local_batcher_queue () =
   make GET ["local"; "batcher"; "queue"] (fun json ->
       JSON.as_list json
       |> List.map @@ fun o ->
-         let hash = JSON.(o |-> "hash" |> as_string) in
+         let id = JSON.(o |-> "id" |> as_string) in
          let hex_msg = JSON.(o |-> "message" |-> "content" |> as_string) in
-         (hash, Hex.to_string (`Hex hex_msg)))
+         (id, Hex.to_string (`Hex hex_msg)))
 
-let get_local_batcher_queue_msg_hash ~msg_hash =
-  make GET ["local"; "batcher"; "queue"; msg_hash] (fun json ->
+let get_local_batcher_queue_msg_id ~msg_id =
+  make GET ["local"; "batcher"; "queue"; msg_id] (fun json ->
       if JSON.is_null json then failwith "Message is not in the queue"
       else
         let hex_msg = JSON.(json |-> "content" |> as_string) in

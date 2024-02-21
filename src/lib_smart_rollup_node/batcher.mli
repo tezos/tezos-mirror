@@ -50,18 +50,18 @@ val shutdown : unit -> unit Lwt.t
 val active : unit -> bool
 
 (** Retrieve an L2 message from the queue. *)
-val find_message : L2_message.hash -> L2_message.t option tzresult
+val find_message : L2_message.id -> L2_message.t option tzresult
 
 (** List all queued messages in the order they appear in the queue, i.e. the
     message that were added first to the queue are at the end of list. *)
-val get_queue : unit -> (L2_message.hash * L2_message.t) list tzresult
+val get_queue : unit -> (L2_message.id * L2_message.t) list tzresult
 
 (** [register_messages messages] registers new L2 [messages] in the
     queue of the batcher for future injection on L1. In this case,
     when the application fails, the messages are not queued.  *)
-val register_messages : string list -> L2_message.hash list tzresult Lwt.t
+val register_messages : string list -> L2_message.id list tzresult Lwt.t
 
 (** The status of a message in the batcher. Returns [None] if the message is not
     known by the batcher (the batcher only keeps the batched status of the last
     500000 messages). *)
-val message_status : L2_message.hash -> (status * string) option tzresult
+val message_status : L2_message.id -> (status * string) option tzresult

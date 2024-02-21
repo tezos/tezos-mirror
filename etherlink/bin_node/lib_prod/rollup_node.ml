@@ -71,10 +71,10 @@ end) : Services_backend_sig.Backend = struct
 
     let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages =
       let open Lwt_result_syntax in
-      (* The injection's service returns a notion of L2 message hash (defined
+      (* The injection's service returns a notion of L2 message ids (defined
          by the rollup node) used to track the message's injection in the batcher.
          We do not wish to follow the message's inclusion, and thus, ignore
-         the resulted hash. *)
+         the resulted ids. *)
       let* _answer =
         call_service ~base:Base.base batcher_injection () () messages
       in

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Batcher_worker_types
-module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
+module Message_queue = Hash_queue.Make (L2_message.Id) (L2_message)
 
 module Batcher_events = Batcher_events.Declare (struct
   let worker_name = "batcher"
@@ -34,7 +34,7 @@ module L2_batched_message = struct
   type t = {content : string; l1_id : Injector.Inj_operation.id}
 end
 
-module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
+module Batched_messages = Hash_queue.Make (L2_message.Id) (L2_batched_message)
 
 type status = Pending_batch | Batched of Injector.Inj_operation.id
 
@@ -68,8 +68,8 @@ let inject_batch state (l2_messages : L2_message.t list) =
   List.iter
     (fun msg ->
       let content = L2_message.content msg in
-      let hash = L2_message.hash msg in
-      Batched_messages.replace state.batched hash {content; l1_id})
+      let id = L2_message.id msg in
+      Batched_messages.replace state.batched id {content; l1_id})
     l2_messages
 
 let inject_batches state = List.iter_es (inject_batch state)
@@ -86,7 +86,7 @@ let get_batches state ~only_full =
         current_batch_elements,
         full_batches ) =
     Message_queue.fold
-      (fun msg_hash
+      (fun msg_id
            message
            ( current_rev_batch,
              current_batch_size,
@@ -102,7 +102,7 @@ let get_batches state ~only_full =
         then
           (* We can add the message to the current batch because we are still
              within the bounds. *)
-          ( (msg_hash, message) :: current_rev_batch,
+          ( (msg_id, message) :: current_rev_batch,
             new_batch_size,
             new_batch_elements,
             full_batches )
@@ -113,7 +113,7 @@ let get_batches state ~only_full =
              always < [state.conf.max_batch_size] because {!on_register} only
              accepts those. *)
           let batch = List.rev current_rev_batch in
-          ([(msg_hash, message)], size, 1, batch :: full_batches))
+          ([(msg_id, message)], size, 1, batch :: full_batches))
       state.messages
       ([], 0, 0, [])
   in
@@ -172,16 +172,16 @@ let on_register state (messages : string list) =
       messages
   in
   let*! () = Batcher_events.(emit queue) (List.length messages) in
-  let hashes =
+  let ids =
     List.map
       (fun message ->
-        let msg_hash = L2_message.hash message in
-        Message_queue.replace state.messages msg_hash message ;
-        msg_hash)
+        let msg_id = L2_message.id message in
+        Message_queue.replace state.messages msg_id message ;
+        msg_id)
       messages
   in
   let+ () = produce_batches state ~only_full:true in
-  hashes
+  ids
 
 let on_new_head state = produce_batches state ~only_full:false
 
@@ -320,11 +320,11 @@ let active () =
   | Lwt.Return _ -> true
   | Lwt.Fail _ | Lwt.Sleep -> false
 
-let find_message hash =
+let find_message id =
   let open Result_syntax in
   let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
-  Message_queue.find_opt state.messages hash
+  Message_queue.find_opt state.messages id
 
 let get_queue () =
   let open Result_syntax in
@@ -366,16 +366,16 @@ let shutdown () =
       Lwt.return_unit
   | Ok w -> Worker.shutdown w
 
-let message_status state msg_hash =
-  match Message_queue.find_opt state.messages msg_hash with
+let message_status state msg_id =
+  match Message_queue.find_opt state.messages msg_id with
   | Some msg -> Some (Pending_batch, L2_message.content msg)
   | None -> (
-      match Batched_messages.find_opt state.batched msg_hash with
+      match Batched_messages.find_opt state.batched msg_id with
       | Some {content; l1_id} -> Some (Batched l1_id, content)
       | None -> None)
 
-let message_status msg_hash =
+let message_status msg_id =
   let open Result_syntax in
   let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
-  message_status state msg_hash
+  message_status state msg_id

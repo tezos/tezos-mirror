@@ -413,7 +413,7 @@ let send_message_batcher_aux ?rpc_hooks client sc_node msgs =
     Sc_rollup_node.wait_for sc_node "add_pending.v0" (Fun.const (Some ()))
   in
   let injected = wait_for_injecting_event ~tags:["add_messages"] sc_node in
-  let* hashes =
+  let* ids =
     Sc_rollup_node.RPC.call sc_node ?rpc_hooks
     @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:msgs
   in
@@ -424,13 +424,13 @@ let send_message_batcher_aux ?rpc_hooks client sc_node msgs =
   let* _ = batched in
   let* _ = added_to_injector in
   let* _ = injected in
-  return hashes
+  return ids
 
 let send_message_batcher ?rpc_hooks client sc_node msgs =
-  let* hashes = send_message_batcher_aux ?rpc_hooks client sc_node msgs in
+  let* ids = send_message_batcher_aux ?rpc_hooks client sc_node msgs in
   (* Next head will include messages  *)
   let* () = Client.bake_for_and_wait client in
-  return hashes
+  return ids
 
 let send_messages_batcher ?rpc_hooks ?batch_size n client sc_node =
   let batches =
@@ -440,17 +440,17 @@ let send_messages_batcher ?rpc_hooks ?batch_size n client sc_node =
         List.map (fun j -> Format.sprintf "%d-%d" i j) (range 1 batch_size))
       (range 1 n)
   in
-  let* rhashes =
+  let* rids =
     Lwt_list.fold_left_s
       (fun acc msgs ->
-        let* hashes = send_message_batcher_aux ?rpc_hooks client sc_node msgs in
-        return (List.rev_append hashes acc))
+        let* ids = send_message_batcher_aux ?rpc_hooks client sc_node msgs in
+        return (List.rev_append ids acc))
       []
       batches
   in
   (* Next head will include messages of last batch *)
   let* () = Client.bake_for_and_wait client in
-  return (List.rev rhashes)
+  return (List.rev rids)
 
 (* Synchronizing the inbox in the rollup node
    ------------------------------------------
@@ -705,14 +705,14 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
   let* _level = Sc_rollup_node.wait_sync sc_rollup_node ~timeout:10. in
   Log.info "Sending one message to the batcher" ;
   let msg1 = "3 3 + out" in
-  let* hashes =
+  let* ids =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:[msg1]
   in
-  let msg1_hash = match hashes with [h] -> h | _ -> assert false in
+  let msg1_id = match ids with [i] -> i | _ -> assert false in
   let* retrieved_msg1, status_msg1 =
     Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_hash ~msg_hash:msg1_hash
+    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_id ~msg_id:msg1_id
   in
 
   check_batcher_message_status status_msg1 "pending_batch" ;
@@ -722,7 +722,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_local_batcher_queue ()
   in
-  Check.((queue = [(msg1_hash, msg1)]) (list (tuple2 string string)))
+  Check.((queue = [(msg1_id, msg1)]) (list (tuple2 string string)))
     ~error_msg:"Queue is %L but should be %R." ;
   (* This block triggers injection in the injector. *)
   let injected =
@@ -732,14 +732,14 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
   let* _ = injected in
   let* _msg1, status_msg1 =
     Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_hash ~msg_hash:msg1_hash
+    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_id ~msg_id:msg1_id
   in
   check_batcher_message_status status_msg1 "injected" ;
   (* We bake so that msg1 is included. *)
   let* () = Client.bake_for_and_wait client in
   let* _msg1, status_msg1 =
     Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_hash ~msg_hash:msg1_hash
+    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_id ~msg_id:msg1_id
   in
   check_batcher_message_status status_msg1 "included" ;
   let* _ = wait_for_current_level node ~timeout:3. sc_rollup_node in
@@ -750,12 +750,12 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
         let i = i mod 11 in
         if i = 10 then ' ' else Char.chr (i + 48))
   in
-  let* hashes1 =
+  let* ids1 =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.post_local_batcher_injection
          ~messages:(List.init 9 (Fun.const msg2))
   in
-  let* hashes2 =
+  let* ids2 =
     send_message_batcher client sc_rollup_node (List.init 9 (Fun.const msg2))
   in
   let* queue =
@@ -793,7 +793,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
       incl_count
       contents2
   in
-  Check.((incl_count = List.length hashes1 + List.length hashes2) int)
+  Check.((incl_count = List.length ids1 + List.length ids2) int)
     ~error_msg:"Only %L messages are included instead of %R." ;
   let* genesis_info =
     Client.RPC.call ~hooks client
@@ -814,7 +814,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
   in
   let* _msg1, status_msg1 =
     Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_hash ~msg_hash:msg1_hash
+    @@ Sc_rollup_rpc.get_local_batcher_queue_msg_id ~msg_id:msg1_id
   in
   check_batcher_message_status status_msg1 "committed" ;
   unit
@@ -4196,7 +4196,7 @@ let test_rpcs ~kind
     ~error_msg:"SC rollup address of node is %L but should be %R" ;
   let n = 15 in
   let batch_size = 5 in
-  let* hashes =
+  let* ids =
     send_messages_batcher
       ~rpc_hooks:Tezos_regression.rpc_hooks
       ~batch_size
@@ -4204,7 +4204,7 @@ let test_rpcs ~kind
       client
       sc_rollup_node
   in
-  Check.((List.length hashes = n * batch_size) int)
+  Check.((List.length ids = n * batch_size) int)
     ~error_msg:"Injected %L messages but should have injected %R" ;
   (* Head block hash endpoint test *)
   let* level = Node.get_level node in
@@ -4563,7 +4563,7 @@ let test_injector_auto_discard =
   in
   let n = 65 in
   let batch_size = 3 in
-  let* _hashes =
+  let* _ids =
     send_messages_batcher
       ~rpc_hooks:Tezos_regression.rpc_hooks
       ~batch_size
@@ -5401,7 +5401,7 @@ let test_injector_uses_available_keys ~kind =
   in
   let inject_n_msgs_batches_in_rollup_node ~nb_of_batches ~msg_per_batch
       ~msg_size =
-    let* _hashes =
+    let* _ids =
       Lwt.all @@ List.init nb_of_batches
       @@ fun _ ->
       Sc_rollup_node.RPC.call rollup_node
