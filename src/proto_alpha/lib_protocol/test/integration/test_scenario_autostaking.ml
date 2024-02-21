@@ -15,12 +15,9 @@
 
 open State_account
 open Tez_helpers.Ez_tez
-open Scenario_dsl
-open Scenario_base
-open Scenario_op
+open Scenario
 open Test_scenario_base
 open Log_helpers
-open Scenario_begin
 
 let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
     ~new_balance compare =
