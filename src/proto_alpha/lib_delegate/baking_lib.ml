@@ -621,7 +621,12 @@ let rec baking_minimal_timestamp ~count state
     | Some first_potential_round -> return first_potential_round
   in
   let* signed_attestations =
-    Baking_actions.sign_consensus_votes state own_attestations
+    let*! own_attestations_with_dal =
+      dal_content_map_p
+        (Baking_actions.may_get_dal_content state)
+        own_attestations
+    in
+    Baking_actions.sign_consensus_votes state own_attestations_with_dal
   in
   let pool =
     Operation_pool.add_operations

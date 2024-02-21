@@ -170,6 +170,7 @@ type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;
   delegate : consensus_key_and_delegate;
+  dal_content : dal_content option;
 }
 
 type signed_consensus_vote = {
@@ -194,6 +195,11 @@ val make_unsigned_consensus_vote_batch :
   batch_content ->
   (consensus_key_and_delegate * Slot.t) list ->
   unsigned_consensus_vote_batch
+
+val dal_content_map_p :
+  (unsigned_consensus_vote -> dal_content option tzresult Lwt.t) ->
+  unsigned_consensus_vote_batch ->
+  unsigned_consensus_vote_batch Lwt.t
 
 type signed_consensus_vote_batch = private {
   batch_kind : consensus_vote_kind;

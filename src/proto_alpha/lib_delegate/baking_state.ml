@@ -368,6 +368,7 @@ type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;
   delegate : consensus_key_and_delegate;
+  dal_content : dal_content option;
 }
 
 type batch_content = {
@@ -388,10 +389,42 @@ let make_unsigned_consensus_vote_batch kind
     List.map
       (fun (delegate, slot) ->
         let consensus_content = {level; round; slot; block_payload_hash} in
-        {vote_kind = kind; vote_consensus_content = consensus_content; delegate})
+        {
+          vote_kind = kind;
+          vote_consensus_content = consensus_content;
+          delegate;
+          dal_content = None;
+        })
       delegates_and_slots
   in
   {batch_kind = kind; batch_content; unsigned_consensus_votes}
+
+let dal_content_map_p f unsigned_consensus_vote_batch =
+  let open Lwt_syntax in
+  let* patched_unsigned_consensus_votes =
+    List.map_p
+      (fun unsigned_consensus_vote ->
+        let fallback_case =
+          {
+            unsigned_consensus_vote with
+            dal_content = Some {attestation = Dal.Attestation.empty};
+          }
+        in
+        Lwt.catch
+          (fun () ->
+            let* dal_content = f unsigned_consensus_vote in
+            match dal_content with
+            | Ok dal_content ->
+                return {unsigned_consensus_vote with dal_content}
+            | Error _ -> return fallback_case)
+          (fun _exn -> return fallback_case))
+      unsigned_consensus_vote_batch.unsigned_consensus_votes
+  in
+  return
+    {
+      unsigned_consensus_vote_batch with
+      unsigned_consensus_votes = patched_unsigned_consensus_votes;
+    }
 
 type signed_consensus_vote = {
   unsigned_consensus_vote : unsigned_consensus_vote;
@@ -608,15 +641,22 @@ let vote_kind_encoding =
 
 let unsigned_consensus_vote_encoding =
   let open Data_encoding in
+  let dal_content_encoding : dal_content encoding =
+    conv
+      (fun {attestation} -> attestation)
+      (fun attestation -> {attestation})
+      Dal.Attestation.encoding
+  in
   conv
-    (fun {vote_kind; vote_consensus_content; delegate} ->
-      (vote_kind, vote_consensus_content, delegate))
-    (fun (vote_kind, vote_consensus_content, delegate) ->
-      {vote_kind; vote_consensus_content; delegate})
-    (obj3
+    (fun {vote_kind; vote_consensus_content; delegate; dal_content} ->
+      (vote_kind, vote_consensus_content, delegate, dal_content))
+    (fun (vote_kind, vote_consensus_content, delegate, dal_content) ->
+      {vote_kind; vote_consensus_content; delegate; dal_content})
+    (obj4
        (req "vote_kind" vote_kind_encoding)
        (req "vote_consensus_content" consensus_content_encoding)
-       (req "delegate" consensus_key_and_delegate_encoding))
+       (req "delegate" consensus_key_and_delegate_encoding)
+       (opt "dal_content" dal_content_encoding))
 
 let signed_consensus_vote_encoding =
   let open Data_encoding in

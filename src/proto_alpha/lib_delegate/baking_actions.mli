@@ -77,6 +77,9 @@ val inject_block :
   prepared_block ->
   state tzresult Lwt.t
 
+val may_get_dal_content :
+  state -> unsigned_consensus_vote -> dal_content option tzresult Lwt.t
+
 val sign_consensus_votes :
   state ->
   unsigned_consensus_vote_batch ->

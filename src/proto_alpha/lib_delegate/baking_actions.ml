@@ -572,12 +572,17 @@ let authorized_consensus_votes state
   in
   return authorized_votes
 
-let forge_and_sign_consensus_vote ?dal_content state unsigned_consensus_vote :
+let forge_and_sign_consensus_vote state unsigned_consensus_vote :
     signed_consensus_vote option Lwt.t =
   let open Lwt_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
-  let {vote_kind; vote_consensus_content; delegate = (ck, _) as delegate; _} =
+  let {
+    vote_kind;
+    vote_consensus_content;
+    delegate = (ck, _) as delegate;
+    dal_content;
+  } =
     unsigned_consensus_vote
   in
   let level, round =
@@ -651,22 +656,13 @@ let sign_consensus_votes state
         let*! () = Events.(emit event delegate) in
         match batch_kind with
         | Attestation ->
-            let* dal_content =
-              may_get_dal_content state unsigned_consensus_vote
-            in
             let*! signed_consensus_vote =
-              forge_and_sign_consensus_vote
-                ?dal_content
-                state
-                unsigned_consensus_vote
+              forge_and_sign_consensus_vote state unsigned_consensus_vote
             in
             return signed_consensus_vote
         | Preattestation ->
             let*! signed_consensus_vote =
-              forge_and_sign_consensus_vote
-                ?dal_content:None
-                state
-                unsigned_consensus_vote
+              forge_and_sign_consensus_vote state unsigned_consensus_vote
             in
             return signed_consensus_vote)
       authorized_consensus_votes
@@ -938,7 +934,13 @@ let prepare_preattestations_request state unsigned_preattestations =
 let prepare_attestations_request state unsigned_attestations =
   let open Lwt_result_syntax in
   let branch = state.level_state.latest_proposal.predecessor.hash in
-  let request = Forge_and_sign_attestations {branch; unsigned_attestations} in
+  let*! unsigned_attestations_with_dal =
+    dal_content_map_p (may_get_dal_content state) unsigned_attestations
+  in
+  let request =
+    Forge_and_sign_attestations
+      {branch; unsigned_attestations = unsigned_attestations_with_dal}
+  in
   state.global_state.forge_worker_hooks.push_request request ;
   return state
 
