@@ -85,8 +85,7 @@ create_kernel_config() {
   done
 
   # sequencer_config
-  if [[ -n $SEQUENCER_SECRET_KEY ]]; then
-    run_in_docker octez-client --endpoint "${ENDPOINT}" import secret key "${SEQUENCER_ALIAS}" unencrypted:"${SEQUENCER_SECRET_KEY}" --force
+  if [[ -n $SEQUENCER_ALIAS ]]; then
     pubkey=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${SEQUENCER_ALIAS}" | grep Public | grep -oE "edpk.*")
     pubkey_hex=$(printf '%s' "${pubkey}" | xxd -p -c 54)
     add_kernel_config_set "$file" "/evm/sequencer" "${pubkey_hex}" "SEQUENCER_PUBKEY: ${pubkey}"
@@ -270,6 +269,9 @@ init_rollup)
   if [[ -n ${OPERATOR_ALIAS} ]]; then
     generate_key "${OPERATOR_ALIAS}"
     loop_until_balance_is_enough "${OPERATOR_ALIAS}" "${MINIMUM_OPERATOR_BALANCE}"
+  fi
+  if [[ -n ${SEQUENCER_ALIAS} ]]; then
+    generate_key "${SEQUENCER_ALIAS}"
   fi
   generate_key "${ORIGINATOR_ALIAS}"
   loop_until_balance_is_enough "${ORIGINATOR_ALIAS}" 100
