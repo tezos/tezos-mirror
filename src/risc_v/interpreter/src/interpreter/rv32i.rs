@@ -114,6 +114,50 @@ where
         let result = self.read(rs1) ^ self.read(rs2);
         self.write(rd, result)
     }
+
+    /// `SLTI` I-type instruction
+    ///
+    /// Places the value 1 in `rd` if val(rs1) is less than the immediate
+    /// when treated as signed integers, 0 otherwise
+    pub fn run_slti(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+        let result = if (self.read(rs1) as i64) < imm { 1 } else { 0 };
+        self.write(rd, result)
+    }
+
+    /// `SLTIU` I-type instruction
+    ///
+    /// Places the value 1 in `rd` if val(rs1) is less than the immediate
+    /// when treated as unsigned integers, 0 otherwise
+    pub fn run_sltiu(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
+        let result = if self.read(rs1) < (imm as u64) { 1 } else { 0 };
+        self.write(rd, result)
+    }
+
+    /// `SLT` R-type instruction
+    ///
+    /// Places the value 1 in `rd` if val(rs1) < val(rs2)
+    /// when treated as signed integers, 0 otherwise
+    pub fn run_slt(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let result = if (self.read(rs1) as i64) < (self.read(rs2) as i64) {
+            1
+        } else {
+            0
+        };
+        self.write(rd, result)
+    }
+
+    /// `SLTU` R-type instruction
+    ///
+    /// Places the value 1 in `rd` if val(rs1) < val(rs2)
+    /// when treated as unsigned integers, 0 otherwise
+    pub fn run_sltu(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let result = if self.read(rs1) < self.read(rs2) {
+            1
+        } else {
+            0
+        };
+        self.write(rd, result)
+    }
 }
 
 impl<M> HartState<M>
@@ -848,6 +892,31 @@ mod tests {
             prop_assert_eq!(xregs.read(a2), 0);
             prop_assert_eq!(xregs.read(a4), 0);
         });
+    });
+
+    backend_test!(test_slt, F, {
+        let mut backend = create_backend!(XRegistersLayout, F);
+        let mut xregs = create_state!(XRegisters, F, backend);
+
+        let v1_v2_exp_expu = [
+            (0, 0, 0, 0),
+            (-1_i64 as u64, 0, 1, 0),
+            (123123123, -1_i64 as u64, 0, 1),
+            (123, 123123, 1, 1),
+        ];
+
+        for (v1, v2, exp, expu) in v1_v2_exp_expu {
+            xregs.write(a1, v1);
+            xregs.write(a2, v2);
+            xregs.run_slt(a1, a2, t0);
+            assert_eq!(xregs.read(t0), exp);
+            xregs.run_sltu(a1, a2, t1);
+            assert_eq!(xregs.read(t1), expu);
+            xregs.run_slti(v2 as i64, a1, t0);
+            assert_eq!(xregs.read(t0), exp);
+            xregs.run_sltiu(v2 as i64, a1, t0);
+            assert_eq!(xregs.read(t0), expu);
+        }
     });
 
     backend_test!(test_xret, F, {
