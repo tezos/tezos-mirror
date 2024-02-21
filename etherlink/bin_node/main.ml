@@ -1019,13 +1019,18 @@ let init_from_rollup_node_command =
   command
     ~desc:
       "initialises the EVM node data-dir using the data-dir of a rollup node."
-    (args1 data_dir_arg)
+    (args2 data_dir_arg devmode_arg)
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
-    (fun data_dir rollup_node_data_dir () ->
-      Evm_node_lib_dev.Evm_context.init_from_rollup_node
-        ~data_dir
-        ~rollup_node_data_dir)
+    (fun (data_dir, devmode) rollup_node_data_dir () ->
+      if devmode then
+        Evm_node_lib_dev.Evm_context.init_from_rollup_node
+          ~data_dir
+          ~rollup_node_data_dir
+      else
+        Evm_node_lib_prod.Evm_context.init_from_rollup_node
+          ~data_dir
+          ~rollup_node_data_dir)
 
 let dump_to_rlp =
   let open Tezos_clic in

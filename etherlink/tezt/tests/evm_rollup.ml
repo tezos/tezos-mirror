@@ -4487,7 +4487,10 @@ let test_migrate_proxy_to_sequencer =
 
   (* Run the sequencer from the rollup node state. *)
   let* () =
-    Evm_node.init_from_rollup_node_data_dir sequencer_node sc_rollup_node
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      sequencer_node
+      sc_rollup_node
   in
   let* () = Evm_node.run sequencer_node in
   (* Same head after initialisation. *)
