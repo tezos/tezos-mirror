@@ -1032,61 +1032,6 @@ let init_from_rollup_node_command =
           ~data_dir
           ~rollup_node_data_dir)
 
-module Migration = struct
-  type metadata = {
-    checkpoint : Context_hash.t;
-    next_blueprint_number : Ethereum_types.quantity;
-    current_block_hash : Ethereum_types.block_hash;
-  }
-
-  let metadata_encoding =
-    let open Data_encoding in
-    conv
-      (fun {checkpoint; next_blueprint_number; current_block_hash} ->
-        (checkpoint, next_blueprint_number, current_block_hash))
-      (fun (checkpoint, next_blueprint_number, current_block_hash) ->
-        {checkpoint; next_blueprint_number; current_block_hash})
-      (obj3
-         (req "checkpoint" Context_hash.encoding)
-         (req "next_blueprint_number" Ethereum_types.quantity_encoding)
-         (req "current_block_hash" Ethereum_types.block_hash_encoding))
-end
-
-let migrate_metadata_command =
-  let open Tezos_clic in
-  command
-    ~desc:"Migrate the old metadata json file to the new sqlite database"
-    (args1 data_dir_arg)
-    (prefixes ["migrate"; "metadata"; "file"] @@ stop)
-    (fun data_dir () ->
-      let open Filename.Infix in
-      let open Lwt_result_syntax in
-      let metadata_path = data_dir // "metadata" in
-      let*! exists = Lwt_unix.file_exists metadata_path in
-      if exists then
-        let*! contents = Lwt_utils_unix.read_file metadata_path in
-        let json =
-          match Data_encoding.Json.from_string contents with
-          | Ok json -> json
-          | Error _ -> Stdlib.failwith "Cannot parse metadata file"
-        in
-        let metadata =
-          Data_encoding.Json.(destruct Migration.metadata_encoding json)
-        in
-        let current =
-          match metadata.Migration.next_blueprint_number with
-          | Qty x -> Ethereum_types.Qty Z.(pred x)
-        in
-        let* store = Evm_node_lib_dev.Store.init ~data_dir in
-        let* () =
-          Evm_node_lib_dev.Store.Context_hashes.store
-            store
-            current
-            metadata.checkpoint
-        in
-        return_unit
-      else return_unit)
-
 let dump_to_rlp =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -1139,7 +1084,6 @@ let commands =
     chunker_command;
     make_upgrade_command;
     init_from_rollup_node_command;
-    migrate_metadata_command;
     dump_to_rlp;
   ]
 
