@@ -8411,6 +8411,10 @@ let evm_node_lib_prod =
         evm_node_lib_prod_encoding |> open_;
         lwt_watcher;
         lwt_exit;
+        caqti;
+        caqti_lwt;
+        caqti_lwt_unix;
+        caqti_sqlite;
         octez_client_base |> open_;
         evm_node_config |> open_;
         octez_context_sigs;

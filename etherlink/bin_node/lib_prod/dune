@@ -16,6 +16,10 @@
   octez-evm-node-libs.evm_node_lib_prod_encoding
   lwt-watcher
   lwt-exit
+  caqti
+  caqti-lwt
+  caqti-lwt.unix
+  caqti-driver-sqlite3
   octez-shell-libs.client-base
   octez-evm-node-libs.evm_node_config
   octez-libs.context.sigs

@@ -11,4 +11,6 @@ val main : Evm_context.t -> evm_node_endpoint:Uri.t -> unit tzresult Lwt.t
 
 module Make (Ctxt : sig
   val ctxt : Evm_context.t
+
+  val evm_node_endpoint : Uri.t
 end) : Services_backend_sig.S

@@ -157,7 +157,6 @@ let create ~cctxt ~sequencer_key ~timestamp ~smart_rollup_address ~number
       rlp_sequencer_blueprint)
     |> return
   in
-
   let* to_publish =
     List.mapi_ep (message_from_chunk nb_chunks_publish) to_publish_chunks
   in

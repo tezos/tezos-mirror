@@ -10,7 +10,7 @@ val start :
   max_blueprints_lag:int ->
   max_blueprints_catchup:int ->
   catchup_cooldown:int ->
-  Blueprint_store.t ->
+  Store.t ->
   unit tzresult Lwt.t
 
 val shutdown : unit -> unit Lwt.t

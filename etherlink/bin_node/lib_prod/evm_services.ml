@@ -62,12 +62,15 @@ let create_blueprint_watcher_service (ctxt : Evm_context.t) from_level =
         let current_request = !next_level_requested in
         (next_level_requested := Z.(succ current_request)) ;
         let* blueprint =
-          Evm_context.find_blueprint ctxt (Qty current_request)
+          Store.Executable_blueprints.find ctxt.store (Qty current_request)
         in
         match blueprint with
-        | Some payload ->
+        | Ok (Some payload) ->
             return_some Blueprint_types.{number = Qty current_request; payload}
-        | None -> return_none)
+        | Ok None -> return_none
+        | Error _ ->
+            Stdlib.failwith
+              "Something went wrong when trying to fetch a blueprint")
       else Lwt_stream.get blueprint_stream
   in
   Tezos_rpc.Answer.return_stream {next; shutdown}
@@ -77,12 +80,12 @@ let register_get_smart_rollup_address_service ctxt dir =
       let open Lwt_syntax in
       return_ok ctxt.Evm_context.smart_rollup_address)
 
-let register_get_blueprint_service ctxt dir =
+let register_get_blueprint_service (ctxt : Evm_context.t) dir =
   Directory.opt_register1 dir get_blueprint_service (fun level () () ->
-      let open Lwt_syntax in
+      let open Lwt_result_syntax in
       let number = Ethereum_types.Qty (Z.of_int64 level) in
-      let* blueprint = Evm_context.find_blueprint ctxt number in
-      return_ok blueprint)
+      let* blueprint = Store.Executable_blueprints.find ctxt.store number in
+      return blueprint)
 
 let register_blueprint_watcher_service ctxt dir =
   Directory.gen_register0 dir blueprint_watcher_service (fun level () ->
