@@ -241,7 +241,16 @@ type forge_event = Block_ready of prepared_block
 
 (** [forge_request] type used to push a concurrent forging task in the
     forge worker. *)
-type forge_request = Forge_and_sign_block of block_to_bake
+type forge_request =
+  | Forge_and_sign_block of block_to_bake
+  | Forge_and_sign_preattestations of {
+      branch : Block_hash.t;
+      unsigned_preattestations : unsigned_consensus_vote_batch;
+    }
+  | Forge_and_sign_attestations of {
+      branch : Block_hash.t;
+      unsigned_attestations : unsigned_consensus_vote_batch;
+    }
 
 (** [forge_worker_hooks] type that allows interactions with the forge
     worker. Hooks are needed in order to break a circular dependency. *)

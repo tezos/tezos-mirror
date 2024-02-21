@@ -141,6 +141,8 @@ let start (baking_state : Baking_state.global_state) =
       | Forge_and_sign_block block_to_bake ->
           handle_forge_block state baking_state block_to_bake ;
           return_unit
+      | Forge_and_sign_preattestations _ | Forge_and_sign_attestations _ ->
+          failwith "Forge and signed (pre)attestations not implemented yet"
     in
     match forge_request_opt with
     | None -> (* Shutdown called *) return_unit

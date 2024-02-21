@@ -445,7 +445,16 @@ let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
 
 type forge_event = Block_ready of prepared_block
 
-type forge_request = Forge_and_sign_block of block_to_bake
+type forge_request =
+  | Forge_and_sign_block of block_to_bake
+  | Forge_and_sign_preattestations of {
+      branch : Block_hash.t;
+      unsigned_preattestations : unsigned_consensus_vote_batch;
+    }
+  | Forge_and_sign_attestations of {
+      branch : Block_hash.t;
+      unsigned_attestations : unsigned_consensus_vote_batch;
+    }
 
 type forge_worker_hooks = {
   push_request : forge_request -> unit;
