@@ -52,6 +52,7 @@ type mode =
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
       devmode : bool;  (** --devmode flag. *)
+      wallet_dir : string option;  (** --wallet-dir: client directory. *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 

@@ -289,9 +289,11 @@ module Params = struct
 
   let evm_node_endpoint = endpoint
 
-  let secret_key : (Signature.secret_key, unit) Tezos_clic.parameter =
-    Tezos_clic.parameter (fun _ sk ->
-        Lwt.return_ok (Signature.Secret_key.of_b58check_exn sk))
+  let sequencer_key =
+    Tezos_clic.param
+      ~name:"sequencer-key"
+      ~desc:"key to sign the blueprints."
+      string
 
   let string_list =
     Tezos_clic.parameter (fun _ s ->
@@ -324,6 +326,25 @@ module Params = struct
                    [\"1970-01-01T00:00:00Z\"]) or in number of seconds since \
                    the {!Time.Protocol.epoch}."))
 end
+
+let wallet_dir_arg =
+  Tezos_clic.default_arg
+    ~long:"wallet-dir"
+    ~short:'d'
+    ~placeholder:"path"
+    ~default:Client_config.default_base_dir
+    ~doc:
+      (Format.asprintf
+         "@[<v>@[<2>client data directory (absent: %s env)@,\
+          The directory where the Tezos client stores all its wallet data.@,\
+          If absent, its value is the value of the %s@,\
+          environment variable. If %s is itself not specified,@,\
+          defaults to %s@]@]@."
+         Client_config.base_dir_env_name
+         Client_config.base_dir_env_name
+         Client_config.base_dir_env_name
+         Client_config.default_base_dir)
+    Params.string
 
 let rpc_addr_arg =
   Tezos_clic.arg
@@ -508,17 +529,12 @@ let parent_hash_arg =
        ~default:
          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 
-let secret_key_arg =
-  let open Tezos_clic in
-  (* This is `Bootstrap.bootstrap1.secret_key` in
-     `tezt/lib_tezos/account.ml`. *)
-  let default_sk = "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" in
-  Params.secret_key
-  |> default_arg
-       ~long:"secret-key"
-       ~doc:"Unencrypted secret key to sign the blueprints."
-       ~placeholder:"edsk..."
-       ~default:default_sk
+let sequencer_key_arg =
+  Tezos_clic.arg
+    ~long:"sequencer-key"
+    ~doc:"key to sign the blueprints."
+    ~placeholder:"edsk..."
+    Params.string
 
 let proxy_command =
   let open Tezos_clic in
@@ -620,7 +636,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args15
+    (args16
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -635,7 +651,8 @@ let sequencer_command =
        maximum_blueprints_lag_arg
        maximum_blueprints_catchup_arg
        catchup_cooldown_arg
-       devmode_arg)
+       devmode_arg
+       wallet_dir_arg)
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -644,12 +661,7 @@ let sequencer_command =
             will communicate with."
          Params.rollup_node_endpoint
     @@ prefixes ["signing"; "with"]
-    @@ param
-         ~name:"secret-key"
-         ~desc:
-           "The tezos secret key used to sign the blueprints published to L1"
-         Params.secret_key
-    @@ stop)
+    @@ Params.sequencer_key @@ stop)
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
@@ -664,10 +676,25 @@ let sequencer_command =
            max_blueprints_lag,
            max_blueprints_catchup,
            catchup_cooldown,
-           devmode )
+           devmode,
+           wallet_dir )
          rollup_node_endpoint
-         sequencer
+         sequencer_str
          () ->
+      let wallet_ctxt =
+        new Client_context_unix.unix_io_wallet
+          ~base_dir:wallet_dir
+          ~password_filename:None
+      in
+      let () =
+        Client_main_run.register_default_signer
+          (wallet_ctxt :> Client_context.io_wallet)
+      in
+      let* sequencer =
+        Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
+      in
+      let* pk_uri = Client_keys.neuterize sequencer in
+      let* sequencer_pkh, _ = Client_keys.public_key_hash pk_uri in
       let*! () =
         let open Tezos_base_unix.Internal_event_unix in
         let verbosity = if verbose then Some Internal_event.Debug else None in
@@ -704,7 +731,7 @@ let sequencer_command =
           ~rollup_node_endpoint
           ?preimages
           ?time_between_blocks
-          ~sequencer
+          ~sequencer:sequencer_pkh
           ()
       in
       let* () =
@@ -718,6 +745,7 @@ let sequencer_command =
           ~max_blueprints_catchup
           ~catchup_cooldown
           ?genesis_timestamp
+          ~cctxt:(wallet_ctxt :> Client_context.wallet)
           ~sequencer
           ~configuration
           ?kernel
@@ -730,6 +758,7 @@ let sequencer_command =
           ~max_blueprints_catchup
           ~catchup_cooldown
           ?genesis_timestamp
+          ~cctxt:(wallet_ctxt :> Client_context.wallet)
           ~sequencer
           ~configuration
           ?kernel
@@ -849,12 +878,13 @@ let make_dev_messages ~kind ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
   let s = Ethereum_types.hex_of_string s in
-  let*? messages =
+  let* messages =
     match kind with
-    | `Blueprint (secret_key, timestamp, number, parent_hash) ->
-        let Sequencer_blueprint.{to_publish; _} =
+    | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
+        let* Sequencer_blueprint.{to_publish; _} =
           Sequencer_blueprint.create
-            ~secret_key
+            ~cctxt
+            ~sequencer_key:sk_uri
             ~timestamp
             ~smart_rollup_address
             ~number:(Ethereum_types.quantity_of_z number)
@@ -863,12 +893,14 @@ let make_dev_messages ~kind ~smart_rollup_address s =
               [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
             ~delayed_transactions:[]
         in
-        to_publish |> List.map (fun (`External s) -> s) |> Result.ok
+        return @@ List.map (fun (`External s) -> s) to_publish
     | `Transaction ->
-        Transaction_format.make_encoded_messages
-          ~smart_rollup_address
-          (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
-        |> Result.map snd
+        let*? _, blueprints =
+          Transaction_format.make_encoded_messages
+            ~smart_rollup_address
+            (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
+        in
+        return blueprints
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
@@ -879,14 +911,15 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup"
-    (args7
+    (args8
        devmode_arg
        rollup_address_arg
        blueprint_mode_arg
        timestamp_arg
        blueprint_number_arg
        parent_hash_arg
-       secret_key_arg)
+       sequencer_key_arg
+       wallet_dir_arg)
     (prefixes ["chunk"; "data"]
     @@ param
          ~name:"data"
@@ -899,17 +932,36 @@ let chunker_command =
            blueprint_timestamp,
            blueprint_number,
            blueprint_parent_hash,
-           secret_key )
+           sequencer_str,
+           wallet_dir )
          data
          () ->
-      let kind =
+      let* kind =
         if as_blueprint then
+          let*! sequencer_str =
+            match sequencer_str with
+            | Some k -> Lwt.return k
+            | None -> Lwt.fail_with "missing sequencer key"
+          in
+          let wallet_ctxt =
+            new Client_context_unix.unix_io_wallet
+              ~base_dir:wallet_dir
+              ~password_filename:None
+          in
+          let () =
+            Client_main_run.register_default_signer
+              (wallet_ctxt :> Client_context.io_wallet)
+          in
+          let+ sequencer_key =
+            Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
+          in
           `Blueprint
-            ( secret_key,
+            ( wallet_ctxt,
+              sequencer_key,
               blueprint_timestamp,
               blueprint_number,
               blueprint_parent_hash )
-        else `Transaction
+        else return `Transaction
       in
       let print_chunks smart_rollup_address s =
         let* messages =
@@ -1036,7 +1088,7 @@ let executable_name = Filename.basename Sys.executable_name
 
 let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
 
-let dispatch initial_ctx args =
+let dispatch args =
   let open Lwt_result_syntax in
   let commands =
     Tezos_clic.add_manual
@@ -1046,10 +1098,10 @@ let dispatch initial_ctx args =
       Format.std_formatter
       commands
   in
-  let* ctx, remaining_args =
-    Tezos_clic.parse_global_options global_options initial_ctx args
+  let* (), remaining_args =
+    Tezos_clic.parse_global_options global_options () args
   in
-  Tezos_clic.dispatch commands ctx remaining_args
+  Tezos_clic.dispatch commands () remaining_args
 
 let handle_error = function
   | Ok _ -> ()
@@ -1089,4 +1141,4 @@ let () =
         Short)
   in
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Lwt_main.run (dispatch () (argv ())) |> handle_error
+  Lwt_main.run (dispatch (argv ())) |> handle_error

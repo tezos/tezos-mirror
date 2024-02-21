@@ -83,12 +83,12 @@ module type M = sig
   val logger : RPC_client_unix.logger option
 end
 
-let setup_remote_signer (module C : M) client_config
-    (rpc_config : RPC_client_unix.config) parsed_config_file =
+let register_default_signer ?other_registrations ?logger
+    (cctxt : Client_context.io_wallet) =
   let module Remote_params = struct
     let authenticate pkhs payload =
       let open Lwt_result_syntax in
-      let* keys = Client_keys.list_keys client_config in
+      let* keys = Client_keys.list_keys cctxt in
       match
         List.filter_map
           (function
@@ -103,16 +103,14 @@ let setup_remote_signer (module C : M) client_config
             | _ -> None)
           keys
       with
-      | sk_uri :: _ -> Client_keys.sign client_config sk_uri payload
+      | sk_uri :: _ -> Client_keys.sign cctxt sk_uri payload
       | [] ->
           failwith
             "remote signer expects authentication signature, but no authorized \
              key was found in the wallet"
 
     let logger =
-      (* overriding the logger we might already have with the one from
-             module C *)
-      match C.logger with Some logger -> logger | None -> rpc_config.logger
+      Option.value ~default:RPC_client_unix.default_config.logger logger
   end in
   let module Http =
     Tezos_signer_backends.Http.Make (RPC_client_unix) (Remote_params)
@@ -123,11 +121,11 @@ let setup_remote_signer (module C : M) client_config
   let module Socket = Tezos_signer_backends_unix.Socket.Make (Remote_params) in
   Client_keys.register_signer
     (module Tezos_signer_backends.Encrypted.Make (struct
-      let cctxt = (client_config :> Client_context.io_wallet)
+      let cctxt = cctxt
     end)) ;
   Client_keys.register_aggregate_signer
     (module Tezos_signer_backends.Encrypted.Make_aggregate (struct
-      let cctxt = (client_config :> Client_context.io_wallet)
+      let cctxt = cctxt
     end)) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
   Client_keys.register_aggregate_signer
@@ -138,12 +136,27 @@ let setup_remote_signer (module C : M) client_config
   Client_keys.register_signer (module Socket.Tcp) ;
   Client_keys.register_signer (module Http) ;
   Client_keys.register_signer (module Https) ;
-  match parsed_config_file with
+  match other_registrations with
+  | Some other_registrations ->
+      other_registrations (module Remote_params : Client_config.Remote_params)
   | None -> ()
-  | Some parsed_config_file -> (
-      match C.other_registrations with
-      | Some r -> r parsed_config_file (module Remote_params)
-      | None -> ())
+
+let register_signer (module C : M) (cctxt : Client_context.io_wallet)
+    (rpc_config : RPC_client_unix.config) parsed_config_file =
+  let logger =
+    (* overriding the logger we might already have with the one from
+       module C *)
+    match C.logger with Some logger -> logger | None -> rpc_config.logger
+  in
+  let other_registrations =
+    match parsed_config_file with
+    | None -> None
+    | Some parsed_config_file -> (
+        match C.other_registrations with
+        | Some r -> Some (r parsed_config_file)
+        | None -> None)
+  in
+  register_default_signer ?other_registrations ~logger cctxt
 
 (** Warn the user if there are duplicate URIs in the sources (may or may
     not be a misconfiguration). *)
@@ -502,9 +515,9 @@ let main (module C : M) ~select_commands =
               base_dir
               rpc_config
           in
-          setup_remote_signer
+          register_signer
             (module C)
-            client_config
+            (client_config :> Client_context.io_wallet)
             rpc_config
             parsed_config_file ;
           let* other_commands =

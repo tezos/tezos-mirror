@@ -116,8 +116,9 @@ type t = {
   to_execute : Blueprint_types.payload;
 }
 
-let create ~secret_key ~timestamp ~smart_rollup_address ~number ~parent_hash
-    ~delayed_transactions ~transactions =
+let create ~cctxt ~sequencer_key ~timestamp ~smart_rollup_address ~number
+    ~parent_hash ~delayed_transactions ~transactions =
+  let open Lwt_result_syntax in
   let open Rlp in
   let number = Value (encode_u256_le number) in
   let to_publish_chunks, to_execute_chunks =
@@ -140,12 +141,13 @@ let create ~secret_key ~timestamp ~smart_rollup_address ~number ~parent_hash
     let rlp_unsigned_blueprint =
       List [value; number; nb_chunks; chunk_index] |> encode
     in
-    let signature =
-      Signature.(sign secret_key rlp_unsigned_blueprint |> to_bytes)
+    let* signature =
+      Client_keys.sign cctxt sequencer_key rlp_unsigned_blueprint
     in
+    let signature_bytes = Signature.to_bytes signature in
     (* Encode the blueprints fields and its signature. *)
     let rlp_sequencer_blueprint =
-      List [value; number; nb_chunks; chunk_index; Value signature]
+      List [value; number; nb_chunks; chunk_index; Value signature_bytes]
       |> encode |> Bytes.to_string
     in
     `External
@@ -153,10 +155,12 @@ let create ~secret_key ~timestamp ~smart_rollup_address ~number ~parent_hash
       ^ "\003"
       ^ (* Sequencer blueprint *)
       rlp_sequencer_blueprint)
+    |> return
   in
-  {
-    to_publish =
-      List.mapi (message_from_chunk nb_chunks_publish) to_publish_chunks;
-    to_execute =
-      List.mapi (message_from_chunk nb_chunks_execute) to_execute_chunks;
-  }
+  let* to_publish =
+    List.mapi_ep (message_from_chunk nb_chunks_publish) to_publish_chunks
+  in
+  let* to_execute =
+    List.mapi_ep (message_from_chunk nb_chunks_execute) to_execute_chunks
+  in
+  return {to_publish; to_execute}

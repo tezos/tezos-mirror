@@ -28,11 +28,12 @@ type t = {
     valid list of external messages inputs to put in the inbox.
 *)
 val create :
-  secret_key:Signature.secret_key ->
+  cctxt:#Client_context.wallet ->
+  sequencer_key:Client_keys.sk_uri ->
   timestamp:Time.Protocol.t ->
   smart_rollup_address:string ->
   number:Ethereum_types.quantity ->
   parent_hash:Ethereum_types.block_hash ->
   delayed_transactions:Ethereum_types.Delayed_transaction.t list ->
   transactions:string list ->
-  t
+  t tzresult Lwt.t

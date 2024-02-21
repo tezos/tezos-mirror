@@ -8,7 +8,9 @@
 module MakeBackend (Ctxt : sig
   val ctxt : Evm_context.t
 
-  val secret_key : Signature.secret_key
+  val cctxt : Client_context.wallet
+
+  val sequencer_key : Client_keys.sk_uri
 end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
@@ -49,9 +51,10 @@ end) : Services_backend_sig.Backend = struct
     let publish_messages ~timestamp ~smart_rollup_address ~messages =
       let open Lwt_result_syntax in
       (* Create the blueprint with the messages. *)
-      let blueprint =
+      let* blueprint =
         Sequencer_blueprint.create
-          ~secret_key:Ctxt.secret_key
+          ~sequencer_key:Ctxt.sequencer_key
+          ~cctxt:Ctxt.cctxt
           ~timestamp
           ~smart_rollup_address
           ~transactions:messages.TxEncoder.raw
@@ -94,7 +97,9 @@ end
 module Make (Ctxt : sig
   val ctxt : Evm_context.t
 
-  val secret_key : Signature.secret_key
+  val cctxt : Client_context.wallet
+
+  val sequencer_key : Client_keys.sk_uri
 end) =
   Services_backend_sig.Make (MakeBackend (Ctxt))
 
@@ -214,7 +219,7 @@ let loop_sequencer :
 
 let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
     ~max_blueprints_catchup ~catchup_cooldown
-    ?(genesis_timestamp = Helpers.now ()) ~sequencer
+    ?(genesis_timestamp = Helpers.now ()) ~cctxt ~sequencer
     ~(configuration : Configuration.sequencer Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
@@ -241,9 +246,10 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let* ctxt =
     if not loaded then
       (* Create the first empty block. *)
-      let genesis =
+      let* genesis =
         Sequencer_blueprint.create
-          ~secret_key:sequencer
+          ~cctxt
+          ~sequencer_key:sequencer
           ~timestamp:genesis_timestamp
           ~smart_rollup_address
           ~transactions:[]
@@ -258,7 +264,9 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let module Sequencer = Make (struct
     let ctxt = ctxt
 
-    let secret_key = sequencer
+    let cctxt = cctxt
+
+    let sequencer_key = sequencer
   end) in
   let* () =
     Tx_pool.start

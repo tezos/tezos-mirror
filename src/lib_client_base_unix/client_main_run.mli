@@ -84,6 +84,12 @@ sig
     RPC_client_unix.logger option
 end
 
+val register_default_signer :
+  ?other_registrations:((module Client_config.Remote_params) -> unit) ->
+  ?logger:RPC_client_unix.logger ->
+  Client_context.io_wallet ->
+  unit
+
 val run :
   (module M) ->
   select_commands:

@@ -40,6 +40,7 @@ type mode =
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
       devmode : bool;
+      wallet_dir : string option;
     }
   | Proxy of {devmode : bool}
 
@@ -259,9 +260,6 @@ let create ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
   on_event evm_node (handle_blueprint_applied_event evm_node) ;
   evm_node
 
-let create ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
-  create ?mode ?runner ?data_dir ?rpc_addr ?rpc_port rollup_node
-
 let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
 let run_args evm_node =
@@ -283,6 +281,7 @@ let run_args evm_node =
           max_blueprints_catchup;
           catchup_cooldown;
           devmode;
+          wallet_dir;
         } ->
         [
           "run";
@@ -324,6 +323,7 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_switch "devmode" devmode
+        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Observer {preimage_dir; initial_kernel} ->
         [
           "run";

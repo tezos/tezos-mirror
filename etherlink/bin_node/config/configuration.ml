@@ -22,7 +22,7 @@ type sequencer = {
   preimages : string;
   time_between_blocks : time_between_blocks;
   private_rpc_port : int;
-  sequencer : Signature.secret_key;
+  sequencer : Signature.public_key_hash;
 }
 
 type observer = {evm_node_endpoint : Uri.t; preimages : string}
@@ -143,7 +143,7 @@ let encoding_sequencer =
           ~description:"RPC port for private server"
           uint16
           default_private_rpc_port)
-       (req "sequencer" Signature.Secret_key.encoding))
+       (req "sequencer" Signature.Public_key_hash.encoding))
 
 let encoding_observer =
   let open Data_encoding in
