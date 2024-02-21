@@ -120,7 +120,7 @@ module Frozen_tez = struct
     assert (Q.(equal rem zero)) ;
     Tez.(tez +! a.self_current)
 
-  (* 0 <= quantity < 1 && co_current + quantity is int *)
+  (* Precondition: 0 <= quantity < 1 && co_current + quantity is int *)
   let add_q_to_all_co_current quantity co_current =
     let s = total_co_current_q co_current in
     if Q.(equal quantity zero) then co_current
@@ -214,7 +214,7 @@ module Frozen_tez = struct
             in
             ({a with co_current}, amount)
 
-  (* Remove a partial amount to the co frozen tez table. *)
+  (* Remove a partial amount from the co frozen tez table. *)
   let sub_current_q amount_q account a =
     if account = a.delegate then assert false
     else
