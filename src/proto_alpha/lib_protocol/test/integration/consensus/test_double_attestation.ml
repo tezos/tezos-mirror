@@ -52,17 +52,17 @@ let block_fork ?excluding b =
   (blk_a, blk_b)
 
 (* Checks that there is exactly one denunciation for the given delegate *)
-let check_denunciations ~(level : Raw_level.t) b delegate =
+let check_denunciations ~loc b delegate duplicate_op =
   let open Lwt_result_syntax in
   let* denunciations = Context.get_denunciations (B b) in
   match denunciations with
-  | [(d, item)] when Signature.Public_key_hash.equal d delegate ->
-      assert (item.Denunciations_repr.misbehaviour.kind = Double_attesting) ;
-      assert (
-        Raw_level_repr.to_int32 item.Denunciations_repr.misbehaviour.level
-        = Raw_level.to_int32 level) ;
-      return_unit
-  | _ -> assert false
+  | [(d, item)] ->
+      let* () = Assert.equal_pkh ~loc d delegate in
+      Slashing_helpers.Misbehaviour_repr.check_from_duplicate_operation
+        ~loc
+        item.misbehaviour
+        duplicate_op
+  | _ -> Test.fail ~__LOC__:loc "expected exactly one denunciation"
 
 let check_empty_denunciations b =
   let open Lwt_result_syntax in
@@ -131,9 +131,7 @@ let test_valid_double_attestation_evidence () =
   let* full_balance = Context.Delegate.full_balance (B blk_a) baker in
   let* () = check_empty_denunciations blk_a in
   let* blk_final = Block.bake ~policy:(By_account baker) ~operation blk_a in
-  (* Check that parts of the frozen deposits are slashed *)
-  let*? double_level = Context.get_level (B blk_a) in
-  let* () = check_denunciations ~level:double_level blk_final delegate in
+  let* () = check_denunciations ~loc:__LOC__ blk_final delegate attestation_a in
   let* frozen_deposits_before =
     Context.Delegate.current_frozen_deposits (B blk_a) delegate
   in
@@ -155,6 +153,8 @@ let test_valid_double_attestation_evidence () =
       frozen_deposits_right_after
       frozen_deposits_before
   in
+  (* Check that the right portion of the frozen deposits is slashed at
+     the end of the cycle. *)
   let* blk_eoc, metadata, _ =
     Block.bake_until_n_cycle_end_with_metadata
       ~policy:(By_account baker)

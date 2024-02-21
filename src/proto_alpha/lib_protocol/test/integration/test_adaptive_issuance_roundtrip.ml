@@ -162,10 +162,9 @@ let default_params =
 
 type double_signing_state = {
   culprit : Signature.Public_key_hash.t;
-  kind : Protocol.Misbehaviour_repr.kind;
   evidence : Context.t -> Protocol.Alpha_context.packed_operation;
   denounced : bool;
-  level : Int32.t;
+  misbehaviour : Protocol.Misbehaviour_repr.t;
 }
 
 (** Module for the [State.t] type of asserted information about the system during a test. *)
@@ -1292,55 +1291,13 @@ let finalize_unstake src_name : (t, t) scenarios =
 
 (* ======== Slashing ======== *)
 
-let check_pending_slashings (block, state) : unit tzresult Lwt.t =
+let check_pending_slashings ~loc (block, state) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let open Protocol.Denunciations_repr in
   let* denunciations_rpc = Context.get_denunciations (B block) in
-  let denunciations_obj_equal (pkh_1, {rewarded = r1; misbehaviour = m1; _})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; _}) =
-    Signature.Public_key_hash.equal pkh_1 pkh_2
-    && Signature.Public_key_hash.equal r1 r2
-    && Stdlib.(m1.kind = m2.kind)
-  in
-  let compare_denunciations (pkh_1, {rewarded = r1; misbehaviour = m1; _})
-      (pkh_2, {rewarded = r2; misbehaviour = m2; _}) =
-    let c1 = Signature.Public_key_hash.compare pkh_1 pkh_2 in
-    if c1 <> 0 then c1
-    else
-      let c2 = Signature.Public_key_hash.compare r1 r2 in
-      if c2 <> 0 then c2
-      else Protocol.Misbehaviour_repr.compare_kind m1.kind m2.kind
-  in
-  let denunciations_rpc = List.sort compare_denunciations denunciations_rpc in
-  let denunciations_state =
-    List.sort compare_denunciations state.State.pending_slashes
-  in
-  let denunciations_equal = List.equal denunciations_obj_equal in
-  let denunciations_obj_pp fmt
-      (pkh, {rewarded; misbehaviour; operation_hash = _}) =
-    Format.fprintf
-      fmt
-      "slashed: %a; rewarded: %a; kind: %s@."
-      Signature.Public_key_hash.pp
-      pkh
-      Signature.Public_key_hash.pp
-      rewarded
-      (match misbehaviour.kind with
-      | Double_baking -> "double baking"
-      | Double_attesting -> "double attesting"
-      | Double_preattesting -> "double preattesting")
-  in
-  let denunciations_pp = Format.pp_print_list denunciations_obj_pp in
-  let* () =
-    Assert.equal
-      ~loc:__LOC__
-      denunciations_equal
-      "Denunciations are not equal"
-      denunciations_pp
-      denunciations_rpc
-      denunciations_state
-  in
-  return_unit
+  Slashing_helpers.Full_denunciation.check_same_lists_any_order
+    ~loc
+    denunciations_rpc
+    state.State.pending_slashes
 
 (** Double attestation helpers *)
 let order_attestations ~correct_order op1 op2 =
@@ -1384,14 +1341,11 @@ let double_bake_ delegate_name (block, state) =
   (* includes pending operations *)
   let* main_branch, state = bake ~baker:delegate_name (block, state) in
   let evidence = op_double_baking main_branch.header forked_block.header in
+  let*? misbehaviour =
+    Slashing_helpers.Misbehaviour_repr.from_duplicate_block main_branch
+  in
   let dss =
-    {
-      culprit = delegate.pkh;
-      denounced = false;
-      evidence;
-      kind = Double_baking;
-      level = block.header.shell.level;
-    }
+    {culprit = delegate.pkh; denounced = false; evidence; misbehaviour}
   in
   let state =
     {state with double_signings = dss :: state.State.double_signings}
@@ -1445,8 +1399,9 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_name
       culprit = delegate.pkh;
       denounced = false;
       evidence;
-      kind;
-      level = block.header.shell.level;
+      misbehaviour =
+        Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+          attestation_a;
     }
   in
   let state =
@@ -1504,7 +1459,7 @@ let get_pending_slashed_pct_for_delegate (block, state) delegate =
   aux 0 state.State.pending_slashes
 
 let update_state_denunciation (block, state)
-    {culprit; denounced; evidence = _; kind; level} =
+    {culprit; denounced; evidence = _; misbehaviour} =
   let open Lwt_result_syntax in
   if denounced then
     (* If the double signing has already been denounced, a second denunciation should fail *)
@@ -1514,77 +1469,73 @@ let update_state_denunciation (block, state)
     let next_level =
       Protocol.Alpha_context.Raw_level.(to_int32 @@ succ block_level)
     in
-    if level > next_level then
+    let inclusion_cycle =
+      cycle_from_level block.constants.blocks_per_cycle next_level
+    in
+    let ds_level = Protocol.Raw_level_repr.to_int32 misbehaviour.level in
+    let ds_cycle = cycle_from_level block.constants.blocks_per_cycle ds_level in
+    if Cycle.(ds_cycle > inclusion_cycle) then
       (* The denunciation is trying to be included too early *)
       return (state, denounced)
+    else if
+      Cycle.(
+        add ds_cycle Protocol.Constants_repr.max_slashing_period
+        <= inclusion_cycle)
+    then
+      (* The denunciation is too late and gets refused. *)
+      return (state, denounced)
+    else if get_pending_slashed_pct_for_delegate (block, state) culprit >= 100
+    then
+      (* Culprit has been slashed too much, a denunciation is not added to the list.
+         TODO: is the double signing treated as included, or can it be included in the
+         following cycle? *)
+      return (state, denounced)
     else
-      let inclusion_cycle =
-        cycle_from_level block.constants.blocks_per_cycle next_level
+      (* for simplicity's sake (lol), the block producer and the payload producer are the same
+         We also assume that the current state baking policy will be used for the next block *)
+      let* rewarded, _, _, _ =
+        Block.get_next_baker ?policy:state.baking_policy block
       in
-      let ds_cycle = cycle_from_level block.constants.blocks_per_cycle level in
-      if Cycle.(succ ds_cycle < inclusion_cycle) then
-        (* denunciation is too late, gets refused *)
-        return (state, denounced)
-      else if get_pending_slashed_pct_for_delegate (block, state) culprit >= 100
-      then
-        (* Culprit has been slashed too much, a denunciation is not added to the list.
-           TODO: is the double signing treated as included, or can it be included in the
-           following cycle? *)
-        return (state, denounced)
-      else
-        let misbehaviour =
+      let culprit_name, culprit_account =
+        State.find_account_from_pkh culprit state
+      in
+      let state =
+        State.update_account
+          culprit_name
           {
-            (* Fields level and round are unused for now. *)
-            level = Protocol.Raw_level_repr.of_int32_exn level;
-            round = Protocol.Round_repr.zero;
-            Protocol.Misbehaviour_repr.kind;
+            culprit_account with
+            slashed_cycles = inclusion_cycle :: culprit_account.slashed_cycles;
           }
-        in
-        (* for simplicity's sake (lol), the block producer and the payload producer are the same
-           We also assume that the current state baking policy will be used for the next block *)
-        let* rewarded, _, _, _ =
-          Block.get_next_baker ?policy:state.baking_policy block
-        in
-        let culprit_name, culprit_account =
-          State.find_account_from_pkh culprit state
-        in
-        let state =
-          State.update_account
-            culprit_name
-            {
-              culprit_account with
-              slashed_cycles = inclusion_cycle :: culprit_account.slashed_cycles;
-            }
-            state
-        in
-        let new_pending_slash =
-          ( culprit,
-            {
-              Protocol.Denunciations_repr.rewarded;
-              misbehaviour;
-              operation_hash = Operation_hash.zero;
-              (* unused *)
-            } )
-        in
-        (* TODO: better log... *)
-        Log.info
-          ~color:Log_module.event_color
-          "Including denunciation (misbehaviour cycle %a)"
-          Cycle.pp
-          ds_cycle ;
-        let state =
-          State.
-            {
-              state with
-              pending_slashes = new_pending_slash :: state.pending_slashes;
-            }
-        in
-        return (state, true)
+          state
+      in
+      let new_pending_slash =
+        ( culprit,
+          {
+            Protocol.Denunciations_repr.rewarded;
+            misbehaviour;
+            operation_hash = Operation_hash.zero;
+            (* unused *)
+          } )
+      in
+      (* TODO: better log... *)
+      Log.info
+        ~color:Log_module.event_color
+        "Including denunciation (misbehaviour cycle %a)"
+        Cycle.pp
+        ds_cycle ;
+      let state =
+        State.
+          {
+            state with
+            pending_slashes = new_pending_slash :: state.pending_slashes;
+          }
+      in
+      return (state, true)
 
 let make_denunciations_ ?(filter = fun {denounced; _} -> not denounced)
     (block, state) =
   let open Lwt_result_syntax in
-  let* () = check_pending_slashings (block, state) in
+  let* () = check_pending_slashings ~loc:__LOC__ (block, state) in
   let make_op state ({evidence; _} as dss) =
     if filter dss then
       let* state, denounced = update_state_denunciation (block, state) dss in
@@ -2510,7 +2461,7 @@ module Slashing = struct
                 (* bootstrap1 can be forbidden in this case, so we set another baker *)
                 --> exclude_bakers ["delegate"; "bootstrap1"])
          --> check_snapshot_balances "before slash"
-         --> exec_unit check_pending_slashings
+         --> exec_unit (check_pending_slashings ~loc:__LOC__)
          --> next_cycle
          --> assert_failure
                (exec_unit (fun (_block, state) ->
@@ -2518,7 +2469,7 @@ module Slashing = struct
                       failwith "ns_enable = true: slash not applied yet"
                     else return_unit)
                --> check_snapshot_balances "before slash")
-         --> exec_unit check_pending_slashings
+         --> exec_unit (check_pending_slashings ~loc:__LOC__)
          --> next_cycle
         |+ Tag "denounce too late" --> next_cycle --> next_cycle
            --> assert_failure
@@ -2526,15 +2477,18 @@ module Slashing = struct
                    let ds = state.State.double_signings in
                    let ds = match ds with [a] -> a | _ -> assert false in
                    let level =
-                     Protocol.Alpha_context.Raw_level.of_int32_exn
-                       (Int32.succ ds.level)
+                     Protocol.Alpha_context.Raw_level.Internal_for_tests
+                     .from_repr
+                       ds.misbehaviour.level
                    in
                    let last_cycle =
                      Cycle.add
                        (Block.current_cycle_of_level
                           ~blocks_per_cycle:
                             state.State.constants.blocks_per_cycle
-                          ~current_level:ds.level)
+                          ~current_level:
+                            (Protocol.Raw_level_repr.to_int32
+                               ds.misbehaviour.level))
                        Protocol.Constants_repr.max_slashing_period
                    in
                    let (kind : Protocol.Alpha_context.Misbehaviour.kind) =
@@ -2542,7 +2496,7 @@ module Slashing = struct
                         Misbehaviour_repr.kind were moved to a
                         separate file that doesn't have under/over
                         Alpha_context versions. *)
-                     match ds.kind with
+                     match ds.misbehaviour.kind with
                      | Double_baking -> Double_baking
                      | Double_attesting -> Double_attesting
                      | Double_preattesting -> Double_preattesting
@@ -2602,12 +2556,14 @@ module Slashing = struct
               order" --> double_attest "delegate" --> next_cycle
            --> double_attest "delegate"
            --> make_denunciations
-                 ~filter:(fun {level; denounced; _} ->
-                   (not denounced) && level > 10l)
+                 ~filter:(fun {denounced; misbehaviour = {level; _}; _} ->
+                   (not denounced)
+                   && Protocol.Raw_level_repr.to_int32 level > 10l)
                  ()
            --> make_denunciations
-                 ~filter:(fun {level; denounced; _} ->
-                   (not denounced) && level <= 10l)
+                 ~filter:(fun {denounced; misbehaviour = {level; _}; _} ->
+                   (not denounced)
+                   && Protocol.Raw_level_repr.to_int32 level <= 10l)
                  ()
            --> check_is_forbidden "delegate")
 
