@@ -10,6 +10,10 @@ use crate::state_backend as backend;
 use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
+        csregisters::{
+            xstatus::{self, MPPValue, SPPValue},
+            CSRegister,
+        },
         mode::Mode,
         registers::{XRegister, XRegisters},
         Exception, HartState, MachineState,
@@ -253,6 +257,88 @@ where
             current_pc.wrapping_add(4)
         }
     }
+
+    /// `MRET` instruction
+    ///
+    /// If successful, returns next instruction address to be executed from `MEPC`
+    pub fn run_mret(&mut self) -> Result<Address, Exception> {
+        // Only M-mode (and Debug) can run mret
+        match self.mode.read() {
+            Mode::User | Mode::Supervisor => return Err(Exception::IllegalInstruction),
+            Mode::Machine | Mode::Debug => (),
+        }
+
+        let mstatus = self.csregisters.read(CSRegister::mstatus);
+        // get MPP
+        let prev_privilege = xstatus::get_MPP(mstatus);
+        // Set MIE to MPIE
+        let prev_mie = xstatus::get_MPIE(mstatus);
+        let mstatus = xstatus::set_MIE(mstatus, prev_mie);
+        // set MPIE to 1
+        let mstatus = xstatus::set_MPIE(mstatus, true);
+        // Set MPP to least privilege-mode supported
+        let mstatus = xstatus::set_MPP(mstatus, MPPValue::User);
+        // Set MPRV to 0 when leaving M-mode. (MPP != M-mode)
+        let mstatus = if prev_privilege != MPPValue::Machine {
+            xstatus::set_MPRV(mstatus, false)
+        } else {
+            mstatus
+        };
+
+        // Commit the mstatus
+        self.csregisters.write(CSRegister::mstatus, mstatus);
+
+        // Set the mode after handling mret, according to MPP read initially
+        self.mode.write(match prev_privilege {
+            MPPValue::User => Mode::User,
+            MPPValue::Supervisor => Mode::Supervisor,
+            MPPValue::Machine => Mode::Machine,
+        });
+
+        // set pc to MEPC (we just have to return it)
+        Ok(self.csregisters.read(CSRegister::mepc))
+    }
+
+    /// `SRET` instruction
+    ///
+    /// If successful, returns next instruction address to be executed from `SEPC`
+    pub fn run_sret(&mut self) -> Result<Address, Exception> {
+        // Only M and S mode (and Debug) can run SRET
+        match self.mode.read() {
+            Mode::User => return Err(Exception::IllegalInstruction),
+            Mode::Supervisor | Mode::Machine | Mode::Debug => (),
+        }
+        // Section 3.1.6.5
+        // SRET raises IllegalInstruction exception when TSR (Trap SRET) bit is on.
+        let mstatus = self.csregisters.read(CSRegister::mstatus);
+        if xstatus::get_TSR(mstatus) {
+            return Err(Exception::IllegalInstruction);
+        }
+        // get SPP
+        let prev_privilege = xstatus::get_SPP(mstatus);
+        // Set SIE to SPIE
+        let prev_sie = xstatus::get_SPIE(mstatus);
+        let mstatus = xstatus::set_SIE(mstatus, prev_sie);
+        // set SPIE to 1
+        let mstatus = xstatus::set_SPIE(mstatus, true);
+        // Set SPP to least privilege-mode supported
+        let mstatus = xstatus::set_SPP(mstatus, SPPValue::User);
+        // Set MPRV to 0 when leaving M-mode. (SPP != M-mode)
+        // Since SPP can only hold User / Supervisor, it is always set to 0
+        let mstatus = xstatus::set_MPRV(mstatus, false);
+
+        // Commit the mstatus
+        self.csregisters.write(CSRegister::mstatus, mstatus);
+
+        // Set the mode after handling sret, according to SPP read initially
+        self.mode.write(match prev_privilege {
+            SPPValue::User => Mode::User,
+            SPPValue::Supervisor => Mode::Supervisor,
+        });
+
+        // set pc to SEPC (we just have to return it)
+        Ok(self.csregisters.read(CSRegister::sepc))
+    }
 }
 
 impl<ML, M> MachineState<ML, M>
@@ -275,10 +361,16 @@ mod tests {
     use crate::{backend_test, create_backend, create_state};
     use crate::{
         machine_state::{
-            bus::main_memory::tests::T1K,
+            bus::{main_memory::tests::T1K, Address},
+            csregisters::{
+                xstatus,
+                xstatus::{MPPValue, SPPValue},
+                CSRegister,
+            },
             mode::Mode,
-            registers::fa0,
-            registers::{a0, a1, a2, a3, a4, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout},
+            registers::{
+                a0, a1, a2, a3, a4, fa0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
+            },
             Exception, HartState, HartStateLayout, MachineState, MachineStateLayout,
         },
         parser::instruction::FenceSet,
@@ -652,6 +744,74 @@ mod tests {
             // it doesn't modify other registers
             prop_assert_eq!(xregs.read(a2), 0);
             prop_assert_eq!(xregs.read(a4), 0);
+        });
+    });
+
+    backend_test!(test_xret, F, {
+        proptest!(|(
+            curr_pc in any::<Address>(),
+            mepc in any::<Address>(),
+            sepc in any::<Address>(),
+        )| {
+            let mut backend = create_backend!(HartStateLayout, F);
+            let mut state = create_state!(HartState, F, backend);
+
+            // 4-byte align
+            let mepc = mepc & !0b11;
+            let sepc = sepc & !0b11;
+
+            // TEST: TSR trapping
+            state.reset(Mode::Supervisor, curr_pc);
+            state.csregisters.write(CSRegister::mepc, mepc);
+            state.csregisters.write(CSRegister::sepc, sepc);
+
+            assert_eq!(state.csregisters.read(CSRegister::sepc), sepc);
+            assert_eq!(state.csregisters.read(CSRegister::mepc), mepc);
+
+            let mstatus = state.csregisters.read(CSRegister::mstatus);
+            let mstatus = xstatus::set_TSR(mstatus, true);
+            state.csregisters.write(CSRegister::mstatus, mstatus);
+            assert_eq!(state.run_sret(), Err(Exception::IllegalInstruction));
+
+            // set TSR back to 0
+            let mstatus = xstatus::set_TSR(mstatus, false);
+            state.csregisters.write(CSRegister::mstatus, mstatus);
+
+            // TEST: insuficient privilege mode
+            state.mode.write(Mode::User);
+            assert_eq!(state.run_sret(), Err(Exception::IllegalInstruction));
+
+            // TEST: Use SRET from M-mode, check SPP, SIE, SPIE, MPRV
+            state.mode.write(Mode::Machine);
+            let mstatus = xstatus::set_SIE(state.csregisters.read(CSRegister::mstatus), true);
+            let mstatus = xstatus::set_SPP(mstatus, SPPValue::User);
+            state.csregisters.write(CSRegister::mstatus, mstatus);
+
+            // check pc address
+            assert_eq!(state.run_sret(), Ok(sepc));
+            // check fields
+            let mstatus = state.csregisters.read(CSRegister::mstatus);
+            assert!(xstatus::get_SPIE(mstatus));
+            assert!(!xstatus::get_SIE(mstatus));
+            assert!(!xstatus::get_MPRV(mstatus));
+            assert_eq!(xstatus::get_SPP(mstatus), SPPValue::User);
+            assert_eq!(state.mode.read(), Mode::User);
+
+            // TEST: Call MRET from M-mode, with MPRV true, and MPP Machine to see if MPRV stays the same.
+            let mstatus = xstatus::set_MPIE(mstatus, true);
+            let mstatus = xstatus::set_MPP(mstatus, MPPValue::Machine);
+            let mstatus = xstatus::set_MPRV(mstatus, true);
+            state.csregisters.write(CSRegister::mstatus, mstatus);
+            state.mode.write(Mode::Machine);
+            // check pc address
+            assert_eq!(state.run_mret(), Ok(mepc));
+            // check fields
+            let mstatus = state.csregisters.read(CSRegister::mstatus);
+            assert!(xstatus::get_MPIE(mstatus));
+            assert!(xstatus::get_MIE(mstatus));
+            assert!(xstatus::get_MPRV(mstatus));
+            assert_eq!(xstatus::get_MPP(mstatus), MPPValue::User);
+            assert_eq!(state.mode.read(), Mode::Machine);
         });
     });
 }
