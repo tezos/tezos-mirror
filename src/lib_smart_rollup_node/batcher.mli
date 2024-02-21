@@ -26,9 +26,9 @@
 (** The type for the status of messages in the batcher.  *)
 type status =
   | Pending_batch  (** The message is in the queue of the batcher. *)
-  | Batched of Injector.Inj_operation.hash
+  | Batched of Injector.Inj_operation.id
       (** The message has already been batched and sent to the injector in an L1
-          operation whose hash is given. *)
+          operation whose id is given. *)
 
 (** [init plugin node_ctxt] initializes and starts the batcher for
     [signer].  [plugin] is the protocol plugin with which the batcher

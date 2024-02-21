@@ -98,18 +98,18 @@ end
 module type INJECTOR_OPERATION = sig
   type operation
 
-  (** Hash with b58check encoding iop(53), for hashes of injector operations *)
-  module Hash : Tezos_crypto.Intfs.HASH
+  (** Hash with b58check encoding iop(53), for ids of injector operations *)
+  module Id : Tezos_crypto.Intfs.HASH
 
-  (** Alias for L1 operations hashes *)
-  type hash = Hash.t
+  (** Alias for L1 operations ids *)
+  type id = Id.t
 
   (** Structure to keep track of injection errors. *)
   type errors = {count : int; last_error : tztrace option}
 
-  (** The type of L1 operations that are injected on Tezos. These have a hash
+  (** The type of L1 operations that are injected on Tezos. These have an id
       attached to them that allows tracking and retrieving their status. *)
-  type t = private {hash : hash; operation : operation; mutable errors : errors}
+  type t = private {id : id; operation : operation; mutable errors : errors}
 
   (** [make op] returns an L1 operation with the corresponding hash. *)
   val make : operation -> t
@@ -313,9 +313,9 @@ module type S = sig
       (Signature.public_key_hash list * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 
-  (** Add an operation as pending injection in the injector. It returns the hash
+  (** Add an operation as pending injection in the injector. It returns the id
       of the operation in the injector queue. *)
-  val add_pending_operation : operation -> Inj_operation.Hash.t tzresult Lwt.t
+  val add_pending_operation : operation -> Inj_operation.Id.t tzresult Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending
@@ -330,8 +330,8 @@ module type S = sig
   (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t
 
-  (** The status of an operation in the injector.  *)
-  val operation_status : Inj_operation.Hash.t -> status option
+  (** The status of an operation in the injector. *)
+  val operation_status : Inj_operation.Id.t -> status option
 
   (** Register a protocol client for a specific protocol to be used by the
       injector. This function {b must} be called for all protocols that the

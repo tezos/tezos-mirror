@@ -31,12 +31,12 @@ module Batcher_events = Batcher_events.Declare (struct
 end)
 
 module L2_batched_message = struct
-  type t = {content : string; l1_hash : Injector.Inj_operation.hash}
+  type t = {content : string; l1_id : Injector.Inj_operation.id}
 end
 
 module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
 
-type status = Pending_batch | Batched of Injector.Inj_operation.hash
+type status = Pending_batch | Batched of Injector.Inj_operation.id
 
 type state = {
   node_ctxt : Node_context.ro;
@@ -53,23 +53,23 @@ let inject_batch state (l2_messages : L2_message.t list) =
   let open Lwt_result_syntax in
   let messages = List.map L2_message.content l2_messages in
   let operation = L1_operation.Add_messages {messages} in
-  let* l1_hash =
+  let* l1_id =
     Injector.check_and_add_pending_operation
       state.node_ctxt.config.mode
       operation
   in
-  let+ l1_hash =
-    match l1_hash with
-    | Some l1_hash -> return l1_hash
+  let+ l1_id =
+    match l1_id with
+    | Some l1_id -> return l1_id
     | None ->
         let op = Injector.Inj_operation.make operation in
-        return op.hash
+        return op.id
   in
   List.iter
     (fun msg ->
       let content = L2_message.content msg in
       let hash = L2_message.hash msg in
-      Batched_messages.replace state.batched hash {content; l1_hash})
+      Batched_messages.replace state.batched hash {content; l1_id})
     l2_messages
 
 let inject_batches state = List.iter_es (inject_batch state)
@@ -371,7 +371,7 @@ let message_status state msg_hash =
   | Some msg -> Some (Pending_batch, L2_message.content msg)
   | None -> (
       match Batched_messages.find_opt state.batched msg_hash with
-      | Some {content; l1_hash} -> Some (Batched l1_hash, content)
+      | Some {content; l1_id} -> Some (Batched l1_id, content)
       | None -> None)
 
 let message_status msg_hash =

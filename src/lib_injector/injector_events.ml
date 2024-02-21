@@ -155,7 +155,7 @@ module Make
         Format.fprintf
           ppf
           "@[%a@]"
-          (Format.pp_print_list Inj_operation.Hash.pp)
+          (Format.pp_print_list Inj_operation.Id.pp)
           operations
 
       let number_of_operations_in_queue =
@@ -267,7 +267,7 @@ module Make
           ~level:Info
           ("block", Block_hash.encoding)
           ("level", Data_encoding.int32)
-          ("operations", Data_encoding.list Inj_operation.Hash.encoding)
+          ("operations", Data_encoding.list Inj_operation.Id.encoding)
           ~pp3:pp_operations_hash_list
 
       let revert_operations =
@@ -275,7 +275,7 @@ module Make
           ~name:"revert_operations"
           ~msg:"Reverting operations: {operations}"
           ~level:Info
-          ("operations", Data_encoding.list Inj_operation.Hash.encoding)
+          ("operations", Data_encoding.list Inj_operation.Id.encoding)
           ~pp1:pp_operations_hash_list
 
       let confirmed_level =

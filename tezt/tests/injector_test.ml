@@ -12,7 +12,7 @@ let add_pending_transaction =
    * Fix injector so this workaround is no longer required. *)
   let transaction_amount = ref 100L in
   fun injector ->
-    let* injector_operation_hash =
+    let* injector_operation_id =
       Injector.RPC.(
         call injector
         @@ add_pending_transaction
@@ -20,14 +20,14 @@ let add_pending_transaction =
              Account.Bootstrap.keys.(1).public_key_hash)
     in
     transaction_amount := Int64.succ !transaction_amount ;
-    return injector_operation_hash
+    return injector_operation_id
 
 let add_pending_contract_call =
   (* Increase the value passed in every contract call added to the injector
    * queue so that transactions have different hashes. *)
   let counter = ref 0L in
   fun injector contract ->
-    let* injector_operation_hash =
+    let* injector_operation_id =
       Injector.RPC.(
         call injector
         @@ add_pending_transaction
@@ -36,7 +36,7 @@ let add_pending_contract_call =
              contract)
     in
     counter := Int64.succ !counter ;
-    return injector_operation_hash
+    return injector_operation_id
 
 (* For a list of pending injector operations, query their status with the
  * injector RPC, confirm the "included" status by checking the block in which
@@ -70,15 +70,15 @@ let check_operation_status =
       return ()
     in
 
-    let check_status op_hash =
-      let* status = Injector.RPC.(call injector @@ operation_status op_hash) in
+    let check_status op_id =
+      let* status = Injector.RPC.(call injector @@ operation_status op_id) in
       match status with
-      | Some Pending -> return [op_hash]
+      | Some Pending -> return [op_id]
       | Some (Injected _info) ->
           (* Here, we could check that the operation is indeed in the mempool,
            * but it would be a flaky test because by the time we query the mempool
            * the operation might have already been injected. *)
-          return [op_hash]
+          return [op_id]
       | Some (Included info) ->
           let* () = check_included info.included_oph info.level in
           return []

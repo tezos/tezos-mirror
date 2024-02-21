@@ -99,13 +99,13 @@ module Make (Parameters : PARAMETERS) = struct
 
   type injected_l1_op_content = {
     level : int32;
-    inj_ops : Inj_operation.Hash.t list;
+    inj_ops : Inj_operation.Id.t list;
     signer_pkh : Signature.public_key_hash;
   }
 
   type included_l1_op_content = {
     level : int32;
-    inj_ops : Inj_operation.Hash.t list;
+    inj_ops : Inj_operation.Id.t list;
   }
 
   type status =
@@ -118,28 +118,28 @@ module Make (Parameters : PARAMETERS) = struct
       (struct
         let name = "operations_queue"
       end)
-      (Inj_operation.Hash)
+      (Inj_operation.Id)
       (struct
         include Inj_operation
 
         let persist o = Parameters.persist_operation o.operation
       end)
 
-  module Injected_operations = Inj_operation.Hash.Table
+  module Injected_operations = Inj_operation.Id.Table
   module Injected_ophs = Operation_hash.Table
 
   (** The part of the state which gathers information about injected
     operations (but not included). *)
   type injected_state = {
     injected_operations : injected_info Injected_operations.t;
-        (** A table mapping L1 manager operation hashes to the injection info for that
-          operation.  *)
+        (** A table mapping L1 operation ids to the injection info for that
+            operation.  *)
     injected_ophs : injected_l1_op_content Injected_ophs.t;
-        (** A mapping of all L1 manager operations contained in a L1 batch (i.e. an L1
-          operation). *)
+        (** A mapping of all L1 manager operations contained in a L1 batch
+            (i.e. an L1 operation). *)
   }
 
-  module Included_operations = Inj_operation.Hash.Table
+  module Included_operations = Inj_operation.Id.Table
   module Included_in_blocks = Block_hash.Table
 
   (** The part of the state which gathers information about
@@ -344,7 +344,7 @@ module Make (Parameters : PARAMETERS) = struct
     operation.  *)
   let add_pending_operation ?(retry = false) state (op : Inj_operation.t) =
     let open Lwt_result_syntax in
-    if already_exists state op.hash then
+    if already_exists state op.id then
       (* Ignore operations which already exist in the injector *)
       return_unit
     else
@@ -353,14 +353,14 @@ module Make (Parameters : PARAMETERS) = struct
           state
           op.operation
       in
-      Op_queue.replace state.queue op.hash op
+      Op_queue.replace state.queue op.id op
 
   (** Mark operations as injected (in [oph]). *)
   let add_injected_operations state {pkh = signer_pkh; _} oph ~injection_level
       operations =
     let infos =
       List.map
-        (fun (op_index, op) -> (op.Inj_operation.hash, {op; oph; op_index}))
+        (fun (op_index, op) -> (op.Inj_operation.id, {op; oph; op_index}))
         operations
     in
     Injected_operations.replace_seq
@@ -379,7 +379,7 @@ module Make (Parameters : PARAMETERS) = struct
     let infos =
       List.map
         (fun ({op; oph; op_index} : injected_info) ->
-          (op.Inj_operation.hash, {op; oph; op_index; l1_block; l1_level}))
+          (op.Inj_operation.id, {op; oph; op_index; l1_block; l1_level}))
         operations
     in
     Included_operations.replace_seq
@@ -591,7 +591,7 @@ module Make (Parameters : PARAMETERS) = struct
           op.errors.count
           op.errors.last_error
       in
-      Op_queue.remove state.queue op.hash
+      Op_queue.remove state.queue op.id
     else
       let*! () =
         Event.(emit3 ?signers error_simulation_operation)
@@ -785,7 +785,7 @@ module Make (Parameters : PARAMETERS) = struct
             let* () =
               List.iter_es
                 (fun (_index, op) ->
-                  Op_queue.remove state.queue op.Inj_operation.hash)
+                  Op_queue.remove state.queue op.Inj_operation.id)
                 injected_operations
             in
             let*! () =
@@ -818,7 +818,7 @@ module Make (Parameters : PARAMETERS) = struct
             in
             let* () =
               List.iter_es
-                (fun op -> Op_queue.remove state.queue op.Inj_operation.hash)
+                (fun op -> Op_queue.remove state.queue op.Inj_operation.id)
                 operations_to_drop
             in
             return (`Continue 0))
@@ -927,7 +927,7 @@ module Make (Parameters : PARAMETERS) = struct
             block
             level
             (List.map
-               (fun (o : injected_info) -> o.op.Inj_operation.hash)
+               (fun (o : injected_info) -> o.op.Inj_operation.id)
                included)
         in
         add_included_operations state block level (List.rev included) ;
@@ -983,7 +983,7 @@ module Make (Parameters : PARAMETERS) = struct
     let*! () =
       Event.(emit1 revert_operations)
         state
-        (List.map (fun o -> o.op.hash) revert_infos)
+        (List.map (fun o -> o.op.id) revert_infos)
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2814
        maybe put at the front of the queue for re-injection. *)
@@ -1488,7 +1488,7 @@ module Make (Parameters : PARAMETERS) = struct
     let operation = Inj_operation.make op in
     let*? w = worker_of_tag (Parameters.operation_tag op) in
     let* () = add_pending_operation (Worker.state w) operation in
-    return operation.hash
+    return operation.id
 
   let shutdown () =
     let workers = Worker.list table in
