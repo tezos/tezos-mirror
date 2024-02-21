@@ -6,6 +6,7 @@ pub mod devices;
 pub mod main_memory;
 
 use crate::machine_state::{backend, registers};
+use std::mem;
 
 /// Bus address
 pub type Address = registers::XValue;
@@ -21,9 +22,13 @@ pub trait Addressable<E: backend::Elem> {
 
     /// Write an element of type `E` to the given address.
     fn write(&mut self, addr: Address, value: E) -> Result<(), OutOfBounds>;
+
+    /// Write consecutive elements of type `E` starting from the given address.
+    fn write_all(&mut self, addr: Address, values: &[E]) -> Result<(), OutOfBounds>;
 }
 
 /// Address space identifier
+#[derive(Debug, strum::EnumIter, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 enum AddressSpace {
     Devices,
     MainMemory,
@@ -48,7 +53,20 @@ impl AddressSpace {
         }
 
         // Address is entirely out of bounds.
-        (AddressSpace::OutOfBounds, addr)
+        let oob_addr = mem_addr.saturating_sub(mem_size);
+        (AddressSpace::OutOfBounds, oob_addr)
+    }
+
+    /// Get the start of the address space.
+    fn start<ML: main_memory::MainMemoryLayout>(&self) -> Address {
+        match self {
+            AddressSpace::Devices => 0,
+            AddressSpace::MainMemory => devices::DEVICES_ADDRESS_SPACE_LENGTH,
+            AddressSpace::OutOfBounds => {
+                let mem_size: u64 = ML::BYTES.try_into().expect("ML::BYTES out of bounds");
+                devices::DEVICES_ADDRESS_SPACE_LENGTH + mem_size
+            }
+        }
     }
 }
 
@@ -75,6 +93,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> Bus<ML, M> {
         self.devices.reset();
         self.memory.reset();
     }
+}
+
+/// Address of where the main memory starts.
+pub fn start_of_main_memory<ML: main_memory::MainMemoryLayout>() -> Address {
+    AddressSpace::MainMemory.start::<ML>()
 }
 
 impl<E, ML, M> Addressable<E> for Bus<ML, M>
@@ -104,15 +127,35 @@ where
             AddressSpace::OutOfBounds => Err(OutOfBounds),
         }
     }
+
+    #[inline(always)]
+    fn write_all(&mut self, addr: Address, values: &[E]) -> Result<(), OutOfBounds> {
+        let end_addr = addr + mem::size_of_val(values).saturating_sub(1) as Address;
+
+        let (addr_space, local_addr) = AddressSpace::locate::<ML>(addr);
+        let (end_addr_space, _) = AddressSpace::locate::<ML>(end_addr);
+
+        if addr_space != end_addr_space {
+            // We don't allow cross-address space writes
+            return Err(OutOfBounds);
+        }
+
+        match addr_space {
+            AddressSpace::Devices => self.devices.write_all(local_addr, values),
+            AddressSpace::MainMemory => self.memory.write_all(local_addr, values),
+            AddressSpace::OutOfBounds => Err(OutOfBounds),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{main_memory::tests::T1K, Bus, BusLayout};
+    use super::{main_memory::tests::T1K, AddressSpace, Bus, BusLayout};
     use crate::{
         backend_test,
         machine_state::backend::tests::{test_determinism, ManagerFor},
     };
+    use strum::IntoEnumIterator;
 
     backend_test!(test_reset, F, {
         test_determinism::<F, BusLayout<T1K>, _>(|space| {
@@ -120,4 +163,14 @@ mod tests {
             bus.reset();
         });
     });
+
+    #[test]
+    fn test_addr_spaces_start() {
+        for addr_space in AddressSpace::iter() {
+            let start = addr_space.start::<T1K>();
+            let (round_trip, in_addr_space) = AddressSpace::locate::<T1K>(start);
+            assert_eq!(addr_space, round_trip);
+            assert_eq!(in_addr_space, 0);
+        }
+    }
 }
