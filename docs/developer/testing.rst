@@ -233,11 +233,6 @@ Example tests:
  - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
    execute them locally, run ``dune build @src/lib_requester/runtest`` in
    the Octez root.
- - Integration tests for the P2P layer in the shell.  For instance
-   :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
-   processes that exercise large parts of the P2P layer.  To execute
-   it locally, run ``dune build @runtest_p2p_pool`` in the Octez
-   root.
 
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
