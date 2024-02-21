@@ -74,13 +74,11 @@ pub fn reveal_storage(
 ) {
     log!(host, Info, "Starting the reveal dump");
 
-    let config_root_hash_bytes = host
+    let config_root_hash = host
         .store_read_all(&CONFIG_ROOT_HASH_PATH)
         .expect("Failed reading the config root hash");
 
     // Reveal RLP encoded list of `Set` instructions in storage.
-    let config_root_hash =
-        hex::decode(config_root_hash_bytes).expect("Provide a valid root hash");
     let config = OwnedConfigProgram(vec![OwnedConfigInstruction::reveal_instr(
         config_root_hash.into(),
         OwnedPath::from(&CONFIG_PATH),

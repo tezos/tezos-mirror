@@ -4720,7 +4720,7 @@ let test_reveal_storage =
         [
           Set
             {
-              value = Hex.of_string configuration_root_hash |> Hex.show;
+              value = configuration_root_hash;
               to_ = Durable_storage_path.config_root_hash;
             };
         ]
