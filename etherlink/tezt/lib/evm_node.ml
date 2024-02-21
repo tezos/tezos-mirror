@@ -381,13 +381,14 @@ let init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
   let* () = run evm_node in
   return evm_node
 
-let init_from_rollup_node_data_dir evm_node rollup_node =
+let init_from_rollup_node_data_dir ?(devmode = false) evm_node rollup_node =
   let rollup_node_data_dir = Sc_rollup_node.data_dir rollup_node in
   let process =
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
-      @ data_dir evm_node)
+      @ data_dir evm_node
+      @ Cli_arg.optional_switch "devmode" devmode)
   in
   Process.check process
 

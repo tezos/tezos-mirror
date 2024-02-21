@@ -24,6 +24,7 @@ use storage::{
     read_minimum_base_fee_per_gas, store_base_fee_per_gas, store_chain_id, store_da_fee,
     store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
@@ -255,8 +256,9 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
             option_env!("EVM_SEQUENCER").map(|s| {
                 PublicKey::from_b58check(s).expect("Failed parsing EVM_SEQUENCER")
             }),
-            option_env!("EVM_ADMIN")
-                .map(|s| PublicKey::from_b58check(s).expect("Failed parsing EVM_ADMIN")),
+            option_env!("EVM_ADMIN").map(|s| {
+                ContractKt1Hash::from_base58_check(s).expect("Failed parsing EVM_ADMIN")
+            }),
         );
     }
 

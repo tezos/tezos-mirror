@@ -7,6 +7,7 @@ use crate::{
     EVM_PATH,
 };
 use rlp::{Decodable, DecoderError, Rlp};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_debug::Runtime;
@@ -70,17 +71,15 @@ pub fn is_revealed_storage(host: &impl Runtime) -> bool {
 pub fn reveal_storage(
     host: &mut impl Runtime,
     sequencer: Option<PublicKey>,
-    admin: Option<PublicKey>,
+    admin: Option<ContractKt1Hash>,
 ) {
     log!(host, Info, "Starting the reveal dump");
 
-    let config_root_hash_bytes = host
+    let config_root_hash = host
         .store_read_all(&CONFIG_ROOT_HASH_PATH)
         .expect("Failed reading the config root hash");
 
     // Reveal RLP encoded list of `Set` instructions in storage.
-    let config_root_hash =
-        hex::decode(config_root_hash_bytes).expect("Provide a valid root hash");
     let config = OwnedConfigProgram(vec![OwnedConfigInstruction::reveal_instr(
         config_root_hash.into(),
         OwnedPath::from(&CONFIG_PATH),
@@ -122,8 +121,8 @@ pub fn reveal_storage(
     // Change the admin if asked:
     if let Some(admin) = admin {
         let sequencer_path = concat(&EVM_PATH, &ADMIN).unwrap();
-        let pk_b58 = PublicKey::to_b58check(&admin);
-        let bytes = String::as_bytes(&pk_b58);
+        let kt1_b58 = admin.to_base58_check();
+        let bytes = String::as_bytes(&kt1_b58);
         host.store_write_all(&sequencer_path, bytes).unwrap();
     }
 

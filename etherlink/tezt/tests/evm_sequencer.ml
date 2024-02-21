@@ -911,7 +911,12 @@ let test_init_from_rollup_node_data_dir =
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
-  let* () = Evm_node.init_from_rollup_node_data_dir evm_node' sc_rollup_node in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      evm_node'
+      sc_rollup_node
+  in
   let* () = Evm_node.run evm_node' in
   let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
   let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node' in

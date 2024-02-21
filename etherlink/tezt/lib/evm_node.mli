@@ -170,10 +170,11 @@ val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t
 val upgrade_payload :
   root_hash:string -> activation_timestamp:string -> string Lwt.t
 
-(** [init_from_rollup_node_data_dir evm_node rollup_node] initialises
-    the data dir of the evm node by importing the evm state from a
-    rollup node data dir. *)
-val init_from_rollup_node_data_dir : t -> Sc_rollup_node.t -> unit Lwt.t
+(** [init_from_rollup_node_data_dir ?devmode evm_node rollup_node]
+    initialises the data dir of the evm node by importing the evm
+    state from a rollup node data dir. [devmode] is false by default. *)
+val init_from_rollup_node_data_dir :
+  ?devmode:bool -> t -> Sc_rollup_node.t -> unit Lwt.t
 
 (** [transform_dump ~dump_json ~dump_rlp] transforms a JSON list of
     instructions stored in [dump_json] to an RLP list, which is
