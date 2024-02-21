@@ -20,6 +20,22 @@ const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
 const CHUNKER = external.bin("./octez-evm-node")
 
+// fee is 4 mutez per byte, but has to be converted in wei
+// 1 tez = 1 eth = 10^18 wei
+// 1 mutez = 10^-6 tez = 10^12 wei
+const DA_FEE_PER_BYTE = 4 * Math.pow(10, 12);
+
+const ASSUMED_TX_ENCODED_SIZE = 150;
+const add_fee = function (tx) {
+    let gas_price = tx.gasPrice;
+    let size = ASSUMED_TX_ENCODED_SIZE;
+    if (tx.data) {
+        size += tx.data.length / 2;
+    }
+    let da_fee = size * DA_FEE_PER_BYTE;
+    let fee_gas = Math.ceil(da_fee / gas_price);
+    tx.gasLimit += fee_gas;
+}
 const print_full = function (rawTx) {
 
     console.log(`tx = 0x${rawTx.rawTx}`);
@@ -29,9 +45,9 @@ const print_full = function (rawTx) {
 }
 
 exports.transfer = function (playera, playerb, amount, options = {}) {
-    let tx = { 
+    let tx = {
         ...transfer_prototype_json,
-        ...options 
+        ...options
     };
     tx.nonce = playera.nonce;
     playera.nonce += 1;
@@ -39,12 +55,13 @@ exports.transfer = function (playera, playerb, amount, options = {}) {
     // Enforce amount to be in Eth, not Wei
     tx.value = Math.round(amount * 1_000_000_000_000_000_000);
     tx.gasLimit = 21000;
+    add_fee(tx);
     let rawTx = sign(tx, playera.privateKey)
     return rawTx.rawTx;
 }
 
 exports.create = function (player, amount, data, options = {}) {
-    let tx = { 
+    let tx = {
         ...create_prototype_json,
         ...options,
     };
@@ -53,6 +70,7 @@ exports.create = function (player, amount, data, options = {}) {
     player.nonce += 1;
     tx.value = Math.round(amount * 1_000_000_000_000_000_000);
     tx.data = data;
+    add_fee(tx);
     let rawTx = sign(tx, player.privateKey)
     return {
         addr: address,
@@ -61,15 +79,16 @@ exports.create = function (player, amount, data, options = {}) {
 }
 
 exports.send = function (player, contract_addr, amount, data, options = {}) {
-    let tx = { 
+    let tx = {
         ...transfer_prototype_json,
-        ...options 
+        ...options
     };
     tx.nonce = player.nonce;
     player.nonce += 1;
     tx.to = contract_addr;
     tx.value = Math.round(amount * 1_000_000_000_000_000_000);
     tx.data = data;
+    add_fee(tx);
     let rawTx = sign(tx, player.privateKey)
     return rawTx.rawTx;
 }
