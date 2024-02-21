@@ -43,7 +43,9 @@
   (glob_files ../interpreter/*)
   (source_tree ../interpreter/src)
   (glob_files ../machine_state/*)
-  (source_tree ../machine_state/src))
+  (source_tree ../machine_state/src)
+  (glob_files ../kernel_loader/*)
+  (source_tree ../kernel_loader/src))
  (action
   (no-infer
    (progn

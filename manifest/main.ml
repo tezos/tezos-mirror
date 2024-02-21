@@ -972,6 +972,8 @@ let octez_risc_v_pvm =
           [S "source_tree"; S "../interpreter/src"];
           [S "glob_files"; S "../machine_state/*"];
           [S "source_tree"; S "../machine_state/src"];
+          [S "glob_files"; S "../kernel_loader/*"];
+          [S "source_tree"; S "../kernel_loader/src"];
         ];
         [
           S "action";
