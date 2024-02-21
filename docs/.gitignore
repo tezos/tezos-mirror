@@ -1,16 +1,5 @@
-octez-baker.html
-octez-accuser.html
-octez-endorser.html
-octez-client.html
-octez-smart-rollup-node.html
-octez-dac-client.html
-octez-dac-node.html
-/api/octez-snoop.html
-/api/octez-codec.html
-/api/octez-admin-client.html
-/api/octez-signer.html
-/api/octez-*.txt
-
+octez-*.html
+octez-*.txt
 /alpha/rpc.rst
 /shell/rpc.rst
 
