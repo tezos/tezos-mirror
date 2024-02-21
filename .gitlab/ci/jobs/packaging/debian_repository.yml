@@ -9,8 +9,8 @@ variables:
   extends:
     - .image_template__docker
     - .docker_auth_template
+    - .needs__trigger
   stage: build
-  needs: []
   rules:
     - changes:
         - scripts/version.sh
