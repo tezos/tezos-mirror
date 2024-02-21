@@ -16,12 +16,12 @@ depends: [
   "octez-version"
   "lwt-watcher" { = "0.2" }
   "lwt-exit"
-  "octez-shell-libs"
-  "octez-l2-libs"
-  "octez-smart-rollup-wasm-debugger-lib"
   "caqti"
   "caqti-lwt" { >= "2.0.1" }
   "caqti-driver-sqlite3" { >= "2.0.1" }
+  "octez-shell-libs"
+  "octez-l2-libs"
+  "octez-smart-rollup-wasm-debugger-lib"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

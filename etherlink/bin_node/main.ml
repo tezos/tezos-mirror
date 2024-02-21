@@ -170,7 +170,7 @@ let rollup_node_config_prod ~rollup_node_endpoint ~keep_alive =
   let* smart_rollup_address =
     fetch_smart_rollup_address
       ~keep_alive
-      Rollup_node_services.smart_rollup_address
+      Rollup_services.smart_rollup_address
       rollup_node_endpoint
   in
   return

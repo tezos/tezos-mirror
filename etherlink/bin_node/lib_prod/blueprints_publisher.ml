@@ -7,14 +7,14 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  store : Blueprint_store.t;
+  store : Store.t;
   max_blueprints_lag : int;
   max_blueprints_catchup : int;
   catchup_cooldown : int;
 }
 
 type state = {
-  store : Blueprint_store.t;
+  store : Store.t;
   rollup_node_endpoint : Uri.t;
   max_blueprints_lag : Z.t;
   max_blueprints_catchup : Z.t;
@@ -95,7 +95,7 @@ module Worker = struct
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
-    let* res = Rollup_node_services.publish ~rollup_node_endpoint payload in
+    let* res = Rollup_services.publish ~rollup_node_endpoint payload in
     match res with
     | Ok _ -> Blueprint_events.blueprint_injected level
     | Error _ ->
@@ -105,12 +105,7 @@ module Worker = struct
         Blueprint_events.blueprint_injection_failed level
 
   let catch_up worker =
-    let open Lwt_syntax in
-    let rec range min max () =
-      if Z.Compare.(max <= min) then return (Lwt_seq.Cons (min, Lwt_seq.empty))
-      else return (Lwt_seq.Cons (min, range (Z.succ min) max))
-    in
-
+    let open Lwt_result_syntax in
     (* We limit the maximum number of blueprints we send at once *)
     let upper_bound =
       Z.(
@@ -119,36 +114,35 @@ module Worker = struct
           (latest_level_seen worker))
     in
 
-    let* () =
+    let*! () =
       Blueprint_events.catching_up (latest_level_confirmed worker) upper_bound
     in
-    let to_catchup = range (latest_level_confirmed worker) upper_bound in
 
-    let* () =
-      Lwt_seq.iter_s
-        (fun level ->
-          let* payload =
-            Blueprint_store.find
-              ~kind:`Publish
-              (blueprint_store worker)
-              (Qty level)
-          in
-          match payload with
-          | Some payload -> publish worker payload level
-          | None ->
-              let* () = Blueprint_events.missing_blueprint level in
-              Stdlib.failwith
-                Format.(
-                  asprintf
-                    "Blueprint for level %a missing from the store"
-                    Z.pp_print
-                    level))
-        to_catchup
+    let rec catching_up curr =
+      if Z.Compare.(curr <= upper_bound) then
+        let* payload =
+          Store.Publishable_blueprints.find (blueprint_store worker) (Qty curr)
+        in
+        match payload with
+        | Some payload ->
+            let*! () = publish worker payload curr in
+            catching_up Z.(succ curr)
+        | None ->
+            let*! () = Blueprint_events.missing_blueprint curr in
+            Stdlib.failwith
+              Format.(
+                asprintf
+                  "Blueprint for level %a missing from the store"
+                  Z.pp_print
+                  curr)
+      else return_unit
     in
+
+    let* () = catching_up (latest_level_confirmed worker) in
 
     (* We give ourselves a cooldown window Tezos blocks to inject everything *)
     set_cooldown worker (catchup_cooldown worker) ;
-    Lwt_result_syntax.return_unit
+    return_unit
 end
 
 type worker = Worker.infinite Worker.queue Worker.t

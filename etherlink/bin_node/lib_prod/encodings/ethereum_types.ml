@@ -165,6 +165,8 @@ let decode_address bytes = Address (decode_hex bytes)
 
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
+let encode_number (Qty v) = Z.to_bits v |> Bytes.of_string
+
 let decode_hash bytes = Hash (decode_hex bytes)
 
 let pad_to_n_bytes_le bytes length =
@@ -1098,10 +1100,30 @@ let filter_topic_encoding =
         (fun l -> Or l);
     ]
 
+type filter_address = Single of address | Vec of address list
+
+let filter_address_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"single"
+        (Tag 0)
+        address_encoding
+        (function Single address -> Some address | _ -> None)
+        (fun address -> Single address);
+      case
+        ~title:"vec"
+        (Tag 1)
+        (list address_encoding)
+        (function Vec l -> Some l | _ -> None)
+        (fun l -> Vec l);
+    ]
+
 type filter = {
   from_block : block_param option;
   to_block : block_param option;
-  address : address option;
+  address : filter_address option;
   topics : filter_topic option list option;
   block_hash : block_hash option;
 }
@@ -1116,7 +1138,7 @@ let filter_encoding =
     (obj5
        (opt "fromBlock" block_param_encoding)
        (opt "toBlock" block_param_encoding)
-       (opt "address" address_encoding)
+       (opt "address" filter_address_encoding)
        (opt "topics" (list @@ option filter_topic_encoding))
        (opt "blockHash" block_hash_encoding))
 
@@ -1191,7 +1213,7 @@ module Delayed_transaction = struct
 
   let of_bytes hash bytes =
     match bytes |> Rlp.decode with
-    | Ok Rlp.(List [List [Value tag; content]; _timestamp]) -> (
+    | Ok Rlp.(List [List [Value tag; content]; _timestamp; _level]) -> (
         match (Bytes.to_string tag, content) with
         | "\x01", Rlp.Value raw_tx ->
             let hash =
@@ -1213,4 +1235,50 @@ module Delayed_transaction = struct
     Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
 
   let pp_short fmt {hash = Hash (Hex h); _} = Format.pp_print_string fmt h
+end
+
+module Upgrade = struct
+  type t = {hash : hash; timestamp : quantity}
+
+  let of_rlp = function
+    | Rlp.List [Value hash_bytes; Value timestamp] ->
+        let hash =
+          hash_bytes |> Bytes.to_string |> Hex.of_string |> Hex.show
+          |> hash_of_string
+        in
+        let timestamp = decode_number timestamp in
+        Some {hash; timestamp}
+    | _ -> None
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
+
+  let to_bytes {hash; timestamp} =
+    let hash_bytes = hash_to_bytes hash |> String.to_bytes in
+    let timestamp_bytes = encode_number timestamp in
+    Rlp.(encode (List [Value hash_bytes; Value timestamp_bytes]))
+end
+
+module Evm_events = struct
+  type t = Upgrade_event of Upgrade.t
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with
+    | Ok (Rlp.List [Value tag; rlp_content]) -> (
+        match Bytes.to_string tag with
+        | "\x01" ->
+            let upgrade = Upgrade.of_rlp rlp_content in
+            Option.map (fun u -> Upgrade_event u) upgrade
+        | _ -> None)
+    | _ -> None
+
+  let pp fmt = function
+    | Upgrade_event {hash; timestamp = Qty timestamp} ->
+        Format.fprintf
+          fmt
+          "upgrade:@ hash %a,@ timestamp %a"
+          pp_hash
+          hash
+          Z.pp_print
+          timestamp
 end

@@ -26,7 +26,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Rollup_node_services
+open Rollup_services
 open Transaction_format
 
 module MakeBackend (Base : sig

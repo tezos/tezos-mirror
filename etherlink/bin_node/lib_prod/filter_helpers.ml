@@ -27,6 +27,8 @@ open Ethereum_types
   to blocks that have at least a log that matches with the pattern.
   For this reason, we decide to ignore [Or] patterns in the bloom filter
   "heuristic" (including all topics would break the previous property).
+  The same is done for addresses, as a filter can match against a list
+  of them.
   If this becomes a serious bottleneck, we could keep a collection of bloom
   filters to represent the disjunction.
 *)
@@ -44,7 +46,7 @@ type valid_filter = {
   to_block : block_height;
   bloom : Ethbloom.t;
   topics : filter_topic option list;
-  address : address option;
+  address : address list;
 }
 
 module Event = struct
@@ -53,7 +55,7 @@ module Event = struct
   let incompatible_block_params =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"incompatible_block_params_dev"
+      ~name:"incompatible_block_params_prod"
       ~msg:"block_hash field cannot be set when from_block and to_block are set"
       ~level:Error
       ()
@@ -61,7 +63,7 @@ module Event = struct
   let block_range_too_large =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"block_range_too_large_dev"
+      ~name:"block_range_too_large_prod"
       ~msg:"Requested block range is above the maximum"
       ~level:Error
       ()
@@ -69,7 +71,7 @@ module Event = struct
   let topic_list_too_large =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"topic_list_too_large_dev"
+      ~name:"topic_list_too_large_prod"
       ~msg:"Topic list length should be at most 4"
       ~level:Error
       ()
@@ -77,7 +79,7 @@ module Event = struct
   let receipt_not_found =
     Internal_event.Simple.declare_1
       ~section
-      ~name:"receipt_not_found_dev"
+      ~name:"receipt_not_found_prod"
       ~msg:"Receipt not found for {tx_hash}"
       ~level:Error
       ("tx_hash", hash_encoding)
@@ -85,7 +87,7 @@ module Event = struct
   let too_many_logs =
     Internal_event.Simple.declare_0
       ~section
-      ~name:"too_many_logs_dev"
+      ~name:"too_many_logs_prod"
       ~msg:"Too many logs requested"
       ~level:Error
       ()
@@ -142,7 +144,9 @@ let validate_range log_filter_config
 let make_bloom (filter : filter) =
   let bloom = Ethbloom.make () in
   Option.iter
-    (fun (Address address) -> Ethbloom.accrue ~input:address bloom)
+    (function
+      | Single (Address address) -> Ethbloom.accrue ~input:address bloom
+      | _ -> ())
     filter.address ;
   Option.iter
     (List.iter (function
@@ -176,13 +180,17 @@ let validate_filter log_filter_config
   in
   let*?? () = validate_topics filter in
   let bloom = make_bloom filter in
+  let address =
+    Option.map (function Single a -> [a] | Vec l -> l) filter.address
+    |> Option.value ~default:[]
+  in
   return_some
     {
       from_block;
       to_block;
       bloom;
       topics = Option.value ~default:[] filter.topics;
-      address = filter.address;
+      address;
     }
 
 let hex_to_bytes h = hex_to_bytes h |> Bytes.of_string
@@ -211,7 +219,7 @@ let match_filter_topics (filter : valid_filter) (log_topics : hash list) : bool
 
 (* Checks if a filter's address matches a log's address *)
 let match_filter_address (filter : valid_filter) (address : address) : bool =
-  Option.fold ~none:true ~some:(( = ) address) filter.address
+  List.is_empty filter.address || List.mem ~equal:( = ) address filter.address
 
 (* Apply a filter on one log *)
 let filter_one_log : valid_filter -> transaction_log -> filter_changes option =

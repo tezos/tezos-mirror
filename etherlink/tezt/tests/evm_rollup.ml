@@ -2659,6 +2659,8 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
     ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
+      ~da_fee_per_byte:Wei.zero
+      ~minimum_base_fee_per_gas:(Wei.of_string "21000")
       ?config
       ~kernel_installee:Constant.WASM.ghostnet_evm_kernel
       ~admin:(Some admin)
@@ -3151,55 +3153,11 @@ let test_transaction_storage_before_and_after_migration =
   in
   gen_kernel_migration_test ~config ~scenario_prior ~scenario_after protocol
 
-let test_migration_sets_kernel_governance =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "migration"; "kernel_governance"]
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-        Constant.WASM.ghostnet_evm_kernel;
-      ])
-    ~title:"Migration sets kernel_governance contract"
-  @@ fun protocol ->
-  let scenario_prior ~evm_setup:_ = return () in
-  let scenario_after ~evm_setup ~sanity_check:() =
-    let* kernel_governance_contract =
-      Sc_rollup_node.RPC.call
-        evm_setup.sc_rollup_node
-        ~rpc_hooks:Tezos_regression.rpc_hooks
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind
-           ~operation:Sc_rollup_rpc.Value
-           ~key:Durable_storage_path.kernel_governance
-           ()
-    in
-    let kernel_governance_contract =
-      Option.map
-        (fun hex ->
-          let hex = `Hex hex in
-          Hex.to_string hex)
-        kernel_governance_contract
-    in
-    Check.(
-      (kernel_governance_contract = Some "KT1Nn8bjcPSpg7EUHcZwYPCcfT1W8Z5Q8ug5")
-        (option string))
-      ~error_msg:
-        "The migration should have set the kernel_governance contract, got %L \
-         expected %R" ;
-    unit
-  in
-  gen_kernel_migration_test ~scenario_prior ~scenario_after protocol
-
 let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
   test_deposit_before_and_after_migration protocols ;
   test_block_storage_before_and_after_migration protocols ;
-  test_transaction_storage_before_and_after_migration protocols ;
-  test_migration_sets_kernel_governance protocols
+  test_transaction_storage_before_and_after_migration protocols
 
 let block_transaction_count_by ~by arg =
   let method_ = "eth_getBlockTransactionCountBy" ^ by_block_arg_string by in

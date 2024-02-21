@@ -28,7 +28,7 @@ type t = {
     valid list of external messages inputs to put in the inbox.
 *)
 val create :
-  cctxt:Client_context.wallet ->
+  cctxt:#Client_context.wallet ->
   sequencer_key:Client_keys.sk_uri ->
   timestamp:Time.Protocol.t ->
   smart_rollup_address:string ->

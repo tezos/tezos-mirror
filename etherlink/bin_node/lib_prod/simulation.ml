@@ -289,7 +289,10 @@ let gas_estimation Encodings.{success; result; gas} =
          The extra gas units, i.e. 2300, will be refunded.
       *)
       let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
-
+      (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
+      let simulated_amount =
+        Z.(add simulated_amount (cdiv simulated_amount (of_int 50)))
+      in
       return (Ok (quantity_of_z simulated_amount))
   | Some false, Some result, _ ->
       let error_msg = Bytes.to_string result in

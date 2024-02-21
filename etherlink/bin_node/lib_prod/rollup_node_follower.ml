@@ -86,7 +86,7 @@ let worker =
     | Lwt.Sleep -> Error (TzTrace.make No_l2_block_follower))
 
 let read_from_rollup_node path level rollup_node_endpoint =
-  let open Rollup_node_services in
+  let open Rollup_services in
   call_service
     ~base:rollup_node_endpoint
     durable_state_value
@@ -113,6 +113,7 @@ let process_new_block ~rollup_node_endpoint block =
   let open Lwt_syntax in
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
   let* _ = Delayed_inbox.new_rollup_block finalized_level in
+  let* _ = Evm_events_follower.new_rollup_block finalized_level in
   let* () =
     advertize_blueprints_publisher rollup_node_endpoint finalized_level
   in
@@ -143,7 +144,7 @@ let start ({rollup_node_endpoint} as parameters) =
     Lwt.dont_wait
       (fun () ->
         let*! stream =
-          Rollup_node_services.make_streamed_call ~rollup_node_endpoint
+          Rollup_services.make_streamed_call ~rollup_node_endpoint
         in
         process_rollup_node_stream ~stream worker)
       (fun _ -> ())

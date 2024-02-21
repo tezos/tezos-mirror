@@ -1,6 +1,16 @@
 # Changelog
 
-## Version Next
+## Version NEXT
+
+### Features
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version 20ab639f09a8c7c76f982383c3d9e1f831f38088
 
 ### Features
 

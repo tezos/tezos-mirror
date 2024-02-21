@@ -66,7 +66,7 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 type worker = Worker.infinite Worker.queue Worker.t
 
 let subkeys_from_rollup_node path level rollup_node_endpoint =
-  let open Rollup_node_services in
+  let open Rollup_services in
   call_service
     ~base:rollup_node_endpoint
     durable_state_subkeys
@@ -75,7 +75,7 @@ let subkeys_from_rollup_node path level rollup_node_endpoint =
     ()
 
 let read_from_rollup_node path level rollup_node_endpoint =
-  let open Rollup_node_services in
+  let open Rollup_services in
   call_service
     ~base:rollup_node_endpoint
     durable_state_value
