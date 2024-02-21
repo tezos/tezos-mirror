@@ -1414,7 +1414,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         query
           (fun
             version
-            applied
             validated
             refused
             outdated
@@ -1424,8 +1423,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ->
             object
               method version = version
-
-              method applied = applied
 
               method validated = validated
 
@@ -1444,15 +1441,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (version_arg pending_operations_versions)
              pending_operations_versions.default
              (fun t -> t#version)
-        |+ opt_field
-             ~descr:
-               "(DEPRECATED use validated instead) Include validated operations"
-               (* https://gitlab.com/tezos/tezos/-/issues/5891
-                  applied is deprecated and should be removed in a future
-                  version of Octez *)
-             "applied"
-             Tezos_rpc.Arg.bool
-             (fun t -> t#applied)
         |+ field
              ~descr:"Include validated operations (true by default)"
              "validated"
@@ -1547,7 +1535,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         query
           (fun
             version
-            applied
             validated
             refused
             outdated
@@ -1557,8 +1544,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ->
             object
               method version = version
-
-              method applied = applied
 
               method validated = validated
 
@@ -1577,15 +1562,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              (version_arg monitor_operations_versions)
              monitor_operations_versions.default
              (fun t -> t#version)
-        |+ opt_field
-             ~descr:
-               "(DEPRECATED use validated instead) Include validated operations"
-               (* https://gitlab.com/tezos/tezos/-/issues/5891
-                  applied is deprecated and should be removed in a future
-                  version of Octez *)
-             "applied"
-             Tezos_rpc.Arg.bool
-             (fun t -> t#applied)
         |+ field
              ~descr:"Include validated operations (set by default)"
              "validated"
@@ -2016,8 +1992,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           (object
              method version = version
 
-             method applied = None
-
              method validated = validated
 
              method refused = refused
@@ -2059,8 +2033,6 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ((), chain)
           (object
              method version = version
-
-             method applied = None
 
              method validated = validated
 

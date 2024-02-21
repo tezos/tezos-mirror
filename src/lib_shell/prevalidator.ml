@@ -1086,12 +1086,7 @@ module Make
           (Proto_services.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
           (fun pv params () ->
             let validated =
-              if
-                params#validated && Option.value ~default:true params#applied
-                (* https://gitlab.com/tezos/tezos/-/issues/5891
-                   applied is deprecated and should be removed in a future
-                   version of Octez *)
-              then
+              if params#validated then
                 Classification.Sized_map.to_map
                   pv.shell.classification.validated
                 |> Operation_hash.Map.to_seq
@@ -1177,12 +1172,7 @@ module Make
             in
             (* First call : retrieve the current set of op from the mempool *)
             let validated_seq =
-              if
-                params#validated && Option.value ~default:true params#applied
-                (* https://gitlab.com/tezos/tezos/-/issues/5891
-                   applied is deprecated and should be removed in a future
-                   version of Octez *)
-              then
+              if params#validated then
                 Classification.Sized_map.to_map
                   pv.shell.classification.validated
                 |> Operation_hash.Map.to_seq
@@ -1231,8 +1221,7 @@ module Make
             in
             let current_mempool = ref (Some current_mempool) in
             let filter_result = function
-              | `Validated ->
-                  params#validated && Option.value ~default:true params#applied
+              | `Validated -> params#validated
               | `Refused _ -> params#refused
               | `Outdated _ -> params#outdated
               | `Branch_refused _ -> params#branch_refused
