@@ -6,7 +6,7 @@
 
 pub mod bus;
 pub mod csregisters;
-mod mode;
+pub mod mode;
 pub mod registers;
 
 #[cfg(test)]
@@ -21,6 +21,9 @@ pub enum Exception {
     IllegalInstruction,
     LoadAccessFault,
     StoreAccessFault,
+    EnvCallFromUMode,
+    EnvCallFromSMode,
+    EnvCallFromMMode,
 }
 
 /// RISC-V hart state

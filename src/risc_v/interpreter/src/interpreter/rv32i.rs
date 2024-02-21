@@ -10,8 +10,9 @@ use crate::state_backend as backend;
 use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
+        mode::Mode,
         registers::{XRegister, XRegisters},
-        HartState, MachineState,
+        Exception, HartState, MachineState,
     },
     parser::instruction::FenceSet,
 };
@@ -72,6 +73,16 @@ where
         // U-type immediates have bits [31:12] set and the lower 12 bits zeroed.
         let rval = self.pc.read().wrapping_add(imm as u64);
         self.xregisters.write(rd, rval);
+    }
+
+    /// `ECALL` instruction
+    pub fn run_ecall(&self) -> Exception {
+        match self.mode.read() {
+            Mode::User => Exception::EnvCallFromUMode,
+            Mode::Supervisor => Exception::EnvCallFromSMode,
+            Mode::Machine => Exception::EnvCallFromMMode,
+            Mode::Debug => Exception::IllegalInstruction,
+        }
     }
 
     /// Generic `JALR` w.r.t instruction width
@@ -265,10 +276,10 @@ mod tests {
     use crate::{
         machine_state::{
             bus::main_memory::tests::T1K,
-            registers::{
-                a0, a1, a2, a3, a4, fa0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
-            },
-            HartState, HartStateLayout, MachineState, MachineStateLayout,
+            mode::Mode,
+            registers::fa0,
+            registers::{a0, a1, a2, a3, a4, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout},
+            Exception, HartState, HartStateLayout, MachineState, MachineStateLayout,
         },
         parser::instruction::FenceSet,
     };
@@ -542,6 +553,24 @@ mod tests {
             assert_eq!(state.hart.xregisters.read(t1), 123);
             assert_eq!(state.hart.fregisters.read(fa0), 0.1_f64.into());
         });
+    });
+
+    backend_test!(test_ecall, F, {
+        let mut backend = create_backend!(HartStateLayout, F);
+        let mut state = create_state!(HartState, F, backend);
+
+        let mode_exc = [
+            (Mode::User, Exception::EnvCallFromUMode),
+            (Mode::Supervisor, Exception::EnvCallFromSMode),
+            (Mode::Machine, Exception::EnvCallFromMMode),
+            (Mode::Debug, Exception::IllegalInstruction),
+        ];
+
+        for (mode, expected_e) in mode_exc {
+            state.mode.write(mode);
+            let instr_res = state.run_ecall();
+            assert!(instr_res == expected_e);
+        }
     });
 
     backend_test!(test_jalr, F, {
