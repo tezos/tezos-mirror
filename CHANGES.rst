@@ -55,6 +55,11 @@ Node
 - **Breaking change** Removed the deprecated ``endorsing_rights`` RPC,
   use ``attestation_rights`` instead. (MR :gl:`!11952`)
 
+- Removed the deprecated ``applied`` parameter from RPCs ``GET
+  ../mempool/monitor_operations`` and ``GET
+  ../mempool/pending_operations``. Use ``validated`` instead. (MR
+  :gl:`!12157`)
+
 Client
 ------
 
