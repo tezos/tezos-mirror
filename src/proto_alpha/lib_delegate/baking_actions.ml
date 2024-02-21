@@ -926,6 +926,22 @@ let prepare_block_request state block_to_bake =
   state.global_state.forge_worker_hooks.push_request request ;
   return state
 
+let prepare_preattestations_request state unsigned_preattestations =
+  let open Lwt_result_syntax in
+  let branch = state.level_state.latest_proposal.predecessor.hash in
+  let request =
+    Forge_and_sign_preattestations {branch; unsigned_preattestations}
+  in
+  state.global_state.forge_worker_hooks.push_request request ;
+  return state
+
+let prepare_attestations_request state unsigned_attestations =
+  let open Lwt_result_syntax in
+  let branch = state.level_state.latest_proposal.predecessor.hash in
+  let request = Forge_and_sign_attestations {branch; unsigned_attestations} in
+  state.global_state.forge_worker_hooks.push_request request ;
+  return state
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4539
    Avoid updating the state here.
    (See also comment in {!State_transitions.step}.)
@@ -940,6 +956,10 @@ let rec perform_action ~state_recorder state (action : action) =
       let* () = state_recorder ~new_state:state in
       return state
   | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
+  | Prepare_preattestations {preattestations} ->
+      prepare_preattestations_request state preattestations
+  | Prepare_attestations {attestations} ->
+      prepare_attestations_request state attestations
   | Inject_block {prepared_block; force_injection; asynchronous} ->
       let* new_state =
         inject_block ~force_injection ~asynchronous state prepared_block
@@ -971,5 +991,3 @@ let rec perform_action ~state_recorder state (action : action) =
            [Prequorum_reached] event *)
       let*! () = start_waiting_for_preattestation_quorum state in
       return state
-  | Prepare_attestations _ | Prepare_preattestations _ ->
-      failwith "prepare (pre)attestations: not implemented yet"
