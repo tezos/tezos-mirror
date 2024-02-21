@@ -20,6 +20,7 @@ open Scenario_dsl
 open Scenario_base
 open Scenario_op
 open Test_scenario_base
+open Scenario_begin
 
 let test_wait_with_rewards =
   let constants =

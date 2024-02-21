@@ -19,6 +19,7 @@ open Tez_helpers.Ez_tez
 open Scenario_dsl
 open Scenario_base
 open Scenario_op
+open Scenario_begin
 
 let default_param_wait, default_unstake_wait =
   let constants = Default_parameters.constants_test in

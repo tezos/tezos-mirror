@@ -38,6 +38,7 @@ open Scenario_dsl
 open Scenario_base
 open Scenario_op
 open Test_scenario_base
+open Scenario_begin
 
 let fs = Format.asprintf
 
