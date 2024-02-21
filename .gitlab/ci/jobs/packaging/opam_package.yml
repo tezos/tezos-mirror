@@ -516,9 +516,19 @@ opam:octez-distributed-lwt-internal:
   variables:
     package: octez-distributed-lwt-internal
 
-# Ignoring unreleased package octez-evm-node.
+opam:octez-evm-node:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_exec_opam_batch_1
+  variables:
+    package: octez-evm-node
 
-# Ignoring unreleased package octez-evm-node-libs.
+opam:octez-evm-node-libs:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_1
+  variables:
+    package: octez-evm-node-libs
 
 # Ignoring unreleased package octez-evm-node-tests.
 
@@ -785,7 +795,7 @@ opam:octez-smart-rollup-node-PtNairob:
 opam:octez-smart-rollup-node-PtParisA:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_1
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: octez-smart-rollup-node-PtParisA
 
@@ -917,7 +927,7 @@ opam:tezos-dal-node-lib:
 opam:tezos-dal-node-services:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-dal-node-services
 
@@ -976,7 +986,7 @@ opam:tezos-protocol-004-Pt24m4xi:
 opam:tezos-protocol-005-PsBABY5H:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-005-PsBABY5H
 
@@ -1067,14 +1077,14 @@ opam:tezos-protocol-015-PtLimaPt:
 opam:tezos-protocol-016-PtMumbai:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: tezos-protocol-016-PtMumbai
 
 opam:tezos-protocol-017-PtNairob:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: tezos-protocol-017-PtNairob
 
@@ -1129,7 +1139,7 @@ opam:tezos-protocol-genesis:
 opam:tezos-proxy-server-config:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-proxy-server-config
 
