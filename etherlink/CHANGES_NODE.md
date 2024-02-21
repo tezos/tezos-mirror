@@ -1,6 +1,16 @@
 # Changelog
 
-## Next
+## Version for NEXT
+
+### Features
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version for kernel 20ab639f09a8c7c76f982383c3d9e1f831f38088
 
 ### Features
 
@@ -17,7 +27,6 @@
   in a sqlite database (as a consquence, the node now depends on `libsqlite3`).
   (!11948)
 
-### Internal
 
 ## Version for kernel c5969505b81b52a779270b69f48b6a66c84da429
 
