@@ -163,6 +163,8 @@ type signed_consensus_vote_batch = {
 type action =
   | Do_nothing
   | Prepare_block of {block_to_bake : block_to_bake}
+  | Prepare_preattestations of {preattestations : unsigned_consensus_vote_batch}
+  | Prepare_attestations of {attestations : unsigned_consensus_vote_batch}
   | Inject_block of {
       prepared_block : prepared_block;
       force_injection : bool;
@@ -193,6 +195,8 @@ type t = action
 let pp_action fmt = function
   | Do_nothing -> Format.fprintf fmt "do nothing"
   | Prepare_block _ -> Format.fprintf fmt "prepare block"
+  | Prepare_preattestations _ -> Format.fprintf fmt "prepare preattestations"
+  | Prepare_attestations _ -> Format.fprintf fmt "prepare attestations"
   | Inject_block _ -> Format.fprintf fmt "inject block"
   | Inject_preattestations _ -> Format.fprintf fmt "inject preattestations"
   | Inject_attestations _ -> Format.fprintf fmt "inject attestations"
@@ -1003,3 +1007,5 @@ let rec perform_action ~state_recorder state (action : action) =
            [Prequorum_reached] event *)
       let*! () = start_waiting_for_preattestation_quorum state in
       return state
+  | Prepare_attestations _ | Prepare_preattestations _ ->
+      failwith "prepare (pre)attestations: not implemented yet"
