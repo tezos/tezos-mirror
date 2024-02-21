@@ -219,7 +219,7 @@ module Frozen_tez = struct
     if account = a.delegate then assert false
     else
       match String.Map.find account a.co_current with
-      | None -> a
+      | None -> assert false
       | Some frozen ->
           if Q.(geq amount_q frozen) then
             let co_current = String.Map.remove account a.co_current in
