@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2024 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2023-2024 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
@@ -116,11 +116,15 @@ pub enum TicketError {
     InvalidAmount(BigInt),
 }
 
+// TODO: <https://gitlab.com/tezos/tezos/-/issues/6991>
+// Switch from `MichelsonInt` to `MichelsonNat` for the amount field
+// for consistency with the OCaml part.
+// This will be a breaking change.
 /// Michelson *ticket* encoding.
 #[derive(Debug, PartialEq, Eq)]
-struct TypedTicket<Arg0>(pub MichelsonContract, pub Arg0, pub MichelsonInt)
+struct TypedTicket<Contents>(pub MichelsonContract, pub Contents, pub MichelsonInt)
 where
-    Arg0: Debug + PartialEq + Eq;
+    Contents: Debug + PartialEq + Eq;
 
 impl<Arg> HasEncoding for TypedTicket<Arg>
 where
@@ -272,6 +276,8 @@ where
 }
 
 impl<Expr: MichelsonTicketContent> BinWriter for Ticket<Expr> {
+    // TODO: <https://gitlab.com/tezos/tezos/-/issues/6992>
+    // Switch the output to the new Ticket constructor.
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
         self.0.bin_write(output)
     }
@@ -477,6 +483,7 @@ mod test {
         assert_eq!(expected_ticket, ticket);
         assert!(remaining.is_empty());
     }
+
     #[test]
     fn basic_encode_decode_on_int_ticket() {
         let expected_ticket: TypedTicket<MichelsonInt> = TypedTicket(
@@ -572,7 +579,7 @@ mod test {
         assert_eq!(expected_ticket, ticket);
         assert!(remaining.is_empty());
 
-        // none
+        // None
         let expected_ticket = TypedTicket::<MichelsonOption<MichelsonBytes>>(
             MichelsonContract(
                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),
@@ -633,7 +640,6 @@ mod test {
 
     #[test]
     fn basic_encode_decode_on_pair_ticket() {
-        // Some
         let expected_ticket = TypedTicket(
             MichelsonContract(
                 Contract::from_b58check("KT1FHqsvc7vRS3u54L66DdMX4gb6QKqxJ1JW").unwrap(),

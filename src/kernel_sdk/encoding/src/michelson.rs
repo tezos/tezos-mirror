@@ -81,7 +81,8 @@ pub mod v1_primitives {
     pub const TICKET_TAG: u8 = 157;
 }
 
-// TODO: combine MichelsonTicketContent and Michelson traits
+// TODO: <https://gitlab.com/tezos/tezos/-/issues/6990>
+// combine MichelsonTicketContent and Michelson traits
 /// marker trait for michelson encoding
 pub trait Michelson:
     HasEncoding + BinWriter + NomReader + Debug + PartialEq + Eq
