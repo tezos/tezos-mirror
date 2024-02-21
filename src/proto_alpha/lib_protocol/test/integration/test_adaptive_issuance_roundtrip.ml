@@ -318,89 +318,6 @@ module State = struct
       let* total_supply = Tez.(total_supply + delta_rewards) in
       return {state with last_level_rewards = current_level; total_supply}
 
-  (** [apply_staking_abstract_balance_updates] updates a state based on balance
-      updates (found in block application metadata).
-      It first collect all changes on pseudotokens, then apply them on
-      accounts. *)
-  let apply_staking_abstract_balance_updates balance_updates state =
-    let update_staking_delegator_numerator delta account_state =
-      let staking_delegator_numerator =
-        Z.add delta account_state.staking_delegator_numerator
-      in
-      {account_state with staking_delegator_numerator}
-    in
-    let update_staking_delegate_denominator delta account_state =
-      let staking_delegate_denominator =
-        Z.add delta account_state.staking_delegate_denominator
-      in
-      {account_state with staking_delegate_denominator}
-    in
-    let add_change pkh update ~f changes =
-      let delta_pt, delta_mul =
-        match
-          (update
-            : Protocol.Alpha_context.Staking_pseudotoken.t
-              Protocol.Alpha_context.Receipt.balance_update)
-        with
-        | Credited pt -> (pt, Z.one)
-        | Debited pt -> (pt, Z.minus_one)
-      in
-      let delta =
-        Z.mul delta_mul
-        @@ Protocol.Alpha_context.Staking_pseudotoken.Internal_for_tests.to_z
-             delta_pt
-      in
-      let f = f delta in
-      Signature.Public_key_hash.Map.update
-        pkh
-        (function
-          | None -> Some f
-          | Some existing_change ->
-              Some (fun account_state -> f (existing_change account_state)))
-        changes
-    in
-    let changes =
-      List.fold_left
-        (fun changes balance_update ->
-          let (Protocol.Alpha_context.Receipt.Balance_update_item
-                (balance, update, _origin)) =
-            balance_update
-          in
-          match balance with
-          | Staking_delegator_numerator {delegator} -> (
-              match delegator with
-              | Originated _ -> assert false
-              | Implicit pkh ->
-                  add_change
-                    pkh
-                    update
-                    changes
-                    ~f:update_staking_delegator_numerator)
-          | Staking_delegate_denominator {delegate} ->
-              add_change
-                delegate
-                update
-                changes
-                ~f:update_staking_delegate_denominator
-          | _ -> (
-              match Protocol.Alpha_context.Receipt.token_of_balance balance with
-              | Tez -> changes
-              | Staking_pseudotoken -> assert false))
-        Signature.Public_key_hash.Map.empty
-        balance_updates
-    in
-    let update_account account_state =
-      match Signature.Public_key_hash.Map.find account_state.pkh changes with
-      | None -> account_state
-      | Some f -> f account_state
-    in
-    let log_updates =
-      List.map
-        (fun (x, _) -> fst @@ find_account_from_pkh x state)
-        (Signature.Public_key_hash.Map.bindings changes)
-    in
-    update_map ~log_updates ~f:(String.Map.map update_account) state
-
   let apply_slashing
       ( culprit,
         Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash} )
@@ -854,7 +771,7 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
   let issuance_from_rate =
     Tez.(
       mul_q total_supply Q.(div yearly_rate_exact ~$525_600_00)
-      |> of_q ~round_up:false)
+      |> of_q ~round:`Down)
   in
   let* () =
     Assert.equal
@@ -871,16 +788,6 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
   let open Lwt_result_wrap_syntax in
-  Log.info
-    ~color:time_color
-    "Baking level %d"
-    (Int32.to_int (Int32.succ Block.(block.header.shell.level))) ;
-  let current_cycle = Block.current_cycle block in
-  let adaptive_issuance_vote =
-    if state.activate_ai then
-      Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
-    else Per_block_vote_pass
-  in
   let policy =
     match baker with
     | None -> state.baking_policy
@@ -900,15 +807,22 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let baker_name, {contract = baker_contract; _} =
     State.find_account_from_pkh baker state
   in
+  Log.info
+    ~color:time_color
+    "Baking level %d with %s"
+    (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
+    baker_name ;
+  let current_cycle = Block.current_cycle block in
+  let adaptive_issuance_vote =
+    if state.activate_ai then
+      Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
+    else Per_block_vote_pass
+  in
   let* () = check_issuance_rpc block in
   let state, operations = State.pop_pending_operations state in
   let* block, state =
-    let* block', metadata =
+    let* block', _metadata =
       Block.bake_with_metadata ?policy ~adaptive_issuance_vote ~operations block
-    in
-    let balance_updates = Block.get_balance_updates_from_metadata metadata in
-    let state =
-      State.apply_staking_abstract_balance_updates balance_updates state
     in
     if state.burn_rewards then
       (* Incremental mode *)
@@ -1352,7 +1266,7 @@ let unstake src_name unstake_value : (t, t) scenarios =
         unstake_value ;
       let stake_balance =
         (balance_of_account src_name state.account_map).staked_b
-        |> Partial_tez.to_tez ~round_up:false
+        |> Partial_tez.to_tez ~round:`Down
       in
       let amount = quantity_to_tez stake_balance unstake_value in
       let* operation = unstake (B block) src.contract amount in
@@ -1760,7 +1674,7 @@ let rec loop_action n : ('a -> 'a tzresult Lwt.t) -> ('a, 'a) scenarios =
 let check_balance_field src_name field amount : (t, t) scenarios =
   let open Lwt_result_syntax in
   let check = Assert.equal_tez ~loc:__LOC__ amount in
-  let check' a = check (Partial_tez.to_tez ~round_up:false a) in
+  let check' a = check (Partial_tez.to_tez ~round:`Down a) in
   exec_state (fun (block, state) ->
       let src = State.find_account src_name state in
       let src_balance, src_total =
@@ -2262,12 +2176,56 @@ module Rewards = struct
         ~autostaking_enable:false
         ()
     in
-    begin_test ~activate_ai:true ~constants ["delegate"]
+    let set_edge pct =
+      let params =
+        {
+          limit_of_staking_over_baking = Q.one;
+          edge_of_baking_over_staking = Q.of_float pct;
+        }
+      in
+      set_delegate_params "delegate" params
+    in
+    begin_test ~activate_ai:true ~constants ["delegate"; "faucet"]
+    --> set_baker "faucet"
+    --> (Tag "edge = 0" --> set_edge 0.
+        |+ Tag "edge = 0.24" --> set_edge 0.24
+        |+ Tag "edge = 0.11..." --> set_edge 0.1111111111
+        |+ Tag "edge = 1" --> set_edge 1.)
+    --> add_account_with_funds
+          "staker1"
+          "faucet"
+          (Amount (Tez.of_mutez 2_000_000_000L))
+    --> add_account_with_funds
+          "staker2"
+          "faucet"
+          (Amount (Tez.of_mutez 2_000_000_000L))
+    --> add_account_with_funds
+          "staker3"
+          "faucet"
+          (Amount (Tez.of_mutez 2_000_000_000L))
+    --> set_delegate "staker1" (Some "delegate")
+    --> set_delegate "staker2" (Some "delegate")
+    --> set_delegate "staker3" (Some "delegate")
+    --> set_baker "delegate"
     --> (Tag "block step" --> wait_n_blocks 200
         |+ Tag "cycle step" --> wait_n_cycles 20
         |+ Tag "wait AI activation" --> next_block --> wait_ai_activation
+           --> (Tag "no staker" --> Empty
+               |+ Tag "one staker"
+                  --> stake "staker1" (Amount (Tez.of_mutez 450_000_111L))
+               |+ Tag "two stakers"
+                  --> stake "staker1" (Amount (Tez.of_mutez 444_000_111L))
+                  --> stake "staker2" (Amount (Tez.of_mutez 333_001_987L))
+                  --> set_baker "delegate"
+               |+ Tag "three stakers"
+                  --> stake "staker1" (Amount (Tez.of_mutez 444_000_111L))
+                  --> stake "staker2" (Amount (Tez.of_mutez 333_001_987L))
+                  --> stake "staker3" (Amount (Tez.of_mutez 123_456_788L)))
            --> (Tag "block step" --> wait_n_blocks 100
                |+ Tag "cycle step" --> wait_n_cycles 10))
+    --> Tag "staker 1 unstakes half..." --> unstake "staker1" Half
+    --> (Tag "block step" --> wait_n_blocks 100
+        |+ Tag "cycle step" --> wait_n_cycles 10)
 
   let test_ai_curve_activation_time =
     let constants =

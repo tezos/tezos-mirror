@@ -58,8 +58,10 @@ module Tez = struct
 
   let of_z a = Z.to_int64 a |> of_mutez
 
-  let of_q ~round_up Q.{num; den} =
-    (if round_up then Z.cdiv num den else Z.div num den) |> of_z
+  let of_q ~round Q.{num; den} =
+    (match round with `Up -> Z.cdiv num den | `Down -> Z.div num den) |> of_z
+
+  let to_z a = to_mutez a |> Z.of_int64
 
   let ratio num den =
     Q.make (Z.of_int64 (to_mutez num)) (Z.of_int64 (to_mutez den))
@@ -79,7 +81,7 @@ module Partial_tez = struct
     let tez, rem = Z.div_rem num den in
     (Tez.of_z tez, rem /// den)
 
-  let to_tez ~round_up = Tez.of_q ~round_up
+  let to_tez ~round = Tez.of_q ~round
 
   let get_rem a = snd (to_tez_rem a)
 
@@ -167,18 +169,27 @@ module Frozen_tez = struct
     assert (Q.(equal rem zero)) ;
     Tez.(tez +! a.self_current)
 
+  (* 0 <= quantity < 1 && co_current + quantity is int *)
   let add_q_to_all_co_current quantity co_current =
     let s = total_co_current_q co_current in
-    let f p_amount =
-      let q = Q.div p_amount s in
-      Partial_tez.add p_amount (Q.mul quantity q)
-    in
-    String.Map.map f co_current
+    if Q.(equal quantity zero) then co_current
+    else
+      let f p_amount =
+        let q = Q.div p_amount s in
+        Partial_tez.add p_amount (Q.mul quantity q)
+      in
+      String.Map.map f co_current
 
   (* For rewards, distribute equally *)
-  let add_tez_to_all_current tez a =
+  let add_tez_to_all_current ~edge tez a =
     let self_portion = Tez.ratio a.self_current (total_current a) in
-    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round_up:true in
+    (* Baker's advantage for the mutez *)
+    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up in
+    let remains = Tez.(tez -! self_quantity) in
+    (* Baker's edge. Round up for the baker's advantage again *)
+    let bakers_edge = Tez.mul_q remains edge |> Tez.of_q ~round:`Up in
+    let self_quantity = Tez.(self_quantity +! bakers_edge) in
+    (* The remains are distributed equally *)
     let co_quantity = Partial_tez.of_tez Tez.(tez -! self_quantity) in
     let co_current = add_q_to_all_co_current co_quantity a.co_current in
     {a with co_current; self_current = Tez.(a.self_current +! self_quantity)}
@@ -186,9 +197,7 @@ module Frozen_tez = struct
   (* For slashing, slash equally *)
   let sub_tez_from_all_current tez a =
     let self_portion = Tez.ratio a.self_current (total_current a) in
-    let self_quantity =
-      Tez.mul_q tez self_portion |> Tez.of_q ~round_up:false
-    in
+    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Down in
     let self_current =
       if Tez.(self_quantity >= a.self_current) then Tez.zero
       else Tez.(a.self_current -! self_quantity)
@@ -206,9 +215,11 @@ module Frozen_tez = struct
       {a with self_current; co_current = String.Map.map f a.co_current}
 
   (* Adds frozen to account. Happens each stake in frozen deposits *)
-  let add_current amount account a =
-    if account = a.delegate then
-      {a with self_current = Tez.(a.self_current +! amount)}
+  let add_current_q amount account a =
+    if account = a.delegate then (
+      let amount, rem = Partial_tez.to_tez_rem amount in
+      assert (Q.(equal rem zero)) ;
+      {a with self_current = Tez.(a.self_current +! amount)})
     else
       {
         a with
@@ -216,10 +227,16 @@ module Frozen_tez = struct
           String.Map.update
             account
             (function
-              | None -> Some (Partial_tez.of_tez amount)
-              | Some q -> Some Partial_tez.(add q (of_tez amount)))
+              | None -> Some amount | Some q -> Some Partial_tez.(add q amount))
             a.co_current;
       }
+
+  let add_current amount account a =
+    add_current_q (Partial_tez.of_tez amount) account a
+
+  let add_self_current amount a =
+    let self_current = Tez.(a.self_current +! amount) in
+    {a with self_current}
 
   (* Adds frozen to account. Happens each unstake to unstaked frozen deposits *)
   let add_init amount account a = union a (init amount account a.delegate)
@@ -246,15 +263,29 @@ module Frozen_tez = struct
             in
             ({a with co_current}, amount)
 
+  (* Remove a partial amount to the co frozen tez table. *)
+  let sub_current_q amount_q account a =
+    if account = a.delegate then assert false
+    else
+      match String.Map.find account a.co_current with
+      | None -> a
+      | Some frozen ->
+          if Q.(geq amount_q frozen) then
+            let co_current = String.Map.remove account a.co_current in
+            {a with co_current}
+          else
+            let co_current =
+              String.Map.add account Q.(frozen - amount_q) a.co_current
+            in
+            {a with co_current}
+
   let sub_current_and_init amount account a =
     let a, amount = sub_current amount account a in
     ({a with initial = Tez.(a.initial -! amount)}, amount)
 
   let slash base_amount (pct : Protocol.Percentage.t) a =
     let pct_q = Protocol.Percentage.to_q pct in
-    let slashed_amount =
-      Tez.mul_q base_amount pct_q |> Tez.of_q ~round_up:false
-    in
+    let slashed_amount = Tez.mul_q base_amount pct_q |> Tez.of_q ~round:`Down in
     let total_current = total_current a in
     let slashed_amount_final = Tez.min slashed_amount total_current in
     (sub_tez_from_all_current slashed_amount a, slashed_amount_final)
@@ -298,13 +329,13 @@ module Unstaked_frozen = struct
 
   let apply_slash_to_request slash_pct amount =
     let slashed_amount =
-      Tez.mul_q amount Q.(slash_pct // 100) |> Tez.of_q ~round_up:true
+      Tez.mul_q amount Q.(slash_pct // 100) |> Tez.of_q ~round:`Up
     in
     Tez.(amount -! slashed_amount)
 
   let apply_slash_to_current slash_pct initial current =
     let slashed_amount =
-      Tez.mul_q initial Q.(slash_pct // 100) |> Tez.of_q ~round_up:false
+      Tez.mul_q initial Q.(slash_pct // 100) |> Tez.of_q ~round:`Down
     in
     Tez.sub_opt current slashed_amount |> Option.value ~default:Tez.zero
 
@@ -733,8 +764,8 @@ let assert_balance_equal ~loc account_name
           Tez.equal
           (f "Staked balances do not match")
           Tez.pp
-          (Partial_tez.to_tez ~round_up:false a_staked_b)
-          (Partial_tez.to_tez ~round_up:false b_staked_b);
+          (Partial_tez.to_tez ~round:`Down a_staked_b)
+          (Partial_tez.to_tez ~round:`Down b_staked_b);
         Assert.equal
           ~loc
           Tez.equal
@@ -782,8 +813,17 @@ let add_liquid_rewards amount account_name account_map =
 
 let add_frozen_rewards amount account_name account_map =
   let f account =
+    let actual_edge =
+      Q.(
+        mul account.parameters.edge_of_baking_over_staking (1_000_000_000 // 1)
+        |> to_int |> of_int
+        |> mul (1 // 1_000_000_000))
+    in
     let frozen_deposits =
-      Frozen_tez.add_tez_to_all_current amount account.frozen_deposits
+      Frozen_tez.add_tez_to_all_current
+        ~edge:actual_edge
+        amount
+        account.frozen_deposits
     in
     {account with frozen_deposits}
   in
@@ -864,6 +904,42 @@ let stake_from_unstake amount current_cycle consensus_rights_delay delegate_name
         in
         (account_map, rem_amount)
 
+let tez_to_pseudo ~round amount delegate_account =
+  let {staking_delegate_denominator; frozen_deposits; _} = delegate_account in
+  let total_q = Frozen_tez.total_co_current_q frozen_deposits.co_current in
+  let total, rem = Partial_tez.to_tez_rem total_q in
+  assert (Q.(equal rem zero)) ;
+  if Tez.(equal total zero) then Tez.to_z amount
+  else
+    let r = Tez.ratio amount total in
+    let p = Q.(r * of_bigint staking_delegate_denominator) in
+    Tez.(of_q ~round p |> to_z)
+
+let pseudo_to_partial_tez amount_pseudo delegate_account =
+  let {staking_delegate_denominator; frozen_deposits; _} = delegate_account in
+  let total_q = Frozen_tez.total_co_current_q frozen_deposits.co_current in
+  let total, rem = Partial_tez.to_tez_rem total_q in
+  assert (Q.(equal rem zero)) ;
+  if Z.(equal staking_delegate_denominator zero) then Q.of_bigint amount_pseudo
+  else
+    let q = Q.(amount_pseudo /// staking_delegate_denominator) in
+    Tez.mul_q total q
+
+(* tez_q <= amount *)
+let stake_values_real amount delegate_account =
+  let pseudo = tez_to_pseudo ~round:`Down amount delegate_account in
+  let tez_q = pseudo_to_partial_tez pseudo delegate_account in
+  (pseudo, tez_q)
+
+(* returned_amount <= amount *)
+let unstake_values_real amount delegate_account =
+  let pseudo = tez_to_pseudo ~round:`Up amount delegate_account in
+  let tez_q = pseudo_to_partial_tez pseudo delegate_account in
+  if Tez.equal (Tez.of_q ~round:`Down tez_q) amount then (pseudo, tez_q)
+  else
+    let pseudo = Z.(pseudo - one) in
+    (pseudo, pseudo_to_partial_tez pseudo delegate_account)
+
 let apply_stake amount current_cycle consensus_rights_delay staker_name
     account_map =
   match String.Map.find staker_name account_map with
@@ -875,6 +951,8 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
           account_map
       | Some delegate_name ->
           let old_account_map = account_map in
+          (* If self stake, then try to stake from unstake.
+             Returns the amount that remains to be staked from liquid *)
           let account_map, amount =
             if delegate_name = staker_name then
               stake_from_unstake
@@ -886,21 +964,64 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
             else (account_map, amount)
           in
           if Tez.(staker.liquid < amount) then
-            (* Invalid amount: operation will fail *)
+            (* Not enough liquid balance: operation will fail *)
             old_account_map
-          else
-            let f_staker staker =
-              let liquid = Tez.(staker.liquid -! amount) in
-              {staker with liquid}
-            in
-            let f_delegate delegate =
+          else if delegate_name = staker_name then
+            (* If self stake: increase frozen deposits and decrease liquid balance.
+               "add_current" is easy to resolve since there is no pseudotokens *)
+            let f delegate =
               let frozen_deposits =
                 Frozen_tez.add_current
                   amount
                   staker_name
                   delegate.frozen_deposits
               in
-              {delegate with frozen_deposits}
+              let liquid = Tez.(delegate.liquid -! amount) in
+              {delegate with frozen_deposits; liquid}
+            in
+            update_account ~f delegate_name account_map
+          else
+            (* If external stake: *)
+            let delegate_account =
+              String.Map.find delegate_name account_map
+              |> Option.value_f ~default:(fun _ -> assert false)
+            in
+            (* Call stake_values_real to know the actual amount staked and the pseudotokens minted *)
+            (* amount_q would be the effective stake on the delegate's side, while
+               amount is the amount removed from the liquid balance *)
+            let pseudo, amount_q = stake_values_real amount delegate_account in
+            let f_staker staker =
+              let liquid = Tez.(staker.liquid -! amount) in
+              let staking_delegator_numerator =
+                Z.add staker.staking_delegator_numerator pseudo
+              in
+              {staker with liquid; staking_delegator_numerator}
+            in
+            let f_delegate delegate =
+              (* The difference between the actual amount and the effective amount is
+                 "distributed" amongst current stake holders.
+                 Indeed, when trading in "amount", the staker receives "pseudo" pseudotokens
+                 valued at "amount_q". So the total amount of value is increased by "amount_q".
+                 Then, "portion" is added to the total, so it must be distributed.
+                 This means that the order is important: first you add_current_q, then
+                 you add the portion to all *)
+              let portion = Partial_tez.(of_tez amount - amount_q) in
+              let frozen_deposits =
+                Frozen_tez.add_current_q
+                  amount_q
+                  staker_name
+                  delegate.frozen_deposits
+              in
+              let co_current =
+                Frozen_tez.add_q_to_all_co_current
+                  portion
+                  frozen_deposits.co_current
+              in
+              let frozen_deposits = {frozen_deposits with co_current} in
+              let staking_delegate_denominator =
+                Z.add delegate.staking_delegate_denominator pseudo
+              in
+              {delegate with frozen_deposits; staking_delegate_denominator}
             in
             let account_map =
               update_account ~f:f_staker staker_name account_map
@@ -917,17 +1038,15 @@ let apply_unstake cycle amount staker_name account_map =
           match String.Map.find delegate_name account_map with
           | None -> raise Not_found
           | Some delegate ->
-              let frozen_deposits, amount_unstaked =
-                Frozen_tez.sub_current
-                  amount
-                  staker_name
-                  delegate.frozen_deposits
-              in
-              let delegate = {delegate with frozen_deposits} in
-              let account_map =
-                String.Map.add delegate_name delegate account_map
-              in
-              let f delegate =
+              if delegate_name = staker_name then
+                (* Case self stake *)
+                (* No pseudotokens : no problem *)
+                let frozen_deposits, amount_unstaked =
+                  Frozen_tez.sub_current
+                    amount
+                    staker_name
+                    delegate.frozen_deposits
+                in
                 let unstaked_frozen =
                   Unstaked_frozen.add_unstake
                     cycle
@@ -935,9 +1054,79 @@ let apply_unstake cycle amount staker_name account_map =
                     staker_name
                     delegate.unstaked_frozen
                 in
-                {delegate with unstaked_frozen}
-              in
-              update_account ~f delegate_name account_map))
+                let delegate =
+                  {delegate with frozen_deposits; unstaked_frozen}
+                in
+                update_account ~f:(fun _ -> delegate) delegate_name account_map
+              else
+                (* Case external stake *)
+                let staked_amount =
+                  Frozen_tez.get staker_name delegate.frozen_deposits
+                in
+                let pseudotokens, amount_q =
+                  if Partial_tez.(staked_amount <= of_tez amount) then
+                    (* Unstake all case *)
+                    (staker.staking_delegator_numerator, staked_amount)
+                  else
+                    (* The staker requests "amount".
+                       It translates to some "pseudotokens", valued at "amount_q".
+                       If those pseudotokens would give strictly more than the requested amount,
+                       then give one less pseudotoken. The actual amount unstaked is always lower than
+                       the requested amount (except in the unstake all case) *)
+                    unstake_values_real amount delegate
+                in
+                (* Actual unstaked amount (that will be finalized) *)
+                let amount = Partial_tez.to_tez ~round:`Down amount_q in
+                (* Delta from pseudotokens' value, to be redistributed amongst all remaining stakers
+                   (including current if still staking) *)
+                let portion = Partial_tez.(amount_q - of_tez amount) in
+                let f_staker staker =
+                  (* The staker's account representation doesn't change much,
+                     the unstake request is stored on the delegate's side *)
+                  let staking_delegator_numerator =
+                    Z.sub staker.staking_delegator_numerator pseudotokens
+                  in
+                  {staker with staking_delegator_numerator}
+                in
+                let account_map =
+                  update_account ~f:f_staker staker_name account_map
+                in
+                let f_delegate delegate =
+                  let staking_delegate_denominator =
+                    Z.sub delegate.staking_delegate_denominator pseudotokens
+                  in
+                  (* Just like in stake *)
+                  (* Do the effective unstake *)
+                  let frozen_deposits =
+                    Frozen_tez.sub_current_q
+                      amount_q
+                      staker_name
+                      delegate.frozen_deposits
+                  in
+                  (* Apply the delta *)
+                  let co_current =
+                    Frozen_tez.add_q_to_all_co_current
+                      portion
+                      frozen_deposits.co_current
+                  in
+                  let frozen_deposits = {frozen_deposits with co_current} in
+                  (* Add unstake request
+                     Note that "amount" might not be the initial requested amount *)
+                  let unstaked_frozen =
+                    Unstaked_frozen.add_unstake
+                      cycle
+                      amount
+                      staker_name
+                      delegate.unstaked_frozen
+                  in
+                  {
+                    delegate with
+                    staking_delegate_denominator;
+                    frozen_deposits;
+                    unstaked_frozen;
+                  }
+                in
+                update_account ~f:f_delegate delegate_name account_map))
 
 let apply_unslashable_f cycle delegate =
   let amount_unslashable, unstaked_frozen =
@@ -1009,7 +1198,7 @@ let balance_and_total_balance_of_account account_name account_map =
   ( balance,
     Tez.(
       liquid_b +! bonds_b
-      +! Partial_tez.to_tez ~round_up:false staked_b
+      +! Partial_tez.to_tez ~round:`Down staked_b
       +! unstaked_frozen_b +! unstaked_finalizable_b) )
 
 let apply_slashing
@@ -1116,7 +1305,7 @@ let apply_slashing
      down each time *)
   let reward_to_snitch =
     List.map
-      (fun x -> Tez.mul_q x Q.(1 // portion_reward) |> Tez.of_q ~round_up:false)
+      (fun x -> Tez.mul_q x Q.(1 // portion_reward) |> Tez.of_q ~round:`Down)
       total_slashed
     |> List.fold_left Tez.( +! ) Tez.zero
   in
@@ -1183,6 +1372,47 @@ let get_balance_from_context ctxt contract =
   in
   return (bd, total_balance)
 
+let assert_pseudotokens_consistency ~loc balance account account_name
+    account_map =
+  let open Lwt_result_syntax in
+  let {delegate; staking_delegator_numerator = num_pt; _} = account in
+  let exact_staking_balance = balance.staked_b in
+  match delegate with
+  | None -> return_unit
+  | Some delegate_name -> (
+      if account_name = delegate_name then return_unit
+      else
+        match String.Map.find delegate_name account_map with
+        | None -> raise Not_found
+        | Some delegate_account ->
+            let total_co =
+              Frozen_tez.total_co_current_q
+                delegate_account.frozen_deposits.co_current
+            in
+            let den_pt = delegate_account.staking_delegate_denominator in
+            if Z.(equal den_pt zero) then
+              Assert.equal
+                ~loc
+                Q.equal
+                (Format.asprintf
+                   "%s : Delegate should not have external stake with a 0 \
+                    staking denominator"
+                   account_name)
+                Q.pp_print
+                total_co
+                Q.zero
+            else
+              let expected = Q.(num_pt /// den_pt * total_co) in
+              Assert.equal
+                ~loc
+                Q.equal
+                (Format.asprintf
+                   "%s : Pseudotokens do not match exact staking balance"
+                   account_name)
+                Q.pp_print
+                exact_staking_balance
+                expected)
+
 let assert_balance_check ~loc ctxt account_name account_map =
   let open Lwt_result_syntax in
   match String.Map.find account_name account_map with
@@ -1194,7 +1424,16 @@ let assert_balance_check ~loc ctxt account_name account_map =
       let balance, total_balance =
         balance_and_total_balance_of_account account_name account_map
       in
+      let*! r0 =
+        assert_pseudotokens_consistency
+          ~loc
+          balance
+          account
+          account_name
+          account_map
+      in
       let*! r1 = assert_balance_equal ~loc account_name balance_ctxt balance in
+      let*! r1 = join_errors r0 r1 in
       let*! r2 =
         Assert.equal
           ~loc
@@ -1273,4 +1512,4 @@ let portion_of_rewards_to_liquid_for_cycle ?policy ctxt cycle pkh rewards =
   in
   let portion = Tez.(ratio weighted_delegated (frozen +! weighted_delegated)) in
   let to_liquid = Tez.mul_q rewards portion in
-  return (Partial_tez.to_tez ~round_up:false to_liquid)
+  return (Partial_tez.to_tez ~round:`Down to_liquid)
