@@ -130,20 +130,6 @@ let ( --> ) a b = concat a b
 (** Branching connector: creates two tests with different execution paths *)
 let ( |+ ) a b = branch a b
 
-let list_to_branch (list : (string * 'a) list) : (unit, 'a) scenarios =
-  match list with
-  | [] ->
-      Stdlib.failwith
-        (Format.asprintf
-           "%s: Cannot build scenarios from\n  empty list"
-           __LOC__)
-  | (tag, h) :: t ->
-      List.fold_left
-        (fun scenarios (tag, elt) ->
-          scenarios |+ Tag tag --> Action (fun () -> return elt))
-        (Tag tag --> Action (fun () -> return h))
-        t
-
 (** Ends the test. Dump the state, returns [unit] *)
 let end_test : ('a, unit) scenarios =
   let open Lwt_result_syntax in

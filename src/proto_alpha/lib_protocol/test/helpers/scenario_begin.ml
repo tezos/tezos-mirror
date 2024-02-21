@@ -14,23 +14,60 @@ open Adaptive_issuance_helpers
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
+type starter_constants = Mainnet | Sandbox | Test
+
+type constants = Protocol.Alpha_context.Constants.Parametric.t
+
+let start ~(constants : starter_constants) : (unit, constants) scenarios =
+  let constants, name =
+    match constants with
+    | Mainnet -> (Default_parameters.constants_mainnet, "mainnet")
+    | Sandbox -> (Default_parameters.constants_sandbox, "sandbox")
+    | Test -> (Default_parameters.constants_test, "test")
+  in
+  Action
+    (fun () ->
+      Log.info ~color:begin_end_color "-- Begin test --" ;
+      Log.info "Loading constants_%s." name ;
+      return constants)
+
+let start_with ~(constants : constants) : (unit, constants) scenarios =
+  Action
+    (fun () ->
+      Log.info ~color:begin_end_color "-- Begin test --" ;
+      Log.info "Loading custom constants." ;
+      return constants)
+
+let start_with_list ~(constants : (string * constants) list) :
+    (unit, constants) scenarios =
+  match constants with
+  | [] ->
+      Stdlib.failwith
+        (Format.asprintf
+           "%s: Cannot build scenarios from\n  empty list"
+           __LOC__)
+  | (tag, constants) :: t ->
+      List.fold_left
+        (fun scenarios (tag, constants) ->
+          scenarios |+ Tag tag --> start_with ~constants)
+        (Tag tag --> start_with ~constants)
+        t
+
 (** Initialize the test, given some initial parameters *)
 let begin_test ~activate_ai ?(burn_rewards = false) ?(ns_enable_fork = false)
-    ?(constants : Protocol.Alpha_context.Constants.Parametric.t option)
-    ?(constants_list :
-       (string * Protocol.Alpha_context.Constants.Parametric.t) list option)
-    delegates_name_list : (unit, t) scenarios =
+    ?(constants : constants option)
+    ?(constants_list : (string * constants) list option) delegates_name_list :
+    (unit, t) scenarios =
   let f ns_enable =
     (match (constants, constants_list) with
     | None, None -> Stdlib.failwith "No constants provided to begin_test"
     | Some _, Some _ ->
         Stdlib.failwith
           "You cannot provide ~constants and ~constants_list to begin_test"
-    | None, Some constants_list -> list_to_branch constants_list
-    | Some constants, None -> Action (fun () -> return constants))
-    --> exec (fun (constants : Protocol.Alpha_context.Constants.Parametric.t) ->
+    | None, Some constants -> start_with_list ~constants
+    | Some constants, None -> start_with ~constants)
+    --> exec (fun (constants : constants) ->
             let open Lwt_result_syntax in
-            Log.info ~color:begin_end_color "-- Begin test --" ;
             let bootstrap = "__bootstrap__" in
             let delegates_name_list = bootstrap :: delegates_name_list in
             (* Override threshold value if activate *)
