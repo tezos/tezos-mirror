@@ -268,7 +268,7 @@ test-protocol-compile:
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
-OTHER_DIRS := $(shell find contrib/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
+OTHER_DIRS := $(shell find contrib/ ci/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
 test-proto-unit:

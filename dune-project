@@ -4,6 +4,7 @@
 (using ctypes 0.3)
 (using menhir 2.1)
 (package (name bls12-381))
+(package (name gitlab_ci))
 (package (name internal-devtools))
 (package (name internal-devtools_proto-context-du))
 (package (name kaitai))
