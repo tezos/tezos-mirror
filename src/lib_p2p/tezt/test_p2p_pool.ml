@@ -182,7 +182,7 @@ module Random_connections = struct
     Tezt.Log.debug "Random connections OK.@." ;
     return_unit
 
-  let run points repeat = Node.detach_nodes (fun _ -> node repeat) points
+  let run repeat points = Node.detach_nodes (fun _ -> node repeat) points
 end
 
 (** Detaches a number of nodes. Each will connect to all other nodes
@@ -713,37 +713,26 @@ let init_logs =
   in
   lazy (Tezos_base_unix.Internal_event_unix.init ~config ())
 
-let wrap ?(clients = 10) n f =
+let register ?(tags = []) ?(clients = 10) title f =
+  Test.register
+    ~title:(sf "tezos-p2p: p2p-connection-pool (%s)" title)
+    ~tags:("p2p" :: tags)
+    ~__FILE__
+  @@ fun () ->
   let addr = Node.default_ipv6_addr in
   let points = Node.gen_points clients addr in
-  Alcotest_lwt.test_case n `Quick (fun _ () ->
-      let open Lwt_syntax in
-      let* () = Lazy.force init_logs in
-      let* r = f points in
-      match r with
-      | Ok () -> Lwt.return_unit
-      | Error error ->
-          Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
+  let open Lwt_syntax in
+  let* () = Lazy.force init_logs in
+  let* r = f points in
+  match r with
+  | Ok () -> Lwt.return_unit
+  | Error error -> Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
 
 let () =
   let repeat_connections = 5 in
-  Lwt_main.run
-  @@ Alcotest_lwt.run
-       ~__FILE__
-       "tezos-p2p"
-       [
-         ( "p2p-connection-pool",
-           [
-             wrap "simple" (fun points -> Simple.run points);
-             wrap "random" (fun points ->
-                 Random_connections.run points repeat_connections);
-             wrap "garbled" (fun points -> Garbled.run points);
-             wrap "overcrowded" (fun points -> Overcrowded.run points);
-             wrap "overcrowded-mixed" (fun points ->
-                 Overcrowded.run_mixed_versions points);
-             wrap "no-common-network-protocol" (fun points ->
-                 No_common_network.run points);
-           ] );
-       ]
-
-let () = Tezt.Test.run ()
+  register "simple" Simple.run ;
+  register "random" (Random_connections.run repeat_connections) ;
+  register "garbled" Garbled.run ;
+  register "overcrowded" Overcrowded.run ;
+  register "overcrowded-mixed" Overcrowded.run_mixed_versions ;
+  register "no-common-network-protocol" No_common_network.run

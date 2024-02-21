@@ -2761,7 +2761,13 @@ let octez_p2p_test_common =
 
 let _octez_p2p_tezt =
   tezt
-    ["test_p2p_fd"; "test_p2p_socket"; "test_p2p_conn"]
+    [
+      "test_p2p_fd";
+      "test_p2p_socket";
+      "test_p2p_conn";
+      "test_p2p_node";
+      "test_p2p_pool";
+    ]
     ~path:"src/lib_p2p/tezt"
     ~opam:"octez-shell-libs"
     ~deps:
@@ -2782,13 +2788,11 @@ let _octez_p2p_tests =
   tests
     [
       "test_p2p_socket";
-      "test_p2p_pool";
       "test_p2p_broadcast";
       "test_p2p_io_scheduler";
       "test_p2p_peerset";
       "test_p2p_buffer_reader";
       "test_p2p_banned_peers";
-      "test_p2p_node";
       "test_p2p_connect_handler";
       "test_p2p_maintenance";
     ]
