@@ -1054,6 +1054,15 @@ let call_selfdestruct =
     bin = kernel_inputs_path ^ "/call_selfdestruct.bin";
   }
 
+(** The info for the "recursive.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/recursive.sol] *)
+let recursive =
+  {
+    label = "recursive";
+    abi = kernel_inputs_path ^ "/recursive.abi";
+    bin = kernel_inputs_path ^ "/recursive.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   register_proxy
@@ -4492,6 +4501,39 @@ let test_l2_call_selfdetruct_contract_in_same_transaction =
   let* _address, _tx = deploy ~contract:call_selfdestruct ~sender evm_setup in
   unit
 
+let test_call_recursive_contract_estimate_gas =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "l2_call"; "estimate_gas"; "recursive"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"Check recursive contract gasLimit is high enough"
+  @@ fun protocol ->
+  let* ({evm_node; endpoint; sc_rollup_node; node; client; _} as evm_setup) =
+    setup_evm_kernel ~admin:None protocol
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* recursive_address, _tx = deploy ~contract:recursive ~sender evm_setup in
+  let call () =
+    Eth_cli.contract_send
+      ~source_private_key:sender.private_key
+      ~endpoint
+      ~abi_label:recursive.label
+      ~address:recursive_address
+      ~method_call:"call(50)"
+      ()
+  in
+  let* tx =
+    wait_for_application ~evm_node ~sc_rollup_node ~node ~client call ()
+  in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  unit
+
 let test_transaction_exhausting_ticks_is_rejected =
   register_both
     ~tags:["evm"; "loop"; "out_of_ticks"; "rejected"]
@@ -4700,7 +4742,8 @@ let register_evm_node ~protocols =
   test_estimate_gas_out_of_ticks protocols ;
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
   test_transaction_exhausting_ticks_is_rejected protocols ;
-  test_reveal_storage protocols
+  test_reveal_storage protocols ;
+  test_call_recursive_contract_estimate_gas protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;
