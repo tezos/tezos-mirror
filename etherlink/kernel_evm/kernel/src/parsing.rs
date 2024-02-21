@@ -375,7 +375,9 @@ impl InputResult {
                 }
             },
             MichelsonOr::Right(MichelsonBytes(bytes)) => {
-                if tezos_contracts.is_admin(&source) {
+                if tezos_contracts.is_admin(&source)
+                    || tezos_contracts.is_kernel_governance(&source)
+                {
                     Self::parse_kernel_upgrade(&bytes)
                 } else if tezos_contracts.is_sequencer_admin(&source) {
                     Self::parse_sequencer_update(&bytes)
@@ -463,7 +465,8 @@ mod tests {
                 &TezosContracts {
                     ticketer: None,
                     admin: None,
-                    sequencer_admin: None
+                    sequencer_admin: None,
+                    kernel_governance: None
                 },
                 &None,
                 &None

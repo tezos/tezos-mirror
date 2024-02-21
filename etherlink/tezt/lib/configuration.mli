@@ -16,6 +16,7 @@ val make_config :
   ?bootstrap_accounts:Eth_account.t array ->
   ?ticketer:string ->
   ?administrator:string ->
+  ?kernel_governance:string ->
   ?sequencer_administrator:string ->
   ?sequencer:string ->
   ?delayed_bridge:string ->

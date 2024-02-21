@@ -1,8 +1,8 @@
 use crate::{
     delayed_inbox::DelayedInbox,
     storage::{
-        read_admin, read_delayed_transaction_bridge, read_sequencer_admin, read_ticketer,
-        sequencer,
+        read_admin, read_delayed_transaction_bridge, read_kernel_governance,
+        read_sequencer_admin, read_ticketer, sequencer,
     },
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -65,14 +65,21 @@ pub struct TezosContracts {
     pub ticketer: Option<ContractKt1Hash>,
     pub admin: Option<ContractKt1Hash>,
     pub sequencer_admin: Option<ContractKt1Hash>,
+    pub kernel_governance: Option<ContractKt1Hash>,
 }
 
 impl std::fmt::Display for TezosContracts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let TezosContracts {
+            ticketer,
+            admin,
+            sequencer_admin,
+            kernel_governance,
+        } = self;
         write!(
             f,
-            "Ticketer is {:?}. Administrator is {:?}. Sequencer administrator is {:?}.",
-            self.ticketer, self.admin, self.sequencer_admin,
+            "Ticketer is {:?}. Administrator is {:?}. Sequencer administrator is {:?}. Kernel governance is {:?}.",
+            ticketer, admin, sequencer_admin, kernel_governance
         )
     }
 }
@@ -90,6 +97,9 @@ impl TezosContracts {
     pub fn is_ticketer(&self, contract: &ContractKt1Hash) -> bool {
         contains(&self.ticketer, contract)
     }
+    pub fn is_kernel_governance(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.kernel_governance, contract)
+    }
 }
 
 fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
@@ -102,11 +112,15 @@ fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
     // 3. Fetch the sequencer administrator, returns `None` if it is badly
     //    encoded or absent.
     let sequencer_admin = read_sequencer_admin(host);
+    // 4. Fetch the kernel_governance contract, returns `None` if it is badly
+    //    encoded or absent.
+    let kernel_governance = read_kernel_governance(host);
 
     TezosContracts {
         ticketer,
         admin,
         sequencer_admin,
+        kernel_governance,
     }
 }
 

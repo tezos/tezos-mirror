@@ -36,7 +36,8 @@ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 pub const ADMIN: RefPath = RefPath::assert_from(b"/admin");
-pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
+const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
+pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/kernel_governance");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
 // Path to the block in progress, used between reboots
@@ -740,6 +741,10 @@ pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
 
 pub fn read_sequencer_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &SEQUENCER_ADMIN.into())
+}
+
+pub fn read_kernel_governance<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &KERNEL_GOVERNANCE.into())
 }
 
 pub fn get_and_increment_deposit_nonce<Host: Runtime>(
