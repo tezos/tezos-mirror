@@ -41,7 +41,11 @@ let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
       Log.debug "@[<v 2>Old Balance@ %a@]@." balance_pp old_balance ;
       Log.debug "@[<v 2>New Balance@ %a@]@." balance_pp new_balance ;
       failwith "%s Unexpected stake evolution for %s" loc name)
-  else raise Not_found
+  else (
+    Log.error
+      "Test_scenario_autostaking.assert_balance_evolution: account %s not found"
+      name ;
+    assert false)
 
 let delegate = "delegate"
 
