@@ -57,7 +57,7 @@ workflow:
 default:
   interruptible: true
 variables:
-  build_deps_image_version: 2e1cee010a93b56f8aface30e795e57cf6678bde
+  build_deps_image_version: d8bd1a0e555b2f9a32bce18a4022f6851c700bca
   build_deps_image_name: ${CI_REGISTRY}/tezos/opam-repository
   rust_toolchain_image_name: registry.gitlab.com/${CI_PROJECT_PATH}/rust-toolchain
   client_libs_dependencies_image_name: registry.gitlab.com/${CI_PROJECT_PATH}/client-libs-dependencies
