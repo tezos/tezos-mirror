@@ -358,17 +358,23 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                     .gasometer
                     .as_ref()
                     .map(|g| g.total_used_gas())
-                    .unwrap_or(0_u64)
+                    .unwrap_or_default()
             })
-            .unwrap_or(0_u64)
+            .unwrap_or_default()
     }
 
     /// Get the amount of gas still available for the current transaction.
     fn gas_remaining(&self) -> u64 {
         self.transaction_data
             .last()
-            .map(|layer| layer.gasometer.as_ref().map(|g| g.gas()).unwrap_or(0_u64))
-            .unwrap_or(0_u64)
+            .map(|layer| {
+                layer
+                    .gasometer
+                    .as_ref()
+                    .map(|g| g.gas())
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
     }
 
     /// Record the cost of a static-cost opcode
@@ -1019,12 +1025,6 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             stack_depth
         );
 
-        // TODO: check gas
-        // issue: https://gitlab.com/tezos/tezos/-/issues/5120
-
-        // TODO: add transfer to gas (if it is there)
-        // issue: https://gitlab.com/tezos/tezos/-/issues/5121
-
         if let Some(ref transfer) = transfer {
             match self.execute_transfer(
                 transaction_context.context.caller,
@@ -1072,9 +1072,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.config.memory_limit,
             );
 
-            let result = self.execute(&mut runtime);
+            let result = self.execute(&mut runtime)?;
 
-            return Ok((result?, None, runtime.machine().return_value()));
+            return Ok((result, None, runtime.machine().return_value()));
         }
     }
 
@@ -1119,7 +1119,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 value,
             }),
             input,
-            TransactionContext::new(caller, callee, value.unwrap_or(U256::zero())),
+            TransactionContext::new(caller, callee, value.unwrap_or_default()),
         );
 
         self.end_initial_transaction(result)
@@ -1880,13 +1880,13 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     fn balance(&self, address: H160) -> U256 {
         self.get_account(address)
             .and_then(|a| a.balance(self.host).ok())
-            .unwrap_or(U256::zero())
+            .unwrap_or_default()
     }
 
     fn code_size(&self, address: H160) -> U256 {
         self.get_account(address)
             .and_then(|a| a.code_size(self.host).ok())
-            .unwrap_or(U256::zero())
+            .unwrap_or_default()
     }
 
     // Hash of the chosen account's code, the empty hash (CODE_HASH_DEFAULT) if the account has no code,
@@ -1902,9 +1902,6 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     }
 
     fn code(&self, address: H160) -> Vec<u8> {
-        // TODO: mark address as hot
-        // issue: https://gitlab.com/tezos/tezos/-/issues/4866
-
         self.get_account(address)
             .and_then(|a| a.code(self.host).ok())
             .unwrap_or_default()
@@ -1913,13 +1910,13 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     fn storage(&self, address: H160, index: H256) -> H256 {
         self.get_account(address)
             .and_then(|a| a.get_storage(self.host, &index).ok())
-            .unwrap_or(H256::zero())
+            .unwrap_or_default()
     }
 
     fn original_storage(&self, address: H160, index: H256) -> H256 {
         self.get_original_account(address)
             .and_then(|a| a.get_storage(self.host, &index).ok())
-            .unwrap_or(H256::zero())
+            .unwrap_or_default()
     }
 
     fn gas_left(&self) -> U256 {
@@ -1942,8 +1939,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             Some(block_diff)
                 if block_diff <= U256::from(256) && block_diff != U256::zero() =>
             {
-                storage::blocks::get_block_hash(self.host, number)
-                    .unwrap_or_else(|_| H256::zero())
+                storage::blocks::get_block_hash(self.host, number).unwrap_or_default()
             }
             _ => H256::zero(),
         }
@@ -2176,26 +2172,27 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
                     ));
                 }
 
-                if let Err(err) = self.begin_inter_transaction(false, gas_limit) {
-                    log!(
-                        self.host,
-                        Debug,
-                        "Not enought gas for call. Required at least: {:?}",
-                        gas_limit
-                    );
+                match self.begin_inter_transaction(false, gas_limit) {
+                    Ok(()) => {
+                        let result = self.execute_create(
+                            caller,
+                            value,
+                            init_code,
+                            contract_address,
+                        );
 
-                    Capture::Exit((
-                        ExitReason::Fatal(ExitFatal::Other(Cow::from(
-                            "Out of gas before recursive create",
-                        ))),
-                        None,
-                        vec![],
-                    ))
-                } else {
-                    let result =
-                        self.execute_create(caller, value, init_code, contract_address);
+                        self.end_inter_transaction(result)
+                    }
+                    Err(err) => {
+                        log!(
+                            self.host,
+                            Debug,
+                            "Intermediate transaction failed, reason: {:?}",
+                            err
+                        );
 
-                    self.end_inter_transaction(result)
+                        Capture::Exit((ethereum_error_to_exit_reason(&err), None, vec![]))
+                    }
                 }
             }
             Precondition::PreconditionErr(exit_reason) => {
@@ -2218,7 +2215,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
     ) -> Capture<CallOutcome, Self::CallInterrupt> {
         let transaction_context = TransactionContext::from_context(context);
 
-        // Retrieve value from `Transfer` struct to check if caller has enough balanace
+        // Retrieve value from `Transfer` struct to check if caller has enough balance
         let value = match transfer {
             None => U256::zero(),
             Some(Transfer { value, .. }) => value,
@@ -2229,7 +2226,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             Precondition::PassPrecondition => {
                 let mut gas_limit = self.nested_call_gas_limit(target_gas);
 
-                if let Err(err) = self.record_cost(gas_limit.unwrap_or(0)) {
+                if let Err(err) = self.record_cost(gas_limit.unwrap_or_default()) {
                     log!(
                         self.host,
                         Debug,
