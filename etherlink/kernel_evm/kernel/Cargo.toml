@@ -21,6 +21,7 @@ anyhow.workspace = true
 
 primitive-types.workspace = true
 num-traits.workspace = true
+softfloat.workspace = true
 
 rlp.workspace = true
 hex.workspace = true

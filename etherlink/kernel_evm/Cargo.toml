@@ -21,6 +21,7 @@ num-bigint = "0.3"
 num-traits = "0.2.8"
 ethereum = { version = "0.14.0", default-features = false }
 ethbloom = { version = "0.13.0", default-features = false, features = ["rlp"] }
+softfloat = "1.0.0"
 
 # serialization
 hex = "0.4"

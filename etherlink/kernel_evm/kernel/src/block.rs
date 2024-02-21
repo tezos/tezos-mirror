@@ -144,7 +144,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
     current_block_parent_hash: H256,
-    current_constants: &BlockConstants,
+    current_constants: &mut BlockConstants,
     tick_counter: &TickCounter,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
@@ -159,12 +159,25 @@ fn next_bip_from_blueprints<Host: Runtime>(
                     return Ok(None);
                 }
             }
+            let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
+            crate::gas_price::store_new_base_fee_per_gas(
+                host,
+                gas_price,
+                &mut current_constants.block_fees,
+            )?;
+
             let bip = block_in_progress::BlockInProgress::from_blueprint(
                 blueprint,
                 current_block_number,
                 current_block_parent_hash,
                 current_constants,
                 tick_counter.c,
+            );
+
+            tezos_evm_logging::log!(
+                host,
+                tezos_evm_logging::Level::Debug,
+                "bip: {bip:?}"
             );
             Ok(Some(bip))
         }
@@ -206,6 +219,7 @@ fn compute_bip<Host: KernelRuntime>(
             host.mark_for_reboot()?
         }
         ComputationResult::Finished => {
+            crate::gas_price::register_block(host, &block_in_progress)?;
             *tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
             let new_block = block_in_progress
                 .finalize_and_store(host)
@@ -284,7 +298,7 @@ pub fn produce<Host: KernelRuntime>(
         host,
         current_block_number,
         current_block_parent_hash,
-        &current_constants,
+        &mut current_constants,
         &tick_counter,
         config,
         &kernel_upgrade,
@@ -561,6 +575,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -596,13 +615,18 @@ mod tests {
 
     #[test]
     // Test if a valid transaction is producing a receipt with a success status
-    fn test_valid_transactions_receipt_status() {
+    fn tst_valid_transactions_receipt_status() {
         let mut mock_host = MockHost::default();
         let mut internal = MockInternal();
         let mut host = SafeStorage {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
@@ -645,6 +669,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx = dummy_eth_transaction_deploy();
@@ -698,6 +727,12 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
+
         let mut evm_account_storage = init_account_storage().unwrap();
 
         produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
@@ -719,6 +754,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -772,7 +812,9 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+
         let base_gas = U256::from(21000);
+        crate::storage::store_minimum_base_fee_per_gas(&mut host, base_gas).unwrap();
         let gas_for_fees = U256::from(7479012);
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
@@ -846,6 +888,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let tx = Transaction {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
@@ -905,6 +952,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let accounts_index = init_account_index().unwrap();
 
@@ -1001,6 +1053,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let blocks_index = init_blocks_index().unwrap();
         let transaction_hashes_index = init_transaction_hashes_index().unwrap();
@@ -1358,6 +1415,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         // sanity check: no current block
         assert!(
@@ -1430,6 +1492,12 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         // sanity check: no current block
         assert!(
@@ -1591,6 +1659,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         // sanity check: no current block
         assert!(
@@ -1699,6 +1772,11 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_eip1559 = [1; TRANSACTION_HASH_SIZE];
