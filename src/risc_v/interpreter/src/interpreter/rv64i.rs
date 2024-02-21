@@ -18,8 +18,10 @@ where
     M: backend::Manager,
 {
     /// `ADDIW` I-type instruction
+    ///
+    /// Add `imm` to val(rs1) only on lowest 32 bits
+    /// and store the sign-extended result in `rd`
     pub fn run_addiw(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
-        // Perform addition only on the lower 32 bits, ignoring the upper 32 bits.
         // We do not need to explicitly truncate for the lower bits since wrapping_add
         // has the same semantics & result on the lower 32 bits irrespective of bit width
         let rval = self.read(rs1);
@@ -27,6 +29,34 @@ where
         // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
         let result = result as i32 as u64;
         self.write(rd, result);
+    }
+
+    /// `ADDW` R-type instruction
+    ///
+    /// Perform val(rs1) + val(rs2) but only on lowest 32 bits
+    /// and store the sign-extended result in `rd`
+    pub fn run_addw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        // We do not need to explicitly truncate for the lower bits since wrapping_add
+        // has the same semantics & result on the lower 32 bits irrespective of bit width
+        let lhs = self.read(rs1);
+        let rhs = self.read(rs2);
+        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+        let result = lhs.wrapping_add(rhs) as i32 as u64;
+        self.write(rd, result)
+    }
+
+    /// `SUBW` R-type instruction
+    ///
+    /// Perform val(rs1) - val(rs2) but only on lowest 32 bits
+    /// and store the sign-extended result in `rd`
+    pub fn run_subw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        // We do not need to explicitly truncate for the lower bits since wrapping_sub
+        // has the same semantics & result on the lower 32 bits irrespective of bit width
+        let lhs = self.read(rs1);
+        let rhs = self.read(rs2);
+        // Truncate result to use only the lower 32 bits, then sign-extend to 64 bits.
+        let result = lhs.wrapping_sub(rhs) as i32 as u64;
+        self.write(rd, result)
     }
 
     /// `SLLI` I-type instruction
@@ -349,7 +379,7 @@ mod tests {
     use crate::{create_backend, create_state};
     use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
 
-    backend_test!(test_addiw, F, {
+    backend_test!(test_add_w, F, {
         proptest!(|(
             imm in any::<i64>(),
             reg_val in any::<i64>())|
@@ -358,6 +388,7 @@ mod tests {
             let mut state = create_state!(HartState, F, backend);
 
             state.xregisters.write(a0, reg_val as u64);
+            state.xregisters.write(t0, imm as u64);
             state.xregisters.run_addiw(imm, a0, a1);
             // check against wrapping addition performed on the lowest 32 bits
             let r_val = reg_val as u32;
@@ -365,7 +396,33 @@ mod tests {
             prop_assert_eq!(
                 state.xregisters.read(a1),
                 r_val.wrapping_add(i_val) as i32 as i64 as u64
-            )
+            );
+            state.xregisters.run_addw(a0, t0, a2);
+            prop_assert_eq!(
+                state.xregisters.read(a2),
+                r_val.wrapping_add(i_val) as i32 as i64 as u64
+            );
+        });
+    });
+
+    backend_test!(test_sub_w, F, {
+        proptest!(|(
+            v1 in any::<i64>(),
+            v2 in any::<i64>())|
+        {
+            let mut backend = create_backend!(HartStateLayout, F);
+            let mut state = create_state!(HartState, F, backend);
+
+            state.xregisters.write(t0, v1 as u64);
+            state.xregisters.write(a0, v2 as u64);
+            state.xregisters.run_subw(t0, a0, a1);
+            // check against wrapping subtraction performed on the lowest 32 bits
+            let v1_u32 = v1 as u32;
+            let v2_u32 = v2 as u32;
+            prop_assert_eq!(
+                state.xregisters.read(a1),
+                v1_u32.wrapping_sub(v2_u32) as i32 as i64 as u64
+            );
         });
     });
 

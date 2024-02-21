@@ -26,12 +26,36 @@ where
     M: backend::Manager,
 {
     /// `ADDI` I-type instruction
+    ///
+    /// Add `imm` to val(rs1) and store the result in `rd`
     pub fn run_addi(&mut self, imm: i64, rs1: XRegister, rd: XRegister) {
-        // Return the lower XLEN (64 bits in our case) bits of the multiplication
+        // Return the lower XLEN (64 bits in our case) bits of the addition
         // Irrespective of sign, the result is the same, casting to u64 for addition
         let rval = self.read(rs1);
         let result = rval.wrapping_add(imm as u64);
-        self.write(rd, result);
+        self.write(rd, result)
+    }
+
+    /// `ADD` R-type instruction
+    ///
+    /// Perform val(rs1) + val(rs2) and store the result in `rd`
+    pub fn run_add(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let lhs = self.read(rs1);
+        let rhs = self.read(rs2);
+        // Wrapped addition in two's complement behaves the same for signed and unsigned
+        let result = lhs.wrapping_add(rhs);
+        self.write(rd, result)
+    }
+
+    /// `SUB` R-type instruction
+    ///
+    /// Perform val(rs1) - val(rs2) and store the result in `rd`
+    pub fn run_sub(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let lhs = self.read(rs1);
+        let rhs = self.read(rs2);
+        // Wrapped subtraction in two's complement behaves the same for signed and unsigned
+        let result = lhs.wrapping_sub(rhs);
+        self.write(rd, result)
     }
 
     /// `LUI` U-type instruction
@@ -387,6 +411,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::machine_state::registers::t0;
     use crate::{backend_test, create_backend, create_state};
     use crate::{
         machine_state::{
@@ -409,7 +434,7 @@ mod tests {
         prop_assert_eq, prop_assume, proptest,
     };
 
-    backend_test!(test_addi, F, {
+    backend_test!(test_add_sub, F, {
         let imm_rs1_rd_res = [
             (0_i64, 0_u64, t3, 0_u64),
             (0, 0xFFF0_0420, t2, 0xFFF0_0420),
@@ -433,10 +458,20 @@ mod tests {
             let mut backend = create_backend!(HartStateLayout, F);
             let mut state = create_state!(HartState, F, backend);
 
-            state.xregisters.write(a1, rs1);
-            state.xregisters.run_addi(imm, a1, rd);
-            // check against wrapping addition performed on the lowest 32 bits
-            assert_eq!(state.xregisters.read(rd), res)
+            state.xregisters.write(a0, rs1);
+            state.xregisters.write(t0, imm as u64);
+            state.xregisters.run_addi(imm, a0, rd);
+            assert_eq!(state.xregisters.read(rd), res);
+            state.xregisters.run_add(a0, t0, a0);
+            assert_eq!(state.xregisters.read(a0), res);
+            // test sub with: res - imm = rs1 and res - rs1 = imm
+            state.xregisters.write(a0, res);
+            state.xregisters.write(t0, imm as u64);
+            state.xregisters.run_sub(a0, t0, a1);
+            assert_eq!(state.xregisters.read(a1), rs1);
+            // now rs1 is in register a1
+            state.xregisters.run_sub(a0, a1, a1);
+            assert_eq!(state.xregisters.read(a1), imm as u64);
         }
     });
 
