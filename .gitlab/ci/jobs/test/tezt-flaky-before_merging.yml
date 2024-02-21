@@ -1,0 +1,7 @@
+include: .gitlab/ci/jobs/test/tezt-flaky.yml
+
+# Runs flaky Tezts in the 'before_merging' pipeline.
+tezt-flaky:
+  extends:
+    - .tezt-flaky
+    - .rules__octez_changes_manual

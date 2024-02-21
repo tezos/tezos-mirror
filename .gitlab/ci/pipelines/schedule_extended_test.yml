@@ -31,7 +31,7 @@ include:
   # Stage: test
   - .gitlab/ci/jobs/test/install_octez.yml
   # Flaky tezts
-  - .gitlab/ci/jobs/test/tezt-flaky.yml
+  - .gitlab/ci/jobs/test/tezt-flaky-schedule_extended_test.yml
   # Slow tezts
   - .gitlab/ci/jobs/test/tezt-slow.yml
   # Tests that may not have been run in before_merging pipeline
