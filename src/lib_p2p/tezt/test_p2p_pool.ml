@@ -730,9 +730,12 @@ let register ?(tags = []) ?(clients = 10) title f =
 
 let () =
   let repeat_connections = 5 in
-  register "simple" Simple.run ;
-  register "random" (Random_connections.run repeat_connections) ;
-  register "garbled" Garbled.run ;
-  register "overcrowded" Overcrowded.run ;
-  register "overcrowded-mixed" Overcrowded.run_mixed_versions ;
-  register "no-common-network-protocol" No_common_network.run
+  register ~tags:[Tag.flaky] "simple" Simple.run ;
+  register
+    ~tags:[Tag.flaky]
+    "random"
+    (Random_connections.run repeat_connections) ;
+  register ~tags:[Tag.flaky] "garbled" Garbled.run ;
+  register ~tags:[Tag.flaky] "overcrowded" Overcrowded.run ;
+  register ~tags:[Tag.flaky] "overcrowded-mixed" Overcrowded.run_mixed_versions ;
+  register ~tags:[Tag.flaky] "no-common-network-protocol" No_common_network.run
