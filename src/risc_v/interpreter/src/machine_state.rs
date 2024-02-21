@@ -12,7 +12,11 @@ pub mod registers;
 #[cfg(test)]
 extern crate proptest;
 
-use crate::state_backend::{self as backend, Atom, Cell};
+use self::bus::{Addressable, OutOfBounds};
+use crate::{
+    program::Program,
+    state_backend::{self as backend, Atom, Cell},
+};
 use bus::{main_memory, Address, Bus};
 
 /// RISC-V exceptions
@@ -98,6 +102,65 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         self.hart.reset(mode, pc);
         self.bus.reset();
     }
+
+    /// Perform one instruction.
+    pub fn step(&mut self) {
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6944
+        // Implement stepper function
+        todo!("Step function is not implemented")
+    }
+
+    /// Perform at most `max` instructions. Returns the actual number of
+    /// instructions that have been performed.
+    pub fn step_many<F: FnMut(&Self) -> bool>(
+        &mut self,
+        max: usize,
+        mut should_continue: F,
+    ) -> usize {
+        let mut steps_done = 0;
+
+        while steps_done < max && should_continue(self) {
+            self.step();
+            steps_done += 1;
+        }
+
+        steps_done
+    }
+
+    /// Install a program and set the program counter to its start.
+    pub fn setup_boot(&mut self, program: &Program) -> Result<(), MachineError> {
+        // Write program to main memory and point the PC at its start
+        for (addr, data) in program.segments.iter() {
+            self.bus.write_all(*addr, data)?;
+        }
+        self.hart.pc.write(program.entrypoint);
+
+        // Set booting Hart ID (a0) to 0
+        self.hart.xregisters.write(registers::a0, 0);
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/6941
+        // Write device tree
+        let dtb_addr = program
+            .segments
+            .iter()
+            .map(|(base, data)| base + data.len() as Address)
+            .max()
+            .unwrap_or(bus::start_of_main_memory::<ML>());
+
+        // Point DTB boot argument (a1) at the written device tree
+        self.hart.xregisters.write(registers::a1, dtb_addr);
+
+        // Start in supervisor mode
+        self.hart.mode.write(mode::Mode::Supervisor);
+
+        Ok(())
+    }
+}
+
+/// Errors that occur from interacting with the [MachineState]
+#[derive(Debug, Clone, derive_more::From)]
+pub enum MachineError {
+    AddressError(OutOfBounds),
 }
 
 #[cfg(test)]

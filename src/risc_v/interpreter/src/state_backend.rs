@@ -295,6 +295,10 @@ pub mod tests {
         fn write<E: Elem>(&mut self, _address: usize, _value: E) {
             unimplemented!()
         }
+
+        fn write_all<E: Elem>(&mut self, _address: usize, _values: &[E]) {
+            unimplemented!()
+        }
     }
 
     /// A tracing [Manager] that only keeps track of a layout's locations.

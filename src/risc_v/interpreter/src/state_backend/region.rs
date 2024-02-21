@@ -193,6 +193,9 @@ pub trait DynRegion {
 
     /// Update an element in the region. `address` is in bytes.
     fn write<E: Elem>(&mut self, address: usize, value: E);
+
+    /// Update multiple elements in the region. `address` is in bytes.
+    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]);
 }
 
 impl<T, const LEN: usize> DynRegion for [T; LEN] {
@@ -219,6 +222,17 @@ impl<T, const LEN: usize> DynRegion for [T; LEN] {
                 .write_unaligned(value)
         }
     }
+
+    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+        assert!(address + mem::size_of_val(values) <= Self::LEN);
+        unsafe {
+            self.as_mut_ptr()
+                .cast::<u8>()
+                .add(address)
+                .cast::<E>()
+                .copy_from(values.as_ptr(), values.len());
+        }
+    }
 }
 
 impl<T: DynRegion> DynRegion for &mut T {
@@ -230,6 +244,10 @@ impl<T: DynRegion> DynRegion for &mut T {
 
     fn write<E: Elem>(&mut self, address: usize, value: E) {
         (self as &mut T).write(address, value)
+    }
+
+    fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
+        (self as &mut T).write_all(address, values)
     }
 }
 

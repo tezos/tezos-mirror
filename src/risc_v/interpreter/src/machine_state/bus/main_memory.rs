@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+use super::{Address, Addressable};
 use crate::state_backend::{self as backend, DynRegion};
 use std::mem;
-
-use super::Addressable;
 
 /// Configuration object for memory size
 pub enum Sizes<const BYTES: usize> {}
@@ -110,6 +109,18 @@ impl<E: backend::Elem, L: MainMemoryLayout, M: backend::Manager> Addressable<E>
         }
 
         self.data.write(addr as usize, value);
+
+        Ok(())
+    }
+
+    fn write_all(&mut self, addr: Address, values: &[E]) -> Result<(), super::OutOfBounds> {
+        let addr = addr as usize;
+
+        if addr + mem::size_of_val(values) > L::BYTES {
+            return Err(super::OutOfBounds);
+        }
+
+        self.data.write_all(addr, values);
 
         Ok(())
     }
