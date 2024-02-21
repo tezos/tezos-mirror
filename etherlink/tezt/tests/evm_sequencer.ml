@@ -1538,6 +1538,44 @@ let test_delayed_inbox_flushing =
     ~error_msg:"Expected a bigger balance" ;
   unit
 
+let test_no_automatic_block_production =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "block"]
+    ~title:"No automatic block production"
+    ~uses
+  @@ fun protocol ->
+  let* {sequencer; _} = setup_sequencer protocol ~time_between_blocks:Nothing in
+  let*@ before_head = Rpc.get_block_by_number ~block:"latest" sequencer in
+  let transfer =
+    let* tx_hash =
+      Eth_cli.transaction_send
+        ~source_private_key:Eth_account.(bootstrap_accounts.(0).private_key)
+        ~to_public_key:Eth_account.(bootstrap_accounts.(0).address)
+        ~value:(Wei.of_eth_int 1)
+        ~endpoint:(Evm_node.endpoint sequencer)
+        ()
+    in
+    return (Some tx_hash)
+  in
+  let timeout =
+    let* () = Lwt_unix.sleep 15. in
+    return None
+  in
+  let* tx_hash = Lwt.pick [transfer; timeout] in
+
+  let*@ after_head = Rpc.get_block_by_number ~block:"latest" sequencer in
+  (* As the time between blocks is "none", the sequencer should not produce a block
+     even if we send a transaction. *)
+  Check.((before_head.number = after_head.number) int32)
+    ~error_msg:"No block production expected" ;
+  (* The transaction hash is not returned as no receipt is produced, and eth-cli
+     awaits for the receipt. *)
+  Check.is_true
+    (Option.is_none tx_hash)
+    ~error_msg:"No transaction hash expected" ;
+  unit
+
 let () =
   test_remove_sequencer [Alpha] ;
   test_persistent_state [Alpha] ;
@@ -1559,4 +1597,5 @@ let () =
   test_external_transaction_to_delayed_inbox_fails [Alpha] ;
   test_delayed_transfer_timeout [Alpha] ;
   test_delayed_transfer_timeout_fails_l1_levels [Alpha] ;
-  test_delayed_inbox_flushing [Alpha]
+  test_delayed_inbox_flushing [Alpha] ;
+  test_no_automatic_block_production [Alpha]
