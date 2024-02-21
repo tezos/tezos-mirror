@@ -828,6 +828,8 @@ let handle_forge_event state forge_event =
         ( state,
           Inject_block
             {prepared_block; force_injection = false; asynchronous = true} )
+  | Preattestation_ready _ | Attestation_ready _ ->
+      Stdlib.failwith "(Pre)Attestation_ready not implemented yet"
 
 (* Hypothesis:
    - The state is not to be modified outside this module

@@ -237,7 +237,10 @@ type round_state = {
 
 (** [forge_event] type used to return the result of a task completion
     in the forge worker. *)
-type forge_event = Block_ready of prepared_block
+type forge_event =
+  | Block_ready of prepared_block
+  | Preattestation_ready of signed_consensus_vote
+  | Attestation_ready of signed_consensus_vote
 
 (** [forge_request] type used to push a concurrent forging task in the
     forge worker. *)

@@ -443,7 +443,10 @@ let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
   in
   return {batch_kind; batch_content; signed_consensus_votes}
 
-type forge_event = Block_ready of prepared_block
+type forge_event =
+  | Block_ready of prepared_block
+  | Preattestation_ready of signed_consensus_vote
+  | Attestation_ready of signed_consensus_vote
 
 type forge_request =
   | Forge_and_sign_block of block_to_bake
@@ -585,6 +588,47 @@ let event_encoding =
         (fun ((), tk) -> Timeout tk);
     ]
 
+let vote_kind_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Preattestation"
+        unit
+        (function Preattestation -> Some () | _ -> None)
+        (fun () -> Preattestation);
+      case
+        (Tag 1)
+        ~title:"Attestation"
+        unit
+        (function Attestation -> Some () | _ -> None)
+        (fun () -> Attestation);
+    ]
+
+let unsigned_consensus_vote_encoding =
+  let open Data_encoding in
+  conv
+    (fun {vote_kind; vote_consensus_content; delegate} ->
+      (vote_kind, vote_consensus_content, delegate))
+    (fun (vote_kind, vote_consensus_content, delegate) ->
+      {vote_kind; vote_consensus_content; delegate})
+    (obj3
+       (req "vote_kind" vote_kind_encoding)
+       (req "vote_consensus_content" consensus_content_encoding)
+       (req "delegate" consensus_key_and_delegate_encoding))
+
+let signed_consensus_vote_encoding =
+  let open Data_encoding in
+  conv
+    (fun {unsigned_consensus_vote; signed_operation} ->
+      (unsigned_consensus_vote, signed_operation))
+    (fun (unsigned_consensus_vote, signed_operation) ->
+      {unsigned_consensus_vote; signed_operation})
+    (obj2
+       (req "unsigned_consensus_vote" unsigned_consensus_vote_encoding)
+       (req "signed_operation" (dynamic_size Operation.encoding)))
+
 let forge_event_encoding =
   let open Data_encoding in
   let prepared_block_encoding =
@@ -607,11 +651,28 @@ let forge_event_encoding =
       case
         (Tag 0)
         ~title:"Block_ready"
-        (obj2
-           (req "kind" (constant "Block_ready"))
-           (req "signed_block" prepared_block_encoding))
-        (function Block_ready prepared_block -> Some ((), prepared_block))
-        (fun ((), prepared_block) -> Block_ready prepared_block);
+        (obj1 (req "signed_block" prepared_block_encoding))
+        (function
+          | Block_ready prepared_block -> Some prepared_block | _ -> None)
+        (fun prepared_block -> Block_ready prepared_block);
+      case
+        (Tag 1)
+        ~title:"Preattestation_ready"
+        (obj1 (req "signed_preattestation" signed_consensus_vote_encoding))
+        (function
+          | Preattestation_ready signed_preattestation ->
+              Some signed_preattestation
+          | _ -> None)
+        (fun signed_preattestation ->
+          Preattestation_ready signed_preattestation);
+      case
+        (Tag 2)
+        ~title:"Attestation_ready"
+        (obj1 (req "signed_attestation" signed_consensus_vote_encoding))
+        (function
+          | Attestation_ready signed_attestation -> Some signed_attestation
+          | _ -> None)
+        (fun signed_attestation -> Attestation_ready signed_attestation);
     ]
 
 (* Disk state *)
@@ -1167,6 +1228,16 @@ let pp_timeout_kind fmt = function
 
 let pp_forge_event fmt =
   let open Format in
+  let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
+    fprintf
+      fmt
+      "for delegate %a at level %ld (round %a)"
+      pp_consensus_key_and_delegate
+      unsigned_consensus_vote.delegate
+      (Raw_level.to_int32 unsigned_consensus_vote.vote_consensus_content.level)
+      Round.pp
+      unsigned_consensus_vote.vote_consensus_content.round
+  in
   function
   | Block_ready {signed_block_header; round; delegate; _} ->
       fprintf
@@ -1177,6 +1248,18 @@ let pp_forge_event fmt =
         signed_block_header.shell.level
         Round.pp
         round
+  | Preattestation_ready signed_preattestation ->
+      fprintf
+        fmt
+        "preattestation ready %a"
+        pp_signed_consensus_vote
+        signed_preattestation
+  | Attestation_ready signed_attestation ->
+      fprintf
+        fmt
+        "attestation ready %a"
+        pp_signed_consensus_vote
+        signed_attestation
 
 let pp_event fmt = function
   | New_valid_proposal proposal ->
