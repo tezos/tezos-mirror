@@ -23,6 +23,7 @@ use bus::{main_memory, Address, Bus};
 #[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug)]
 pub enum Exception {
     IllegalInstruction,
+    Breakpoint,
     LoadAccessFault,
     StoreAccessFault,
     EnvCallFromUMode,

@@ -103,6 +103,11 @@ where
         self.xregisters.write(rd, rval);
     }
 
+    /// `EBREAK` instruction
+    pub fn run_ebreak(&self) -> Exception {
+        Exception::Breakpoint
+    }
+
     /// `ECALL` instruction
     pub fn run_ecall(&self) -> Exception {
         match self.mode.read() {
@@ -681,6 +686,14 @@ mod tests {
             test_branch_instr!(state, run_bgeu, 0, t2, r1_val, t2, r1_val, init_pc, init_pc);
 
         });
+    });
+
+    backend_test!(test_ebreak, F, {
+        let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+        let state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+
+        let ret_val = state.hart.run_ebreak();
+        assert_eq!(ret_val, Exception::Breakpoint);
     });
 
     backend_test!(test_fence, F, {
