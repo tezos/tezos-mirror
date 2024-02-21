@@ -15,11 +15,12 @@
 
 ### Breaking changes
 
-- Sequencer upgrade expect an activation timestamp attached to the new
-  public key. The new sequencer is activated when the rollup sees a l1
-  block with a timestamp greater than or equal to the activation
-  timestamp. Blueprint in the storage are deleted during the sequencer
-  upgrade as they can be trusted anymore. (!12038)
+- Sequencer upgrade expect an activation timestamp and an etherlink
+  pool address attached to the new public key. The new sequencer is
+  activated when the rollup sees a l1 block with a timestamp greater
+  than or equal to the activation timestamp. Blueprint in the storage
+  are deleted during the sequencer upgrade as they can be trusted
+  anymore. (!12038, !12046)
 
 ### Internal
 

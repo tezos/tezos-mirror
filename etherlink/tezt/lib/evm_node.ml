@@ -503,13 +503,17 @@ let transform_dump ~dump_json ~dump_rlp =
   Process.check process
 
 let sequencer_upgrade_payload ?(devmode = true) ?client ~public_key
-    ~activation_timestamp () =
+    ~pool_address ~activation_timestamp () =
   let args =
     [
       "make";
       "sequencer";
       "upgrade";
       "payload";
+      "with";
+      "pool";
+      "address";
+      pool_address;
       "at";
       "activation";
       "timestamp";

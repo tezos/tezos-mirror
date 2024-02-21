@@ -112,5 +112,6 @@ val sequencer_upgrade :
   sequencer_admin_contract:string ->
   client:Client.t ->
   upgrade_to:string ->
+  pool_address:string ->
   activation_timestamp:string ->
   unit Lwt.t

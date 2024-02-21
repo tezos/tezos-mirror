@@ -325,6 +325,14 @@ module Params = struct
                   "Timestamp must be either in RFC3399 format  (e.g., \
                    [\"1970-01-01T00:00:00Z\"]) or in number of seconds since \
                    the {!Time.Protocol.epoch}."))
+
+  let l2_address =
+    Tezos_clic.parameter (fun _ s ->
+        let hex_addr =
+          Option.value ~default:s @@ String.remove_prefix ~prefix:"0x" s
+        in
+        Lwt.return_ok
+        @@ Evm_node_lib_dev_encoding.Ethereum_types.(Address (Hex hex_addr)))
 end
 
 let wallet_dir_arg =
@@ -1056,23 +1064,24 @@ let make_sequencer_upgrade_command =
   command
     ~desc:"Create bytes payload for the sequencer upgrade entrypoint"
     (args2 wallet_dir_arg devmode_arg)
-    (prefixes
-       [
-         "make";
-         "sequencer";
-         "upgrade";
-         "payload";
-         "at";
-         "activation";
-         "timestamp";
-       ]
+    (prefixes ["make"; "sequencer"; "upgrade"; "payload"]
+    @@ prefixes ["with"; "pool"; "address"]
+    @@ Tezos_clic.param
+         ~name:"pool_address"
+         ~desc:"pool address of the sequencer"
+         Params.l2_address
+    @@ prefixes ["at"; "activation"; "timestamp"]
     @@ param
          ~name:"activation_timestamp"
          ~desc:
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
-    (fun (wallet_dir, devmode) activation_timestamp sequencer_str () ->
+    (fun (wallet_dir, devmode)
+         pool_address
+         activation_timestamp
+         sequencer_str
+         () ->
       let wallet_ctxt = register_wallet ~wallet_dir in
       let* _pk_uri, sequencer_pk_opt =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
@@ -1085,8 +1094,8 @@ let make_sequencer_upgrade_command =
       let* payload =
         if devmode then
           let open Evm_node_lib_dev_encoding.Ethereum_types in
-          let sequencer_upgrade =
-            Sequencer_upgrade.{sequencer; timestamp = activation_timestamp}
+          let sequencer_upgrade : Sequencer_upgrade.t =
+            {sequencer; pool_address; timestamp = activation_timestamp}
           in
           return @@ Sequencer_upgrade.to_bytes sequencer_upgrade
         else

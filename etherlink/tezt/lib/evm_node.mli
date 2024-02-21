@@ -106,8 +106,9 @@ val wait_for_blueprint_applied : timeout:float -> t -> int -> unit Lwt.t
     [evm_node] has injected a blueprint for level [level] to its rollup node. *)
 val wait_for_blueprint_injected : timeout:float -> t -> int -> unit Lwt.t
 
-(** [init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node_endpoint]
-    creates an EVM node server with {!create} and runs it with {!run}. *)
+(** [init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+    rollup_node_endpoint] creates an EVM node server with {!create}
+    and runs it with {!run}. *)
 val init :
   ?name:string ->
   ?runner:Runner.t ->
@@ -180,7 +181,7 @@ val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t
 val upgrade_payload :
   root_hash:string -> activation_timestamp:string -> string Lwt.t
 
-(** [sequencer_upgrade_payload ?devmode ?client ~public_key
+(** [sequencer_upgrade_payload ?devmode ?client ~public_key  ~pool_address
     ~activation_timestamp ()] gives the sequencer upgrade payload to
     put in a upgrade message, it will upgrade the sequencer to
     [public_key] at the first l1 block after [activation_timestamp]
@@ -189,6 +190,7 @@ val sequencer_upgrade_payload :
   ?devmode:bool ->
   ?client:Client.t ->
   public_key:string ->
+  pool_address:string ->
   activation_timestamp:string ->
   unit ->
   string Lwt.t

@@ -4488,6 +4488,7 @@ let test_migrate_proxy_to_sequencer_future =
       ~client
       ~upgrade_to:sequencer_key.alias
       ~activation_timestamp
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
   in
   let sequencer_node =
     let mode =
@@ -4626,6 +4627,7 @@ let test_migrate_proxy_to_sequencer_past =
       ~client
       ~upgrade_to:sequencer_key.alias
       ~activation_timestamp:"0"
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
   in
   let* () =
     (* We need to bake 3 blocks, because otherwise the sequencer upgrade event

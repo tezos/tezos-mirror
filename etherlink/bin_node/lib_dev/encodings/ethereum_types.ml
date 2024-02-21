@@ -1283,23 +1283,29 @@ module Upgrade = struct
 end
 
 module Sequencer_upgrade = struct
-  type t = {sequencer : Signature.public_key; timestamp : Time.Protocol.t}
+  type t = {
+    sequencer : Signature.public_key;
+    pool_address : address;
+    timestamp : Time.Protocol.t;
+  }
 
   let of_rlp = function
-    | Rlp.List [Value sequencer; Value timestamp] ->
+    | Rlp.List [Value sequencer; Value pool_address; Value timestamp] ->
         let sequencer =
           Signature.Public_key.of_b58check_exn (String.of_bytes sequencer)
         in
         let timestamp = timestamp_of_bytes timestamp in
-        Some {sequencer; timestamp}
+        let pool_address = decode_address pool_address in
+        Some {sequencer; pool_address; timestamp}
     | _ -> None
 
-  let to_rlp {sequencer; timestamp} =
+  let to_rlp {sequencer; pool_address; timestamp} =
     let sequencer =
       Signature.Public_key.to_b58check sequencer |> String.to_bytes
     in
     let timestamp = timestamp_to_bytes timestamp in
-    Rlp.List [Value sequencer; Value timestamp]
+    let pool_address = encode_address pool_address in
+    Rlp.List [Value sequencer; Value pool_address; Value timestamp]
 
   let of_bytes bytes =
     match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
@@ -1309,9 +1315,11 @@ module Sequencer_upgrade = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {sequencer; timestamp} -> (sequencer, timestamp))
-      (fun (sequencer, timestamp) -> {sequencer; timestamp})
-      (tup2 Signature.Public_key.encoding Time.Protocol.encoding)
+      (fun {sequencer; pool_address = Address (Hex pool_address); timestamp} ->
+        (sequencer, pool_address, timestamp))
+      (fun (sequencer, pool_address, timestamp) ->
+        {sequencer; pool_address = Address (Hex pool_address); timestamp})
+      (tup3 Signature.Public_key.encoding string Time.Protocol.encoding)
 end
 
 module Evm_events = struct
@@ -1341,12 +1349,14 @@ module Evm_events = struct
           hash
           Time.Protocol.pp_hum
           timestamp
-    | Sequencer_upgrade_event {sequencer; timestamp} ->
+    | Sequencer_upgrade_event
+        {sequencer; pool_address = Address (Hex address); timestamp} ->
         Format.fprintf
           fmt
-          "Sequencer_upgrade:@ sequencer:@ %a,@ timestamp %a"
+          "SequencerUpgrade:@ sequencer:@ %a,pool_address %s,@ timestamp: %a"
           Signature.Public_key.pp
           sequencer
+          address
           Time.Protocol.pp_hum
           timestamp
 

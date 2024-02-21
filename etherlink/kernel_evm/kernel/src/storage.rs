@@ -655,7 +655,6 @@ pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
     Some(bytes.into())
 }
 
-#[cfg(test)]
 pub fn store_sequencer_pool_address(
     host: &mut impl Runtime,
     address: H160,

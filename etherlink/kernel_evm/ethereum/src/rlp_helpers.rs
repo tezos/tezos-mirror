@@ -8,7 +8,7 @@
 use crate::transaction::{
     TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
 };
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use tezos_smart_rollup_encoding::{public_key::PublicKey, timestamp::Timestamp};
 
@@ -58,6 +58,23 @@ pub fn decode_field_h256(
 ) -> Result<H256, DecoderError> {
     let custom_err = |_: DecoderError| (DecoderError::Custom(field_name));
     decode_h256(decoder).map_err(custom_err)
+}
+
+pub fn decode_h160(decoder: &Rlp<'_>) -> Result<H160, DecoderError> {
+    let bytes = decoder.data()?;
+    const H160_EXPECTED_LENGTH: usize = std::mem::size_of::<H160>();
+    let length = bytes.len();
+    if length == H160_EXPECTED_LENGTH {
+        Ok(H160::from_slice(bytes))
+    } else if length < H160_EXPECTED_LENGTH && length > 0 {
+        // there were missing 0 that encoding deleted
+        let missing = H160_EXPECTED_LENGTH - length;
+        let mut full = [0u8; H160_EXPECTED_LENGTH];
+        full[missing..].copy_from_slice(bytes);
+        Ok(H160::from(full))
+    } else {
+        Err(DecoderError::RlpInvalidLength)
+    }
 }
 
 pub fn decode_option<T: Decodable>(
@@ -329,4 +346,29 @@ pub fn decode_public_key(decoder: &Rlp<'_>) -> Result<PublicKey, DecoderError> {
         )
     })?;
     Ok(pk)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rlp_helpers::decode_h160;
+    use primitive_types::H160;
+    use rlp::{Rlp, RlpStream};
+
+    #[test]
+    fn roundtrip_h160() {
+        let partial_bytes: [u8; 16] = [1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0];
+        let full_bytes: [u8; 20] =
+            [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0];
+        let h160 = H160::from(full_bytes);
+
+        let mut stream = RlpStream::new();
+        stream.encoder().encode_value(&partial_bytes);
+        let encoded_bytes = stream.out();
+        let decoder = Rlp::new(&encoded_bytes);
+        let result_h160 = decode_h160(&decoder).unwrap();
+        let result_bytes = result_h160.as_fixed_bytes();
+
+        assert!(result_h160.eq(&h160));
+        assert!(result_bytes.eq(&full_bytes));
+    }
 }

@@ -5,19 +5,24 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage;
+use core::fmt;
+
 use crate::error::UpgradeProcessError;
 use crate::event::Event;
 use crate::safe_storage::KernelRuntime;
 use crate::storage;
 use crate::storage::read_optional_rlp;
 use crate::storage::store_sequencer;
+use crate::storage::store_sequencer_pool_address;
 use anyhow::Context;
+use primitive_types::H160;
 use rlp::Decodable;
 use rlp::DecoderError;
 use rlp::Encodable;
 use tezos_ethereum::rlp_helpers::append_public_key;
 use tezos_ethereum::rlp_helpers::append_timestamp;
 use tezos_ethereum::rlp_helpers::decode_field;
+use tezos_ethereum::rlp_helpers::decode_h160;
 use tezos_ethereum::rlp_helpers::decode_public_key;
 use tezos_ethereum::rlp_helpers::decode_timestamp;
 use tezos_ethereum::rlp_helpers::next;
@@ -129,11 +134,22 @@ pub fn upgrade<Host: Runtime>(
 #[derive(Debug, PartialEq, Clone)]
 pub struct SequencerUpgrade {
     pub sequencer: PublicKey,
+    pub pool_address: H160,
     pub activation_timestamp: Timestamp,
 }
 
 impl SequencerUpgrade {
-    const RLP_LIST_SIZE: usize = 2;
+    const RLP_LIST_SIZE: usize = 3;
+}
+
+impl fmt::Display for SequencerUpgrade {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "sequencer: {}, pool_address: {}, activation_timestamp: {}",
+            self.sequencer, self.pool_address, self.activation_timestamp
+        )
+    }
 }
 
 impl Decodable for SequencerUpgrade {
@@ -147,10 +163,12 @@ impl Decodable for SequencerUpgrade {
 
         let mut it = decoder.iter();
         let sequencer = decode_public_key(&next(&mut it)?)?;
+        let pool_address = decode_h160(&next(&mut it)?)?;
         let activation_timestamp = decode_timestamp(&next(&mut it)?)?;
 
         Ok(Self {
             sequencer,
+            pool_address,
             activation_timestamp,
         })
     }
@@ -160,6 +178,7 @@ impl Encodable for SequencerUpgrade {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(SequencerUpgrade::RLP_LIST_SIZE);
         append_public_key(stream, &self.sequencer);
+        stream.append(&self.pool_address);
         append_timestamp(stream, self.activation_timestamp);
     }
 }
@@ -196,11 +215,13 @@ fn delete_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()
 
 fn sequencer_upgrade<Host: Runtime>(
     host: &mut Host,
+    pool_address: H160,
     sequencer: &PublicKey,
 ) -> anyhow::Result<()> {
     log!(host, Info, "sequencer upgrade initialisation.");
 
     store_sequencer(host, sequencer)?;
+    store_sequencer_pool_address(host, pool_address)?;
     delete_sequencer_upgrade(host)?;
     log!(host, Info, "Sequencer has been updated.");
     Ok(())
@@ -213,7 +234,7 @@ pub fn possible_sequencer_upgrade<Host: KernelRuntime>(
     if let Some(upgrade) = upgrade {
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(host)?;
         if ipl_timestamp >= upgrade.activation_timestamp {
-            sequencer_upgrade(host, &upgrade.sequencer)?;
+            sequencer_upgrade(host, upgrade.pool_address, &upgrade.sequencer)?;
             blueprint_storage::clear_all_blueprint(host)?;
         }
     }
