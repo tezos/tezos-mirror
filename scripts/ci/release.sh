@@ -11,13 +11,12 @@ src_dir=$(dirname "$scripts_dir")
 script_inputs_dir="$src_dir/script-inputs"
 
 
-gitlab_package=$((echo "${CI_COMMIT_TAG}" | grep -Eq "^etherlink-") \
-                     && echo "etherlink" || echo "octez")
+gitlab_package=$((echo "${CI_COMMIT_TAG}" | Grep -Eq "^etherlink-") && echo "etherlink" || echo "octez")
 
 if [ "${gitlab_package}" = "etherlink" ]; then
     binaries="$(cat "$script_inputs_dir/etherlink-executables")"
-    deb_packages="$(find . -maxdepth 1 \( -name etherlink-evm\*.deb -o -name etherlink-smartrollup\*.deb\))"
-    rpm_packages="$(find . -maxdepth 1 \( -name etherlink-evm\*.rpm -o -name etherlink-smartrollup\*.rpm\))"
+    deb_packages="$(find . -maxdepth 1 \( -name etherlink-evm\*.deb -o -name etherlink-smartrollup\*.deb \))"
+    rpm_packages="$(find . -maxdepth 1 \( -name etherlink-evm\*.rpm -o -name etherlink-smartrollup\*.rpm \))"
 else
     binaries="$(cat "$script_inputs_dir/released-executables")"
     deb_packages="$(find . -maxdepth 1 -name octez-\*.deb)"
