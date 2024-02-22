@@ -100,7 +100,7 @@ module Internal_for_tests = struct
   let fake_srs2 = Lazy.from_fun (compute_fake_srs Srs_g2.generate_insecure)
 
   module Print = struct
-    (* Bounds (in log₂)
+    (* Bounds (following inequalities are given for log₂ for simplicity)
        1 <= redundancy<= 4
        7 <= page size + (redundancy + 1) <= slot size <= 20
        5 <= page size <= slot size - (redundancy + 1) <= 18 - 5 = 13
@@ -117,10 +117,10 @@ module Internal_for_tests = struct
       (* Ensure validity before computing actual value *)
       let f ~slot ~redundancy ~page ~shards =
         Parameters_check.ensure_validity_without_srs
-          ~slot_size:(1 lsl slot)
-          ~page_size:(1 lsl page)
-          ~redundancy_factor:(1 lsl redundancy)
-          ~number_of_shards:(1 lsl shards)
+          ~slot_size:slot
+          ~page_size:page
+          ~redundancy_factor:redundancy
+          ~number_of_shards:shards
         |> function
         | Ok () -> func ~slot ~redundancy ~page ~shards
         | _ -> 0
@@ -142,7 +142,7 @@ module Internal_for_tests = struct
       let page_srs =
         let values =
           List.map
-            (fun page -> Parameters_check.domain_length ~size:(1 lsl page))
+            (fun page -> Parameters_check.domain_length ~size:page)
             p.page
         in
         values
@@ -151,27 +151,28 @@ module Internal_for_tests = struct
         concat_map4 p (fun ~slot ~redundancy:_ ~page ~shards:_ ->
             max_srs_size
             - Parameters_check.slot_as_polynomial_length
-                ~page_size:(1 lsl page)
-                ~slot_size:(1 lsl slot))
+                ~page_size:page
+                ~slot_size:slot)
       in
       let shard_srs =
         concat_map4 p (fun ~slot ~redundancy ~page ~shards ->
             let max_polynomial_length =
               Parameters_check.slot_as_polynomial_length
-                ~page_size:(1 lsl page)
-                ~slot_size:(1 lsl slot)
+                ~page_size:page
+                ~slot_size:slot
             in
             let erasure_encoded_polynomial_length =
-              (1 lsl redundancy) * max_polynomial_length
+              redundancy * max_polynomial_length
             in
-            erasure_encoded_polynomial_length / (1 lsl shards))
+            erasure_encoded_polynomial_length / shards)
       in
       let page_shards =
         List.sort_uniq (fun x y -> Int.compare y x) (page_srs @ shard_srs)
       in
       let max_srs1_needed = List.hd page_shards in
       ( max_srs1_needed,
-        List.sort_uniq Int.compare (page_shards @ commitment_srs) )
+        List.sort_uniq Int.compare (page_shards @ commitment_srs)
+        |> List.filter (fun i -> i > 0) )
 
     let _generate_all_poly_lengths ~max_srs_size =
       List.fold_left
@@ -181,24 +182,22 @@ module Internal_for_tests = struct
         (0, [])
   end
 
-  let print_verifier_srs_from_file ?(max_srs_size = max_srs_size) ~srs_g1_path
-      ~srs_g2_path () =
+  let print_verifier_srs_from_file ?(max_srs_size = Zcash_srs.max_srs_g1_size)
+      ~srs_g1_path ~srs_g2_path () =
     let params =
       Print.
         {
-          redundancy = [1; 2; 3; 4];
-          slot = [15; 16; 17; 18; 19; 20];
-          page = [12];
-          shards = [11; 12];
+          redundancy = [1; 2; 3; 4] |> List.map (Int.shift_left 1);
+          slot = [15; 16; 17; 18; 19; 20] |> List.map (Int.shift_left 1);
+          page = [12] |> List.map (Int.shift_left 1);
+          shards = [11; 12] |> List.map (Int.shift_left 1);
         }
     in
     let open Lwt_result_syntax in
     let srs_g1_size, lengths =
       Print.generate_poly_lengths ~max_srs_size params
     in
-    let* srs_g1, srs_g2 =
-      read_srs ~len:srs_g1_size ~srs_g1_path ~srs_g2_path ()
-    in
+    let* srs_g1, srs_g2 = read_srs ~srs_g1_path ~srs_g2_path () in
     let srs2 =
       List.map
         (fun i ->
