@@ -3,6 +3,7 @@ pub mod machine_state;
 pub mod parser;
 pub mod program;
 pub mod state_backend;
+pub mod traps;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right

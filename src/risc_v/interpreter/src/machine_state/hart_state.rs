@@ -1,6 +1,7 @@
-use crate::state_backend::{self as backend, Atom, Cell};
-
-use super::{bus::Address, csregisters, mode, registers};
+use crate::{
+    machine_state::{bus::Address, csregisters, mode, registers},
+    state_backend::{self as backend, Atom, Cell},
+};
 
 /// RISC-V hart state
 pub struct HartState<M: backend::Manager> {
@@ -42,11 +43,11 @@ impl<M: backend::Manager> HartState<M> {
     }
 
     /// Reset the hart state.
-    pub fn reset(&mut self, mode: mode::Mode, pc: Address) {
+    pub fn reset(&mut self, pc: Address) {
         self.xregisters.reset();
         self.fregisters.reset();
         self.csregisters.reset();
-        self.mode.reset(mode);
+        self.mode.reset();
         self.pc.write(pc);
     }
 }
@@ -54,21 +55,15 @@ impl<M: backend::Manager> HartState<M> {
 mod tests {
     use crate::{
         backend_test,
-        machine_state::{
-            hart_state::{HartState, HartStateLayout},
-            mode,
-        },
+        machine_state::hart_state::{HartState, HartStateLayout},
         state_backend::tests::test_determinism,
     };
-    use strum::IntoEnumIterator;
 
     backend_test!(test_hart_state_reset, F, {
-        mode::Mode::iter().for_each(|mode: mode::Mode| {
-            proptest::proptest!(|(pc: u64)| {
-                test_determinism::<F, HartStateLayout, _>(|space| {
-                    let mut hart = HartState::bind(space);
-                    hart.reset(mode, pc);
-                });
+        proptest::proptest!(|(pc: u64)| {
+            test_determinism::<F, HartStateLayout, _>(|space| {
+                let mut hart = HartState::bind(space);
+                hart.reset(pc);
             });
         });
     });

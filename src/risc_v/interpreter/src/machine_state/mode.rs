@@ -73,8 +73,8 @@ impl<M: backend::Manager> ModeCell<M> {
     }
 
     /// Reset to the initial state.
-    pub fn reset(&mut self, mode: Mode) {
-        self.write(mode);
+    pub fn reset(&mut self) {
+        self.write(Mode::Machine);
     }
 }
 
@@ -90,11 +90,9 @@ mod tests {
     use strum::IntoEnumIterator;
 
     backend_test!(test_mode_reset, F, {
-        Mode::iter().for_each(|mode| {
-            test_determinism::<F, ModeLayout, _>(|space| {
-                let mut mode1 = ModeCell::bind(space);
-                mode1.reset(mode);
-            });
+        test_determinism::<F, ModeLayout, _>(|space| {
+            let mut mode1 = ModeCell::bind(space);
+            mode1.reset();
         });
     });
 

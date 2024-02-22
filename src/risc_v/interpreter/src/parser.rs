@@ -467,8 +467,10 @@ pub fn parse_segment(contents: &[u8], range: Range<usize>) -> Vec<Instr> {
 
 #[cfg(test)]
 mod tests {
-    use super::instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs};
-    use super::parse_block;
+    use super::{
+        instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs},
+        parse_block,
+    };
     use crate::machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*};
 
     // rv64ui-p-addiw

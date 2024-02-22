@@ -5,7 +5,11 @@
 // Allow dead code while this module contains stubs.
 #![allow(dead_code)]
 
-use risc_v_interpreter::{machine_state, state_backend};
+use risc_v_interpreter::{
+    machine_state::{self, MachineState, StepManyResult},
+    state_backend,
+    traps::EnvironException,
+};
 
 /// Memory configuration
 type MemorySize = machine_state::bus::main_memory::M1G;
@@ -56,16 +60,44 @@ impl<M: state_backend::Manager> Pvm<M> {
         Status::Eval
     }
 
-    /// Perform one step. Returns `false` if the PVM is not in `Status::Eval` status.
+    fn execution_environment_trap_handler(
+        _machine_state: &MachineState<MemorySize, M>,
+        _exception: EnvironException,
+    ) {
+        // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
+        todo!("PVM Trap handler for execution environment traps not implemented")
+    }
+
+    /// Perform one step. Returns `false` if the PVM is not in [`Status::Eval`] status.
     pub fn step(&mut self) -> bool {
-        self.machine_state.step();
+        if let Err(exc) = self.machine_state.step() {
+            Pvm::execution_environment_trap_handler(&self.machine_state, exc)
+        };
         true
     }
 
     /// Perform at most `max_steps` steps. Returns the actual number of steps
-    /// performed.
+    /// performed (retired instructions)
+    ///
+    /// If an environment trap is raised, handle it and
+    /// return the number of retired instructions until the raised trap
+    ///
+    /// NOTE: instructions which raise exceptions / are interrupted are NOT retired
+    ///       See section 3.3.1 for context on retired instructions.
+    /// e.g: a load instruction raises an exception but the first instruction
+    /// of the trap handler will be executed and retired,
+    /// so in the end the load instruction which does not bubble it's exception up to
+    /// the execution environment will still retire an instruction, just not itself.
+    /// (a possible case: the privilege mode access violation is treated in EE,
+    /// but a page fault is not)
     pub fn step_many(&mut self, max_steps: usize) -> usize {
-        self.machine_state.step_many(max_steps, |_| true)
+        let StepManyResult { steps, exception } = self.machine_state.step_many(max_steps, |_| true);
+
+        if let Some(exc) = exception {
+            Pvm::execution_environment_trap_handler(&self.machine_state, exc)
+        }
+
+        steps
     }
 }
 

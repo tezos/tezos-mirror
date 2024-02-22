@@ -6,8 +6,6 @@
 //!
 //! Chapter 2 - Unprivileged spec
 
-use crate::machine_state::hart_state::HartState;
-use crate::state_backend as backend;
 use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Address},
@@ -15,11 +13,14 @@ use crate::{
             xstatus::{self, MPPValue, SPPValue},
             CSRegister,
         },
+        hart_state::HartState,
         mode::Mode,
         registers::{XRegister, XRegisters},
-        Exception, MachineState,
+        MachineState,
     },
     parser::instruction::FenceSet,
+    state_backend as backend,
+    traps::Exception,
 };
 
 impl<M> XRegisters<M>
@@ -456,9 +457,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::registers::t0;
-    use crate::{backend_test, create_backend, create_state};
     use crate::{
+        backend_test, create_backend, create_state,
         machine_state::{
             bus::{main_memory::tests::T1K, Address},
             csregisters::{
@@ -469,11 +469,12 @@ mod tests {
             hart_state::{HartState, HartStateLayout},
             mode::Mode,
             registers::{
-                a0, a1, a2, a3, a4, fa0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
+                a0, a1, a2, a3, a4, fa0, t0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
             },
-            Exception, MachineState, MachineStateLayout,
+            MachineState, MachineStateLayout,
         },
         parser::instruction::FenceSet,
+        traps::Exception,
     };
     use proptest::{
         prelude::{any, prop},
