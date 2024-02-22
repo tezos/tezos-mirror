@@ -4635,10 +4635,10 @@ let dal_crypto_benchmark () =
     Process.run (Base.project_root // "scripts/install_dal_trusted_setup.sh") []
   in
   Log.info "SRS files downloaded." ;
-  let number_of_shards = 512 in
-  let slot_size = 126_944 in
-  let redundancy_factor = 8 in
-  let page_size = 3967 in
+  let number_of_shards = Cli.get_int ~default:512 "nb_shards" in
+  let slot_size = Cli.get_int ~default:126_944 "slot_size" in
+  let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
+  let page_size = Cli.get_int ~default:3967 "page_size" in
   let sample = Cli.get_int ~default:1 "sample" in
   let generate_slot ~slot_size =
     Bytes.init slot_size (fun _ ->
