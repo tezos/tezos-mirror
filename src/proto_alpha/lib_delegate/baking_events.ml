@@ -274,6 +274,15 @@ module State_transitions = struct
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
 
+  let attempting_vote_proposal =
+    declare_1
+      ~section
+      ~name:"attempting_vote_proposal"
+      ~level:Info
+      ~msg:"attempting to vote for proposal {block_hash}"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+
   let skipping_invalid_proposal =
     declare_0
       ~section

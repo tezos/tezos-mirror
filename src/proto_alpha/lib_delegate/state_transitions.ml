@@ -104,6 +104,15 @@ let prepare_preattest_action state proposal =
   in
   Prepare_preattestations {preattestations}
 
+let prepare_consensus_votes_action state proposal =
+  let preattestations : unsigned_consensus_vote_batch =
+    make_consensus_vote_batch state proposal Baking_state.Preattestation
+  in
+  let attestations : unsigned_consensus_vote_batch =
+    make_consensus_vote_batch state proposal Baking_state.Attestation
+  in
+  Prepare_consensus_votes {preattestations; attestations}
+
 let update_proposal ~is_proposal_applied state proposal =
   let open Lwt_syntax in
   let* () = Events.(emit updating_latest_proposal proposal.block.hash) in
@@ -150,6 +159,21 @@ let preattest state proposal =
     (* Here, we do not cancel pending signatures as it is already done
        in [handle_proposal]. *)
     return (new_state, prepare_preattest_action state proposal)
+
+let prepare_consensus_votes state proposal =
+  let open Lwt_syntax in
+  if Baking_state.is_first_block_in_protocol proposal then
+    (* We do not vote for the first transition block *)
+    let new_state = update_current_phase state Idle in
+    return (new_state, Do_nothing)
+  else
+    let* () = Events.(emit attempting_vote_proposal proposal.block.hash) in
+    let new_state =
+      (* We have detected a new proposal that needs to be voted for.
+         We switch to the `Awaiting_preattestations` phase. *)
+      update_current_phase state Awaiting_preattestations
+    in
+    return (new_state, prepare_consensus_votes_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
@@ -222,12 +246,11 @@ let mark_awaiting_pqc state =
 
 let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
   let open Lwt_syntax in
-  (* We need to avoid to send preattestations, if we are in phases were
-     preattestations have been sent already. This is needed to avoid switching
+  (* We need to avoid to send votes if we are in phases where consensus
+     votes are already being forged. This is needed to avoid switching
      back from Awaiting_attestations to Awaiting_preattestations.
-     Hypothesis: a fresh round's initial phase is Idle
-  *)
-  let may_preattest state proposal =
+     Hypothesis: a fresh round's initial phase is Idle *)
+  let may_vote state proposal =
     match state.round_state.current_phase with
     | Idle ->
         (* We prioritize the new and meaningful consensus vote signing
@@ -237,7 +260,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
            active forge requests are still processed until
            completion. *)
         state.global_state.forge_worker_hooks.cancel_all_pending_tasks () ;
-        preattest state proposal
+        prepare_consensus_votes state proposal
     | _ -> do_nothing state
   in
   let current_level = state.level_state.current_level in
@@ -319,16 +342,16 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                   locked_round.payload_hash = new_proposal.block.payload_hash)
               then
                 (* when the new head has the same payload as our
-                   [locked_round], we accept it and preattest *)
-                may_preattest new_state new_proposal
+                   [locked_round], we accept it and vote for it *)
+                may_vote new_state new_proposal
               else
                 (* The payload is different *)
                 match new_proposal.block.prequorum with
                 | Some {round; _} when Round.(locked_round.round < round) ->
-                    (* This PQC is above our locked_round, we can preattest it *)
-                    may_preattest new_state new_proposal
+                    (* This PQC is above our locked_round, we can and vote for it *)
+                    may_vote new_state new_proposal
                 | _ ->
-                    (* We shouldn't preattest this proposal, but we
+                    (* We shouldn't vote for proposal, but we
                        should at least watch (pre)quorums events on it
                        but only when it is applied otherwise we await
                        for the proposal to be applied. *)
@@ -339,8 +362,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                     return (new_state, Watch_proposal))
           | None ->
               (* Otherwise, we did not lock on any payload, thus we can
-                 preattest it *)
-              may_preattest new_state new_proposal)
+                 vote for it it *)
+              may_vote new_state new_proposal)
   else
     (* Last case: new_proposal_level > current_level *)
     (* Possible scenarios:
