@@ -5,7 +5,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_evm_logging::{log, Level};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 #[cfg(feature = "proto-alpha")]
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
@@ -14,11 +13,8 @@ use tezos_smart_rollup_host::{
     metadata::RollupMetadata,
     path::{concat, OwnedPath, Path, RefPath},
     runtime::{Runtime, RuntimeError, ValueType},
-    Error, KERNEL_BOOT_PATH,
+    Error,
 };
-
-const BACKUP_KERNEL_BOOT_PATH: RefPath =
-    RefPath::assert_from(b"/__backup_kernel/boot.wasm");
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
 
@@ -108,7 +104,7 @@ pub struct SafeStorage<Host, Internal> {
     pub internal: Internal,
 }
 
-fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
+pub fn safe_path<T: Path>(path: &T) -> Result<OwnedPath, RuntimeError> {
     concat(&TMP_PATH, path).map_err(|_| RuntimeError::PathNotFound)
 }
 
@@ -280,55 +276,6 @@ impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut Intern
 }
 
 impl<Host: Runtime, Internal> SafeStorage<&mut Host, &mut Internal> {
-    fn backup_current_kernel(&mut self) -> Result<(), RuntimeError> {
-        // Fallback preparation detected
-        // Storing the current kernel boot path under a temporary path in
-        // order to fallback on it if something goes wrong in the upcoming
-        // upgraded kernel.
-        log!(
-            self.host,
-            Level::Info,
-            "Preparing potential fallback by backing up the current kernel."
-        );
-        self.host
-            .store_copy(&KERNEL_BOOT_PATH, &BACKUP_KERNEL_BOOT_PATH)
-    }
-
-    pub fn fallback_backup_kernel(&mut self) -> Result<(), RuntimeError> {
-        log!(
-            self.host,
-            Level::Info,
-            "Something went wrong, fallback mechanism is triggered."
-        );
-        self.host
-            .store_move(&BACKUP_KERNEL_BOOT_PATH, &KERNEL_BOOT_PATH)
-    }
-
-    fn clean_backup_kernel(&mut self) -> Result<(), RuntimeError> {
-        log!(self.host, Level::Info, "Cleaning the backup kernel.");
-        self.host.store_delete(&BACKUP_KERNEL_BOOT_PATH)
-    }
-
-    pub fn promote_upgrade(&mut self) -> Result<(), RuntimeError> {
-        let safe_kernel_boot_path = safe_path(&KERNEL_BOOT_PATH)?;
-        match self.host.store_read(&safe_kernel_boot_path, 0, 0) {
-            Ok(_) => {
-                // Upgrade detected
-                log!(self, Level::Info, "Upgrade activated.");
-                self.backup_current_kernel()?;
-                self.host
-                    .store_move(&safe_kernel_boot_path, &KERNEL_BOOT_PATH)
-            }
-            Err(_) => {
-                // No on-going upgrade detected
-                if self.host.store_read(&BACKUP_KERNEL_BOOT_PATH, 0, 0).is_ok() {
-                    self.clean_backup_kernel()?
-                };
-                Ok(())
-            }
-        }
-    }
-
     pub fn promote(&mut self, path: &impl Path) -> Result<(), RuntimeError> {
         self.host.store_move(&TMP_PATH, path)
     }
