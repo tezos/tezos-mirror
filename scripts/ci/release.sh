@@ -16,8 +16,8 @@ gitlab_package=$((echo "${CI_COMMIT_TAG}" | grep -Eq "^etherlink-") \
 
 if [ "${gitlab_package}" = "etherlink" ]; then
     binaries="$(cat "$script_inputs_dir/etherlink-executables")"
-    deb_packages="$(find . -maxdepth 1 \( -name octez-evm\*.deb -o -name octez-smartrollup\*.deb\))"
-    rpm_packages="$(find . -maxdepth 1 \( -name octez-evm\*.rpm -o -name octez-smartrollup\*.rpm\))"
+    deb_packages="$(find . -maxdepth 1 \( -name etherlink-evm\*.deb -o -name etherlink-smartrollup\*.deb\))"
+    rpm_packages="$(find . -maxdepth 1 \( -name etherlink-evm\*.rpm -o -name etherlink-smartrollup\*.rpm\))"
 else
     binaries="$(cat "$script_inputs_dir/released-executables")"
     deb_packages="$(find . -maxdepth 1 -name octez-\*.deb)"

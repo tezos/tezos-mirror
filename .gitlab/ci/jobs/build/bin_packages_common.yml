@@ -32,7 +32,7 @@
     - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev protobuf-compiler libsqlite3-dev
   artifacts:
     paths:
-      - octez-*.deb
+      - "${OCTEZ_PKGNAME}-*.deb"
 
 .bin_packages_rpm:
   image: fedora:39
@@ -44,4 +44,4 @@
     - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel sqlite-devel
   artifacts:
     paths:
-      - octez-*.rpm
+      - "${OCTEZ_PKGNAME}-*.rpm"
