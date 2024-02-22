@@ -67,7 +67,7 @@ type signed_consensus_vote_batch = private {
 type action =
   | Do_nothing
   | Prepare_block of {block_to_bake : block_to_bake}
-  | Inject_block of {prepared_block : prepared_block}
+  | Inject_block of {prepared_block : prepared_block; force_injection : bool}
   | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
   | Update_to_level of level_update
@@ -101,7 +101,8 @@ val generate_seed_nonce_hash :
 val prepare_block :
   global_state -> block_to_bake -> prepared_block tzresult Lwt.t
 
-val inject_block : state -> prepared_block -> state tzresult Lwt.t
+val inject_block :
+  ?force_injection:bool -> state -> prepared_block -> state tzresult Lwt.t
 
 val sign_consensus_votes :
   state ->

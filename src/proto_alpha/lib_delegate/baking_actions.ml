@@ -163,7 +163,7 @@ type signed_consensus_vote_batch = {
 type action =
   | Do_nothing
   | Prepare_block of {block_to_bake : block_to_bake}
-  | Inject_block of {prepared_block : prepared_block}
+  | Inject_block of {prepared_block : prepared_block; force_injection : bool}
   | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
   | Update_to_level of level_update
@@ -743,7 +743,7 @@ let inject_consensus_votes state
           return_unit))
     signed_consensus_votes
 
-let inject_block state prepared_block =
+let inject_block ?(force_injection = false) state prepared_block =
   let open Lwt_result_syntax in
   let {signed_block_header; round; delegate; operations; baking_votes} =
     prepared_block
@@ -798,7 +798,8 @@ let inject_block state prepared_block =
      block's timestamp before injecting. *)
   let* () =
     let delay = Ptime.diff block_time now in
-    if Ptime.Span.(compare delay zero < 0) then inject_block ()
+    if Ptime.Span.(compare delay zero < 0) || force_injection then
+      inject_block ()
     else
       let*! () =
         Events.(
@@ -961,8 +962,8 @@ let rec perform_action ~state_recorder state (action : action) =
       let* () = state_recorder ~new_state:state in
       return state
   | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
-  | Inject_block {prepared_block} ->
-      let* new_state = inject_block state prepared_block in
+  | Inject_block {prepared_block; force_injection} ->
+      let* new_state = inject_block ~force_injection state prepared_block in
       let* () = state_recorder ~new_state in
       return new_state
   | Inject_preattestations {preattestations} ->
