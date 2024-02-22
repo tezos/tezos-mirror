@@ -4661,10 +4661,10 @@ let dal_crypto_benchmark () =
     in
     Lwt.return config
   in
-  let number_of_shards = [2048] |> List.to_seq in
-  let slot_size_log2 = [16; 18; 20] |> List.to_seq in
-  let redundancy_factor = [4; 16] |> List.to_seq in
-  let page_size = [4096] |> List.to_seq in
+  let number_of_shards = [512] |> List.to_seq in
+  let slot_size = [126_944] |> List.to_seq in
+  let redundancy_factor = [8] |> List.to_seq in
+  let page_size = [3967] |> List.to_seq in
   let sample = Cli.get_int ~default:1 "sample" in
   let generate_slot ~slot_size =
     Bytes.init slot_size (fun _ ->
@@ -4672,20 +4672,17 @@ let dal_crypto_benchmark () =
         Char.chr (x + Char.code 'a'))
   in
   Seq.product redundancy_factor page_size
-  |> Seq.product (Seq.product number_of_shards slot_size_log2)
+  |> Seq.product (Seq.product number_of_shards slot_size)
   |> Seq.iter
-       (fun ((number_of_shards, slot_size_log2), (redundancy_factor, page_size))
-       ->
-         let slot_size = 1 lsl slot_size_log2 in
+       (fun ((number_of_shards, slot_size), (redundancy_factor, page_size)) ->
          let parameters =
            {number_of_shards; redundancy_factor; page_size; slot_size}
          in
          let message =
            Format.asprintf
-             "(shards: %d, slot size: 2^%d, redundancy_factor: %d, page size: \
-              %d)"
+             "(shards: %d, slot size: %d, redundancy_factor: %d, page size: %d)"
              number_of_shards
-             slot_size_log2
+             slot_size
              redundancy_factor
              page_size
          in
