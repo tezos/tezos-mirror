@@ -213,9 +213,6 @@ let has_already_been_handled state new_proposal =
 
 let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
   let open Lwt_syntax in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6648
-     Do not handle proposals that have been applied already.
-  *)
   (* We need to avoid to send preattestations, if we are in phases were
      preattestations have been sent already. This is needed to avoid switching
      back from Awaiting_attestations to Awaiting_preattestations.
