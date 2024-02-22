@@ -32,18 +32,21 @@ let finalize_current_slot_headers ctxt =
   | [] -> Lwt.return ctxt
   | _ :: _ -> Storage.Dal.Slot.Headers.add ctxt current_level.level slot_headers
 
-let compute_attested_slot_headers ctxt seen_slot_headers =
+let compute_attested_slot_headers ~is_slot_attested seen_slot_headers =
   let open Dal_slot_repr in
   let fold_attested_slots (rev_attested_slot_headers, attestation) slot =
-    if Raw_context.Dal.is_slot_index_attested ctxt slot.Header.id.index then
+    if is_slot_attested slot then
       ( slot :: rev_attested_slot_headers,
         Dal_attestation_repr.commit attestation slot.Header.id.index )
     else (rev_attested_slot_headers, attestation)
   in
-  List.fold_left
-    fold_attested_slots
-    ([], Dal_attestation_repr.empty)
-    seen_slot_headers
+  let rev_attested_slot_headers, bitset =
+    List.fold_left
+      fold_attested_slots
+      ([], Dal_attestation_repr.empty)
+      seen_slot_headers
+  in
+  (List.rev rev_attested_slot_headers, bitset)
 
 let get_slot_headers_history ctxt =
   let open Lwt_result_syntax in
@@ -79,10 +82,14 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
         match seen_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
         | Some seen_slots ->
-            let rev_attested_slot_headers, attestation =
-              compute_attested_slot_headers ctxt seen_slots
+            let attested_slot_headers, attestation =
+              let is_slot_attested slot =
+                Raw_context.Dal.is_slot_index_attested
+                  ctxt
+                  slot.Dal_slot_repr.Header.id.index
+              in
+              compute_attested_slot_headers ~is_slot_attested seen_slots
             in
-            let attested_slot_headers = List.rev rev_attested_slot_headers in
             return (ctxt, attestation, attested_slot_headers)
       in
       let* ctxt =

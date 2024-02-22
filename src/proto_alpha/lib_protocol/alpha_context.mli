@@ -2881,6 +2881,11 @@ module Dal : sig
 
     val finalize_pending_slot_headers :
       context -> number_of_slots:int -> (context * Attestation.t) tzresult Lwt.t
+
+    val compute_attested_slot_headers :
+      is_slot_attested:(Header.t -> bool) ->
+      Header.t list ->
+      Header.t list * Attestation.t
   end
 
   module Operations : sig
