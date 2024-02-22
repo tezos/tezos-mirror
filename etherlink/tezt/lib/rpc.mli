@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error = {code : int; message : string}
+type error = {code : int; message : string; data : string option}
 
 module Request : sig
   val eth_blockNumber : Evm_node.request
@@ -78,3 +78,8 @@ val get_transaction_count :
 (** [tez_kernelVersion evm_node] calls [tez_kernelVersion]. Returns the
     kernel commit hash. *)
 val tez_kernelVersion : Evm_node.t -> (string, error) result Lwt.t
+
+(** [call ~to_ ~data] call [eth_call] with [to] and [data] as argument (on block
+    latest) *)
+val call :
+  to_:string -> data:string -> Evm_node.t -> (string, error) result Lwt.t
