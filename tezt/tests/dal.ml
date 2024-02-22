@@ -4639,7 +4639,6 @@ let dal_crypto_benchmark () =
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
   let page_size = Cli.get_int ~default:3967 "page_size" in
-  let sample = Cli.get_int ~default:1 "sample" in
   let generate_slot ~slot_size =
     Bytes.init slot_size (fun _ ->
         let x = Random.int 26 in
@@ -4689,95 +4688,86 @@ let dal_crypto_benchmark () =
         let message = Format.asprintf "Fail: %s" msg in
         Profiler.record_f Profiler.main message @@ fun () -> Lwt.return_unit
     | Ok _ ->
-        Seq.ints 0 |> Seq.take sample
-        |> Seq.iter (fun _ ->
-               let*? dal =
-                 Profiler.record_f Profiler.main "make" @@ fun () ->
-                 make parameters
-               in
-               let precomputation =
-                 Profiler.record_f Profiler.main "shard precomputation"
-                 @@ fun () -> precompute_shards_proofs dal
-               in
-               let slot =
-                 Profiler.record_f Profiler.main "slot generation" @@ fun () ->
-                 generate_slot ~slot_size
-               in
-               let*? polynomial =
-                 Profiler.record_f Profiler.main "polynomial from slot"
-                 @@ fun () -> polynomial_from_slot dal slot
-               in
-               let*? commitment =
-                 Profiler.record_f Profiler.main "commit" @@ fun () ->
-                 commit dal polynomial
-               in
-               let*? commitment_proof =
-                 Profiler.record_f Profiler.main "prove commitment" @@ fun () ->
-                 prove_commitment dal polynomial
-               in
-               let shards =
-                 Profiler.record_f Profiler.main "shards from polynomial"
-                 @@ fun () -> shards_from_polynomial dal polynomial
-               in
-               let shard_proofs =
-                 Profiler.record_f Profiler.main "prove shards" @@ fun () ->
-                 prove_shards dal ~precomputation ~polynomial |> Array.to_seq
-               in
-               let _polynomial =
-                 Profiler.record_f Profiler.main "Reconstruct polynomial"
-                 @@ fun () -> polynomial_from_shards dal shards
-               in
-               let nb_pages = slot_size / page_size in
-               let page_proofs =
-                 Seq.ints 0 |> Seq.take 1
-                 |> Seq.map (fun i ->
-                        Profiler.record_f Profiler.main "prove page"
-                        @@ fun () ->
-                        let*? page_proof = prove_page dal polynomial i in
-                        page_proof)
-               in
-               Internal_for_tests.init_verifier_dal_default () ;
-               let is_valid =
-                 Profiler.record_f Profiler.main "verify commitment"
-                 @@ fun () -> verify_commitment dal commitment commitment_proof
-               in
-               assert is_valid ;
-               let () =
-                 Seq.zip shards shard_proofs
-                 |> Seq.take 1
-                 |> Seq.iter (fun (shard, shard_proof) ->
-                        let message =
-                          Format.asprintf
-                            "verify shard (size: %d)"
-                            (Bytes.length
-                               (Data_encoding.Binary.to_bytes_exn
-                                  share_encoding
-                                  shard.share))
-                        in
-                        Profiler.record_f Profiler.main message @@ fun () ->
-                        let*? () =
-                          verify_shard dal commitment shard shard_proof
-                        in
-                        ())
-               in
-               let pages =
-                 Seq.ints 0 |> Seq.take nb_pages
-                 |> Seq.map (fun i -> Bytes.sub slot (i * page_size) page_size)
-               in
-               let () =
-                 Seq.zip
-                   (Seq.ints 0 |> Seq.take nb_pages)
-                   (Seq.zip pages page_proofs)
-                 |> Seq.take 1
-                 |> Seq.iter (fun (page_index, (page, page_proof)) ->
-                        Profiler.record_f Profiler.main "verify page"
-                        @@ fun () ->
-                        let*? () =
-                          verify_page dal commitment ~page_index page page_proof
-                        in
-                        ())
-               in
-               ()) ;
+        let*? dal =
+          Profiler.record_f Profiler.main "make" @@ fun () -> make parameters
+        in
+        let precomputation =
+          Profiler.record_f Profiler.main "shard precomputation" @@ fun () ->
+          precompute_shards_proofs dal
+        in
+        let slot =
+          Profiler.record_f Profiler.main "slot generation" @@ fun () ->
+          generate_slot ~slot_size
+        in
+        let*? polynomial =
+          Profiler.record_f Profiler.main "polynomial from slot" @@ fun () ->
+          polynomial_from_slot dal slot
+        in
+        let*? commitment =
+          Profiler.record_f Profiler.main "commit" @@ fun () ->
+          commit dal polynomial
+        in
+        let*? commitment_proof =
+          Profiler.record_f Profiler.main "prove commitment" @@ fun () ->
+          prove_commitment dal polynomial
+        in
+        let shards =
+          Profiler.record_f Profiler.main "shards from polynomial" @@ fun () ->
+          shards_from_polynomial dal polynomial
+        in
+        let shard_proofs =
+          Profiler.record_f Profiler.main "prove shards" @@ fun () ->
+          prove_shards dal ~precomputation ~polynomial |> Array.to_seq
+        in
+        let _polynomial =
+          Profiler.record_f Profiler.main "Reconstruct polynomial" @@ fun () ->
+          polynomial_from_shards dal shards
+        in
+        let nb_pages = slot_size / page_size in
+        let page_proofs =
+          Seq.ints 0 |> Seq.take 1
+          |> Seq.map (fun i ->
+                 Profiler.record_f Profiler.main "prove page" @@ fun () ->
+                 let*? page_proof = prove_page dal polynomial i in
+                 page_proof)
+        in
+        Internal_for_tests.init_verifier_dal_default () ;
+        let is_valid =
+          Profiler.record_f Profiler.main "verify commitment" @@ fun () ->
+          verify_commitment dal commitment commitment_proof
+        in
+        assert is_valid ;
+        let () =
+          Seq.zip shards shard_proofs
+          |> Seq.take 1
+          |> Seq.iter (fun (shard, shard_proof) ->
+                 let message =
+                   Format.asprintf
+                     "verify shard (size: %d)"
+                     (Bytes.length
+                        (Data_encoding.Binary.to_bytes_exn
+                           share_encoding
+                           shard.share))
+                 in
+                 Profiler.record_f Profiler.main message @@ fun () ->
+                 let*? () = verify_shard dal commitment shard shard_proof in
+                 ())
+        in
+        let pages =
+          Seq.ints 0 |> Seq.take nb_pages
+          |> Seq.map (fun i -> Bytes.sub slot (i * page_size) page_size)
+        in
+        let () =
+          Seq.zip (Seq.ints 0 |> Seq.take nb_pages) (Seq.zip pages page_proofs)
+          |> Seq.take 1
+          |> Seq.iter (fun (page_index, (page, page_proof)) ->
+                 Profiler.record_f Profiler.main "verify page" @@ fun () ->
+                 let*? () =
+                   verify_page dal commitment ~page_index page page_proof
+                 in
+                 ())
+        in
+        () ;
         Lwt.return_unit
   in
   Profiler.close_and_unplug Profiler.main instance ;
