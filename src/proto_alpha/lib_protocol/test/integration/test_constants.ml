@@ -32,7 +32,7 @@
     Subject:    the consistency of parametric constants
  *)
 
-open Test_tez
+open Tez_helpers
 
 let test_sc_rollup_constants_consistency () =
   let open Protocol.Alpha_context in

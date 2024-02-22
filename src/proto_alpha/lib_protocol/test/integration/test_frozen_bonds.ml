@@ -33,7 +33,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 let big_random_amount () =
   match Tez.of_mutez (Int64.add 100_000L (Random.int64 1_000_000L)) with

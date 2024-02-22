@@ -5420,7 +5420,12 @@ end = struct
             ("test_constants", true);
             ("test_frozen_bonds", true);
             ("test_adaptive_issuance_launch", N.(number >= 018));
-            ("test_adaptive_issuance_roundtrip", N.(number >= 018));
+            ("test_adaptive_issuance_roundtrip", N.(number == 018));
+            ("test_scenario_base", N.(number >= 019));
+            ("test_scenario_stake", N.(number >= 019));
+            ("test_scenario_rewards", N.(number >= 019));
+            ("test_scenario_autostaking", N.(number >= 019));
+            ("test_scenario_slashing", N.(number >= 019));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
@@ -6203,6 +6208,10 @@ let hash = Protocol.hash
         ~opam_only_deps:[octez_protocol_environment; parameters |> if_some]
         ~deps:
           [
+            tezt_core_lib |> if_ N.(number >= 019) |> open_ |> open_ ~m:"Base";
+            alcotezt |> if_ N.(number >= 019);
+            tezt_lib |> if_ N.(number >= 019);
+            octez_base_test_helpers |> if_ N.(number >= 019) |> open_;
             qcheck_alcotest;
             octez_test_helpers;
             octez_base |> open_ ~m:"TzPervasives"

@@ -318,7 +318,7 @@ let originate_script block ~script ~storage ~sender ~baker ~forges_tickets =
     Op.contract_origination_hash
       (B block)
       sender
-      ~fee:(Test_tez.of_int 10)
+      ~fee:(Tez_helpers.of_int 10)
       ~script
   in
   let* incr =

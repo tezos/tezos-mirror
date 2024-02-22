@@ -51,7 +51,7 @@ let originate_contract file storage src b =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
   let* operation, dst =
-    Op.contract_origination (B b) src ~fee:(Test_tez.of_int 10) ~script
+    Op.contract_origination (B b) src ~fee:(Tez_helpers.of_int 10) ~script
   in
   let* incr = Incremental.begin_construction b in
   let* incr = Incremental.add_operation incr operation in
@@ -65,10 +65,10 @@ let contract_test () =
   let open Lwt_result_syntax in
   let* b, src = Context.init1 ~consensus_threshold:0 () in
   let* dst, b = originate_contract (path // "contracts/emit.tz") "Unit" src b in
-  let fee = Test_tez.of_int 10 in
+  let fee = Tez_helpers.of_int 10 in
   let parameters = Script.unit_parameter in
   let* operation =
-    Op.transaction ~fee ~parameters (B b) src dst (Test_tez.of_int 0)
+    Op.transaction ~fee ~parameters (B b) src dst (Tez_helpers.of_int 0)
   in
   let* incr = Incremental.begin_construction b in
   let* incr = Incremental.add_operation incr operation in

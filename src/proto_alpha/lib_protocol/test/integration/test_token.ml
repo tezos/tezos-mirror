@@ -33,7 +33,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 (** Creates a context with a single account. Returns the context and the public
     key hash of the account. *)

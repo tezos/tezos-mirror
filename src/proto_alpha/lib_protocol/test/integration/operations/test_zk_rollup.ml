@@ -149,7 +149,8 @@ let test_origination_fees () =
     + Data_encoding.Binary.length Zk_rollup.pending_list_encoding init_pl
   in
   let expected_fees =
-    Test_tez.(constants.parametric.cost_per_byte *! Int64.of_int expected_size)
+    Tez_helpers.(
+      constants.parametric.cost_per_byte *! Int64.of_int expected_size)
   in
   let* operation, _rollup =
     Op.zk_rollup_origination

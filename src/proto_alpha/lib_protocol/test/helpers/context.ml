@@ -266,7 +266,7 @@ let get_bonus_reward ctxt ~attesting_power =
       ~reward_kind:Baking_reward_bonus_per_slot
   in
   let multiplier = max 0 (attesting_power - consensus_threshold) in
-  return Test_tez.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
+  return Tez_helpers.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
 
 let get_attesting_reward ctxt ~expected_attesting_power =
   let open Lwt_result_wrap_syntax in

@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
+open Tez_helpers
 
 let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
     ?expect_apply_failure src dst amount =
