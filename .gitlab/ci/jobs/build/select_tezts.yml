@@ -10,7 +10,7 @@ select_tezts:
     - ./scripts/ci/take_ownership.sh
     - eval $(opam env)
   script:
-    - scripts/ci/select_tezts.sh
+    - scripts/ci/select_tezts.sh || exit $?
   allow_failure:
     exit_codes: 17
   artifacts:
