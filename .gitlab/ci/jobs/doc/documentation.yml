@@ -1,0 +1,70 @@
+# Warning: the documentation:linkcheck job must have at least the same
+# restrictions in the rules as documentation:build_all, otherwise the CI
+# may complain that documentation:linkcheck depends on documentation:build_all
+# which does not exist.
+.doc_job_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies
+    - .tags_template__build
+    - .needs__trigger
+    - .rules__octez_docs_changes
+  stage: doc
+  before_script:
+    - eval $(opam env)
+    - . $HOME/.venv/bin/activate
+
+documentation:odoc:
+  extends:
+    - .doc_job_template
+  script:
+    - make -C docs odoc-lite
+  artifacts:
+    paths:
+      - docs/_build/api/odoc/
+    expire_in: 1 hour
+
+documentation:manuals:
+  extends:
+    - .doc_job_template
+  script:
+    - ./.gitlab/ci/jobs/doc/documentation:manuals.sh
+  artifacts:
+    paths:
+      - docs/*/octez-*.html
+      - docs/api/octez-*.txt
+      - docs/developer/metrics.csv
+      - docs/user/node-config.json
+    expire_in: 1 hour
+
+documentation:rpc:
+  extends:
+    - .doc_job_template
+  script:
+    - make -C docs -j rpc
+  artifacts:
+    paths:
+      - docs/alpha/rpc.rst
+      - docs/shell/rpc.rst
+      - docs/user/default-acl.json
+    expire_in: 1 hour
+
+documentation:build_all:
+  extends:
+    - .doc_job_template
+  needs:
+    - documentation:odoc
+    - documentation:manuals
+    - documentation:rpc
+  dependencies:
+    - documentation:odoc
+    - documentation:manuals
+    - documentation:rpc
+  script:
+    - make -C docs -j html
+  artifacts:
+    expose_as: 'Documentation - excluding old protocols'
+    paths:
+      # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
+      - docs/_build/
+    expire_in: 1 week

@@ -22,7 +22,7 @@ include:
   # because of absence of certain changes
   - .gitlab/ci/jobs/build/ocaml-check.yml
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
-  - .gitlab/ci/jobs/doc/documentation:build_all.yml
+  - .gitlab/ci/jobs/doc/documentation.yml
 
   # Stage: packaging
   - .gitlab/ci/jobs/packaging/opam:prepare.yml
