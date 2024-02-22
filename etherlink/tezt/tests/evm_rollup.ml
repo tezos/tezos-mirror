@@ -4627,7 +4627,27 @@ let test_migrate_proxy_to_sequencer_past =
       ~upgrade_to:sequencer_key.alias
       ~activation_timestamp:"0"
   in
-  let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client in
+  let* () =
+    (* We need to bake 3 blocks, because otherwise the sequencer upgrade event
+       is re-received by the EVM node. This is because `init from rollup node`
+       reads the HEAD context of the rollup node, but the EVM node interacts
+       with the rollup node two blocks in the past. As a consequence, without
+       baking these blocks, the EVM node will virtually handle the sequencer
+       upgrade event twice.
+
+       However, the EVM node does not deal with sequencer event gracefully
+       right now. It works for preventing the old sequencer to produce
+       blueprints, but not for the new sequencer to start producing blueprints.
+
+       This is because of the blueprint deletion mechanism of the kernel.
+       When the sequencer upgrade is applied at the end of stage-1, the
+       pending blueprints are deleted. This means the bluperint currently
+       applied in `apply_blueprint` is deleted, meaning nothing is executed
+       in the stage-2. *)
+    repeat 3 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
   let sequencer_node =
     let mode =
       Evm_node.Sequencer
