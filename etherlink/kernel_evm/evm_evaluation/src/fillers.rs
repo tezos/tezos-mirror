@@ -329,7 +329,7 @@ pub fn process(
     output: &OutputOptions,
     test_name: &str,
     diff_result_map: &mut DiffMap,
-) {
+) -> TestResult {
     let mut status = TestResult::Success;
 
     for (name, fillers) in filler_source.0.into_iter() {
@@ -399,4 +399,6 @@ pub fn process(
             map.insert(full_name, (*result, Some(status)));
         }
     }
+
+    status
 }

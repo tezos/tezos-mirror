@@ -393,19 +393,28 @@ pub fn run_test(
                 };
                 // Check the state after the execution of the result.
                 match filler_source.clone() {
-                    Some(filler_source) => process(
-                        &mut host,
-                        filler_source,
-                        spec_name,
-                        report_map,
-                        report_key.clone(),
-                        output_file,
-                        labels,
-                        &test_execution.indexes,
-                        output,
-                        &name,
-                        diff_result_map,
-                    ),
+                    Some(filler_source) => {
+                        let result = process(
+                            &mut host,
+                            filler_source,
+                            spec_name,
+                            report_map,
+                            report_key.clone(),
+                            output_file,
+                            labels,
+                            &test_execution.indexes,
+                            output,
+                            &name,
+                            diff_result_map,
+                        );
+                        if opt.ci_mode && result == TestResult::Failure {
+                            panic!(
+                                "The execution isn't 100% compatible anymore. \
+                                 Use the evaluation assessor to output debug traces and \
+                                 find the issue."
+                            )
+                        }
+                    }
                     None => write_host!(
                         host,
                         "No filler file, the outcome of this test is uncertain."
