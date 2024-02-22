@@ -1012,7 +1012,7 @@ let make_upgrade_command =
     (fun () root_hash activation_timestamp () ->
       let open Rlp in
       let activation_timestamp =
-        Evm_node_lib_dev.Helpers.timestamp_to_bytes activation_timestamp
+        Ethereum_types.timestamp_to_bytes activation_timestamp
       in
       let root_hash_bytes = Hex.to_bytes_exn (`Hex root_hash) in
       let kernel_upgrade =
@@ -1051,7 +1051,7 @@ let make_sequencer_upgrade_command =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
       in
       let activation_timestamp =
-        Evm_node_lib_dev.Helpers.timestamp_to_bytes activation_timestamp
+        Ethereum_types.timestamp_to_bytes activation_timestamp
       in
       let*? sequencer_pk =
         Option.to_result

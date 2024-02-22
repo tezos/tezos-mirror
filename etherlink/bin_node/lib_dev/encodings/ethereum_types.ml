@@ -62,6 +62,14 @@ let address_to_string (Address a) = hex_to_string a
 let address_encoding =
   Data_encoding.(conv address_to_string address_of_string string)
 
+(** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
+    compatible with the kernel. *)
+let timestamp_to_bytes timestamp =
+  let seconds = Time.Protocol.to_seconds timestamp in
+  let buffer = Bytes.make 8 '\000' in
+  Bytes.set_int64_le buffer 0 seconds ;
+  buffer
+
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]
 
