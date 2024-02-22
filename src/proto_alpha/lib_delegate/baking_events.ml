@@ -1145,4 +1145,13 @@ module Forge_worker = struct
       ~msg:"error while processing forge request: {errors}"
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
       ~pp1:pp_print_top_error_of_trace
+
+  let error_while_authorizing_consensus_votes =
+    declare_1
+      ~section
+      ~name:"error_while_authorizing_consensus_votes"
+      ~level:Error
+      ~msg:"error while authorizing consensus votes: {errors}"
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+      ~pp1:pp_print_top_error_of_trace
 end
