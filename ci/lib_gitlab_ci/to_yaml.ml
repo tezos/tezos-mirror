@@ -158,7 +158,7 @@ let enc_artifacts : artifacts -> value =
     [
       opt "name" string name;
       opt "expire_in" enc_time_interval expire_in;
-      key "paths" strings paths;
+      opt "paths" strings paths;
       opt "reports" enc_report reports;
       opt "when" enc_when_artifact when_;
       opt "expose_as" string expose_as;

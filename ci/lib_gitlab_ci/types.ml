@@ -78,7 +78,7 @@ type when_artifact = Always | On_success | On_failure
 
 type artifacts = {
   expire_in : time_interval option;
-  paths : string list;
+  paths : string list option;
   reports : reports option;
   when_ : when_artifact option;
   expose_as : string option;

@@ -114,7 +114,7 @@ module Pipeline = struct
     (* Check that all [dependencies:] are on jobs that produce artifacts *)
     ( Fun.flip String_set.iter dependencies @@ fun dependency ->
       match Hashtbl.find_opt job_by_name dependency with
-      | Some {artifacts = Some {paths = _ :: _; _}; _}
+      | Some {artifacts = Some {paths = Some (_ :: _); _}; _}
       | Some {artifacts = Some {reports = Some {dotenv = Some _; _}; _}; _} ->
           (* This is fine: we depend on a job that define non-report artifacts, or a dotenv file. *)
           ()
