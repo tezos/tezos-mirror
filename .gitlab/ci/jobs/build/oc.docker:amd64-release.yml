@@ -10,3 +10,7 @@ oc.docker:amd64:
     IMAGE_ARCH_PREFIX: "amd64_"
     CI_DOCKER_HUB: "true"
     EXECUTABLE_FILES: "script-inputs/released-executables"
+  rules:
+    - if: '$OCTEZ_PKGNAME == "etherlink"'
+      variables:
+        EXECUTABLE_FILES: "script-inputs/etherlink-executables"

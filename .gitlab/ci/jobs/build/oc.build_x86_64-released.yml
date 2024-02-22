@@ -10,3 +10,7 @@ oc.build_x86_64-released:
     - .rules__octez_changes
   variables:
     EXECUTABLE_FILES: "script-inputs/released-executables"
+  rules:
+    - if: '$OCTEZ_PKGNAME == "etherlink"'
+      variables:
+        EXECUTABLE_FILES: "script-inputs/etherlink-executables"
