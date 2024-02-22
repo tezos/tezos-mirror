@@ -43,6 +43,7 @@ type action =
     }
   | Inject_preattestation of {signed_preattestation : signed_consensus_vote}
   | Inject_attestation of {signed_attestation : signed_consensus_vote}
+  | Inject_attestations of {signed_attestations : signed_consensus_vote_batch}
   | Update_to_level of level_update
   | Synchronize_round of round_update
   | Watch_proposal
