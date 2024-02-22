@@ -274,10 +274,6 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
                     "The temporarily modified durable storage is discarded"
                 );
 
-                // TODO: https://gitlab.com/tezos/tezos/-/issues/5766
-                // If an input is consumed then an error happens, the input
-                // will be lost, this cannot happen in production.
-
                 host.revert()
                     .expect("The kernel failed to delete the temporary directory")
             }
