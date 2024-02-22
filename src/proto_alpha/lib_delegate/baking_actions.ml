@@ -123,6 +123,10 @@ type action =
   | Prepare_block of {block_to_bake : block_to_bake}
   | Prepare_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Prepare_attestations of {attestations : unsigned_consensus_vote_batch}
+  | Prepare_consensus_votes of {
+      preattestations : unsigned_consensus_vote_batch;
+      attestations : unsigned_consensus_vote_batch;
+    }
   | Inject_block of {
       prepared_block : prepared_block;
       force_injection : bool;
@@ -155,6 +159,7 @@ let pp_action fmt = function
   | Prepare_block _ -> Format.fprintf fmt "prepare block"
   | Prepare_preattestations _ -> Format.fprintf fmt "prepare preattestations"
   | Prepare_attestations _ -> Format.fprintf fmt "prepare attestations"
+  | Prepare_consensus_votes _ -> Format.fprintf fmt "prepare consensus votes"
   | Inject_block _ -> Format.fprintf fmt "inject block"
   | Inject_preattestation _ -> Format.fprintf fmt "inject preattestation"
   | Inject_attestation _ -> Format.fprintf fmt "inject attestation"
@@ -940,8 +945,10 @@ let rec perform_action state (action : action) =
       let* new_state = prepare_preattestations_request state preattestations in
       return new_state
   | Prepare_attestations {attestations} ->
-      let* new_state = prepare_attestations_request state attestations in
-      return new_state
+      prepare_attestations_request state attestations
+  | Prepare_consensus_votes {preattestations; attestations} ->
+      let* state = prepare_preattestations_request state preattestations in
+      prepare_attestations_request state attestations
   | Inject_block {prepared_block; force_injection; asynchronous} ->
       let* new_state =
         inject_block ~force_injection ~asynchronous state prepared_block

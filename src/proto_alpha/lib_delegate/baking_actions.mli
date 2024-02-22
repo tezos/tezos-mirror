@@ -32,6 +32,10 @@ type action =
   | Prepare_block of {block_to_bake : block_to_bake}
   | Prepare_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Prepare_attestations of {attestations : unsigned_consensus_vote_batch}
+  | Prepare_consensus_votes of {
+      preattestations : unsigned_consensus_vote_batch;
+      attestations : unsigned_consensus_vote_batch;
+    }
   | Inject_block of {
       prepared_block : prepared_block;
       force_injection : bool;
