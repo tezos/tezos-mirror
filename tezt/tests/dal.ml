@@ -4635,10 +4635,10 @@ let dal_crypto_benchmark () =
     Process.run (Base.project_root // "scripts/install_dal_trusted_setup.sh") []
   in
   Log.info "SRS files downloaded." ;
-  let number_of_shards = [512] |> List.to_seq in
-  let slot_size = [126_944] |> List.to_seq in
-  let redundancy_factor = [8] |> List.to_seq in
-  let page_size = [3967] |> List.to_seq in
+  let number_of_shards = 512 in
+  let slot_size = 126_944 in
+  let redundancy_factor = 8 in
+  let page_size = 3967 in
   let sample = Cli.get_int ~default:1 "sample" in
   let generate_slot ~slot_size =
     Bytes.init slot_size (fun _ ->
@@ -4646,156 +4646,139 @@ let dal_crypto_benchmark () =
         Char.chr (x + Char.code 'a'))
   in
   let* () =
-    Seq.product redundancy_factor page_size
-    |> Seq.product (Seq.product number_of_shards slot_size)
-    |> List.of_seq
-    |> Lwt_list.iter_s
-         (fun ((number_of_shards, slot_size), (redundancy_factor, page_size)) ->
-           let parameters =
-             {number_of_shards; redundancy_factor; page_size; slot_size}
-           in
-           let message =
-             Format.asprintf
-               "(shards: %d, slot size: %d, redundancy_factor: %d, page size: \
-                %d)"
-               number_of_shards
-               slot_size
-               redundancy_factor
-               page_size
-           in
-           let* () =
-             Profiler.record_f Profiler.main "SRS" @@ fun () ->
-             Log.info "Loading SRS..." ;
-             let* result =
-               Config.init_prover_dal
-                 ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-                 Config.
-                   {
-                     activated = true;
-                     bootstrap_peers = [];
-                     use_mock_srs_for_testing = None;
-                   }
-             in
-             Log.info "SRS loaded." ;
-             let*? config =
-               Result.map_error
-                 (fun x ->
-                   `Fail
-                     (Format.asprintf
-                        "%a"
-                        Tezos_error_monad.Error_monad.pp_print_trace
-                        x))
-                 result
-             in
-             Lwt.return config
-           in
-           Profiler.record_f Profiler.main message @@ fun () ->
-           match make parameters with
-           | Error (`Fail msg) ->
-               let message = Format.asprintf "Fail: %s" msg in
-               Profiler.record_f Profiler.main message @@ fun () ->
-               Lwt.return_unit
-           | Ok _ ->
-               Seq.ints 0 |> Seq.take sample
-               |> Seq.iter (fun _ ->
-                      let*? dal =
-                        Profiler.record_f Profiler.main "make" @@ fun () ->
-                        make parameters
-                      in
-                      let precomputation =
-                        Profiler.record_f Profiler.main "shard precomputation"
-                        @@ fun () -> precompute_shards_proofs dal
-                      in
-                      let slot =
-                        Profiler.record_f Profiler.main "slot generation"
-                        @@ fun () -> generate_slot ~slot_size
-                      in
-                      let*? polynomial =
-                        Profiler.record_f Profiler.main "polynomial from slot"
-                        @@ fun () -> polynomial_from_slot dal slot
-                      in
-                      let*? commitment =
-                        Profiler.record_f Profiler.main "commit" @@ fun () ->
-                        commit dal polynomial
-                      in
-                      let*? commitment_proof =
-                        Profiler.record_f Profiler.main "prove commitment"
-                        @@ fun () -> prove_commitment dal polynomial
-                      in
-                      let shards =
-                        Profiler.record_f Profiler.main "shards from polynomial"
-                        @@ fun () -> shards_from_polynomial dal polynomial
-                      in
-                      let shard_proofs =
-                        Profiler.record_f Profiler.main "prove shards"
+    let parameters =
+      {number_of_shards; redundancy_factor; page_size; slot_size}
+    in
+    let message =
+      Format.asprintf
+        "(shards: %d, slot size: %d, redundancy_factor: %d, page size: %d)"
+        number_of_shards
+        slot_size
+        redundancy_factor
+        page_size
+    in
+    let* () =
+      Profiler.record_f Profiler.main "SRS" @@ fun () ->
+      Log.info "Loading SRS..." ;
+      let* result =
+        Config.init_prover_dal
+          ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
+          Config.
+            {
+              activated = true;
+              bootstrap_peers = [];
+              use_mock_srs_for_testing = None;
+            }
+      in
+      Log.info "SRS loaded." ;
+      let*? config =
+        Result.map_error
+          (fun x ->
+            `Fail
+              (Format.asprintf
+                 "%a"
+                 Tezos_error_monad.Error_monad.pp_print_trace
+                 x))
+          result
+      in
+      Lwt.return config
+    in
+    Profiler.record_f Profiler.main message @@ fun () ->
+    match make parameters with
+    | Error (`Fail msg) ->
+        let message = Format.asprintf "Fail: %s" msg in
+        Profiler.record_f Profiler.main message @@ fun () -> Lwt.return_unit
+    | Ok _ ->
+        Seq.ints 0 |> Seq.take sample
+        |> Seq.iter (fun _ ->
+               let*? dal =
+                 Profiler.record_f Profiler.main "make" @@ fun () ->
+                 make parameters
+               in
+               let precomputation =
+                 Profiler.record_f Profiler.main "shard precomputation"
+                 @@ fun () -> precompute_shards_proofs dal
+               in
+               let slot =
+                 Profiler.record_f Profiler.main "slot generation" @@ fun () ->
+                 generate_slot ~slot_size
+               in
+               let*? polynomial =
+                 Profiler.record_f Profiler.main "polynomial from slot"
+                 @@ fun () -> polynomial_from_slot dal slot
+               in
+               let*? commitment =
+                 Profiler.record_f Profiler.main "commit" @@ fun () ->
+                 commit dal polynomial
+               in
+               let*? commitment_proof =
+                 Profiler.record_f Profiler.main "prove commitment" @@ fun () ->
+                 prove_commitment dal polynomial
+               in
+               let shards =
+                 Profiler.record_f Profiler.main "shards from polynomial"
+                 @@ fun () -> shards_from_polynomial dal polynomial
+               in
+               let shard_proofs =
+                 Profiler.record_f Profiler.main "prove shards" @@ fun () ->
+                 prove_shards dal ~precomputation ~polynomial |> Array.to_seq
+               in
+               let _polynomial =
+                 Profiler.record_f Profiler.main "Reconstruct polynomial"
+                 @@ fun () -> polynomial_from_shards dal shards
+               in
+               let nb_pages = slot_size / page_size in
+               let page_proofs =
+                 Seq.ints 0 |> Seq.take 1
+                 |> Seq.map (fun i ->
+                        Profiler.record_f Profiler.main "prove page"
                         @@ fun () ->
-                        prove_shards dal ~precomputation ~polynomial
-                        |> Array.to_seq
-                      in
-                      let _polynomial =
-                        Profiler.record_f Profiler.main "Reconstruct polynomial"
-                        @@ fun () -> polynomial_from_shards dal shards
-                      in
-                      let nb_pages = slot_size / page_size in
-                      let page_proofs =
-                        Seq.ints 0 |> Seq.take 1
-                        |> Seq.map (fun i ->
-                               Profiler.record_f Profiler.main "prove page"
-                               @@ fun () ->
-                               let*? page_proof = prove_page dal polynomial i in
-                               page_proof)
-                      in
-                      Internal_for_tests.init_verifier_dal_default () ;
-                      let is_valid =
-                        Profiler.record_f Profiler.main "verify commitment"
+                        let*? page_proof = prove_page dal polynomial i in
+                        page_proof)
+               in
+               Internal_for_tests.init_verifier_dal_default () ;
+               let is_valid =
+                 Profiler.record_f Profiler.main "verify commitment"
+                 @@ fun () -> verify_commitment dal commitment commitment_proof
+               in
+               assert is_valid ;
+               let () =
+                 Seq.zip shards shard_proofs
+                 |> Seq.take 1
+                 |> Seq.iter (fun (shard, shard_proof) ->
+                        let message =
+                          Format.asprintf
+                            "verify shard (size: %d)"
+                            (Bytes.length
+                               (Data_encoding.Binary.to_bytes_exn
+                                  share_encoding
+                                  shard.share))
+                        in
+                        Profiler.record_f Profiler.main message @@ fun () ->
+                        let*? () =
+                          verify_shard dal commitment shard shard_proof
+                        in
+                        ())
+               in
+               let pages =
+                 Seq.ints 0 |> Seq.take nb_pages
+                 |> Seq.map (fun i -> Bytes.sub slot (i * page_size) page_size)
+               in
+               let () =
+                 Seq.zip
+                   (Seq.ints 0 |> Seq.take nb_pages)
+                   (Seq.zip pages page_proofs)
+                 |> Seq.take 1
+                 |> Seq.iter (fun (page_index, (page, page_proof)) ->
+                        Profiler.record_f Profiler.main "verify page"
                         @@ fun () ->
-                        verify_commitment dal commitment commitment_proof
-                      in
-                      assert is_valid ;
-                      let () =
-                        Seq.zip shards shard_proofs
-                        |> Seq.take 1
-                        |> Seq.iter (fun (shard, shard_proof) ->
-                               let message =
-                                 Format.asprintf
-                                   "verify shard (size: %d)"
-                                   (Bytes.length
-                                      (Data_encoding.Binary.to_bytes_exn
-                                         share_encoding
-                                         shard.share))
-                               in
-                               Profiler.record_f Profiler.main message
-                               @@ fun () ->
-                               let*? () =
-                                 verify_shard dal commitment shard shard_proof
-                               in
-                               ())
-                      in
-                      let pages =
-                        Seq.ints 0 |> Seq.take nb_pages
-                        |> Seq.map (fun i ->
-                               Bytes.sub slot (i * page_size) page_size)
-                      in
-                      let () =
-                        Seq.zip
-                          (Seq.ints 0 |> Seq.take nb_pages)
-                          (Seq.zip pages page_proofs)
-                        |> Seq.take 1
-                        |> Seq.iter (fun (page_index, (page, page_proof)) ->
-                               Profiler.record_f Profiler.main "verify page"
-                               @@ fun () ->
-                               let*? () =
-                                 verify_page
-                                   dal
-                                   commitment
-                                   ~page_index
-                                   page
-                                   page_proof
-                               in
-                               ())
-                      in
-                      ()) ;
-               Lwt.return_unit)
+                        let*? () =
+                          verify_page dal commitment ~page_index page page_proof
+                        in
+                        ())
+               in
+               ()) ;
+        Lwt.return_unit
   in
   Profiler.close_and_unplug Profiler.main instance ;
   Lwt.return_unit
