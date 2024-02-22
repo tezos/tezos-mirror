@@ -176,12 +176,3 @@ val outbox_proof_simple :
   message_index:int ->
   unit ->
   outbox_proof option RPC_core.t
-
-(** RPC: [GET global/block/<block>/helpers/proofs/outbox] *)
-val outbox_proof_single :
-  ?block:string ->
-  message_index:int ->
-  outbox_level:int ->
-  message:string ->
-  unit ->
-  outbox_proof option RPC_core.t

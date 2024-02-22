@@ -264,25 +264,3 @@ let outbox_proof_simple ?(block = "head") ~outbox_level ~message_index () =
       (* There is 0x return in the proof hash as it is a hex *)
       let proof_hex = sf "0x%s" proof_string in
       Some {commitment_hash; proof = proof_hex})
-
-let outbox_proof_single ?(block = "head") ~message_index ~outbox_level ~message
-    () =
-  let open RPC_core in
-  let query_string =
-    [
-      ("message_index", string_of_int message_index);
-      ("outbox_level", string_of_int outbox_level);
-      ("serialized_outbox_message", Hex.to_string (`Hex message));
-    ]
-  in
-  make
-    ~query_string
-    GET
-    ["global"; "block"; block; "helpers"; "proofs"; "outbox"]
-    (fun json ->
-      let open JSON in
-      let commitment_hash = json |-> "commitment" |> as_string in
-      let proof_string = json |-> "proof" |> as_string in
-      (* There is 0x return in the proof hash as it is a hex *)
-      let proof_hex = sf "0x%s" proof_string in
-      Some {commitment_hash; proof = proof_hex})
