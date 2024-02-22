@@ -40,10 +40,13 @@ let compute_attested_slot_headers ~is_slot_attested seen_slot_headers =
         Dal_attestation_repr.commit attestation slot.Header.id.index )
     else (rev_attested_slot_headers, attestation)
   in
-  List.fold_left
-    fold_attested_slots
-    ([], Dal_attestation_repr.empty)
-    seen_slot_headers
+  let rev_attested_slot_headers, bitset =
+    List.fold_left
+      fold_attested_slots
+      ([], Dal_attestation_repr.empty)
+      seen_slot_headers
+  in
+  (List.rev rev_attested_slot_headers, bitset)
 
 let get_slot_headers_history ctxt =
   let open Lwt_result_syntax in
@@ -79,7 +82,7 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
         match seen_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
         | Some seen_slots ->
-            let rev_attested_slot_headers, attestation =
+            let attested_slot_headers, attestation =
               let is_slot_attested slot =
                 Raw_context.Dal.is_slot_index_attested
                   ctxt
@@ -87,7 +90,6 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
               in
               compute_attested_slot_headers ~is_slot_attested seen_slots
             in
-            let attested_slot_headers = List.rev rev_attested_slot_headers in
             return (ctxt, attestation, attested_slot_headers)
       in
       let* ctxt =
