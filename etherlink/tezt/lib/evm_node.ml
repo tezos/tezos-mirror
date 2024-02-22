@@ -227,12 +227,18 @@ let wait_for_blueprint_applied ~timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
-let create ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
+let create ?name ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
     ?rpc_port endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ()
   in
-  let name = fresh_name () in
+  let new_name () =
+    match mode with
+    | Proxy _ -> "proxy_" ^ fresh_name ()
+    | Sequencer _ -> "sequencer_" ^ fresh_name ()
+    | Observer _ -> "observer_" ^ fresh_name ()
+  in
+  let name = Option.value ~default:(new_name ()) name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
   in
@@ -376,9 +382,9 @@ let endpoint ?(private_ = false) (evm_node : t) =
   in
   Format.sprintf "http://%s:%d%s" addr port path
 
-let init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
+let init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
   let evm_node =
-    create ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node
+    create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node
   in
   let* () = run evm_node in
   return evm_node

@@ -62,7 +62,7 @@ val mode : t -> mode
 (** Returns the name of the EVM node. *)
 val name : t -> string
 
-(** [create ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+(** [create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
@@ -75,6 +75,7 @@ val name : t -> string
     [mode] defaults to [Proxy].
 *)
 val create :
+  ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
   ?data_dir:string ->
@@ -108,6 +109,7 @@ val wait_for_blueprint_injected : timeout:float -> t -> int -> unit Lwt.t
 (** [init ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node_endpoint]
     creates an EVM node server with {!create} and runs it with {!run}. *)
 val init :
+  ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
   ?data_dir:string ->
