@@ -23,6 +23,8 @@ use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
+const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct KernelUpgrade {
     pub preimage_hash: [u8; PREIMAGE_HASH_SIZE],
@@ -63,8 +65,6 @@ impl Encodable for KernelUpgrade {
         append_timestamp(stream, self.activation_timestamp);
     }
 }
-
-const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
 
 pub fn store_kernel_upgrade<Host: Runtime>(
     host: &mut Host,
