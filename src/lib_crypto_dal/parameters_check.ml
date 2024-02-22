@@ -64,24 +64,6 @@ let ensure_validity_without_srs ~slot_size ~page_size ~redundancy_factor
   in
   let* () =
     assert_result
-      (Kzg.Utils.is_power_of_two slot_size)
-      (* According to the specification the length of a slot are in MiB *)
-      (fun () ->
-        Format.asprintf
-          "Slot size is expected to be a power of 2. Given: %d"
-          slot_size)
-  in
-  let* () =
-    assert_result
-      (Kzg.Utils.is_power_of_two page_size)
-      (* According to the specification the lengths of a page are in MiB *)
-      (fun () ->
-        Format.asprintf
-          "Page size is expected to be a power of 2. Given: %d"
-          page_size)
-  in
-  let* () =
-    assert_result
       (Kzg.Utils.is_power_of_two redundancy_factor && redundancy_factor >= 2)
       (* The redundancy factor should be a power of 2 so that n is a power of 2
          for proper FFT sizing. The variable [polynomial_length] is assumed to be a power of 2
