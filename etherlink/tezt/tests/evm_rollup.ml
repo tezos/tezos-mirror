@@ -4480,23 +4480,15 @@ let test_migrate_proxy_to_sequencer_future =
     | Some contract -> contract
     | None -> Test.fail "missing sequencer admin contract"
   in
-  let* payload =
-    Evm_node.sequencer_upgrade_payload
-      ~client
-      ~public_key:sequencer_key.alias
-      ~activation_timestamp
-      ()
-  in
   let* () =
-    Client.transfer
-      ~amount:Tez.zero
-      ~giver:sequencer_admin.public_key_hash
-      ~receiver:sequencer_admin_contract
-      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
-      ~burn_cap:Tez.one
-      client
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:sequencer_admin.alias
+      ~sequencer_admin_contract
+      ~client
+      ~upgrade_to:sequencer_key.alias
+      ~activation_timestamp
   in
-  let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client in
   let sequencer_node =
     let mode =
       Evm_node.Sequencer
@@ -4626,21 +4618,14 @@ let test_migrate_proxy_to_sequencer_past =
     | Some contract -> contract
     | None -> Test.fail "missing sequencer admin contract"
   in
-  let* payload =
-    Evm_node.sequencer_upgrade_payload
-      ~client
-      ~public_key:sequencer_key.alias
-      ~activation_timestamp:"0"
-      ()
-  in
   let* () =
-    Client.transfer
-      ~amount:Tez.zero
-      ~giver:sequencer_admin.public_key_hash
-      ~receiver:sequencer_admin_contract
-      ~arg:(sf "Pair %S 0x%s" sc_rollup_address payload)
-      ~burn_cap:Tez.one
-      client
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:sequencer_admin.alias
+      ~sequencer_admin_contract
+      ~client
+      ~upgrade_to:sequencer_key.alias
+      ~activation_timestamp:"0"
   in
   let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~node ~client in
   let sequencer_node =
