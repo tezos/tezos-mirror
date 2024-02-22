@@ -7,7 +7,7 @@ oc.build:static-arm64-linux-binaries:
   variables:
     EXECUTABLE_FILES: "script-inputs/released-executables"
   rules:
-    - if: '${OCTEZ_PKGNAME} == "etherlink"'
+    - if: '$OCTEZ_PKGNAME == "etherlink"'
       variables:
         EXECUTABLE_FILES: "script-inputs/etherlink-executables"
   # Extend the lifespan to prevent failure for external tools using artifacts.
