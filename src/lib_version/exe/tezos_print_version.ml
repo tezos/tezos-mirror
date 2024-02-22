@@ -32,7 +32,8 @@ open Current_git_info
 let help_string =
   "This script prints out the current version of the\n\
    node as it is deduced from the git tag of the current branch.\n\
-   print_version [--major|--minor|--additional-info|--full]"
+   print_version \
+   [--major|--minor|--additional-info|--full|--full-with-commit|--commit]"
 
 let () =
   match Sys.argv with
@@ -43,6 +44,8 @@ let () =
   | [|_; "--full"|] | [|_|] -> print_endline (to_string version)
   | [|_; "--full-with-commit"|] ->
       print_endline Tezos_version_value.Bin_version.simple_version_string
+  | [|_; "--commit"|] ->
+      print_endline Tezos_version_value.Current_git_info.abbreviated_commit_hash
   | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;
