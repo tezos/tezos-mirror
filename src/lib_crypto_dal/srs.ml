@@ -171,7 +171,8 @@ module Internal_for_tests = struct
       in
       let max_srs1_needed = List.hd page_shards in
       ( max_srs1_needed,
-        List.sort_uniq Int.compare (page_shards @ commitment_srs) )
+        List.sort_uniq Int.compare (page_shards @ commitment_srs)
+        |> List.filter (fun i -> i > 0) )
 
     let _generate_all_poly_lengths ~max_srs_size =
       List.fold_left
@@ -181,8 +182,8 @@ module Internal_for_tests = struct
         (0, [])
   end
 
-  let print_verifier_srs_from_file ?(max_srs_size = max_srs_size) ~srs_g1_path
-      ~srs_g2_path () =
+  let print_verifier_srs_from_file ?(max_srs_size = Zcash_srs.max_srs_g1_size)
+      ~srs_g1_path ~srs_g2_path () =
     let params =
       Print.
         {
@@ -196,9 +197,7 @@ module Internal_for_tests = struct
     let srs_g1_size, lengths =
       Print.generate_poly_lengths ~max_srs_size params
     in
-    let* srs_g1, srs_g2 =
-      read_srs ~len:srs_g1_size ~srs_g1_path ~srs_g2_path ()
-    in
+    let* srs_g1, srs_g2 = read_srs ~srs_g1_path ~srs_g2_path () in
     let srs2 =
       List.map
         (fun i ->
