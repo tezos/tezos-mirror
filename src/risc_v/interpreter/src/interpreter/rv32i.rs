@@ -6,6 +6,7 @@
 //!
 //! Chapter 2 - Unprivileged spec
 
+use crate::machine_state::hart_state::HartState;
 use crate::state_backend as backend;
 use crate::{
     machine_state::{
@@ -16,7 +17,7 @@ use crate::{
         },
         mode::Mode,
         registers::{XRegister, XRegisters},
-        Exception, HartState, MachineState,
+        Exception, MachineState,
     },
     parser::instruction::FenceSet,
 };
@@ -465,11 +466,12 @@ mod tests {
                 xstatus::{MPPValue, SPPValue},
                 CSRegister,
             },
+            hart_state::{HartState, HartStateLayout},
             mode::Mode,
             registers::{
                 a0, a1, a2, a3, a4, fa0, t1, t2, t3, t4, t5, t6, XRegisters, XRegistersLayout,
             },
-            Exception, HartState, HartStateLayout, MachineState, MachineStateLayout,
+            Exception, MachineState, MachineStateLayout,
         },
         parser::instruction::FenceSet,
     };

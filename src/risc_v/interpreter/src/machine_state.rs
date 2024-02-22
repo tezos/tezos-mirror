@@ -6,17 +6,18 @@
 
 pub mod bus;
 pub mod csregisters;
+pub mod hart_state;
 pub mod mode;
 pub mod registers;
 
 #[cfg(test)]
 extern crate proptest;
 
-use self::bus::{Addressable, OutOfBounds};
-use crate::{
-    program::Program,
-    state_backend::{self as backend, Atom, Cell},
+use self::{
+    bus::{Addressable, OutOfBounds},
+    hart_state::{HartState, HartStateLayout},
 };
+use crate::{program::Program, state_backend as backend};
 use bus::{main_memory, Address, Bus};
 
 /// RISC-V exceptions
@@ -29,55 +30,6 @@ pub enum Exception {
     EnvCallFromUMode,
     EnvCallFromSMode,
     EnvCallFromMMode,
-}
-
-/// RISC-V hart state
-pub struct HartState<M: backend::Manager> {
-    /// Integer registers
-    pub xregisters: registers::XRegisters<M>,
-
-    /// Floating-point number registers
-    pub fregisters: registers::FRegisters<M>,
-
-    /// Control and state registers
-    pub csregisters: csregisters::CSRegisters<M>,
-
-    /// Current running mode of hart
-    pub mode: mode::ModeCell<M>,
-
-    /// Program counter
-    pub pc: Cell<Address, M>,
-}
-
-/// Layout of [HartState]
-pub type HartStateLayout = (
-    registers::XRegistersLayout,
-    registers::FRegistersLayout,
-    csregisters::CSRegistersLayout,
-    mode::ModeLayout,
-    Atom<Address>, // Program counter layout
-);
-
-impl<M: backend::Manager> HartState<M> {
-    /// Bind the hart state to the given allocated space.
-    pub fn bind(space: backend::AllocatedOf<HartStateLayout, M>) -> Self {
-        Self {
-            xregisters: registers::XRegisters::bind(space.0),
-            fregisters: registers::FRegisters::bind(space.1),
-            csregisters: csregisters::CSRegisters::bind(space.2),
-            mode: mode::ModeCell::bind(space.3),
-            pc: Cell::bind(space.4),
-        }
-    }
-
-    /// Reset the hart state.
-    pub fn reset(&mut self, pc: Address) {
-        self.xregisters.reset();
-        self.fregisters.reset();
-        self.csregisters.reset();
-        self.mode.reset(mode::Mode::Machine);
-        self.pc.write(pc);
-    }
 }
 
 /// Layout for the machine state
@@ -177,18 +129,9 @@ mod tests {
     use super::{
         backend::tests::{test_determinism, ManagerFor},
         bus::main_memory::tests::T1K,
-        HartState, HartStateLayout, MachineState, MachineStateLayout,
+        mode, MachineState, MachineStateLayout,
     };
     use crate::backend_test;
-
-    backend_test!(test_hart_state_reset, F, {
-        proptest::proptest!(|(pc: u64)| {
-            test_determinism::<F, HartStateLayout, _>(|space| {
-                let mut hart = HartState::bind(space);
-                hart.reset(pc);
-            });
-        });
-    });
 
     backend_test!(test_machine_state_reset, F, {
         test_determinism::<F, MachineStateLayout<T1K>, _>(|space| {

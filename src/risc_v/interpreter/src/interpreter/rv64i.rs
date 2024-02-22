@@ -372,8 +372,9 @@ mod tests {
         backend_test,
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            hart_state::{HartState, HartStateLayout},
             registers::{a0, a1, a2, a3, a4, t0, t1, t2, t3, t4},
-            Exception, HartState, HartStateLayout, MachineState, MachineStateLayout,
+            Exception, MachineState, MachineStateLayout,
         },
     };
     use crate::{create_backend, create_state};

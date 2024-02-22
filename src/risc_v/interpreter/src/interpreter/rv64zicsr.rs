@@ -3,7 +3,7 @@
 //! Chapter 9 - Unprivileged spec
 
 use crate::{
-    machine_state::{csregisters, registers, HartState},
+    machine_state::{csregisters, hart_state::HartState, registers},
     state_backend as backend,
 };
 
