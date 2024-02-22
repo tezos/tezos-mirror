@@ -527,6 +527,7 @@ impl<'a> TypedValue<'a> {
 #[allow(missing_docs)]
 pub enum Instruction<'a> {
     Add(overloads::Add),
+    Sub(overloads::Sub),
     Mul(overloads::Mul),
     Neg(overloads::Neg),
     SubMutez,

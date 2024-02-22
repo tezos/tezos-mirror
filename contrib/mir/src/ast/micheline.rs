@@ -253,8 +253,7 @@ macro_rules! micheline_fields {
 /// supported. Useful for total match in the typechecker.
 macro_rules! micheline_unsupported_instructions {
     () => {
-        Prim::SUB
-            | Prim::EDIV
+        Prim::EDIV
             | Prim::LSL
             | Prim::LSR
             | Prim::EMPTY_MAP

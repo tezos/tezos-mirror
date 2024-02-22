@@ -16,9 +16,6 @@
 //! The library is currently incomplete. The following instructions are not
 //! supported:
 //!
-//! - `ADD: timestamp : int`
-//! - `ADD: int : timestamp`
-//! - `SUB`
 //! - `EDIV`
 //! - `LSL`
 //! - `LSR`

@@ -737,6 +737,15 @@ pub(crate) fn typecheck_instruction<'a>(
             pop!();
             I::Add(overloads::Add::Bls12381G2)
         }
+        (App(ADD, [], _), [.., T::Timestamp, T::Int]) => {
+            pop!();
+            I::Add(overloads::Add::IntTimestamp)
+        }
+        (App(ADD, [], _), [.., T::Int, T::Timestamp]) => {
+            pop!();
+            stack[0] = T::Timestamp;
+            I::Add(overloads::Add::TimestampInt)
+        }
         (App(ADD, [], _), [.., _, _]) => no_overload!(ADD),
         (App(ADD, [], _), [_] | []) => no_overload!(ADD, len 2),
         (App(ADD, expect_args!(0), _), _) => unexpected_micheline!(),
@@ -815,6 +824,38 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NEG, [], _), [.., _]) => no_overload!(NEG),
         (App(NEG, [], _), []) => no_overload!(NEG, len 1),
         (App(NEG, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(SUB, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            stack[0] = T::Int;
+            I::Sub(overloads::Sub::NatNat)
+        }
+        (App(SUB, [], _), [.., T::Int, T::Nat]) => {
+            pop!();
+            I::Sub(overloads::Sub::NatInt)
+        }
+        (App(SUB, [], _), [.., T::Nat, T::Int]) => {
+            pop!();
+            stack[0] = T::Int;
+            I::Sub(overloads::Sub::IntNat)
+        }
+        (App(SUB, [], _), [.., T::Int, T::Int]) => {
+            pop!();
+            I::Sub(overloads::Sub::IntInt)
+        }
+        (App(SUB, [], _), [.., T::Int, T::Timestamp]) => {
+            pop!();
+            stack[0] = T::Timestamp;
+            I::Sub(overloads::Sub::TimestampInt)
+        }
+        (App(SUB, [], _), [.., T::Timestamp, T::Timestamp]) => {
+            pop!();
+            stack[0] = T::Int;
+            I::Sub(overloads::Sub::TimestampTimestamp)
+        }
+        (App(SUB, [], _), [.., _, _]) => no_overload!(SUB),
+        (App(SUB, [], _), [] | [_]) => no_overload!(SUB, len 2),
+        (App(SUB, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(SUB_MUTEZ, [], _), [.., T::Mutez, T::Mutez]) => {
             pop!();

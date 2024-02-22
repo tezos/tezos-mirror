@@ -21,6 +21,18 @@ pub enum Add {
     Bls12381G1,
     Bls12381G2,
     Bls12381Fr,
+    TimestampInt,
+    IntTimestamp,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Sub {
+    NatNat,
+    NatInt,
+    IntNat,
+    IntInt,
+    TimestampInt,
+    TimestampTimestamp,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

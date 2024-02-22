@@ -454,6 +454,11 @@ pub mod interpret_cost {
         (35 + (sz >> 1)).as_gas_cost()
     }
 
+    pub fn sub_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let sz = Checked::from(std::cmp::max(i1.byte_size(), i2.byte_size()));
+        (35 + (sz >> 1)).as_gas_cost()
+    }
+
     /// Cost for `AND` on numbers and bytearrays
     pub fn and_num(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
         let sz = Checked::from(Ord::min(i1.byte_size(), i2.byte_size()));

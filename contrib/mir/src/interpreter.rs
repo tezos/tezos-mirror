@@ -216,6 +216,60 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::ADD_BLS_G2)?;
                 stack.push(V::new_bls12381_g2(o1.as_ref() + o2.as_ref()));
             }
+            overloads::Add::IntTimestamp => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Timestamp);
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                stack.push(V::Timestamp(o1 + o2));
+            }
+            overloads::Add::TimestampInt => {
+                let o1 = pop!(V::Timestamp);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                stack.push(V::Timestamp(o1 + o2));
+            }
+        },
+        I::Sub(overload) => match overload {
+            overloads::Sub::IntInt => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = o1 - o2;
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::NatNat => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = BigInt::from(o1) - BigInt::from(o2);
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::IntNat => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = o1 - BigInt::from(o2);
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::NatInt => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = BigInt::from(o1) - o2;
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::TimestampInt => {
+                let o1 = pop!(V::Timestamp);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                stack.push(V::Timestamp(o1 - o2));
+            }
+            overloads::Sub::TimestampTimestamp => {
+                let o1 = pop!(V::Timestamp);
+                let o2 = pop!(V::Timestamp);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                stack.push(V::Int(o1 - o2));
+            }
         },
         I::Mul(overload) => match overload {
             overloads::Mul::NatNat => {
@@ -1456,6 +1510,7 @@ mod interpreter_tests {
     use crate::ast::or::Or::Left;
     use crate::bls;
     use crate::gas::Gas;
+    use chrono::DateTime;
     use num_bigint::BigUint;
     use Instruction::*;
     use Option::None;
@@ -1491,6 +1546,93 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::NatNat), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    mod sub {
+        use super::*;
+
+        #[track_caller]
+        fn test_sub(
+            overload: overloads::Sub,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Sub(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        macro_rules! test {
+            ($name:ident, $overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $name() {
+                    test_sub(overloads::Sub::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        test!(
+            NatNatPos,
+            NatNat,
+            V::nat(54263),
+            V::nat(5034),
+            V::int(49229),
+        );
+
+        test!(
+            NatNatNeg,
+            NatNat,
+            V::nat(5034),
+            V::nat(54263),
+            V::int(-49229),
+        );
+
+        test!(NatNatZero, NatNat, V::nat(43872), V::nat(43872), V::int(0),);
+
+        test!(
+            NatPosInt,
+            NatInt,
+            V::nat(99131),
+            V::int(11012),
+            V::int(88119),
+        );
+
+        test!(
+            NatNegInt,
+            NatInt,
+            V::nat(99131),
+            V::int(-11012),
+            V::int(110143),
+        );
+
+        test!(
+            PosIntNat,
+            IntNat,
+            V::int(11012),
+            V::nat(99131),
+            V::int(-88119),
+        );
+
+        test!(
+            NegIntNat,
+            IntNat,
+            V::int(-11012),
+            V::nat(99131),
+            V::int(-110143),
+        );
+
+        test!(NegIntNegInt, IntInt, V::int(-10), V::int(-30), V::int(20),);
+
+        test!(NegIntPosInt, IntInt, V::int(-10), V::int(30), V::int(-40),);
+
+        test!(PosIntNegInt, IntInt, V::int(10), V::int(-30), V::int(40),);
+
+        test!(PosIntPosInt, IntInt, V::int(10), V::int(30), V::int(-20),);
     }
 
     #[test]
@@ -1566,6 +1708,87 @@ mod interpreter_tests {
             ),
             Err(InterpretError::MutezOverflow)
         );
+    }
+
+    #[test]
+    fn test_add_timestamp_int() {
+        let str_o1: &str = "1979-02-21T17:13:37+01:00";
+        let int_o1 = DateTime::parse_from_rfc3339(str_o1)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_result: &str = "2000-02-21T17:14:37+01:00";
+        let int_result = DateTime::parse_from_rfc3339(str_result)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Int("662688060".parse().unwrap()), V::Timestamp(int_o1),];
+        let expected_stack = stk![V::Timestamp(int_result)];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Add(overloads::Add::TimestampInt), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_add_int_timestamp() {
+        let str_o2: &str = "1972-02-23T19:31:04+01:00";
+        let int_o2 = DateTime::parse_from_rfc3339(str_o2)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_result: &str = "1973-01-30T03:08:24+01:00";
+        let int_result = DateTime::parse_from_rfc3339(str_result)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Timestamp(int_o2), V::Int("29489840".parse().unwrap()),];
+        let expected_stack = stk![V::Timestamp(int_result)];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Add(overloads::Add::IntTimestamp), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_sub_timestamp_int() {
+        let str_o1: &str = "2000-02-21T17:14:37+01:00";
+        let int_o1 = DateTime::parse_from_rfc3339(str_o1)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_result: &str = "1979-02-21T17:13:37+01:00";
+        let int_result = DateTime::parse_from_rfc3339(str_result)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Int("662688060".parse().unwrap()), V::Timestamp(int_o1),];
+        let expected_stack = stk![V::Timestamp(int_result)];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Sub(overloads::Sub::TimestampInt), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_sub_timestamp_timestamp() {
+        let str_o1: &str = "1973-01-30T03:08:24+01:00";
+        let int_o1 = DateTime::parse_from_rfc3339(str_o1)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_o2: &str = "1972-02-23T19:31:04+01:00";
+        let int_o2 = DateTime::parse_from_rfc3339(str_o2)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Timestamp(int_o2), V::Timestamp(int_o1),];
+        let expected_stack = stk![V::Int("29489840".parse().unwrap())];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(
+            &Sub(overloads::Sub::TimestampTimestamp),
+            &mut ctx,
+            &mut stack
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     mod logic {
