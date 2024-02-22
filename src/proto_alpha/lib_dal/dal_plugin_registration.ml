@@ -26,6 +26,8 @@
 open Protocol
 open Alpha_context
 
+let wrap = Environment.wrap_tzresult
+
 module Plugin = struct
   module Proto = Registerer.Registered
 
@@ -71,7 +73,7 @@ module Plugin = struct
 
   let get_round fitness =
     let open Result_syntax in
-    let* round = Fitness.round_from_raw fitness |> Environment.wrap_tzresult in
+    let* round = Fitness.round_from_raw fitness |> wrap in
     return @@ Round.to_int32 round
 
   (* Turn the given value of type {!Protocol.Apply_operation_result.operation_result}
@@ -103,7 +105,7 @@ module Plugin = struct
   let get_committee ctxt ~level =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
-    let*? level = Raw_level.of_int32 level |> Environment.wrap_tzresult in
+    let*? level = Raw_level.of_int32 level |> wrap in
     let+ pkh_to_shards =
       Plugin.RPC.Dal.dal_shards cpctxt (`Main, `Head 0) ~level ()
     in
@@ -126,7 +128,7 @@ module Plugin = struct
         ~number_of_slots
         ~lower:0
         ~upper:(number_of_slots - 1)
-      |> Environment.wrap_tzresult
+      |> wrap
     in
     List.filter (Dal.Attestation.is_attested confirmed_slots) all_slots
     |> Dal.Slot_index.to_int_list |> return
