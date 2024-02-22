@@ -69,7 +69,7 @@ const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
 pub fn store_kernel_upgrade<Host: Runtime>(
     host: &mut Host,
     kernel_upgrade: &KernelUpgrade,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     log!(
         host,
         Info,
@@ -86,7 +86,7 @@ pub fn store_kernel_upgrade<Host: Runtime>(
 
 pub fn read_kernel_upgrade<Host: Runtime>(
     host: &Host,
-) -> Result<Option<KernelUpgrade>, anyhow::Error> {
+) -> anyhow::Result<Option<KernelUpgrade>> {
     let path = OwnedPath::from(KERNEL_UPGRADE);
     read_optional_rlp(host, &path).context("Failed to decode kernel upgrade")
 }
