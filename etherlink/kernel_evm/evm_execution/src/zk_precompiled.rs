@@ -66,8 +66,7 @@ fn ecadd_precompile_without_gas_draining<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     use bn::AffineG1;
     log!(handler.borrow_host(), Info, "Calling ecAdd precompile");
-    // TODO: Make the actual tick estimation (remove the stub value).
-    let estimated_ticks = 1_000_000;
+    let estimated_ticks = 1_700_000;
 
     if let Err(record_err) = handler.record_cost(150) {
         return Ok(PrecompileOutcome {
@@ -124,8 +123,7 @@ fn ecmul_precompile_without_gas_draining<Host: Runtime>(
 ) -> Result<PrecompileOutcome, EthereumError> {
     use bn::AffineG1;
     log!(handler.borrow_host(), Info, "Calling ecMul precompile");
-    // TODO: Make the actual tick estimation (remove the stub value).
-    let estimated_ticks = 1_000_000;
+    let estimated_ticks = 100_000_000;
 
     if let Err(record_err) = handler.record_cost(6_000) {
         return Ok(PrecompileOutcome {
@@ -179,8 +177,12 @@ fn ecpairing_precompile_without_gas_draining<Host: Runtime>(
     input: &[u8],
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling ecPairing precompile");
-    // TODO: Make the actual tick estimation (remove the stub value).
-    let estimated_ticks = 1_000_000;
+
+    let mut estimated_ticks = 70_000;
+
+    if input.len() % PAIR_ELEMENT_LEN == 0 {
+        estimated_ticks += (input.len() / PAIR_ELEMENT_LEN) as u64 * 1_200_000_000
+    }
 
     let gas_cost = (input.len() / PAIR_ELEMENT_LEN) as u64 * 34_000 /* ISTANBUL_PAIR_PER_POINT */ + 45_000 /* ISTANBUL_PAIR_BASE */;
 
