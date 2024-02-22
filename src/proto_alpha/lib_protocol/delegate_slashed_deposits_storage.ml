@@ -28,21 +28,31 @@
 (* TODO #6918: Remove after P *)
 let update_slashing_storage_for_p ctxt =
   let open Lwt_result_syntax in
-  let*! ctxt =
-    Storage.Contract.Slashed_deposits__Oxford.fold
-      ctxt
-      ~order:`Undefined
-      ~init:ctxt
-      ~f:(fun contract slashed_history ctxt ->
-        let slashed_history =
-          List.map
-            (fun (cycle, percentage) ->
-              (cycle, Percentage.convert_from_o_to_p percentage))
-            slashed_history
-        in
-        Storage.Contract.Slashed_deposits.add ctxt contract slashed_history)
-  in
-  Storage.Contract.Slashed_deposits__Oxford.clear ctxt
+  Storage.Delegates.fold
+    ctxt
+    ~init:(Ok ctxt)
+    ~order:`Undefined
+    ~f:(fun delegate ctxt ->
+      let*? ctxt in
+      let delegate = Contract_repr.Implicit delegate in
+      let* slashed_history =
+        Storage.Contract.Slashed_deposits__Oxford.find ctxt delegate
+      in
+      match slashed_history with
+      | None -> return ctxt
+      | Some slashed_history ->
+          let slashed_history =
+            List.map
+              (fun (cycle, percentage) ->
+                (cycle, Percentage.convert_from_o_to_p percentage))
+              slashed_history
+          in
+          let*! ctxt =
+            Storage.Contract.Slashed_deposits.add ctxt delegate slashed_history
+          in
+          Storage.Contract.Slashed_deposits__Oxford.remove_existing
+            ctxt
+            delegate)
 
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 

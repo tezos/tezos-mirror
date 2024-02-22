@@ -83,7 +83,8 @@ val punish_double_signing :
 val apply_and_clear_denunciations :
   Raw_context.t -> (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
-val update_slashing_storage_for_p : Raw_context.t -> Raw_context.t Lwt.t
+val update_slashing_storage_for_p :
+  Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 module For_RPC : sig
   (** [get_estimated_shared_pending_slashed_amount ctxt delegate]
