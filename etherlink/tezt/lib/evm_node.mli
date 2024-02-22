@@ -130,6 +130,11 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
+(** [wait_for_evm_event evm_node ~event_kind] wait for the event
+    [evm_events_new_event.v0] using {!wait_for} where the event kind
+    is equal to [event_kind] (e.g. "sequencer_upgrade"). *)
+val wait_for_evm_event : t -> event_kind:string -> unit Lwt.t
+
 (** [endpoint ?private_ evm_node] returns the endpoint to communicate with the
     [evm_node]. If [private_] is true, the endpoint for the private
     RPC server is returned. *)
@@ -175,12 +180,13 @@ val txpool_content : t -> (txpool_slot list * txpool_slot list) Lwt.t
 val upgrade_payload :
   root_hash:string -> activation_timestamp:string -> string Lwt.t
 
-(** [sequencer_upgrade_payload ?client ~public_key
+(** [sequencer_upgrade_payload ?devmode ?client ~public_key
     ~activation_timestamp ()] gives the sequencer upgrade payload to
     put in a upgrade message, it will upgrade the sequencer to
     [public_key] at the first l1 block after [activation_timestamp]
-    (in RFC3399 format). *)
+    (in RFC3399 format).  [devmode] is true by default. *)
 val sequencer_upgrade_payload :
+  ?devmode:bool ->
   ?client:Client.t ->
   public_key:string ->
   activation_timestamp:string ->

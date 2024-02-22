@@ -227,6 +227,15 @@ let wait_for_blueprint_applied ~timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
+let wait_for_evm_event evm_node ~event_kind =
+  wait_for
+    evm_node
+    "evm_events_new_event.v0"
+    JSON.(
+      fun json ->
+        let found_event_kind = json |-> "kind" |> as_string in
+        if event_kind = found_event_kind then Some () else None)
+
 let create ?name ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
     ?rpc_port endpoint =
   let arguments, rpc_addr, rpc_port =
@@ -493,7 +502,8 @@ let transform_dump ~dump_json ~dump_rlp =
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
   Process.check process
 
-let sequencer_upgrade_payload ?client ~public_key ~activation_timestamp () =
+let sequencer_upgrade_payload ?(devmode = true) ?client ~public_key
+    ~activation_timestamp () =
   let args =
     [
       "make";
@@ -515,6 +525,7 @@ let sequencer_upgrade_payload ?client ~public_key ~activation_timestamp () =
         "wallet-dir"
         Fun.id
         (Option.map Client.base_dir client)
+    @ Cli_arg.optional_switch "devmode" devmode
   in
   let* payload = Process.check_and_read_stdout process in
   return (String.trim payload)
