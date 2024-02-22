@@ -115,9 +115,7 @@ let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
           return_some {finalizable = []; unfinalizable = {delegate; requests}}
       | Some greatest_finalizable_cycle ->
           let* slashing_history_opt =
-            Storage.Contract.Slashed_deposits.find
-              ctxt
-              (Contract_repr.Implicit delegate)
+            Storage.Slashed_deposits.find ctxt delegate
           in
           let slashing_history =
             Option.value slashing_history_opt ~default:[]
@@ -187,11 +185,7 @@ module For_RPC = struct
     let slashable_deposits_period =
       Constants_storage.slashable_deposits_period ctxt
     in
-    let* slashing_history_opt =
-      Storage.Contract.Slashed_deposits.find
-        ctxt
-        (Contract_repr.Implicit delegate)
-    in
+    let* slashing_history_opt = Storage.Slashed_deposits.find ctxt delegate in
     let slashing_history = Option.value slashing_history_opt ~default:[] in
 
     (* Oxford values *)
