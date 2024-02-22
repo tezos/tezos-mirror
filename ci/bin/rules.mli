@@ -40,11 +40,8 @@ val on_tezos_namespace : If.t
 (** A rule that is true if [CI_PROJECT_NAMESPACE] is not [tezos]. *)
 val not_on_tezos_namespace : If.t
 
-(** A rule that is true if [CI_COMMIT_TAG] is defined and matches the given regexp. *)
+(** A rule that is true if [CI_COMMIT_TAG] matches the given regexp. *)
 val has_tag_match : string -> If.t
-
-(** A rule that is true if [CI_COMMIT_TAG] is defined but does not matches the given regexp. *)
-val has_tag_not_match : string -> If.t
 
 (** A rule that is true if the comma-separated list [CI_MERGE_REQUEST_LABELS] contains a given label. *)
 val has_mr_label : string -> If.t

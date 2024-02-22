@@ -100,3 +100,11 @@ let ( || ) = or_
 let ( =~ ) = match_
 
 let ( =~! ) = unmatch
+
+let rec not = function
+  | And (a, b) -> Or (not a, not b)
+  | Or (a, b) -> And (not a, not b)
+  | Eq (x, b) -> Neq (x, b)
+  | Neq (x, b) -> Eq (x, b)
+  | Match (x, s) -> Unmatch (x, s)
+  | Unmatch (x, s) -> Match (x, s)

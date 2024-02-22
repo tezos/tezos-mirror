@@ -40,9 +40,6 @@ let not_on_tezos_namespace = Predefined_vars.ci_project_namespace != str "tezos"
 
 let has_tag_match tag = Predefined_vars.ci_commit_tag =~ tag
 
-let has_tag_not_match tag =
-  Predefined_vars.(ci_commit_tag != null && ci_commit_tag =~! tag)
-
 let assigned_to_marge_bot =
   Predefined_vars.ci_merge_request_assignees =~ "/nomadic-margebot/"
 

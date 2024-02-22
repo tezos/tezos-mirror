@@ -1,0 +1,19 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+.image_template__alpine:
+  image: alpine:3.18
+.image_template__client_libs_dependencies:
+  image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
+.image_template__docker:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+.image_template__runtime_build_dependencies:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+.image_template__runtime_build_test_dependencies:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+.image_template__runtime_e2etest_dependencies:
+  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+.image_template__runtime_prebuild_dependencies:
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+.image_template__rust_toolchain:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
