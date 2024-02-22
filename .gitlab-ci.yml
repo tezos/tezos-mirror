@@ -35,7 +35,7 @@ workflow:
         PIPELINE_TYPE: 'release_tag'
         OCTEZ_PKGNAME: 'octez'
     # Allow 'Etherlink release tag' pipelines
-    - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink-\d+\.\d+(?:\-rc\d+)?$/'
+    - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink\-\d+\.\d+(?:\-rc\d+)?$/'
       variables:
         PIPELINE_TYPE: 'release_tag'
         OCTEZ_PKGNAME: 'etherlink'
@@ -45,7 +45,7 @@ workflow:
         PIPELINE_TYPE: 'beta_release_tag'
         OCTEZ_PKGNAME: 'octez'
     # Allow 'Etherlink beta release tag' pipelines
-    - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink-\d+\.\d+\-beta\d*$/'
+    - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink\-\d+\.\d+\-beta\d*$/'
       variables:
         PIPELINE_TYPE: 'beta_release_tag'
         OCTEZ_PKGNAME: 'etherlink'
@@ -57,17 +57,17 @@ workflow:
         OCTEZ_PKGNAME: 'octez'
     # Allow 'Etherlink test release tag' pipelines for dry running release tag
     # pipelines in the nomadic-labs/tezos CI.
-    - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink-\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+    - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink\-\d+\.\d+(?:\-(rc|beta)\d*)?$/'
       variables:
         PIPELINE_TYPE: 'release_tag_test'
         OCTEZ_PKGNAME: 'etherlink'
     # Allow 'Non-release tag' pipelines
-    - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+    - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink\-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
       variables:
         PIPELINE_TYPE: 'non_release_tag'
     # Allow 'Test non-release tag' pipelines for dry running non-release tag
     # pipelines in the nomadic-labs/tezos CI.
-    - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+    - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink\-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
       variables:
         PIPELINE_TYPE: 'non_release_tag_test'
     # Allow 'Scheduled pipeline for extended test' pipelines
@@ -215,7 +215,7 @@ include:
   # Etherlink release tag
   - local: .gitlab/ci/pipelines/release_tag.yml
     rules:
-      - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink-\d+\.\d+(?:\-rc\d+)?$/'
+      - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink\-\d+\.\d+(?:\-rc\d+)?$/'
 
   # Beta release tag
   - local: .gitlab/ci/pipelines/beta_release_tag.yml
@@ -225,7 +225,7 @@ include:
   # Etherlink beta release tag
   - local: .gitlab/ci/pipelines/beta_release_tag.yml
     rules:
-      - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink-\d+\.\d+\-beta\d*$/'
+      - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink\-\d+\.\d+\-beta\d*$/'
 
   # Test release tag
   - local: .gitlab/ci/pipelines/release_tag_test.yml
@@ -235,17 +235,17 @@ include:
   # Etherlink test release tag
   - local: .gitlab/ci/pipelines/release_tag_test.yml
     rules:
-      - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+      - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^etherlink\-\d+\.\d+(?:\-(rc|beta)\d*)?$/'
 
   # Non-release tag
   - local: .gitlab/ci/pipelines/non_release_tag.yml
     rules:
-      - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+      - if: '$CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink\-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
 
   # Test non-release tag
   - local: .gitlab/ci/pipelines/non_release_tag_test.yml
     rules:
-      - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
+      - if: '$CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG != null && $CI_COMMIT_TAG !~ /^(v|etherlink\-)\d+\.\d+(?:\-(rc|beta)\d*)?$/'
 
   # Scheduled pipeline for extended test
   - local: .gitlab/ci/pipelines/schedule_extended_test.yml
