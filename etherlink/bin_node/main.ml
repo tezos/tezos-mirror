@@ -1077,31 +1077,22 @@ let make_sequencer_upgrade_command =
       let* _pk_uri, sequencer_pk_opt =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
       in
-      let activation_timestamp =
-        if devmode then
-          Evm_node_lib_dev_encoding.Ethereum_types.timestamp_to_bytes
-            activation_timestamp
-        else
-          Evm_node_lib_prod_encoding.Ethereum_types.timestamp_to_bytes
-            activation_timestamp
-      in
-      let*? sequencer_pk =
+      let*? sequencer =
         Option.to_result
           ~none:[error_of_fmt "invalid format or unknown public key."]
           sequencer_pk_opt
       in
-      let sequencer_pk_bytes =
-        Signature.Public_key.to_b58check sequencer_pk |> String.to_bytes
-      in
-      let payload =
+      let* payload =
         if devmode then
-          Evm_node_lib_dev_encoding.Rlp.(
-            encode
-            @@ List [Value sequencer_pk_bytes; Value activation_timestamp])
+          let open Evm_node_lib_dev_encoding.Ethereum_types in
+          let sequencer_upgrade =
+            Sequencer_upgrade.{sequencer; timestamp = activation_timestamp}
+          in
+          return @@ Sequencer_upgrade.to_bytes sequencer_upgrade
         else
-          Evm_node_lib_prod_encoding.Rlp.(
-            encode
-            @@ List [Value sequencer_pk_bytes; Value activation_timestamp])
+          tzfail
+            (error_of_fmt
+               "devmode must be set for producing the sequencer upgrade")
       in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
