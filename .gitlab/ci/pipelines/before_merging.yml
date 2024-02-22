@@ -45,6 +45,8 @@ include:
   - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
   - .gitlab/ci/jobs/test/install_octez.yml
   - .gitlab/ci/jobs/test/tezt.yml
+  - .gitlab/ci/jobs/test/tezt-slow-before_merging.yml
+  - .gitlab/ci/jobs/test/tezt-flaky-before_merging.yml
   - .gitlab/ci/jobs/test/test_kernels.yml
   - .gitlab/ci/jobs/test/test_etherlink_kernel-before_merging.yml
 

@@ -1,0 +1,6 @@
+include: .gitlab/ci/jobs/test/tezt-flaky.yml
+
+# Runs flaky Tezts in the 'schedule_extended_test' pipeline.
+tezt-flaky:
+  extends:
+    - .tezt-flaky
