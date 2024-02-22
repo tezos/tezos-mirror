@@ -3959,35 +3959,9 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           in
           Log.info "Expected is %s" (JSON.encode expected) ;
           assert (JSON.encode expected = JSON.encode outbox) ;
-          let parameters_json = `O [("int", `String parameters)] in
-          let batch =
-            {
-              destination = address;
-              entrypoint;
-              parameters = parameters_json;
-              parameters_ty =
-                (match outbox_parameters_ty with
-                | Some json_value -> Some (`O [("prim", `String json_value)])
-                | None -> None);
-            }
-          in
-          let message_json =
-            Sc_rollup_helpers.json_of_output_tx_batch [batch]
-          in
-          let* message =
-            Codec.encode
-              ~name:
-                (Protocol.encoding_prefix protocol
-                ^ ".smart_rollup.outbox.message")
-              message_json
-          in
           let* proof =
             Sc_rollup_node.RPC.call rollup_node
-            @@ Sc_rollup_rpc.outbox_proof_single
-                 ~message_index
-                 ~outbox_level
-                 ~message
-                 ()
+            @@ Sc_rollup_rpc.outbox_proof_simple ~message_index ~outbox_level ()
           in
           let* proof' =
             Sc_rollup_node.RPC.call rollup_node

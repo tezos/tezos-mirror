@@ -133,6 +133,10 @@ Smart Rollup node
 - Higher gas limit for publish commitment operations to avoid their failing due
   to gas variations. (MR :gl:`!11761`)
 
+- **Breaking change** Removed RPC ``/helpers/proofs/outbox?message_index=<index>&outbox_level=<level>&serialized_outbox_message=<bytes>``.
+  Use ``helpers/proofs/outbox/<level>/messages?index=<index>`` to avoid generating the ```serialized_outbox_message`` yourself.
+  (MR :gl:`!12140`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
