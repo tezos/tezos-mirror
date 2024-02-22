@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,10 +8,11 @@ mod helpers;
 mod models;
 mod runner;
 
+use models::SkipData;
 use std::{
     collections::HashMap,
     ffi::OsStr,
-    fs::{read_to_string, File, OpenOptions},
+    fs::{read, read_to_string, File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
 };
@@ -20,6 +21,8 @@ use walkdir::{DirEntry, WalkDir};
 
 use fillers::TestResult;
 use helpers::{construct_folder_path, OutputOptions};
+
+pub const SKIP_DATA_FILE: &str = "skip_data.yml";
 
 pub fn find_all_json_tests(path: &Path) -> Vec<PathBuf> {
     WalkDir::new(path)
@@ -90,6 +93,12 @@ pub struct Opt {
     result: bool,
     #[structopt(long = "diff", about = "Compare result with a former evaluation.")]
     diff: Option<String>,
+    #[structopt(
+        long = "resources",
+        default_value = "./etherlink/kernel_evm/evm_evaluation/resources",
+        about = "Specify the path where the tool needs to retrieve its resources from."
+    )]
+    resources: String,
 }
 
 fn generate_final_report(
@@ -509,6 +518,18 @@ pub fn main() {
         .unwrap();
     }
 
+    let skip_data_path = Path::new(&opt.resources).join(SKIP_DATA_FILE);
+    let skip_data: SkipData = match read(&skip_data_path) {
+        Ok(reader) => serde_yaml::from_reader(&*reader)
+            .expect("Reading data(s) to skip should succeed."),
+        Err(_) => {
+            writeln!(output_file, "WARNING: the specified path [{}] can not be found, data(s) \
+                                   that should be skipped will not be and the outcome of the \
+                                   evaluation could be erroneous.", skip_data_path.display()).unwrap();
+            SkipData { datas: vec![] }
+        }
+    };
+
     for test_file in test_files.into_iter() {
         let splitted_path: Vec<&str> = test_file.to_str().unwrap().split('/').collect();
         let report_key = splitted_path
@@ -553,6 +574,7 @@ pub fn main() {
             skip,
             &mut diff_result_map,
             &output,
+            &skip_data,
         )
         .unwrap();
     }

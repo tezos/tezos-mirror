@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2021-2023 draganrakita
 //
 // SPDX-License-Identifier: MIT
@@ -185,7 +185,7 @@ pub struct TransactionParts {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct BlockEnv {
     pub number: U256,
     /// Coinbase or miner or address that created and signed the block.
@@ -211,7 +211,7 @@ impl Default for BlockEnv {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct TxEnv {
     /// Caller or Author or tx signer
     pub caller: H160,
@@ -237,10 +237,16 @@ impl Default for TxEnv {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Env {
     pub block: BlockEnv,
     pub tx: TxEnv,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct SkipData {
+    #[serde(deserialize_with = "deserialize_vec_str_as_u8_vectors")]
+    pub datas: Vec<Vec<u8>>,
 }
 
 #[cfg(test)]
