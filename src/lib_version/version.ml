@@ -50,11 +50,10 @@ let string_of_additional_info = function
   | RC_dev n -> Format.asprintf "~rc%d+dev" n
   | Release -> ""
 
-let pp f {suite; major; minor; additional_info} =
+let pp f {suite = _; major; minor; additional_info} =
   Format.fprintf
     f
-    "%s%i.%i%s"
-    (match suite with Octez -> "" | Etherlink -> "etherlink-")
+    "%i.%i%s"
     major
     minor
     (string_of_additional_info additional_info)
