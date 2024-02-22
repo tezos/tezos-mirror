@@ -10,6 +10,6 @@ oc.build_arm64-released:
   variables:
     EXECUTABLE_FILES: "script-inputs/released-executables"
   rules:
-    - if: '$OCTEZ_PKGNAME == "etherlink"'
+    - if: '${OCTEZ_PKGNAME} == "etherlink"'
       variables:
         EXECUTABLE_FILES: "script-inputs/etherlink-executables"
