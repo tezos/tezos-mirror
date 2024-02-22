@@ -147,6 +147,8 @@ let preattest state proposal =
          We switch to the `Awaiting_preattestations` phase. *)
       update_current_phase state Awaiting_preattestations
     in
+    (* Here, we do not cancel pending signatures as it is already done
+       in [handle_proposal]. *)
     return (new_state, prepare_preattest_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
@@ -220,7 +222,15 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
   *)
   let may_preattest state proposal =
     match state.round_state.current_phase with
-    | Idle -> preattest state proposal
+    | Idle ->
+        (* We prioritize the new and meaningful consensus vote signing
+           by cancelling all pending forge and signing tasks. In this
+           current context, preattesting means that it is now too late
+           to include outdated consensus votes and blocks. However,
+           active forge requests are still processed until
+           completion. *)
+        state.global_state.forge_worker_hooks.cancel_all_pending_tasks () ;
+        preattest state proposal
     | _ -> do_nothing state
   in
   let current_level = state.level_state.current_level in
