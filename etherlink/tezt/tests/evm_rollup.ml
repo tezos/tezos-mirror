@@ -2083,34 +2083,9 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~evm_node ~sc_rollup_node
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   unit
 
-let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
-    ~evm_node ~sc_rollup_node ~sc_rollup_address ~node ~client ~endpoint =
-  let* withdrawal_level = Client.level client in
-
-  (* Call the withdrawal precompiled contract. *)
-  let* () =
-    Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
-  in
-  let call_withdraw =
-    Eth_cli.contract_send
-      ~source_private_key:sender.Eth_account.private_key
-      ~endpoint
-      ~abi_label:"withdraw"
-      ~address:"0xff00000000000000000000000000000000000001"
-      ~method_call:(sf {|withdraw_base58("%s")|} receiver)
-      ~value:amount_wei
-      ~gas:50_000
-  in
-  let* _tx =
-    wait_for_application
-      ~evm_node
-      ~sc_rollup_node
-      ~node
-      ~client
-      call_withdraw
-      ()
-  in
-
+let find_and_execute_withdrawal ~withdrawal_level ~commitment_period
+    ~challenge_window ~evm_node ~sc_rollup_node ~sc_rollup_address ~node ~client
+    =
   (* Bake enough levels to have a commitment. *)
   let* _ =
     repeat (commitment_period * 2) (fun () ->
@@ -2139,34 +2114,82 @@ let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
           JSON.is_null outbox
           || (JSON.is_list outbox && JSON.as_list outbox = [])
         then aux (level' + 1)
-        else return (outbox, level')
+        else return (JSON.as_list outbox |> List.length, level')
     in
     aux level
   in
-  let* _outbox, withdrawal_level = find_outbox withdrawal_level in
-  let* outbox_proof =
-    Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.outbox_proof_simple
-         ~message_index:0
-         ~outbox_level:withdrawal_level
-         ()
+  let* size, withdrawal_level = find_outbox withdrawal_level in
+  let execute_withdrawal withdrawal_level message_index =
+    let* outbox_proof =
+      Sc_rollup_node.RPC.call sc_rollup_node
+      @@ Sc_rollup_rpc.outbox_proof_simple
+           ~message_index
+           ~outbox_level:withdrawal_level
+           ()
+    in
+    let Sc_rollup_rpc.{proof; commitment_hash} =
+      match outbox_proof with
+      | Some r -> r
+      | None -> Test.fail "No outbox proof found for the withdrawal"
+    in
+    let*! () =
+      Client.Sc_rollup.execute_outbox_message
+        ~hooks
+        ~burn_cap:(Tez.of_int 10)
+        ~rollup:sc_rollup_address
+        ~src:Constant.bootstrap1.alias
+        ~commitment_hash
+        ~proof
+        client
+    in
+    let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
+    unit
   in
-  let Sc_rollup_rpc.{proof; commitment_hash} =
-    match outbox_proof with
-    | Some r -> r
-    | None -> Test.fail "No outbox proof found for the withdrawal"
+  let* () =
+    Lwt_list.iter_s
+      (fun message_index -> execute_withdrawal withdrawal_level message_index)
+      (List.init size Fun.id)
   in
-  let*! () =
-    Client.Sc_rollup.execute_outbox_message
-      ~hooks
-      ~burn_cap:(Tez.of_int 10)
-      ~rollup:sc_rollup_address
-      ~src:Constant.bootstrap1.alias
-      ~commitment_hash
-      ~proof
-      client
+  return withdrawal_level
+
+let withdraw ~commitment_period ~challenge_window ~amount_wei ~sender ~receiver
+    ~evm_node ~sc_rollup_node ~sc_rollup_address ~node ~client ~endpoint =
+  let* withdrawal_level = Client.level client in
+
+  (* Call the withdrawal precompiled contract. *)
+  let* () =
+    Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
   in
-  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
+  let call_withdraw =
+    Eth_cli.contract_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi_label:"withdraw"
+      ~address:"0xff00000000000000000000000000000000000001"
+      ~method_call:(sf {|withdraw_base58("%s")|} receiver)
+      ~value:amount_wei
+      ~gas:50_000
+  in
+  let* _tx =
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      call_withdraw
+      ()
+  in
+  let* _ =
+    find_and_execute_withdrawal
+      ~withdrawal_level
+      ~commitment_period
+      ~challenge_window
+      ~evm_node
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~node
+      ~client
+  in
   unit
 
 let check_balance ~receiver ~endpoint expected_balance =
