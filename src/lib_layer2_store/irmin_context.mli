@@ -133,7 +133,7 @@ val wait_gc_completion : [> `Write] index -> unit Lwt.t
 
     Note: there is no associated [import_snapshot] function as the import
     consist in copying the exported Irmin store. *)
-val export_snapshot : _ t -> hash -> path:string -> unit tzresult Lwt.t
+val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
 
 (** Module for generating and verifying proofs for a context *)
 module Proof (Hash : sig

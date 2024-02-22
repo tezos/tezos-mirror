@@ -70,6 +70,8 @@ module Node_store = struct
         save_when_rw Full
     | Some Full, Some Archive ->
         failwith "Cannot transform a full rollup node into an archive one."
+
+  let of_store store = store
 end
 
 type debug_logger = string -> unit Lwt.t

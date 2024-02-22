@@ -96,17 +96,11 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
 (** [process_head plugin node_ctxt ctxt ~predecessor head inbox_and_messages] runs the PVM for the given
     head. *)
 let process_head plugin (node_ctxt : _ Node_context.t) ctxt
-    ~(predecessor : Layer1.header) (head : Layer1.header) inbox_and_messages =
+    ~(predecessor : Layer1.head) (head : Layer1.head) inbox_and_messages =
   let open Lwt_result_syntax in
   let first_inbox_level = node_ctxt.genesis_info.level |> Int32.succ in
-  if head.Layer1.level >= first_inbox_level then
-    transition_pvm
-      plugin
-      node_ctxt
-      ctxt
-      (Layer1.head_of_header predecessor)
-      (Layer1.head_of_header head)
-      inbox_and_messages
+  if head.level >= first_inbox_level then
+    transition_pvm plugin node_ctxt ctxt predecessor head inbox_and_messages
   else if head.Layer1.level = node_ctxt.genesis_info.level then
     let* ctxt, state = genesis_state plugin head.hash node_ctxt ctxt in
     let*! ctxt = Context.PVMState.set ctxt state in

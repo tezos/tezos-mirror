@@ -141,6 +141,18 @@ let rec connect ~name ?(count = 0) ~delay ~protocols cctxt =
       let* () = Layer1_event.cannot_connect ~name ~count e in
       connect ~name ~delay ~protocols ~count:(count + 1) cctxt
 
+let create ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
+  let heads, _push = Lwt_stream.create () in
+  {
+    name;
+    cctxt = (cctxt :> Client_context.full);
+    heads;
+    stopper = (fun () -> ());
+    reconnection_delay;
+    protocols;
+    running = false;
+  }
+
 let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
   let open Lwt_syntax in
   let* () = Layer1_event.starting ~name in
@@ -167,7 +179,20 @@ let reconnect l1_ctxt =
       ~protocols:l1_ctxt.protocols
       l1_ctxt.cctxt
   in
-  return {l1_ctxt with heads; stopper}
+  return {l1_ctxt with heads; stopper; running = true}
+
+let connect l1_ctxt =
+  let open Lwt_result_syntax in
+  if l1_ctxt.running then failwith "Layer_1.connect: Already connected"
+  else
+    let*! heads, stopper =
+      connect
+        ~name:l1_ctxt.name
+        ~delay:l1_ctxt.reconnection_delay
+        ~protocols:l1_ctxt.protocols
+        l1_ctxt.cctxt
+    in
+    return {l1_ctxt with heads; stopper; running = true}
 
 let shutdown state =
   state.stopper () ;

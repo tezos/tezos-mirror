@@ -127,6 +127,10 @@ let wait_gc_completion
       [> `Write] t) =
   Pvm_Context_Impl.wait_gc_completion index
 
+let export_snapshot (type a)
+    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t) =
+  Pvm_Context_Impl.export_snapshot index
+
 type pvmstate =
   | PVMState : {
       pvm_context_impl : ('repo, 'tree) pvm_context_impl;

@@ -31,6 +31,19 @@ val export :
   filename:string option ->
   string tzresult Lwt.t
 
+(** [export_compact ~compression ~data_dir ~dest ~filename] creates a tar
+    gzipped archive with name [filename] (or a generated name) in [dest] (or the
+    current directory) containing a snapshot of the data of the rollup node with
+    data directory [data_dir]. The difference with {!export} is that the
+    snapshot contains a single commit for the context (which must be
+    reconstructed on import) but is significantly smaller. *)
+val export_compact :
+  compression:compression ->
+  data_dir:string ->
+  dest:string option ->
+  filename:string option ->
+  string tzresult Lwt.t
+
 (** [import ~no_checks ~force cctxt ~data_dir ~snapshot_file] imports the
     snapshot at path [snapshot_file] into the data directory [data_dir]. If
     [no_checks] is [true], the integrity of the imported data is not checked at

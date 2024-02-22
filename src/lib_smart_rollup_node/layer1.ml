@@ -128,6 +128,22 @@ let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
   let cctxt = (cctxt :> Client_context.full) in
   return {l1; cctxt; blocks_cache; headers_cache; prefetch_blocks}
 
+let create ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
+    ?(prefetch_blocks = l1_blocks_cache_size) cctxt =
+  let open Result_syntax in
+  let* () =
+    if prefetch_blocks > l1_blocks_cache_size then
+      error_with
+        "Blocks to prefetch must be less than the cache size: %d"
+        l1_blocks_cache_size
+    else Ok ()
+  in
+  let l1 = create ~name ~reconnection_delay ?protocols cctxt in
+  let blocks_cache = Blocks_cache.create l1_blocks_cache_size in
+  let headers_cache = Blocks_cache.create l1_blocks_cache_size in
+  let cctxt = (cctxt :> Client_context.full) in
+  return {l1; cctxt; blocks_cache; headers_cache; prefetch_blocks}
+
 let shutdown {l1; _} = shutdown l1
 
 let cache_shell_header {headers_cache; _} hash header =

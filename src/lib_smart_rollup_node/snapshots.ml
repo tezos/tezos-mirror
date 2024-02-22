@@ -347,6 +347,129 @@ let check_lcc metadata cctxt (store : _ Store.t) (head : Sc_rollup_block.t)
              Commitment.Hash.pp
              lcc.commitment
 
+let hash_level_of_l2_block (b : Sc_rollup_block.t) =
+  Layer1.{hash = b.header.block_hash; level = b.header.level}
+
+let reconstruct_level_context rollup_ctxt ~predecessor
+    (node_ctxt : _ Node_context.t) level =
+  let open Lwt_result_syntax in
+  let* block = Node_context.get_l2_block_by_level node_ctxt level in
+  let* inbox = Node_context.get_inbox node_ctxt block.header.inbox_hash
+  and* messages = Messages.get node_ctxt block.header.inbox_witness in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level node_ctxt level
+  in
+  let* ctxt, _num_messages, _num_ticks, _initial_tick =
+    Interpreter.process_head
+      (module Plugin)
+      node_ctxt
+      rollup_ctxt
+      ~predecessor:(hash_level_of_l2_block predecessor)
+      (hash_level_of_l2_block block)
+      (inbox, messages)
+  in
+  let*! context_hash = Context.commit ctxt in
+  assert (
+    Smart_rollup_context_hash.(
+      of_context_hash context_hash = block.header.context)) ;
+  return (block, ctxt)
+
+let reconstruct_context_from_first_available_level
+    (node_ctxt : _ Node_context.t) (head : Sc_rollup_block.t) =
+  let open Lwt_result_syntax in
+  let* {first_available_level = first_level; _} =
+    Node_context.get_gc_levels node_ctxt
+  in
+  let total = Int32.sub head.header.level first_level in
+  let progress_bar =
+    Progress_bar.progress_bar
+      ~counter:`Int
+      ~message:"Reconstructing context"
+      ~color:(Terminal.Color.rgb 219 146 21)
+      (Int32.to_int total)
+  in
+  Progress_bar.Lwt.with_reporter progress_bar @@ fun count_progress ->
+  let* first_block = Node_context.get_l2_block_by_level node_ctxt first_level in
+  let* first_ctxt =
+    Node_context.checkout_context node_ctxt first_block.header.block_hash
+  in
+  let rec reconstruct_chain_from (block : Sc_rollup_block.t) rollup_ctxt =
+    if block.header.level >= head.header.level then return_unit
+    else
+      let level = Int32.succ block.header.level in
+      let* block, rollup_ctxt =
+        reconstruct_level_context rollup_ctxt ~predecessor:block node_ctxt level
+      in
+      let*! () = count_progress 1 in
+      reconstruct_chain_from block rollup_ctxt
+  in
+  reconstruct_chain_from first_block first_ctxt
+
+let maybe_reconstruct_context cctxt ~data_dir =
+  let open Lwt_result_syntax in
+  let store_dir = Configuration.default_storage_dir data_dir in
+  let context_dir = Configuration.default_context_dir data_dir in
+  let* () = check_store_version store_dir in
+  let* store =
+    Store.load
+      Read_write
+      ~index_buffer_size:1000
+      ~l2_blocks_cache_size:100
+      store_dir
+  in
+  let* head = get_head store in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store head.header.level
+  in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+  let*? metadata =
+    match metadata with
+    | None -> error_with "No rollup node metadata in %S." data_dir
+    | Some m -> Ok m
+  in
+  let (module C) = Plugin.Pvm.context metadata.kind in
+  let* context =
+    Context.load (module C) ~cache_size:100 Read_write context_dir
+  in
+  let*! head_ctxt =
+    Context.checkout
+      context
+      (Smart_rollup_context_hash.to_context_hash head.header.context)
+  in
+  match head_ctxt with
+  | Some _ -> return_unit
+  | None ->
+      let* current_protocol =
+        Node_context.protocol_of_level_with_store store head.header.level
+      in
+      let*? (module Plugin) =
+        Protocol_plugins.proto_plugin_for_protocol current_protocol.protocol
+      in
+      let* constants =
+        Plugin.Layer1_helpers.retrieve_constants
+          cctxt
+          ~block:(`Level head.header.level)
+      in
+      let current_protocol =
+        {
+          Node_context.hash = current_protocol.protocol;
+          proto_level = current_protocol.proto_level;
+          constants;
+        }
+      in
+      let* node_ctxt =
+        Node_context_loader.For_snapshots.create_node_context
+          cctxt
+          current_protocol
+          store
+          context
+          ~data_dir
+      in
+      let* () = reconstruct_context_from_first_available_level node_ctxt head in
+      let*! () = Context.close context in
+      let* () = Store.close store in
+      return_unit
+
 let post_checks ~action ~message snapshot_metadata ~dest =
   let open Lwt_result_syntax in
   let store_dir = Configuration.default_storage_dir dest in
@@ -432,18 +555,22 @@ let operator_local_file_regexp =
 
 let snapshotable_files_regexp =
   Re.Str.regexp
-    "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|context/.*\\|metadata$\\)"
+    "^\\(storage/.*\\|context/.*\\|wasm_2_0_0/.*\\|arith/.*\\|riscv/.*\\|context/.*\\|metadata$\\)"
 
-let export ~no_checks ~compression ~data_dir ~dest ~filename =
+let with_locks ~data_dir f =
+  Format.eprintf "Acquiring GC lock@." ;
+  (* Take GC lock first in order to not prevent progression of rollup node. *)
+  Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
+  Format.eprintf "Acquiring process lock@." ;
+  Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir) f
+
+let export_dir metadata ~take_locks ~compression ~data_dir ~dest ~filename =
   let open Lwt_result_syntax in
   let* snapshot_file =
-    Format.eprintf "Acquiring GC lock@." ;
-    (* Take GC lock first in order to not prevent progression of rollup node. *)
-    Utils.with_lockfile (Node_context.gc_lockfile_path ~data_dir) @@ fun () ->
-    Format.eprintf "Acquiring process lock@." ;
-    Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
-    @@ fun () ->
-    let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
+    let with_locks =
+      if take_locks then with_locks ~data_dir else fun f -> f ()
+    in
+    with_locks @@ fun () ->
     let dest_file_name =
       match filename with
       | Some f ->
@@ -500,8 +627,97 @@ let export ~no_checks ~compression ~data_dir ~dest ~filename =
     | No | On_the_fly -> snapshot_file
     | After -> compress ~snapshot_file
   in
+  return snapshot_file
+
+let export ~no_checks ~compression ~data_dir ~dest ~filename =
+  let open Lwt_result_syntax in
+  let* metadata = pre_export_checks_and_get_snapshot_metadata ~data_dir in
+  let* snapshot_file =
+    export_dir metadata ~take_locks:true ~compression ~data_dir ~dest ~filename
+  in
   let* () = unless no_checks @@ fun () -> post_export_checks ~snapshot_file in
   return snapshot_file
+
+let export_compact ~compression ~data_dir ~dest ~filename =
+  let open Lwt_result_syntax in
+  let* snapshot_metadata =
+    pre_export_checks_and_get_snapshot_metadata ~data_dir
+  in
+  Lwt_utils_unix.with_tempdir "snapshot_temp_" @@ fun tmp_dir ->
+  let tmp_context_dir = Configuration.default_context_dir tmp_dir in
+  let tmp_store_dir = Configuration.default_storage_dir tmp_dir in
+  let*! () = Lwt_utils_unix.create_dir tmp_context_dir in
+  let*! () = Lwt_utils_unix.create_dir tmp_store_dir in
+  let store_dir = Configuration.default_storage_dir data_dir in
+  let context_dir = Configuration.default_context_dir data_dir in
+  let* store =
+    Store.load Read_only ~index_buffer_size:0 ~l2_blocks_cache_size:1 store_dir
+  in
+  let* metadata = Metadata.read_metadata_file ~dir:data_dir in
+  let*? metadata =
+    match metadata with
+    | None -> error_with "No rollup node metadata in %S." data_dir
+    | Some m -> Ok m
+  in
+  let* head = get_head store in
+  let level = head.Sc_rollup_block.header.level in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level_with_store store level
+  in
+  let (module C) = Plugin.Pvm.context metadata.kind in
+  let* context = Context.load (module C) ~cache_size:1 Read_only context_dir in
+  let* first_level = first_available_level ~data_dir store in
+  let* first_block_hash =
+    Store.Levels_to_hashes.find store.levels_to_hashes first_level
+  in
+  let first_block_hash =
+    WithExceptions.Option.get first_block_hash ~loc:__LOC__
+  in
+  let* first_block = Store.L2_blocks.read store.l2_blocks first_block_hash in
+  let _, first_block = WithExceptions.Option.get first_block ~loc:__LOC__ in
+  Format.eprintf "Exporting context snapshot with first level %ld@." first_level ;
+  let* () =
+    Context.export_snapshot
+      context
+      (Smart_rollup_context_hash.to_context_hash first_block.context)
+      ~path:tmp_context_dir
+  in
+  let ( // ) = Filename.concat in
+  let copy_dir a =
+    let dir = data_dir // a in
+    if Sys.file_exists dir && Sys.is_directory dir then
+      copy_dir dir (tmp_dir // a)
+  in
+  let copy_file a =
+    let path = data_dir // a in
+    if Sys.file_exists path then copy_file ~src:path ~dst:(tmp_dir // a)
+  in
+  Format.eprintf "Acquiring process lock@." ;
+  let* () =
+    Utils.with_lockfile (Node_context.processing_lockfile_path ~data_dir)
+    @@ fun () ->
+    Format.eprintf "Copying data@." ;
+    Snapshot_utils.copy_dir store_dir tmp_store_dir ;
+    copy_file "metadata" ;
+    return_unit
+  in
+  copy_dir "wasm_2_0_0" ;
+  copy_dir "arith" ;
+  copy_dir "riscv" ;
+  let compression =
+    match compression with
+    | After ->
+        (* We've already copied data *)
+        On_the_fly
+    | _ -> compression
+  in
+  export_dir
+    snapshot_metadata
+    ~take_locks:false
+    ~compression
+    ~data_dir:tmp_dir
+    ~dest
+    ~filename
 
 let pre_import_checks cctxt ~no_checks ~data_dir snapshot_metadata =
   let open Lwt_result_syntax in
@@ -599,6 +815,7 @@ let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
       ~snapshot_file
       ~dest:data_dir
   in
+  let* () = maybe_reconstruct_context cctxt ~data_dir in
   unless no_checks @@ fun () ->
   post_checks
     ~action:(`Import cctxt)

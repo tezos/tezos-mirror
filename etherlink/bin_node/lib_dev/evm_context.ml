@@ -197,14 +197,11 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let* rollup_node_index =
     Irmin_context.load ~cache_size:100_000 Read_only rollup_node_context_dir
   in
-  let*! rollup_node_context =
-    Irmin_context.checkout_exn rollup_node_index checkpoint
-  in
   let evm_context_dir = store_path ~data_dir in
   let*! () = Lwt_utils_unix.create_dir evm_context_dir in
   let* () =
     Irmin_context.export_snapshot
-      rollup_node_context
+      rollup_node_index
       checkpoint
       ~path:evm_context_dir
   in

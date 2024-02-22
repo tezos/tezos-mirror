@@ -606,6 +606,19 @@ ensure that the snapshot is not corrupted and can be imported by other users.
    It is also possible to use the ``--no-check`` option to disable the integrity
    checks during the export (i.e., phase 3), which will speed up the process.
 
+.. note::
+
+   Snapshots produced with the ``--compact`` option will be significantly
+   smaller (by a factor of 3) than otherwise as they contain a single commit of
+   the context for the first available block (instead of the full context
+   history). They take a comparable amount of time to be exported but take
+   longer to be imported because the context needs to be reconstructed.
+
+.. warning::
+
+   Snapshots exported with ``--compact`` for *archive* rollup nodes will need a
+   significant time to import because the context will need to be reconstructed
+   from the rollup genesis.
 
 Workflows
 ---------

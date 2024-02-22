@@ -968,14 +968,19 @@ let test_gc variant ?(tags = []) ~challenge_window ~commitment_period
    - we import the snapshot in the second and a fresh rollup node
    - we ensure they are all synchronized
    - we also try to import invalid snapshots to make sure they are rejected. *)
-let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
+let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
+    ~compact =
   let history_mode_str = Sc_rollup_node.string_of_history_mode history_mode in
   test_full_scenario
     {
-      tags = ["snapshot"; history_mode_str];
+      tags =
+        (["snapshot"; history_mode_str] @ if compact then ["compact"] else []);
       variant = None;
       description =
-        sf "snapshot can be exported and checked (%s)" history_mode_str;
+        sf
+          "snapshot can be exported and checked (%s%s)"
+          history_mode_str
+          (if compact then " compact" else "");
     }
     ~kind
     ~challenge_window
@@ -1026,29 +1031,37 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
   let dir = Tezt.Temp.dir "snapshots" in
   let dir_on_the_fly = Tezt.Temp.dir "snapshots_on_the_fly" in
   let* snapshot_file =
-    Sc_rollup_node.export_snapshot sc_rollup_node dir |> Runnable.run
+    Sc_rollup_node.export_snapshot ~compact sc_rollup_node dir |> Runnable.run
   and* snapshot_file_on_the_fly =
     Sc_rollup_node.export_snapshot
       ~compress_on_the_fly:true
+      ~compact
       sc_rollup_node
       dir_on_the_fly
     |> Runnable.run
   in
-  Log.info "Checking if uncompressed snapshot files are identical." ;
-  (* Uncompress snapshots *)
-  let* () = Process.run "cp" [snapshot_file; snapshot_file ^ ".raw.gz"] in
   let* () =
-    Process.run
-      "cp"
-      [snapshot_file_on_the_fly; snapshot_file_on_the_fly ^ ".raw.gz"]
-  in
-  let* () = Process.run "gzip" ["-d"; snapshot_file ^ ".raw.gz"] in
-  let* () = Process.run "gzip" ["-d"; snapshot_file_on_the_fly ^ ".raw.gz"] in
-  (* Compare uncompressed snapshots *)
-  let* () =
-    Process.run
-      "cmp"
-      [snapshot_file ^ ".raw"; snapshot_file_on_the_fly ^ ".raw"]
+    if compact then
+      (* Compact snapshots are not deterministic due to the way irmin generates
+         the single commit context *)
+      unit
+    else (
+      Log.info "Checking if uncompressed snapshot files are identical." ;
+      (* Uncompress snapshots *)
+      let* () = Process.run "cp" [snapshot_file; snapshot_file ^ ".raw.gz"] in
+      let* () =
+        Process.run
+          "cp"
+          [snapshot_file_on_the_fly; snapshot_file_on_the_fly ^ ".raw.gz"]
+      in
+      let* () = Process.run "gzip" ["-d"; snapshot_file ^ ".raw.gz"] in
+      let* () =
+        Process.run "gzip" ["-d"; snapshot_file_on_the_fly ^ ".raw.gz"]
+      in
+      (* Compare uncompressed snapshots *)
+      Process.run
+        "cmp"
+        [snapshot_file ^ ".raw"; snapshot_file_on_the_fly ^ ".raw"])
   in
   let* exists = Lwt_unix.file_exists snapshot_file in
   if not exists then
@@ -1101,10 +1114,11 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode =
     @@ Sc_rollup_node.wait_for sc_rollup_node event_name (Fun.const (Some ()))
   in
   let* _ = Sc_rollup_node.wait_sync ~timeout:30.0 sc_rollup_node in
-  let*! snapshot_file = Sc_rollup_node.export_snapshot sc_rollup_node dir in
+  let*! snapshot_file =
+    Sc_rollup_node.export_snapshot ~compact sc_rollup_node dir
+  in
   (* The rollup node should not have published its commitment yet *)
   Log.info "Try importing snapshot without published commitment." ;
-  Log.info "Try importing outdated snapshot." ;
   let* () = Sc_rollup_node.terminate rollup_node_2 in
   let*? unpublished =
     Sc_rollup_node.import_snapshot ~force:true rollup_node_2 ~snapshot_file
@@ -5759,12 +5773,21 @@ let register_protocol_independent () =
     ~challenge_window:5
     ~commitment_period:2
     ~history_mode:Full
+    ~compact:false
+    protocols ;
+  test_snapshots
+    ~kind
+    ~challenge_window:5
+    ~commitment_period:2
+    ~history_mode:Full
+    ~compact:true
     protocols ;
   test_snapshots
     ~kind
     ~challenge_window:10
     ~commitment_period:5
     ~history_mode:Archive
+    ~compact:false
     protocols ;
   custom_mode_empty_operation_kinds ~kind protocols ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373

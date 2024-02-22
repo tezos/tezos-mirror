@@ -134,6 +134,11 @@ module type S = sig
     GC run is currently ongoing. *)
   val wait_gc_completion : [> `Write] index -> unit Lwt.t
 
+  (** [export_snapshot index context_hash ~path] exports the context
+      corresponding to [context_hash], if found in [index], into the given
+      folder path. *)
+  val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
+
   (** State of the PVM that this rollup node deals with *)
   module PVMState : sig
     (** The value of a PVM state *)

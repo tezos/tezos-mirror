@@ -237,6 +237,43 @@ let rec create_dir ?(perm = 0o755) dir =
            time. *)
         ())
 
+let copy_file ~src ~dst =
+  let in_chan = open_in src in
+  let out_chan = open_out dst in
+  try
+    let buffer_size = 64 * 1024 in
+    let buf = Bytes.create buffer_size in
+    let rec copy () =
+      let read_bytes = input in_chan buf 0 buffer_size in
+      output out_chan buf 0 read_bytes ;
+      if read_bytes > 0 then copy ()
+    in
+    copy () ;
+    flush out_chan ;
+    close_in in_chan ;
+    close_out out_chan
+  with e ->
+    close_in in_chan ;
+    close_out out_chan ;
+    raise e
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6857
+   Use Lwt_utils_unix.copy_dir instead when file descriptors issue is fixed. *)
+let copy_dir ?(perm = 0o755) src dst =
+  create_dir ~perm dst ;
+  let files =
+    list_files src ~include_file:(fun ~relative_path:_ -> true)
+    @@ fun ~full_path ~relative_path ->
+    let dst_file = Filename.concat dst relative_path in
+    (full_path, dst_file)
+  in
+  Stream.iter
+    (fun (src, dst) ->
+      let dst_dir = Filename.dirname dst in
+      create_dir ~perm dst_dir ;
+      copy_file ~src ~dst)
+    files
+
 let extract (module Reader : READER) (module Writer : WRITER) metadata_check
     ~snapshot_file ~dest =
   let open Lwt_result_syntax in

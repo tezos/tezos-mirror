@@ -137,6 +137,8 @@ Smart Rollup node
   Use ``helpers/proofs/outbox/<level>/messages?index=<index>`` to avoid generating the ```serialized_outbox_message`` yourself.
   (MR :gl:`!12140`)
 
+- Compact snapshots with context reconstruction. (MR :gl:`!11651`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

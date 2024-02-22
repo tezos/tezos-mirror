@@ -622,7 +622,8 @@ let dump_durable_storage ~sc_rollup_node ~dump ?(block = "head") () =
   let process = spawn_command sc_rollup_node cmd in
   Process.check process
 
-let export_snapshot ?(compress_on_the_fly = false) sc_rollup_node dir =
+let export_snapshot ?(compress_on_the_fly = false) ?(compact = false)
+    sc_rollup_node dir =
   let process =
     spawn_command
       sc_rollup_node
@@ -634,7 +635,8 @@ let export_snapshot ?(compress_on_the_fly = false) sc_rollup_node dir =
          "--data-dir";
          data_dir sc_rollup_node;
        ]
-      @ Cli_arg.optional_switch "compress-on-the-fly" compress_on_the_fly)
+      @ Cli_arg.optional_switch "compress-on-the-fly" compress_on_the_fly
+      @ Cli_arg.optional_switch "compact" compact)
   in
   let parse process =
     let* output = Process.check_and_read_stdout process in
