@@ -247,6 +247,7 @@ type round_state = {
   current_round : Round.t;
   current_phase : phase;
   delayed_quorum : Kind.attestation operation list option;
+  early_attestations : signed_consensus_vote list;
 }
 
 (** [forge_event] type used to return the result of a task completion

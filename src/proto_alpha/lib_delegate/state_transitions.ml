@@ -299,6 +299,11 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           let* new_state =
             may_update_proposal ~is_proposal_applied new_state new_proposal
           in
+          (* We invalidate early attestations *)
+          let new_round_state =
+            {new_state.round_state with early_attestations = []}
+          in
+          let new_state = {new_state with round_state = new_round_state} in
           (* The proposal is valid but maybe we already locked on a payload *)
           match new_state.level_state.locked_round with
           | Some locked_round -> (
@@ -339,7 +344,12 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
     let compute_new_state ~current_round ~delegate_slots
         ~next_level_delegate_slots =
       let round_state =
-        {current_round; current_phase = Idle; delayed_quorum = None}
+        {
+          current_round;
+          current_phase = Idle;
+          delayed_quorum = None;
+          early_attestations = [];
+        }
       in
       let level_state =
         {
