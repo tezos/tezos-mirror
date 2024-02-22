@@ -355,6 +355,21 @@ module State_transitions = struct
       ("phase", Baking_state.phase_encoding)
       ~pp2:Baking_state.pp_event
       ("event", Baking_state.event_encoding)
+
+  let discarding_attestation =
+    declare_3
+      ~section
+      ~name:"discarding_attestation"
+      ~level:Info
+      ~msg:
+        "discarding outdated attestation for {delegate} at level {level}, \
+         round {round}"
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("round", Round.encoding)
 end
 
 module Node_rpc = struct

@@ -832,6 +832,54 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   let new_state = update_current_phase new_state Idle in
   do_nothing new_state
 
+let handle_arriving_attestation state signed_attestation =
+  let open Lwt_syntax in
+  let {
+    vote_consensus_content =
+      {
+        level;
+        round = att_round;
+        block_payload_hash = att_payload_hash;
+        slot = _;
+      };
+    delegate;
+    _;
+  } =
+    signed_attestation.unsigned_consensus_vote
+  in
+  let att_level = Raw_level.to_int32 level in
+  let attestation_matches_proposal =
+    let {payload_hash; round = block_round; shell; _} =
+      state.level_state.latest_proposal.block
+    in
+    Block_payload_hash.(att_payload_hash = payload_hash)
+    && Round.(att_round = block_round)
+    && Compare.Int32.(shell.level = att_level)
+  in
+  if not attestation_matches_proposal then
+    let* () =
+      Events.(emit discarding_attestation (delegate, att_level, att_round))
+    in
+    do_nothing state
+  else
+    match state.round_state.current_phase with
+    | Awaiting_preattestations ->
+        (* An attestation is ready for injection but the prequorum has
+           not been reached yet: we save them until then. *)
+        let new_round_state =
+          {
+            state.round_state with
+            early_attestations =
+              signed_attestation :: state.round_state.early_attestations;
+          }
+        in
+        let new_state = {state with round_state = new_round_state} in
+        do_nothing new_state
+    | Idle | Awaiting_attestations | Awaiting_application ->
+        (* For these three phases, we have necessarily already reached the
+           prequorum: we are safe to inject. *)
+        Lwt.return (state, Inject_attestation {signed_attestation})
+
 let handle_forge_event state forge_event =
   match forge_event with
   | Block_ready prepared_block ->
@@ -842,7 +890,7 @@ let handle_forge_event state forge_event =
   | Preattestation_ready signed_preattestation ->
       Lwt.return (state, Inject_preattestation {signed_preattestation})
   | Attestation_ready signed_attestation ->
-      Lwt.return (state, Inject_attestation {signed_attestation})
+      handle_arriving_attestation state signed_attestation
 
 (* Hypothesis:
    - The state is not to be modified outside this module
