@@ -88,7 +88,9 @@ end) : Services_backend_sig.Backend = struct
       let eval_result =
         Data_encoding.Json.destruct Simulation.Encodings.eval_result json
       in
-      return eval_result.insights
+      match eval_result.insights with
+      | [data] -> return data
+      | _ -> failwith "Inconsistent simulation results"
   end
 
   let inject_kernel_upgrade ~payload:_ = Lwt_result_syntax.return_unit

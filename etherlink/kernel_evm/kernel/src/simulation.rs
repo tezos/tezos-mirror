@@ -15,13 +15,17 @@ use crate::{
     tick_model, CONFIG,
 };
 
+use evm::ExitReason;
 use evm_execution::handler::ExtendedExitReason;
 use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
-use rlp::{Decodable, DecoderError, Rlp};
+use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::rlp_helpers::{decode_field, decode_option, next};
+use tezos_ethereum::rlp_helpers::{
+    append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
+    next,
+};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -36,6 +40,99 @@ pub const SIMULATION_CHUNK_TAG: u8 = 3;
 pub const EVALUATION_TAG: u8 = 0x00;
 /// Tag indicating simulation is a validation.
 pub const VALIDATION_TAG: u8 = 0x01;
+
+pub const OK_TAG: u8 = 0x1;
+pub const ERR_TAG: u8 = 0x2;
+
+const INCORRECT_SIGNATURE: &str = "Incorrect signature.";
+const INVALID_CHAIN_ID: &str = "Invalid chain id.";
+const NONCE_TOO_LOW: &str = "Nonce too low.";
+const MAX_GAS_FEE_TOO_LOW: &str = "Max gas fee too low.";
+const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
+    is allocated. Try reducing its gas consumption or splitting the call in
+    multiple steps, if possible.";
+
+// Redefined Result as we cannot implement Decodable and Encodable traits on Result
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum SimulationResult<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ExecutionResult {
+    value: Option<Vec<u8>>,
+    gas_used: Option<u64>,
+}
+
+type CallResult = SimulationResult<ExecutionResult, Vec<u8>>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ValidationResult {
+    address: H160,
+}
+
+impl<T: Encodable, E: Encodable> Encodable for SimulationResult<T, E> {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match self {
+            Self::Ok(value) => {
+                stream.append(&OK_TAG);
+                stream.append(value)
+            }
+            Self::Err(e) => {
+                stream.append(&ERR_TAG);
+                stream.append(e)
+            }
+        };
+    }
+}
+
+impl<T: Decodable, E: Decodable> Decodable for SimulationResult<T, E> {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        check_list(decoder, 2)?;
+
+        let mut it = decoder.iter();
+        match decode_field(&next(&mut it)?, "tag")? {
+            OK_TAG => Ok(Self::Ok(decode_field(&next(&mut it)?, "ok")?)),
+            ERR_TAG => Ok(Self::Err(decode_field(&next(&mut it)?, "error")?)),
+            _ => Err(DecoderError::Custom("Invalid execution tag")),
+        }
+    }
+}
+
+impl Encodable for ExecutionResult {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append(&self.value);
+        append_option_u64_le(&self.gas_used, stream);
+    }
+}
+
+impl Decodable for ExecutionResult {
+    fn decode(decoder: &Rlp<'_>) -> Result<Self, DecoderError> {
+        check_list(decoder, 2)?;
+
+        let mut it = decoder.iter();
+        let value = decode_field(&next(&mut it)?, "value")?;
+        let gas_used = decode_option_u64_le(&next(&mut it)?, "gas_used")?;
+        Ok(ExecutionResult { value, gas_used })
+    }
+}
+
+impl Encodable for ValidationResult {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.append(&self.address);
+    }
+}
+
+impl Decodable for ValidationResult {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        Ok(ValidationResult {
+            address: decode_field(decoder, "caller")?,
+        })
+    }
+}
 
 /// Container for eth_call data, used in messages sent by the rollup node
 /// simulation.
@@ -76,11 +173,46 @@ pub struct Evaluation {
     pub data: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum EvaluationOutcome {
-    EvaluationError(EthereumError),
-    Outcome(Option<ExecutionOutcome>),
-    OutOfTicks,
+impl<T> From<EthereumError> for SimulationResult<T, String> {
+    fn from(err: EthereumError) -> Self {
+        let msg = format!("The transaction failed: {:?}.", err);
+        Self::Err(msg)
+    }
+}
+
+impl From<Result<Option<ExecutionOutcome>, EthereumError>>
+    for SimulationResult<CallResult, String>
+{
+    fn from(result: Result<Option<ExecutionOutcome>, EthereumError>) -> Self {
+        match result {
+            Ok(Some(ExecutionOutcome {
+                gas_used,
+                reason: ExtendedExitReason::Exit(ExitReason::Succeed(_)),
+                result,
+                ..
+            })) => Self::Ok(SimulationResult::Ok(ExecutionResult {
+                value: result,
+                gas_used: Some(gas_used),
+            })),
+            Ok(Some(ExecutionOutcome {
+                reason: ExtendedExitReason::Exit(ExitReason::Revert(_)),
+                result,
+                ..
+            })) => Self::Ok(SimulationResult::Err(result.unwrap_or_default())),
+            Ok(Some(ExecutionOutcome {
+                reason: ExtendedExitReason::OutOfTicks,
+                ..
+            })) => Self::Err(String::from(OUT_OF_TICKS_MSG)),
+            Ok(Some(ExecutionOutcome { reason, .. })) => {
+                let msg = format!("The transaction failed: {:?}.", reason);
+                Self::Err(msg)
+            }
+            Ok(None) => Self::Err(String::from(
+                "No outcome was produced when the transaction was ran",
+            )),
+            Err(err) => err.into(),
+        }
+    }
 }
 
 impl Evaluation {
@@ -94,7 +226,7 @@ impl Evaluation {
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
-    ) -> Result<EvaluationOutcome, Error> {
+    ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
 
@@ -141,15 +273,6 @@ impl Evaluation {
             false,
             false,
         ) {
-            Ok(Some(ExecutionOutcome {
-                reason: ExtendedExitReason::OutOfTicks,
-                ..
-            }))
-            | Err(evm_execution::EthereumError::OutOfTicks) => {
-                Ok(EvaluationOutcome::OutOfTicks)
-            }
-            Err(err) => Ok(EvaluationOutcome::EvaluationError(err)),
-            Ok(None) => Ok(EvaluationOutcome::Outcome(None)),
             Ok(Some(outcome)) => {
                 let outcome = simulation_add_gas_for_fees(
                     outcome,
@@ -159,8 +282,12 @@ impl Evaluation {
                 )
                 .map_err(Error::Simulation)?;
 
-                Ok(EvaluationOutcome::Outcome(Some(outcome)))
+                let result: SimulationResult<CallResult, String> =
+                    Result::Ok(Some(outcome)).into();
+
+                Ok(result)
             }
+            result => Ok(result.into()),
         }
     }
 }
@@ -212,16 +339,6 @@ struct TxValidation {
     transaction: EthereumTransactionCommon,
 }
 
-#[derive(Debug, PartialEq)]
-enum TxValidationOutcome {
-    Valid(H160),
-    NonceTooLow,
-    NotCorrectSignature,
-    InvalidChainId,
-    MaxGasFeeTooLow,
-    OutOfTicks,
-}
-
 impl TxValidation {
     // Run the transaction and ensure
     // - it won't fail with  out-of-ticks
@@ -230,7 +347,7 @@ impl TxValidation {
         host: &mut Host,
         transaction: &EthereumTransactionCommon,
         caller: &H160,
-    ) -> Result<TxValidationOutcome, anyhow::Error> {
+    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let chain_id = retrieve_chain_id(host)?;
         let block_fees = retrieve_block_fees(host)?;
 
@@ -254,7 +371,7 @@ impl TxValidation {
             );
 
         let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees) else {
-            return Ok(TxValidationOutcome::MaxGasFeeTooLow);
+            return Self::to_error(MAX_GAS_FEE_TOO_LOW);
         };
 
         match run_transaction(
@@ -277,20 +394,28 @@ impl TxValidation {
             Ok(Some(ExecutionOutcome {
                 reason: ExtendedExitReason::OutOfTicks,
                 ..
-            })) => Ok(TxValidationOutcome::OutOfTicks),
-            _ => Ok(TxValidationOutcome::Valid(*caller)),
+            })) => Self::to_error(OUT_OF_TICKS_MSG),
+            // TODO: #6498, 6813
+            // Check for PREPAY
+            _ => Ok(SimulationResult::Ok(ValidationResult { address: *caller })),
         }
+    }
+
+    pub fn to_error(
+        msg: &str,
+    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
+        Ok(SimulationResult::Err(String::from(msg)))
     }
 
     /// Execute the simulation
     pub fn run<Host: Runtime>(
         &self,
         host: &mut Host,
-    ) -> Result<TxValidationOutcome, anyhow::Error> {
+    ) -> Result<SimulationResult<ValidationResult, String>, anyhow::Error> {
         let tx = &self.transaction;
         let evm_account_storage = account_storage::init_account_storage()?;
         // Get the caller
-        let Ok(caller) = tx.caller() else {return Ok(TxValidationOutcome::NotCorrectSignature)};
+        let Ok(caller) = tx.caller() else {return  Self::to_error(INCORRECT_SIGNATURE)};
         // Get the caller account
         let caller_account_path = evm_execution::account_storage::account_path(&caller)?;
         let caller_account = evm_account_storage.get(host, &caller_account_path)?;
@@ -304,15 +429,15 @@ impl TxValidation {
         let chain_id = storage::read_chain_id(host)?;
         // Check if nonce is too low
         if tx.nonce < caller_nonce {
-            return Ok(TxValidationOutcome::NonceTooLow);
+            return Self::to_error(NONCE_TOO_LOW);
         }
         // Check if the chain id is correct
         if tx.chain_id.is_some() && tx.chain_id != Some(chain_id) {
-            return Ok(TxValidationOutcome::InvalidChainId);
+            return Self::to_error(INVALID_CHAIN_ID);
         }
         // Check if the gas price is high enough
         if tx.max_fee_per_gas < block_fees.base_fee_per_gas() {
-            return Ok(TxValidationOutcome::MaxGasFeeTooLow);
+            return Self::to_error(MAX_GAS_FEE_TOO_LOW);
         }
         // Check if running the transaction (assuming it is valid) would run out
         // of ticks, or fail validation for another reason.
@@ -443,84 +568,6 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
     }
 }
 
-fn store_simulation_outcome<Host: Runtime>(
-    host: &mut Host,
-    outcome: EvaluationOutcome,
-) -> Result<(), anyhow::Error> {
-    log!(host, Debug, "outcome={:?} ", outcome);
-    match outcome {
-        EvaluationOutcome::Outcome(Some(outcome)) => {
-            storage::store_simulation_status(host, outcome.is_success)?;
-            storage::store_evaluation_gas(host, outcome.gas_used)?;
-            storage::store_simulation_result(host, outcome.result)
-        }
-        EvaluationOutcome::Outcome(None) => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(
-                host,
-                Some(b"No outcome was produced when the transaction was ran".to_vec()),
-            )
-        }
-        EvaluationOutcome::OutOfTicks => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(
-                host,
-                Some(
-                    b"The transaction would exhaust all the ticks it is allocated. \
-                      Try reducing its gas consumption or splitting the call in \
-                      multiple steps, if possible."
-                        .to_vec(),
-                ),
-            )
-        }
-        EvaluationOutcome::EvaluationError(err) => {
-            storage::store_simulation_status(host, false)?;
-            let msg = format!("The transaction failed: {:?}.", err);
-            storage::store_simulation_result(host, Some(msg.as_bytes().to_vec()))
-        }
-    }
-}
-
-fn store_tx_validation_outcome<Host: Runtime>(
-    host: &mut Host,
-    outcome: TxValidationOutcome,
-) -> Result<(), anyhow::Error> {
-    match outcome {
-        TxValidationOutcome::Valid(caller) => {
-            storage::store_simulation_status(host, true)?;
-            storage::store_simulation_result(host, Some(caller.to_fixed_bytes().to_vec()))
-        }
-        TxValidationOutcome::NonceTooLow => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Nonce too low.".to_vec()))
-        }
-        TxValidationOutcome::NotCorrectSignature => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Incorrect signature.".to_vec()))
-        }
-        TxValidationOutcome::InvalidChainId => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Invalid chain id.".to_vec()))
-        }
-        TxValidationOutcome::MaxGasFeeTooLow => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(host, Some(b"Max gas fee too low.".to_vec()))
-        }
-        TxValidationOutcome::OutOfTicks => {
-            storage::store_simulation_status(host, false)?;
-            storage::store_simulation_result(
-                host,
-                Some(
-                    b"The transaction would exhaust all the ticks it is allocated. \
-                      Try reducing its gas consumption or splitting the call in \
-                      multiple steps, if possible."
-                        .to_vec(),
-                ),
-            )
-        }
-    }
-}
-
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
 ) -> Result<(), anyhow::Error> {
@@ -529,11 +576,11 @@ pub fn start_simulation_mode<Host: Runtime>(
     match simulation {
         Message::Evaluation(simulation) => {
             let outcome = simulation.run(host)?;
-            store_simulation_outcome(host, outcome)
+            storage::store_simulation_result(host, outcome)
         }
         Message::TxValidation(tx_validation) => {
             let outcome = tx_validation.run(host)?;
-            store_tx_validation_outcome(host, outcome)
+            storage::store_simulation_result(host, outcome)
         }
     }
 }
@@ -702,17 +749,12 @@ mod tests {
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
 
-        if let EvaluationOutcome::Outcome(outcome) = outcome {
-            assert!(
-                outcome.is_some(),
-                "simulation should have produced some outcome"
-            );
-            let outcome = outcome.unwrap();
-            assert_eq!(
-                Some(vec![0u8; 32]),
-                outcome.result,
-                "simulation result should be 0"
-            );
+        if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+            value,
+            gas_used: _,
+        })) = outcome
+        {
+            assert_eq!(Some(vec![0u8; 32]), value, "simulation result should be 0");
         } else {
             panic!("evaluation should have reached outcome");
         }
@@ -730,17 +772,12 @@ mod tests {
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
-        if let EvaluationOutcome::Outcome(outcome) = outcome {
-            assert!(
-                outcome.is_some(),
-                "simulation should have produced some outcome"
-            );
-            let outcome = outcome.unwrap();
-            assert_eq!(
-                Some(vec![0u8; 32]),
-                outcome.result,
-                "evaluation result should be 0"
-            );
+        if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+            value,
+            gas_used: _,
+        })) = outcome
+        {
+            assert_eq!(Some(vec![0u8; 32]), value, "evaluation result should be 0");
         } else {
             panic!("evaluation should have reached outcome");
         }
@@ -765,17 +802,12 @@ mod tests {
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
-        if let EvaluationOutcome::Outcome(outcome) = outcome {
-            assert!(
-                outcome.is_some(),
-                "simulation should have produced some outcome"
-            );
-            let outcome = outcome.unwrap();
-            assert_eq!(
-                Some(vec![0u8; 32]),
-                outcome.result,
-                "evaluation result should be 0"
-            );
+        if let SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+            value,
+            gas_used: _,
+        })) = outcome
+        {
+            assert_eq!(Some(vec![0u8; 32]), value, "evaluation result should be 0");
         } else {
             panic!("evaluation should have reached outcome");
         }
@@ -995,7 +1027,10 @@ mod tests {
         let result = simulation.run(&mut host);
         println!("{result:?}");
         assert!(result.is_ok());
-        assert_eq!(TxValidationOutcome::MaxGasFeeTooLow, result.unwrap());
+        assert_eq!(
+            TxValidation::to_error(MAX_GAS_FEE_TOO_LOW).unwrap(),
+            result.unwrap()
+        );
     }
 
     #[test]
@@ -1041,6 +1076,42 @@ mod tests {
         let result = simulation.run(&mut host);
 
         assert!(result.is_ok());
-        assert_eq!(TxValidationOutcome::MaxGasFeeTooLow, result.unwrap());
+        assert_eq!(
+            SimulationResult::Err(String::from(super::MAX_GAS_FEE_TOO_LOW)),
+            result.unwrap()
+        );
+    }
+
+    pub fn check_roundtrip<R: Decodable + Encodable + core::fmt::Debug + PartialEq>(
+        v: R,
+    ) {
+        let bytes = v.rlp_bytes();
+        let decoder = Rlp::new(&bytes);
+        println!("{:?}", bytes);
+        let decoded = R::decode(&decoder).expect("Value should be decodable");
+        assert_eq!(v, decoded, "Roundtrip failed on {:?}", v)
+    }
+
+    #[test]
+    fn test_simulation_result_encoding_roundtrip() {
+        let valid: SimulationResult<ValidationResult, String> =
+            SimulationResult::Ok(ValidationResult {
+                address: address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
+                    .unwrap(),
+            });
+        let call: SimulationResult<CallResult, String> =
+            SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {
+                value: Some(vec![0, 1, 2, 3]),
+                gas_used: Some(123),
+            }));
+        let revert: SimulationResult<CallResult, String> =
+            SimulationResult::Ok(SimulationResult::Err(vec![3, 2, 1, 0]));
+        let error: SimulationResult<CallResult, String> =
+            SimulationResult::Err(String::from("Un festival de GADTs"));
+
+        check_roundtrip(valid);
+        check_roundtrip(call);
+        check_roundtrip(revert);
+        check_roundtrip(error)
     }
 }

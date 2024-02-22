@@ -119,14 +119,16 @@ let encode_tx tx =
   in
   return @@ List.map encode_message messages
 
+type execution_result = {value : hash option; gas_used : quantity option}
+
+type call_result = (execution_result, hash) result
+
+type validation_result = {address : address}
+
+type 'a simulation_result = ('a, string) result
+
 module Encodings = struct
   open Data_encoding
-
-  type insights = {
-    success : bool option;
-    result : bytes option;
-    gas : bytes option;
-  }
 
   type eval_result = {
     state_hash : string;
@@ -134,7 +136,7 @@ module Encodings = struct
     output : unit;
     inbox_level : unit;
     num_ticks : Z.t;
-    insights : insights;
+    insights : bytes list;
         (** The simulation can ask to look at values on the state after
           the simulation. *)
   }
@@ -199,39 +201,64 @@ module Encodings = struct
                <data-dir>/simulation_kernel_logs/, where <data-dir> is the \
                data directory of the rollup node.")
 
-  let bool_as_bytes =
-    let bytes_to_bool b =
-      b |> Data_encoding.Binary.of_bytes Data_encoding.bool |> Result.to_option
+  let decode_data =
+    let open Result_syntax in
+    function
+    | Rlp.Value v -> return (decode_hash v)
+    | Rlp.List _ -> error_with "The simulation returned an ill-encoded data"
+
+  let decode_gas_used =
+    let open Result_syntax in
+    function
+    | Rlp.Value v -> return (decode_number v)
+    | Rlp.List _ -> error_with "The simulation returned an ill-encoded gas"
+
+  let decode_execution_result =
+    let open Result_syntax in
+    function
+    | Rlp.List [value; gas_used] ->
+        let* value = Rlp.decode_option decode_data value in
+        let* gas_used = Rlp.decode_option decode_gas_used gas_used in
+        return {value; gas_used}
+    | _ ->
+        error_with
+          "The simulation for eth_call/eth_estimateGas returned an ill-encoded \
+           format"
+
+  let decode_call_result v =
+    let open Result_syntax in
+    let decode_revert = function
+      | Rlp.Value msg -> return (decode_hash msg)
+      | _ -> error_with "The revert message is ill-encoded"
     in
+    Rlp.decode_result decode_execution_result decode_revert v
 
-    let bool_to_bytes b =
-      b |> Data_encoding.Binary.to_bytes Data_encoding.bool |> Result.to_option
+  let decode_validation_result =
+    let open Result_syntax in
+    function
+    | Rlp.Value address -> return {address = decode_address address}
+    | _ -> error_with "The transaction pool returned an illformed value"
+
+  let simulation_result_from_rlp decode_payload bytes =
+    let open Result_syntax in
+    let decode_error_msg = function
+      | Rlp.Value msg -> return @@ Bytes.to_string msg
+      | rlp ->
+          error_with
+            "The simulation returned an unexpected error message: %a"
+            Rlp.pp
+            rlp
     in
-    conv
-      (fun b -> Option.bind b bool_to_bytes)
-      (fun b -> Option.bind b bytes_to_bool)
-      (option bytes)
-
-  let insights =
-    conv
-      (fun {success; result; gas} -> (gas, result, success))
-      (fun (gas, result, success) -> {gas; result; success})
-      (tup3 (option bytes) (option bytes) bool_as_bytes)
-
-  let insights_from_list l =
-    match l with
-    | [gas; result; success] ->
-        Some
-          {
-            success =
-              Option.bind success (fun s ->
-                  s
-                  |> Data_encoding.Binary.of_bytes Data_encoding.bool
-                  |> Result.to_option);
-            result;
-            gas;
-          }
-    | _ -> None
+    let* rlp = Rlp.decode bytes in
+    match Rlp.decode_result decode_payload decode_error_msg rlp with
+    | Ok v -> Ok v
+    | Error e ->
+        error_with
+          "The simulation returned an unexpected format: %a, with error %a"
+          Rlp.pp
+          rlp
+          pp_print_trace
+          e
 
   let eval_result =
     conv
@@ -261,26 +288,20 @@ module Encodings = struct
             ~description:"Ticks taken by the PVM for evaluating the messages")
          (req
             "insights"
-            insights
+            (list bytes)
             ~description:"PVM state values requested after the simulation")
 end
 
-let call_result Encodings.{success; result; gas = _} =
-  let open Lwt_result_syntax in
-  match (success, result) with
-  | Some true, Some result ->
-      let v = result |> Hex.of_bytes |> Hex.show in
-      return (Ok (Hash (Hex v)))
-  | Some false, Some result ->
-      let error_msg = Bytes.to_string result in
-      return (Error error_msg)
-  | _ -> failwith "Insights of 'call_result' cannot be parsed"
+let simulation_result bytes =
+  Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
 
-let gas_estimation Encodings.{success; result; gas} =
-  let open Lwt_result_syntax in
-  match (success, result, gas) with
-  | Some true, _, Some simulated_amount ->
-      let simulated_amount = Bytes.to_string simulated_amount |> Z.of_bits in
+let gas_estimation bytes =
+  let open Result_syntax in
+  let* result =
+    Encodings.simulation_result_from_rlp Encodings.decode_call_result bytes
+  in
+  match result with
+  | Ok (Ok {gas_used = Some (Qty gas_used); value}) ->
       (* See EIP2200 for reference. But the tl;dr is: we cannot do the
          opcode SSTORE if we have less than 2300 gas available, even
          if we don't consume it. The simulated amount then gives an
@@ -288,25 +309,14 @@ let gas_estimation Encodings.{success; result; gas} =
 
          The extra gas units, i.e. 2300, will be refunded.
       *)
-      let simulated_amount = Z.(add simulated_amount (of_int 2300)) in
+      let simulated_amount = Z.(add gas_used (of_int 2300)) in
       (* add a safety margin of 2%, sufficient to cover a 1/64th difference *)
       let simulated_amount =
         Z.(add simulated_amount (cdiv simulated_amount (of_int 50)))
       in
-      return (Ok (quantity_of_z simulated_amount))
-  | Some false, Some result, _ ->
-      let error_msg = Bytes.to_string result in
-      return (Error error_msg)
-  | _ -> failwith "Insights of 'gas_estimation' cannot be parsed"
+      return
+      @@ Ok (Ok {gas_used = Some (quantity_of_z @@ simulated_amount); value})
+  | _ -> return result
 
-let is_tx_valid Encodings.{success; result; gas = _} =
-  let open Lwt_result_syntax in
-  match (result, success) with
-  | Some payload, Some success ->
-      if success then
-        let address = Ethereum_types.decode_address payload in
-        return (Ok address)
-      else
-        let error_msg = Bytes.to_string payload in
-        return (Error error_msg)
-  | _ -> failwith "Insights of 'is_tx_valid' is not [Some _, Some _]"
+let is_tx_valid bytes =
+  Encodings.simulation_result_from_rlp Encodings.decode_validation_result bytes

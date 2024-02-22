@@ -409,7 +409,12 @@ let dispatch_request (config : 'a Configuration.t)
           | Some (call, _) -> (
               let* call_result = Backend_rpc.simulate_call call in
               match call_result with
-              | Ok result -> return (Either.Left result)
+              | Ok (Ok {value = Some value; gas_used = _}) ->
+                  return (Either.Left value)
+              | Ok (Ok {value = None; gas_used = _}) ->
+                  return (Either.Left (hash_of_string ""))
+              | Ok (Error _reason) ->
+                  return (Either.Right "execution reverted:")
               | Error reason ->
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
                   return (Either.Right reason))
@@ -421,9 +426,17 @@ let dispatch_request (config : 'a Configuration.t)
           match input with
           | None -> return missing_parameter
           | Some (call, _) -> (
-              let* gas_result = Backend_rpc.estimate_gas call in
-              match gas_result with
-              | Ok gas -> return (Either.Left gas)
+              let* result = Backend_rpc.estimate_gas call in
+              match result with
+              | Ok (Ok {value = _; gas_used = Some gas}) ->
+                  return (Either.Left gas)
+              | Ok (Ok {value = _; gas_used = None}) ->
+                  return
+                    (Either.Right
+                       "Simulation failed before execution, cannot estimate \
+                        gas.")
+              | Ok (Error _reason) ->
+                  return (Either.Right "execution reverted:")
               | Error reason ->
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
                   return (Either.Right reason))

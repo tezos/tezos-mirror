@@ -8,6 +8,7 @@
 use crate::block_in_progress::BlockInProgress;
 use crate::event::Event;
 use crate::indexable_storage::IndexableStorage;
+use crate::simulation::SimulationResult;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
 use evm_execution::storage::blocks::add_new_block_hash;
@@ -80,8 +81,6 @@ const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
     RefPath::assert_from(b"/info_per_level/stats/total");
 
 pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
-pub const SIMULATION_STATUS: RefPath = RefPath::assert_from(b"/simulation_status");
-pub const SIMULATION_GAS: RefPath = RefPath::assert_from(b"/simulation_gas");
 
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
@@ -297,30 +296,13 @@ pub fn store_current_block<Host: Runtime>(
         }
     }
 }
-
-pub fn store_simulation_result<Host: Runtime>(
+pub fn store_simulation_result<Host: Runtime, T: Encodable>(
     host: &mut Host,
-    result: Option<Vec<u8>>,
+    result: SimulationResult<T, String>,
 ) -> Result<(), anyhow::Error> {
-    if let Some(result) = result {
-        host.store_write(&SIMULATION_RESULT, &result, 0)?
-    }
-    Ok(())
-}
-
-pub fn store_evaluation_gas<Host: Runtime>(
-    host: &mut Host,
-    result: u64,
-) -> Result<(), Error> {
-    write_u256(host, &SIMULATION_GAS.into(), U256::from(result))
-}
-
-pub fn store_simulation_status<Host: Runtime>(
-    host: &mut Host,
-    result: bool,
-) -> Result<(), anyhow::Error> {
-    host.store_write(&SIMULATION_STATUS, &[result.into()], 0)
-        .context("Failed to write the simulation status.")
+    let encoded = result.rlp_bytes();
+    host.store_write(&SIMULATION_RESULT, &encoded, 0)
+        .context("Failed to write the simulation result.")
 }
 
 pub fn store_transaction_receipt<Host: Runtime>(
