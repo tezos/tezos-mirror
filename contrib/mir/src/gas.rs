@@ -315,6 +315,8 @@ pub mod interpret_cost {
     pub const MUL_BLS_FR: u32 = 45;
     pub const MUL_TEZ_NAT: u32 = 50;
     pub const MUL_NAT_TEZ: u32 = MUL_TEZ_NAT; // should be the same always
+    pub const EDIV_TEZ_TEZ: u32 = 80;
+    pub const EDIV_TEZ_NAT: u32 = 70;
     pub const NEG_FR: u32 = 30;
     pub const NEG_G1: u32 = 50;
     pub const NEG_G2: u32 = 70;
@@ -512,6 +514,28 @@ pub mod interpret_cost {
             a * (a.ok_or(OutOfGas)?.log2i() as u64)
         };
         (55 + (v0 >> 1) + (v0 >> 2) + (v0 >> 4)).as_gas_cost()
+    }
+
+    pub fn ediv_int(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let size_1 = Checked::from(i1.byte_size());
+        let size_2 = Checked::from(i2.byte_size());
+        let w1 = if size_1 >= size_2 {
+            size_1 - size_2
+        } else {
+            Checked::from(0u64)
+        };
+        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150).as_gas_cost()
+    }
+
+    pub fn ediv_nat(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let size_1 = Checked::from(i1.byte_size());
+        let size_2 = Checked::from(i2.byte_size());
+        let w1 = if size_1 >= size_2 {
+            size_1 - size_2
+        } else {
+            Checked::from(0u64)
+        };
+        ((w1 * 12) + (((w1 >> 10) + (w1 >> 13)) * size_2) + (size_1 >> 2) + size_1 + 150).as_gas_cost()
     }
 
     pub fn compare(v1: &TypedValue, v2: &TypedValue) -> Result<u32, OutOfGas> {

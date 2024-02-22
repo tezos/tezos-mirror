@@ -16,7 +16,6 @@
 //! The library is currently incomplete. The following instructions are not
 //! supported:
 //!
-//! - `EDIV`
 //! - `LSL`
 //! - `LSR`
 //! - `EMPTY_MAP`

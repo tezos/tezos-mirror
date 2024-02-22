@@ -812,6 +812,40 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MUL, [], _), [_] | []) => no_overload!(MUL, len 2),
         (App(MUL, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(EDIV, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            stack[0] = T::new_option(T::new_pair(T::Nat, T::Nat));
+            I::EDiv(overloads::EDiv::NatNat)
+        }
+        (App(EDIV, [], _), [.., T::Int, T::Nat]) => {
+            pop!();
+            stack[0] = T::new_option(T::new_pair(T::Int, T::Nat));
+            I::EDiv(overloads::EDiv::NatInt)
+        }
+        (App(EDIV, [], _), [.., T::Nat, T::Int]) => {
+            pop!();
+            stack[0] = T::new_option(T::new_pair(T::Int, T::Nat));
+            I::EDiv(overloads::EDiv::IntNat)
+        }
+        (App(EDIV, [], _), [.., T::Int, T::Int]) => {
+            pop!();
+            stack[0] = T::new_option(T::new_pair(T::Int, T::Nat));
+            I::EDiv(overloads::EDiv::IntInt)
+        }
+        (App(EDIV, [], _), [.., T::Nat, T::Mutez]) => {
+            pop!();
+            stack[0] = T::new_option(T::new_pair(T::Mutez, T::Mutez));
+            I::EDiv(overloads::EDiv::MutezNat)
+        }
+        (App(EDIV, [], _), [.., T::Mutez, T::Mutez]) => {
+            pop!();
+            stack[0] = T::new_option(T::new_pair(T::Nat, T::Mutez));
+            I::EDiv(overloads::EDiv::MutezMutez)
+        }
+        (App(EDIV, [], _), [.., _, _]) => no_overload!(EDIV),
+        (App(EDIV, [], _), [_] | []) => no_overload!(EDIV, len 2),
+        (App(EDIV, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(NEG, [], _), [.., T::Nat]) => {
             stack[0] = T::Int;
             I::Neg(overloads::Neg::Nat)

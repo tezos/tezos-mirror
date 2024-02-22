@@ -90,6 +90,16 @@ pub enum Mul {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum EDiv {
+    NatNat,
+    NatInt,
+    IntNat,
+    IntInt,
+    MutezNat,
+    MutezMutez,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Neg {
     Nat,
     Int,

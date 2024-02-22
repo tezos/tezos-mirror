@@ -529,6 +529,7 @@ pub enum Instruction<'a> {
     Add(overloads::Add),
     Sub(overloads::Sub),
     Mul(overloads::Mul),
+    EDiv(overloads::EDiv),
     Neg(overloads::Neg),
     SubMutez,
     Dip(Option<u16>, Vec<Self>),
