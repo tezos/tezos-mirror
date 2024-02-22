@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
@@ -10,6 +10,7 @@ use crate::event::Event;
 use crate::indexable_storage::IndexableStorage;
 use anyhow::Context;
 use evm_execution::account_storage::EthereumAccount;
+use evm_execution::storage::blocks::add_new_block_hash;
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -264,6 +265,11 @@ fn store_current_block_nodebug<Host: Runtime>(
         block.number,
         block.hash,
     )?;
+    // We store the current block hash so the BLOCKHASH opcode can retrieve the block hash
+    // by its number and return it in the execution flow.
+    // The routine to clean the outdated hashes (see BLOCKHASH's spec.) is within [add_new_block_hash].
+    add_new_block_hash(host, block.number, block.hash)
+        .map_err(|_| Error::Storage(StorageError::BlockHashStorageFailed))?;
     // When storing the current block's infos we need to store it under the [evm/blocks/<block_hash>]
     store_block_by_hash(host, block)
 }

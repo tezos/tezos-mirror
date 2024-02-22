@@ -6,6 +6,8 @@
 
 ### Bug fixes
 
+- `BLOCKHASH` opcode now returns the actual block hash instead of `0x00..0`. (!12130)
+
 ### Breaking changes
 
 ### Internal

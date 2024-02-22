@@ -1056,6 +1056,15 @@ let block_hash_gen =
     bin = kernel_inputs_path ^ "/block_hash_gen.bin";
   }
 
+(** The info for the "block_hash_gen.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/blockhash.sol] *)
+let blockhash =
+  {
+    label = "blockhash";
+    abi = kernel_inputs_path ^ "/blockhash.abi";
+    bin = kernel_inputs_path ^ "/blockhash.bin";
+  }
+
 (** The info for the "timestamp.sol" contract.
     See [etherlink/kernel_evm/solidity_examples/timestamp.sol] *)
 let timestamp =
@@ -4719,6 +4728,63 @@ let test_reveal_storage =
     ~error_msg:"Head should be the same in the copy" ;
   unit
 
+let call_get_hash ~address ~block_number
+    {sc_rollup_node; node; client; endpoint; evm_node; _} =
+  let call_get_hash block_number =
+    Eth_cli.contract_call
+      ~endpoint
+      ~abi_label:blockhash.label
+      ~address
+      ~method_call:(Printf.sprintf "getHash(%d)" block_number)
+  in
+  wait_for_application
+    ~evm_node
+    ~sc_rollup_node
+    ~node
+    ~client
+    (call_get_hash block_number)
+    ()
+
+let test_blockhash_opcode =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "blockhash"; "opcode"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"Check if blockhash opcode returns the actual hash of the block"
+  @@ fun protocol ->
+  let* ({evm_node; sc_rollup_node; node; client; endpoint; _} as evm_setup) =
+    setup_evm_kernel ~admin:None protocol
+  in
+  let* () =
+    repeat 3 (fun () ->
+        let* _ = next_evm_level ~evm_node ~node ~client ~sc_rollup_node in
+        unit)
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* address, tx = deploy ~contract:blockhash ~sender evm_setup in
+  let* () = check_tx_succeeded ~endpoint ~tx in
+  let* expected_block_hash =
+    let* block = Eth_cli.get_block ~block_id:"2" ~endpoint in
+    return block.hash
+  in
+  (* The client's response is read from stdout, we have to remove the new line
+     symbol. *)
+  let* block_hash =
+    call_get_hash ~address ~block_number:2 evm_setup
+    |> Lwt.map (fun s -> String.sub s 0 (String.length s - 1))
+  in
+  Check.((block_hash = expected_block_hash) string)
+    ~error_msg:
+      "The block hash should be the same when called from an RPC and return by \
+       the BLOCKHASH opcode, got %L, but %R was expected." ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_evm_node_connection protocols ;
@@ -4800,7 +4866,8 @@ let register_evm_node ~protocols =
   test_l2_call_selfdetruct_contract_in_same_transaction protocols ;
   test_transaction_exhausting_ticks_is_rejected protocols ;
   test_reveal_storage protocols ;
-  test_call_recursive_contract_estimate_gas protocols
+  test_call_recursive_contract_estimate_gas protocols ;
+  test_blockhash_opcode protocols
 
 let () =
   register_evm_node ~protocols:[Alpha] ;

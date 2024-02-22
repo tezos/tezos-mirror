@@ -13,10 +13,11 @@ use crate::account_storage::{
     account_path, AccountStorageError, EthereumAccount, EthereumAccountStorage,
     CODE_HASH_DEFAULT,
 };
+use crate::storage::blocks::get_block_hash;
+use crate::tick_model_opcodes;
 use crate::transaction::TransactionContext;
 use crate::EthereumError;
 use crate::PrecompileSet;
-use crate::{storage, tick_model_opcodes};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
 use core::convert::Infallible;
@@ -1939,7 +1940,7 @@ impl<'a, Host: Runtime> Handler for EvmHandler<'a, Host> {
             Some(block_diff)
                 if block_diff <= U256::from(256) && block_diff != U256::zero() =>
             {
-                storage::blocks::get_block_hash(self.host, number).unwrap_or_default()
+                get_block_hash(self.host, number).unwrap_or_default()
             }
             _ => H256::zero(),
         }
