@@ -439,6 +439,11 @@ module Internal_for_tests : sig
       verifier using default parameters designed to handle test cases. *)
   val init_verifier_dal : unit -> unit
 
+  (** This function loads in memory the default verifier SRS. The
+      difference with [init_verifier_dal] is that the latter loads a
+      SRS that should be only used for tests. *)
+  val init_verifier_dal_default : unit -> unit
+
   (** Returns a randomized valid sequence of shards using the random state
      [state] for the given parameters. *)
   val make_dummy_shards : t -> state:Random.State.t -> shard Seq.t
