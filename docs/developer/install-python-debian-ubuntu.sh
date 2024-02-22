@@ -65,20 +65,20 @@ pyenv --version
 [ "$PYENV_VIRTUALENV_INIT" = "1" ]
 
 ##
-## Install python 3.11.6 through pyenv
+## Install python 3.11.8 through pyenv
 ##
 ## References:
 ##  - https://github.com/pyenv/pyenv#usage
 
 # [install python through pyenv]
-pyenv install 3.11.6
-pyenv global 3.11.6
+pyenv install 3.11.8
+pyenv global 3.11.8
 
 # [print python version]
-python --version # should output 3.11.6
+python --version # should output 3.11.8
 
 # [verify python version]
-[ "$(python --version)" = "Python 3.11.6" ]
+[ "$(python --version)" = "Python 3.11.8" ]
 
 ##
 ## Install poetry
