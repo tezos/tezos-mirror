@@ -24,8 +24,8 @@ signer: octez-signer
 smart_rollup_node: octez-smart-rollup-node
 wasm_debugger: octez-smart-rollup-wasm-debugger
 snoop: octez-snoop
-risc_v_sandbox: risc-v-sandbox
 smart_rollup_installer: smart-rollup-installer
 echo: src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm
+risc_v_sandbox: src/risc_v/risc-v-sandbox
 tx_kernel: tx_kernel.wasm
 tx_kernel_dal: tx_kernel_dal.wasm

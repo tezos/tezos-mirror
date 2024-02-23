@@ -1,9 +1,9 @@
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uc-p-rvc --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uc-p-rvc --posix
 Received request to exit with code 0
 rv64uc-p-rvc: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uc-v-rvc --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64uc-v-rvc --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

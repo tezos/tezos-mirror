@@ -13,19 +13,27 @@ NATIVE_OPT := --target="$(NATIVE_TARGET)"
 endif
 
 .PHONY: build
-build:
+build: risc-v-dummy.elf risc-v-sandbox
 	@cargo build --release --workspace $(NATIVE_OPT)
-	@make -C dummy_kernel build
 	@make -C jstz build
+	@make -C tests build
 
-.PHONY: build-sandbox
-build-sandbox:
+.PHONY: risc-v-sandbox
+risc-v-sandbox::
 	@cargo build --release --package risc-v-sandbox $(NATIVE_OPT)
+	@ln -f target/$(NATIVE_TARGET)/release/risc-v-sandbox $@
+
+risc-v-dummy.elf::
+	@make -C dummy_kernel build
+	@ln -f dummy_kernel/target/riscv64gc-unknown-hermit/release/risc-v-dummy $@
 
 .PHONY: build-deps
 build-deps:
 	@exec ./install-rust-std-hermit.sh
 	@rustup component add rustfmt clippy
+ifneq ($(NATIVE_TARGET),)
+	@rustup target add $(NATIVE_TARGET)
+endif
 
 .PHONY: test
 test:
@@ -41,9 +49,13 @@ check:
 	@taplo format --check $(shell git ls-files '**/Cargo.toml')
 	@make -C dummy_kernel check
 	@make -C jstz check
+	@make -C tests check
 
 .PHONY: clean
 clean:
 	@cargo clean
 	@make -C dummy_kernel clean
 	@make -C jstz clean
+	@make -C risc-v-sandbox clean
+	@make -C tests clean
+	@rm -f risc-v-sandbox risc-v-dummy.elf
