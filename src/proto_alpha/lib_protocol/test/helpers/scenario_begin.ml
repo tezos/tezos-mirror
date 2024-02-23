@@ -11,12 +11,12 @@ open Scenario_base
 open Log_helpers
 open Adaptive_issuance_helpers
 
+type constants = Constants_helpers.t
+
 (** Returns when the number of bootstrap accounts created by [Context.init_n n] is not equal to [n] *)
 type error += Inconsistent_number_of_bootstrap_accounts
 
 type starter_constants = Mainnet | Sandbox | Test
-
-type constants = Protocol.Alpha_context.Constants.Parametric.t
 
 let start ~(constants : starter_constants) : (unit, constants) scenarios =
   let constants, name =
@@ -43,15 +43,8 @@ let start_with_list ~(constants : (string * constants) list) :
   match constants with
   | [] ->
       Stdlib.failwith
-        (Format.asprintf
-           "%s: Cannot build scenarios from\n  empty list"
-           __LOC__)
-  | (tag, constants) :: t ->
-      List.fold_left
-        (fun scenarios (tag, constants) ->
-          scenarios |+ Tag tag --> start_with ~constants)
-        (Tag tag --> start_with ~constants)
-        t
+        (Format.asprintf "%s: Cannot build scenarios from empty list" __LOC__)
+  | _ -> fold_tag (fun constants -> start_with ~constants) constants
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ~activate_ai ?(burn_rewards = false) ?(ns_enable_fork = false)
