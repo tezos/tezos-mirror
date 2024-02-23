@@ -1,0 +1,2 @@
+include:
+  - .gitlab/ci/pipelines/etherlink_release_tag.yml

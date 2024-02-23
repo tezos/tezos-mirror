@@ -1,0 +1,5 @@
+include:
+  # Stage: prepare_release
+  - .gitlab/ci/jobs/prepare_release/docker:prepare-etherlink-release.yml
+  # Stage: publish_release_gitlab
+  - .gitlab/ci/jobs/publish/gitlab:etherlink-release.yml

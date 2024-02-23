@@ -79,6 +79,8 @@ let () =
   let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
   (* Matches beta release tags, e.g. [v1.2.3-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
+  (* Matches etherlink release tags, e.g. [etherlink-v1.2]. *)
+  let etherlink_release_tag_re = "/^etherlink-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
   let open Rules in
   let open Pipeline in
   (* Matches either Octez release tags or Octez beta release tags,
@@ -89,7 +91,10 @@ let () =
       || has_tag_match octez_beta_release_tag_re)
   in
   let has_non_release_tag =
-    If.(Predefined_vars.ci_commit_tag != null && not has_any_octez_release_tag)
+    If.(
+      Predefined_vars.ci_commit_tag != null
+      && (not has_any_octez_release_tag)
+      && not (has_tag_match etherlink_release_tag_re))
   in
   register
     "before_merging"
@@ -119,6 +124,13 @@ let () =
     "octez_release_tag_test"
     If.(not_on_tezos_namespace && push && has_any_octez_release_tag)
     ~jobs:(Release_tag.jobs ~test:true Release_tag) ;
+  register
+    "etherlink_release_tag"
+    If.(on_tezos_namespace && push && has_tag_match etherlink_release_tag_re) ;
+  register
+    "etherlink_release_tag_test"
+    If.(
+      not_on_tezos_namespace && push && has_tag_match etherlink_release_tag_re) ;
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)
