@@ -5,8 +5,12 @@
   image: alpine:3.18
 .image_template__client_libs_dependencies:
   image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
+.image_template__debian_bookworm:
+  image: debian:bookworm
 .image_template__docker:
   image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+.image_template__fedora_39:
+  image: fedora:39
 .image_template__runtime_build_dependencies:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
 .image_template__runtime_build_test_dependencies:

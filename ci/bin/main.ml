@@ -177,6 +177,11 @@ module Images = struct
      checked by the jobs [trigger] and [sanity_ci]. *)
   let alpine =
     Image.register ~name:"alpine" ~image_path:("alpine:" ^ alpine_version)
+
+  let debian_bookworm =
+    Image.register ~name:"debian_bookworm" ~image_path:"debian:bookworm"
+
+  let fedora_39 = Image.register ~name:"fedora_39" ~image_path:"fedora:39"
 end
 
 let before_script ?(take_ownership = false) ?(source_version = false)
@@ -624,6 +629,115 @@ let _job_docker_merge_manifests_test =
        ~ci_docker_hub:false
        ~job_docker_amd64:job_docker_amd64_test
        ~job_docker_arm64:job_docker_arm64_test
+
+type bin_package_target = Dpkg | Rpm
+
+let job_build_bin_package ?rules ~name ?(stage = Stages.build) ~arch ~target ()
+    : job =
+  let arch_string =
+    match arch with Tezos_ci.Amd64 -> "amd64" | Arm64 -> "arm64"
+  in
+  let target_string = match target with Dpkg -> "dpkg" | Rpm -> "rpm" in
+  let image =
+    match target with Dpkg -> Images.debian_bookworm | Rpm -> Images.fedora_39
+  in
+  let artifacts =
+    let artifact_path =
+      "octez-*." ^ match target with Dpkg -> "deb" | Rpm -> "rpm"
+    in
+    artifacts
+      ~expire_in:(Days 1)
+      ~when_:On_success
+      ~name:"${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG"
+      [artifact_path]
+  in
+  let before_script =
+    ". ./scripts/version.sh"
+    ::
+    (match target with
+    | Dpkg ->
+        [
+          "apt update";
+          "apt-get install -y rsync git m4 build-essential patch unzip wget \
+           opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev \
+           libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev \
+           protobuf-compiler libsqlite3-dev";
+        ]
+    | Rpm ->
+        [
+          "dnf update -y";
+          "dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel \
+           zlib-devel libpq-devel m4 perl git pkg-config rpmdevtools \
+           python3-devel python3-setuptools wget opam rsync which cargo \
+           autoconf mock systemd systemd-rpm-macros cmake python3-wheel \
+           python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel \
+           sqlite-devel";
+        ])
+  in
+  job
+    ?rules
+    ~name
+    ~arch
+    ~image
+    ~stage
+    ~dependencies:(Dependent [])
+    ~variables:
+      [
+        ("TARGET", target_string);
+        ("OCTEZ_PKGMAINTAINER", "nomadic-labs");
+        ("BLST_PORTABLE", "yes");
+        ("ARCH", arch_string);
+      ]
+    ~artifacts
+    ~before_script
+    [
+      "wget https://sh.rustup.rs/rustup-init.sh";
+      "chmod +x rustup-init.sh";
+      "./rustup-init.sh --profile minimal --default-toolchain  \
+       $recommended_rust_version -y";
+      ". $HOME/.cargo/env";
+      "export OPAMYES=\"true\"";
+      "opam init --bare --disable-sandboxing";
+      "make build-deps";
+      "eval $(opam env)";
+      "make $TARGET";
+    ]
+
+let _job_build_dpkg_amd64 =
+  job_external
+  @@ job_build_bin_package
+       ~name:"oc.build:dpkg:amd64"
+       ~target:Dpkg
+       ~arch:Tezos_ci.Amd64
+       ()
+
+let _job_build_rpm_amd64 =
+  job_external
+  @@ job_build_bin_package
+       ~name:"oc.build:rpm:amd64"
+       ~target:Rpm
+       ~arch:Tezos_ci.Amd64
+       ()
+
+let _job_build_dpkg_amd64_manual =
+  job_external ~directory:"build" ~filename_suffix:"manual"
+  @@ job_build_bin_package
+       ~name:"oc.build:dpkg:amd64"
+       ~target:Dpkg
+       ~arch:Tezos_ci.Amd64
+       ~rules:[job_rule ~when_:Manual ()]
+       ~stage:Stages.manual
+       ()
+
+let _job_build_rpm_amd64_manual =
+  job_external ~directory:"build" ~filename_suffix:"manual"
+  @@ job_build_bin_package
+       ~rules:[job_rule ~when_:Manual ()]
+       ~name:"oc.build:rpm:amd64"
+       ~target:Rpm
+       ~arch:Tezos_ci.Amd64
+       ~stage:Stages.manual
+       ()
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
