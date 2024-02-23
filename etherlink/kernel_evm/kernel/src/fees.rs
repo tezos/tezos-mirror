@@ -15,7 +15,7 @@
 //!
 //! Additionally, we charge a _data-availability_ fee, for each tx posted through L1.
 
-use core::mem::size_of;
+use crate::storage::read_sequencer_pool_address;
 
 use evm_execution::account_storage::{account_path, EthereumAccountStorage};
 use evm_execution::handler::ExecutionOutcome;
@@ -25,6 +25,8 @@ use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_smart_rollup_host::runtime::Runtime;
+
+use std::mem::size_of;
 
 /// Minimum base fee per gas, set to 0.05Gwei.
 pub const MINIMUM_BASE_FEE_PER_GAS: u64 = 5 * 10_u64.pow(7);
@@ -144,7 +146,25 @@ impl FeeUpdates {
             ));
         }
 
-        crate::storage::update_burned_fees(host, self.burn_amount)?;
+        let sequencer = match read_sequencer_pool_address(host) {
+            None => {
+                let burned_fee = self
+                    .burn_amount
+                    .saturating_add(self.compensate_sequencer_amount);
+
+                crate::storage::update_burned_fees(host, burned_fee)?;
+                return Ok(());
+            }
+            Some(sequencer) => {
+                crate::storage::update_burned_fees(host, self.burn_amount)?;
+                sequencer
+            }
+        };
+
+        let sequencer_account_path = account_path(&sequencer)?;
+        accounts
+            .get_or_create(host, &sequencer_account_path)?
+            .balance_add(host, self.compensate_sequencer_amount)?;
 
         Ok(())
     }
@@ -236,6 +256,7 @@ fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EthereumError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::store_sequencer_pool_address;
     use evm::{ExitReason, ExitSucceed};
     use evm_execution::{
         account_storage::{account_path, EthereumAccountStorage},
@@ -290,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_deducts_balance_from_user_and_burns() {
+    fn apply_updates_balances_no_sequencer() {
         // Arrange
         let mut host = MockHost::default();
         let mut evm_account_storage =
@@ -301,13 +322,62 @@ mod tests {
         set_balance(&mut host, &mut evm_account_storage, address, balance);
 
         let burn_amount = balance / 3;
+        let compensate_sequencer_amount = balance / 4;
 
         let fee_updates = FeeUpdates {
             overall_gas_used: U256::zero(),
             overall_gas_price: U256::zero(),
-            burn_amount: balance / 3,
+            burn_amount,
             charge_user_amount: balance / 2,
-            compensate_sequencer_amount: U256::zero(),
+            compensate_sequencer_amount,
+        };
+
+        // Act
+        let result = fee_updates.apply(&mut host, &mut evm_account_storage, address);
+
+        // Assert
+        assert!(result.is_ok());
+        let new_balance = get_balance(&mut host, &mut evm_account_storage, address);
+        assert_eq!(balance / 2, new_balance);
+
+        let burned = crate::storage::read_burned_fees(&mut host);
+
+        // no sequencer reward address set - so everything is burned
+        assert_eq!(burn_amount + compensate_sequencer_amount, burned);
+    }
+
+    #[test]
+    fn apply_updates_balances_with_sequencer() {
+        // Arrange
+        let mut host = MockHost::default();
+        let sequencer_address =
+            address_from_str("0123456789ABCDEF0123456789ABCDEF01234567");
+        store_sequencer_pool_address(&mut host, sequencer_address).unwrap();
+
+        let mut evm_account_storage =
+            evm_execution::account_storage::init_account_storage().unwrap();
+
+        let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
+        let balance = U256::from(1000);
+        set_balance(&mut host, &mut evm_account_storage, address, balance);
+
+        let sequencer_balance = U256::from(500);
+        set_balance(
+            &mut host,
+            &mut evm_account_storage,
+            sequencer_address,
+            sequencer_balance,
+        );
+
+        let burn_amount = balance / 3;
+        let compensate_sequencer_amount = balance / 4;
+
+        let fee_updates = FeeUpdates {
+            overall_gas_used: U256::zero(),
+            overall_gas_price: U256::zero(),
+            burn_amount,
+            charge_user_amount: balance / 2,
+            compensate_sequencer_amount,
         };
 
         // Act
@@ -320,6 +390,13 @@ mod tests {
 
         let burned = crate::storage::read_burned_fees(&mut host);
         assert_eq!(burn_amount, burned);
+
+        let sequencer_new_balance =
+            get_balance(&mut host, &mut evm_account_storage, sequencer_address);
+        assert_eq!(
+            sequencer_new_balance,
+            sequencer_balance + compensate_sequencer_amount
+        );
     }
 
     #[test]

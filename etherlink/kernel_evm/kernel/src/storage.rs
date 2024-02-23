@@ -65,6 +65,13 @@ const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/fees/minimum_base_fee_per_gas");
 const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/fees/da_fee_per_byte");
 
+/// The sequencer pool is the designated account that the data-availability fees are sent to.
+///
+/// This may be updated by the governance mechanism over time. If it is not set, the data-availability
+/// fees are instead burned.
+pub const SEQUENCER_POOL_PATH: RefPath =
+    RefPath::assert_from(b"/fees/sequencer_pool_address");
+
 /// Path to the last L1 level seen.
 const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/l1_level");
 
@@ -596,6 +603,25 @@ pub fn update_burned_fees(
 pub fn read_burned_fees(host: &mut impl Runtime) -> U256 {
     let path = &EVM_BURNED_FEES.into();
     read_u256(host, path).unwrap_or_else(|_| U256::zero())
+}
+
+pub fn read_sequencer_pool_address(host: &impl Runtime) -> Option<H160> {
+    let mut bytes = [0; std::mem::size_of::<H160>()];
+    let Ok(20) = host.store_read_slice(&SEQUENCER_POOL_PATH, 0, bytes.as_mut_slice()) else {
+        log!(host, Debug, "No sequencer pool address set");
+        return None;
+    };
+    Some(bytes.into())
+}
+
+#[cfg(test)]
+pub fn store_sequencer_pool_address(
+    host: &mut impl Runtime,
+    address: H160,
+) -> Result<(), Error> {
+    let bytes = address.to_fixed_bytes();
+    host.store_write_all(&SEQUENCER_POOL_PATH, bytes.as_slice())?;
+    Ok(())
 }
 
 pub fn store_timestamp_path<Host: Runtime>(
