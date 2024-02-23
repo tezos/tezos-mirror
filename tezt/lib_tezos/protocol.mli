@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Oxford | Alpha
+type t = Paris | Oxford | Alpha
 
 val encoding : t Data_encoding.t
 

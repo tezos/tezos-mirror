@@ -25,11 +25,13 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Oxford | Alpha
+type t = Paris | Oxford | Alpha
 
-let all = [Oxford; Alpha]
+let all = [Paris; Oxford; Alpha]
 
-let encoding = Data_encoding.string_enum [("oxford", Oxford); ("alpha", Alpha)]
+let encoding =
+  Data_encoding.string_enum
+    [("paris", Paris); ("oxford", Oxford); ("alpha", Alpha)]
 
 type constants =
   | Constants_sandbox
@@ -43,13 +45,14 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | Oxford -> "Oxford"
+let name = function Alpha -> "Alpha" | Oxford -> "Oxford" | Paris -> "Paris"
 
-let number = function Oxford -> 018 | Alpha -> 019
+let number = function Oxford -> 018 | Paris -> 019 | Alpha -> 020
 
 let directory = function
   | Alpha -> "proto_alpha"
   | Oxford -> "proto_018_Proxford"
+  | Paris -> "proto_019_PtParisA"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -57,6 +60,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Oxford -> "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH"
+  | Paris -> "PtParisAeco71sYvYgfnVPb4rRJe6zgzYRDS5U8t5ednSRPUFN5"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -265,7 +269,10 @@ let write_parameter_file :
   JSON.encode_to_file_u output_file parameters ;
   Lwt.return output_file
 
-let previous_protocol = function Alpha -> Some Oxford | Oxford -> None
+let previous_protocol = function
+  | Alpha -> Some Oxford
+  | Oxford -> None
+  | Paris -> Some Oxford
 
 let has_predecessor p = previous_protocol p <> None
 

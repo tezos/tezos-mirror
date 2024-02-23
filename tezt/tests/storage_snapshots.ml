@@ -378,7 +378,7 @@ let test_drag_after_rolling_import =
     | Oxford ->
         (* Conservative TB finality *)
         blocks_preservation_cycles * blocks_per_cycle
-    | Alpha -> (* TB finality *) 2
+    | Alpha | Paris -> (* TB finality *) 2
   in
   Log.info "Baking a few blocks"
   (* Baking enough blocks so that the caboose is not the genesis

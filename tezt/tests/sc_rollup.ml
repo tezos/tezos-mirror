@@ -43,7 +43,7 @@ open Sc_rollup_helpers
 *)
 
 let default_wasm_pvm_revision = function
-  | Protocol.Alpha -> "2.0.0-r4"
+  | Protocol.Alpha | Paris -> "2.0.0-r4"
   | Protocol.Oxford -> "2.0.0-r3"
 
 let get_outbox_proof ?rpc_hooks ~__LOC__ sc_rollup_node ~message_index
