@@ -128,9 +128,9 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap1) client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
   return {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_admin}
 
-let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_catchup ?catchup_cooldown
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels
+let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) ?(kernel = Constant.WASM.evm_kernel)
     ?minimum_base_fee_per_gas ?preimages_dir protocol =
@@ -194,7 +194,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
         max_blueprints_lag;
         max_blueprints_catchup;
         catchup_cooldown;
-        devmode = true;
+        devmode;
         wallet_dir = Some (Client.base_dir client);
       }
   in
@@ -203,7 +203,7 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
   in
   let* proxy =
     Evm_node.init
-      ~mode:(Proxy {devmode = true})
+      ~mode:(Proxy {devmode})
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   return
@@ -216,6 +216,13 @@ let setup_sequencer ?config ?genesis_timestamp ?time_between_blocks
       sc_rollup_address;
       sc_rollup_node;
     }
+
+let check_head_consistency ~sequencer ~proxy =
+  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
+  Check.((proxy_head.hash = sequencer_head.hash) string)
+    ~error_msg:"Proxy and sequencer do not have the same head" ;
+  unit
 
 let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
     ~sc_rollup_node ~node ~client ~l1_contracts ~sc_rollup_address raw_tx =
@@ -1577,6 +1584,84 @@ let test_no_automatic_block_production =
     ~error_msg:"No transaction hash expected" ;
   unit
 
+let test_migration_from_ghostnet =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "upgrade"; "migration"; "ghostnet"]
+    ~title:"Sequencer can upgrade from ghostnet"
+    ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
+  @@ fun protocol ->
+  (* Creates a sequencer using prod version and ghostnet kernel. *)
+  let* {
+         sequencer;
+         node;
+         client;
+         sc_rollup_node;
+         sc_rollup_address;
+         l1_contracts;
+         proxy;
+         _;
+       } =
+    setup_sequencer
+      protocol
+      ~time_between_blocks:Nothing
+      ~kernel:Constant.WASM.ghostnet_evm_kernel
+      ~devmode:false
+      ~max_blueprints_lag:0
+  in
+  (* Produces a few blocks. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let* () =
+    repeat 4 (fun () ->
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
+  (* Check the consistency. *)
+  let* () = check_head_consistency ~proxy ~sequencer in
+  (* Sends upgrade to current version. *)
+  let* () =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.evm_kernel
+      ~activation_timestamp:"0"
+  in
+  (* Produce a block to trigger the upgrade. *)
+  let* _ = Rpc.produce_block sequencer in
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
+  (* Runs sequencer and proxy with --devmode. *)
+  let* () = Evm_node.terminate proxy in
+  let* () = Evm_node.terminate sequencer in
+  (* Manually put `--devmode` to use the same command line. *)
+  let* () = Evm_node.run ~extra_arguments:["--devmode"] proxy in
+  let* () = Evm_node.run ~extra_arguments:["--devmode"] sequencer in
+  (* Check the consistency. *)
+  let* () = check_head_consistency ~proxy ~sequencer in
+  (* Produces a few blocks. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let* () =
+    repeat 4 (fun () ->
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
+  (* Final consistency check. *)
+  check_head_consistency ~proxy ~sequencer
+
 let () =
   test_remove_sequencer [Alpha] ;
   test_persistent_state [Alpha] ;
@@ -1599,4 +1684,5 @@ let () =
   test_delayed_transfer_timeout [Alpha] ;
   test_delayed_transfer_timeout_fails_l1_levels [Alpha] ;
   test_delayed_inbox_flushing [Alpha] ;
-  test_no_automatic_block_production [Alpha]
+  test_no_automatic_block_production [Alpha] ;
+  test_migration_from_ghostnet [Alpha]
