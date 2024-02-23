@@ -222,6 +222,9 @@ let cleanup_values_for_protocol_p ctxt
   in
   return ctxt
 
+let reset_adaptive_issuance_ema_for_p ctxt =
+  Storage.Adaptive_issuance.Launch_ema.add ctxt 0l
+
 (** Updates the total supply with refined estimation at the activation
     of P using measures from
     https://gitlab.com/tezos/tezos/-/merge_requests/11978.
@@ -344,6 +347,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
           cleanup_values_for_protocol_p ctxt previous_proto_constants level
         in
         let* ctxt = update_total_supply_for_p chain_id ctxt in
+        let*! ctxt = reset_adaptive_issuance_ema_for_p ctxt in
         return (ctxt, [])
   in
   let* ctxt =
