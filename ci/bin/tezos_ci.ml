@@ -343,8 +343,14 @@ let job_external ?directory ?filename_suffix (job : Gitlab_ci.Types.job) :
     | None -> job.name
     | Some suffix -> job.name ^ "-" ^ suffix
   in
-  let directory = Option.value ~default:stage directory in
-  let filename = sf ".gitlab/ci/jobs/%s/%s.yml" directory basename in
+  let directory = ".gitlab/ci/jobs" // Option.value ~default:stage directory in
+  if not (Sys.file_exists directory && Sys.is_directory directory) then
+    failwith
+      "[job_external] attempted to write job '%s' to non-existing directory \
+       '%s'"
+      job.name
+      directory ;
+  let filename = (directory // basename) ^ ".yml" in
   if String_set.mem filename !external_jobs then
     failwith
       "Attempted to write external job %s twice -- perhaps you need to set \
