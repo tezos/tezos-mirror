@@ -240,7 +240,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
             in
 
             let* slash_history_opt =
-              Storage.Contract.Slashed_deposits.find ctxt delegate_contract
+              Storage.Slashed_deposits.find ctxt delegate
             in
             let slash_history = Option.value slash_history_opt ~default:[] in
 
@@ -269,10 +269,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                 slash_history
             in
             let*! ctxt =
-              Storage.Contract.Slashed_deposits.add
-                ctxt
-                delegate_contract
-                slash_history
+              Storage.Slashed_deposits.add ctxt delegate slash_history
             in
             let new_total_slashing_percentage =
               Storage.Slashed_deposits_history.get level.cycle slash_history
