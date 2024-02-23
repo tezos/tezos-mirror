@@ -22,6 +22,12 @@ type error += Unexpected_error
     and the known [State.t] *)
 type t = Block.t * State.t
 
+let log ?color s =
+  let open Lwt_result_syntax in
+  exec_unit (fun _ ->
+      Log.info ?color s ;
+      return_unit)
+
 (* ======== Baking ======== *)
 
 (** After baking and applying rewards in state *)

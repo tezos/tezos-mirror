@@ -33,7 +33,7 @@ let any_flag :
     (constants -> bool -> constants) -> (constants, constants) scenarios =
  fun f -> sets f [("true", true); ("false", false)]
 
-let rec any_flags :
+let any_flags :
     (constants -> bool -> constants) list -> (constants, constants) scenarios =
   unfold any_flag
 

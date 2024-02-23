@@ -59,7 +59,7 @@ let shorter_roundtrip_for_baker =
   let constants = init_constants ~autostaking_enable:false () in
   let amount = Amount (Tez.of_mutez 333_000_000_000L) in
   let consensus_rights_delay = constants.consensus_rights_delay in
-  begin_test ~activate_ai:true ~constants ["delegate"]
+  start_with ~constants --> activate_ai true --> begin_test ["delegate"]
   --> next_block --> wait_ai_activation
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle
@@ -157,7 +157,8 @@ let change_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  begin_test ~activate_ai:true ~constants ["delegate1"; "delegate2"]
+  start_with ~constants --> activate_ai true
+  --> begin_test ["delegate1"; "delegate2"]
   --> set_delegate_params "delegate1" init_params
   --> set_delegate_params "delegate2" init_params
   --> add_account_with_funds
@@ -177,7 +178,7 @@ let unset_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  begin_test ~activate_ai:true ~constants ["delegate"]
+  start_with ~constants --> activate_ai true --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
@@ -223,15 +224,14 @@ let forbid_costaking =
   in
   let amount = Amount (Tez.of_mutez 1_000_000L) in
   (* init *)
-  begin_test
-    ~activate_ai:true
-    ~constants_list:
+  start_with_list
+    ~constants:
       [
         default_constants;
         small_delegate_parameter_constants;
         large_delegate_parameter_constants;
       ]
-    ["delegate"]
+  --> activate_ai true --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"

@@ -77,7 +77,12 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
     else adaptive_issuance.adaptive_rewards_params
   in
   let adaptive_issuance =
-    {adaptive_issuance with adaptive_rewards_params; autostaking_enable}
+    {
+      adaptive_issuance with
+      adaptive_rewards_params;
+      autostaking_enable;
+      ns_enable = false;
+    }
   in
   {
     default_constants with
@@ -106,7 +111,9 @@ let init_scenario ?(force_ai = true) ?reward_per_block () =
   in
   let begin_test ~activate_ai ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
-    begin_test ~activate_ai ~constants [name]
+    start_with ~constants
+    --> Scenario_begin.activate_ai activate_ai
+    --> begin_test [name]
     --> set_delegate_params name init_params
     --> set_baker "__bootstrap__"
   in

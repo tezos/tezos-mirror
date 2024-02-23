@@ -32,7 +32,8 @@ let test_wait_with_rewards =
     in
     set_delegate_params "delegate" params
   in
-  begin_test ~activate_ai:true ~constants ["delegate"; "faucet"]
+  start_with ~constants --> activate_ai true
+  --> begin_test ["delegate"; "faucet"]
   --> set_baker "faucet"
   --> (Tag "edge = 0" --> set_edge 0.
       |+ Tag "edge = 0.24" --> set_edge 0.24
@@ -83,7 +84,8 @@ let test_ai_curve_activation_time =
       ()
   in
   let pc = constants.consensus_rights_delay in
-  begin_test ~activate_ai:true ~burn_rewards:true ~constants [""]
+  start_with ~constants --> activate_ai true
+  --> begin_test ~burn_rewards:true [""]
   --> next_block --> save_current_rate (* before AI rate *)
   --> wait_ai_activation
   (* Rate remains unchanged right after AI activation, we must wait [pc + 1] cycles *)
@@ -119,7 +121,8 @@ let test_static =
   let cycle_stable =
     save_current_rate --> next_cycle --> check_rate_evolution Q.equal
   in
-  begin_test ~activate_ai:true ~burn_rewards:true ~constants ["delegate"]
+  start_with ~constants --> activate_ai true
+  --> begin_test ~burn_rewards:true ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> save_current_rate --> wait_ai_activation
   (* We stake about 50% of the total supply *)

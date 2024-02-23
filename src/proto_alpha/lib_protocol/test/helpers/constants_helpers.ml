@@ -30,5 +30,8 @@ module Set = struct
 
     let ns_enable (c : t) ns_enable =
       adaptive_issuance c {c.adaptive_issuance with ns_enable}
+
+    let launch_ema_threshold (c : t) launch_ema_threshold =
+      adaptive_issuance c {c.adaptive_issuance with launch_ema_threshold}
   end
 end

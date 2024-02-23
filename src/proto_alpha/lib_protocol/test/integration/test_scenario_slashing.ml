@@ -36,6 +36,7 @@ open State_account
 open Tez_helpers.Ez_tez
 open Scenario
 open Test_scenario_base
+open Scenario_constants
 
 let fs = Format.asprintf
 
@@ -48,11 +49,9 @@ let test_simple_slash =
     |+ Tag "double preattesting"
        --> double_preattest ~other_bakers:("bootstrap2", "bootstrap3") delegate
   in
-  begin_test
-    ~activate_ai:true
-    ~ns_enable_fork:true
-    ~constants
-    ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
+  start_with ~constants --> activate_ai true
+  --> any_flag Adaptive_issuance.ns_enable
+  --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
   --> (Tag "No AI" --> next_cycle
       |+ Tag "Yes AI" --> next_block --> wait_ai_activation)
   --> any_slash "delegate"
@@ -129,11 +128,9 @@ let test_delegate_forbidden =
   let constants =
     init_constants ~blocks_per_cycle:30l ~autostaking_enable:false ()
   in
-  begin_test
-    ~activate_ai:false
-    ~ns_enable_fork:true
-    ~constants
-    ["delegate"; "bootstrap1"; "bootstrap2"]
+  start_with ~constants --> activate_ai false
+  --> any_flag Adaptive_issuance.ns_enable
+  --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
   --> set_baker "bootstrap1"
   --> (Tag "Many double bakes"
        --> loop_action 14 (double_bake_ "delegate")
@@ -175,11 +172,9 @@ let test_delegate_forbidden =
 
 let test_slash_unstake =
   let constants = init_constants ~autostaking_enable:false () in
-  begin_test
-    ~activate_ai:false
-    ~ns_enable_fork:true
-    ~constants
-    ["delegate"; "bootstrap1"; "bootstrap2"]
+  start_with ~constants --> activate_ai false
+  --> any_flag Adaptive_issuance.ns_enable
+  --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
   --> set_baker "bootstrap1" --> next_cycle --> unstake "delegate" Half
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
   --> (Empty |+ Tag "unstake twice" --> unstake "delegate" Half)
@@ -191,11 +186,9 @@ let test_slash_monotonous_stake =
     let constants =
       init_constants ~blocks_per_cycle:16l ~autostaking_enable:false ()
     in
-    begin_test
-      ~activate_ai:false
-      ~ns_enable_fork:true
-      ~constants
-      ["delegate"; "bootstrap1"]
+    start_with ~constants --> activate_ai false
+    --> any_flag Adaptive_issuance.ns_enable
+    --> begin_test ["delegate"; "bootstrap1"]
     --> next_cycle
     --> loop
           6
@@ -244,8 +237,9 @@ let test_slash_timing =
   let constants =
     init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
   in
-  begin_test ~activate_ai:false ~ns_enable_fork:true ~constants ["delegate"]
-  --> next_cycle
+  start_with ~constants --> activate_ai false
+  --> any_flag Adaptive_issuance.ns_enable
+  --> begin_test ["delegate"] --> next_cycle
   --> (Tag "stake" --> stake "delegate" Half
       |+ Tag "unstake" --> unstake "delegate" Half)
   --> (Tag "with a first slash" --> double_bake "delegate"
@@ -273,11 +267,9 @@ let init_scenario_with_delegators delegate_name faucet_name delegators_list =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  begin_test
-    ~activate_ai:true
-    ~ns_enable_fork:true
-    ~constants
-    [delegate_name; faucet_name]
+  start_with ~constants --> activate_ai true
+  --> any_flag Adaptive_issuance.ns_enable
+  --> begin_test [delegate_name; faucet_name]
   --> set_baker faucet_name
   --> set_delegate_params "delegate" init_params
   --> init_delegators delegators_list
@@ -328,11 +320,8 @@ let test_no_shortcut_for_cheaters =
   let constants = init_constants ~autostaking_enable:false () in
   let amount = Amount (Tez.of_mutez 333_000_000_000L) in
   let consensus_rights_delay = constants.consensus_rights_delay in
-  begin_test
-    ~activate_ai:true
-    ~ns_enable_fork:false
-    ~constants
-    ["delegate"; "bootstrap1"]
+  start_with ~constants --> activate_ai true
+  --> begin_test ["delegate"; "bootstrap1"]
   --> next_block --> wait_ai_activation
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
@@ -357,11 +346,8 @@ let test_slash_correct_amount_after_stake_from_unstake =
   let amount_to_restake = Amount (Tez.of_mutez 100_000_000_000L) in
   let amount_expected_in_unstake_after_slash = Tez.of_mutez 50_000_000_000L in
   let consensus_rights_delay = constants.consensus_rights_delay in
-  begin_test
-    ~activate_ai:true
-    ~ns_enable_fork:false
-    ~constants
-    ["delegate"; "bootstrap1"]
+  start_with ~constants --> activate_ai true
+  --> begin_test ["delegate"; "bootstrap1"]
   --> next_block --> wait_ai_activation
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle
@@ -382,19 +368,12 @@ let test_slash_correct_amount_after_stake_from_unstake =
 (* Test a non-zero request finalizes for a non-zero amount if it hasn't been slashed 100% *)
 let test_mini_slash =
   let constants = init_constants ~autostaking_enable:false () in
-  (Tag "Yes AI"
-   --> begin_test
-         ~activate_ai:true
-         ~ns_enable_fork:false
-         ~constants
-         ["delegate"; "baker"]
-   --> next_block --> wait_ai_activation
-  |+ Tag "No AI"
-     --> begin_test
-           ~activate_ai:false
-           ~ns_enable_fork:false
-           ~constants
-           ["delegate"; "baker"])
+  start_with ~constants
+  --> (Tag "Yes AI" --> activate_ai true
+       --> begin_test ["delegate"; "baker"]
+       --> next_block --> wait_ai_activation
+      |+ Tag "No AI" --> activate_ai false --> begin_test ["delegate"; "baker"]
+      )
   --> unstake "delegate" (Amount Tez.one_mutez)
   --> set_baker "baker" --> next_cycle
   --> (Tag "5% slash" --> double_bake "delegate" --> make_denunciations ()
@@ -409,11 +388,9 @@ let test_mini_slash =
 
 let test_slash_rounding =
   let constants = init_constants ~autostaking_enable:false () in
-  begin_test
-    ~activate_ai:true
-    ~ns_enable_fork:true
-    ~constants
-    ["delegate"; "baker"]
+  start_with ~constants --> activate_ai true
+  --> any_flag Adaptive_issuance.ns_enable
+  --> begin_test ["delegate"; "baker"]
   --> set_baker "baker" --> next_block --> wait_ai_activation
   --> unstake "delegate" (Amount (Tez.of_mutez 2L))
   --> next_cycle --> double_bake "delegate" --> double_bake "delegate"

@@ -52,7 +52,9 @@ and delegator2 = "delegator2"
 
 let setup ~activate_ai =
   let constants = init_constants ~autostaking_enable:true () in
-  begin_test ~activate_ai ~constants [delegate]
+  start_with ~constants
+  --> Scenario_begin.activate_ai activate_ai
+  --> begin_test [delegate]
   --> add_account_with_funds
         delegator1
         "__bootstrap__"
@@ -141,10 +143,8 @@ let test_overdelegation =
   (* This test assumes that all delegate accounts created in [begin_test]
      begin with 4M tz, with 5% staked *)
   let constants = init_constants ~autostaking_enable:true () in
-  begin_test
-    ~activate_ai:false
-    ~constants
-    ["delegate"; "faucet1"; "faucet2"; "faucet3"]
+  start_with ~constants --> activate_ai false
+  --> begin_test ["delegate"; "faucet1"; "faucet2"; "faucet3"]
   --> add_account_with_funds
         "delegator_to_fund"
         "delegate"
