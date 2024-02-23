@@ -76,6 +76,12 @@ $ evm-evaluation-assessor --result // By default the execution will be outputed 
 $ evm-evaluation-assessor --diff <result-file> // By default the execution will be outputed into `evm_evaluation.diff`
 ```
 
+Specify the path where the tool needs to retrieve its resources from:
+
+```
+$ evm-evaluation-assessor --resources // By default its tezos' directory (./etherlink/kernel_evm/evm_evaluation/resources)
+```
+
 Multiple options can be combined:
 
 ```
