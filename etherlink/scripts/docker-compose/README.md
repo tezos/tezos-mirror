@@ -70,8 +70,8 @@ EVM_ACCOUNTS=("6ce4d79d4e77402e1ef3417fdda433aa744c6e1c" "b53dc01974176e5dff2298
 SEQUENCER_ALIAS=${SEQUENCER_ALIAS:-"sequencer"}
 # sequencer secret key
 SEQUENCER_SECRET_KEY=${SEQUENCER_SECRET_KEY:-"edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"}
-# sequencer kernel config base file
-SEQUENCER_CONFIG=${SEQUENCER_CONFIG:-"$PWD/evm_config.yaml"}
+# evm kernel kernel config base file
+EVM_KERNEL_CONFIG=${EVM_KERNEL_CONFIG:-"$PWD/evm_config.yaml"}
 ```
 
 You can you the dailynet by only setting `TZNETWORK` and removing `SNAPSHOT_URL`:

@@ -77,10 +77,23 @@ _coverage_report
 .gitlab-ci.yml
 
 # Rust
-target
+**/target
 
 evm_kernel.wasm
+evm_installer.wasm
+evm_kernel_unstripped.wasm
+evm-evaluation-assessor
+smart-rollup-installer
+_evm_installer_preimages/
+tx_kernel.wasm
+tx_kernel_dal.wasm
 tx-demo-collector
+dal_echo_kernel.wasm
+risc-v-dummy.elf
+sequencer.wasm
+evm_benchmark_installer.wasm
+evm_unstripped_installer.wasm
+_evm_unstripped_installer_preimages/
 
 # Terraform
 
