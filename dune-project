@@ -64,6 +64,7 @@
 (package (name octez-signer))
 (package (name octez-smart-rollup-node))
 (package (name octez-smart-rollup-node-Proxford)(allow_empty))
+(package (name octez-smart-rollup-node-PtNairob)(allow_empty))
 (package (name octez-smart-rollup-node-alpha)(allow_empty))
 (package (name octez-smart-rollup-node-lib))
 (package (name octez-smart-rollup-wasm-debugger))

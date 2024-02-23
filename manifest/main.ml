@@ -6743,7 +6743,9 @@ let hash = Protocol.hash
         ~linkall:true
     in
     let octez_sc_rollup_node =
-      only_if (active && N.(number >= 016)) @@ fun () ->
+      (* For now, we want to keep this for Nairobi and above because Etherlink
+         Ghostnet requires it. *)
+      only_if N.(number >= 017) @@ fun () ->
       private_lib
         (sf "octez_smart_rollup_node_%s" short_hash)
         ~path:(path // "lib_sc_rollup_node")

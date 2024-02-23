@@ -22,6 +22,7 @@ depends: [
   "octez-smart-rollup-node-Proxford" {with-test}
 ]
 depopts: [
+  "octez-smart-rollup-node-PtNairob" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
 ]
 build: [
