@@ -260,6 +260,8 @@ let create ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
   on_event evm_node (handle_blueprint_applied_event evm_node) ;
   evm_node
 
+let name evm_node = evm_node.name
+
 let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
 let run_args evm_node =

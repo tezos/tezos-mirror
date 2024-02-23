@@ -217,11 +217,20 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       sc_rollup_node;
     }
 
-let check_head_consistency ~sequencer ~proxy =
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  Check.((proxy_head.hash = sequencer_head.hash) string)
-    ~error_msg:"Proxy and sequencer do not have the same head" ;
+let check_head_consistency ~left ~right ?error_msg () =
+  let error_msg =
+    Option.value
+      ~default:
+        Format.(
+          sprintf
+            "Nodes do not have the same head (%s is %%L while %s is %%R"
+            (Evm_node.name left)
+            (Evm_node.name right))
+      error_msg
+  in
+  let*@ left_head = Rpc.get_block_by_number ~block:"latest" left in
+  let*@ right_head = Rpc.get_block_by_number ~block:"latest" right in
+  Check.((left_head.hash = right_head.hash) string) ~error_msg ;
   unit
 
 let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
@@ -437,10 +446,13 @@ let test_resilient_to_rollup_node_disconnect =
   in
 
   (* Check sequencer and rollup consistency *)
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) string)
-    ~error_msg:"The head should be the same before the outage" ;
+  let* () =
+    check_head_consistency
+      ~error_msg:"The head should be the same before the outage"
+      ~left:sequencer
+      ~right:proxy
+      ()
+  in
 
   (* Kill the rollup node *)
   let* () = Sc_rollup_node.kill sc_rollup_node in
@@ -509,10 +521,13 @@ let test_resilient_to_rollup_node_disconnect =
   in
 
   (* Check the consistency again *)
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) string)
-    ~error_msg:"The head should be the same after the outage" ;
+  let* () =
+    check_head_consistency
+      ~error_msg:"The head should be the same after the outage"
+      ~left:sequencer
+      ~right:proxy
+      ()
+  in
 
   unit
 
@@ -925,17 +940,16 @@ let test_init_from_rollup_node_data_dir =
       sc_rollup_node
   in
   let* () = Evm_node.run evm_node' in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node' in
-  Check.((sequencer_head.number = rollup_node_head.number) int32)
-    ~error_msg:"block number is not equal (sequencer: %L; rollup: %R)" ;
+
+  let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
+
   let* _l2_lvl = Rpc.produce_block sequencer in
+
   let* _lvl = Client.bake_for_and_wait client in
   let* _lvl = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" evm_node' in
-  Check.((sequencer_head.number = rollup_node_head.number) int32)
-    ~error_msg:"block number is not equal (sequencer: %L; rollup: %R)" ;
+
+  let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
+
   unit
 
 let test_observer_applies_blueprint =
@@ -978,13 +992,9 @@ let test_observer_applies_blueprint =
          levels_to_wait)
   in
 
-  let*@ sequencer_head =
-    Rpc.get_block_by_number ~block:"latest" sequencer_node
+  let* () =
+    check_head_consistency ~left:sequencer_node ~right:observer_node ()
   in
-  let*@ observer_head = Rpc.get_block_by_number ~block:"latest" observer_node in
-
-  Check.((sequencer_head.hash = observer_head.hash) string)
-    ~error_msg:"head hash is not equal (sequencer: %L; rollup: %R)" ;
 
   unit
 
@@ -1090,10 +1100,13 @@ let test_upgrade_kernel_auto_sync =
         unit)
   in
 
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) string)
-    ~error_msg:"The head should be the same before the upgrade" ;
+  let* () =
+    check_head_consistency
+      ~left:sequencer
+      ~right:proxy
+      ~error_msg:"The head should be the same before the upgrade"
+      ()
+  in
 
   (* Produce a block after activation timestamp, both the rollup
      node and the sequencer will upgrade to debug kernel and
@@ -1111,10 +1124,14 @@ let test_upgrade_kernel_auto_sync =
         unit)
   in
 
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_node_head.hash) string)
-    ~error_msg:"The head should be the same after upgrade" ;
+  let* () =
+    check_head_consistency
+      ~left:sequencer
+      ~right:proxy
+      ~error_msg:"The head should be the same after the upgrade"
+      ()
+  in
+
   unit
 
 let test_delayed_transfer_timeout =
@@ -1621,7 +1638,7 @@ let test_migration_from_ghostnet =
         unit)
   in
   (* Check the consistency. *)
-  let* () = check_head_consistency ~proxy ~sequencer in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   (* Sends upgrade to current version. *)
   let* () =
     upgrade
@@ -1647,7 +1664,7 @@ let test_migration_from_ghostnet =
   let* () = Evm_node.run ~extra_arguments:["--devmode"] proxy in
   let* () = Evm_node.run ~extra_arguments:["--devmode"] sequencer in
   (* Check the consistency. *)
-  let* () = check_head_consistency ~proxy ~sequencer in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   (* Produces a few blocks. *)
   let* _ =
     repeat 2 (fun () ->
@@ -1660,7 +1677,7 @@ let test_migration_from_ghostnet =
         unit)
   in
   (* Final consistency check. *)
-  check_head_consistency ~proxy ~sequencer
+  check_head_consistency ~left:sequencer ~right:proxy ()
 
 let () =
   test_remove_sequencer [Alpha] ;
