@@ -1,15 +1,209 @@
-include:
-  # Stage: build
-  - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-release.yml
-  - .gitlab/ci/jobs/build/oc.build:static-arm64-linux-binaries-release.yml
-  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-other.yml
-  - .gitlab/ci/jobs/build/oc.docker:amd64-release.yml
-  - .gitlab/ci/jobs/build/oc.docker:arm64-release.yml
-  - .gitlab/ci/jobs/build/oc.build:rpm:amd64.yml
-  - .gitlab/ci/jobs/build/oc.build:dpkg:amd64.yml
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
 
-  # Stage: prepare_release
-  - .gitlab/ci/jobs/prepare_release/docker:merge_manifests-release.yml
-
-  # Stage: publish_release_gitlab
-  - .gitlab/ci/jobs/publish/gitlab:release.yml
+oc.docker:rust-toolchain:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  stage: build
+  tags:
+  - gcp
+  dependencies: []
+  before_script: []
+  script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
+oc.build:static-x86_64-linux-binaries:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - job: trigger
+    optional: true
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  script:
+  - ./scripts/ci/build_static_binaries.sh
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/released-executables
+  artifacts:
+    expire_in: 90 days
+    paths:
+    - octez-binaries/$ARCH/*
+oc.build:static-arm64-linux-binaries:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  stage: build
+  tags:
+  - gcp_arm64
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  script:
+  - ./scripts/ci/build_static_binaries.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/released-executables
+  artifacts:
+    expire_in: 90 days
+    paths:
+    - octez-binaries/$ARCH/*
+oc.docker:amd64:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_release.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: amd64_
+    CI_DOCKER_HUB: "true"
+    EXECUTABLE_FILES: script-inputs/released-executables
+oc.docker:arm64:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_release.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: arm64_
+    CI_DOCKER_HUB: "true"
+    EXECUTABLE_FILES: script-inputs/released-executables
+oc.build:dpkg:amd64:
+  image: debian:bookworm
+  stage: build
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  before_script:
+  - . ./scripts/version.sh
+  - apt update
+  - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf
+    cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev
+    protobuf-compiler libsqlite3-dev
+  script:
+  - wget https://sh.rustup.rs/rustup-init.sh
+  - chmod +x rustup-init.sh
+  - ./rustup-init.sh --profile minimal --default-toolchain  $recommended_rust_version
+    -y
+  - . $HOME/.cargo/env
+  - export OPAMYES="true"
+  - opam init --bare --disable-sandboxing
+  - make build-deps
+  - eval $(opam env)
+  - make $TARGET
+  variables:
+    TARGET: dpkg
+    OCTEZ_PKGMAINTAINER: nomadic-labs
+    BLST_PORTABLE: "yes"
+    ARCH: amd64
+  artifacts:
+    name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*.deb
+    when: on_success
+oc.build:rpm:amd64:
+  image: fedora:39
+  stage: build
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  before_script:
+  - . ./scripts/version.sh
+  - dnf update -y
+  - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel
+    m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam
+    rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel
+    python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel sqlite-devel
+  script:
+  - wget https://sh.rustup.rs/rustup-init.sh
+  - chmod +x rustup-init.sh
+  - ./rustup-init.sh --profile minimal --default-toolchain  $recommended_rust_version
+    -y
+  - . $HOME/.cargo/env
+  - export OPAMYES="true"
+  - opam init --bare --disable-sandboxing
+  - make build-deps
+  - eval $(opam env)
+  - make $TARGET
+  variables:
+    TARGET: rpm
+    OCTEZ_PKGMAINTAINER: nomadic-labs
+    BLST_PORTABLE: "yes"
+    ARCH: amd64
+  artifacts:
+    name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
+    - octez-*.rpm
+    when: on_success
+docker:merge_manifests:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  stage: prepare_release
+  tags:
+  - gcp
+  needs:
+  - oc.docker:amd64
+  - oc.docker:arm64
+  dependencies: []
+  before_script:
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_merge_manifests.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "true"
+gitlab:release:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0
+  stage: publish_release_gitlab
+  tags:
+  - gcp
+  needs:
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  - oc.build:dpkg:amd64
+  - oc.build:rpm:amd64
+  dependencies:
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  - oc.build:dpkg:amd64
+  - oc.build:rpm:amd64
+  interruptible: false
+  script:
+  - ./scripts/ci/restrict_export_to_octez_source.sh
+  - ./scripts/ci/gitlab-release.sh

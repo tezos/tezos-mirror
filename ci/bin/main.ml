@@ -353,7 +353,7 @@ let rules_static_build_master = [job_rule ~when_:Always ()]
 
 let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
 
-let job_static_arm64_experimental =
+let _job_static_arm64_experimental =
   job_external ~filename_suffix:"experimental"
   @@ job_build_static_binaries ~arch:Arm64 ~rules:rules_static_build_other ()
 
@@ -361,15 +361,7 @@ let _job_static_arm64_master =
   job_external ~filename_suffix:"master"
   @@ job_build_static_binaries ~arch:Arm64 ~rules:rules_static_build_master ()
 
-let _job_static_arm64_release =
-  job_external ~filename_suffix:"release"
-  @@ job_build_static_binaries
-       ~arch:Arm64
-       ~release:true
-       ~rules:rules_static_build_other
-       ()
-
-let job_static_x86_64_experimental =
+let _job_static_x86_64_experimental =
   job_external ~filename_suffix:"experimental"
   @@ job_build_static_binaries
        ~arch:Amd64
@@ -385,15 +377,6 @@ let _job_static_x86_64_master =
             need to set it optional since we know this job is only on the master branch. *)
        ~needs_trigger:true
        ~rules:rules_static_build_master
-       ()
-
-let _job_static_x86_64_release =
-  job_external ~filename_suffix:"release"
-  @@ job_build_static_binaries
-       ~arch:Amd64
-       ~needs_trigger:true
-       ~release:true
-       ~rules:rules_static_build_other
        ()
 
 let job_docker_rust_toolchain ?rules ?dependencies () =
@@ -542,14 +525,6 @@ let job_docker_amd64_experimental : job =
     ~arch:Amd64
     Experimental
 
-let _job_docker_amd64_release : job =
-  job_docker_build
-    ~external_:true (* TODO: see above *)
-    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
-    ~rules:rules_octez_docker_changes_or_master
-    ~arch:Amd64
-    Release
-
 let _job_docker_amd64_test_manual : job =
   job_docker_build
     ~external_:true (* TODO: see above *)
@@ -557,14 +532,6 @@ let _job_docker_amd64_test_manual : job =
       (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
     ~arch:Amd64
     Test_manual
-
-let job_docker_amd64_test : job =
-  job_docker_build
-    ~external_:true (* TODO: see above *)
-    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
-    ~rules:rules_octez_docker_changes_or_master
-    ~arch:Amd64
-    Test
 
 let job_docker_arm64_experimental : job =
   job_docker_build
@@ -574,14 +541,6 @@ let job_docker_arm64_experimental : job =
     ~arch:Arm64
     Experimental
 
-let _job_docker_arm64_release : job =
-  job_docker_build
-    ~external_:true (* TODO: see above *)
-    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
-    ~rules:rules_octez_docker_changes_or_master
-    ~arch:Arm64
-    Release
-
 let _job_docker_arm64_test_manual : job =
   job_docker_build
     ~external_:true (* TODO: see above *)
@@ -589,14 +548,6 @@ let _job_docker_arm64_test_manual : job =
       (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
     ~arch:Arm64
     Test_manual
-
-let job_docker_arm64_test : job =
-  job_docker_build
-    ~external_:true (* TODO: see above *)
-    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
-    ~rules:rules_octez_docker_changes_or_master
-    ~arch:Arm64
-    Test
 
 (* Note: here we rely on [$IMAGE_ARCH_PREFIX] to be empty.
    Otherwise, [$DOCKER_IMAGE_TAG] would contain [$IMAGE_ARCH_PREFIX] too.
@@ -627,13 +578,6 @@ let _job_docker_merge_manifests_release =
             correcty variant must be used. *)
        ~job_docker_amd64:job_docker_amd64_experimental
        ~job_docker_arm64:job_docker_arm64_experimental
-
-let _job_docker_merge_manifests_test =
-  job_external ~filename_suffix:"test"
-  @@ job_docker_merge_manifests
-       ~ci_docker_hub:false
-       ~job_docker_amd64:job_docker_amd64_test
-       ~job_docker_arm64:job_docker_arm64_test
 
 type bin_package_target = Dpkg | Rpm
 
@@ -744,59 +688,117 @@ let _job_build_rpm_amd64_manual =
        ~stage:Stages.manual
        ()
 
-let job_gitlab_release ~dependencies : job =
-  job
-    ~name:"gitlab:release"
-    ~image:Images.ci_release
-    ~stage:Stages.publish_release_gitlab
-    ~interruptible:false
-    ~dependencies
-    [
-      "./scripts/ci/restrict_export_to_octez_source.sh";
-      "./scripts/ci/gitlab-release.sh";
-    ]
+(** Type of release tag pipelines.
 
-let job_gitlab_publish ~dependencies : job =
-  job
-    ~name:"gitlab:publish"
-    ~image:Images.ci_release
-    ~stage:Stages.publish_package_gitlab
-    ~interruptible:false
-    ~dependencies
-    ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
+    The semantics of the type is summed up in this table:
 
-let _job_gitlab_release : job =
-  job_external ~directory:"publish"
-  @@ job_gitlab_release
-       ~dependencies:
-         (Dependent
-            [
-              Artifacts job_static_x86_64_experimental;
-              Artifacts job_static_arm64_experimental;
-              Artifacts job_build_dpkg_amd64;
-              Artifacts job_build_rpm_amd64;
-            ])
+   |                       | Release_tag | Beta_release_tag | Non_release_tag |
+   |-----------------------+-------------+------------------+-----------------|
+   | GitLab release type   | Release     | Release          | Create          |
+   | Experimental binaries | No          | No               | No              |
+   | Docker build type     | Release     | Release          | Release         |
+   | Publishes to opam     | Yes         | No               | No              |
 
-let _job_gitlab_publish : job =
-  job_external ~directory:"publish"
-  @@ job_gitlab_publish
-       ~dependencies:
-         (Dependent
-            [
-              Artifacts job_static_x86_64_experimental;
-              Artifacts job_static_arm64_experimental;
-              Artifacts job_build_dpkg_amd64;
-              Artifacts job_build_rpm_amd64;
-            ])
+    - All release tag pipelines types publish [Release] type Docker builds.
+    - No release tag pipelines include experimental binaries.
+    - [Release_tag] and [Beta_release_tag] pipelines creates GitLab
+    and publishes releases. [Non_release_tag] pipelines creates the
+    GitLab release but do not publish them.
+    - Only [Release_tag] pipelines publish to opam. *)
+type release_tag_pipeline_type =
+  | Release_tag
+  | Beta_release_tag
+  | Non_release_tag
 
-let _job_opam_release : job =
-  job_external ~directory:"publish"
-  @@ job
-       ~name:"opam:release"
-       ~image:Images.runtime_build_test_dependencies
-       ~stage:Stages.publish_release
-       ~interruptible:false
-       ["./scripts/ci/opam-release.sh"]
+(** Create a release tag pipeline of type {!release_tag_pipeline_type}.
+
+    If [test] is true (default is [false]), then the Docker images are
+    built of the [Test] type and are published to the GitLab registry
+    instead of Docker hub. *)
+let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
+  let job_docker_rust_toolchain = job_docker_rust_toolchain () in
+  let job_docker_amd64 =
+    job_docker_build
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~arch:Amd64
+      (if test then Test else Release)
+  in
+  let job_docker_arm64 =
+    job_docker_build
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~arch:Arm64
+      (if test then Test else Release)
+  in
+  let job_docker_merge =
+    job_docker_merge_manifests
+      ~ci_docker_hub:(not test)
+      ~job_docker_amd64
+      ~job_docker_arm64
+  in
+  let job_static_arm64_release =
+    job_build_static_binaries ~arch:Arm64 ~release:true ()
+  in
+  let job_static_x86_64_release =
+    job_build_static_binaries ~arch:Amd64 ~release:true ~needs_trigger:true ()
+  in
+  let job_gitlab_release ~dependencies : job =
+    job
+      ~image:Images.ci_release
+      ~stage:Stages.publish_release_gitlab
+      ~interruptible:false
+      ~dependencies
+      ~name:"gitlab:release"
+      [
+        "./scripts/ci/restrict_export_to_octez_source.sh";
+        "./scripts/ci/gitlab-release.sh";
+      ]
+  in
+  let job_gitlab_publish ~dependencies : job =
+    job
+      ~image:Images.ci_release
+      ~stage:Stages.publish_package_gitlab
+      ~interruptible:false
+      ~dependencies
+      ~name:"gitlab:publish"
+      ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
+  in
+  let job_gitlab_release_or_publish =
+    let dependencies =
+      Dependent
+        [
+          Artifacts job_static_x86_64_release;
+          Artifacts job_static_arm64_release;
+          Artifacts job_build_dpkg_amd64;
+          Artifacts job_build_rpm_amd64;
+        ]
+    in
+    match release_tag_pipeline_type with
+    | Non_release_tag -> job_gitlab_publish ~dependencies
+    | _ -> job_gitlab_release ~dependencies
+  in
+  let job_opam_release : job =
+    job
+      ~image:Images.runtime_build_test_dependencies
+      ~stage:Stages.publish_release
+      ~interruptible:false
+      ~name:"opam:release"
+      ["./scripts/ci/opam-release.sh"]
+  in
+  [
+    job_docker_rust_toolchain;
+    job_static_x86_64_release;
+    job_static_arm64_release;
+    job_docker_amd64;
+    job_docker_arm64;
+    job_build_dpkg_amd64;
+    job_build_rpm_amd64;
+    job_docker_merge;
+    job_gitlab_release_or_publish;
+  ]
+  @
+  match (test, release_tag_pipeline_type) with
+  | false, Release_tag -> [job_opam_release]
+  | _ -> []
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
@@ -829,19 +831,24 @@ let () =
   register "master_branch" If.(on_tezos_namespace && push && on_branch "master") ;
   register
     "release_tag"
-    If.(on_tezos_namespace && push && has_tag_match release_tag_re) ;
+    If.(on_tezos_namespace && push && has_tag_match release_tag_re)
+    ~jobs:(release_tag_pipeline Release_tag) ;
   register
     "beta_release_tag"
-    If.(on_tezos_namespace && push && has_tag_match beta_release_tag_re) ;
+    If.(on_tezos_namespace && push && has_tag_match beta_release_tag_re)
+    ~jobs:(release_tag_pipeline Beta_release_tag) ;
   register
     "release_tag_test"
-    If.(not_on_tezos_namespace && push && has_any_release_tag) ;
+    If.(not_on_tezos_namespace && push && has_any_release_tag)
+    ~jobs:(release_tag_pipeline ~test:true Release_tag) ;
   register
     "non_release_tag"
-    If.(on_tezos_namespace && push && has_non_release_tag) ;
+    If.(on_tezos_namespace && push && has_non_release_tag)
+    ~jobs:(release_tag_pipeline Non_release_tag) ;
   register
     "non_release_tag_test"
-    If.(not_on_tezos_namespace && push && has_non_release_tag) ;
+    If.(not_on_tezos_namespace && push && has_non_release_tag)
+    ~jobs:(release_tag_pipeline ~test:true Non_release_tag) ;
   register "schedule_extended_test" schedule_extended_tests
 
 (* Split pipelines and writes image templates *)
