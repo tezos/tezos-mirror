@@ -1,0 +1,18 @@
+
+./octez-codec encode 019-PtParisA.gas from '"1238"'
+009613
+
+./octez-codec decode 019-PtParisA.gas from 009613
+"1238"
+
+./octez-codec encode 019-PtParisA.gas from '"unaccounted"'
+01
+
+./octez-codec decode 019-PtParisA.gas from 01
+"unaccounted"
+
+./octez-codec encode 019-PtParisA.gas from '"0"'
+0000
+
+./octez-codec decode 019-PtParisA.gas from 0000
+"0"

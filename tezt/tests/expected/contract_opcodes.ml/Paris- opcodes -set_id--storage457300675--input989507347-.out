@@ -1,0 +1,19 @@
+
+./octez-client --protocol PtParisAeco71sYvYgfnVPb4rRJe6zgzYRDS5U8t5ednSRPUFN5 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/set_id.tz on storage '{}' and input '{ "asdf" ; "bcde" }' --level 1 --trace-stack
+storage
+  { "asdf" ; "bcde" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (just consumed gas: 4.375)
+    [ (Pair { "asdf" ; "bcde" } {}) ]
+  - location: 9 (just consumed gas: 0.010)
+    [ { "asdf" ; "bcde" } ]
+  - location: 10 (just consumed gas: 0.010)
+    [ {}
+      { "asdf" ; "bcde" } ]
+  - location: 12 (just consumed gas: 0.010)
+    [ (Pair {} { "asdf" ; "bcde" }) ]
+
