@@ -39,11 +39,11 @@ module Stages = struct
 
   let prepare_release = Stage.register "prepare_release"
 
-  let _publish_release_gitlab = Stage.register "publish_release_gitlab"
+  let publish_release_gitlab = Stage.register "publish_release_gitlab"
 
   let publish_release = Stage.register "publish_release"
 
-  let _publish_package_gitlab = Stage.register "publish_package_gitlab"
+  let publish_package_gitlab = Stage.register "publish_package_gitlab"
 
   let manual = Stage.register "manual"
 end
@@ -124,7 +124,7 @@ module Images = struct
       ~image_path:
         "${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}"
 
-  let _runtime_build_test_dependencies =
+  let runtime_build_test_dependencies =
     Image.register
       ~name:"runtime_build_test_dependencies"
       ~image_path:
@@ -182,6 +182,11 @@ module Images = struct
     Image.register ~name:"debian_bookworm" ~image_path:"debian:bookworm"
 
   let fedora_39 = Image.register ~name:"fedora_39" ~image_path:"fedora:39"
+
+  let ci_release =
+    Image.register
+      ~name:"ci_release"
+      ~image_path:"${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
 end
 
 let before_script ?(take_ownership = false) ?(source_version = false)
@@ -348,7 +353,7 @@ let rules_static_build_master = [job_rule ~when_:Always ()]
 
 let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
 
-let _job_static_arm64_experimental =
+let job_static_arm64_experimental =
   job_external ~filename_suffix:"experimental"
   @@ job_build_static_binaries ~arch:Arm64 ~rules:rules_static_build_other ()
 
@@ -364,7 +369,7 @@ let _job_static_arm64_release =
        ~rules:rules_static_build_other
        ()
 
-let _job_static_x86_64_experimental =
+let job_static_x86_64_experimental =
   job_external ~filename_suffix:"experimental"
   @@ job_build_static_binaries
        ~arch:Amd64
@@ -703,7 +708,7 @@ let job_build_bin_package ?rules ~name ?(stage = Stages.build) ~arch ~target ()
       "make $TARGET";
     ]
 
-let _job_build_dpkg_amd64 =
+let job_build_dpkg_amd64 =
   job_external
   @@ job_build_bin_package
        ~name:"oc.build:dpkg:amd64"
@@ -711,7 +716,7 @@ let _job_build_dpkg_amd64 =
        ~arch:Tezos_ci.Amd64
        ()
 
-let _job_build_rpm_amd64 =
+let job_build_rpm_amd64 =
   job_external
   @@ job_build_bin_package
        ~name:"oc.build:rpm:amd64"
@@ -738,6 +743,60 @@ let _job_build_rpm_amd64_manual =
        ~arch:Tezos_ci.Amd64
        ~stage:Stages.manual
        ()
+
+let job_gitlab_release ~dependencies : job =
+  job
+    ~name:"gitlab:release"
+    ~image:Images.ci_release
+    ~stage:Stages.publish_release_gitlab
+    ~interruptible:false
+    ~dependencies
+    [
+      "./scripts/ci/restrict_export_to_octez_source.sh";
+      "./scripts/ci/gitlab-release.sh";
+    ]
+
+let job_gitlab_publish ~dependencies : job =
+  job
+    ~name:"gitlab:publish"
+    ~image:Images.ci_release
+    ~stage:Stages.publish_package_gitlab
+    ~interruptible:false
+    ~dependencies
+    ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
+
+let _job_gitlab_release : job =
+  job_external ~directory:"publish"
+  @@ job_gitlab_release
+       ~dependencies:
+         (Dependent
+            [
+              Artifacts job_static_x86_64_experimental;
+              Artifacts job_static_arm64_experimental;
+              Artifacts job_build_dpkg_amd64;
+              Artifacts job_build_rpm_amd64;
+            ])
+
+let _job_gitlab_publish : job =
+  job_external ~directory:"publish"
+  @@ job_gitlab_publish
+       ~dependencies:
+         (Dependent
+            [
+              Artifacts job_static_x86_64_experimental;
+              Artifacts job_static_arm64_experimental;
+              Artifacts job_build_dpkg_amd64;
+              Artifacts job_build_rpm_amd64;
+            ])
+
+let _job_opam_release : job =
+  job_external ~directory:"publish"
+  @@ job
+       ~name:"opam:release"
+       ~image:Images.runtime_build_test_dependencies
+       ~stage:Stages.publish_release
+       ~interruptible:false
+       ["./scripts/ci/opam-release.sh"]
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the

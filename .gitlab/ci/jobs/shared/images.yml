@@ -3,6 +3,8 @@
 
 .image_template__alpine:
   image: alpine:3.18
+.image_template__ci_release:
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0
 .image_template__client_libs_dependencies:
   image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
 .image_template__debian_bookworm:

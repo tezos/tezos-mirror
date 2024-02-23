@@ -1,18 +1,22 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
 gitlab:release:
-  extends:
-    - .default_settings_template
-  # https://gitlab.com/tezos/docker-images/ci-release
-  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
+  image: ${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0
   stage: publish_release_gitlab
-  # Publish jobs are uninterruptible to avoid publishing partial results.
-  interruptible: false
+  tags:
+  - gcp
+  needs:
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  - oc.build:dpkg:amd64
+  - oc.build:rpm:amd64
   dependencies:
-    - oc.build:static-x86_64-linux-binaries
-    - oc.build:static-arm64-linux-binaries
-    - oc.build:dpkg:amd64
-    - oc.build:rpm:amd64
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  - oc.build:dpkg:amd64
+  - oc.build:rpm:amd64
+  interruptible: false
   script:
-    # Set .gitattributes to restrict the tarball create
-    # by gitlab-release.sh to Octez.
-    - ./scripts/ci/restrict_export_to_octez_source.sh
-    - ./scripts/ci/gitlab-release.sh
+  - ./scripts/ci/restrict_export_to_octez_source.sh
+  - ./scripts/ci/gitlab-release.sh

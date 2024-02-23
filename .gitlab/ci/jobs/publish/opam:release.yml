@@ -1,10 +1,12 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
 opam:release:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
   stage: publish_release
-  # Publish jobs are uninterruptible to avoid publishing partial results.
+  tags:
+  - gcp
+  dependencies: []
   interruptible: false
   script:
-  # create opam release and push to github (also pushes latest master branch)
   - ./scripts/ci/opam-release.sh
