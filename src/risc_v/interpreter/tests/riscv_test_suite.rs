@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::process::Command;
-
+use lazy_static::lazy_static;
 use risc_v_interpreter::parser::instruction::Instr;
 use risc_v_interpreter::parser::parse_block;
+use std::process::Command;
 
 fn compute_offset(src: &str, dest: &str) -> i64 {
     i64::from_str_radix(dest, 16).unwrap() - i64::from_str_radix(src, 16).unwrap()
@@ -44,7 +44,26 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
     }
 }
 
-const OBJDUMP: &str = "objdump";
+lazy_static! {
+    static ref OBJDUMP_EXE: &'static str = {
+        // Iterate through the known executable names to find a suitable objdump.
+        for exe in ["riscv64-unknown-linux-gnu-objdump", "objdump"] {
+            let Some(output) = Command::new(exe).arg("--version").output().ok() else {
+                continue;
+            };
+
+            let stdout =
+                std::str::from_utf8(output.stdout.as_slice()).expect("Invalid UTF-8 encoding");
+
+            if stdout.contains("GNU objdump") {
+                return exe;
+            }
+        }
+
+        panic!("Could not find a GNU-style objdump executable")
+    };
+}
+
 const OBJDUMP_OPTS: [&str; 3] = ["--disassemble", "-M", "no-aliases,numeric"];
 
 /// Disassemble a RISC-V binary using objdump and return a vector of tuples
@@ -56,7 +75,7 @@ fn objdump(file_path: &str, disassembled: bool) -> Vec<(String, Instr, String)> 
     let contents = if disassembled {
         std::fs::read_to_string(file_path).expect("Failed to read file")
     } else {
-        let output = Command::new(OBJDUMP)
+        let output = Command::new(*OBJDUMP_EXE)
             .args(OBJDUMP_OPTS)
             .arg(file_path)
             .output()
