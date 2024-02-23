@@ -137,6 +137,19 @@ let can_stake_from_unstake ctxt ~for_next_cycle_use_only_after_slashing
       (Contract_repr.Implicit delegate)
   in
   let slashing_history = Option.value slashing_history_opt ~default:[] in
+
+  let* slashing_history_opt_o =
+    Storage.Contract.Slashed_deposits__Oxford.find
+      ctxt
+      (Contract_repr.Implicit delegate)
+  in
+  let slashing_history_o =
+    Option.value slashing_history_opt_o ~default:[]
+    |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+  in
+
+  let slashing_history = slashing_history @ slashing_history_o in
+
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let current_cycle =
     if for_next_cycle_use_only_after_slashing then Cycle_repr.succ current_cycle

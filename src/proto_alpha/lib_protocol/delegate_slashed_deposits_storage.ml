@@ -25,35 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO #6918: Remove after P *)
-let update_slashing_storage_for_p ctxt =
-  let open Lwt_result_syntax in
-  Storage.Delegates.fold
-    ctxt
-    ~init:(Ok ctxt)
-    ~order:`Undefined
-    ~f:(fun delegate ctxt ->
-      let*? ctxt in
-      let delegate = Contract_repr.Implicit delegate in
-      let* slashed_history =
-        Storage.Contract.Slashed_deposits__Oxford.find ctxt delegate
-      in
-      match slashed_history with
-      | None -> return ctxt
-      | Some slashed_history ->
-          let slashed_history =
-            List.map
-              (fun (cycle, percentage) ->
-                (cycle, Percentage.convert_from_o_to_p percentage))
-              slashed_history
-          in
-          let*! ctxt =
-            Storage.Contract.Slashed_deposits.add ctxt delegate slashed_history
-          in
-          Storage.Contract.Slashed_deposits__Oxford.remove_existing
-            ctxt
-            delegate)
-
 type reward_and_burn = {reward : Tez_repr.t; amount_to_burn : Tez_repr.t}
 
 type punishing_amounts = {
@@ -257,10 +228,37 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                 0) ;
             (* Validate ensures that [denunciations] contains [delegate] at most once *)
             let delegate_contract = Contract_repr.Implicit delegate in
+            (* Oxford values *)
+            let* slash_history_opt_o =
+              Storage.Contract.Slashed_deposits__Oxford.find
+                ctxt
+                delegate_contract
+            in
+            let slash_history_o =
+              Option.value slash_history_opt_o ~default:[]
+              |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+            in
+
             let* slash_history_opt =
               Storage.Contract.Slashed_deposits.find ctxt delegate_contract
             in
             let slash_history = Option.value slash_history_opt ~default:[] in
+
+            (* Concatenate both, Oxford first *)
+            let slash_history =
+              List.fold_left
+                (fun acc (cycle, percentage) ->
+                  Storage.Slashed_deposits_history.add cycle percentage acc)
+                slash_history_o
+                slash_history
+            in
+
+            let*! ctxt =
+              Storage.Contract.Slashed_deposits__Oxford.remove
+                ctxt
+                delegate_contract
+            in
+
             let previous_total_slashing_percentage =
               Storage.Slashed_deposits_history.get level.cycle slash_history
             in

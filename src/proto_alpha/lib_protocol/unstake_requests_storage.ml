@@ -122,6 +122,24 @@ let prepare_finalize_unstake ctxt ~for_next_cycle_use_only_after_slashing
           let slashing_history =
             Option.value slashing_history_opt ~default:[]
           in
+          (* Oxford values *)
+          let* slashing_history_opt_o =
+            Storage.Contract.Slashed_deposits__Oxford.find
+              ctxt
+              (Contract_repr.Implicit delegate)
+          in
+          let slashing_history_o =
+            Option.value slashing_history_opt_o ~default:[]
+            |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+          in
+
+          let slashing_history =
+            List.fold_left
+              (fun acc (cycle, percentage) ->
+                Storage.Slashed_deposits_history.add cycle percentage acc)
+              slashing_history_o
+              slashing_history
+          in
           let finalizable, unfinalizable_requests =
             List.partition_map
               (fun request ->
@@ -175,6 +193,26 @@ module For_RPC = struct
         (Contract_repr.Implicit delegate)
     in
     let slashing_history = Option.value slashing_history_opt ~default:[] in
+
+    (* Oxford values *)
+    let* slashing_history_opt =
+      Storage.Contract.Slashed_deposits__Oxford.find
+        ctxt
+        (Contract_repr.Implicit delegate)
+    in
+    let slashing_history_o =
+      Option.value slashing_history_opt ~default:[]
+      |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
+    in
+
+    let slashing_history =
+      List.fold_left
+        (fun acc (cycle, percentage) ->
+          Storage.Slashed_deposits_history.add cycle percentage acc)
+        slashing_history_o
+        slashing_history
+    in
+
     List.map_es
       (fun (request_cycle, request_amount) ->
         let new_amount =
