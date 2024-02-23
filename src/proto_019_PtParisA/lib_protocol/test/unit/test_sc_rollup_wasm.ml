@@ -338,10 +338,10 @@ let test_protocol_names () =
     Tezos_scoru_wasm.Pvm_input_kind.from_raw_input
       protocol_migration_message_str
   in
-  assert (kind = Internal (Protocol_migration Proto_alpha)) ;
+  assert (kind = Internal (Protocol_migration Paris)) ;
   assert (
     protocol_migration_internal_message
-    = Protocol_migration Tezos_scoru_wasm.Constants.proto_alpha_name) ;
+    = Protocol_migration Tezos_scoru_wasm.Constants.paris_name) ;
   Lwt_result_syntax.return_unit
 
 let test_reveal_host_function_can_request_dal_pages () =

@@ -28,8 +28,8 @@ open Wasm_pvm_state.Internal_state
 
 let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   function
-  | Nairobi -> V1
   | Oxford -> V2
+  | Paris -> V4
   | Proto_alpha -> V4
 
 let link_finished (ast : Wasm.Ast.module_) offset =
