@@ -1,0 +1,34 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_alpha_mockup_simulator)
+ (public_name octez-protocol-alpha-libs.bakings.mockup-simulator)
+ (libraries
+  octez-libs.base
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-alpha-libs.baking
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base-unix
+  tezos-protocol-alpha.parameters
+  octez-shell-libs.mockup
+  octez-shell-libs.mockup-proxy
+  octez-shell-libs.mockup-commands
+  octez-protocol-alpha-libs.baking.tenderbrute
+  tezt.core)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_alpha.Protocol
+  -open Tezos_client_alpha
+  -open Tezos_client_commands
+  -open Tezos_baking_alpha
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base_unix
+  -open Tezos_protocol_alpha_parameters
+  -open Tenderbrute_alpha
+  -open Tezt_core))

@@ -1,0 +1,29 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_client_sapling_alpha)
+ (public_name octez-protocol-alpha-libs.client.sapling)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  octez-libs.crypto
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base
+  octez-shell-libs.signer-backends
+  octez-protocol-alpha-libs.client
+  octez-protocol-alpha-libs.client.commands
+  tezos-protocol-alpha.protocol
+  octez-protocol-alpha-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base
+  -open Tezos_client_alpha
+  -open Tezos_client_alpha_commands
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_plugin_alpha))

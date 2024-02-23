@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_type_inference_alpha)
+ (public_name tezos-benchmark-type-inference-alpha)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.stdlib
+  octez-libs.error-monad
+  octez-libs.crypto
+  octez-libs.micheline
+  tezos-micheline-rewriting
+  tezos-protocol-alpha.protocol
+  hashcons)
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Tezos_crypto
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_protocol_alpha))
