@@ -5,7 +5,8 @@ include:
   - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-other.yml
   - .gitlab/ci/jobs/build/oc.docker:amd64-release.yml
   - .gitlab/ci/jobs/build/oc.docker:arm64-release.yml
-  - .gitlab/ci/jobs/build/bin_packages.yml
+  - .gitlab/ci/jobs/build/oc.build:rpm:amd64.yml
+  - .gitlab/ci/jobs/build/oc.build:dpkg:amd64.yml
 
   # Stage: prepare_release
   - .gitlab/ci/jobs/prepare_release/docker:merge_manifests-release.yml

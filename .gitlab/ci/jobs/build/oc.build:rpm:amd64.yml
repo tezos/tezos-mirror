@@ -1,12 +1,5 @@
 include: .gitlab/ci/jobs/build/bin_packages_common.yml
 
-oc.build:dpkg:amd64:
-  extends:
-    - .tags_template__build
-    - .bin_packages_common
-    - .bin_packages_dpkg
-  stage: build
-
 oc.build:rpm:amd64:
   extends:
     - .tags_template__build
