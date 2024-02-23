@@ -1,0 +1,12 @@
+gitlab:etherlink-release:
+  extends:
+    - .default_settings_template
+  # https://gitlab.com/tezos/docker-images/ci-release
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
+  stage: publish_release_gitlab
+  # Publish jobs are uninterruptible to avoid publishing partial results.
+  interruptible: false
+  dependencies:
+    - docker:prepare-etherlink-release
+  script:
+    - ./scripts/ci/gitlab-etherlink-release.sh

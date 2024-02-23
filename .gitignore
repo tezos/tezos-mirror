@@ -114,6 +114,9 @@ evm_benchmark_installer.wasm
 evm_unstripped_installer.wasm
 _evm_unstripped_installer_preimages/
 
+# Etherlink
+etherlink/kernels-*
+
 # Terraform
 
 # Local .terraform directories

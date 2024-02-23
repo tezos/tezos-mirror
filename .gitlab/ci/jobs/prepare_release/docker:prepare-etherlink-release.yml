@@ -1,0 +1,12 @@
+docker:prepare-etherlink-release:
+  extends:
+    - .docker_auth_template
+    - .image_template__docker
+  stage: prepare_release
+  script:
+    - ./scripts/ci/docker_prepare_etherlink_release.sh
+  artifacts:
+    paths:
+      - kernels.tar.gz
+      - kernels_job_id
+    expire_in: never
