@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Protocol_client_context
 
 (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
