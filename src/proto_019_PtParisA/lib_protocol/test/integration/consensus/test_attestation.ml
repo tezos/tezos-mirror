@@ -692,7 +692,8 @@ let test_attester_not_in_dal_committee () =
   let n = 10 in
   let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
   let dal =
-    Tezos_protocol_019_PtParisA_parameters.Default_parameters.constants_sandbox.dal
+    Tezos_protocol_019_PtParisA_parameters.Default_parameters.constants_sandbox
+      .dal
   in
   let dal =
     (* We need to take a small number of shards to be sure there is a
