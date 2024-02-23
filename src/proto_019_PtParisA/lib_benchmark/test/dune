@@ -11,11 +11,11 @@
   octez-libs.base
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-alpha.protocol
+  tezos-protocol-019-PtParisA.protocol
   tezos-benchmark
-  tezos-benchmark-type-inference-alpha
-  tezos-benchmark-alpha
-  octez-protocol-alpha-libs.test-helpers
+  tezos-benchmark-type-inference-019-PtParisA
+  tezos-benchmark-019-PtParisA
+  octez-protocol-019-PtParisA-libs.test-helpers
   octez-libs.error-monad
   prbnmcn-stats)
  (link_flags
@@ -25,11 +25,11 @@
   (:standard)
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_micheline
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_019_PtParisA
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_benchmark_alpha
-  -open Tezos_alpha_test_helpers))
+  -open Tezos_benchmark_type_inference_019_PtParisA
+  -open Tezos_benchmark_019_PtParisA
+  -open Tezos_019_PtParisA_test_helpers))
 
 (rule
  (alias runtest_micheline_rewriting_data)

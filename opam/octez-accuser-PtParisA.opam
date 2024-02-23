@@ -11,18 +11,13 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs"
-  "octez-injector"
+  "tezos-protocol-019-PtParisA"
+  "octez-protocol-019-PtParisA-libs"
   "octez-shell-libs"
-  "data-encoding" { >= "0.7.1" & < "1.0.0" }
-]
-depopts: [
-  "tezos-injector-018-Proxford"
-  "tezos-injector-019-PtParisA"
-  "tezos-injector-alpha"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Octez injector"
+synopsis: "Tezos/Protocol: accuser binary"

@@ -15,6 +15,7 @@ depends: [
   "tezos-dac-lib"
   "tezos-dac-client-lib"
   "octez-protocol-018-Proxford-libs"
+  "octez-protocol-019-PtParisA-libs"
 ]
 depopts: [
   "octez-protocol-alpha-libs"

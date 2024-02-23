@@ -2,17 +2,17 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_baker_alpha)
- (public_name octez-baker-alpha)
- (package octez-baker-alpha)
+ (name main_baker_019_PtParisA)
+ (public_name octez-baker-PtParisA)
+ (package octez-baker-PtParisA)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
-  tezos-protocol-alpha.protocol
-  octez-protocol-alpha-libs.client
+  tezos-protocol-019-PtParisA.protocol
+  octez-protocol-019-PtParisA-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-alpha-libs.baking-commands
+  octez-protocol-019-PtParisA-libs.baking-commands
   octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix)
  (link_flags
@@ -23,9 +23,9 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-  -open Tezos_protocol_alpha
-  -open Tezos_client_alpha
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_client_019_PtParisA
   -open Tezos_client_commands
-  -open Tezos_baking_alpha_commands
+  -open Tezos_baking_019_PtParisA_commands
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix))

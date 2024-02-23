@@ -2,34 +2,34 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_smart_rollup_node_alpha)
- (package octez-smart-rollup-node-alpha)
+ (name octez_smart_rollup_node_PtParisA)
+ (package octez-smart-rollup-node-PtParisA)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  octez-protocol-alpha-libs.client
+  octez-protocol-019-PtParisA-libs.client
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
-  tezos-protocol-alpha.protocol
-  octez-protocol-alpha-libs.plugin
-  tezos-protocol-alpha.parameters
+  tezos-protocol-019-PtParisA.protocol
+  octez-protocol-019-PtParisA-libs.plugin
+  tezos-protocol-019-PtParisA.parameters
   octez-libs.rpc
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   octez-libs.tezos-workers
   tezos-dal-node-services
   tezos-dal-node-lib
-  octez-protocol-alpha-libs.dac
+  octez-protocol-019-PtParisA-libs.dac
   tezos-dac-lib
   tezos-dac-client-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
-  octez-protocol-alpha-libs.smart-rollup
-  octez-protocol-alpha-libs.smart-rollup-layer2
-  octez-protocol-alpha-libs.layer2-utils
+  octez-protocol-019-PtParisA-libs.smart-rollup
+  octez-protocol-019-PtParisA-libs.smart-rollup-layer2
+  octez-protocol-019-PtParisA-libs.layer2-utils
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tree-encoding
@@ -54,20 +54,20 @@
   -open Tezos_stdlib_unix
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Tezos_client_alpha
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_plugin_alpha
-  -open Tezos_protocol_alpha_parameters
+  -open Tezos_client_019_PtParisA
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_protocol_plugin_019_PtParisA
+  -open Tezos_protocol_019_PtParisA_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
-  -open Tezos_dac_alpha
+  -open Tezos_dac_019_PtParisA
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
   -open Tezos_shell_services
   -open Octez_smart_rollup
-  -open Tezos_smart_rollup_alpha
-  -open Tezos_smart_rollup_layer2_alpha
-  -open Tezos_layer2_utils_alpha
+  -open Tezos_smart_rollup_019_PtParisA
+  -open Tezos_smart_rollup_layer2_019_PtParisA
+  -open Tezos_layer2_utils_019_PtParisA
   -open Tezos_layer2_store
   -open Octez_crawler
   -open Octez_injector

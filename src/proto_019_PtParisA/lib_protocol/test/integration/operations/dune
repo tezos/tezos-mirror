@@ -2,7 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_alpha_lib_protocol_test_integration_operations_tezt_lib)
+ (name
+  src_proto_019_PtParisA_lib_protocol_test_integration_operations_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -22,10 +23,10 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_019_PtParisA
-  -open Tezos_client_alpha
-  -open Tezos_alpha_test_helpers
+  -open Tezos_client_019_PtParisA
+  -open Tezos_019_PtParisA_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_plugin_alpha)
+  -open Tezos_protocol_plugin_019_PtParisA)
  (modules
   test_activation
   test_combined_operations
@@ -44,7 +45,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_proto_alpha_lib_protocol_test_integration_operations_tezt_lib
+  src_proto_019_PtParisA_lib_protocol_test_integration_operations_tezt_lib
   tezt)
  (link_flags
   (:standard)

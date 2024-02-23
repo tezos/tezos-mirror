@@ -2,20 +2,20 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_environment_alpha)
+ (name tezos_protocol_environment_019_PtParisA)
  (public_name tezos-protocol-019-PtParisA.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
- (modules Tezos_protocol_environment_alpha))
+ (modules Tezos_protocol_environment_019_PtParisA))
 
 (rule
- (targets tezos_protocol_environment_alpha.ml)
+ (targets tezos_protocol_environment_019_PtParisA.ml)
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V12.Make(Name)()\n")))
+   "module Name = struct let name = \"019-PtParisA\" end\ninclude Tezos_protocol_environment.V12.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_019_PtParisA)
@@ -28,9 +28,9 @@
   (:standard)
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_alpha
-  -open Tezos_protocol_environment_alpha.Pervasives
-  -open Tezos_protocol_environment_alpha.Error_monad)
+  -open Tezos_protocol_environment_019_PtParisA
+  -open Tezos_protocol_environment_019_PtParisA.Pervasives
+  -open Tezos_protocol_environment_019_PtParisA.Error_monad)
  (modules
   Misc
   Non_empty_string
@@ -316,14 +316,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"\nlet name = Tezos_protocol_environment_alpha.Name.name\ninclude Tezos_raw_protocol_019_PtParisA\ninclude Tezos_raw_protocol_alpha.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtParisAeco71sYvYgfnVPb4rRJe6zgzYRDS5U8t5ednSRPUFN5\"\nlet name = Tezos_protocol_environment_019_PtParisA.Name.name\ninclude Tezos_raw_protocol_019_PtParisA\ninclude Tezos_raw_protocol_019_PtParisA.Main\n")))
 
 (rule
  (targets tezos_protocol_019_PtParisA.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_alpha\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_019_PtParisA\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -593,7 +593,7 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
+ (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
  (name tezos_protocol_019_PtParisA_lifted)
@@ -1183,4 +1183,4 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:octez-embedded-protocol-packer} %{src_dir} alpha)))))
+    (run %{bin:octez-embedded-protocol-packer} %{src_dir} 019_PtParisA)))))

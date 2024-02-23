@@ -431,6 +431,13 @@ opam:octez-accuser-Proxford:
   variables:
     package: octez-accuser-Proxford
 
+opam:octez-accuser-PtParisA:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_exec_opam_batch_1
+  variables:
+    package: octez-accuser-PtParisA
+
 # Ignoring unreleased package octez-accuser-alpha.
 
 opam:octez-alcotezt:
@@ -446,6 +453,13 @@ opam:octez-baker-Proxford:
     - .rules_template__trigger_exec_opam_batch_1
   variables:
     package: octez-baker-Proxford
+
+opam:octez-baker-PtParisA:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_exec_opam_batch_1
+  variables:
+    package: octez-baker-PtParisA
 
 # Ignoring unreleased package octez-baker-alpha.
 
@@ -583,14 +597,14 @@ opam:octez-protocol-002-PsYLVpVv-libs:
 opam:octez-protocol-003-PsddFKi3-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-003-PsddFKi3-libs
 
 opam:octez-protocol-004-Pt24m4xi-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-004-Pt24m4xi-libs
 
@@ -692,6 +706,13 @@ opam:octez-protocol-018-Proxford-libs:
   variables:
     package: octez-protocol-018-Proxford-libs
 
+opam:octez-protocol-019-PtParisA-libs:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-protocol-019-PtParisA-libs
+
 opam:octez-protocol-alpha-libs:
   extends:
     - .opam_template
@@ -761,10 +782,17 @@ opam:octez-smart-rollup-node-PtNairob:
   variables:
     package: octez-smart-rollup-node-PtNairob
 
-opam:octez-smart-rollup-node-alpha:
+opam:octez-smart-rollup-node-PtParisA:
   extends:
     - .opam_template
     - .rules_template__trigger_all_opam_batch_1
+  variables:
+    package: octez-smart-rollup-node-PtParisA
+
+opam:octez-smart-rollup-node-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: octez-smart-rollup-node-alpha
 
@@ -785,7 +813,7 @@ opam:octez-smart-rollup-wasm-debugger:
 opam:octez-smart-rollup-wasm-debugger-lib:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_1
+    - .rules_template__trigger_all_opam_batch_2
   variables:
     package: octez-smart-rollup-wasm-debugger-lib
 
@@ -820,6 +848,8 @@ opam:tezos-benchmark:
 
 # Ignoring unreleased package tezos-benchmark-018-Proxford.
 
+# Ignoring unreleased package tezos-benchmark-019-PtParisA.
+
 # Ignoring unreleased package tezos-benchmark-alpha.
 
 # Ignoring unreleased package tezos-benchmark-examples.
@@ -828,16 +858,20 @@ opam:tezos-benchmark:
 
 # Ignoring unreleased package tezos-benchmark-type-inference-018-Proxford.
 
+# Ignoring unreleased package tezos-benchmark-type-inference-019-PtParisA.
+
 # Ignoring unreleased package tezos-benchmark-type-inference-alpha.
 
 # Ignoring unreleased package tezos-benchmarks-proto-018-Proxford.
+
+# Ignoring unreleased package tezos-benchmarks-proto-019-PtParisA.
 
 # Ignoring unreleased package tezos-benchmarks-proto-alpha.
 
 opam:tezos-client-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: tezos-client-demo-counter
 
@@ -888,6 +922,8 @@ opam:tezos-dal-node-services:
     package: tezos-dal-node-services
 
 # Ignoring unreleased package tezos-injector-018-Proxford.
+
+# Ignoring unreleased package tezos-injector-019-PtParisA.
 
 # Ignoring unreleased package tezos-injector-alpha.
 
@@ -1038,7 +1074,7 @@ opam:tezos-protocol-016-PtMumbai:
 opam:tezos-protocol-017-PtNairob:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-017-PtNairob
 
@@ -1050,6 +1086,15 @@ opam:tezos-protocol-018-Proxford:
     package: tezos-protocol-018-Proxford
 
 # Ignoring unreleased package tezos-protocol-018-Proxford-tests.
+
+opam:tezos-protocol-019-PtParisA:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_6
+  variables:
+    package: tezos-protocol-019-PtParisA
+
+# Ignoring unreleased package tezos-protocol-019-PtParisA-tests.
 
 opam:tezos-protocol-alpha:
   extends:
@@ -1084,7 +1129,7 @@ opam:tezos-protocol-genesis:
 opam:tezos-proxy-server-config:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: tezos-proxy-server-config
 

@@ -9,6 +9,8 @@
   octez-shell-libs.store
   tezos-protocol-018-Proxford.protocol
   octez-protocol-018-Proxford-libs.client
+  tezos-protocol-019-PtParisA.protocol
+  octez-protocol-019-PtParisA-libs.client
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))

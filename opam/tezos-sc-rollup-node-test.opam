@@ -16,6 +16,9 @@ depends: [
   "octez-protocol-018-Proxford-libs" {with-test}
   "octez-smart-rollup-node-Proxford" {with-test}
   "octez-alcotezt" {with-test}
+  "tezos-protocol-019-PtParisA" {with-test}
+  "octez-protocol-019-PtParisA-libs" {with-test}
+  "octez-smart-rollup-node-PtParisA" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}

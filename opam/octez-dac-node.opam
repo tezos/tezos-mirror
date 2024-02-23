@@ -17,6 +17,7 @@ depends: [
   "octez-l2-libs"
   "octez-internal-libs"
   "octez-protocol-018-Proxford-libs"
+  "octez-protocol-019-PtParisA-libs"
 ]
 depopts: [
   "octez-protocol-alpha-libs"

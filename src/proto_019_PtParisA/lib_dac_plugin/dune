@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dac_alpha)
- (public_name octez-protocol-alpha-libs.dac)
+ (name tezos_dac_019_PtParisA)
+ (public_name octez-protocol-019-PtParisA-libs.dac)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
@@ -11,9 +11,9 @@
   octez-libs.stdlib-unix
   tezos-dac-lib
   tezos-dac-client-lib
-  octez-protocol-alpha-libs.client
-  tezos-protocol-alpha.embedded-protocol
-  tezos-protocol-alpha.protocol)
+  octez-protocol-019-PtParisA-libs.client
+  tezos-protocol-019-PtParisA.embedded-protocol
+  tezos-protocol-019-PtParisA.protocol)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -25,6 +25,6 @@
   -open Tezos_stdlib_unix
   -open Tezos_dac_lib
   -open Tezos_dac_client_lib
-  -open Tezos_client_alpha
-  -open Tezos_embedded_protocol_alpha
-  -open Tezos_protocol_alpha))
+  -open Tezos_client_019_PtParisA
+  -open Tezos_embedded_protocol_019_PtParisA
+  -open Tezos_protocol_019_PtParisA))

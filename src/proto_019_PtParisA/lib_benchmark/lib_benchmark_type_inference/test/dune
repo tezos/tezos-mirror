@@ -6,24 +6,24 @@
  (libraries
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha.protocol
+  tezos-benchmark-type-inference-019-PtParisA
+  tezos-protocol-019-PtParisA.protocol
   octez-libs.error-monad
-  octez-protocol-alpha-libs.client)
+  octez-protocol-019-PtParisA-libs.client)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_benchmark_type_inference_alpha))
+  -open Tezos_benchmark_type_inference_019_PtParisA))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-alpha)
+ (package tezos-benchmark-type-inference-019-PtParisA)
  (action (run %{dep:./test_uf.exe})))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-alpha)
+ (package tezos-benchmark-type-inference-019-PtParisA)
  (action (run %{dep:./test_inference.exe})))

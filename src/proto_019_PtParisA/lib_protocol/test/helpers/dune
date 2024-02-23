@@ -2,10 +2,14 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_alpha_test_helpers)
+ (name tezos_019_PtParisA_test_helpers)
  (public_name octez-protocol-019-PtParisA-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezt.core
+  octez-alcotezt
+  tezt
+  octez-libs.base-test-helpers
   qcheck-alcotest
   octez-libs.test-helpers
   octez-libs.base
@@ -22,14 +26,18 @@
   octez-protocol-019-PtParisA-libs.smart-rollup)
  (flags
   (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
+  -open Tezos_base_test_helpers
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_019_PtParisA
-  -open Tezos_client_alpha
+  -open Tezos_client_019_PtParisA
   -open Tezos_protocol_019_PtParisA_parameters
-  -open Tezos_protocol_plugin_alpha
+  -open Tezos_protocol_plugin_019_PtParisA
   -open Tezos_shell_services
   -open Tezos_crypto_dal
-  -open Tezos_smart_rollup_alpha))
+  -open Tezos_smart_rollup_019_PtParisA))

@@ -16,6 +16,7 @@
   re
   tezos-protocol-genesis.embedded-protocol
   tezos-protocol-018-Proxford.embedded-protocol
+  tezos-protocol-019-PtParisA.embedded-protocol
   tezos-protocol-alpha.embedded-protocol)
  (link_flags
   (:standard)

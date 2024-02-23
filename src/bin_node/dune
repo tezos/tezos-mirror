@@ -137,6 +137,8 @@
    (-> void_for_linking-octez-protocol-017-PtNairob-libs-plugin-registerer.empty))
   tezos-protocol-018-Proxford.embedded-protocol
   octez-protocol-018-Proxford-libs.plugin-registerer
+  tezos-protocol-019-PtParisA.embedded-protocol
+  octez-protocol-019-PtParisA-libs.plugin-registerer
   (select void_for_linking-tezos-protocol-alpha-embedded-protocol from
    (tezos-protocol-alpha.embedded-protocol -> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty)
    (-> void_for_linking-tezos-protocol-alpha-embedded-protocol.empty))
