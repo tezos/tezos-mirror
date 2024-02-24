@@ -540,6 +540,7 @@ clean: coverage-clean clean-old-names dpkg-clean rpm-clean
 build-kernels-deps:
 	$(MAKE) -f kernels.mk build-deps
 	$(MAKE) -f etherlink.mk build-deps
+	$(MAKE) -C src/risc_v build-deps
 
 .PHONY: build-kernels-dev-deps
 build-kernels-dev-deps:
@@ -550,18 +551,22 @@ build-kernels-dev-deps:
 build-kernels:
 	$(MAKE) -f kernels.mk build
 	$(MAKE) -f etherlink.mk build
+	$(MAKE) -C src/risc_v build
 
 .PHONY: check-kernels
 check-kernels:
 	$(MAKE) -f kernels.mk check
 	$(MAKE) -f etherlink.mk check
+	$(MAKE) -C src/risc_v check
 
 .PHONY: test-kernels
 test-kernels:
 	$(MAKE) -f kernels.mk test
 	$(MAKE) -f etherlink.mk test
+	$(MAKE) -C src/risc_v test
 
 .PHONY: clean-kernels
 clean-kernels:
 	$(MAKE) -f kernels.mk clean
 	$(MAKE) -f etherlink.mk clean
+	$(MAKE) -C src/risc_v clean

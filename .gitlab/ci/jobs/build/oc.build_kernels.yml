@@ -11,6 +11,8 @@ oc.build_kernels:
   script:
     - make -f kernels.mk build
     - make -f etherlink.mk evm_kernel.wasm
+    - make -C src/risc_v risc-v-sandbox risc-v-dummy.elf
+    - make -C src/risc_v/tests/ build
   artifacts:
     name: "build-kernels-$CI_COMMIT_REF_SLUG"
     paths:

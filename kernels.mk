@@ -7,7 +7,6 @@
 KERNELS=tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm
 SDK_DIR=src/kernel_sdk
 DEMO_DIR=src/kernel_tx_demo
-RISC_V_DIR=src/risc_v
 
 .PHONY: all
 all: build-dev-deps check test build
@@ -43,7 +42,6 @@ dal_echo_kernel.wasm:
 
 .PHONY: build
 build: ${KERNELS} kernel_sdk
-	@make -C ${RISC_V_DIR} build
 
 .PHONY: clang-supports-wasm
 clang-supports-wasm:
@@ -58,7 +56,6 @@ build-dev-deps: clang-supports-wasm build-deps
 build-deps:
 	@make -C ${SDK_DIR} build-deps
 	@make -C ${DEMO_DIR} build-deps
-	@make -C ${RISC_V_DIR} build-deps
 
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
@@ -68,13 +65,11 @@ build-deps:
 test:
 	@make -C ${SDK_DIR} test
 	@make -C ${DEMO_DIR} test
-	@make -C ${RISC_V_DIR} test
 
 .PHONY: check
 check: build-dev-deps
 	@make -C ${SDK_DIR} check
 	@make -C ${DEMO_DIR} check
-	@make -C ${RISC_V_DIR} check
 
 	# Check formatting of all crates.
 	@exec scripts/check-format-rust.sh
@@ -92,4 +87,3 @@ clean:
 	@rm -f ${KERNELS}
 	@make -C ${SDK_DIR} clean
 	@make -C ${DEMO_DIR} clean
-	@make -C ${RISC_V_DIR} clean

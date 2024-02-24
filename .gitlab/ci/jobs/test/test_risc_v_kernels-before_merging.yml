@@ -1,0 +1,13 @@
+test_risc_v_kernels:
+  extends:
+    - .test_risc_v_kernels
+  rules:
+    - changes:
+        # Run if the `rust-toolchain` image is updated
+        - images/**/*
+        - src/kernel_sdk/**/*
+        - src/risc_v/Makefile
+        - src/risc_v/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: on_success

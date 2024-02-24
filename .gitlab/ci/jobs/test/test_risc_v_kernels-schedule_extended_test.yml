@@ -1,0 +1,3 @@
+test_risc_v_kernels:
+  extends:
+    - .test_risc_v_kernels
