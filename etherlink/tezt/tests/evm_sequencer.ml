@@ -916,15 +916,18 @@ let test_init_from_rollup_node_data_dir =
       ])
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
   @@ fun protocol ->
-  let* {sc_rollup_node; sequencer; proxy; client; _} =
+  let* {sc_rollup_node; sequencer; proxy; client; node; _} =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
-        let* _l2_lvl = Rpc.produce_block sequencer in
-        let* _lvl = Client.bake_for_and_wait client in
-        let* _lvl = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+        let* _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let* () =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
         unit)
   in
   let* () = Evm_node.terminate sequencer in
@@ -943,10 +946,12 @@ let test_init_from_rollup_node_data_dir =
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
 
-  let* _l2_lvl = Rpc.produce_block sequencer in
-
-  let* _lvl = Client.bake_for_and_wait client in
-  let* _lvl = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
+  let* _ = Rpc.produce_block evm_node' in
+  let* () =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
 
