@@ -60,9 +60,13 @@ let FAST_MODE = commander.opts().fastMode;
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_kernel.wasm');
 const EVM_BENCHMARK_CONFIG_PATH = external.resource('etherlink/config/benchmarking.yaml');
+const EVM_BENCHMARK_SEQUENCER_CONFIG_PATH = external.resource('etherlink/config/benchmarking_sequencer.yaml');
 const OUTPUT_DIRECTORY = commander.opts().outputDir ? commander.opts().outputDir : external.output()
 mkdirSync(OUTPUT_DIRECTORY, { recursive: true })
 console.log(`Output directory ${OUTPUT_DIRECTORY}`)
+
+// This key corresponds to bootstrap1 in `src/tezt/lib_tezos/account.ml`
+const SEQUENCER_KEY = "unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
 
 function sumArray(arr) {
     return arr?.reduce((acc, curr) => acc + curr, 0) ?? 0;
@@ -133,7 +137,12 @@ function run_profiler(path, logs) {
 
         var profiler_output_path = "";
 
-        const args = ["--kernel", EVM_INSTALLER_KERNEL_PATH, "--inputs", path, "--flamecharts-dir", PROFILER_OUTPUT_DIRECTORY, "--installer-config", EVM_BENCHMARK_CONFIG_PATH];
+        let config =
+            MODE == "proxy" ?
+                EVM_BENCHMARK_CONFIG_PATH :
+                EVM_BENCHMARK_SEQUENCER_CONFIG_PATH;
+
+        const args = ["--kernel", EVM_INSTALLER_KERNEL_PATH, "--inputs", path, "--flamecharts-dir", PROFILER_OUTPUT_DIRECTORY, "--installer-config", config];
 
         const childProcess = spawn(RUN_DEBUGGER_COMMAND, args, {});
 
@@ -308,7 +317,8 @@ async function run_benchmark(path, logs) {
 function build_benchmark_scenario(benchmark_script) {
     try {
         let bench_path = path.format({ dir: __dirname, base: benchmark_script })
-        execSync(`node ${bench_path} > transactions.json`);
+        let extra = MODE == 'sequencer' ? `--sequencer ${SEQUENCER_KEY}` : "";
+        execSync(`node ${bench_path} ${extra} > transactions.json`);
     } catch (error) {
         console.log(`Error running script ${benchmark_script}. Please fixed the error in the script before running this benchmark script`)
         console.error(error);
@@ -521,7 +531,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         var benchmark_script = benchmark_scripts[i];
         var parts = benchmark_script.split("/");
         var benchmark_name = parts[parts.length - 1].split(".")[0];
-        console.log(`Benchmarking ${benchmark_script}`);
+        console.log(`Benchmarking ${benchmark_script} (mode: ${MODE})`);
         fs.appendFileSync(logs, `=================================================\nBenchmarking ${benchmark_script}\n`)
         build_benchmark_scenario(benchmark_script);
         run_benchmark_result = await run_benchmark("transactions.json", logs);
