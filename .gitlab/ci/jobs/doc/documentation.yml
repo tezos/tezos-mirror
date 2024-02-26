@@ -37,16 +37,18 @@ documentation:manuals:
       - docs/user/node-config.json
     expire_in: 1 hour
 
-documentation:rpc:
+documentation:docgen:
   extends:
     - .doc_job_template
   script:
-    - make -C docs -j rpc
+    - make -C docs -j docexes-gen
   artifacts:
     paths:
       - docs/alpha/rpc.rst
       - docs/shell/rpc.rst
       - docs/user/default-acl.json
+      - docs/api/errors.rst
+      - docs/shell/p2p_api.rst
     expire_in: 1 hour
 
 documentation:build_all:
@@ -55,13 +57,13 @@ documentation:build_all:
   needs:
     - documentation:odoc
     - documentation:manuals
-    - documentation:rpc
+    - documentation:docgen
   dependencies:
     - documentation:odoc
     - documentation:manuals
-    - documentation:rpc
+    - documentation:docgen
   script:
-    - make -C docs -j html
+    - make -C docs -j sphinx
   artifacts:
     expose_as: 'Documentation - excluding old protocols'
     paths:
