@@ -121,7 +121,7 @@ function run_profiler(path, logs) {
 
         var profiler_output_path = "";
 
-        const args = ["--kernel", EVM_INSTALLER_KERNEL_PATH, "--inputs", path, "--preimage-dir", PREIMAGE_DIR];
+        const args = ["--kernel", EVM_INSTALLER_KERNEL_PATH, "--inputs", path, "--preimage-dir", PREIMAGE_DIR, "--flamecharts-dir", PROFILER_OUTPUT_DIRECTORY];
 
         const childProcess = spawn(RUN_DEBUGGER_COMMAND, args, {});
 
@@ -459,26 +459,6 @@ function dump_bench_opcode(filename, benchmark_name, opcodes, is_first) {
 const PROFILER_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + "/profiling"
 mkdirSync(PROFILER_OUTPUT_DIRECTORY, { recursive: true })
 
-
-
-function move_profiler_output(src, bench_name, time) {
-    if (!KEEP_TEMP || FAST_MODE) return;
-    let dest = path.format({ dir: PROFILER_OUTPUT_DIRECTORY, base: `${bench_name.replaceAll('/', '_')}_${time}.out` })
-    fs.rename(path.resolve(src), dest, (err) => {
-        if (err && err.code === 'EXDEV') {
-            console.log(`WARNING: couldn't move profiler output with rename. Won't try more to avoid taking too long. File remains at ${src}`)
-            console.log(err)
-            return;
-        } else if (err) {
-            console.log(`WARNING: error while trying to move profiler output. Benchmarking while continue. File remains at ${src}`)
-            console.log(err)
-            return;
-        }
-        console.log(`Finished moving profiling output to ${dest}`)
-        return;
-    })
-}
-
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Running benchmarks on: \n[ ${benchmark_scripts.join(',\n  ')}]`);
@@ -541,7 +521,6 @@ async function run_all_benchmarks(benchmark_scripts) {
         fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config));
         fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
         dump_bench_opcode(opcodes_dump, benchmark_name, run_benchmark_result.opcodes, i == 0);
-        move_profiler_output(run_benchmark_result.profiler_output_path, benchmark_script, time)
     }
     fs.appendFileSync(opcodes_dump, "}");
     console.log("Benchmarking complete");
