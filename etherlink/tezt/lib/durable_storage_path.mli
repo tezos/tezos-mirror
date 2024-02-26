@@ -95,4 +95,8 @@ module Ghostnet : sig
   val code : path -> path
 
   val storage : path -> ?key:path -> unit -> path
+
+  val da_fee_per_byte_path : path
+
+  val minimum_base_fee_per_gas : path
 end

@@ -50,6 +50,10 @@ fn migrate_world_state(host: &mut impl Runtime) -> Result<(), Error> {
         &RefPath::assert_from(b"/fees/sequencer_pool_address"),
         &SEQUENCER_POOL_PATH,
     ))?;
+    allow_path_not_found(host.store_move(
+        &RefPath::assert_from(b"/fees"),
+        &RefPath::assert_from(b"/world_state/fees"),
+    ))?;
     Ok(())
 }
 

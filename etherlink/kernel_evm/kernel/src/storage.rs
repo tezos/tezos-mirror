@@ -63,8 +63,8 @@ const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
 const EVM_BASE_FEE_PER_GAS: RefPath = RefPath::assert_from(b"/base_fee_per_gas");
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
-    RefPath::assert_from(b"/fees/minimum_base_fee_per_gas");
-const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/fees/da_fee_per_byte");
+    RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas");
+const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/world_state/fees/da_fee_per_byte");
 
 /// The sequencer pool is the designated account that the data-availability fees are sent to.
 ///
@@ -75,7 +75,7 @@ pub const SEQUENCER_POOL_PATH: RefPath = RefPath::assert_from(b"/sequencer_pool_
 /// Path to the last L1 level seen.
 const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/l1_level");
 
-const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/fees/burned");
+const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/world_state/fees/burned");
 
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =

@@ -61,9 +61,9 @@ let kernel_boot_wasm = kernel "/boot.wasm"
 
 let delayed_bridge_path = evm "/delayed_bridge"
 
-let da_fee_per_byte_path = evm "/fees/da_fee_per_byte"
+let da_fee_per_byte_path = world_state "/fees/da_fee_per_byte"
 
-let minimum_base_fee_per_gas = evm "/fees/minimum_base_fee_per_gas"
+let minimum_base_fee_per_gas = world_state "/fees/minimum_base_fee_per_gas"
 
 let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
 
@@ -85,4 +85,8 @@ module Ghostnet = struct
       "%s/storage%s"
       (eth_account addr)
       (match key with None -> "" | Some key -> "/" ^ key)
+
+  let da_fee_per_byte_path = evm "/fees/da_fee_per_byte"
+
+  let minimum_base_fee_per_gas = evm "/fees/minimum_base_fee_per_gas"
 end

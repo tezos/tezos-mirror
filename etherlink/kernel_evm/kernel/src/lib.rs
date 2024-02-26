@@ -525,7 +525,8 @@ mod tests {
 
     #[test]
     fn load_block_fees_with_minimum() {
-        let min_path = RefPath::assert_from(b"/fees/minimum_base_fee_per_gas").into();
+        let min_path =
+            RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas").into();
 
         // Arrange
         let mut host = MockHost::default();

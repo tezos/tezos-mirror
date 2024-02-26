@@ -84,7 +84,10 @@ let make_config ~ghostnet ?bootstrap_accounts ?ticketer ?administrator
       delayed_bridge
   in
   let da_fee_per_byte =
-    let to_ = Durable_storage_path.da_fee_per_byte_path in
+    let to_ =
+      if ghostnet then Durable_storage_path.Ghostnet.da_fee_per_byte_path
+      else Durable_storage_path.da_fee_per_byte_path
+    in
     let value = Wei.(to_le_bytes da_fee_per_byte) |> Hex.of_bytes |> Hex.show in
     [Set {value; to_}]
   in
@@ -107,7 +110,11 @@ let make_config ~ghostnet ?bootstrap_accounts ?ticketer ?administrator
   let minimum_base_fee_per_gas =
     Option.fold
       ~some:(fun minimum_base_fee_per_gas ->
-        let to_ = Durable_storage_path.minimum_base_fee_per_gas in
+        let to_ =
+          if ghostnet then
+            Durable_storage_path.Ghostnet.minimum_base_fee_per_gas
+          else Durable_storage_path.minimum_base_fee_per_gas
+        in
         let value =
           Wei.(to_le_bytes minimum_base_fee_per_gas) |> Hex.of_bytes |> Hex.show
         in
