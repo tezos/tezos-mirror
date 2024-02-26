@@ -57,7 +57,7 @@ end
 module Block = struct
   type number = Current | Nth of Z.t
 
-  let blocks = EVM.make "/blocks"
+  let blocks = World_state.make "/blocks"
 
   let number = "/number"
 

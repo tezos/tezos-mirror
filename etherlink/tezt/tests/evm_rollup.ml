@@ -1662,7 +1662,10 @@ let test_simulate =
         Sc_rollup_node.RPC.call sc_rollup_node
         @@ Sc_rollup_rpc.post_global_block_simulate
              ~insight_requests:
-               [`Durable_storage_key ["evm"; "blocks"; "current"; "number"]]
+               [
+                 `Durable_storage_key
+                   ["evm"; "world_state"; "blocks"; "current"; "number"];
+               ]
              []
       in
       let simulated_block_number =

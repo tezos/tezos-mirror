@@ -6,7 +6,7 @@
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
-    read_storage_version, store_storage_version, EVM_TRANSACTIONS_OBJECTS,
+    read_storage_version, store_storage_version, EVM_BLOCKS, EVM_TRANSACTIONS_OBJECTS,
     EVM_TRANSACTIONS_RECEIPTS, STORAGE_VERSION,
 };
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
@@ -39,6 +39,9 @@ fn migrate_world_state(host: &mut impl Runtime) -> Result<(), Error> {
         &RefPath::assert_from(b"/transactions_objects"),
         &EVM_TRANSACTIONS_OBJECTS,
     ))?;
+    allow_path_not_found(
+        host.store_move(&RefPath::assert_from(b"/blocks"), &EVM_BLOCKS),
+    )?;
     Ok(())
 }
 

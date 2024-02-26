@@ -45,8 +45,8 @@ const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
 
-const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
-pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
+const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/world_state/blocks/current");
+pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/world_state/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
 
