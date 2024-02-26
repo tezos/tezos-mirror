@@ -55,7 +55,19 @@ let () =
     ~pp:(fun ppf msg -> Format.fprintf ppf "%s" msg)
     Data_encoding.(obj1 (req "msg" string))
     (function Invalid_degree msg -> Some msg | _ -> None)
-    (fun msg -> Invalid_degree msg)
+    (fun msg -> Invalid_degree msg) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.no_prover_srs"
+    ~title:"No prover SRS"
+    ~description:"The prover SRS has not been loaded."
+    ~pp:(fun ppf _ ->
+      Format.fprintf
+        ppf
+        "The prover SRS must be loaded before using proving functions.")
+    Data_encoding.empty
+    (function No_prover_SRS -> Some () | _ -> None)
+    (fun () -> No_prover_SRS)
 
 (* Used wrapper functions on top of Cryptobox. *)
 
