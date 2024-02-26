@@ -92,13 +92,13 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
 /// Path where all indexes are stored.
-const EVM_INDEXES: RefPath = RefPath::assert_from(b"/indexes");
+pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/world_state/indexes");
 
 /// Path where Ethereum accounts are stored.
 const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
 
 /// Subpath where blocks are indexed.
-const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
+const BLOCKS_INDEX: RefPath = RefPath::assert_from(b"/blocks");
 
 /// Subpath where transactions are indexed
 const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");

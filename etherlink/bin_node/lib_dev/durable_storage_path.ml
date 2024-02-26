@@ -69,7 +69,7 @@ module Block = struct
 end
 
 module Indexes = struct
-  let indexes = EVM.make "/indexes"
+  let indexes = World_state.make "/indexes"
 
   let blocks = "/blocks"
 

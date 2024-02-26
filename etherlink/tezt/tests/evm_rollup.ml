@@ -3485,7 +3485,7 @@ let test_accounts_double_indexing =
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind:"wasm_2_0_0"
            ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/indexes/accounts/length"
+           ~key:"/evm/world_state/indexes/accounts/length"
            ()
     in
     let length = Option.map Helpers.hex_string_to_int length in
