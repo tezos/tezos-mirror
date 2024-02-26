@@ -4355,6 +4355,12 @@ module Tx_kernel_e2e = struct
              "wasm_2_0_0")
         Constant.WASM.tx_kernel_dal
     in
+    (* The kernel is badly written and may ask pages in negative
+       levels. We ensure it is not possible by baking enough
+       blocks. *)
+    let* () =
+      bake_for ~count:parameters.Dal.Parameters.attestation_lag client
+    in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
         ~burn_cap:Tez.(of_int 9999999)
@@ -4534,6 +4540,12 @@ module Tx_kernel_e2e = struct
         ~preimages_dir:
           (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
         Constant.WASM.dal_echo_kernel
+    in
+    (* The kernel is badly written and may ask pages in negative
+       levels. We ensure it is not possible by baking enough
+       blocks. *)
+    let* () =
+      bake_for ~count:parameters.Dal.Parameters.attestation_lag client
     in
     let* sc_rollup_address =
       Client.Sc_rollup.originate
@@ -4969,9 +4981,10 @@ let register ~protocols =
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
     ~pvm_name:"wasm_2_0_0"
-    ~number_of_shards:2048
+    ~number_of_shards:256
     ~slot_size:(1 lsl 15)
-    ~redundancy_factor:32
+    ~redundancy_factor:8
+    ~attestation_lag:4
     ~page_size:128
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
@@ -4981,10 +4994,11 @@ let register ~protocols =
       [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
     ~pvm_name:"wasm_2_0_0"
     ~producer_profiles:[0]
-    ~number_of_shards:2048
+    ~number_of_shards:256
     ~slot_size:(1 lsl 15)
-    ~redundancy_factor:32
+    ~redundancy_factor:8
     ~page_size:128
+    ~attestation_lag:4
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
   scenario_with_all_nodes

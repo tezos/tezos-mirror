@@ -1030,10 +1030,10 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
            change. *)
         let cryptobox_parameters =
           {
-            Dal.page_size = 4096;
-            slot_size = 1 lsl 20;
-            redundancy_factor = 16;
-            number_of_shards = 2048;
+            Dal.page_size = 3967;
+            slot_size = 126_944;
+            redundancy_factor = 8;
+            number_of_shards = 512;
           }
         in
         let dal =
@@ -1041,9 +1041,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             {
               feature_enable = true;
               incentives_enable = false;
-              number_of_slots = 256;
-              attestation_lag = 4;
-              attestation_threshold = 50;
+              number_of_slots = 32;
+              attestation_lag = 8;
+              attestation_threshold = 66;
               cryptobox_parameters;
             }
         in
