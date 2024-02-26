@@ -597,7 +597,7 @@ opam:octez-protocol-004-Pt24m4xi-libs:
 opam:octez-protocol-005-PsBabyM1-libs:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+    - .rules_template__trigger_all_opam_batch_3
   variables:
     package: octez-protocol-005-PsBabyM1-libs
 
@@ -754,6 +754,13 @@ opam:octez-smart-rollup-node-Proxford:
   variables:
     package: octez-smart-rollup-node-Proxford
 
+opam:octez-smart-rollup-node-PtNairob:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_all_opam_batch_2
+  variables:
+    package: octez-smart-rollup-node-PtNairob
+
 opam:octez-smart-rollup-node-alpha:
   extends:
     - .opam_template
@@ -837,7 +844,7 @@ opam:tezos-client-demo-counter:
 opam:tezos-client-genesis:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+    - .rules_template__trigger_all_opam_batch_4
   variables:
     package: tezos-client-genesis
 
@@ -940,7 +947,7 @@ opam:tezos-protocol-005-PsBABY5H:
 opam:tezos-protocol-005-PsBabyM1:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+    - .rules_template__trigger_all_opam_batch_5
   variables:
     package: tezos-protocol-005-PsBabyM1
 
@@ -1031,7 +1038,7 @@ opam:tezos-protocol-016-PtMumbai:
 opam:tezos-protocol-017-PtNairob:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+    - .rules_template__trigger_all_opam_batch_6
   variables:
     package: tezos-protocol-017-PtNairob
 
@@ -1077,7 +1084,7 @@ opam:tezos-protocol-genesis:
 opam:tezos-proxy-server-config:
   extends:
     - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+    - .rules_template__trigger_all_opam_batch_7
   variables:
     package: tezos-proxy-server-config
 

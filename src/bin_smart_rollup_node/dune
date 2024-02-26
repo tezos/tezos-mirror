@@ -15,6 +15,9 @@
   octez-shell-libs.client-commands
   octez-l2-libs.smart-rollup
   octez-smart-rollup-node-lib
+  (select void_for_linking-octez_smart_rollup_node_PtNairob from
+   (octez_smart_rollup_node_PtNairob -> void_for_linking-octez_smart_rollup_node_PtNairob.empty)
+   (-> void_for_linking-octez_smart_rollup_node_PtNairob.empty))
   octez_smart_rollup_node_Proxford
   (select void_for_linking-octez_smart_rollup_node_alpha from
    (octez_smart_rollup_node_alpha -> void_for_linking-octez_smart_rollup_node_alpha.empty)
@@ -38,4 +41,6 @@
 
 (rule
  (action
-  (progn (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))
+  (progn
+   (write-file void_for_linking-octez_smart_rollup_node_PtNairob.empty "")
+   (write-file void_for_linking-octez_smart_rollup_node_alpha.empty ""))))
