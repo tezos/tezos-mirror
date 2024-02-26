@@ -6202,18 +6202,17 @@ let hash = Protocol.hash
       only_if active @@ fun () ->
       octez_protocol_lib
         "test-helpers"
-        ~path:
-          (if active then path // "lib_protocol/test/helpers"
-          else path // "lib_protocol")
+        ~path:(path // "lib_protocol/test/helpers")
         ~internal_name:(sf "tezos_%s_test_helpers" name_underscore)
         ~synopsis:"Protocol testing framework"
         ~opam_only_deps:[octez_protocol_environment; parameters |> if_some]
         ~deps:
           [
             tezt_core_lib |> if_ N.(number >= 019) |> open_ |> open_ ~m:"Base";
-            alcotezt |> if_ N.(number >= 019);
+            alcotezt |> if_ N.(number == 019);
+            tezt_tezos |> if_ N.(number >= 020);
             tezt_lib |> if_ N.(number >= 019);
-            octez_base_test_helpers |> if_ N.(number >= 019) |> open_;
+            octez_base_test_helpers |> if_ N.(number == 019) |> open_;
             qcheck_alcotest;
             octez_test_helpers;
             octez_base |> open_ ~m:"TzPervasives"

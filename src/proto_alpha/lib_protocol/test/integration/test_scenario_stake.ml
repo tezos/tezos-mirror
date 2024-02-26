@@ -290,6 +290,4 @@ let tests =
        ("Test stake from unstake", shorter_roundtrip_for_baker);
      ]
 
-let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("protocol stake unstake", tests)]
-  |> Lwt_main.run
+let () = register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "stake"] tests

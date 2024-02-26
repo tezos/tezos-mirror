@@ -66,20 +66,43 @@ let rec run_scenario :
         let* result = action input in
         run_scenario next result
 
+type test_closure = string * bool * (Tezt_tezos.Protocol.t -> unit Lwt.t)
+
 let unfolded_to_test :
-    (unit, unit) single_scenario * string list * bool ->
-    unit Alcotest_lwt.test_case =
- fun (s, name, b) ->
-  let speed = if b then `Slow else `Quick in
-  let name =
-    match name with
-    | [] -> ""
-    | [n] -> n
-    | title :: tags ->
-        (* We chose to separate all tags with a comma, and use the head tag as a title for the test *)
-        title ^ ": " ^ String.concat ", " tags
-  in
-  Tztest.tztest name speed (run_scenario s)
+    (unit, unit) single_scenario * string list * bool -> test_closure =
+  let open Lwt_syntax in
+  fun (s, title, is_slow) ->
+    let title =
+      match title with
+      | [] -> ""
+      | [n] -> n
+      | header :: tags ->
+          (* We chose to separate all tags with a comma, and use the head tag as a header for the test *)
+          header ^ ": " ^ String.concat ", " tags
+    in
+    ( title,
+      is_slow,
+      fun _proto ->
+        let* _ = (run_scenario s) () in
+        return_unit )
+
+let register_test ~__FILE__ ~tags ((title, is_slow, test) : test_closure) : unit
+    =
+  let tags = if is_slow then Tezos_test_helpers.Tag.slow :: tags else tags in
+  Tezt_tezos.Protocol.(
+    register_test
+      ~__FILE__
+      ~title
+      ~tags
+      ~uses:(fun _ -> [])
+      ~uses_node:false
+      ~uses_client:false
+      ~uses_admin_client:false
+      test
+      [Alpha])
+
+let register_tests ~__FILE__ ~tags (l : test_closure list) : unit =
+  List.iter (register_test ~__FILE__ ~tags) l
 
 (** Useful aliases and operators *)
 
@@ -129,9 +152,9 @@ let end_test : ('a, unit) scenarios =
       Log.info ~color:begin_end_color "-- End test --" ;
       return_unit)
 
-(** Transforms scenarios into Alcotest tests *)
+(** Transforms scenarios into tests *)
 let tests_of_scenarios :
-    (string * (unit, 't) scenarios) list -> unit Alcotest_lwt.test_case list =
+    (string * (unit, 't) scenarios) list -> test_closure list =
  fun scenarios ->
   List.map (fun (s, x) -> Tag s --> x --> end_test) scenarios |> function
   | [] -> []
