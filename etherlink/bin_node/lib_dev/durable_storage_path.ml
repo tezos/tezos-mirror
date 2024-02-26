@@ -89,7 +89,7 @@ module Transaction_receipt = struct
 end
 
 module Transaction_object = struct
-  let objects = EVM.make "/transactions_objects"
+  let objects = World_state.make "/transactions_objects"
 
   let object_ (Hash (Hex tx_hash)) = objects ^ "/" ^ tx_hash
 end
