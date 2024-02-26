@@ -486,3 +486,29 @@ let transform_dump ~dump_json ~dump_rlp =
   let args = ["transform"; "dump"; dump_json; "to"; "rlp"; dump_rlp] in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
   Process.check process
+
+let sequencer_upgrade_payload ?client ~public_key ~activation_timestamp () =
+  let args =
+    [
+      "make";
+      "sequencer";
+      "upgrade";
+      "payload";
+      "at";
+      "activation";
+      "timestamp";
+      activation_timestamp;
+      "for";
+      public_key;
+    ]
+  in
+  let process =
+    Process.spawn (Uses.path Constant.octez_evm_node)
+    @@ args
+    @ Cli_arg.optional_arg
+        "wallet-dir"
+        Fun.id
+        (Option.map Client.base_dir client)
+  in
+  let* payload = Process.check_and_read_stdout process in
+  return (String.trim payload)

@@ -13,7 +13,7 @@ use crate::storage::{
     chunked_transaction_path, clear_events, create_chunked_transaction,
     get_and_increment_deposit_nonce, read_last_info_per_level_timestamp,
     remove_chunked_transaction, remove_sequencer, store_l1_level,
-    store_last_info_per_level_timestamp, store_sequencer, store_transaction_chunk,
+    store_last_info_per_level_timestamp, store_transaction_chunk,
 };
 use crate::upgrade::*;
 use crate::Error;
@@ -315,8 +315,10 @@ pub fn handle_input(
             }
         }
         Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
+        Input::SequencerUpgrade(sequencer_upgrade) => {
+            store_sequencer_upgrade(host, &sequencer_upgrade)?
+        }
         Input::RemoveSequencer => remove_sequencer(host)?,
-        Input::NewSequencer(sequencer) => store_sequencer(host, sequencer)?,
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
             clear_events(host)?;

@@ -899,9 +899,9 @@ pub fn remove_sequencer<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
 
 pub fn store_sequencer<Host: Runtime>(
     host: &mut Host,
-    public_key: PublicKey,
+    public_key: &PublicKey,
 ) -> anyhow::Result<()> {
-    let pk_b58 = PublicKey::to_b58check(&public_key);
+    let pk_b58 = PublicKey::to_b58check(public_key);
     let bytes = String::as_bytes(&pk_b58);
     host.store_write_all(&SEQUENCER, bytes).map_err(Into::into)
 }

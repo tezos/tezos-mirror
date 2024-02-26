@@ -350,6 +350,17 @@ pub fn drop_head_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
     host.store_delete(&path).map_err(Error::from)
 }
 
+pub fn clear_all_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    if host.store_has(&EVM_BLUEPRINTS)?.is_some() {
+        let last_blueprint_number = read_last_blueprint_number(host)?;
+        host.store_delete(&EVM_BLUEPRINTS)
+            .map_err(StorageError::from)?;
+        store_last_blueprint_number(host, last_blueprint_number)
+    } else {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
