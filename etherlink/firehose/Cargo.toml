@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "firehose"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "^4.0", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
