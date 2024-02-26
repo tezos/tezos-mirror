@@ -5,7 +5,10 @@
 // SPDX-License-Identifier: MIT
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
+use crate::storage::{
+    read_storage_version, store_storage_version, EVM_TRANSACTIONS_RECEIPTS,
+    STORAGE_VERSION,
+};
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
@@ -28,6 +31,10 @@ fn migrate_world_state(host: &mut impl Runtime) -> Result<(), Error> {
     allow_path_not_found(
         host.store_move(&RefPath::assert_from(b"/eth_accounts"), &EVM_ACCOUNTS_PATH),
     )?;
+    allow_path_not_found(host.store_move(
+        &RefPath::assert_from(b"/transactions_receipts"),
+        &EVM_TRANSACTIONS_RECEIPTS,
+    ))?;
     Ok(())
 }
 

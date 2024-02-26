@@ -83,7 +83,7 @@ module Indexes = struct
 end
 
 module Transaction_receipt = struct
-  let receipts = EVM.make "/transactions_receipts"
+  let receipts = World_state.make "/transactions_receipts"
 
   let receipt (Hash (Hex tx_hash)) = receipts ^ "/" ^ tx_hash
 end

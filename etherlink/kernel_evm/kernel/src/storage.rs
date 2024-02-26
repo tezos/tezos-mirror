@@ -53,7 +53,7 @@ const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
 const EVENTS: RefPath = RefPath::assert_from(b"/events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
-    RefPath::assert_from(b"/transactions_receipts");
+    RefPath::assert_from(b"/world_state/transactions_receipts");
 
 pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
     RefPath::assert_from(b"/transactions_objects");
