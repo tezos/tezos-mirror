@@ -111,13 +111,6 @@ val request_encoding : packed_request Data_encoding.t
 
 val result_encoding : 'a request -> 'a Data_encoding.t
 
-val send : Lwt_io.output_channel -> 'a Data_encoding.t -> 'a -> unit Lwt.t
-
-val recv : Lwt_io.input_channel -> 'a Data_encoding.t -> 'a Lwt.t
-
-val recv_result :
-  Lwt_io.input_channel -> 'a Data_encoding.t -> 'a tzresult Lwt.t
-
 (** The prefix for the validation socket filename.
 
     Do not use it directly except for documentation purposes; use
@@ -129,14 +122,3 @@ val socket_path_prefix : string
     [socket_dir] is the directory where the file should be put.
     [pid] is the process ID of the validator process. *)
 val socket_path : socket_dir:string -> pid:int -> string
-
-val create_socket_listen :
-  canceler:Lwt_canceler.t ->
-  max_requests:int ->
-  socket_path:string ->
-  Lwt_unix.file_descr tzresult Lwt.t
-
-val create_socket_connect :
-  canceler:Lwt_canceler.t ->
-  socket_path:string ->
-  Lwt_unix.file_descr tzresult Lwt.t

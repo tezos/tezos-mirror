@@ -640,13 +640,13 @@ module External_validator_process = struct
   let process_handshake process_input process_output =
     let open Lwt_result_syntax in
     let*! () =
-      External_validation.send
+      Lwt_unix_socket.send
         process_input
         Data_encoding.Variable.bytes
         External_validation.magic
     in
     let*! magic =
-      External_validation.recv process_output Data_encoding.Variable.bytes
+      Lwt_unix_socket.recv process_output Data_encoding.Variable.bytes
     in
     fail_when
       (not (Bytes.equal magic External_validation.magic))
@@ -671,13 +671,13 @@ module External_validator_process = struct
   let process_init vp process_input process_output =
     let open Lwt_result_syntax in
     let*! () =
-      External_validation.send
+      Lwt_unix_socket.send
         process_input
         External_validation.parameters_encoding
         vp.parameters
     in
     let* () =
-      External_validation.recv
+      Lwt_unix_socket.recv
         process_output
         (Error_monad.result_encoding Data_encoding.empty)
     in
@@ -755,7 +755,7 @@ module External_validator_process = struct
           Lwt.finalize
             (fun () ->
               let* process_socket =
-                External_validation.create_socket_listen
+                Lwt_unix_socket.create_socket_listen
                   ~canceler
                   ~max_requests:1
                   ~socket_path
@@ -851,13 +851,13 @@ module External_validator_process = struct
                  let now = Time.System.now () in
                  let*! () = Events.(emit request_for prequest) in
                  let*! () =
-                   External_validation.send
+                   Lwt_unix_socket.send
                      process_input
                      External_validation.request_encoding
                      prequest
                  in
                  let*! res =
-                   External_validation.recv_result
+                   Lwt_unix_socket.recv_result
                      process_output
                      (External_validation.result_encoding request)
                  in
@@ -1030,7 +1030,7 @@ module External_validator_process = struct
               vp.validator_process <- Exiting ;
               (* Try to trigger the clean shutdown of the validation
                  process. *)
-              External_validation.send
+              Lwt_unix_socket.send
                 process_input
                 External_validation.request_encoding
                 request)

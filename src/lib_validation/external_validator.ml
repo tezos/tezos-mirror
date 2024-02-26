@@ -197,12 +197,12 @@ let inconsistent_handshake msg =
 let handshake input output =
   let open Lwt_syntax in
   let* () =
-    External_validation.send
+    Lwt_unix_socket.send
       output
       Data_encoding.Variable.bytes
       External_validation.magic
   in
-  let* magic = External_validation.recv input Data_encoding.Variable.bytes in
+  let* magic = Lwt_unix_socket.recv input Data_encoding.Variable.bytes in
   fail_when
     (not (Bytes.equal magic External_validation.magic))
     (inconsistent_handshake "bad magic")
@@ -216,7 +216,7 @@ let init input output =
   let*! () = Events.(emit initialization_request ()) in
   let*! ({context_root; genesis; readonly; sandbox_parameters; dal_config; _} as
         parameters) =
-    External_validation.recv input External_validation.parameters_encoding
+    Lwt_unix_socket.recv input External_validation.parameters_encoding
   in
   let*? () = Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal dal_config in
   let sandbox_parameters =
@@ -239,7 +239,7 @@ let init input output =
      complete initialization as the node relies on the external
      validator for the context's initialization. *)
   let*! () =
-    External_validation.send
+    Lwt_unix_socket.send
       output
       (Error_monad.result_encoding Data_encoding.empty)
       (Ok ())
@@ -548,7 +548,7 @@ let run ~using_std_channel input output =
   let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)
       cached_result =
     let*! (External_validation.Erequest recved) =
-      External_validation.recv input External_validation.request_encoding
+      Lwt_unix_socket.recv input External_validation.request_encoding
     in
     let*! action =
       handle_request parameters context_index cache cached_result recved
@@ -556,7 +556,7 @@ let run ~using_std_channel input output =
     match action with
     | `Continue (res, cache, cached_result) ->
         let*! () =
-          External_validation.send
+          Lwt_unix_socket.send
             output
             (Error_monad.result_encoding
                (External_validation.result_encoding recved))
@@ -576,7 +576,7 @@ let main ?socket_dir () =
         let pid = Unix.getpid () in
         let socket_path = External_validation.socket_path ~socket_dir ~pid in
         let* socket_process =
-          External_validation.create_socket_connect ~canceler ~socket_path
+          Lwt_unix_socket.create_socket_connect ~canceler ~socket_path
         in
         let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
         let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
@@ -604,7 +604,7 @@ let main ?socket_dir () =
       return_unit
   | Error _ as errs ->
       let*! () =
-        External_validation.send
+        Lwt_unix_socket.send
           out_channel
           (Error_monad.result_encoding Data_encoding.unit)
           errs
