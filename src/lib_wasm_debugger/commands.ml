@@ -487,12 +487,12 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Z.to_int64 @@ Z.sub info_after.current_tick info_before.current_tick
         ))
 
-  let produce_flamegraph ~collapse ~max_depth kernel_runs =
+  let produce_flamegraph ~collapse ~max_depth config kernel_runs =
     let filename =
       Time.System.(
         Format.asprintf "wasm-debugger-profiling-%a.out" pp_hum (now ()))
     in
-    let path = Filename.(concat (get_temp_dir_name ()) filename) in
+    let path = Filename.(concat config.Config.flamecharts_directory filename) in
     let file = open_out path in
     let pp_kernel_run ppf = function
       | Some run ->
@@ -553,7 +553,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             function_symbols
             tree
         in
-        produce_flamegraph ~collapse ~max_depth:100 graph ;
+        produce_flamegraph ~collapse ~max_depth:100 config graph ;
         List.iter profiling_results graph ;
         Format.printf
           "----------------------\nFull execution with padding: %a ticks\n%!"
