@@ -23,7 +23,17 @@ const path = require('node:path')
 const { timestamp } = require("./lib/timestamp")
 const csv = require('csv-stringify/sync');
 const commander = require('commander');
-const { mkdirSync } = require('node:fs')
+const { mkdirSync } = require('node:fs');
+const { exit } = require('process');
+
+function parse_mode (mode, _) {
+    if (mode != "sequencer" && mode != "proxy") {
+        console.error("Mode can be either `proxy` or `sequencer`");
+        exit(2)
+    } else {
+        return mode
+    }
+}
 
 commander
     .usage('[OPTIONS]')
@@ -32,6 +42,7 @@ commander
     .option('-o, --output-dir <path>', "Output directory")
     .option('--fast-mode', "Launch kernel in fast mode, but less information is collected", false)
     .option('--keep-temp', "Keep temporary files", false)
+    .option('--mode <mode>', 'Kernel mode: `proxy` or `sequencer`', parse_mode)
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -43,6 +54,7 @@ function filter_name(name) {
             || !name.match(EXCLUDE_REGEX))
 }
 
+let MODE = commander.opts().mode || "proxy";
 let KEEP_TEMP = commander.opts().keepTemp;
 let FAST_MODE = commander.opts().fastMode;
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
