@@ -70,8 +70,7 @@ const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/fees/da_fee_per_byte");
 ///
 /// This may be updated by the governance mechanism over time. If it is not set, the data-availability
 /// fees are instead burned.
-pub const SEQUENCER_POOL_PATH: RefPath =
-    RefPath::assert_from(b"/fees/sequencer_pool_address");
+pub const SEQUENCER_POOL_PATH: RefPath = RefPath::assert_from(b"/sequencer_pool_address");
 
 /// Path to the last L1 level seen.
 const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/l1_level");
