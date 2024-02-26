@@ -307,31 +307,80 @@ let read_data_from_stdin retries =
   in
   input_data retries
 
-let read_data ~kind ~directory ~filename retries =
-  Lwt.catch
-    (fun () ->
-      let path = Filename.concat directory filename in
-      let s = read_data_from_file path in
-      Lwt.return s)
-    (fun _ ->
-      let open Lwt_syntax in
+let read_data ~kind ~directory ~filename ?fetch_from_remote retries =
+  let read_from_file () =
+    let path = Filename.concat directory filename in
+    let s = read_data_from_file path in
+    Lwt.return s
+  in
+  let read_from_remote =
+    match fetch_from_remote with
+    | None -> fun () -> raise Not_found
+    | Some fetch_from_remote ->
+        fun () ->
+          let open Lwt_syntax in
+          let* s = fetch_from_remote filename in
+          let ch = open_out (Filename.concat directory filename) in
+          output_string ch s ;
+          close_out ch ;
+          return s
+  in
+  let read_from_stdin () =
+    let open Lwt_syntax in
+    let* () =
+      Lwt_fmt.printf
+        "%s %s not found in %s, or there was a reading error. Please provide \
+         it manually.\n\
+         %!"
+        kind
+        filename
+        directory
+    in
+    read_data_from_stdin retries
+  in
+  Lwt.catch read_from_file @@ fun _ ->
+  Lwt.catch read_from_remote @@ fun _ -> read_from_stdin ()
+
+let fetch_preimage_from_remote endpoint hash_hex =
+  let open Lwt_syntax in
+  let url =
+    Uri.with_path endpoint String.(concat "/" [Uri.path endpoint; hash_hex])
+  in
+  let* resp, body = Cohttp_lwt_unix.Client.get url in
+  let* body_str = Cohttp_lwt.Body.to_string body in
+  match resp.status with
+  | `OK ->
+      let contents_hash_hex =
+        let open Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash in
+        hash_string ~scheme:Blake2B [body_str] |> to_hex
+      in
+      if not (String.equal contents_hash_hex hash_hex) then
+        Format.ksprintf
+          Stdlib.failwith
+          "The kernel fetched pre-image with hash %s instead of %s."
+          contents_hash_hex
+          hash_hex ;
+      return body_str
+  | #Cohttp.Code.status_code ->
       let* () =
         Lwt_fmt.printf
-          "%s %s not found in %s, or there was a reading error. Please provide \
-           it manually.\n\
-           %!"
-          kind
-          filename
-          directory
+          "Could not fetch %s from %s. Response status code %d\n%!"
+          hash_hex
+          (Uri.path endpoint)
+          (Cohttp.Code.code_of_status resp.status)
       in
-      read_data_from_stdin retries)
+      raise Not_found
 
 let reveal_preimage_builtin config retries hash =
   let hex = Tezos_protocol_alpha.Protocol.Sc_rollup_reveal_hash.to_hex hash in
+  let fetch_from_remote =
+    Option.map fetch_preimage_from_remote config.Config.preimage_endpoint
+  in
   read_data
     ~kind:"Preimage"
     ~directory:config.Config.preimage_directory
     ~filename:hex
+    ?fetch_from_remote
     retries
 
 let request_dal_page config retries published_level slot_index page_index =

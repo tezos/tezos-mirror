@@ -466,6 +466,17 @@ let preimages_arg =
     ~placeholder:"_evm_installer_preimages"
     Params.string
 
+let preimages_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"preimage-endpoint"
+    ~placeholder:"url"
+    ~doc:
+      (Format.sprintf
+         "The address of a service which provides pre-images for the rollup. \
+          Missing pre-images will be downloaded remotely if they are not \
+          already present on disk.")
+    (Tezos_clic.parameter (fun () s -> Lwt.return_ok (Uri.of_string s)))
+
 let time_between_blocks_arg =
   Tezos_clic.arg
     ~long:"time-between-blocks"
@@ -636,7 +647,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args16
+    (args17
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -646,6 +657,7 @@ let sequencer_command =
        verbose_arg
        kernel_arg
        preimages_arg
+       preimages_endpoint_arg
        time_between_blocks_arg
        genesis_timestamp_arg
        maximum_blueprints_lag_arg
@@ -671,6 +683,7 @@ let sequencer_command =
            verbose,
            kernel,
            preimages,
+           preimages_endpoint,
            time_between_blocks,
            genesis_timestamp,
            max_blueprints_lag,
@@ -730,6 +743,7 @@ let sequencer_command =
           ?cors_headers
           ~rollup_node_endpoint
           ?preimages
+          ?preimages_endpoint
           ?time_between_blocks
           ~sequencer:sequencer_pkh
           ()
@@ -769,7 +783,7 @@ let observer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in observer mode"
-    (args8
+    (args9
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -777,7 +791,8 @@ let observer_command =
        cors_allowed_headers_arg
        verbose_arg
        kernel_arg
-       preimages_arg)
+       preimages_arg
+       preimages_endpoint_arg)
     (prefixes ["run"; "observer"; "with"; "endpoint"]
     @@ param
          ~name:"evm-node-endpoint"
@@ -793,7 +808,8 @@ let observer_command =
            cors_headers,
            verbose,
            kernel,
-           preimages )
+           preimages,
+           preimages_endpoint )
              evm_node_endpoint
              () ->
   let open Evm_node_lib_dev in
@@ -815,6 +831,7 @@ let observer_command =
       ?cors_headers
       ~evm_node_endpoint
       ?preimages
+      ?preimages_endpoint
       ()
   in
   let* () = Configuration.save_observer ~force:true ~data_dir config in
@@ -828,6 +845,7 @@ let observer_command =
       ~data_dir
       ?kernel_path:kernel
       ~preimages:config.mode.preimages
+      ~preimages_endpoint:config.mode.preimages_endpoint
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)

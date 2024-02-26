@@ -8340,6 +8340,7 @@ let octez_scoru_wasm_debugger_lib =
         (* The debugger always rely on proto_alpha, as such the client is always
            available. *)
         Protocol.(client_exn alpha);
+        cohttp_lwt_unix;
         octez_scoru_wasm;
         octez_scoru_wasm_helpers |> open_;
         octez_smart_rollup_lib;

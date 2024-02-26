@@ -20,12 +20,17 @@ type time_between_blocks = Nothing | Time_between_blocks of float
 type sequencer = {
   rollup_node_endpoint : Uri.t;
   preimages : string;
+  preimages_endpoint : Uri.t option;
   time_between_blocks : time_between_blocks;
   private_rpc_port : int;
   sequencer : Signature.public_key_hash;
 }
 
-type observer = {evm_node_endpoint : Uri.t; preimages : string}
+type observer = {
+  evm_node_endpoint : Uri.t;
+  preimages : string;
+  preimages_endpoint : Uri.t option;
+}
 
 type 'a t = {
   rpc_addr : string;
@@ -106,30 +111,35 @@ let encoding_sequencer =
   conv
     (fun {
            preimages;
+           preimages_endpoint;
            rollup_node_endpoint;
            time_between_blocks;
            private_rpc_port;
            sequencer;
          } ->
       ( preimages,
+        preimages_endpoint,
         Uri.to_string rollup_node_endpoint,
         time_between_blocks,
         private_rpc_port,
         sequencer ))
     (fun ( preimages,
+           preimages_endpoint,
            rollup_node_endpoint,
            time_between_blocks,
            private_rpc_port,
            sequencer ) ->
       {
         preimages;
+        preimages_endpoint;
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
         time_between_blocks;
         private_rpc_port;
         sequencer;
       })
-    (obj5
+    (obj6
        (dft "preimages" string default_preimages)
+       (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
        (dft
           "rollup_node_endpoint"
           string
@@ -148,12 +158,17 @@ let encoding_sequencer =
 let encoding_observer =
   let open Data_encoding in
   conv
-    (fun {preimages; evm_node_endpoint} ->
-      (preimages, Uri.to_string evm_node_endpoint))
-    (fun (preimages, evm_node_endpoint) ->
-      {preimages; evm_node_endpoint = Uri.of_string evm_node_endpoint})
-    (obj2
+    (fun {preimages; preimages_endpoint; evm_node_endpoint} ->
+      (preimages, preimages_endpoint, Uri.to_string evm_node_endpoint))
+    (fun (preimages, preimages_endpoint, evm_node_endpoint) ->
+      {
+        preimages;
+        preimages_endpoint;
+        evm_node_endpoint = Uri.of_string evm_node_endpoint;
+      })
+    (obj3
        (dft "preimages" string default_preimages)
+       (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
        (dft
           "evm_node_endpoint"
           string
@@ -279,7 +294,7 @@ module Cli = struct
 
   let create_sequencer ?private_rpc_port ~devmode ?rpc_addr ?rpc_port
       ?cors_origins ?cors_headers ?log_filter ?rollup_node_endpoint ?preimages
-      ?time_between_blocks ~sequencer =
+      ?preimages_endpoint ?time_between_blocks ~sequencer =
     let mode =
       {
         rollup_node_endpoint =
@@ -287,6 +302,7 @@ module Cli = struct
             ~default:default_rollup_node_endpoint
             rollup_node_endpoint;
         preimages = Option.value ~default:default_preimages preimages;
+        preimages_endpoint;
         time_between_blocks =
           Option.value ~default:default_time_between_blocks time_between_blocks;
         private_rpc_port =
@@ -304,12 +320,13 @@ module Cli = struct
       ~mode
 
   let create_observer ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ?evm_node_endpoint ?preimages =
+      ?log_filter ?evm_node_endpoint ?preimages ?preimages_endpoint =
     let mode =
       {
         evm_node_endpoint =
           Option.value ~default:default_rollup_node_endpoint evm_node_endpoint;
         preimages = Option.value ~default:default_preimages preimages;
+        preimages_endpoint;
       }
     in
     create
@@ -356,8 +373,8 @@ module Cli = struct
 
   let patch_sequencer_configuration_from_args ?private_rpc_port ~devmode
       ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?log_filter
-      ?rollup_node_endpoint ?preimages ?time_between_blocks configuration
-      ~sequencer =
+      ?rollup_node_endpoint ?preimages ?preimages_endpoint ?time_between_blocks
+      configuration ~sequencer =
     let mode =
       {
         rollup_node_endpoint =
@@ -365,6 +382,8 @@ module Cli = struct
             ~default:configuration.mode.rollup_node_endpoint
             rollup_node_endpoint;
         preimages = Option.value ~default:configuration.mode.preimages preimages;
+        preimages_endpoint =
+          Option.either preimages_endpoint configuration.mode.preimages_endpoint;
         time_between_blocks =
           Option.value
             ~default:configuration.mode.time_between_blocks
@@ -386,7 +405,7 @@ module Cli = struct
 
   let patch_observer_configuration_from_args ~devmode ?rpc_addr ?rpc_port
       ?cors_origins ?cors_headers ?log_filter ?evm_node_endpoint ?preimages
-      configuration =
+      ?preimages_endpoint configuration =
     let mode =
       {
         evm_node_endpoint =
@@ -394,6 +413,8 @@ module Cli = struct
             ~default:configuration.mode.evm_node_endpoint
             evm_node_endpoint;
         preimages = Option.value ~default:configuration.mode.preimages preimages;
+        preimages_endpoint =
+          Option.either preimages_endpoint configuration.mode.preimages_endpoint;
       }
     in
     patch_configuration_from_args
@@ -473,7 +494,8 @@ module Cli = struct
 
   let create_or_read_sequencer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
       ?private_rpc_port ?cors_origins ?cors_headers ?log_filter
-      ?rollup_node_endpoint ?preimages ?time_between_blocks ~sequencer () =
+      ?rollup_node_endpoint ?preimages ?preimages_endpoint ?time_between_blocks
+      ~sequencer () =
     create_or_read_config
       ~data_dir
       ~devmode
@@ -488,18 +510,21 @@ module Cli = struct
         (patch_sequencer_configuration_from_args
            ?rollup_node_endpoint
            ?preimages
+           ?preimages_endpoint
            ?time_between_blocks
            ~sequencer)
       ~create:
         (create_sequencer
            ?rollup_node_endpoint
            ?preimages
+           ?preimages_endpoint
            ?time_between_blocks
            ~sequencer)
       ()
 
   let create_or_read_observer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?cors_origins ?cors_headers ?log_filter ?evm_node_endpoint ?preimages () =
+      ?cors_origins ?cors_headers ?log_filter ?evm_node_endpoint ?preimages
+      ?preimages_endpoint () =
     create_or_read_config
       ~data_dir
       ~devmode
@@ -510,8 +535,11 @@ module Cli = struct
       ?log_filter
       ~load:load_observer
       ~patch_configuration_from_args:(fun ?private_rpc_port:_ ->
-        patch_observer_configuration_from_args ?evm_node_endpoint ?preimages)
+        patch_observer_configuration_from_args
+          ?evm_node_endpoint
+          ?preimages
+          ?preimages_endpoint)
       ~create:(fun ?private_rpc_port:_ ->
-        create_observer ?evm_node_endpoint ?preimages)
+        create_observer ?evm_node_endpoint ?preimages ?preimages_endpoint)
       ()
 end

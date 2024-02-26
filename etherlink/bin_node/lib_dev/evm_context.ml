@@ -10,6 +10,7 @@ type t = {
   mutable context : Irmin_context.rw;
   index : Irmin_context.rw_index;
   preimages : string;
+  preimages_endpoint : Uri.t option;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
@@ -54,6 +55,7 @@ let evm_state {context; _} = Irmin_context.PVMState.get context
 let execution_config ctxt =
   Config.config
     ~preimage_directory:ctxt.preimages
+    ?preimage_endpoint:ctxt.preimages_endpoint
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
     ()
@@ -131,7 +133,8 @@ let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
   let* () = Blueprints_publisher.publish level blueprint.to_publish in
   return ctxt
 
-let init ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
+let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
+    ~smart_rollup_address () =
   let open Lwt_result_syntax in
   let* index =
     Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
@@ -148,6 +151,7 @@ let init ?kernel_path ~data_dir ~preimages ~smart_rollup_address () =
       context;
       data_dir;
       preimages;
+      preimages_endpoint;
       smart_rollup_address = destination;
       next_blueprint_number;
       current_block_hash;
