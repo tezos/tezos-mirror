@@ -1,7 +1,7 @@
 instructions:
   - set:
       value: 00000000000000000000dc0a0713000c1e020000000000000000000000000000
-      to: /evm/eth_accounts/d9e5c94a12f78a96640757ac97ba0c257e8aa262/balance
+      to: /evm/world_state/eth_accounts/d9e5c94a12f78a96640757ac97ba0c257e8aa262/balance
   - set:
       # KT1DXADSWXucAJ6PujZeUSK9brpToFtC9fz6
       value: 4b5431445841445357587563414a3650756a5a6555534b39627270546f46744339667a36

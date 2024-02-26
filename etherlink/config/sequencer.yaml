@@ -4,13 +4,13 @@ instructions:
       to: /evm/sequencer
   - set:
       value: 0000dc0a0713000c1e0200000000000000000000000000000000000000000000
-      to: /evm/eth_accounts/6ce4d79d4e77402e1ef3417fdda433aa744c6e1c/balance
+      to: /evm/world_state/eth_accounts/6ce4d79d4e77402e1ef3417fdda433aa744c6e1c/balance
   - set:
       value: 0000dc0a0713000c1e0200000000000000000000000000000000000000000000
-      to: /evm/eth_accounts/b53dc01974176e5dff2298c5a94343c2585e3c54/balance
+      to: /evm/world_state/eth_accounts/b53dc01974176e5dff2298c5a94343c2585e3c54/balance
   - set:
       value: 0000dc0a0713000c1e0200000000000000000000000000000000000000000000
-      to: /evm/eth_accounts/9b49c988b5817be31dfb00f7a5a4671772dcce2b/balance
+      to: /evm/world_state/eth_accounts/9b49c988b5817be31dfb00f7a5a4671772dcce2b/balance
   - set:
       # edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav
       # `Boostrap.bootstrap1.public_key` in `tezt/lib_tezos/account.ml`

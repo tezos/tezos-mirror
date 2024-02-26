@@ -6,12 +6,29 @@
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
-use tezos_smart_rollup_host::runtime::Runtime;
+use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
+use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
 pub enum MigrationStatus {
     None,
     InProgress,
     Done,
+}
+
+fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
+    match res {
+        Ok(()) => Ok(()),
+        Err(RuntimeError::PathNotFound) => Ok(()),
+        Err(err) => Err(err),
+    }
+}
+
+fn migrate_world_state(host: &mut impl Runtime) -> Result<(), Error> {
+    allow_path_not_found(
+        host.store_move(&RefPath::assert_from(b"/eth_accounts"), &EVM_ACCOUNTS_PATH),
+    )?;
+    Ok(())
 }
 
 // The workflow for migration is the following:
@@ -36,6 +53,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+        migrate_world_state(host)?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);

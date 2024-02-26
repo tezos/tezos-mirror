@@ -84,3 +84,15 @@ val delayed_inbox_min_levels : path
 (** [config_root_hash] is the path to the root hash of the
     storage configuration.  *)
 val config_root_hash : path
+
+module Ghostnet : sig
+  val eth_accounts : path
+
+  val eth_account : path -> path
+
+  val balance : path -> path
+
+  val code : path -> path
+
+  val storage : path -> ?key:path -> unit -> path
+end

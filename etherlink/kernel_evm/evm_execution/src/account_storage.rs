@@ -102,7 +102,7 @@ impl From<OwnedPath> for EthereumAccount {
 }
 
 /// Path where Ethereum accounts are stored
-pub const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/eth_accounts");
+pub const EVM_ACCOUNTS_PATH: RefPath = RefPath::assert_from(b"/world_state/eth_accounts");
 
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.

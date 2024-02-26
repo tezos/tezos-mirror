@@ -18,6 +18,12 @@ module EVM = struct
   let make s = root ^ s
 end
 
+module World_state = struct
+  let root = "/world_state"
+
+  let make s = EVM.make (root ^ s)
+end
+
 let chain_id = EVM.make "/chain_id"
 
 let base_fee_per_gas = EVM.make "/base_fee_per_gas"
@@ -27,7 +33,7 @@ let kernel_version = EVM.make "/kernel_version"
 let kernel_upgrade = EVM.make "/kernel_upgrade"
 
 module Accounts = struct
-  let accounts = EVM.make "/eth_accounts"
+  let accounts = World_state.make "/eth_accounts"
 
   let balance = "/balance"
 
