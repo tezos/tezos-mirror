@@ -30,6 +30,7 @@ commander
     .option('-i, --include <regex>', 'Only consider benchmark scripts matching <regex>')
     .option('-e, --exclude <regex>', 'Exclude benchmark scripts matching <regex>')
     .option('-o, --output-dir <path>', "Output directory")
+    .option('--fast-mode', "Launch kernel in fast mode, but less information is collected", false)
     .option('--keep-temp', "Keep temporary files", false)
     .parse(process.argv);
 
@@ -43,6 +44,7 @@ function filter_name(name) {
 }
 
 let KEEP_TEMP = commander.opts().keepTemp;
+let FAST_MODE = commander.opts().fastMode;
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_installer.wasm');
 const PREIMAGE_DIR = external.ressource_dir('_evm_unstripped_installer_preimages');
@@ -51,7 +53,7 @@ mkdirSync(OUTPUT_DIRECTORY, { recursive: true })
 console.log(`Output directory ${OUTPUT_DIRECTORY}`)
 
 function sumArray(arr) {
-    return arr.reduce((acc, curr) => acc + curr, 0);
+    return arr?.reduce((acc, curr) => acc + curr, 0) ?? 0;
 }
 
 function push_match(output, array, regexp) {
@@ -131,13 +133,16 @@ function run_profiler(path, logs) {
 
         childProcess.stdin.write("step kernel_run\n");
 
-        childProcess.stdin.write("profile\n");
+        if (FAST_MODE)
+            childProcess.stdin.write("step inbox\n");
+        else
+            childProcess.stdin.write("profile\n");
 
         childProcess.stdin.end();
 
         childProcess.stdout.on('data', (data) => {
             const output = data.toString();
-            if (!output.includes("__wasm_debugger__::Section")) fs.appendFileSync(logs, output)
+            if (!output.includes("__wasm_debugger__")) fs.appendFileSync(logs, output)
             const profiler_output_path_regex = /Profiling result can be found in (.+)/;
             const profiler_output_path_match = output.match(profiler_output_path_regex);
             const profiler_output_path_result = profiler_output_path_match
@@ -160,7 +165,7 @@ function run_profiler(path, logs) {
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
         childProcess.on('close', _ => {
-            if (profiler_output_path == "") {
+            if (!FAST_MODE && profiler_output_path == "") {
                 console.log(new Error("Profiler output path not found"));
             }
             if (gas_used == []) {
@@ -275,8 +280,8 @@ async function analyze_profiler_output(path) {
 async function run_benchmark(path, logs) {
     var inbox_size = fs.statSync(path).size
     run_profiler_result = await run_profiler(path, logs);
-    profiler_output_analysis_result = await analyze_profiler_output(run_profiler_result.profiler_output_path);
-    if (!KEEP_TEMP) {
+    profiler_output_analysis_result = FAST_MODE ? {} : await analyze_profiler_output(run_profiler_result.profiler_output_path);
+    if (!KEEP_TEMP && !FAST_MODE) {
         fs.unlink(run_profiler_result.profiler_output_path, (err) => {
             if (err) {
                 console.error(err);
@@ -328,7 +333,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     for (var j = 0; j < tx_status.length; j++) {
         let basic_info_row = {
             benchmark_name,
-            signature_verification_ticks: signature_verification_ticks[j],
+            signature_verification_ticks: signature_verification_ticks?.[j],
             status: tx_status[j],
             estimated_ticks: estimated_ticks_per_tx[j],
         }
@@ -337,27 +342,28 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             rows.push(
                 {
                     gas_cost: 21000,
-                    run_transaction_ticks: run_transaction_ticks[j],
+                    run_transaction_ticks: run_transaction_ticks?.[j],
                     sputnik_runtime_ticks: 0,
-                    store_transaction_object_ticks: store_transaction_object_ticks[j],
+                    store_transaction_object_ticks: store_transaction_object_ticks?.[j],
                     ...basic_info_row
                 });
 
         }
         else if (tx_status[j].includes("OK")) {
             // sputnik runtime called only if not a transfer
-            sputnik_runtime_tick = (gas_costs[gas_cost_index] > 21000) ? sputnik_runtime_ticks[run_time_index++] : 0
+            // FIXME: won't work with fees ? + run_time_index unreliable in fast mode
+            sputnik_runtime_tick = (gas_costs[gas_cost_index] > 21000) ? sputnik_runtime_ticks?.[run_time_index++] : 0
 
             rows.push(
                 {
                     gas_cost: gas_costs[gas_cost_index],
-                    run_transaction_ticks: run_transaction_ticks[j],
-                    sputnik_runtime_ticks: sputnik_runtime_tick,
-                    store_transaction_object_ticks: store_transaction_object_ticks[j],
-                    store_receipt_ticks: run_benchmark_result.store_receipt_ticks[j],
+                    run_transaction_ticks: run_transaction_ticks?.[j],
+                    sputnik_runtime_ticks: sputnik_runtime_tick ?? 0,
+                    store_transaction_object_ticks: store_transaction_object_ticks?.[j],
+                    store_receipt_ticks: run_benchmark_result.store_receipt_ticks?.[j],
                     receipt_size: run_benchmark_result.receipt_size[j],
                     tx_size: tx_size[j],
-                    logs_to_bloom: run_benchmark_result.logs_to_bloom[j],
+                    logs_to_bloom: run_benchmark_result.logs_to_bloom?.[j],
                     bloom_size: run_benchmark_result.bloom_size[j],
                     ...basic_info_row
                 });
@@ -370,39 +376,40 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         }
     }
 
-    if (run_time_index !== sputnik_runtime_ticks.length) {
+    if (!FAST_MODE && run_time_index !== sputnik_runtime_ticks.length) {
         console.log("Warning: runtime not matched with a transaction in: " + benchmark_name);
     }
 
     // first kernel run
     // the nb of tx correspond to the full inbox, not just those done in first run
+    // FIXME: bip_idx unreliable in FAST_MODE
     let bip_idx = 0
     rows.push({
         benchmark_name: benchmark_name + "(all)",
-        interpreter_init_ticks: interpreter_init_ticks[0],
-        interpreter_decode_ticks: interpreter_decode_ticks[0],
-        fetch_blueprint_ticks: fetch_blueprint_ticks[0],
-        kernel_run_ticks: kernel_run_ticks[0],
-        estimated_ticks: estimated_ticks[0],
+        interpreter_init_ticks: interpreter_init_ticks?.[0],
+        interpreter_decode_ticks: interpreter_decode_ticks?.[0],
+        fetch_blueprint_ticks: fetch_blueprint_ticks?.[0],
+        kernel_run_ticks: kernel_run_ticks?.[0],
+        estimated_ticks: estimated_ticks?.[0],
         inbox_size: run_benchmark_result.inbox_size,
         nb_tx: tx_status.length,
         block_in_progress_store: block_in_progress_store[0] ? block_in_progress_store[0] : '',
-        block_in_progress_store_ticks: block_in_progress_store[0] ? block_in_progress_store_ticks[bip_idx++] : ''
+        block_in_progress_store_ticks: block_in_progress_store[0] ? block_in_progress_store_ticks?.[bip_idx++] : ''
     });
 
     //reboots
-    for (var j = 1; j < kernel_run_ticks.length; j++) {
+    for (var j = 1; j < kernel_run_ticks?.length; j++) {
         rows.push({
             benchmark_name: benchmark_name + "(all)",
-            interpreter_init_ticks: interpreter_init_ticks[j],
-            interpreter_decode_ticks: interpreter_decode_ticks[j],
-            fetch_blueprint_ticks: fetch_blueprint_ticks[j],
-            kernel_run_ticks: kernel_run_ticks[j],
-            estimated_ticks: estimated_ticks[j],
+            interpreter_init_ticks: interpreter_init_ticks?.[j],
+            interpreter_decode_ticks: interpreter_decode_ticks?.[j],
+            fetch_blueprint_ticks: fetch_blueprint_ticks?.[j],
+            kernel_run_ticks: kernel_run_ticks?.[j],
+            estimated_ticks: estimated_ticks?.[j],
             block_in_progress_store: block_in_progress_store[j] ? block_in_progress_store[j] : '',
-            block_in_progress_store_ticks: block_in_progress_store[j] ? block_in_progress_store_ticks[bip_idx] : '',
+            block_in_progress_store_ticks: block_in_progress_store[j] ? block_in_progress_store_ticks?.[bip_idx] : '',
             block_in_progress_read: block_in_progress_read[j - 1], // the first read correspond to second run
-            block_in_progress_read_ticks: block_in_progress_read[j - 1] ? block_in_progress_read_ticks[bip_idx - 1] : ''
+            block_in_progress_read_ticks: block_in_progress_read[j - 1] ? block_in_progress_read_ticks?.[bip_idx - 1] : ''
         });
         if (block_in_progress_read[j - 1]) bip_idx++
     }
@@ -455,7 +462,7 @@ mkdirSync(PROFILER_OUTPUT_DIRECTORY, { recursive: true })
 
 
 function move_profiler_output(src, bench_name, time) {
-    if (!KEEP_TEMP) return;
+    if (!KEEP_TEMP || FAST_MODE) return;
     let dest = path.format({ dir: PROFILER_OUTPUT_DIRECTORY, base: `${bench_name.replaceAll('/', '_')}_${time}.out` })
     fs.rename(path.resolve(src), dest, (err) => {
         if (err && err.code === 'EXDEV') {
