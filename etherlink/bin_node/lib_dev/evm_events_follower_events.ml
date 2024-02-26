@@ -27,6 +27,15 @@ module Event = struct
       ("index", Data_encoding.int31)
       ("level", Data_encoding.int32)
 
+  let new_event =
+    declare_1
+      ~section
+      ~name:"evm_events_new_event"
+      ~msg:"Evm events follower: applying {event}"
+      ~level:Notice
+      ~pp1:Ethereum_types.Evm_events.pp
+      ("event", Ethereum_types.Evm_events.encoding)
+
   let pp_int32 fmt i = Format.fprintf fmt "%ld" i
 
   let shutdown =
@@ -44,3 +53,5 @@ let shutdown = Internal_event.Simple.emit Event.shutdown
 
 let unreadable_event (index, level) =
   Internal_event.Simple.emit Event.unreadable_event (index, level)
+
+let new_event event = Internal_event.Simple.emit Event.new_event event

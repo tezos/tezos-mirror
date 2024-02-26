@@ -85,7 +85,7 @@ let make_blueprint_chunks ~timestamp ~transactions ~delayed_transactions
     in
     (List m, List (delayed_transactions @ m))
   in
-  let timestamp = Value (Helpers.timestamp_to_bytes timestamp) in
+  let timestamp = Value (Ethereum_types.timestamp_to_bytes timestamp) in
   let parent_hash =
     Value (block_hash_to_bytes parent_hash |> Bytes.of_string)
   in

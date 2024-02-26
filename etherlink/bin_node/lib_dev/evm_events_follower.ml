@@ -73,8 +73,10 @@ let read_from_rollup_node path level rollup_node_endpoint =
     ()
 
 let on_new_event ({backend; _} : Types.state) event =
+  let open Lwt_syntax in
   let open Ethereum_types in
   let (module Backend) = backend in
+  let* () = Evm_events_follower_events.new_event event in
   match event with
   | Evm_events.Upgrade_event upgrade ->
       let payload = Upgrade.to_bytes upgrade |> String.of_bytes in
