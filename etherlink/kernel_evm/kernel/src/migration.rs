@@ -6,9 +6,9 @@
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
-    read_storage_version, store_storage_version, EVM_BLOCKS, EVM_INDEXES,
-    EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS, SEQUENCER_POOL_PATH,
-    STORAGE_VERSION,
+    read_storage_version, store_storage_version, EVM_BASE_FEE_PER_GAS, EVM_BLOCKS,
+    EVM_INDEXES, EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS,
+    SEQUENCER_POOL_PATH, STORAGE_VERSION,
 };
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use tezos_smart_rollup_host::path::RefPath;
@@ -53,6 +53,10 @@ fn migrate_world_state(host: &mut impl Runtime) -> Result<(), Error> {
     allow_path_not_found(host.store_move(
         &RefPath::assert_from(b"/fees"),
         &RefPath::assert_from(b"/world_state/fees"),
+    ))?;
+    allow_path_not_found(host.store_move(
+        &RefPath::assert_from(b"/base_fee_per_gas"),
+        &EVM_BASE_FEE_PER_GAS,
     ))?;
     Ok(())
 }

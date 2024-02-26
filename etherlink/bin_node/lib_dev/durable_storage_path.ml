@@ -26,7 +26,7 @@ end
 
 let chain_id = EVM.make "/chain_id"
 
-let base_fee_per_gas = EVM.make "/base_fee_per_gas"
+let base_fee_per_gas = World_state.make "/fees/base_fee_per_gas"
 
 let kernel_version = EVM.make "/kernel_version"
 

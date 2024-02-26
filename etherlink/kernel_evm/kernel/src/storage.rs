@@ -61,7 +61,8 @@ pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
-const EVM_BASE_FEE_PER_GAS: RefPath = RefPath::assert_from(b"/base_fee_per_gas");
+pub const EVM_BASE_FEE_PER_GAS: RefPath =
+    RefPath::assert_from(b"/world_state/fees/base_fee_per_gas");
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas");
 const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/world_state/fees/da_fee_per_byte");
