@@ -46,6 +46,7 @@ rotateonstart=yes
 [ -r /etc/octez/evmnode.conf ] && . /etc/octez/evmnode.conf
 
 [ -z "$srnodeurl" ] && srnodeurl="http://$sraddr:$srrpcport"
+[ -z "$endpointurl" ] && endpointurl="$srnodeurl"
 
 [ ! -z "$sequencer_key" ] && [ "$evmmode" = "sequencer" ] && \
 	seq_opts="signing with ${sequencer_key}"
@@ -76,7 +77,7 @@ rotate_logs ()
 case "$1" in
 start)	initial_checks
 	rotate_logs
-	su $user -c "${evm} run ${evmmode} with endpoint $srnodeurl ${seq_opts} --rpc-addr ${evmaddr} --rpc-port ${evmport} ${additional_cliopts} >> ${logfile} 2>&1 &"
+	su $user -c "${evm} run ${evmmode} with endpoint $endpointurl ${seq_opts} --rpc-addr ${evmaddr} --rpc-port ${evmport} ${additional_cliopts} >> ${logfile} 2>&1 &"
 	;;
 stop)	
        	pkill -f octez-evm-node
