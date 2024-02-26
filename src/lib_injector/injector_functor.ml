@@ -1064,6 +1064,10 @@ module Make (Parameters : PARAMETERS) = struct
       match state.last_seen_head with
       | None ->
           return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
+      | Some {level; _} when Int32.sub head_level level > 120l ->
+          (* Don't analyze reorgs which are too long (more than 120 blocks) as
+             this would be too expensive in the injector. *)
+          return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
       | Some last_head ->
           Layer_1.get_tezos_reorg_for_new_head
             state.l1_ctxt
