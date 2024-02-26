@@ -2622,7 +2622,9 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   in
   (* Load the EVM rollup's storage and sanity check results. *)
   let* evm_node =
-    Evm_node.init (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+    Evm_node.init
+      ~mode:(Proxy {devmode = false})
+      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
@@ -2644,6 +2646,12 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
       ~node:evm_setup.node
       ~client:evm_setup.client
   in
+  let* evm_node =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+  in
+  let evm_setup = {evm_setup with evm_node} in
   (* Check the values after the upgrade with [sanity_check] results. *)
   scenario_after ~evm_setup ~sanity_check
 
@@ -2783,7 +2791,11 @@ let test_deposit_dailynet =
       smart_rollup_node_extra_args
   in
 
-  let* evm_node = Evm_node.init (Sc_rollup_node.endpoint sc_rollup_node) in
+  let* evm_node =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
   let endpoint = Evm_node.endpoint evm_node in
 
   (* Deposit tokens to the EVM rollup. *)
