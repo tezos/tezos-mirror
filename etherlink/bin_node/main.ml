@@ -897,11 +897,15 @@ let make_prod_messages ~smart_rollup_address s =
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
-let make_dev_messages ~kind ~smart_rollup_address s =
+let make_dev_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
   let open Evm_node_lib_dev_encoding in
-  let s = Ethereum_types.hex_of_string s in
+  let transactions =
+    List.map
+      (fun s -> Ethereum_types.hex_of_string s |> Ethereum_types.hex_to_bytes)
+      data
+  in
   let* messages =
     match kind with
     | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
@@ -913,17 +917,18 @@ let make_dev_messages ~kind ~smart_rollup_address s =
             ~smart_rollup_address
             ~number:(Ethereum_types.quantity_of_z number)
             ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
-            ~transactions:[Ethereum_types.hex_to_bytes s]
+            ~transactions
             ~delayed_transactions:[]
         in
         return @@ List.map (fun (`External s) -> s) to_publish
     | `Transaction ->
-        let*? _, blueprints =
-          Transaction_format.make_encoded_messages
-            ~smart_rollup_address
-            (Ethereum_types.hex_to_bytes s)
+        let*? chunks =
+          List.map_e
+            (fun tx ->
+              Transaction_format.make_encoded_messages ~smart_rollup_address tx)
+            transactions
         in
-        return blueprints
+        return (chunks |> List.map snd |> List.flatten)
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
@@ -944,11 +949,11 @@ let chunker_command =
        sequencer_key_arg
        wallet_dir_arg)
     (prefixes ["chunk"; "data"]
+    @@ seq_of_param
     @@ param
          ~name:"data"
          ~desc:"Data to prepare and chunk with the EVM rollup format"
-         Params.string
-    @@ stop)
+         Params.string)
     (fun ( devmode,
            rollup_address,
            as_blueprint,
@@ -978,10 +983,10 @@ let chunker_command =
               blueprint_parent_hash )
         else return `Transaction
       in
-      let print_chunks smart_rollup_address s =
+      let print_chunks smart_rollup_address data =
         let* messages =
-          if devmode then make_dev_messages ~kind ~smart_rollup_address s
-          else make_prod_messages ~smart_rollup_address s
+          if devmode then make_dev_messages ~kind ~smart_rollup_address data
+          else make_prod_messages ~kind ~smart_rollup_address data
         in
         Format.printf "Chunked transactions :\n%!" ;
         List.iter (Format.printf "%s\n%!") messages ;
