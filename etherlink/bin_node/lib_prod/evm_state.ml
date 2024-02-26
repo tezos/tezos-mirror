@@ -64,12 +64,20 @@ let current_block_height evm_state =
     inspect evm_state Durable_storage_path.Block.current_number
   in
   match current_block_number with
-  | None ->
-      (* No block has been created yet and we are waiting for genesis,
-         whose number will be [zero]. Since the semantics of [apply_blueprint]
-         is to verify the block height has been incremented once, we default to
-         [-1]. *)
-      return (Block_height Z.(pred zero))
+  | None -> (
+      let* current_block_number2 =
+        inspect evm_state "/evm/world_state/blocks/current/number"
+      in
+      match current_block_number2 with
+      | Some current_block_number ->
+          let (Qty current_block_number) = decode_number current_block_number in
+          return (Block_height current_block_number)
+      | None ->
+          (* No block has been created yet and we are waiting for genesis,
+             whose number will be [zero]. Since the semantics of [apply_blueprint]
+             is to verify the block height has been incremented once, we default to
+             [-1]. *)
+          return (Block_height Z.(pred zero)))
   | Some current_block_number ->
       let (Qty current_block_number) = decode_number current_block_number in
       return (Block_height current_block_number)
@@ -81,7 +89,13 @@ let current_block_hash evm_state =
   in
   match current_hash with
   | Some h -> return (decode_block_hash h)
-  | None -> return genesis_parent_hash
+  | None -> (
+      let*! current_hash2 =
+        inspect evm_state "/evm/world_state/blocks/current/hash"
+      in
+      match current_hash2 with
+      | Some h -> return (decode_block_hash h)
+      | None -> return genesis_parent_hash)
 
 let execute_and_inspect ?wasm_entrypoint ~config
     ~input:Simulation.Encodings.{messages; insight_requests; _} ctxt =
