@@ -43,7 +43,8 @@ const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/kernel_governance");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
 // Path to the block in progress, used between reboots
-const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
+const EVM_BLOCK_IN_PROGRESS: RefPath =
+    RefPath::assert_from(b"/world_state/blocks/in_progress");
 
 const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/world_state/blocks/current");
 pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/world_state/blocks");
