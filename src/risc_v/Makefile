@@ -31,7 +31,7 @@ build-deps:
 test:
 	@cargo test --workspace
 	@make -C dummy_kernel test
-	@make -C jstz build
+	@make -C jstz test
 
 .PHONY: check
 check:
