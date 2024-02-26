@@ -217,22 +217,6 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       sc_rollup_node;
     }
 
-let check_head_consistency ~left ~right ?error_msg () =
-  let error_msg =
-    Option.value
-      ~default:
-        Format.(
-          sprintf
-            "Nodes do not have the same head (%s is %%L while %s is %%R"
-            (Evm_node.name left)
-            (Evm_node.name right))
-      error_msg
-  in
-  let*@ left_head = Rpc.get_block_by_number ~block:"latest" left in
-  let*@ right_head = Rpc.get_block_by_number ~block:"latest" right in
-  Check.((left_head.hash = right_head.hash) string) ~error_msg ;
-  unit
-
 let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
     ~sc_rollup_node ~node ~client ~l1_contracts ~sc_rollup_address raw_tx =
   let expected_hash =

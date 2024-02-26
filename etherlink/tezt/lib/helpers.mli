@@ -95,3 +95,9 @@ val upgrade :
   upgrade_to:Uses.t ->
   activation_timestamp:string ->
   unit Lwt.t
+
+(** [check_head_consistency ~left ~right ?error_msg ()] check that the
+    latest block hash of [left] and [right] are equal. Fails if they
+    are not with [error_msg] *)
+val check_head_consistency :
+  left:Evm_node.t -> right:Evm_node.t -> ?error_msg:string -> unit -> unit Lwt.t

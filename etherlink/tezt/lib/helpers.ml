@@ -119,3 +119,20 @@ let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
   unit
+
+let check_head_consistency ~left ~right ?error_msg () =
+  let open Rpc.Syntax in
+  let error_msg =
+    Option.value
+      ~default:
+        Format.(
+          sprintf
+            "Nodes do not have the same head (%s is %%L while %s is %%R"
+            (Evm_node.name left)
+            (Evm_node.name right))
+      error_msg
+  in
+  let*@ left_head = Rpc.get_block_by_number ~block:"latest" left in
+  let*@ right_head = Rpc.get_block_by_number ~block:"latest" right in
+  Check.((left_head.hash = right_head.hash) string) ~error_msg ;
+  unit
