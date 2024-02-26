@@ -39,6 +39,10 @@
   octez-protocol-018-Proxford-libs.client
   octez-protocol-018-Proxford-libs.client.commands
   tezos-protocol-018-Proxford.protocol
+  octez-protocol-019-PtParisA-libs.baking
+  octez-protocol-019-PtParisA-libs.client
+  octez-protocol-019-PtParisA-libs.client.commands
+  tezos-protocol-019-PtParisA.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.client.commands
@@ -54,7 +58,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context)
- (modules sigs tool_018_Proxford tool_alpha))
+ (modules sigs tool_018_Proxford tool_019_PtParisA tool_alpha))
 
 (executable
  (name simulation_scenario)

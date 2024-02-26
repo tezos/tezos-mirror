@@ -1,0 +1,63 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_019_PtParisA_lib_plugin_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-libs.base
+  octez-libs.base-test-helpers
+  octez-libs.base.unix
+  octez-alcotezt
+  octez-libs.test-helpers
+  qcheck-alcotest
+  octez-libs.stdlib-unix
+  octez-libs.micheline
+  octez-protocol-019-PtParisA-libs.plugin
+  tezos-protocol-019-PtParisA.protocol
+  tezos-protocol-019-PtParisA.parameters
+  octez-protocol-019-PtParisA-libs.test-helpers)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base_test_helpers
+  -open Octez_alcotezt
+  -open Tezos_test_helpers
+  -open Tezos_micheline
+  -open Tezos_protocol_plugin_019_PtParisA
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_protocol_019_PtParisA.Protocol
+  -open Tezos_protocol_019_PtParisA_parameters
+  -open Tezos_019_PtParisA_test_helpers)
+ (modules
+  helpers
+  test_conflict_handler
+  test_consensus_filter
+  test_fee_needed_to_overtake
+  test_fee_needed_to_replace_by_fee))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_019_PtParisA_lib_plugin_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package octez-protocol-019-PtParisA-libs)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

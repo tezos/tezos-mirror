@@ -121,6 +121,12 @@
   (select void_for_linking-octez-protocol-018-Proxford-libs-plugin from
    (octez-protocol-018-Proxford-libs.plugin -> void_for_linking-octez-protocol-018-Proxford-libs-plugin.empty)
    (-> void_for_linking-octez-protocol-018-Proxford-libs-plugin.empty))
+  (select void_for_linking-octez-protocol-019-PtParisA-libs-client from
+   (octez-protocol-019-PtParisA-libs.client -> void_for_linking-octez-protocol-019-PtParisA-libs-client.empty)
+   (-> void_for_linking-octez-protocol-019-PtParisA-libs-client.empty))
+  (select void_for_linking-octez-protocol-019-PtParisA-libs-plugin from
+   (octez-protocol-019-PtParisA-libs.plugin -> void_for_linking-octez-protocol-019-PtParisA-libs-plugin.empty)
+   (-> void_for_linking-octez-protocol-019-PtParisA-libs-plugin.empty))
   (select void_for_linking-octez-protocol-alpha-libs-client from
    (octez-protocol-alpha-libs.client -> void_for_linking-octez-protocol-alpha-libs-client.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client.empty))
@@ -174,5 +180,7 @@
    (write-file void_for_linking-octez-protocol-017-PtNairob-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-018-Proxford-libs-plugin.empty "")
+   (write-file void_for_linking-octez-protocol-019-PtParisA-libs-client.empty "")
+   (write-file void_for_linking-octez-protocol-019-PtParisA-libs-plugin.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-client.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-plugin.empty ""))))

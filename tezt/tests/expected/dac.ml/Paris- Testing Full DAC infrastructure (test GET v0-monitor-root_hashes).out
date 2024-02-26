@@ -1,0 +1,4 @@
+RPC_REQUEST_URI: GET $SCHEME://$HOST:$PORT/v0/monitor/root_hashes
+RPC_REQUEST_HEADER: Content-Type: application/json
+
+

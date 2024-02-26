@@ -1,0 +1,17 @@
+{0 Octez-protocol-019-PtParisA-libs: octez protocol 019-PtParisA libraries}
+
+This is a package containing some libraries related to the Tezos 019-PtParisA protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_019_PtParisA_test_helpers}Tezos_019_PtParisA_test_helpers}: Protocol testing framework
+- {{!module-Tezos_baking_019_PtParisA}Tezos_baking_019_PtParisA}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_019_PtParisA_commands}Tezos_baking_019_PtParisA_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_019_PtParisA}Tezos_client_019_PtParisA}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dac_019_PtParisA}Tezos_dac_019_PtParisA}: Protocol specific library for the Data availability Committee
+- {{!module-Tezos_dal_019_PtParisA}Tezos_dal_019_PtParisA}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_019_PtParisA}Tezos_layer2_utils_019_PtParisA}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_019_PtParisA}Tezos_protocol_plugin_019_PtParisA}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_019_PtParisA_registerer}Tezos_protocol_plugin_019_PtParisA_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_019_PtParisA}Tezos_smart_rollup_019_PtParisA}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_019_PtParisA}Tezos_smart_rollup_layer2_019_PtParisA}: Protocol specific library for `tezos-smart-rollup`

@@ -116,6 +116,9 @@
   octez-protocol-018-Proxford-libs.client.commands-registration
   octez-protocol-018-Proxford-libs.baking-commands.registration
   octez-protocol-018-Proxford-libs.plugin
+  octez-protocol-019-PtParisA-libs.client.commands-registration
+  octez-protocol-019-PtParisA-libs.baking-commands.registration
+  octez-protocol-019-PtParisA-libs.plugin
   (select void_for_linking-octez-protocol-alpha-libs-client-commands-registration from
    (octez-protocol-alpha-libs.client.commands-registration -> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-client-commands-registration.empty))

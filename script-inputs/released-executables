@@ -8,5 +8,7 @@ octez-codec
 octez-client
 octez-admin-client
 octez-node
+octez-accuser-PtParisA
+octez-baker-PtParisA
 octez-accuser-Proxford
 octez-baker-Proxford

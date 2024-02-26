@@ -39,6 +39,7 @@
   prometheus-app
   prometheus
   octez-protocol-018-Proxford-libs.dal
+  octez-protocol-019-PtParisA-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))

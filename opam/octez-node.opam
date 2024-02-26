@@ -24,6 +24,8 @@ depends: [
   "tezos-protocol-000-Ps9mPmXa"
   "tezos-protocol-018-Proxford"
   "octez-protocol-018-Proxford-libs"
+  "tezos-protocol-019-PtParisA"
+  "octez-protocol-019-PtParisA-libs"
 ]
 depopts: [
   "tezos-protocol-genesis"

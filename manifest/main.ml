@@ -5420,12 +5420,13 @@ end = struct
             ("test_constants", true);
             ("test_frozen_bonds", true);
             ("test_adaptive_issuance_launch", N.(number >= 018));
-            ("test_adaptive_issuance_roundtrip", N.(number == 018));
-            ("test_scenario_base", N.(number >= 019));
-            ("test_scenario_stake", N.(number >= 019));
-            ("test_scenario_rewards", N.(number >= 019));
-            ("test_scenario_autostaking", N.(number >= 019));
-            ("test_scenario_slashing", N.(number >= 019));
+            ( "test_adaptive_issuance_roundtrip",
+              N.(number == 018 || number == 019) );
+            ("test_scenario_base", N.(number >= 020));
+            ("test_scenario_stake", N.(number >= 020));
+            ("test_scenario_rewards", N.(number >= 020));
+            ("test_scenario_autostaking", N.(number >= 020));
+            ("test_scenario_slashing", N.(number >= 020));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
@@ -5547,7 +5548,7 @@ end = struct
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number >= 018));
             ("test_percentage", N.(number >= 019));
-            ("test_full_staking_balance_repr", N.(number >= 019));
+            ("test_full_staking_balance_repr", N.(number >= 020));
           ]
           |> conditional_list
         in
@@ -7061,6 +7062,8 @@ let hash = Protocol.hash
   let _017_PtNairob = frozen (Name.v "PtNairob" 017)
 
   let _018_Proxford = active (Name.v "Proxford" 018)
+
+  let _019_PtParisA = active (Name.v "PtParisA" 019)
 
   let alpha = active Name.alpha
 

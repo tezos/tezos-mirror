@@ -1,0 +1,34 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_019_PtParisA)
+ (public_name tezos-benchmark-019-PtParisA)
+ (libraries
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  octez-libs.micheline
+  tezos-micheline-rewriting
+  tezos-benchmark
+  tezos-benchmark-type-inference-019-PtParisA
+  tezos-protocol-019-PtParisA.protocol
+  octez-libs.crypto
+  tezos-protocol-019-PtParisA.parameters
+  hashcons
+  octez-protocol-019-PtParisA-libs.test-helpers
+  prbnmcn-stats)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_019_PtParisA
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_019_PtParisA_test_helpers)
+ (private_modules kernel rules state_space))

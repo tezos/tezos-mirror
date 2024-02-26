@@ -1,0 +1,113 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_baking_019_PtParisA)
+ (public_name octez-protocol-019-PtParisA-libs.baking)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  octez-version.value
+  tezos-protocol-019-PtParisA.protocol
+  tezos-protocol-019-PtParisA.protocol.lifted
+  octez-protocol-019-PtParisA-libs.plugin
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-019-PtParisA-libs.client
+  octez-shell-libs.client-commands
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
+  octez-shell-libs.shell-context
+  octez-libs.tezos-context
+  octez-libs.tezos-context.memory
+  octez-libs.rpc-http-client-unix
+  octez-shell-libs.context-ops
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.crypto-dal
+  tezos-dal-node-services
+  lwt-canceler
+  lwt-exit
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_protocol_019_PtParisA_lifted
+  -open Tezos_protocol_plugin_019_PtParisA
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_019_PtParisA
+  -open Tezos_client_commands
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_context
+  -open Tezos_context
+  -open Tezos_context_ops
+  -open Tezos_rpc_http
+  -open Tezos_crypto_dal)
+ (modules (:standard \ Baking_commands Baking_commands_registration)))
+
+(library
+ (name tezos_baking_019_PtParisA_commands)
+ (public_name octez-protocol-019-PtParisA-libs.baking-commands)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-019-PtParisA.protocol
+  tezos-protocol-019-PtParisA.parameters
+  octez-libs.stdlib-unix
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-019-PtParisA-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-019-PtParisA-libs.baking
+  octez-libs.rpc
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_protocol_019_PtParisA_parameters
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_019_PtParisA
+  -open Tezos_client_commands
+  -open Tezos_baking_019_PtParisA)
+ (modules Baking_commands))
+
+(library
+ (name tezos_baking_019_PtParisA_commands_registration)
+ (public_name octez-protocol-019-PtParisA-libs.baking-commands.registration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-019-PtParisA.protocol
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-019-PtParisA-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-019-PtParisA-libs.baking
+  octez-protocol-019-PtParisA-libs.baking-commands
+  octez-libs.rpc)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_019_PtParisA
+  -open Tezos_client_commands
+  -open Tezos_baking_019_PtParisA
+  -open Tezos_baking_019_PtParisA_commands)
+ (modules Baking_commands_registration))

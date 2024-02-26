@@ -20,6 +20,7 @@ depends: [
   "prometheus-app" { >= "1.2" }
   "prometheus" { >= "1.2" }
   "octez-protocol-018-Proxford-libs"
+  "octez-protocol-019-PtParisA-libs"
 ]
 depopts: [
   "octez-protocol-alpha-libs"

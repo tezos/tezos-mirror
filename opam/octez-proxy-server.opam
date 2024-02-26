@@ -41,6 +41,7 @@ depopts: [
   "octez-protocol-016-PtMumbai-libs"
   "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
+  "octez-protocol-019-PtParisA-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [

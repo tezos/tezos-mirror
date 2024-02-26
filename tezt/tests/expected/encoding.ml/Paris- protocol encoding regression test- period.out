@@ -1,0 +1,12 @@
+
+./octez-codec encode 019-PtParisA.period from '"2789"'
+0000000000000ae5
+
+./octez-codec decode 019-PtParisA.period from 0000000000000ae5
+"2789"
+
+./octez-codec encode 019-PtParisA.period from '"0"'
+0000000000000000
+
+./octez-codec decode 019-PtParisA.period from 0000000000000000
+"0"

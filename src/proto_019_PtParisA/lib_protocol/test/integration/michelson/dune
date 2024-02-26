@@ -1,0 +1,85 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name
+  src_proto_019_PtParisA_lib_protocol_test_integration_michelson_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-alcotezt
+  octez-libs.base
+  tezos-protocol-019-PtParisA.protocol
+  octez-protocol-019-PtParisA-libs.test-helpers
+  octez-libs.base-test-helpers
+  octez-protocol-019-PtParisA-libs.client
+  tezos-benchmark
+  octez-libs.micheline
+  tezos-benchmark-019-PtParisA
+  tezos-benchmark-type-inference-019-PtParisA
+  octez-protocol-019-PtParisA-libs.plugin
+  tezos-protocol-019-PtParisA.parameters)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_019_PtParisA
+  -open Tezos_019_PtParisA_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_client_019_PtParisA
+  -open Tezos_micheline
+  -open Tezos_benchmark_019_PtParisA
+  -open Tezos_benchmark_type_inference_019_PtParisA
+  -open Tezos_protocol_plugin_019_PtParisA)
+ (modules
+  test_annotations
+  test_block_time_instructions
+  test_contract_event
+  test_global_constants_storage
+  test_interpretation
+  test_lazy_storage_diff
+  test_patched_contracts
+  test_sapling
+  test_script_cache
+  test_script_typed_ir_size
+  test_temp_big_maps
+  test_ticket_accounting
+  test_ticket_balance_key
+  test_ticket_balance
+  test_ticket_lazy_storage_diff
+  test_ticket_manager
+  test_ticket_operations_diff
+  test_ticket_scanner
+  test_ticket_storage
+  test_ticket_direct_spending
+  test_typechecking
+  test_lambda_normalization))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_proto_019_PtParisA_lib_protocol_test_integration_michelson_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-019-PtParisA-tests)
+ (deps
+  (glob_files contracts/*)
+  (glob_files patched_contracts/*)
+  (glob_files_rec ../../../../../../michelson_test_scripts/*))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

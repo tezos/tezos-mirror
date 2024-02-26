@@ -17,6 +17,7 @@ depends: [
 ]
 depopts: [
   "tezos-injector-018-Proxford"
+  "tezos-injector-019-PtParisA"
   "tezos-injector-alpha"
 ]
 build: [

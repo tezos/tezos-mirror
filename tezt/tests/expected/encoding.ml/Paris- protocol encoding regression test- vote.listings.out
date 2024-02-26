@@ -1,0 +1,16 @@
+
+./octez-codec encode 019-PtParisA.vote.listings from '[
+  {
+    "pkh": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+    "voting_power": "20115"
+  },
+  {
+    "pkh": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+    "voting_power": "9000"
+  }
+]'
+0000003a0002298c03ed7d454a101eb7022bc95f7e5f41ac780000000000004e9300e7670f32038107a59a2b9cfefae36ea21f5aa63c0000000000002328
+
+./octez-codec decode 019-PtParisA.vote.listings from 0000003a0002298c03ed7d454a101eb7022bc95f7e5f41ac780000000000004e9300e7670f32038107a59a2b9cfefae36ea21f5aa63c0000000000002328
+[ { "pkh": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "voting_power": "20115" },
+  { "pkh": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN", "voting_power": "9000" } ]

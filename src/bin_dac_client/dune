@@ -18,6 +18,7 @@
   tezos-dac-lib
   tezos-dac-client-lib
   octez-protocol-018-Proxford-libs.dac
+  octez-protocol-019-PtParisA-libs.dac
   (select void_for_linking-octez-protocol-alpha-libs-dac from
    (octez-protocol-alpha-libs.dac -> void_for_linking-octez-protocol-alpha-libs-dac.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dac.empty)))

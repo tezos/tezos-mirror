@@ -1,0 +1,47 @@
+
+./octez-client --protocol PtParisAeco71sYvYgfnVPb4rRJe6zgzYRDS5U8t5ednSRPUFN5 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/self_with_default_entrypoint.tz on storage Unit and input Unit --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 13 (just consumed gas: 15.247)
+    [ (Pair (Right (Left Unit)) Unit) ]
+  - location: 13 (just consumed gas: 0.010)
+    [  ]
+  - location: 14 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 15 (just consumed gas: 0.010)
+    [  ]
+  - location: 16 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A" ]
+  - location: 17 (just consumed gas: 0.010)
+    [  ]
+  - location: 18 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 19 (just consumed gas: 0.516)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 20 (just consumed gas: 0.010)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 21 (just consumed gas: 0.516)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 24 (just consumed gas: 0.035)
+    [ 0 ]
+  - location: 25 (just consumed gas: 0.010)
+    [ True ]
+  - location: 26 (just consumed gas: 0.010)
+    [  ]
+  - location: 26 (just consumed gas: 0.025)
+    [  ]
+  - location: 32 (just consumed gas: 0.010)
+    [ Unit ]
+  - location: 33 (just consumed gas: 0.010)
+    [ {}
+      Unit ]
+  - location: 35 (just consumed gas: 0.010)
+    [ (Pair {} Unit) ]
+

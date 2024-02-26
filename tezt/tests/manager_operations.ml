@@ -996,7 +996,7 @@ module Gas_limits = struct
   let remaining_gas_after_big_operation ~(protocol : Protocol.t)
       (limits : Helpers.hard_gas_limits) =
     match protocol with
-    | Alpha ->
+    | Alpha | Paris ->
         limits.hard_gas_limit_per_block - limits.hard_gas_limit_per_operation
     | Oxford -> limits.hard_gas_limit_per_operation
 

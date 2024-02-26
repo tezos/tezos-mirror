@@ -1,0 +1,25 @@
+
+./octez-client --protocol PtParisAeco71sYvYgfnVPb4rRJe6zgzYRDS5U8t5ednSRPUFN5 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/left_right.tz on storage '(Left "X")' and input '(Left True)' --level 1 --trace-stack
+storage
+  (Right True)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (just consumed gas: 6.990)
+    [ (Pair (Left True) (Left "X")) ]
+  - location: 11 (just consumed gas: 0.010)
+    [ (Left True) ]
+  - location: 12 (just consumed gas: 0.010)
+    [ True ]
+  - location: 14 (just consumed gas: 0.010)
+    [ (Right True) ]
+  - location: 12 (just consumed gas: 0.025)
+    [ (Right True) ]
+  - location: 19 (just consumed gas: 0.010)
+    [ {}
+      (Right True) ]
+  - location: 21 (just consumed gas: 0.010)
+    [ (Pair {} (Right True)) ]
+

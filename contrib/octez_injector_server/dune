@@ -18,6 +18,9 @@
   (select void_for_linking-octez_injector_Proxford from
    (octez_injector_Proxford -> void_for_linking-octez_injector_Proxford.empty)
    (-> void_for_linking-octez_injector_Proxford.empty))
+  (select void_for_linking-octez_injector_PtParisA from
+   (octez_injector_PtParisA -> void_for_linking-octez_injector_PtParisA.empty)
+   (-> void_for_linking-octez_injector_PtParisA.empty))
   (select void_for_linking-octez_injector_alpha from
    (octez_injector_alpha -> void_for_linking-octez_injector_alpha.empty)
    (-> void_for_linking-octez_injector_alpha.empty)))
@@ -40,4 +43,5 @@
  (action
   (progn
    (write-file void_for_linking-octez_injector_Proxford.empty "")
+   (write-file void_for_linking-octez_injector_PtParisA.empty "")
    (write-file void_for_linking-octez_injector_alpha.empty ""))))

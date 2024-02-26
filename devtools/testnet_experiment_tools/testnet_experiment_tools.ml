@@ -95,6 +95,11 @@ let protocol_alpha_parameters_template =
 
 let network_activation_parameters_templates protocol_hash =
   match protocol_hash with
+  | Tezt_tezos.Protocol.Paris ->
+      Some
+        (Filename.concat
+           network_parameters_templates_dir
+           "proto_019_PtParisA_mainnet.json")
   | Tezt_tezos.Protocol.Oxford ->
       Some
         (Filename.concat

@@ -1,0 +1,12 @@
+
+./octez-codec encode 019-PtParisA.tez from '"7322135"'
+97f4be03
+
+./octez-codec decode 019-PtParisA.tez from 97f4be03
+"7322135"
+
+./octez-codec encode 019-PtParisA.tez from '"0"'
+00
+
+./octez-codec decode 019-PtParisA.tez from 00
+"0"

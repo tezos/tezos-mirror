@@ -1,0 +1,276 @@
+
+trace
+  - UNPAIR (interp) @ location: 7
+    [ (Pair 2 60) ]
+  - UNPAIR (entry) @ location: 7
+    [ (Pair 2 60) ]
+    - log/DIP (exit) @ location: 7
+      [ 2
+        60 ]
+  - DIP (entry) @ location: 8
+    [ 2
+      60 ]
+    - log/SELF (exit) @ location: 8
+      [ 60 ]
+  - SELF (entry) @ location: 10
+    [ 60 ]
+    - log/ADDRESS (exit) @ location: 10
+      [ "[CONTRACT_HASH]"
+        60 ]
+  - ADDRESS (entry) @ location: 11
+    [ "[CONTRACT_HASH]"
+      60 ]
+    - log/SENDER (exit) @ location: 11
+      [ "[CONTRACT_HASH]"
+        60 ]
+  - SENDER (entry) @ location: 12
+    [ "[CONTRACT_HASH]"
+      60 ]
+    - log/COMPARE (exit) @ location: 12
+      [ "[PUBLIC_KEY_HASH]"
+        "[CONTRACT_HASH]"
+        60 ]
+  - COMPARE (entry) @ location: 14
+    [ "[PUBLIC_KEY_HASH]"
+      "[CONTRACT_HASH]"
+      60 ]
+    - log/EQ (exit) @ location: 14
+      [ -1
+        60 ]
+  - EQ (entry) @ location: 15
+    [ -1
+      60 ]
+    - log/IF (exit) @ location: 15
+      [ False
+        60 ]
+  - IF (entry) @ location: 16
+    [ False
+      60 ]
+    - log/DROP (exit) @ location: 16
+      [ 60 ]
+  - DROP (entry) @ location: 19
+    [ 60 ]
+    - log/PUSH (exit) @ location: 19
+      [  ]
+  - PUSH (entry) @ location: 20
+    [  ]
+    - log/[halt] (exit) @ location: 20
+      [ 1 ]
+  - [halt] (entry) @ location: 9
+    [ 1 ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 16
+      [ 1 ]
+  - [halt] (entry) @ location: 9
+    [ 1 ]
+    - control: KUndip
+    - control: KCons
+    - log/DUP (exit) @ location: 8
+      [ 2
+        1 ]
+  - DUP (entry) @ location: 23
+    [ 2
+      1 ]
+    - log/PUSH (exit) @ location: 23
+      [ 2
+        2
+        1 ]
+  - PUSH (entry) @ location: 24
+    [ 2
+      2
+      1 ]
+    - log/COMPARE (exit) @ location: 24
+      [ 1
+        2
+        2
+        1 ]
+  - COMPARE (entry) @ location: 28
+    [ 1
+      2
+      2
+      1 ]
+    - log/GE (exit) @ location: 28
+      [ -1
+        2
+        1 ]
+  - GE (entry) @ location: 29
+    [ -1
+      2
+      1 ]
+    - log/IF (exit) @ location: 29
+      [ False
+        2
+        1 ]
+  - IF (entry) @ location: 30
+    [ False
+      2
+      1 ]
+    - log/PUSH (exit) @ location: 30
+      [ 2
+        1 ]
+  - PUSH (entry) @ location: 37
+    [ 2
+      1 ]
+    - log/SWAP (exit) @ location: 37
+      [ 1
+        2
+        1 ]
+  - SWAP (entry) @ location: 40
+    [ 1
+      2
+      1 ]
+    - log/SUB (exit) @ location: 40
+      [ 2
+        1
+        1 ]
+  - SUB (entry) @ location: 41
+    [ 2
+      1
+      1 ]
+    - log/ISNAT (exit) @ location: 41
+      [ 1
+        1 ]
+  - ISNAT (entry) @ location: 42
+    [ 1
+      1 ]
+    - log/IF_NONE (exit) @ location: 42
+      [ (Some 1)
+        1 ]
+  - IF_NONE (entry) @ location: 43
+    [ (Some 1)
+      1 ]
+    - log/DUP (exit) @ location: 43
+      [ 1
+        1 ]
+  - DUP (entry) @ location: 49
+    [ 1
+      1 ]
+    - log/DIP (exit) @ location: 49
+      [ 1
+        1
+        1 ]
+  - DIP (entry) @ location: 50
+    [ 1
+      1
+      1 ]
+    - log/PUSH (exit) @ location: 50
+      [ 1
+        1 ]
+  - PUSH (entry) @ location: 52
+    [ 1
+      1 ]
+    - log/ADD (exit) @ location: 52
+      [ 1
+        1
+        1 ]
+  - ADD (entry) @ location: 55
+    [ 1
+      1
+      1 ]
+    - log/MUL (exit) @ location: 55
+      [ 2
+        1 ]
+  - MUL (entry) @ location: 56
+    [ 2
+      1 ]
+    - log/[halt] (exit) @ location: 56
+      [ 2 ]
+  - [halt] (entry) @ location: 51
+    [ 2 ]
+    - control: KUndip
+    - control: KCons
+    - log/SWAP (exit) @ location: 50
+      [ 1
+        2 ]
+  - SWAP (entry) @ location: 57
+    [ 1
+      2 ]
+    - log/DIP (exit) @ location: 57
+      [ 2
+        1 ]
+  - DIP (entry) @ location: 58
+    [ 2
+      1 ]
+    - log/DIP (exit) @ location: 58
+      [ 1 ]
+  - DIP (entry) @ location: 60
+    [ 1 ]
+    - log/SELF (exit) @ location: 60
+      [  ]
+  - SELF (entry) @ location: 62
+    [  ]
+    - log/PUSH (exit) @ location: 62
+      [ "[CONTRACT_HASH]" ]
+  - PUSH (entry) @ location: 63
+    [ "[CONTRACT_HASH]" ]
+    - log/[halt] (exit) @ location: 63
+      [ 0
+        "[CONTRACT_HASH]" ]
+  - [halt] (entry) @ location: 61
+    [ 0
+      "[CONTRACT_HASH]" ]
+    - control: KUndip
+    - control: KCons
+    - log/TRANSFER_TOKENS (exit) @ location: 60
+      [ 1
+        0
+        "[CONTRACT_HASH]" ]
+  - TRANSFER_TOKENS (entry) @ location: 66
+    [ 1
+      0
+      "[CONTRACT_HASH]" ]
+    - log/NIL (exit) @ location: 66
+      [ 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 ]
+  - NIL (entry) @ location: 67
+    [ 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 ]
+    - log/SWAP (exit) @ location: 67
+      [ {}
+        0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 ]
+  - SWAP (entry) @ location: 69
+    [ {}
+      0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 ]
+    - log/CONS (exit) @ location: 69
+      [ 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001
+        {} ]
+  - CONS (entry) @ location: 70
+    [ 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001
+      {} ]
+    - log/[halt] (exit) @ location: 70
+      [ { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 } ]
+  - [halt] (entry) @ location: 59
+    [ { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 } ]
+    - control: KUndip
+    - control: KCons
+    - log/SWAP (exit) @ location: 58
+      [ 2
+        { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 } ]
+  - SWAP (entry) @ location: 71
+    [ 2
+      { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 } ]
+    - log/PAIR (exit) @ location: 71
+      [ { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+        2 ]
+  - PAIR (entry) @ location: 72
+    [ { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+      2 ]
+    - log/[halt] (exit) @ location: 72
+      [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+              2) ]
+  - [halt] (entry) @ location: 6
+    [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+            2) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 43
+      [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+              2) ]
+  - [halt] (entry) @ location: 6
+    [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+            2) ]
+    - control: KCons
+    - log/[halt] (exit) @ location: 30
+      [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+              2) ]
+  - [halt] (entry) @ location: 6
+    [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 }
+            2) ]
+    - control: KNil
