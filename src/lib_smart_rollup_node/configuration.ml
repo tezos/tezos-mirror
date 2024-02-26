@@ -71,6 +71,7 @@ type t = {
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
   l1_rpc_timeout : float;
+  loop_retry_delay : float;
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
@@ -214,6 +215,8 @@ let default_l1_blocks_cache_size = 64
 let default_l2_blocks_cache_size = 64
 
 let default_l1_rpc_timeout = 60. (* seconds *)
+
+let default_loop_retry_delay = 10. (* seconds *)
 
 let default_gc_parameters =
   {
@@ -425,6 +428,7 @@ let encoding : t Data_encoding.t =
            l2_blocks_cache_size;
            prefetch_blocks;
            l1_rpc_timeout;
+           loop_retry_delay;
            index_buffer_size;
            irmin_cache_size;
            log_kernel_debug;
@@ -453,6 +457,7 @@ let encoding : t Data_encoding.t =
             l2_blocks_cache_size,
             prefetch_blocks ),
           ( l1_rpc_timeout,
+            loop_retry_delay,
             index_buffer_size,
             irmin_cache_size,
             log_kernel_debug,
@@ -480,6 +485,7 @@ let encoding : t Data_encoding.t =
                l2_blocks_cache_size,
                prefetch_blocks ),
              ( l1_rpc_timeout,
+               loop_retry_delay,
                index_buffer_size,
                irmin_cache_size,
                log_kernel_debug,
@@ -508,6 +514,7 @@ let encoding : t Data_encoding.t =
         l2_blocks_cache_size;
         prefetch_blocks;
         l1_rpc_timeout;
+        loop_retry_delay;
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
@@ -566,8 +573,12 @@ let encoding : t Data_encoding.t =
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
-          (obj8
+          (obj9
              (dft "l1_rpc_timeout" Data_encoding.float default_l1_rpc_timeout)
+             (dft
+                "loop_retry_delay"
+                Data_encoding.float
+                default_loop_retry_delay)
              (opt "index_buffer_size" int31)
              (opt "irmin_cache_size" int31)
              (dft "log-kernel-debug" Data_encoding.bool false)
@@ -713,6 +724,7 @@ module Cli = struct
       l2_blocks_cache_size = default_l2_blocks_cache_size;
       prefetch_blocks = None;
       l1_rpc_timeout = default_l1_rpc_timeout;
+      loop_retry_delay = default_loop_retry_delay;
       index_buffer_size;
       irmin_cache_size;
       log_kernel_debug;

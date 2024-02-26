@@ -33,10 +33,6 @@ type state = {
   node_ctxt : Node_context.rw;
 }
 
-(** Delay in seconds to retry the main loop and the refutation loop after an
-    error. *)
-let retry_delay = 10.
-
 let is_before_origination (node_ctxt : _ Node_context.t)
     (header : Layer1.header) =
   let origination_level = node_ctxt.genesis_info.level in
@@ -379,8 +375,11 @@ let rec refutation_daemon ?(restart = false) state =
   let loop ~restart () =
     let*! () =
       if restart then
-        let*! () = Daemon_event.refutation_loop_retry retry_delay in
-        Lwt_unix.sleep retry_delay
+        let*! () =
+          Daemon_event.refutation_loop_retry
+            state.node_ctxt.config.loop_retry_delay
+        in
+        Lwt_unix.sleep state.node_ctxt.config.loop_retry_delay
       else Lwt.return_unit
     in
     Layer1.iter_heads
