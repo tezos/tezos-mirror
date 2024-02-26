@@ -1009,16 +1009,11 @@ let make_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ stop)
-    (fun () root_hash activation_timestamp () ->
-      let open Rlp in
-      let activation_timestamp =
-        Ethereum_types.timestamp_to_bytes activation_timestamp
+    (fun () root_hash timestamp () ->
+      let payload =
+        Ethereum_types.Upgrade.(
+          to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
       in
-      let root_hash_bytes = Hex.to_bytes_exn (`Hex root_hash) in
-      let kernel_upgrade =
-        List [Value root_hash_bytes; Value activation_timestamp]
-      in
-      let payload = encode kernel_upgrade in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
 
