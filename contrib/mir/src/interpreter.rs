@@ -13,6 +13,7 @@ use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{Signed, ToPrimitive, Zero};
+use std::ops::{Shl, Shr};
 use std::rc::Rc;
 use tezos_crypto_rs::blake2b::digest as blake2bdigest;
 use typed_arena::Arena;
@@ -41,6 +42,9 @@ pub enum InterpretError<'a> {
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
     FailedWith(Type, TypedValue<'a>),
+    /// Encountered an argument outside of the bounds defined in the documentation
+    #[error("Argument out of bounds")]
+    ArgOutOfBounds,
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
@@ -542,6 +546,98 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::NEG_FR)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381Fr);
                 *v = -(v as &bls::Fr);
+            }
+        },
+        I::Lsl(overload) => match overload {
+            overloads::Lsl::Nat => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(256u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas.consume(interpret_cost::lsl_nat(&o1)?)?;
+                stack.push(V::Nat(o1.shl(o2_usize)));
+            }
+            overloads::Lsl::Bytes => {
+                let o1 = pop!(V::Bytes);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(64000u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas
+                    .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
+
+                let byte_shifts = o2_usize / 8;
+                let bit_shifts = o2_usize % 8;
+
+                let left_pad = bit_shifts > 0;
+                let mut result: Vec<u8> =
+                    vec![0; o1.len() + byte_shifts + if left_pad { 1 } else { 0 }];
+                let mut carry = 0u8;
+
+                for (i, &byte) in o1.iter().enumerate().rev() {
+                    result[i + if left_pad { 1 } else { 0 }] = (byte << bit_shifts) | carry;
+                    if left_pad {
+                        carry = byte >> (8 - bit_shifts);
+                    }
+                }
+
+                if left_pad {
+                    result[0] = carry;
+                }
+
+                stack.push(V::Bytes(result));
+            }
+        },
+        I::Lsr(overload) => match overload {
+            overloads::Lsr::Nat => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(256u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas.consume(interpret_cost::lsr_nat(&o1)?)?;
+                stack.push(V::Nat(o1.shr(o2_usize)));
+            }
+            overloads::Lsr::Bytes => {
+                let o1 = pop!(V::Bytes);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(64000u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas
+                    .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
+
+                let byte_shifts = o2_usize / 8;
+                let bit_shifts = o2_usize % 8;
+
+                let need_carry = bit_shifts > 0;
+                let mut result: Vec<u8> = vec![0; o1.len() - byte_shifts];
+                let mut carry = 0u8;
+
+                for (i, byte) in o1.iter().enumerate() {
+                    if i >= o1.len() - byte_shifts {
+                        break;
+                    }
+                    result[i] = (byte >> bit_shifts) | carry;
+                    if need_carry {
+                        carry = byte << (8 - bit_shifts);
+                    }
+                }
+
+                stack.push(V::Bytes(result));
             }
         },
         I::SubMutez => {
@@ -6136,6 +6232,144 @@ mod interpreter_tests {
             test!(Int, V::int(0), V::int(0));
             test!(Nat, V::nat(0), V::int(0));
         }
+    }
+
+    mod lsl {
+        use super::*;
+
+        #[track_caller]
+        fn test_lsl(
+            overload: overloads::Lsl,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Lsl(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        macro_rules! test {
+            ($name:ident, $overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $name() {
+                    test_lsl(overloads::Lsl::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        test!(
+            Case1,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(0),
+            V::Bytes(hex::decode("06").unwrap()),
+        );
+
+        test!(
+            Case2,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("000c").unwrap()),
+        );
+
+        test!(
+            Case3,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(8),
+            V::Bytes(hex::decode("0600").unwrap()),
+        );
+
+        test!(
+            Case4,
+            Bytes,
+            V::Bytes(hex::decode("0006").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("00000c").unwrap()),
+        );
+    }
+
+    mod lsr {
+        use super::*;
+
+        #[track_caller]
+        fn test_lsr(
+            overload: overloads::Lsr,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Lsr(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        macro_rules! test {
+            ($name:ident, $overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $name() {
+                    test_lsr(overloads::Lsr::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        test!(
+            Case1,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("03").unwrap()),
+        );
+
+        test!(
+            Case2,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(8),
+            V::Bytes(hex::decode("").unwrap()),
+        );
+
+        test!(
+            Case3,
+            Bytes,
+            V::Bytes(hex::decode("0006").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("0003").unwrap()),
+        );
+
+        test!(
+            Case4,
+            Bytes,
+            V::Bytes(hex::decode("0006").unwrap()),
+            V::nat(8),
+            V::Bytes(hex::decode("00").unwrap()),
+        );
+
+        test!(
+            Case5,
+            Bytes,
+            V::Bytes(hex::decode("001234").unwrap()),
+            V::nat(0),
+            V::Bytes(hex::decode("001234").unwrap()),
+        );
+
+        test!(
+            Case6,
+            Bytes,
+            V::Bytes(hex::decode("001234").unwrap()),
+            V::nat(30),
+            V::Bytes(hex::decode("").unwrap()),
+        );
     }
 
     #[test]

@@ -253,9 +253,7 @@ macro_rules! micheline_fields {
 /// supported. Useful for total match in the typechecker.
 macro_rules! micheline_unsupported_instructions {
     () => {
-        Prim::LSL
-            | Prim::LSR
-            | Prim::EMPTY_MAP
+        Prim::EMPTY_MAP
             | Prim::SAPLING_EMPTY_STATE
             | Prim::SAPLING_VERIFY_UPDATE
             | Prim::OPEN_CHEST

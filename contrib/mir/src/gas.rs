@@ -505,6 +505,39 @@ pub mod interpret_cost {
         (30 + (sz >> 1)).as_gas_cost()
     }
 
+    pub fn lsl_nat(i1: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let sz = i1.byte_size();
+        let w1 = sz >> 1;
+        Checked::from(w1 + 130).as_gas_cost()
+    }
+
+    pub fn lsl_bytes(i1: &Vec<u8>, i2: &usize) -> Result<u32, OutOfGas> {
+        let size_1 = i1.len();
+        let size_2 = *i2;
+        let w1 = if size_2 > 0 {
+            ((size_2 - 1) >> 4) + (size_1 >> 1)
+        } else {
+            size_1 >> 1
+        };
+        Checked::from(w1 + (size_1 >> 2) + 65).as_gas_cost()
+    }
+
+    pub fn lsr_nat(i1: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
+        let sz = i1.byte_size();
+        Checked::from((sz >> 1) + 45).as_gas_cost()
+    }
+
+    pub fn lsr_bytes(i1: &Vec<u8>, i2: &usize) -> Result<u32, OutOfGas> {
+        let size_1 = i1.len();
+        let size_2 = *i2;
+        let w1 = if size_1 >= (size_2 >> 3) {
+            Checked::from(size_1 - (size_2 >> 3))
+        } else {
+            Checked::from(0usize)
+        };
+        ((w1 >> 1) + (w1 >> 2) + 55).as_gas_cost()
+    }
+
     pub fn mul_int(i1: &impl BigIntByteSize, i2: &impl BigIntByteSize) -> Result<u32, OutOfGas> {
         let a = Checked::from(i1.byte_size()) + Checked::from(i2.byte_size());
         // log2 is ill-defined for zero, hence this check

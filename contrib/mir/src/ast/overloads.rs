@@ -109,6 +109,18 @@ pub enum Neg {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Lsl {
+    Nat,
+    Bytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Lsr {
+    Nat,
+    Bytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Get {
     Map,
     BigMap,

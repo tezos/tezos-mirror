@@ -16,8 +16,6 @@
 //! The library is currently incomplete. The following instructions are not
 //! supported:
 //!
-//! - `LSL`
-//! - `LSR`
 //! - `EMPTY_MAP`
 //! - `SAPLING_EMPTY_STATE`
 //! - `SAPLING_VERIFY_UPDATE`

@@ -944,6 +944,32 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(prim @ (AND | OR | XOR), [], _), [_] | []) => no_overload!(*prim, len 2),
         (App(AND | OR | XOR, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(LSL, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            I::Lsl(overloads::Lsl::Nat)
+        }
+        (App(LSL, [], _), [.., T::Nat, T::Bytes]) => {
+            pop!();
+            stack[0] = T::Bytes;
+            I::Lsl(overloads::Lsl::Bytes)
+        }
+        (App(LSL, [], _), [.., _, _]) => no_overload!(LSL),
+        (App(LSL, [], _), [] | [_]) => no_overload!(LSL, len 2),
+        (App(LSL, expect_args!(0), _), _) => unexpected_micheline!(),
+
+        (App(LSR, [], _), [.., T::Nat, T::Nat]) => {
+            pop!();
+            I::Lsr(overloads::Lsr::Nat)
+        }
+        (App(LSR, [], _), [.., T::Nat, T::Bytes]) => {
+            pop!();
+            stack[0] = T::Bytes;
+            I::Lsr(overloads::Lsr::Bytes)
+        }
+        (App(LSR, [], _), [.., _, _]) => no_overload!(LSR),
+        (App(LSR, [], _), [] | [_]) => no_overload!(LSR, len 2),
+        (App(LSR, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(NOT, [], _), [.., T::Bool]) => I::Not(overloads::Not::Bool),
         (App(NOT, [], _), [.., T::Int]) => I::Not(overloads::Not::Int),
         (App(NOT, [], _), [.., T::Nat]) => {
