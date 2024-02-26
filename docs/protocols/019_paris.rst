@@ -4,8 +4,6 @@ Protocol Paris
 This page documents the changes brought by protocol Alpha with respect
 to Oxford (see :ref:`naming_convention`).
 
-For changes brought by Oxford with respect to Nairobi, see :doc:`../protocols/018_oxford`.
-
 The code can be found in directory :src:`src/proto_019_PtParisA` of the ``master``
 branch of Octez.
 
@@ -13,7 +11,6 @@ branch of Octez.
 
 Environment Version
 -------------------
-
 
 This protocol requires a different protocol environment version than Oxford.
 It requires protocol environment V12, compared to V11 for Oxford.
@@ -23,11 +20,8 @@ Smart Rollups
 
 - The unnecessary initial PVM state hash and its associated RPC are removed. (MR :gl:`!11472`)
 
-Zero Knowledge Rollups (ongoing)
---------------------------------
-
-Data Availability Layer (ongoing)
----------------------------------
+Data Availability Layer
+-----------------------
 
 - Introduced a new optional field ``dal_content`` to consensus
   attestation operations. The existing encoding of consensus
@@ -58,8 +52,8 @@ Data Availability Layer (ongoing)
   <https://tezos.gitlab.io/alpha/dal_support.html#smart-rollups-integration>`_.
 
 
-Adaptive Issuance (ongoing)
-----------------------------
+Adaptive Issuance
+-----------------
 
 - Active-delegates update and autostaking are now done before staking-rights computation
   at cycle end. (MR :gl:`!11972`)
@@ -109,9 +103,6 @@ Adaptive Issuance (ongoing)
 
 - Activating new slashing flag (MR :gl:`!12013`)
 
-Gas improvements
-----------------
-
 Breaking Changes
 ----------------
 
@@ -144,10 +135,6 @@ RPC Changes
 - New RPC to list the pending denunciations of a given delegate.
   ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/denunciations``. (MR :gl:`!11885`)
 
-
-Operation receipts
-------------------
-
 Protocol parameters
 -------------------
 
@@ -159,9 +146,6 @@ Protocol parameters
 - Set the number of blocks preservation cycles to 1. (MR :gl:`!11325`)
 
 - Set ``liquidity_baking_subsidy`` to 5 tez issued per minute (MR :gl:`!11971`)
-
-Bug Fixes
----------
 
 10s Blocks Time (MR :gl:`!11288`)
 ---------------------------------
