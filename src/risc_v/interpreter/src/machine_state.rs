@@ -71,11 +71,11 @@ impl<M: backend::Manager> HartState<M> {
     }
 
     /// Reset the hart state.
-    pub fn reset(&mut self, mode: mode::Mode, pc: Address) {
+    pub fn reset(&mut self, pc: Address) {
         self.xregisters.reset();
         self.fregisters.reset();
         self.csregisters.reset();
-        self.mode.reset(mode);
+        self.mode.reset(mode::Mode::Machine);
         self.pc.write(pc);
     }
 }
@@ -99,8 +99,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Reset the machine state.
-    pub fn reset(&mut self, mode: mode::Mode, pc: Address) {
-        self.hart.reset(mode, pc);
+    pub fn reset(&mut self) {
+        self.hart.reset(bus::start_of_main_memory::<ML>());
         self.bus.reset();
     }
 
@@ -154,6 +154,14 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         // Start in supervisor mode
         self.hart.mode.write(mode::Mode::Supervisor);
 
+        // Make sure to forward all exceptions and interrupts to supervisor mode
+        self.hart
+            .csregisters
+            .write(csregisters::CSRegister::medeleg, !0);
+        self.hart
+            .csregisters
+            .write(csregisters::CSRegister::mideleg, !0);
+
         Ok(())
     }
 }
@@ -169,31 +177,24 @@ mod tests {
     use super::{
         backend::tests::{test_determinism, ManagerFor},
         bus::main_memory::tests::T1K,
-        mode, HartState, HartStateLayout, MachineState, MachineStateLayout,
+        HartState, HartStateLayout, MachineState, MachineStateLayout,
     };
     use crate::backend_test;
-    use strum::IntoEnumIterator;
 
     backend_test!(test_hart_state_reset, F, {
-        mode::Mode::iter().for_each(|mode: mode::Mode| {
-            proptest::proptest!(|(pc: u64)| {
-                test_determinism::<F, HartStateLayout, _>(|space| {
-                    let mut hart = HartState::bind(space);
-                    hart.reset(mode, pc);
-                });
+        proptest::proptest!(|(pc: u64)| {
+            test_determinism::<F, HartStateLayout, _>(|space| {
+                let mut hart = HartState::bind(space);
+                hart.reset(pc);
             });
         });
     });
 
     backend_test!(test_machine_state_reset, F, {
-        mode::Mode::iter().for_each(|mode: mode::Mode| {
-            proptest::proptest!(|(pc: u64)| {
-                test_determinism::<F, MachineStateLayout<T1K>, _>(|space| {
-                    let mut hart: MachineState<T1K, ManagerFor<'_, F, MachineStateLayout<T1K>>> =
-                        MachineState::bind(space);
-                    hart.reset(mode, pc);
-                });
-            });
+        test_determinism::<F, MachineStateLayout<T1K>, _>(|space| {
+            let mut machine: MachineState<T1K, ManagerFor<'_, F, MachineStateLayout<T1K>>> =
+                MachineState::bind(space);
+            machine.reset();
         });
     });
 }

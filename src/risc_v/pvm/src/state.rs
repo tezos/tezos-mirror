@@ -37,10 +37,10 @@ impl<M: state_backend::Manager> Pvm<M> {
         }
     }
 
-    /// Bind the PVM to the given allocated region.
-    pub fn reset(&mut self, mode: machine_state::mode::Mode, pc: machine_state::bus::Address) {
+    /// Reset the PVM state.
+    pub fn reset(&mut self) {
         self.version.write(INITIAL_VERSION);
-        self.machine_state.reset(mode, pc);
+        self.machine_state.reset();
     }
 
     /// Provide input. Returns `false` if the machine state is not in

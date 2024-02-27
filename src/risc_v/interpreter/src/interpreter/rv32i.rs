@@ -933,7 +933,7 @@ mod tests {
             let sepc = sepc & !0b11;
 
             // TEST: TSR trapping
-            state.reset(Mode::Supervisor, curr_pc);
+            state.reset(curr_pc);
             state.csregisters.write(CSRegister::mepc, mepc);
             state.csregisters.write(CSRegister::sepc, sepc);
 
