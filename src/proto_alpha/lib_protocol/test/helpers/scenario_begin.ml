@@ -48,8 +48,8 @@ let start_with_list ~(constants : (string * constants) list) :
 let activate_ai flag =
   if flag then
     log ~color:event_color "Setting ai threshold to 0"
-    --> set Adaptive_issuance.launch_ema_threshold 0l
-    --> set Adaptive_issuance.activation_vote_enable true
+    --> set S.Adaptive_issuance.launch_ema_threshold 0l
+    --> set S.Adaptive_issuance.activation_vote_enable true
   else Empty
 
 (** Initialize the test, given some initial parameters *)

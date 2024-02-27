@@ -10,11 +10,17 @@ open Scenario_dsl
 type constants = Constants_helpers.t
 
 (* Not a Set *)
-include Constants_helpers.Set
+module S = Constants_helpers.Set
 
 let set :
     (constants -> 'a -> constants) -> 'a -> (constants, constants) scenarios =
  fun f x -> Action (fun csts -> return @@ f csts x)
+
+let set_opt :
+    (constants -> 'a -> constants) ->
+    'a option ->
+    (constants, constants) scenarios =
+ fun f -> function None -> Empty | Some x -> set f x
 
 let sets :
     (constants -> 'a -> constants) ->

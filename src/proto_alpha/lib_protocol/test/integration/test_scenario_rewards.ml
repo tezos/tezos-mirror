@@ -20,9 +20,6 @@ open Scenario
 open Test_scenario_base
 
 let test_wait_with_rewards =
-  let constants =
-    init_constants ~reward_per_block:1_000_000_000L ~autostaking_enable:false ()
-  in
   let set_edge pct =
     let params =
       {
@@ -32,7 +29,8 @@ let test_wait_with_rewards =
     in
     set_delegate_params "delegate" params
   in
-  start_with ~constants --> activate_ai true
+  init_constants ~reward_per_block:1_000_000_000L ~autostaking_enable:false ()
+  --> activate_ai true
   --> begin_test ["delegate"; "faucet"]
   --> set_baker "faucet"
   --> (Tag "edge = 0" --> set_edge 0.
@@ -76,15 +74,13 @@ let test_wait_with_rewards =
       |+ Tag "cycle step" --> wait_n_cycles 10)
 
 let test_ai_curve_activation_time =
-  let constants =
-    init_constants
-      ~reward_per_block:1_000_000_000L
-      ~deactivate_dynamic:true
-      ~autostaking_enable:false
-      ()
-  in
-  let pc = constants.consensus_rights_delay in
-  start_with ~constants --> activate_ai true
+  let pc = Default_parameters.constants_test.consensus_rights_delay in
+  init_constants
+    ~reward_per_block:1_000_000_000L
+    ~deactivate_dynamic:true
+    ~autostaking_enable:false
+    ()
+  --> activate_ai true
   --> begin_test ~burn_rewards:true [""]
   --> next_block --> save_current_rate (* before AI rate *)
   --> wait_ai_activation
@@ -98,14 +94,7 @@ let test_ai_curve_activation_time =
   --> check_rate_evolution Q.gt
 
 let test_static =
-  let constants =
-    init_constants
-      ~reward_per_block:1_000_000_000L
-      ~deactivate_dynamic:true
-      ~autostaking_enable:false
-      ()
-  in
-  let rate_var_lag = constants.consensus_rights_delay in
+  let rate_var_lag = Default_parameters.constants_test.consensus_rights_delay in
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
@@ -121,7 +110,12 @@ let test_static =
   let cycle_stable =
     save_current_rate --> next_cycle --> check_rate_evolution Q.equal
   in
-  start_with ~constants --> activate_ai true
+  init_constants
+    ~reward_per_block:1_000_000_000L
+    ~deactivate_dynamic:true
+    ~autostaking_enable:false
+    ()
+  --> activate_ai true
   --> begin_test ~burn_rewards:true ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> save_current_rate --> wait_ai_activation
