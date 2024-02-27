@@ -64,20 +64,36 @@ let fetch_dal_config cctxt =
   | Error e -> return_error e
   | Ok dal_config -> return_ok dal_config
 
-let init_cryptobox dal_config (proto_parameters : Dal_plugin.proto_parameters) =
+let init_cryptobox config dal_config
+    (proto_parameters : Dal_plugin.proto_parameters) =
   let open Lwt_result_syntax in
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/6906
 
      We should load the verifier SRS by default.
   *)
+  let prover_srs =
+    match config.Configuration_file.profiles with
+    | Types.Bootstrap -> false
+    | Types.Random_observer -> true
+    | Types.Operator l ->
+        List.exists
+          (function
+            | Types.Attester _ -> false
+            | Producer _ -> true
+            | Observer _ -> true)
+          l
+  in
   let* () =
-    let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
-    Cryptobox.Config.init_prover_dal ~find_srs_files dal_config
+    if prover_srs then
+      let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
+      Cryptobox.Config.init_prover_dal ~find_srs_files dal_config
+    else Cryptobox.Config.init_verifier_dal dal_config
   in
   match Cryptobox.make proto_parameters.cryptobox_parameters with
   | Ok cryptobox ->
       let shards_proofs_precomputation =
-        Cryptobox.precompute_shards_proofs cryptobox
+        if prover_srs then Some (Cryptobox.precompute_shards_proofs cryptobox)
+        else None
       in
       return (cryptobox, shards_proofs_precomputation)
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
@@ -239,7 +255,7 @@ module Handler = struct
              Instead of recompute those parameters, they could be stored
              (for a given cryptobox). *)
           let* cryptobox, shards_proofs_precomputation =
-            init_cryptobox dal_config proto_parameters
+            init_cryptobox config dal_config proto_parameters
           in
           Store.Value_size_hooks.set_share_size
             (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;

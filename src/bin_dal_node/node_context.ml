@@ -29,7 +29,7 @@ type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   plugin_proto : int; (* the [proto_level] of the plugin *)
   last_processed_level : int32 option;
 }

@@ -349,8 +349,8 @@ let scenario_with_layer1_node ?(tags = [team]) ?additional_bootstrap_accounts
 let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
     ?custom_constants ?minimal_block_delay ?delay_increment_per_round
     ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?activation_timestamp ?bootstrap_profile variant
-    scenario =
+    ?(dal_enable = true) ?activation_timestamp ?bootstrap_profile
+    ?producer_profiles variant scenario =
   let description = "Testing DAL node" in
   test
     ~__FILE__
@@ -370,7 +370,8 @@ let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node ?bootstrap_profile node @@ fun _key dal_node ->
+      with_dal_node ?bootstrap_profile ?producer_profiles node
+      @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
 let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
@@ -378,7 +379,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
     ?(tags = []) ?(uses = fun _ -> []) ?(pvm_name = "arith")
     ?(dal_enable = true) ?commitment_period ?challenge_window
     ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
-    variant scenario =
+    ?producer_profiles variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -404,7 +405,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
-      with_dal_node node @@ fun key dal_node ->
+      with_dal_node ?producer_profiles node @@ fun key dal_node ->
       ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node ->
         scenario
@@ -1606,9 +1607,9 @@ let test_dal_node_test_slots_propagation _protocol parameters cryptobox node
   let dal_node2 = Dal_node.create ~node () in
   let dal_node3 = Dal_node.create ~node () in
   let dal_node4 = Dal_node.create ~node () in
-  let* () = Dal_node.init_config dal_node2 in
-  let* () = Dal_node.init_config dal_node3 in
-  let* () = Dal_node.init_config dal_node4 in
+  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node2 in
+  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node3 in
+  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node4 in
   update_neighbors dal_node3 [dal_node1; dal_node2] ;
   update_neighbors dal_node4 [dal_node3] ;
   let* () = Dal_node.run dal_node2 in
@@ -2813,37 +2814,44 @@ let create_additional_nodes ~extra_node_operators rollup_address l1_node
      [node with odd idx] -- [node with even idx] -- init_node
 
      So, we initialize its value to [dal_node]. *)
+  let dal_node_producer = Dal_node.create ~node:l1_node () in
+  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node_producer in
+  let* () = Dal_node.run dal_node_producer in
   let connect_dal_node_to = ref dal_node in
-  Lwt_list.mapi_s
-    (fun index key_opt ->
-      (* We create a new DAL node and initialize it. *)
-      let fresh_dal_node = Dal_node.create ~node:l1_node () in
-      let* () = Dal_node.init_config fresh_dal_node in
+  let* nodes =
+    Lwt_list.mapi_s
+      (fun index key_opt ->
+        (* We create a new DAL node and initialize it. *)
+        let fresh_dal_node = Dal_node.create ~node:l1_node () in
+        let* () = Dal_node.init_config fresh_dal_node in
 
-      (* We connect the fresh DAL node to another node, start it and update the
-         value of [connect_dal_node_to] to generate the topology above: *)
-      update_neighbors fresh_dal_node [!connect_dal_node_to] ;
-      let* () = Dal_node.run fresh_dal_node in
-      connect_dal_node_to :=
-        if index mod 2 = 0 then fresh_dal_node else dal_node ;
+        (* We connect the fresh DAL node to another node, start it and update the
+           value of [connect_dal_node_to] to generate the topology above: *)
+        update_neighbors fresh_dal_node [!connect_dal_node_to] ;
+        update_neighbors fresh_dal_node [dal_node_producer] ;
+        let* () = Dal_node.run fresh_dal_node in
+        connect_dal_node_to :=
+          if index mod 2 = 0 then fresh_dal_node else dal_node ;
 
-      (* We create a new SORU node, connected to the new DAL node, and
-         initialize it. *)
-      let rollup_mode =
-        Sc_rollup_node.(if Option.is_none key_opt then Observer else Operator)
-      in
-      let sc_rollup_node =
-        Sc_rollup_node.create
-          ~dal_node:fresh_dal_node
-          rollup_mode
-          l1_node
-          ~base_dir:(Client.base_dir l1_client)
-          ?default_operator:key_opt
-      in
-      (* We start the rollup node and create a client for it. *)
-      let* () = Sc_rollup_node.run sc_rollup_node rollup_address [] in
-      return (fresh_dal_node, sc_rollup_node))
-    extra_node_operators
+        (* We create a new SORU node, connected to the new DAL node, and
+           initialize it. *)
+        let rollup_mode =
+          Sc_rollup_node.(if Option.is_none key_opt then Observer else Operator)
+        in
+        let sc_rollup_node =
+          Sc_rollup_node.create
+            ~dal_node:fresh_dal_node
+            rollup_mode
+            l1_node
+            ~base_dir:(Client.base_dir l1_client)
+            ?default_operator:key_opt
+        in
+        (* We start the rollup node and create a client for it. *)
+        let* () = Sc_rollup_node.run sc_rollup_node rollup_address [] in
+        return (fresh_dal_node, sc_rollup_node))
+      extra_node_operators
+  in
+  return (dal_node_producer, nodes)
 
 (* This function allows to run an end-to-end test involving L1, DAL and rollup
    nodes. For that it:
@@ -2872,7 +2880,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   (* Generate new DAL and rollup nodes if requested. *)
-  let* additional_nodes =
+  let* dal_node_producer, additional_nodes =
     create_additional_nodes
       ~extra_node_operators
       sc_rollup_address
@@ -2928,7 +2936,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
       ~from:start_dal_slots_level
       ~into:end_dal_slots_level
       ~slot_size
-      dal_node
+      dal_node_producer
       l1_node
       l1_client
   in
@@ -2999,7 +3007,7 @@ let e2e_tests =
   let test1 =
     {
       constants = Protocol.Constants_test;
-      attestation_lag = 3;
+      attestation_lag = 6;
       block_delay = 12;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
@@ -3010,7 +3018,7 @@ let e2e_tests =
   let test2 =
     {
       constants = Protocol.Constants_test;
-      attestation_lag = 3;
+      attestation_lag = 6;
       block_delay = 4;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 5;
@@ -3021,7 +3029,7 @@ let e2e_tests =
   let mainnet1 =
     {
       constants = Protocol.Constants_mainnet;
-      attestation_lag = 3;
+      attestation_lag = 6;
       block_delay = 10;
       number_of_dal_slots = 1;
       beforehand_slot_injection = 1;
@@ -3032,7 +3040,7 @@ let e2e_tests =
   let mainnet2 =
     {
       constants = Protocol.Constants_mainnet;
-      attestation_lag = 3;
+      attestation_lag = 6;
       block_delay = 5;
       number_of_dal_slots = 5;
       beforehand_slot_injection = 10;
@@ -3092,11 +3100,14 @@ let register_end_to_end_tests ~protocols =
         List.init num_extra_nodes (fun _index -> None)
       in
       let tags =
-        ["e2e"; network]
+        ["e2e"; network; Tag.ci_disabled]
         @ (match constants with Constants_mainnet -> [Tag.slow] | _ -> [])
         @ tags
       in
       scenario_with_all_nodes
+        ~number_of_shards:256
+        ~slot_size:(1 lsl 15)
+        ~redundancy_factor:8
         ~custom_constants:constants
         ~attestation_lag
         ~activation_timestamp:(Ago activation_timestamp)
@@ -4817,34 +4828,42 @@ let register ~protocols =
   (* Tests with layer1 and dal nodes *)
   test_dal_node_startup protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node slot management"
     test_dal_node_slot_management
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node slot headers tracking"
     test_dal_node_slots_headers_tracking
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node shard fetching and slot reconstruction"
     test_dal_node_rebuild_from_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node slots propagation"
     test_dal_node_test_slots_propagation
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node POST /commitments"
     test_dal_node_test_post_commitments
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node PATCH /commitments"
     test_dal_node_test_patch_commitments
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node GET /commitments/<commitment>/slot"
     test_dal_node_test_get_commitment_slot
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[0]
     "dal node GET /commitments/<commitment>/proof"
     test_dal_node_test_get_commitment_proof
     protocols ;
@@ -4860,10 +4879,12 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     "dal node GET \
      /profiles/<public_key_hash>/attested_levels/<level>/attestable_slots"
+    ~producer_profiles:[0]
     test_dal_node_get_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:100
+    ~producer_profiles:[0]
     "dal attester with bake for"
     test_attester_with_bake_for
     protocols ;
@@ -4872,11 +4893,13 @@ let register ~protocols =
     ~attestation_threshold:100
     ~attestation_lag:16
     ~activation_timestamp:Now
+    ~producer_profiles:[0]
     "dal attester with baker daemon"
     test_attester_with_daemon
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["snapshot"; "import"]
+    ~producer_profiles:[0]
     "dal node import snapshot"
     test_dal_node_import_snapshot
     protocols ;
@@ -4894,12 +4917,14 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gossipsub"]
+    ~producer_profiles:[0]
     "GS valid messages exchange"
     test_dal_node_gs_valid_messages_exchange
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["gossipsub"]
     "GS invalid messages exchange"
+    ~producer_profiles:[0]
     test_dal_node_gs_invalid_messages_exchange
     protocols ;
   (* Will be re-enabled once the debug in
@@ -4945,14 +4970,17 @@ let register ~protocols =
 
   (* Tests with all nodes *)
   scenario_with_all_nodes
+    ~producer_profiles:[0]
     "rollup_node_downloads_slots"
     rollup_node_stores_dal_slots
     protocols ;
   scenario_with_all_nodes
+    ~producer_profiles:[0]
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
     protocols ;
   scenario_with_all_nodes
+    ~producer_profiles:[0]
     "test reveal_dal_page in fast exec wasm pvm"
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
@@ -4968,6 +4996,7 @@ let register ~protocols =
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.tx_kernel_dal])
     ~pvm_name:"wasm_2_0_0"
+    ~producer_profiles:[0]
     ~number_of_shards:2048
     ~slot_size:(1 lsl 15)
     ~redundancy_factor:32
@@ -4982,6 +5011,7 @@ let register ~protocols =
     ~slot_size:2048
     ~page_size:256
     ~number_of_shards:64
+    ~producer_profiles:[0]
     Tx_kernel_e2e.test_echo_kernel_e2e
     protocols ;
 

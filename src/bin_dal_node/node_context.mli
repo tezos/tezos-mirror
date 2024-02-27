@@ -34,7 +34,7 @@ type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
   plugin : (module Dal_plugin.T);
-  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation;
+  shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   plugin_proto : int;  (** Protocol level of the plugin. *)
   last_processed_level : int32 option;
 }
@@ -71,7 +71,7 @@ val set_ready :
   t ->
   (module Tezos_dal_node_lib.Dal_plugin.T) ->
   Cryptobox.t ->
-  Cryptobox.shards_proofs_precomputation ->
+  Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->
   int ->
   unit tzresult
