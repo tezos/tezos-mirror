@@ -12,10 +12,16 @@ const addr = require('../lib/address');
 
 var faucet;
 
-var args = process.argv.slice(2);
-if (args.length == 1 &&
-    (args[0] == "--for-reboot-limits-test" ||
-        args[0] == "--for-reboot-discard-test")) {
+let mode = utils.bench_args(process.argv,
+    [
+        {flag: '--for-reboot-limits-test', desc: 'Generate the raw inputs for the reboot Tezt test', default: false},
+        {flag: '--reboot-limits-debugger', desc: 'Generate the raw inputs for the reboot test for the debugger', default: false},
+        {flag: '--for-reboot-discard-test', desc: 'Generate the raw inputs for the transaction discard Tezt test', default: false},
+        {flag: '--reboot-discard-debugger', desc: 'Generate the raw inputs for the transaction discard test in the debugger', default: false},
+    ]
+);
+
+if (mode.extra.forRebootLimitsTest || mode.extra.forRebootDiscardTest) {
     // for tests
     faucet = require('./players/tezt_bootstraped.json');
 } else {
@@ -69,23 +75,22 @@ function test_reboot_discard(player1, txs, create_addr) {
     txs.push(utils.send(player1, create_addr, 0, call_data(5800), { gasLimit: 4_000_000 }))
 }
 
-
-if (args.length == 1 && args[0] == "--for-reboot-limits-test") {
+if (mode.extra.forRebootLimitsTest) {
     let addr = init(txs, 9000);
     test_reboot_limits(player1, player2, txs, addr);
     utils.print_raw_txs(txs)
-} else if (args.length == 1 && args[0] == "--reboot-limits-debugger") {
+} else if (mode.extra.rebootLimitsDebugger) {
     let addr = init(txs, 1000000);
     test_reboot_limits(player1, player2, txs, addr);
-    utils.print_bench([txs])
-} else if (args.length == 1 && args[0] == "--for-reboot-discard-test") {
+    utils.print_bench([txs], mode)
+} else if (mode.extra.forRebootDiscardTest) {
     let addr = init(txs, 9000);
     test_reboot_discard(player1, txs, addr);
     utils.print_raw_txs(txs)
-} else if (args.length == 1 && args[0] == "--reboot-discard-debugger") {
+} else if (mode.extra.rebootDiscardDebugger) {
     let addr = init(txs, 1000000);
     test_reboot_discard(player1, txs, addr);
-    utils.print_bench([txs])
+    utils.print_bench([txs], mode)
 } else {
     txs.push(utils.transfer(faucet, player1, 1000000))
     let create = utils.create(player1, 0, create_data, { gasLimit: 160000 })
@@ -96,5 +101,5 @@ if (args.length == 1 && args[0] == "--for-reboot-limits-test") {
         txs.push(utils.send(player1, create.addr, 0, call_data(i)))
     }
 
-    utils.print_bench([txs])
+    utils.print_bench([txs], mode)
 }
