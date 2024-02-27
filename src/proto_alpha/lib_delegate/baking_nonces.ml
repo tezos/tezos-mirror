@@ -87,8 +87,6 @@ let load (wallet : #Client_context.wallet) location =
 let save (wallet : #Client_context.wallet) location nonces =
   wallet#write (Baking_files.filename location) nonces encoding
 
-let mem nonces hash = Block_hash.Map.mem hash nonces
-
 let find_opt nonces hash = Block_hash.Map.find hash nonces
 
 let add nonces hash nonce = Block_hash.Map.add hash nonce nonces

@@ -41,41 +41,10 @@ type t = state
 
 type nonces = Nonce.t Block_hash.Map.t
 
-val empty : Nonce.t Block_hash.Map.t
-
-val encoding : Nonce.t Block_hash.Map.t Data_encoding.t
-
 val load :
   #Client_context.wallet ->
   [< `Highwatermarks | `Nonce | `State] Baking_files.location ->
   Nonce.t Block_hash.Map.t tzresult Lwt.t
-
-val save :
-  #Client_context.wallet ->
-  [< `Highwatermarks | `Nonce | `State] Baking_files.location ->
-  Nonce.t Block_hash.Map.t ->
-  unit tzresult Lwt.t
-
-val mem : Nonce.t Block_hash.Map.t -> Block_hash.t -> bool
-
-val find_opt : Nonce.t Block_hash.Map.t -> Block_hash.t -> Nonce.t option
-
-val get_block_level_opt :
-  #Tezos_rpc.Context.simple ->
-  chain:Block_services.chain ->
-  block:Block_services.block ->
-  int32 option Lwt.t
-
-val get_outdated_nonces :
-  t ->
-  Nonce.t Block_hash.Map.t ->
-  (Nonce.t Block_hash.Map.t * Nonce.t Block_hash.Map.t) tzresult Lwt.t
-
-val filter_outdated_nonces :
-  t -> Nonce.t Block_hash.Map.t -> Nonce.t Block_hash.Map.t tzresult Lwt.t
-
-val get_unrevealed_nonces :
-  t -> Nonce.t Block_hash.Map.t -> (Raw_level.t * Nonce.t) list tzresult Lwt.t
 
 val generate_seed_nonce :
   Baking_configuration.nonce_config ->
@@ -89,16 +58,6 @@ val register_nonce :
   Block_hash.t ->
   Nonce.t ->
   unit tzresult Lwt.t
-
-val inject_seed_nonce_revelation :
-  #Protocol_client_context.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
-  branch:Block_hash.t ->
-  (Raw_level.t * Nonce.t) list ->
-  unit tzresult Lwt.t
-
-val reveal_potential_nonces : t -> Baking_state.proposal -> unit tzresult Lwt.t
 
 val start_revelation_worker :
   Protocol_client_context.full ->
