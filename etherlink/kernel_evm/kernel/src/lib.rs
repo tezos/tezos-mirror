@@ -30,7 +30,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 mod apply;
@@ -218,24 +218,6 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
 
 const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
 
-const ERRORS_PATH: RefPath = RefPath::assert_from(b"/errors");
-
-fn log_error<Host: Runtime>(
-    host: &mut Host,
-    err: &anyhow::Error,
-) -> Result<(), anyhow::Error> {
-    let current_level = storage::read_current_block_number(host).unwrap_or_default();
-    let err_msg = format!("Error during block {}: {:?}", current_level, err);
-
-    let nb_errors = host.store_count_subkeys(&ERRORS_PATH)?;
-    let raw_error_path: Vec<u8> = format!("/{}", nb_errors + 1).into();
-    let error_path = OwnedPath::try_from(raw_error_path)?;
-    let error_path = concat(&ERRORS_PATH, &error_path)?;
-
-    host.store_write_all(&error_path, err_msg.as_bytes())?;
-    Ok(())
-}
-
 pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
@@ -285,7 +267,6 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
                 host.fallback_backup_kernel()
                     .expect("Fallback mechanism failed");
             } else {
-                log_error(host.host, &e).expect("The kernel failed to write the error");
                 log!(host, Error, "The kernel produced an error: {:?}", e);
                 log!(
                     host,
