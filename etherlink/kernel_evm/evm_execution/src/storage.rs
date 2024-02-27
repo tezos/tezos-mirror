@@ -98,8 +98,11 @@ pub mod blocks {
         block_number: U256,
     ) -> Result<(), EvmBlockStorageError> {
         let block_hash_path = to_block_hash_path(block_number)?;
-        host.store_delete(&block_hash_path)
-            .map_err(EvmBlockStorageError::RuntimeError)
+
+        match host.store_delete(&block_hash_path) {
+            Ok(()) | Err(RuntimeError::PathNotFound) => Ok(()),
+            Err(err) => Err(EvmBlockStorageError::RuntimeError(err)),
+        }
     }
 
     fn write_h256(
