@@ -273,7 +273,10 @@ check_licenses_git_new() {
     "${CHECK_LICENSES_DIFF_BASE:-}" HEAD -- "${source_directories[@]}" > "$diff"
   if [ -n "$license_check_exclude" ]; then
     diff2=$(mktemp)
-    grep -v "$license_check_exclude" "$diff" > "$diff2"
+    # 'grep -v' will exit with a non-zero exit code when no lines are selected.
+    # consequently, if $diff \ $license_check_exclude is empty, the
+    # grep will fail, which we want to allow.
+    grep -v "$license_check_exclude" "$diff" > "$diff2" || true
     mv "$diff2" "$diff"
   fi
 
