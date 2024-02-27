@@ -36,10 +36,6 @@ type state = {
   nonces_location : [`Nonce] Baking_files.location;
   mutable last_predecessor : Block_hash.t;
   cycle_cache : Block_hash.t list Cycle_cache.t;
-      (** This cache is used to avoid calling expensive RPCs at each
-          block. Still, this component's logic is very inefficient and
-          should be refactored. This cache is intended as "duct tape"
-          until a proper refactoring happens. *)
 }
 
 type t = state
@@ -99,6 +95,9 @@ let remove_all nonces nonces_to_remove =
     nonces_to_remove
     nonces
 
+(** [get_block_level_opt cctxt ~chain ~block] makes an RPC call to 
+    retrieve the block level associated to the [~block], given the 
+    client context [cctxt] and chain [~chain]. *)
 let get_block_level_opt cctxt ~chain ~block =
   let open Lwt_syntax in
   let* result =
@@ -115,6 +114,12 @@ let get_block_level_opt cctxt ~chain ~block =
       in
       return_none
 
+(** [get_outdated_nonces state nonces] returns an (orphans, outdated) pair 
+    of lists of nonces (paired with their block hashes); "orphans" are nonces
+    for which we could not retrieve the block level, which can happen in case
+    of a snapshot import or of a block reorganisation; "outdated" nonces
+    appear in cycles which are [consensus_rights_delay] older than the 
+    current cycle.  *)
 let get_outdated_nonces {cctxt; constants; chain; _} nonces =
   let open Lwt_result_syntax in
   let {Constants.parametric = {blocks_per_cycle; consensus_rights_delay; _}; _}
@@ -148,6 +153,9 @@ let get_outdated_nonces {cctxt; constants; chain; _} nonces =
         nonces
         (return (empty, empty))
 
+(** [filter_outdated_nonces state nonces] computes the pair of "orphaned" and
+    "outdated" nonces; emits a warning in case our map contains too many "orphaned"
+    nonces, and removes all the oudated nonces. *)
 let filter_outdated_nonces state nonces =
   let open Lwt_result_syntax in
   let* orphans, outdated_nonces = get_outdated_nonces state nonces in
@@ -165,6 +173,8 @@ let filter_outdated_nonces state nonces =
   in
   return (remove_all nonces outdated_nonces)
 
+(** [blocks_from_previous_cycle state] retrieves all the block hashes corresponding
+    to all the blocks from the cycle right before the current one. *)
 let blocks_from_previous_cycle {cctxt; chain; _} =
   let open Lwt_result_syntax in
   let current_head = `Head 0 in
@@ -200,6 +210,9 @@ let blocks_from_previous_cycle {cctxt; chain; _} =
              size %d (expected 1)"
             (List.length l))
 
+(** [cached_blocks_from_previous_cycle state] attempts to use a cache containing
+    a list of blocks per cycle key; in case of a cache miss, the blocks are 
+    computed and stored in a cache, in an LRU fashion. *)
 let cached_blocks_from_previous_cycle ({cctxt; chain; cycle_cache; _} as state)
     =
   let open Lwt_result_syntax in
@@ -219,6 +232,8 @@ let cached_blocks_from_previous_cycle ({cctxt; chain; cycle_cache; _} as state)
           Cycle_cache.replace cycle_cache cycle_key blocks ;
           return blocks)
 
+(** [get_unrevealed_nonces state nonces] retrieves all the nonces which have been
+    computed for blocks from the previous cycle, which have not been yet revealed. *)
 let get_unrevealed_nonces ({cctxt; chain; _} as state) nonces =
   let open Lwt_result_syntax in
   let* blocks = cached_blocks_from_previous_cycle state in
@@ -289,6 +304,9 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
   let* () = save cctxt nonces_location nonces in
   return_unit
 
+(** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one 
+    [Seed_nonce_revelation] operation per each nonce to be revealed, together with
+    a signature and then injects these operations. *)
 let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
     ~block ~branch nonces =
   let open Lwt_result_syntax in
@@ -321,7 +339,9 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
           return_unit)
         nonces
 
-(** [reveal_potential_nonces] reveal registered nonces *)
+(** [reveal_potential_nonces state new_proposal] updates the internal [state] of 
+    the worker each time a proposal with a new predecessor is received; this means
+    revealing the necessary nonces. *)
 let reveal_potential_nonces state new_proposal =
   let open Lwt_result_syntax in
   let {cctxt; chain; nonces_location; last_predecessor; _} = state in
