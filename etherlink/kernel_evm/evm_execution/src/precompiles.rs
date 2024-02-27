@@ -33,6 +33,11 @@ use sha3::Keccak256;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 
+/// Cost of doing a withdrawal. A valid call to this precompiled contract
+/// takes almost 880000 ticks, and one gas unit takes 1000 ticks.
+/// The ticks/gas ratio is from benchmarks on `ecrecover`.
+const WITHDRAWAL_COST: u64 = 880;
+
 /// Outcome of executing a precompiled contract. Covers both successful
 /// return, stop and revert and additionally, it covers contract execution
 /// failures (malformed input etc.). This is encoded using the `ExitReason`
@@ -495,7 +500,20 @@ fn withdrawal_precompile<Host: Runtime>(
         }
     }
 
-    // TODO check gas_limit if it can't cover the cost, bail out
+    if let Err(err) = handler.record_cost(WITHDRAWAL_COST) {
+        log!(
+            handler.borrow_host(),
+            Info,
+            "Couldn't record the cost of withdrawal {:?}",
+            err
+        );
+        return Ok(PrecompileOutcome {
+            exit_status: ExitReason::Error(err),
+            output: vec![],
+            withdrawals: vec![],
+            estimated_ticks,
+        });
+    }
 
     let Some(transfer) = transfer else {
         log!(handler.borrow_host(), Info, "Withdrawal precompiled contract: no transfer");
@@ -624,7 +642,7 @@ mod tick_model {
         Ok(42_000 + 35 * size)
     }
     pub fn ticks_of_withdraw() -> u64 {
-        1_000_000
+        880_000
     }
 
     pub fn ticks_of_ecrecover() -> u64 {
@@ -826,7 +844,8 @@ mod tests {
             Contract::from_b58check("tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w").unwrap();
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
-        + 1032; // transaction data cost (90 zero bytes + 42 non zero bytes)
+        + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
+        + WITHDRAWAL_COST; // cost of calling withdrawal precompiled contract
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
@@ -839,7 +858,7 @@ mod tests {
                 target: expected_target,
                 amount: 100.into(),
             }],
-            estimated_ticks_used: 1_000_000,
+            estimated_ticks_used: 880_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -881,7 +900,8 @@ mod tests {
             Contract::from_b58check("KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc").unwrap();
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
-        + 1032; // transaction data cost (90 zero bytes + 42 non zero bytes)
+        + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
+        + WITHDRAWAL_COST; // cost of calling withdrawal precompiled contract
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
@@ -895,7 +915,7 @@ mod tests {
                 amount: 100.into(),
             }],
             // TODO (#6426): estimate the ticks consumption of precompiled contracts
-            estimated_ticks_used: 1_000_000,
+            estimated_ticks_used: 880_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -921,7 +941,8 @@ mod tests {
         let result = execute_precompiled(target, input, transfer, Some(25000));
 
         let expected_gas = 21000 // base cost, no additional cost for withdrawal
-        + 1032; // transaction data cost (90 zero bytes + 42 non zero bytes)
+        + 1032 // transaction data cost (90 zero bytes + 42 non zero bytes)
+        + WITHDRAWAL_COST; // cost of calling the withdrawals precompiled contract.
 
         let expected = ExecutionOutcome {
             gas_used: expected_gas,
@@ -931,7 +952,7 @@ mod tests {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 1_000_000,
+            estimated_ticks_used: 880_000,
         };
 
         assert_eq!(Ok(expected), result);
@@ -954,7 +975,7 @@ mod tests {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 1_000_000,
+            estimated_ticks_used: 880_000,
         };
 
         let result = execute_precompiled(target, input, transfer, Some(25000));
