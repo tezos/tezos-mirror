@@ -46,9 +46,11 @@ let () =
     (function Test_failure e -> Some e | _ -> None)
     (fun e -> Test_failure e)
 
+let dal_prover_srs = lazy (Cryptobox.Internal_for_tests.init_prover_dal ())
+
 let mk_cryptobox dal_params =
   let open Result_syntax in
-  let () = Cryptobox.Internal_for_tests.init_prover_dal () in
+  let () = Lazy.force dal_prover_srs in
   match Cryptobox.make dal_params with
   | Ok dal -> return dal
   | Error (`Fail s) -> fail [Test_failure s]
