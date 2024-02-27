@@ -13,3 +13,4 @@ include Scenario_base
 include Scenario_op
 include Scenario_dsl
 include Scenario_begin
+include Scenario_constants

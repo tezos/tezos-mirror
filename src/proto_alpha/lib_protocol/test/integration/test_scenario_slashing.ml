@@ -48,7 +48,8 @@ let test_simple_slash =
     |+ Tag "double preattesting"
        --> double_preattest ~other_bakers:("bootstrap2", "bootstrap3") delegate
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> any_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
@@ -125,7 +126,8 @@ let check_is_not_forbidden baker =
       return input)
 
 let test_delegate_forbidden =
-  init_constants ~blocks_per_cycle:30l ~autostaking_enable:false ()
+  init_constants ~blocks_per_cycle:30l ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai false
   --> any_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
@@ -169,7 +171,8 @@ let test_delegate_forbidden =
          --> check_is_forbidden "delegate")
 
 let test_slash_unstake =
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai false
   --> any_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
@@ -181,7 +184,8 @@ let test_slash_unstake =
 
 let test_slash_monotonous_stake =
   let scenario ~offending_op ~op ~early_d =
-    init_constants ~blocks_per_cycle:16l ~autostaking_enable:false ()
+    init_constants ~blocks_per_cycle:16l ()
+    --> set S.Adaptive_issuance.autostaking_enable false
     --> activate_ai false
     --> any_flag S.Adaptive_issuance.ns_enable
     --> begin_test ["delegate"; "bootstrap1"]
@@ -230,7 +234,8 @@ let test_slash_monotonous_stake =
      --> make_denunciations ()
 
 let test_slash_timing =
-  init_constants ~blocks_per_cycle:8l ~autostaking_enable:false ()
+  init_constants ~blocks_per_cycle:8l ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai false
   --> any_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"] --> next_cycle
@@ -260,7 +265,8 @@ let init_scenario_with_delegators delegate_name faucet_name delegators_list =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> any_flag S.Adaptive_issuance.ns_enable
   --> begin_test [delegate_name; faucet_name]
@@ -315,7 +321,8 @@ let test_no_shortcut_for_cheaters =
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> begin_test ["delegate"; "bootstrap1"]
   --> next_block --> wait_ai_activation
@@ -343,7 +350,8 @@ let test_slash_correct_amount_after_stake_from_unstake =
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> begin_test ["delegate"; "bootstrap1"]
   --> next_block --> wait_ai_activation
@@ -368,7 +376,8 @@ let test_mini_slash =
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> (Tag "Yes AI" --> activate_ai true
        --> begin_test ["delegate"; "baker"]
        --> next_block --> wait_ai_activation
@@ -387,7 +396,8 @@ let test_mini_slash =
   --> wait_n_cycles (consensus_rights_delay + 1)
 
 let test_slash_rounding =
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> any_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "baker"]

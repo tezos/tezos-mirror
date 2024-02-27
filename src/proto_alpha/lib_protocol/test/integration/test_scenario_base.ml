@@ -40,8 +40,7 @@ let test_expected_error =
     Recommended over [start] or [start_with] *)
 let init_constants ?(default = Test) ?(reward_per_block = 0L)
     ?(deactivate_dynamic = false) ?blocks_per_cycle
-    ?delegate_parameters_activation_delay ~autostaking_enable () =
-  let open Scenario_constants in
+    ?delegate_parameters_activation_delay () =
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   start ~constants:default
   --> (* default for tests: 12 *)
@@ -69,7 +68,6 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
          (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
       else Empty)
   --> set S.Adaptive_issuance.ns_enable false
-  --> set S.Adaptive_issuance.autostaking_enable autostaking_enable
 
 (** Initialization of scenarios with 3 cases:
      - AI activated, staker = delegate
@@ -83,7 +81,8 @@ let init_scenario ?(force_ai = true) ?reward_per_block () =
   in
   let begin_test ~activate_ai ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
-    init_constants ?reward_per_block ~autostaking_enable:false ()
+    init_constants ?reward_per_block ()
+    --> set S.Adaptive_issuance.autostaking_enable false
     --> Scenario_begin.activate_ai activate_ai
     --> begin_test [name]
     --> set_delegate_params name init_params

@@ -51,7 +51,8 @@ and delegator1 = "delegator1"
 and delegator2 = "delegator2"
 
 let setup ~activate_ai =
-  init_constants ~autostaking_enable:true ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable true
   --> Scenario_begin.activate_ai activate_ai
   --> begin_test [delegate]
   --> add_account_with_funds
@@ -141,7 +142,8 @@ let test_autostaking =
 let test_overdelegation =
   (* This test assumes that all delegate accounts created in [begin_test]
      begin with 4M tz, with 5% staked *)
-  init_constants ~autostaking_enable:true ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable true
   --> activate_ai false
   --> begin_test ["delegate"; "faucet1"; "faucet2"; "faucet3"]
   --> add_account_with_funds

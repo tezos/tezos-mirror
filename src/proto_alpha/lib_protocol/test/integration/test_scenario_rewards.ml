@@ -29,7 +29,8 @@ let test_wait_with_rewards =
     in
     set_delegate_params "delegate" params
   in
-  init_constants ~reward_per_block:1_000_000_000L ~autostaking_enable:false ()
+  init_constants ~reward_per_block:1_000_000_000L ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> begin_test ["delegate"; "faucet"]
   --> set_baker "faucet"
@@ -75,11 +76,8 @@ let test_wait_with_rewards =
 
 let test_ai_curve_activation_time =
   let pc = Default_parameters.constants_test.consensus_rights_delay in
-  init_constants
-    ~reward_per_block:1_000_000_000L
-    ~deactivate_dynamic:true
-    ~autostaking_enable:false
-    ()
+  init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> begin_test ~burn_rewards:true [""]
   --> next_block --> save_current_rate (* before AI rate *)
@@ -110,11 +108,8 @@ let test_static =
   let cycle_stable =
     save_current_rate --> next_cycle --> check_rate_evolution Q.equal
   in
-  init_constants
-    ~reward_per_block:1_000_000_000L
-    ~deactivate_dynamic:true
-    ~autostaking_enable:false
-    ()
+  init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> begin_test ~burn_rewards:true ["delegate"]
   --> set_delegate_params "delegate" init_params

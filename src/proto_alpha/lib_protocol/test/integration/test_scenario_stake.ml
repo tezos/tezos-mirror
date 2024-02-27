@@ -60,7 +60,8 @@ let shorter_roundtrip_for_baker =
   let consensus_rights_delay =
     Default_parameters.constants_test.consensus_rights_delay
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true --> begin_test ["delegate"] --> next_block
   --> wait_ai_activation
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
@@ -158,7 +159,8 @@ let change_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
   --> begin_test ["delegate1"; "delegate2"]
   --> set_delegate_params "delegate1" init_params
@@ -179,7 +181,8 @@ let unset_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  init_constants ~autostaking_enable:false ()
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
@@ -209,20 +212,15 @@ let forbid_costaking =
   in
   let amount = Amount (Tez.of_mutez 1_000_000L) in
   (* init constants *)
-  (Tag "default protocol constants"
-   --> init_constants ~autostaking_enable:false ()
+  (Tag "default protocol constants" --> init_constants ()
   |+ Tag "small delegate parameters delay"
-     --> init_constants
-           ~delegate_parameters_activation_delay:0
-           ~autostaking_enable:false
-           ()
+     --> init_constants ~delegate_parameters_activation_delay:0 ()
   |+ Tag "large delegate parameters delay"
-     --> init_constants
-           ~delegate_parameters_activation_delay:10
-           ~autostaking_enable:false
-           ())
-  (* Start scenario *)
+     --> init_constants ~delegate_parameters_activation_delay:10 ())
+  (* Set flags *)
+  --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
+  (* Start scenario *)
   --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
