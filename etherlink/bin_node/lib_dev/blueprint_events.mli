@@ -17,9 +17,9 @@ val publisher_is_ready : unit -> unit Lwt.t
     will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
-(** [blueprint_applied level] advertizes that a blueprint for level
-    [level] has been applied onto the local state. *)
-val blueprint_applied : Z.t -> unit Lwt.t
+(** [blueprint_applied (level, hash)] advertizes that a blueprint for
+    level [level] has been applied onto the local state. *)
+val blueprint_applied : Z.t * Ethereum_types.block_hash -> unit Lwt.t
 
 (** [blueprint_injected level] advertizes that a blueprint for level
     [level] has been forwarded to a rollup node  *)

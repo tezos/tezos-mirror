@@ -40,7 +40,7 @@ let event_shutdown_node =
   Internal_event.Simple.declare_1
     ~section
     ~name:"shutting_down"
-    ~msg:"Stopping the EVM node"
+    ~msg:"Stopping the EVM node with {exit_status}"
     ~level:Notice
     ("exit_status", Data_encoding.int8)
 

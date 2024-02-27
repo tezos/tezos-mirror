@@ -26,12 +26,15 @@ let publisher_shutdown =
     ()
 
 let blueprint_application =
-  declare_1
-    ~section
+  declare_2
     ~name:"blueprint_application"
-    ~msg:"Applied a blueprint for level {level}"
+    ~section
+    ~msg:
+      "Applied a blueprint for level {level} leading to creating block \
+       {block_hash}"
     ~level:Notice
     ("level", Data_encoding.n)
+    ("block_hash", Ethereum_types.block_hash_encoding)
 
 let blueprint_injection =
   declare_1
@@ -82,7 +85,7 @@ let blueprint_injected level = emit blueprint_injection level
 
 let blueprint_injection_failed level = emit blueprint_injection_failure level
 
-let blueprint_applied level = emit blueprint_application level
+let blueprint_applied (level, hash) = emit blueprint_application (level, hash)
 
 let invalid_blueprint_produced level = emit invalid_blueprint level
 

@@ -107,7 +107,9 @@ let apply_blueprint ctxt payload =
       in
       ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
       ctxt.current_block_hash <- current_block_hash ;
-      let*! () = Blueprint_events.blueprint_applied blueprint_number in
+      let*! () =
+        Blueprint_events.blueprint_applied (blueprint_number, current_block_hash)
+      in
       let* () = commit ~number:(Qty blueprint_number) ctxt evm_state in
       Lwt_watcher.notify
         ctxt.blueprint_watcher
