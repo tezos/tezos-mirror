@@ -4,10 +4,14 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use ethers::utils::format_units;
 use tokio::task::spawn_blocking;
+use tokio::try_join;
 
+mod client;
 mod config;
 
+use client::Client;
 use config::Config;
 
 #[derive(Debug, Parser)]
@@ -26,13 +30,10 @@ enum Commands {
     Configure {
         #[arg(long)]
         endpoint: String,
-        #[arg(long, value_name = "COORDINATOR_SK")]
-        coordinator: Option<String>,
+        #[arg(long, value_name = "CONTROLLER_SK")]
+        controller: Option<String>,
     },
-    Status {
-        // current gas price
-        // current balances
-    },
+    Status,
     Start {
         // Type (erc-20/transfers/etc)
         // Target TPS
@@ -51,10 +52,34 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Configure {
             endpoint,
-            coordinator,
-        } => Config::configure(&config_path, endpoint, coordinator).await?,
+            controller,
+        } => Config::configure(&config_path, endpoint, controller).await?,
+        Commands::Status => {
+            let config = Config::load(&config_path).await?;
+            status_check(&config).await?;
+        }
         command => todo!("handle command {command:?}"),
     };
 
+    Ok(())
+}
+
+// retrieve controller balance & current gas price
+async fn status_check(config: &Config) -> Result<()> {
+    let client = Client::new(config)?;
+    let (chain_id, gas_price, controller_balance) = try_join!(
+        client.chain_id(),
+        client.gas_price(),
+        client.controller_balance()
+    )?;
+    println!("chain_id\t\t{chain_id}");
+    println!("gas_price\t\t{}\tGwei", format_units(gas_price, "gwei")?);
+    println!(
+        "\ncontroller_address\t{:?}", client.controller_address()
+    );
+    println!(
+        "controller_balance\t{}\tXTZ",
+        format_units(controller_balance, "ether")?
+    );
     Ok(())
 }

@@ -15,6 +15,7 @@ use anyhow::Result;
 use ethers::core::k256::elliptic_curve::SecretKey;
 use ethers::core::k256::Secp256k1;
 use ethers::core::rand::thread_rng;
+use ethers::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::fs::{read, write};
 use tokio::task::spawn_blocking;
@@ -24,23 +25,23 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     endpoint: String,
-    coordinator: Account,
+    controller: Account,
 }
 
 impl Config {
     pub async fn configure(
         path: &(impl AsRef<Path> + std::fmt::Debug),
         endpoint: String,
-        coordinator: Option<String>,
+        controller: Option<String>,
     ) -> Result<()> {
         let config = Self::load(path).await;
 
-        let config = match (config, coordinator) {
+        let config = match (config, controller) {
             (Err(_), None) => {
                 let sk = SecretKey::random(&mut thread_rng());
                 Config {
                     endpoint,
-                    coordinator: Account { sk, nonce: 0 },
+                    controller: Account { sk },
                 }
             }
             (Ok(mut config), None) => {
@@ -49,9 +50,8 @@ impl Config {
             }
             (Ok(mut config), Some(sk)) => {
                 let sk = eth_sk_from_str(sk)?;
-                if sk != config.coordinator.sk {
-                    config.coordinator.sk = sk;
-                    config.coordinator.nonce = 0;
+                if sk != config.controller.sk {
+                    config.controller.sk = sk;
                 };
                 config.endpoint = endpoint;
                 config
@@ -60,7 +60,7 @@ impl Config {
                 let sk = eth_sk_from_str(sk)?;
                 Config {
                     endpoint,
-                    coordinator: Account { sk, nonce: 0 },
+                    controller: Account { sk },
                 }
             }
         };
@@ -90,6 +90,14 @@ impl Config {
 
         Ok(path)
     }
+
+    pub fn endpoint(&self) -> &str {
+        self.endpoint.as_str()
+    }
+
+    pub fn controller(&self) -> LocalWallet {
+        LocalWallet::from(self.controller.sk.clone())
+    }
 }
 
 /// An account, formed of a secret key and nonce
@@ -97,21 +105,18 @@ impl Config {
 #[serde(into = "AccountRepr", try_from = "AccountRepr")]
 pub struct Account {
     sk: SecretKey<Secp256k1>,
-    nonce: u64,
 }
 
 // Account representation used when serializing/deserializing
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct AccountRepr {
     sk: String,
-    nonce: u64,
 }
 
 impl From<Account> for AccountRepr {
     fn from(a: Account) -> Self {
         Self {
             sk: hex::encode(a.sk.to_bytes()),
-            nonce: a.nonce,
         }
     }
 }
@@ -121,7 +126,7 @@ impl TryFrom<AccountRepr> for Account {
 
     fn try_from(a: AccountRepr) -> Result<Self> {
         let sk = eth_sk_from_str(a.sk)?;
-        Ok(Self { sk, nonce: a.nonce })
+        Ok(Self { sk })
     }
 }
 
