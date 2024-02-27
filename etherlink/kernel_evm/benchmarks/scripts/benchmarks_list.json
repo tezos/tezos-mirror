@@ -47,6 +47,7 @@
     "benchmarks/bench_ecadd.js",
     "benchmarks/bench_ecmul.js",
     "benchmarks/bench_ecpairing.js",
+    "benchmarks/bench_modexp.js",
     "benchmarks/bench_linear_transfers.js 0",
     "benchmarks/bench_linear_transfers.js 5",
     "benchmarks/bench_linear_transfers.js 10",
