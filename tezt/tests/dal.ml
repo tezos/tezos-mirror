@@ -4639,6 +4639,7 @@ let dal_crypto_benchmark () =
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
   let page_size = Cli.get_int ~default:3967 "page_size" in
+  let verifier_srs = Cli.get_bool ~default:true "verifier_srs" in
   let generate_slot ~slot_size =
     Bytes.init slot_size (fun _ ->
         let x = Random.int 26 in
@@ -4731,7 +4732,7 @@ let dal_crypto_benchmark () =
                  let*? page_proof = prove_page dal polynomial i in
                  page_proof)
         in
-        Internal_for_tests.init_verifier_dal_default () ;
+        if verifier_srs then Internal_for_tests.init_verifier_dal_default () ;
         let is_valid =
           Profiler.record_f Profiler.main "verify commitment" @@ fun () ->
           verify_commitment dal commitment commitment_proof
