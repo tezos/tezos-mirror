@@ -13,8 +13,8 @@ platform=${platform:-"linux/amd64"}
 
 # register information about the rust-toolchain image
 rust_toolchain_info() {
-  _=$(docker pull -q "${rust_image}:${rust_image_tag}")
-  docker inspect --format='{{index .RepoDigests 0}}' "${rust_image}:${rust_image_tag}"
+  digest=$(docker pull "${rust_image}:${rust_image_tag}" | grep -oE "sha256:.*")
+  echo "${digest:7}"
 }
 
 # build docker image with wasm inside it
