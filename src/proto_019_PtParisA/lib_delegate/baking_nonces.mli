@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,55 +35,38 @@ type state = {
   config : Baking_configuration.nonce_config;
   nonces_location : [`Nonce] Baking_files.location;
   mutable last_predecessor : Block_hash.t;
+      (** This cache is used to avoid calling expensive RPCs at each
+      block. Still, this component's logic is very inefficient and
+      should be refactored. This cache is intended as "duct tape"
+      until a proper refactoring happens. *)
   cycle_cache : Block_hash.t list Cycle_cache.t;
 }
 
 type t = state
 
+(** [nonces] is a hash map corresponding to the data which can be found in the
+    file from [nonces_location] *)
 type nonces = Nonce.t Block_hash.Map.t
 
-val empty : Nonce.t Block_hash.Map.t
-
-val encoding : Nonce.t Block_hash.Map.t Data_encoding.t
-
+(** [load wallet location] loads the file corresponding to [location] and 
+    returns a data structure containing the stored information. *)
 val load :
   #Client_context.wallet ->
   [< `Highwatermarks | `Nonce | `State] Baking_files.location ->
   Nonce.t Block_hash.Map.t tzresult Lwt.t
 
-val save :
-  #Client_context.wallet ->
-  [< `Highwatermarks | `Nonce | `State] Baking_files.location ->
-  Nonce.t Block_hash.Map.t ->
-  unit tzresult Lwt.t
-
-val mem : Nonce.t Block_hash.Map.t -> Block_hash.t -> bool
-
-val find_opt : Nonce.t Block_hash.Map.t -> Block_hash.t -> Nonce.t option
-
-val get_block_level_opt :
-  #Tezos_rpc.Context.simple ->
-  chain:Block_services.chain ->
-  block:Block_services.block ->
-  int32 option Lwt.t
-
-val get_outdated_nonces :
-  t ->
-  Nonce.t Block_hash.Map.t ->
-  (Nonce.t Block_hash.Map.t * Nonce.t Block_hash.Map.t) tzresult Lwt.t
-
-val filter_outdated_nonces :
-  t -> Nonce.t Block_hash.Map.t -> Nonce.t Block_hash.Map.t tzresult Lwt.t
-
-val get_unrevealed_nonces :
-  t -> Nonce.t Block_hash.Map.t -> (Raw_level.t * Nonce.t) list tzresult Lwt.t
-
+(** [generate_seed_nonce nonce_config delegate level] computes a nonce via a 
+    [Deterministic] or [Random] approach, depending on the [nonce_config]
+    argument; the deterministic case uses as parameters [delegate] and [level]. *)
 val generate_seed_nonce :
   Baking_configuration.nonce_config ->
   Baking_state.consensus_key ->
   Raw_level.t ->
   (Nonce_hash.t * Nonce.t) tzresult Lwt.t
 
+(** [register_nonce cctxt ~chain_id block_hash nonce] updates the contents from
+    the nonces file located using [cctxt] and [~chain_id] by adding a new entry
+    or replacing an existing one of the form [block_hash] : [nonce]. *)
 val register_nonce :
   #Protocol_client_context.full ->
   chain_id:Chain_id.t ->
@@ -90,16 +74,11 @@ val register_nonce :
   Nonce.t ->
   unit tzresult Lwt.t
 
-val inject_seed_nonce_revelation :
-  #Protocol_client_context.full ->
-  chain:Chain_services.chain ->
-  block:Block_services.block ->
-  branch:Block_hash.t ->
-  (Raw_level.t * Nonce.t) list ->
-  unit tzresult Lwt.t
-
-val reveal_potential_nonces : t -> Baking_state.proposal -> unit tzresult Lwt.t
-
+(** [start_revelation_worker cctxt config chain_id constants block_stream] 
+    represents the continuous process of receiving new proposal from [block_stream]
+    and applying them to the internal state created from [cctxt], [config], 
+    [chain_id] and [constants]; each new proposal can produce a nonce, to be stored
+    in a nonce file location, facilitating the nonce revelation process. *)
 val start_revelation_worker :
   Protocol_client_context.full ->
   Baking_configuration.nonce_config ->
