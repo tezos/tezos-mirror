@@ -16,6 +16,9 @@ const { legacy_contract_address } = require('../lib/contract');
 const { execSync } = require('child_process');
 const external = require("../lib/external")
 const commander = require('commander');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
@@ -109,16 +112,30 @@ const print_list = function (src, mode, blueprint_number) {
     return txs.length
 }
 
-const chunk_data = function (src) {
-    run_chunker_command = `${CHUNKER} chunk data "${src}" --devmode`
-    chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
+function temporary_data_file(data) {
+    const tmp_dir = os.tmpdir();
+    const tmp_file = path.join(tmp_dir, "chunker_data");
+
+    fs.writeFileSync(tmp_file, data);
+    return tmp_file;
+}
+
+function chunk_data_gen(data, extra_args){
+    let tmp_data_file = temporary_data_file(data, "--devmode")
+    run_chunker_command = `${CHUNKER} chunk data file:${tmp_data_file} --devmode ${extra_args}`;
+    // The buffer for the output is chosen really big to prevent ENOBUF errors, as the output is proportional to the input
+    chunked_message = new Buffer.from(execSync(run_chunker_command, { maxBuffer : data.length * 3 })).toString();
+    fs.unlinkSync(tmp_data_file);
     return chunked_message.split("\n").slice(1, -1);
 }
 
+const chunk_data = function (src) {
+    return chunk_data_gen(src, "");
+}
+
 const chunk_data_into_blueprint = function (src, number, sequencer_key) {
-    run_chunker_command = `${CHUNKER} chunk data ${src} --devmode --as-blueprint --number ${number} --timestamp ${number} --sequencer-key text:${sequencer_key}`
-    chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
-    return chunked_message.split("\n").slice(1, -1);
+    let extra_args = `--as-blueprint --number ${number} --timestamp ${number} --sequencer-key text:${sequencer_key}`;
+    return chunk_data_gen(src, extra_args);
 }
 
 exports.print_bench = function (src, mode = {}) {
