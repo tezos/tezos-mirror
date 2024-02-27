@@ -97,15 +97,13 @@ exports.send = function (player, contract_addr, amount, data, options = {}) {
 const print_list = function (src, mode, blueprint_number) {
     const txs = src.slice();
     console.log("[")
-    for (var i = 0; i < txs.length; i++) {
-        transaction = txs[i];
-        messages = mode.sequencer_key ?
-            chunk_data_into_blueprint(transaction, i + blueprint_number, mode.sequencer_key) :
-            chunk_data(transaction);
-        for (var j = 0; j < messages.length; j++) {
-            seperator = (i < txs.length - 1 || j < messages.length - 1) ? "," : "";
-            console.log(`{"external": "${messages[j]}"}${seperator}`);
-        }
+    let data = txs.join(" ");
+    let messages = mode.sequencer_key ?
+        chunk_data_into_blueprint(data, blueprint_number, mode.sequencer_key) :
+        chunk_data(data);
+    for (var j = 0; j < messages.length; j++) {
+        seperator = (j < messages.length - 1) ? "," : "";
+        console.log(`{"external": "${messages[j]}"}${seperator}`);
     }
     console.log("]");
     return txs.length
@@ -118,7 +116,7 @@ const chunk_data = function (src) {
 }
 
 const chunk_data_into_blueprint = function (src, number, sequencer_key) {
-    run_chunker_command = `${CHUNKER} chunk data "${src}" --devmode --as-blueprint --number ${number} --timestamp ${number} --sequencer-key text:${sequencer_key}`
+    run_chunker_command = `${CHUNKER} chunk data ${src} --devmode --as-blueprint --number ${number} --timestamp ${number} --sequencer-key text:${sequencer_key}`
     chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
     return chunked_message.split("\n").slice(1, -1);
 }
