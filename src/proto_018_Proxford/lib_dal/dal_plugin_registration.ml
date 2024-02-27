@@ -134,6 +134,26 @@ module Plugin = struct
     in
     List.filter (Dal.Attestation.is_attested confirmed_slots) all_slots
     |> Dal.Slot_index.to_int_list |> return
+
+  (* Section of helpers for Skip lists *)
+  module Skip_list = struct
+    type cell = Dal.Slots_history.t
+
+    type hash = Dal.Slots_history.Pointer_hash.t
+
+    let cell_encoding = Dal.Slots_history.encoding
+
+    let hash_encoding = Dal.Slots_history.Pointer_hash.encoding
+
+    let cell_equal = Dal.Slots_history.equal
+
+    let hash_equal = Dal.Slots_history.Pointer_hash.equal
+
+    let cell_hash = Dal.Slots_history.hash
+
+    (* We return the empty list here because DAL is not activated in Oxford2. *)
+    let cells_of_level _block_info _ctxt = Lwt_result_syntax.return []
+  end
 end
 
 let () = Dal_plugin.register (module Plugin)

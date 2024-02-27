@@ -104,6 +104,42 @@ module type T = sig
   (** [block_shell_header block_info] returns the shell header of the block
       whose information are given . *)
   val block_shell_header : block_info -> Block_header.shell_header
+
+  (* Section of helpers for Skip lists *)
+
+  module Skip_list : sig
+    type cell
+
+    type hash
+
+    val cell_encoding : cell Data_encoding.t
+
+    val hash_encoding : hash Data_encoding.t
+
+    val cell_equal : cell -> cell -> bool
+
+    val hash_equal : hash -> hash -> bool
+
+    val cell_hash : cell -> hash
+
+    (*
+      This function mimics what the protocol does in
+      {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info and
+      an RPC context, this function computes the cells produced by the DAL skip
+      list during the level L of block_info using:
+
+       - The information telling which slot headers were waiting for attestation
+       at level [L - attestation_lag];
+
+       - The bitset of attested slots at level [L] in the block's metadata.
+
+      The ordering of the elements in the returned list is not relevant.
+    *)
+    val cells_of_level :
+      block_info ->
+      Tezos_rpc.Context.generic ->
+      (hash * cell) list tzresult Lwt.t
+  end
 end
 
 val register : (module T) -> unit

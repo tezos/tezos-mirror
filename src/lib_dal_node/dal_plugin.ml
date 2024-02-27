@@ -75,6 +75,29 @@ module type T = sig
   val get_round : Fitness.t -> int32 tzresult
 
   val block_shell_header : block_info -> Block_header.shell_header
+
+  (* Section of helpers for Skip lists *)
+
+  module Skip_list : sig
+    type cell
+
+    type hash
+
+    val cell_encoding : cell Data_encoding.t
+
+    val hash_encoding : hash Data_encoding.t
+
+    val cell_equal : cell -> cell -> bool
+
+    val hash_equal : hash -> hash -> bool
+
+    val cell_hash : cell -> hash
+
+    val cells_of_level :
+      block_info ->
+      Tezos_rpc.Context.generic ->
+      (hash * cell) list tzresult Lwt.t
+  end
 end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
