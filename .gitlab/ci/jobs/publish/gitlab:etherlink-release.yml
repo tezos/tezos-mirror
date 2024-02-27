@@ -10,3 +10,7 @@ gitlab:etherlink-release:
     - docker:prepare-etherlink-release
   script:
     - ./scripts/ci/gitlab-etherlink-release.sh
+  artifacts:
+    paths:
+      - kernels.tar.gz
+    expire_in: never

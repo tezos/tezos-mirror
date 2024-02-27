@@ -8,5 +8,5 @@ docker:prepare-etherlink-release:
   artifacts:
     paths:
       - kernels.tar.gz
-      - kernels_job_id
-    expire_in: never
+    expire_in: 1 hour
+    public: false

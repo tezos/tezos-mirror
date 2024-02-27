@@ -15,6 +15,3 @@ etherlink/scripts/build-wasm.sh etherlink/config/dev.yaml kernels
 
 # compress the directory
 tar -czf kernels.tar.gz kernels
-
-# expose job id
-echo "$CI_JOB_ID" > kernels_job_id

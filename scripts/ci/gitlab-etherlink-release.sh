@@ -7,8 +7,7 @@ set -eu
 # Enable release-cli verbose mode
 export DEBUG='true'
 
-prepare_etherlink_job_id=$(cat kernels_job_id)
-kernels_artifact_url="$CI_SERVER_URL/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/-/jobs/$prepare_etherlink_job_id/artifacts/raw/kernels.tar.gz"
+kernels_artifact_url="$CI_SERVER_URL/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/raw/kernels.tar.gz"
 
 release-cli create \
   --name="Release ${CI_COMMIT_TAG}" \
