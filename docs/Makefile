@@ -105,7 +105,8 @@ odoc-lite:
 	rm -rf $(CURDIR)/_build/api/odoc/_odocls
 
 .PHONY: linkcheck
-linkcheck: html
+# Run this after make html
+linkcheck:
 	@echo "Running linkcheck, outputs messages to $(BUILDDIR)/output.txt"
 	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) >$@;\
 		RESULT=$$?; cat $(BUILDDIR)/output.txt; exit $$RESULT
@@ -115,7 +116,8 @@ fixlinkcheck:
 	@scripts/update_links.sh
 
 .PHONY: redirectcheck
-redirectcheck: html
+# Run this after make html
+redirectcheck:
 	@cd $$(pwd)/.. ; ./scripts/lint.sh --check-redirects
 
 # xrefs should be checked:

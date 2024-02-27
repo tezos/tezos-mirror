@@ -17,6 +17,7 @@ documentation:linkcheck:
     - . $HOME/.venv/bin/activate
   script:
     - make all
+    - make -C docs html
     - make -C docs redirectcheck
     - make -C docs linkcheck
   allow_failure: true
