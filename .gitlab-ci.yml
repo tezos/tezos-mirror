@@ -39,15 +39,26 @@ workflow:
       PIPELINE_TYPE: release_tag_test
     when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/
+    variables:
+      PIPELINE_TYPE: etherlink_release_tag
+    when: always
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/
+    variables:
+      PIPELINE_TYPE: etherlink_test_release_tag
+    when: always
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG !~
-      /^v\d+\.\d+\-beta\d*$/
+      /^v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/
+      && $CI_COMMIT_TAG !~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/
     variables:
       PIPELINE_TYPE: non_release_tag
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG !~
-      /^v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/ &&
-      $CI_COMMIT_TAG !~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/
+      /^v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/
+      && $CI_COMMIT_TAG !~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/
     variables:
       PIPELINE_TYPE: non_release_tag_test
     when: always
@@ -55,17 +66,6 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_extended_test
     when: always
-  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      != null && $CI_COMMIT_TAG =~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/
-    variables:
-      PIPELINE_TYPE: etherlink_release
-    when: always
-  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      != null && $CI_COMMIT_TAG =~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/
-    variables:
-      PIPELINE_TYPE: etherlink_release_test
-    when: always
-
 default:
   interruptible: true
 variables:
@@ -137,11 +137,22 @@ include:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_TAG
       =~ /^v\d+\.\d+(?:\-rc\d+)?$/ || $CI_COMMIT_TAG =~ /^v\d+\.\d+\-beta\d*$/)
     when: always
+- local: .gitlab/ci/pipelines/etherlink_release_tag.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/
+    when: always
+- local: .gitlab/ci/pipelines/etherlink_test_release_tag.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/
+    when: always
 - local: .gitlab/ci/pipelines/non_release_tag.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       != null && $CI_COMMIT_TAG !~ /^v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG !~
-      /^v\d+\.\d+\-beta\d*$/
+      /^v\d+\.\d+\-beta\d*$/ && $CI_COMMIT_TAG !~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/
+      && $CI_COMMIT_TAG !~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/
     when: always
 - local: .gitlab/ci/pipelines/non_release_tag_test.yml
   rules:
@@ -153,10 +164,4 @@ include:
 - local: .gitlab/ci/pipelines/schedule_extended_test.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: always
-- local: .gitlab/ci/pipelines/etherlink_release.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      != null && ($CI_COMMIT_TAG =~ /^etherlink-v\d+\.\d+(?:\-rc\d+)?$/ ||
-      $CI_COMMIT_TAG =~ /^etherlink-test-v\d+\.\d+(?:\-rc\d+)?$/)
     when: always
