@@ -59,7 +59,9 @@ __pycache__
 /octogram
 /simulation-scenario
 /safety-checker
-/risc-v-sandbox
+
+/src/risc_v/risc-v-sandbox
+/src/risc_v/risc-v-dummy.elf
 
 /src/proto_*/parameters/*-parameters.json
 
@@ -108,7 +110,6 @@ tx_kernel.wasm
 tx_kernel_dal.wasm
 tx-demo-collector
 dal_echo_kernel.wasm
-risc-v-dummy.elf
 sequencer.wasm
 evm_benchmark_installer.wasm
 evm_unstripped_installer.wasm

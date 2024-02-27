@@ -1,5 +1,5 @@
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/hermit-loader --initrd risc-v-dummy.elf
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/hermit-loader --initrd src/risc_v/risc-v-dummy.elf
 [src/arch/riscv64/kernel/core_local.rs:38] CPU_ONLINE.load(Ordering::Relaxed) = 0
 [0][WARN] Unable to read entropy! Fallback to a naive implementation!
 Hello World

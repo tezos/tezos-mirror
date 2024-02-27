@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let risc_v_sandbox = Uses.make ~tag:"risc_v_sandbox" ~path:"./risc-v-sandbox"
+let risc_v_sandbox =
+  Uses.make ~tag:"risc_v_sandbox" ~path:"./src/risc_v/risc-v-sandbox"
 
 let run_kernel ?(posix = false) ~input ?initrd () =
   let process =

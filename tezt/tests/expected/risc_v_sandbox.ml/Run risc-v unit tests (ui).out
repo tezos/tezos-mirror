@@ -1,519 +1,519 @@
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-add --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-add --posix
 Received request to exit with code 0
 rv64ui-p-add: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-addi --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-addi --posix
 Received request to exit with code 0
 rv64ui-p-addi: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-addiw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-addiw --posix
 Received request to exit with code 0
 rv64ui-p-addiw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-addw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-addw --posix
 Received request to exit with code 0
 rv64ui-p-addw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-and --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-and --posix
 Received request to exit with code 0
 rv64ui-p-and: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-andi --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-andi --posix
 Received request to exit with code 0
 rv64ui-p-andi: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-auipc --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-auipc --posix
 Received request to exit with code 0
 rv64ui-p-auipc: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-beq --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-beq --posix
 Received request to exit with code 0
 rv64ui-p-beq: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bge --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bge --posix
 Received request to exit with code 0
 rv64ui-p-bge: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bgeu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bgeu --posix
 Received request to exit with code 0
 rv64ui-p-bgeu: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-blt --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-blt --posix
 Received request to exit with code 0
 rv64ui-p-blt: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bltu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bltu --posix
 Received request to exit with code 0
 rv64ui-p-bltu: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bne --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-bne --posix
 Received request to exit with code 0
 rv64ui-p-bne: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-fence_i --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-fence_i --posix
 Received request to exit with code 0
 rv64ui-p-fence_i: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-jal --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-jal --posix
 Received request to exit with code 0
 rv64ui-p-jal: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-jalr --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-jalr --posix
 Received request to exit with code 0
 rv64ui-p-jalr: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lb --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lb --posix
 Received request to exit with code 0
 rv64ui-p-lb: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lbu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lbu --posix
 Received request to exit with code 0
 rv64ui-p-lbu: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-ld --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-ld --posix
 Received request to exit with code 0
 rv64ui-p-ld: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lh --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lh --posix
 Received request to exit with code 0
 rv64ui-p-lh: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lhu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lhu --posix
 Received request to exit with code 0
 rv64ui-p-lhu: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lui --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lui --posix
 Received request to exit with code 0
 rv64ui-p-lui: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lw --posix
 Received request to exit with code 0
 rv64ui-p-lw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lwu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-lwu --posix
 Received request to exit with code 0
 rv64ui-p-lwu: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-ma_data --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-ma_data --posix
 Received request to exit with code 0
 rv64ui-p-ma_data: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-or --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-or --posix
 Received request to exit with code 0
 rv64ui-p-or: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-ori --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-ori --posix
 Received request to exit with code 0
 rv64ui-p-ori: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sb --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sb --posix
 Received request to exit with code 0
 rv64ui-p-sb: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sd --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sd --posix
 Received request to exit with code 0
 rv64ui-p-sd: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sh --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sh --posix
 Received request to exit with code 0
 rv64ui-p-sh: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-simple --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-simple --posix
 Received request to exit with code 0
 rv64ui-p-simple: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sll --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sll --posix
 Received request to exit with code 0
 rv64ui-p-sll: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slli --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slli --posix
 Received request to exit with code 0
 rv64ui-p-slli: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slliw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slliw --posix
 Received request to exit with code 0
 rv64ui-p-slliw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sllw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sllw --posix
 Received request to exit with code 0
 rv64ui-p-sllw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slt --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slt --posix
 Received request to exit with code 0
 rv64ui-p-slt: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slti --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-slti --posix
 Received request to exit with code 0
 rv64ui-p-slti: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sltiu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sltiu --posix
 Received request to exit with code 0
 rv64ui-p-sltiu: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sltu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sltu --posix
 Received request to exit with code 0
 rv64ui-p-sltu: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sra --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sra --posix
 Received request to exit with code 0
 rv64ui-p-sra: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srai --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srai --posix
 Received request to exit with code 0
 rv64ui-p-srai: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sraiw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sraiw --posix
 Received request to exit with code 0
 rv64ui-p-sraiw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sraw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sraw --posix
 Received request to exit with code 0
 rv64ui-p-sraw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srl --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srl --posix
 Received request to exit with code 0
 rv64ui-p-srl: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srli --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srli --posix
 Received request to exit with code 0
 rv64ui-p-srli: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srliw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srliw --posix
 Received request to exit with code 0
 rv64ui-p-srliw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srlw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-srlw --posix
 Received request to exit with code 0
 rv64ui-p-srlw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sub --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sub --posix
 Received request to exit with code 0
 rv64ui-p-sub: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-subw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-subw --posix
 Received request to exit with code 0
 rv64ui-p-subw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-sw --posix
 Received request to exit with code 0
 rv64ui-p-sw: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-xor --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-xor --posix
 Received request to exit with code 0
 rv64ui-p-xor: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-xori --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-p-xori --posix
 Received request to exit with code 0
 rv64ui-p-xori: success
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-add --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-add --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-add: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addi --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addi --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-addi: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addiw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addiw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-addiw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-addw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-addw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-and --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-and --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-and: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-andi --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-andi --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-andi: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-auipc --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-auipc --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-auipc: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-beq --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-beq --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-beq: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bge --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bge --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bge: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bgeu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bgeu --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bgeu: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-blt --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-blt --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-blt: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bltu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bltu --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bltu: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bne --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-bne --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-bne: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-fence_i --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-fence_i --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-fence_i: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-jal --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-jal --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-jal: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-jalr --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-jalr --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-jalr: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lb --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lb --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lb: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lbu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lbu --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lbu: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ld --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ld --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-ld: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lh --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lh --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lh: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lhu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lhu --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lhu: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lui --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lui --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lui: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lwu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-lwu --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-lwu: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ma_data --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ma_data --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-ma_data: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-or --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-or --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-or: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ori --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-ori --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-ori: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sb --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sb --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sb: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sd --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sd --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sd: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sh --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sh --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sh: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-simple --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-simple --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-simple: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sll --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sll --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sll: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slli --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slli --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slli: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slliw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slliw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slliw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sllw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sllw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sllw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slt --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slt --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slt: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slti --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-slti --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-slti: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sltiu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sltiu --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sltiu: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sltu --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sltu --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sltu: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sra --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sra --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sra: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srai --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srai --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srai: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sraiw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sraiw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sraiw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sraw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sraw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sraw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srl --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srl --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srl: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srli --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srli --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srli: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srliw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srliw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srliw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srlw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-srlw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-srlw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sub --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sub --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sub: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-subw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-subw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-subw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sw --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-sw --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-sw: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-xor --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-xor --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ui-v-xor: fail
 
-./risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-xori --posix
+./src/risc_v/risc-v-sandbox --input tezt/tests/riscv-tests/generated/rv64ui-v-xori --posix
 thread 'main' panicked at sandbox/src/main.rs:131:25:
 Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

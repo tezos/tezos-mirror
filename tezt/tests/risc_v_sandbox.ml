@@ -26,7 +26,7 @@
 let test_dummy_kernel () =
   Tezt_risc_v_sandbox.run_kernel
     ~input:"tezt/tests/riscv-tests/hermit-loader"
-    ~initrd:"risc-v-dummy.elf"
+    ~initrd:"src/risc_v/risc-v-dummy.elf"
     ()
 
 let fold_dir_lwt ~f ~acc dirname =
