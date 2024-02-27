@@ -204,11 +204,6 @@ let () =
   let beta_release_tag_re = "/^v\\d+\\.\\d+\\-beta\\d*$/" in
   (* Matches etherlink release tags, e.g. [etherlink-v1.2]. *)
   let etherlink_release_tag_re = "/^etherlink-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
-  (* Matches testing etherlink release tags, e.g. [etherlink-test-v1.2].
-     CAN BE REMOVED BEFORE MERGING *)
-  let etherlink_test_release_tag_re =
-    "/^etherlink-test-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
-  in
   let open Rules in
   let open Pipeline in
   (* Matches either release tags or beta release tags, e.g. [v1.2],
@@ -216,16 +211,11 @@ let () =
   let has_any_release_tag =
     If.(has_tag_match release_tag_re || has_tag_match beta_release_tag_re)
   in
-  let has_any_etherlink_release_tag =
-    If.(
-      has_tag_match etherlink_release_tag_re
-      || has_tag_match etherlink_test_release_tag_re)
-  in
   let has_non_release_tag =
     If.(
       Predefined_vars.ci_commit_tag != null
       && (not has_any_release_tag)
-      && not has_any_etherlink_release_tag)
+      && not (has_tag_match etherlink_release_tag_re))
   in
   register "before_merging" If.(on_tezos_namespace && merge_request) ;
   register
@@ -248,10 +238,9 @@ let () =
     "etherlink_release_tag"
     If.(on_tezos_namespace && push && has_tag_match etherlink_release_tag_re) ;
   register
-    "etherlink_test_release_tag"
+    "etherlink_release_tag_test"
     If.(
-      not_on_tezos_namespace && push
-      && has_tag_match etherlink_test_release_tag_re) ;
+      not_on_tezos_namespace && push && has_tag_match etherlink_release_tag_re) ;
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag) ;
