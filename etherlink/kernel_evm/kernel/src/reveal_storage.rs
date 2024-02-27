@@ -14,17 +14,12 @@ use tezos_smart_rollup_debug::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::ValueType;
-use tezos_smart_rollup_installer_config::binary::owned::{
-    OwnedConfigInstruction, OwnedConfigProgram,
-};
 
 /// This module is a testing device, allowing to replicate the state of an existing EVM rollup
 /// chain into a new deployment. It is not tick-safe, and should obviously not be used in a
 /// production setup.
 
-const CONFIG_PATH: RefPath = RefPath::assert_from(b"/__tmp/config");
-pub const CONFIG_ROOT_HASH_PATH: RefPath =
-    RefPath::assert_from(b"/__tmp/config_root_hash");
+const CONFIG_PATH: RefPath = RefPath::assert_from(b"/__tmp/reveal_config");
 
 #[derive(Debug)]
 struct Set {
@@ -63,7 +58,7 @@ impl Decodable for Sets {
 
 pub fn is_revealed_storage(host: &impl Runtime) -> bool {
     matches!(
-        host.store_has(&CONFIG_ROOT_HASH_PATH).unwrap_or_default(),
+        host.store_has(&CONFIG_PATH).unwrap_or_default(),
         Some(ValueType::Value)
     )
 }
@@ -75,16 +70,6 @@ pub fn reveal_storage(
 ) {
     log!(host, Info, "Starting the reveal dump");
 
-    let config_root_hash = host
-        .store_read_all(&CONFIG_ROOT_HASH_PATH)
-        .expect("Failed reading the config root hash");
-
-    // Reveal RLP encoded list of `Set` instructions in storage.
-    let config = OwnedConfigProgram(vec![OwnedConfigInstruction::reveal_instr(
-        config_root_hash.into(),
-        OwnedPath::from(&CONFIG_PATH),
-    )]);
-    config.evaluate(host).expect("Revealing the config failed");
     let config_bytes = host
         .store_read_all(&CONFIG_PATH)
         .expect("Failed reading the configuration");
@@ -105,10 +90,6 @@ pub fn reveal_storage(
     // Remove temporary configuration
     host.store_delete(&CONFIG_PATH)
         .expect("Failed to remove the configuration");
-
-    // Remove configuration root hash
-    host.store_delete(&CONFIG_ROOT_HASH_PATH)
-        .expect("Failed to remove the configuration root hash");
 
     // Change the sequencer if asked:
     if let Some(sequencer) = sequencer {

@@ -4811,10 +4811,10 @@ let test_reveal_storage =
     `Config
       Sc_rollup_helpers.Installer_kernel_config.
         [
-          Set
+          Reveal
             {
-              value = configuration_root_hash;
-              to_ = Durable_storage_path.config_root_hash;
+              hash = configuration_root_hash;
+              to_ = Durable_storage_path.reveal_config;
             };
         ]
   in
