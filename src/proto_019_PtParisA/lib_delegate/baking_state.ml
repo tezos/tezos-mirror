@@ -118,6 +118,15 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
+type forge_event = |
+
+type forge_request
+
+type forge_worker_hooks = {
+  push_request : forge_request -> unit;
+  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+}
+
 type global_state = {
   (* client context *)
   cctxt : Protocol_client_context.full;
@@ -131,6 +140,8 @@ type global_state = {
   round_durations : Round.round_durations;
   (* worker that monitor and aggregates new operations *)
   operation_worker : Operation_worker.t;
+  (* hooks to the consensus and block forge worker *)
+  mutable forge_worker_hooks : forge_worker_hooks;
   (* the validation mode used by the baker*)
   validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)
@@ -416,6 +427,7 @@ type event =
       Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
       Operation_worker.candidate * Kind.attestation operation list
+  | New_forge_event of forge_event
   | Timeout of timeout_kind
 
 let event_encoding =
@@ -1068,5 +1080,6 @@ let pp_event fmt = function
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
+  | New_forge_event _event -> .
   | Timeout kind ->
       Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
