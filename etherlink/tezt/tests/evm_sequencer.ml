@@ -66,7 +66,7 @@ type sequencer_setup = {
   l1_contracts : l1_contracts;
 }
 
-let setup_l1_contracts ?(dictator = Constant.bootstrap1) client =
+let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
   (* Originates the delayed transaction bridge. *)
   let* delayed_transaction_bridge =
     Client.originate_contract
@@ -289,7 +289,7 @@ let test_remove_sequencer =
   let* () =
     Client.transfer
       ~amount:Tez.zero
-      ~giver:Constant.bootstrap1.public_key_hash
+      ~giver:Constant.bootstrap2.public_key_hash
       ~receiver:l1_contracts.sequencer_admin
       ~arg:(sf "Pair %S 0x" sc_rollup_address)
       ~burn_cap:Tez.one
@@ -1067,7 +1067,7 @@ let test_upgrade_kernel_auto_sync =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
-      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
       ~upgrade_to:Constant.WASM.debug_kernel
@@ -1318,7 +1318,7 @@ let test_force_kernel_upgrade_too_early =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
-      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
       ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
@@ -1387,7 +1387,7 @@ let test_force_kernel_upgrade =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
-      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
       ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
@@ -1615,6 +1615,31 @@ let test_migration_from_ghostnet =
       ~devmode:false
       ~max_blueprints_lag:0
   in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let check_kernel_version ~evm_node ~equal expected =
+    let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
+    if equal then
+      Check.((kernel_version = expected) string)
+        ~error_msg:"Expected kernelVersion to be %R, got %L"
+    else
+      Check.((kernel_version <> expected) string)
+        ~error_msg:"Expected kernelVersion to be different than %R" ;
+    return kernel_version
+  in
+  (* Check kernelVersion. *)
+  let* _kernel_version =
+    check_kernel_version
+      ~evm_node:sequencer
+      ~equal:true
+      Constant.WASM.ghostnet_evm_commit
+  in
+  let* _kernel_version =
+    check_kernel_version
+      ~evm_node:proxy
+      ~equal:true
+      Constant.WASM.ghostnet_evm_commit
+  in
+
   (* Produces a few blocks. *)
   let* _ =
     repeat 2 (fun () ->
@@ -1633,18 +1658,31 @@ let test_migration_from_ghostnet =
     upgrade
       ~sc_rollup_node
       ~sc_rollup_address
-      ~admin:Constant.bootstrap1.public_key_hash
+      ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
       ~upgrade_to:Constant.WASM.evm_kernel
       ~activation_timestamp:"0"
   in
-  (* Produce a block to trigger the upgrade. *)
-  let* _ = Rpc.produce_block sequencer in
+  (* Bakes 2 blocks for the event follower to see the upgrade. *)
   let* _ =
     repeat 2 (fun () ->
         let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
         unit)
+  in
+  (* Produce a block to trigger the upgrade. *)
+  let* _ = Rpc.produce_block sequencer in
+  let* _ =
+    repeat 4 (fun () ->
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
+  (* Check that the prod sequencer has updated. *)
+  let* new_kernel_version =
+    check_kernel_version
+      ~evm_node:sequencer
+      ~equal:false
+      Constant.WASM.ghostnet_evm_commit
   in
   (* Runs sequencer and proxy with --devmode. *)
   let* () = Evm_node.terminate proxy in
@@ -1652,6 +1690,13 @@ let test_migration_from_ghostnet =
   (* Manually put `--devmode` to use the same command line. *)
   let* () = Evm_node.run ~extra_arguments:["--devmode"] proxy in
   let* () = Evm_node.run ~extra_arguments:["--devmode"] sequencer in
+  (* Check that new sequencer and proxy are on a new version. *)
+  let* _kernel_version =
+    check_kernel_version ~evm_node:sequencer ~equal:true new_kernel_version
+  in
+  let* _kernel_version =
+    check_kernel_version ~evm_node:proxy ~equal:true new_kernel_version
+  in
   (* Check the consistency. *)
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   (* Produces a few blocks. *)

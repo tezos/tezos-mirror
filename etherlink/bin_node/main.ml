@@ -887,18 +887,20 @@ let observer_command =
 
 let make_prod_messages ~smart_rollup_address s =
   let open Lwt_result_syntax in
+  let open Evm_node_lib_prod_encoding in
   let open Evm_node_lib_prod in
   let s = Ethereum_types.hex_of_string s in
   let*? _, messages =
     Transaction_format.make_encoded_messages
       ~smart_rollup_address
-      (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
+      (Ethereum_types.hex_to_bytes s)
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
 let make_dev_messages ~kind ~smart_rollup_address s =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
+  let open Evm_node_lib_dev_encoding in
   let s = Ethereum_types.hex_of_string s in
   let* messages =
     match kind with
@@ -911,8 +913,7 @@ let make_dev_messages ~kind ~smart_rollup_address s =
             ~smart_rollup_address
             ~number:(Ethereum_types.quantity_of_z number)
             ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
-            ~transactions:
-              [Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s]
+            ~transactions:[Ethereum_types.hex_to_bytes s]
             ~delayed_transactions:[]
         in
         return @@ List.map (fun (`External s) -> s) to_publish
@@ -920,7 +921,7 @@ let make_dev_messages ~kind ~smart_rollup_address s =
         let*? _, blueprints =
           Transaction_format.make_encoded_messages
             ~smart_rollup_address
-            (Evm_node_lib_dev_encoding.Ethereum_types.hex_to_bytes s)
+            (Ethereum_types.hex_to_bytes s)
         in
         return blueprints
   in
@@ -996,7 +997,7 @@ let make_upgrade_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Create bytes payload for the upgrade entrypoint"
-    no_options
+    (args1 devmode_arg)
     (prefixes ["make"; "upgrade"; "payload"; "with"; "root"; "hash"]
     @@ param
          ~name:"preimage_hash"
@@ -1009,10 +1010,14 @@ let make_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ stop)
-    (fun () root_hash timestamp () ->
+    (fun devmode root_hash timestamp () ->
       let payload =
-        Ethereum_types.Upgrade.(
-          to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
+        if devmode then
+          Evm_node_lib_dev_encoding.Ethereum_types.Upgrade.(
+            to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
+        else
+          Evm_node_lib_prod_encoding.Ethereum_types.Upgrade.(
+            to_bytes @@ {hash = Hash (Hex root_hash); timestamp})
       in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
@@ -1022,7 +1027,7 @@ let make_sequencer_upgrade_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Create bytes payload for the sequencer upgrade entrypoint"
-    (args1 wallet_dir_arg)
+    (args2 wallet_dir_arg devmode_arg)
     (prefixes
        [
          "make";
@@ -1039,14 +1044,18 @@ let make_sequencer_upgrade_command =
            "After activation timestamp, the kernel will upgrade to this value"
          Params.timestamp
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
-    (fun wallet_dir activation_timestamp sequencer_str () ->
-      let open Rlp in
+    (fun (wallet_dir, devmode) activation_timestamp sequencer_str () ->
       let wallet_ctxt = register_wallet ~wallet_dir in
       let* _pk_uri, sequencer_pk_opt =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
       in
       let activation_timestamp =
-        Ethereum_types.timestamp_to_bytes activation_timestamp
+        if devmode then
+          Evm_node_lib_dev_encoding.Ethereum_types.timestamp_to_bytes
+            activation_timestamp
+        else
+          Evm_node_lib_prod_encoding.Ethereum_types.timestamp_to_bytes
+            activation_timestamp
       in
       let*? sequencer_pk =
         Option.to_result
@@ -1056,10 +1065,16 @@ let make_sequencer_upgrade_command =
       let sequencer_pk_bytes =
         Signature.Public_key.to_b58check sequencer_pk |> String.to_bytes
       in
-      let kernel_upgrade =
-        List [Value sequencer_pk_bytes; Value activation_timestamp]
+      let payload =
+        if devmode then
+          Evm_node_lib_dev_encoding.Rlp.(
+            encode
+            @@ List [Value sequencer_pk_bytes; Value activation_timestamp])
+        else
+          Evm_node_lib_prod_encoding.Rlp.(
+            encode
+            @@ List [Value sequencer_pk_bytes; Value activation_timestamp])
       in
-      let payload = encode kernel_upgrade in
       Printf.printf "%s%!" Hex.(of_bytes payload |> show) ;
       return_unit)
 
@@ -1092,14 +1107,13 @@ let dump_to_rlp =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    no_options
+    (args1 devmode_arg)
     (prefixes ["transform"; "dump"]
     @@ param ~name:"dump.json" ~desc:"Description" Params.string
     @@ prefixes ["to"; "rlp"]
     @@ param ~name:"dump.rlp" ~desc:"Description" Params.string
     @@ stop)
-    (fun () dump_json dump_rlp () ->
-      let open Rlp in
+    (fun devmode dump_json dump_rlp () ->
       let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
       let config =
         Data_encoding.Json.destruct
@@ -1107,18 +1121,32 @@ let dump_to_rlp =
           dump_json
       in
 
-      let instructions =
-        List.fold_left
-          (fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-            if String.starts_with ~prefix:"/evm" to_ then
-              List [Value (String.to_bytes to_); Value (String.to_bytes value)]
-              :: acc
-            else acc)
-          []
-          config
+      let bytes =
+        if devmode then
+          let open Evm_node_lib_dev_encoding.Rlp in
+          List.fold_left
+            (fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
+              if String.starts_with ~prefix:"/evm" to_ then
+                List
+                  [Value (String.to_bytes to_); Value (String.to_bytes value)]
+                :: acc
+              else acc)
+            []
+            config
+          |> fun l -> encode (List l)
+        else
+          let open Evm_node_lib_prod_encoding.Rlp in
+          List.fold_left
+            (fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
+              if String.starts_with ~prefix:"/evm" to_ then
+                List
+                  [Value (String.to_bytes to_); Value (String.to_bytes value)]
+                :: acc
+              else acc)
+            []
+            config
+          |> fun l -> encode (List l)
       in
-
-      let bytes = List instructions |> encode in
 
       let write_bytes_to_file filename bytes =
         let oc = open_out filename in

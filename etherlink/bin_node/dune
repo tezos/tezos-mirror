@@ -18,7 +18,6 @@
   octez-shell-libs.client-base-unix
   octez-evm-node-libs.evm_node_lib_prod
   octez-evm-node-libs.evm_node_lib_dev
-  octez-evm-node-libs.evm_node_lib_dev_encoding
   octez-evm-node-libs.evm_node_config)
  (link_flags
   (:standard)
@@ -31,5 +30,4 @@
   -open Tezos_rpc_http
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Evm_node_lib_dev_encoding
   -open Evm_node_config))

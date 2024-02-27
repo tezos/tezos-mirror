@@ -8554,7 +8554,6 @@ let _evm_node =
         octez_client_base_unix |> open_;
         evm_node_lib_prod;
         evm_node_lib_dev;
-        evm_node_lib_dev_encoding |> open_;
         evm_node_config |> open_;
       ]
     ~bisect_ppx:Yes

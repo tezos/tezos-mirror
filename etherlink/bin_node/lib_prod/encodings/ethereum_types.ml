@@ -62,6 +62,18 @@ let address_to_string (Address a) = hex_to_string a
 let address_encoding =
   Data_encoding.(conv address_to_string address_of_string string)
 
+(** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
+    compatible with the kernel. *)
+let timestamp_to_bytes timestamp =
+  let seconds = Time.Protocol.to_seconds timestamp in
+  let buffer = Bytes.make 8 '\000' in
+  Bytes.set_int64_le buffer 0 seconds ;
+  buffer
+
+let timestamp_of_bytes timestamp_bytes =
+  let timestamp_64 = Bytes.get_int64_le timestamp_bytes 0 in
+  Time.Protocol.of_seconds timestamp_64
+
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@ocaml.unboxed]
 
@@ -1238,7 +1250,7 @@ module Delayed_transaction = struct
 end
 
 module Upgrade = struct
-  type t = {hash : hash; timestamp : quantity}
+  type t = {hash : hash; timestamp : Time.Protocol.t}
 
   let of_rlp = function
     | Rlp.List [Value hash_bytes; Value timestamp] ->
@@ -1246,7 +1258,7 @@ module Upgrade = struct
           hash_bytes |> Bytes.to_string |> Hex.of_string |> Hex.show
           |> hash_of_string
         in
-        let timestamp = decode_number timestamp in
+        let timestamp = timestamp_of_bytes timestamp in
         Some {hash; timestamp}
     | _ -> None
 
@@ -1254,9 +1266,9 @@ module Upgrade = struct
     match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
 
   let to_bytes {hash; timestamp} =
-    let hash_bytes = hash_to_bytes hash |> String.to_bytes in
-    let timestamp_bytes = encode_number timestamp in
-    Rlp.(encode (List [Value hash_bytes; Value timestamp_bytes]))
+    let hash = hash_to_bytes hash |> String.to_bytes in
+    let timestamp = timestamp_to_bytes timestamp in
+    Rlp.(encode (List [Value hash; Value timestamp]))
 end
 
 module Evm_events = struct
@@ -1273,12 +1285,12 @@ module Evm_events = struct
     | _ -> None
 
   let pp fmt = function
-    | Upgrade_event {hash; timestamp = Qty timestamp} ->
+    | Upgrade_event {hash; timestamp} ->
         Format.fprintf
           fmt
-          "upgrade:@ hash %a,@ timestamp %a"
+          "upgrade:@ hash %a,@ timestamp: %a"
           pp_hash
           hash
-          Z.pp_print
+          Time.Protocol.pp_hum
           timestamp
 end
