@@ -49,6 +49,7 @@ include:
   - .gitlab/ci/jobs/test/tezt-flaky-before_merging.yml
   - .gitlab/ci/jobs/test/test_kernels.yml
   - .gitlab/ci/jobs/test/test_etherlink_kernel-before_merging.yml
+  - .gitlab/ci/jobs/test/test_risc_v_kernels-before_merging.yml
 
   # Stage: test_coverage
   # Only run on merge requests that do not have the label `ci--no-coverage`

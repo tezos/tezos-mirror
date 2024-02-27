@@ -12,7 +12,6 @@ test_kernels:
         - images/**/*
         - kernels.mk
         - src/kernel_*/**/*
-        - src/risc_v/**/*
         - .gitlab/**/*
         - .gitlab-ci.yml
       when: on_success

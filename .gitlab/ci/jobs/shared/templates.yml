@@ -268,3 +268,15 @@
     key: kernels
     paths:
       - cargo/
+
+.test_risc_v_kernels:
+  extends:
+    - .oc.kernels_template
+  stage: test
+  script:
+    - make -C src/risc_v check
+    - make -C src/risc_v test
+  cache:
+    key: kernels
+    paths:
+      - cargo/

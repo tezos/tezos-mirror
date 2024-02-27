@@ -35,6 +35,10 @@ ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
 endif
 
+	# Iterate through all the toolchains. 'rustup show' will install the
+	# toolchain in addition to showing toolchain information.
+	@find . -iname 'rust-toolchain*' -execdir rustup show active-toolchain \; 2>/dev/null
+
 .PHONY: test
 test:
 	@cargo test --workspace
@@ -50,6 +54,9 @@ check:
 	@make -C dummy_kernel check
 	@make -C jstz check
 	@make -C tests check
+
+	# Check format of all crates
+	@exec ../../scripts/check-format-rust.sh
 
 .PHONY: clean
 clean:
