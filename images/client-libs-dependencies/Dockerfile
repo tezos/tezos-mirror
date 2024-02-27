@@ -42,21 +42,24 @@ COPY sbt-$SBT_VERSION.tgz.sha256 .
 # hadolint ignore=DL3003
 RUN wget -q https://github.com/sbt/sbt/releases/download/v${SBT_VERSION}/sbt-${SBT_VERSION}.tgz \
     && sha256sum --check sbt-${SBT_VERSION}.tgz.sha256 \
-    && tar xfz sbt-${SBT_VERSION}.tgz -C /tmp \
-    # Clone the repository.
-    && git clone --recursive https://github.com/kaitai-io/kaitai_struct.git \
+    && tar xfz sbt-${SBT_VERSION}.tgz -C /tmp 
+# Clone the repository.
+ARG KSC_TAG=11b8e7f1b1849aaebcae32836b393d12be78b87f
+ARG KSC_VERSION=0.11-SNAPSHOT
+RUN git clone --recursive https://github.com/kaitai-io/kaitai_struct.git \
     # Change working directory to "kaitai_scruct/compiler" as specified here:
     #    - https://doc.kaitai.io/developers.html#_building_for_jvm
-    && cd /tmp/kaitai_struct/compiler \
-    # Build universal zip package as specified here:
-    #    - https://doc.kaitai.io/developers.html#_building_for_jvm
-    && /tmp/sbt/bin/sbt compilerJVM/universal:packageBin \
+    && cd /tmp/kaitai_struct \
+    && git checkout --recurse-submodules ${KSC_TAG} 
+# Build universal zip package as specified here:
+#    - https://doc.kaitai.io/developers.html#_building_for_jvm
+RUN cd /tmp/kaitai_struct/compiler && /tmp/sbt/bin/sbt compilerJVM/universal:packageBin \
     # Unzip executable to "/usr/local".
-    &&  unzip jvm/target/universal/kaitai-struct-compiler-0.11-SNAPSHOT.zip -d /usr/local \
+    && unzip jvm/target/universal/kaitai-struct-compiler-${KSC_VERSION}.zip -d /usr/local \
     # Remove "kaitai-struct" repository and "sbt".
     && rm -rf /tmp/sbt-${SBT_VERSION}.tgz /tmp/sbt-${SBT_VERSION}.tgz.sha256 /tmp/kaitai_struct /tmp/sbt /root/.cache /root/.sbt
 # Make "kaitai-struct-compiler" available as part of the "PATH".
-ENV PATH="/usr/local/kaitai-struct-compiler-0.11-SNAPSHOT/bin:${PATH}"
+ENV PATH="/usr/local/kaitai-struct-compiler-${KSC_VERSION}/bin:${PATH}"
 
 # Create a static system group and system user (no password + login shell)
 # Prepare sudo, ssh and run

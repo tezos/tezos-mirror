@@ -47,6 +47,9 @@ cd "${images_dir}/client-libs-dependencies" &&
   tar -cvh . |
   docker build \
     --build-arg BUILD_IMAGE=alpine:${alpine_version} \
+    --build-arg SBT_VERSION=1.9.7 \
+    --build-arg KSC_TAG=11b8e7f1b1849aaebcae32836b393d12be78b87f \
+    --build-arg KSC_VERSION=0.11-SNAPSHOT \
     -t "${image_name}" \
     "$@" \
     -
