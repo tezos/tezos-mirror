@@ -8,8 +8,8 @@
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
-let make_config ?bootstrap_accounts ?ticketer ?administrator ?kernel_governance
-    ?sequencer_administrator ?sequencer ?delayed_bridge
+let make_config ~ghostnet ?bootstrap_accounts ?ticketer ?administrator
+    ?kernel_governance ?sequencer_administrator ?sequencer ?delayed_bridge
     ?(da_fee_per_byte = Wei.zero) ?minimum_base_fee_per_gas
     ?delayed_inbox_timeout ?delayed_inbox_min_levels () =
   let open Sc_rollup_helpers.Installer_kernel_config in
@@ -31,7 +31,10 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?kernel_governance
                Wei.(to_le_bytes default_bootstrap_account_balance)
                |> Hex.of_bytes |> Hex.show
              in
-             let to_ = Durable_storage_path.balance address in
+             let to_ =
+               if ghostnet then Durable_storage_path.Ghostnet.balance address
+               else Durable_storage_path.balance address
+             in
              Set {value; to_} :: acc)
            [])
       ~none:[]
@@ -81,7 +84,10 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?kernel_governance
       delayed_bridge
   in
   let da_fee_per_byte =
-    let to_ = Durable_storage_path.da_fee_per_byte_path in
+    let to_ =
+      if ghostnet then Durable_storage_path.Ghostnet.da_fee_per_byte_path
+      else Durable_storage_path.da_fee_per_byte_path
+    in
     let value = Wei.(to_le_bytes da_fee_per_byte) |> Hex.of_bytes |> Hex.show in
     [Set {value; to_}]
   in
@@ -104,7 +110,11 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?kernel_governance
   let minimum_base_fee_per_gas =
     Option.fold
       ~some:(fun minimum_base_fee_per_gas ->
-        let to_ = Durable_storage_path.minimum_base_fee_per_gas in
+        let to_ =
+          if ghostnet then
+            Durable_storage_path.Ghostnet.minimum_base_fee_per_gas
+          else Durable_storage_path.minimum_base_fee_per_gas
+        in
         let value =
           Wei.(to_le_bytes minimum_base_fee_per_gas) |> Hex.of_bytes |> Hex.show
         in

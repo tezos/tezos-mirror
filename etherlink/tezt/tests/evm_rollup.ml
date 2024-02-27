@@ -385,6 +385,8 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       | Setup_sequencer {sequencer; _} -> Some sequencer.public_key
     in
     Configuration.make_config
+      ~ghostnet:
+        (Uses.tag kernel_installee = Uses.tag Constant.WASM.ghostnet_evm_kernel)
       ~bootstrap_accounts
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
@@ -1660,7 +1662,10 @@ let test_simulate =
         Sc_rollup_node.RPC.call sc_rollup_node
         @@ Sc_rollup_rpc.post_global_block_simulate
              ~insight_requests:
-               [`Durable_storage_key ["evm"; "blocks"; "current"; "number"]]
+               [
+                 `Durable_storage_key
+                   ["evm"; "world_state"; "blocks"; "current"; "number"];
+               ]
              []
       in
       let simulated_block_number =
@@ -2622,7 +2627,9 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
   in
   (* Load the EVM rollup's storage and sanity check results. *)
   let* evm_node =
-    Evm_node.init (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+    Evm_node.init
+      ~mode:(Proxy {devmode = false})
+      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
   in
   let endpoint = Evm_node.endpoint evm_node in
   let* sanity_check =
@@ -2644,6 +2651,12 @@ let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
       ~node:evm_setup.node
       ~client:evm_setup.client
   in
+  let* evm_node =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint evm_setup.sc_rollup_node)
+  in
+  let evm_setup = {evm_setup with evm_node} in
   (* Check the values after the upgrade with [sanity_check] results. *)
   scenario_after ~evm_setup ~sanity_check
 
@@ -2783,7 +2796,11 @@ let test_deposit_dailynet =
       smart_rollup_node_extra_args
   in
 
-  let* evm_node = Evm_node.init (Sc_rollup_node.endpoint sc_rollup_node) in
+  let* evm_node =
+    Evm_node.init
+      ~mode:(Proxy {devmode = true})
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
   let endpoint = Evm_node.endpoint evm_node in
 
   (* Deposit tokens to the EVM rollup. *)
@@ -3085,25 +3102,24 @@ let test_transaction_storage_before_and_after_migration =
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
   let config =
-    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config-ghostnet.yaml")
   in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
   let raw_txs, tx_hashes = List.split txs in
-  let scenario_prior ~evm_setup:{sc_rollup_node; node; client; evm_node; _} =
+  let check_one evm_setup tx_hash =
+    let*@ _receipt = Rpc.get_transaction_receipt ~tx_hash evm_setup.evm_node in
+    let* _tx_object = get_tx_object ~endpoint:evm_setup.endpoint ~tx_hash in
+    unit
+  in
+  let scenario_prior
+      ~evm_setup:({sc_rollup_node; node; client; evm_node; _} as evm_setup) =
     let* _requests, _receipt, _hashes =
       send_n_transactions ~sc_rollup_node ~node ~client ~evm_node raw_txs
     in
-    return ()
+    Lwt_list.iter_p (check_one evm_setup) tx_hashes
   in
   let scenario_after ~evm_setup ~sanity_check:() =
-    let check_one tx_hash =
-      let*@ _receipt =
-        Rpc.get_transaction_receipt ~tx_hash evm_setup.evm_node
-      in
-      let* _tx_object = get_tx_object ~endpoint:evm_setup.endpoint ~tx_hash in
-      unit
-    in
-    Lwt_list.iter_p check_one tx_hashes
+    Lwt_list.iter_p (check_one evm_setup) tx_hashes
   in
   gen_kernel_migration_test ~config ~scenario_prior ~scenario_after protocol
 
@@ -3469,7 +3485,7 @@ let test_accounts_double_indexing =
       @@ Sc_rollup_rpc.get_global_block_durable_state_value
            ~pvm_kind:"wasm_2_0_0"
            ~operation:Sc_rollup_rpc.Value
-           ~key:"/evm/indexes/accounts/length"
+           ~key:"/evm/world_state/indexes/accounts/length"
            ()
     in
     let length = Option.map Helpers.hex_string_to_int length in

@@ -31,7 +31,7 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 6;
+pub const STORAGE_VERSION: u64 = 7;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
@@ -43,39 +43,40 @@ const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/kernel_governance");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
 // Path to the block in progress, used between reboots
-const EVM_BLOCK_IN_PROGRESS: RefPath = RefPath::assert_from(b"/blocks/in_progress");
+const EVM_BLOCK_IN_PROGRESS: RefPath =
+    RefPath::assert_from(b"/world_state/blocks/in_progress");
 
-const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/blocks/current");
-pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/blocks");
+const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/world_state/blocks/current");
+pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/world_state/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
 
 const EVENTS: RefPath = RefPath::assert_from(b"/events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
-    RefPath::assert_from(b"/transactions_receipts");
+    RefPath::assert_from(b"/world_state/transactions_receipts");
 
 pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
-    RefPath::assert_from(b"/transactions_objects");
+    RefPath::assert_from(b"/world_state/transactions_objects");
 
 const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
 
-const EVM_BASE_FEE_PER_GAS: RefPath = RefPath::assert_from(b"/base_fee_per_gas");
+pub const EVM_BASE_FEE_PER_GAS: RefPath =
+    RefPath::assert_from(b"/world_state/fees/base_fee_per_gas");
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
-    RefPath::assert_from(b"/fees/minimum_base_fee_per_gas");
-const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/fees/da_fee_per_byte");
+    RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas");
+const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/world_state/fees/da_fee_per_byte");
 
 /// The sequencer pool is the designated account that the data-availability fees are sent to.
 ///
 /// This may be updated by the governance mechanism over time. If it is not set, the data-availability
 /// fees are instead burned.
-pub const SEQUENCER_POOL_PATH: RefPath =
-    RefPath::assert_from(b"/fees/sequencer_pool_address");
+pub const SEQUENCER_POOL_PATH: RefPath = RefPath::assert_from(b"/sequencer_pool_address");
 
 /// Path to the last L1 level seen.
 const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/l1_level");
 
-const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/fees/burned");
+const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/world_state/fees/burned");
 
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
@@ -92,13 +93,13 @@ pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result
 pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
 
 /// Path where all indexes are stored.
-const EVM_INDEXES: RefPath = RefPath::assert_from(b"/indexes");
+pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/world_state/indexes");
 
 /// Path where Ethereum accounts are stored.
 const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
 
 /// Subpath where blocks are indexed.
-const BLOCKS_INDEX: RefPath = EVM_BLOCKS;
+const BLOCKS_INDEX: RefPath = RefPath::assert_from(b"/blocks");
 
 /// Subpath where transactions are indexed
 const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");

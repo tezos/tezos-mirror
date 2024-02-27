@@ -29,9 +29,11 @@ type path = string
 
 let evm rst = sf "/evm%s" rst
 
+let world_state rst = evm (sf "/world_state%s" rst)
+
 let kernel rst = sf "/kernel%s" rst
 
-let eth_accounts = evm "/eth_accounts"
+let eth_accounts = world_state "/eth_accounts"
 
 let eth_account addr = sf "%s/%s" eth_accounts (Helpers.normalize addr)
 
@@ -59,12 +61,32 @@ let kernel_boot_wasm = kernel "/boot.wasm"
 
 let delayed_bridge_path = evm "/delayed_bridge"
 
-let da_fee_per_byte_path = evm "/fees/da_fee_per_byte"
+let da_fee_per_byte_path = world_state "/fees/da_fee_per_byte"
 
-let minimum_base_fee_per_gas = evm "/fees/minimum_base_fee_per_gas"
+let minimum_base_fee_per_gas = world_state "/fees/minimum_base_fee_per_gas"
 
 let delayed_inbox_timeout = evm "/delayed_inbox_timeout"
 
 let delayed_inbox_min_levels = evm "/delayed_inbox_min_levels"
 
 let config_root_hash = "/__tmp/config_root_hash"
+
+module Ghostnet = struct
+  let eth_accounts = evm "/eth_accounts"
+
+  let eth_account addr = sf "%s/%s" eth_accounts (Helpers.normalize addr)
+
+  let balance addr = sf "%s/balance" (eth_account addr)
+
+  let code addr = sf "%s/code" (eth_account addr)
+
+  let storage addr ?key () =
+    sf
+      "%s/storage%s"
+      (eth_account addr)
+      (match key with None -> "" | Some key -> "/" ^ key)
+
+  let da_fee_per_byte_path = evm "/fees/da_fee_per_byte"
+
+  let minimum_base_fee_per_gas = evm "/fees/minimum_base_fee_per_gas"
+end
