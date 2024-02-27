@@ -1174,6 +1174,7 @@ dependencies = [
  "derive_more",
  "goblin",
  "hex",
+ "lazy_static",
  "num_enum",
  "paste",
  "proptest",
