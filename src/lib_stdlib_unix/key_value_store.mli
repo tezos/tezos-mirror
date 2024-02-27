@@ -95,12 +95,18 @@ type ('file, 'key, 'value) t
     [lru_size] is a parameter that represents maximum number of open files. It
     is up to the user of this library to decide this number depending on the
     sizes of the values.
+
+    Internally creates a lockfile and returns an error if a key value store in
+    the same [root_dir] is locked by another process. This lockfile does not
+    prevent concurrent opens by the same process and should be completed by a
+    mutex if necessary.
 *)
-val init : lru_size:int -> root_dir:string -> ('file, 'key, 'value) t Lwt.t
+val init :
+  lru_size:int -> root_dir:string -> ('file, 'key, 'value) t tzresult Lwt.t
 
 (** [close kvs] waits until all pending reads and writes are completed
     and closes the key-value store. *)
-val close : ('file, 'key, 'value) t -> unit Lwt.t
+val close : ('file, 'key, 'value) t -> unit tzresult Lwt.t
 
 (** [write_value ?(override=false) t file_layout file key value] writes a value in
     the [key] value store in [file]. If there is already a written
