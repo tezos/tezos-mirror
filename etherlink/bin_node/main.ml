@@ -963,6 +963,22 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   in
   return (List.map (fun m -> m |> Hex.of_string |> Hex.show) messages)
 
+let from_data_or_file data_for_file =
+  let open Lwt_result_syntax in
+  Client_aliases.parse_alternatives
+    [
+      ( "file",
+        fun filename ->
+          Lwt.catch
+            (fun () ->
+              let*! data = Lwt_utils_unix.read_file filename in
+              return @@ String.split_on_char ' ' (String.trim data))
+            (fun exn ->
+              failwith "cannot read file (%s)" (Printexc.to_string exn)) );
+      ("data", fun data -> return [data]);
+    ]
+    data_for_file
+
 let chunker_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
@@ -982,9 +998,12 @@ let chunker_command =
     (prefixes ["chunk"; "data"]
     @@ seq_of_param
     @@ param
-         ~name:"data"
-         ~desc:"Data to prepare and chunk with the EVM rollup format"
-         Params.string)
+         ~name:"data or file"
+         ~desc:
+           "Data to prepare and chunk with the EVM rollup format. If the data \
+            is prefixed with `file:`, the content is read from the given \
+            filename and can contain a list of data separated by a whitespace."
+         (Tezos_clic.parameter (fun _ -> from_data_or_file)))
     (fun ( devmode,
            rollup_address,
            as_blueprint,
@@ -1014,6 +1033,7 @@ let chunker_command =
               blueprint_parent_hash )
         else return `Transaction
       in
+      let data = List.flatten data in
       let print_chunks smart_rollup_address data =
         let* messages =
           if devmode then make_dev_messages ~kind ~smart_rollup_address data
