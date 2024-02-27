@@ -66,6 +66,30 @@ where
         let result = self.read(rs1) ^ (imm as u64);
         self.write(rd, result)
     }
+
+    /// `AND` R-type instruction
+    ///
+    /// Saves in `rd` the bitwise AND between the value in `rs1` and `imm`
+    pub fn run_and(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let result = self.read(rs1) & self.read(rs2);
+        self.write(rd, result)
+    }
+
+    /// `OR` R-type instruction
+    ///
+    /// Saves in `rd` the bitwise OR between the value in `rs1` and `imm`
+    pub fn run_or(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let result = self.read(rs1) | self.read(rs2);
+        self.write(rd, result)
+    }
+
+    /// `XOR` R-type instruction
+    ///
+    /// Saves in `rd` the bitwise XOR between the value in `rs1` and `imm`
+    pub fn run_xor(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let result = self.read(rs1) ^ self.read(rs2);
+        self.write(rd, result)
+    }
 }
 
 impl<M> HartState<M>
@@ -574,6 +598,37 @@ mod tests {
             state.run_xori(positive_imm as i64, t2, t1);
             prop_assert_eq!(state.read(t1), val ^ positive_imm);
         })
+    });
+
+    backend_test!(test_bitwise_reg, F, {
+        proptest!(|(v1 in any::<u64>(), v2 in any::<u64>())| {
+            let mut backend = create_backend!(XRegistersLayout, F);
+            let mut state = create_state!(XRegisters, F, backend);
+
+            state.write(a0, v1);
+            state.write(t3, v2);
+            state.run_and(t3, a0, a1);
+            prop_assert_eq!(state.read(a1), v1 & v2);
+
+            state.write(a0, v1);
+            state.write(t3, v2);
+            state.run_or(t3, a0, a0);
+            prop_assert_eq!(state.read(a0), v1 | v2);
+
+            state.write(t2, v1);
+            state.write(t3, v2);
+            state.run_xor(t3, t2, t1);
+            prop_assert_eq!(state.read(t1), v1 ^ v2);
+
+            // Same register
+            state.write(a0, v1);
+            state.run_and(a0, a0, a1);
+            prop_assert_eq!(state.read(a1), v1);
+            state.run_or(a0, a0, a1);
+            prop_assert_eq!(state.read(a1), v1);
+            state.run_xor(a0, a0, a0);
+            prop_assert_eq!(state.read(a0), 0);
+        });
     });
 
     backend_test!(test_bge_ble_u, F, {
