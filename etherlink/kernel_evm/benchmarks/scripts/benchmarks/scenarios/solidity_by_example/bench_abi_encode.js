@@ -26,4 +26,6 @@ let test = abi_encode.interface.encodeFunctionData("test", [create.addr, player2
 
 txs.push(utils.send(player1, create_encode.addr, 0, test))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

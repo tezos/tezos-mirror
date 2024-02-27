@@ -31,4 +31,6 @@ txs.push(utils.send(player1, create.addr, 0, confirmTransaction))
 txs.push(utils.send(player2, create.addr, 0, confirmTransaction))
 txs.push(utils.send(player2, create.addr, 0, executeTransaction))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)
