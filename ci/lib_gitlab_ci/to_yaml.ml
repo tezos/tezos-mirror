@@ -226,9 +226,9 @@ let enc_job : job -> value =
       opt "timeout" enc_time_interval timeout;
       opt "cache" (array1 enc_cache) cache;
       opt "interruptible" bool interruptible;
+      opt "before_script" strings before_script;
       key "script" strings script;
       opt "after_script" strings after_script;
-      opt "before_script" strings before_script;
       opt "services" enc_services services;
       opt "variables" enc_variables variables;
       opt "artifacts" enc_artifacts artifacts;
