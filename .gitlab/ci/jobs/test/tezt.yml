@@ -19,7 +19,7 @@ tezt:
 tezt-memory-4k:
   extends: [.tezt_tests]
   variables:
-    TESTS: "memory_4k"
+    TESTS: "/ci_disabled memory_4k"
     TEZT_PARALLEL: 1
     TEZT_VARIANT: "-memory_4k"
   parallel: 4
@@ -27,7 +27,7 @@ tezt-memory-4k:
 tezt-memory-3k:
   extends: [.tezt_tests]
   variables:
-    TESTS: "memory_3k"
+    TESTS: "/ci_disabled memory_3k"
     TEZT_PARALLEL: 1
     TEZT_VARIANT: "-memory_3k"
 
@@ -38,7 +38,7 @@ tezt-memory-3k:
 tezt-time-sensitive:
   extends: [.tezt_tests]
   variables:
-    TESTS: "time_sensitive"
+    TESTS: "/ci_disabled time_sensitive"
     TEZT_PARALLEL: 1
     TEZT_VARIANT: "-time_sensitive"
 
@@ -65,7 +65,7 @@ tezt:static-binaries:
     - oc.build:static-x86_64-linux-binaries
     - oc.tezt:fetch-records
   variables:
-    TESTS: "cli"
+    TESTS: "/ci_disabled cli"
   before_script:
     - mv octez-binaries/x86_64/octez-* .
 

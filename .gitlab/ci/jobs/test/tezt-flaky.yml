@@ -6,7 +6,7 @@ include: .gitlab/ci/jobs/test/common.yml
     - .tezt_tests
   variables:
     # Run only flaky tests
-    TESTS: "flaky"
+    TESTS: "/ci_disabled /memory_3k /memory_4k /time_sensitive /slow flaky"
     # To handle flakiness, consider tweaking TEZT_PARALLEL (passed to
     # Tezt's '--job-count'), and TEZT_RETRY (passed to Tezt's
     # '--retry')

@@ -7,7 +7,7 @@ include: .gitlab/ci/jobs/test/common.yml
     - .tezt_tests
   variables:
     # Run only slow tests
-    TESTS: "slow"
+    TESTS: "/ci_disabled slow"
     TEZT_PARALLEL: 3
     TEZT_VARIANT: "-slow"
   parallel: 10
