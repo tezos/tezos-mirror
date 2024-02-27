@@ -11,7 +11,9 @@ let faucet = require('./players/faucet.json');
 let player1 = require('./players/player1.json');
 let player2 = require('./players/player2.json');
 
-let nb_iter = process.argv.length > 2 ? process.argv[2] : 1;
+let mode = utils.bench_args(process.argv, [{flag: '--count <n>', desc: 'Number of transfers', default: 0}]);
+
+let nb_iter = mode.extra.count > 2 ? mode.extra.count : 1;
 if (nb_iter < 0) nb_iter = 0;
 
 // Using `MyMultiToken`
@@ -29,4 +31,4 @@ for (let i = 0; i < nb_iter; i++) {
 let create = utils.create(player1, 0, create_data);
 txs.push(create.tx);
 }
-utils.print_bench([txs]);
+utils.print_bench([txs], mode);
