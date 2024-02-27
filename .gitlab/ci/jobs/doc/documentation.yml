@@ -35,7 +35,7 @@ documentation:manuals:
       - docs/api/octez-*.txt
       - docs/developer/metrics.csv
       - docs/user/node-config.json
-    expire_in: 1 hour
+    expire_in: 1 week
 
 documentation:docgen:
   extends:
@@ -49,7 +49,7 @@ documentation:docgen:
       - docs/user/default-acl.json
       - docs/api/errors.rst
       - docs/shell/p2p_api.rst
-    expire_in: 1 hour
+    expire_in: 1 week
 
 documentation:build_all:
   extends:

@@ -3,7 +3,14 @@ documentation:linkcheck:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies
   stage: doc
-  needs: []
+  needs:
+    - documentation:manuals
+    - documentation:docgen
+    - documentation:build_all
+  dependencies:
+    - documentation:manuals
+    - documentation:docgen
+    - documentation:build_all
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
@@ -16,8 +23,6 @@ documentation:linkcheck:
     - eval $(opam env)
     - . $HOME/.venv/bin/activate
   script:
-    - make all
-    - make -C docs html
     - make -C docs redirectcheck
     - make -C docs linkcheck
   allow_failure: true
