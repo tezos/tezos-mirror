@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -564,17 +565,33 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
               items.elements
           in
           (Micheline.Seq (loc, List.rev items), ctxt)
-      | Ticket_t (t, _), {ticketer; contents; amount} ->
-          (* ideally we would like to allow a little overhead here because it is only used for unparsing *)
-          let*? t = P.opened_ticket_type loc t in
+      | Ticket_t (t, _), {ticketer; contents; amount} -> (
           let destination : Destination.t = Contract ticketer in
           let addr = {destination; entrypoint = Entrypoint.default} in
-          (unparse_data_rec [@tailcall])
-            ctxt
-            ~stack_depth
-            mode
-            t
-            (addr, (contents, (amount :> Script_int.n Script_int.num)))
+          let amount = (amount :> Script_int.n Script_int.num) in
+          match mode with
+          | Optimized_legacy ->
+              let*? t = P.opened_ticket_type loc t in
+              (unparse_data_rec [@tailcall])
+                ctxt
+                ~stack_depth
+                mode
+                t
+                (addr, (contents, amount))
+          | Optimized | Readable ->
+              let*? ticketer, ctxt = unparse_address ~loc ctxt mode addr in
+              let* contents, ctxt =
+                non_terminal_recursion ctxt mode t contents
+              in
+              let*? amount, ctxt = unparse_nat ~loc ctxt amount in
+              let*? contents_type, ctxt = unparse_ty ~loc ctxt t in
+              return
+                ( Prim
+                    ( loc,
+                      D_Ticket,
+                      [ticketer; contents_type; contents; amount],
+                      [] ),
+                  ctxt ))
       | Set_t (t, _), set ->
           let+ items, ctxt =
             List.fold_left_es

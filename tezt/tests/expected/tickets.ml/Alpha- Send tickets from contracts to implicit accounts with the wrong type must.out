@@ -109,7 +109,7 @@ Contract memorized as tickets_list_blackhole.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 4063.855 units (will add 100 for safety)
+Estimated gas: 4063.615 units (will add 100 for safety)
 Estimated storage: 66 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -136,7 +136,7 @@ This sequence of operations was run:
       Updated storage: Unit
       Storage size: 145 bytes
       Paid storage size diff: 66 bytes
-      Consumed gas: 2211.251
+      Consumed gas: 2211.011
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0165
         storage fees ........................... +ꜩ0.0165
@@ -145,7 +145,7 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [CONTRACT_HASH]
-          Parameter: { Pair 0x011213b3979289bef70dc1d1a4fb7574f306bf7f2400 (Pair "Ticket" 1) }
+          Parameter: { Ticket 0x011213b3979289bef70dc1d1a4fb7574f306bf7f2400 string "Ticket" 1 }
           This transaction was successfully applied
           Updated storage: Unit
           Storage size: 42 bytes

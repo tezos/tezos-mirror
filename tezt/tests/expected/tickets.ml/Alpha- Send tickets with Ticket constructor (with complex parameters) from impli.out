@@ -1,8 +1,8 @@
 
 ./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint store --arg 'Pair 99 {Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket1" 1)) ; Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket2" 2))}'
 Node is bootstrapped.
-Estimated gas: 4001.421 units (will add 100 for safety)
-Estimated storage: 222 bytes added (will add 20 for safety)
+Estimated gas: 4001.005 units (will add 100 for safety)
+Estimated storage: 238 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -15,7 +15,7 @@ This sequence of operations was run:
     Fee to the baker: ꜩ0.000827
     Expected counter: 4
     Gas limit: 4102
-    Storage limit: 242 bytes
+    Storage limit: 258 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000827
       payload fees(the block proposer) ....... +ꜩ0.000827
@@ -29,14 +29,14 @@ This sequence of operations was run:
                          Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket2" 2)) })
       This transaction was successfully applied
       Updated storage:
-        { Pair 0x01b9ce1609aab1100170d2ea4f94e3407244090b1000 (Pair "Ticket2" 2) ;
-          Pair 0x01b9ce1609aab1100170d2ea4f94e3407244090b1000 (Pair "Ticket1" 1) }
-      Storage size: 287 bytes
-      Paid storage size diff: 222 bytes
-      Consumed gas: 4001.388
+        { Ticket 0x01b9ce1609aab1100170d2ea4f94e3407244090b1000 string "Ticket2" 2 ;
+          Ticket 0x01b9ce1609aab1100170d2ea4f94e3407244090b1000 string "Ticket1" 1 }
+      Storage size: 303 bytes
+      Paid storage size diff: 238 bytes
+      Consumed gas: 4000.972
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ0.0555
-        storage fees ........................... +ꜩ0.0555
+        [PUBLIC_KEY_HASH] ... -ꜩ0.0595
+        storage fees ........................... +ꜩ0.0595
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string

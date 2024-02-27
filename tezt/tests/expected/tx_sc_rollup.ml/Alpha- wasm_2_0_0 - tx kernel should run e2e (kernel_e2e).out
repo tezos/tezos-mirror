@@ -110,8 +110,8 @@ GET http://[HOST]:[PORT]/global/block/12/total_ticks
 
 ./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from bootstrap1 for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof '[SMART_ROLLUP_BYTES]' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 6269.903 units (will add 100 for safety)
-Estimated storage: 125 bytes added (will add 20 for safety)
+Estimated gas: 6269.695 units (will add 100 for safety)
+Estimated storage: 133 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -124,7 +124,7 @@ This sequence of operations was run:
     Fee to the baker: ꜩ0.001625
     Expected counter: 8
     Gas limit: 6370
-    Storage limit: 145 bytes
+    Storage limit: 153 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.001625
       payload fees(the block proposer) ....... +ꜩ0.001625
@@ -152,13 +152,13 @@ This sequence of operations was run:
           Parameter: (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220))
           This transaction was successfully applied
           Updated storage:
-            { Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
-          Storage size: 175 bytes
-          Paid storage size diff: 53 bytes
-          Consumed gas: 1208.974
+            { Ticket [MICHELINE_KT1_BYTES] string "Hello, Ticket!" 220 }
+          Storage size: 183 bytes
+          Paid storage size diff: 61 bytes
+          Consumed gas: 1208.766
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.01325
-            storage fees ........................... +ꜩ0.01325
+            [PUBLIC_KEY_HASH] ... -ꜩ0.01525
+            storage fees ........................... +ꜩ0.01525
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string
@@ -169,8 +169,8 @@ This sequence of operations was run:
 
 ./octez-client --wait none execute outbox message of smart rollup '[SMART_ROLLUP_HASH]' from bootstrap1 for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof '[SMART_ROLLUP_BYTES]' --burn-cap 10
 Node is bootstrapped.
-Estimated gas: 5818.472 units (will add 100 for safety)
-Estimated storage: 52 bytes added (will add 20 for safety)
+Estimated gas: 5818.056 units (will add 100 for safety)
+Estimated storage: 60 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -183,7 +183,7 @@ This sequence of operations was run:
     Fee to the baker: ꜩ0.001577
     Expected counter: 9
     Gas limit: 5919
-    Storage limit: 72 bytes
+    Storage limit: 80 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.001577
       payload fees(the block proposer) ....... +ꜩ0.001577
@@ -207,14 +207,14 @@ This sequence of operations was run:
           Parameter: (Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 40))
           This transaction was successfully applied
           Updated storage:
-            { Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 40) ;
-              Pair [MICHELINE_KT1_BYTES] (Pair "Hello, Ticket!" 220) }
-          Storage size: 227 bytes
-          Paid storage size diff: 52 bytes
-          Consumed gas: 1217.197
+            { Ticket [MICHELINE_KT1_BYTES] string "Hello, Ticket!" 40 ;
+              Ticket [MICHELINE_KT1_BYTES] string "Hello, Ticket!" 220 }
+          Storage size: 243 bytes
+          Paid storage size diff: 60 bytes
+          Consumed gas: 1216.781
           Balance updates:
-            [PUBLIC_KEY_HASH] ... -ꜩ0.013
-            storage fees ........................... +ꜩ0.013
+            [PUBLIC_KEY_HASH] ... -ꜩ0.015
+            storage fees ........................... +ꜩ0.015
           Ticket updates:
             Ticketer: [CONTRACT_HASH]
             Content type: string

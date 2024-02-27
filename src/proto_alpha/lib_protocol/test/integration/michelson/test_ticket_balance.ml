@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2024 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1660,12 +1661,12 @@ let test_storage_for_create_and_remove_tickets () =
   (* Add 1000 units of "A" tickets. *)
   let* block = add block 1000 "A" in
   (* After adding one block the new used and paid storage grows to accommodate
-     for the new ticket. The size is 141 + 40 (size of ticket) = 181. *)
+     for the new ticket. The size is 141 + 48 (size of ticket) = 189. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 181
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 189
   in
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 181
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 189
   in
   (* The size of used and paid-for ticket storage is 67 bytes.  (65 for hash
      and 2 for amount). *)
@@ -1673,25 +1674,25 @@ let test_storage_for_create_and_remove_tickets () =
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 67 in
   (* Add 1000 units of "B" tickets. *)
   let* block = add block 1000 "B" in
-  (* The new used and paid for contract storage grow to 155 + 40 = 195. *)
+  (* The new used and paid for contract storage grow to 189 + 48 = 237. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 221
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 237
   in
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 237
   in
   (* The new used and paid for ticket storage doubles (2 * 67 = 134). *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 134 in
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   (* Clear all tickets. *)
   let* block = clear block in
-  (* We're back to 115 base-line for the used contract storage and keep 195 for
+  (* We're back to 115 base-line for the used contract storage and keep 237 for
      paid. *)
   let* () =
     assert_used_contract_storage ~loc:__LOC__ block ticket_manager 141
   in
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 237
   in
   (* Since the ticket-table is empty it does not take up any space. However,
      we've already paid for 134 bytes. *)
@@ -1699,14 +1700,14 @@ let test_storage_for_create_and_remove_tickets () =
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   (* Add one unit of "C" tickets. *)
   let* block = add block 1 "C" in
-  (* The new used storage is 141 + 39 (size of ticket) = 180. The size is 39
-      rather than 40 because it carries a smaller amount payload. *)
+  (* The new used storage is 141 + 47 (size of ticket) = 188. The size is 47
+      rather than 48 because it carries a smaller amount payload. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 180
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 188
   in
-  (* We still have paid for 221 contract storage. *)
+  (* We still have paid for 237 contract storage. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 237
   in
   (* There is one row in the ticket table with size 65 (for the hash) + 1
      (for the amount) = 65 bytes. *)
@@ -1715,13 +1716,13 @@ let test_storage_for_create_and_remove_tickets () =
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   (* Add yet another "C" ticket. *)
   let* block = add block 1 "C" in
-  (* The new used storage is 180 + 39 (size of ticket) = 219. *)
+  (* The new used storage is 188 + 47 (size of ticket) = 235. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 219
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 235
   in
-  (* We still have paid for 221 contract storage. *)
+  (* We still have paid for 237 contract storage. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 237
   in
   (* There is still only one row in the ticket table with size 66. *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
@@ -1729,26 +1730,26 @@ let test_storage_for_create_and_remove_tickets () =
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   (* Add a "D" ticket. *)
   let* block = add block 1 "D" in
-  (* The new used storage is 219 + 39 (size of ticket) = 258. *)
+  (* The new used storage is 235 + 47 (size of ticket) = 282. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 258
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 282
   in
-  (* The paid storage also increases to 258. *)
+  (* The paid storage also increases to 282. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 258
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 282
   in
   (* There are now two rows in the ticket table: 2 x 66 = 132 *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 132 in
   (* And we've still paid for 134 bytes. *)
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   let* block = add block 1 "E" in
-  (* The new used storage is 258 + 39 (size of ticket) = 297. *)
+  (* The new used storage is 282 + 47 (size of ticket) = 297. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 297
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 329
   in
-  (* The paid storage also increases to 297. *)
+  (* The paid storage also increases to 329. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 297
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 329
   in
   (* There are now three rows in the ticket table: 3 x 66 = 198. *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 198 in
