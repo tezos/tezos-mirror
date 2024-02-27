@@ -38,4 +38,6 @@ for(var bs = 1; bs < 5; bs ++) {
   }
 }
 
-utils.print_bench([txs]);
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode);

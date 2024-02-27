@@ -17,4 +17,6 @@ for (let i = 0; i < 10; i++) {
     txs.push(utils.transfer(player1, player2, 1000))
 }
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

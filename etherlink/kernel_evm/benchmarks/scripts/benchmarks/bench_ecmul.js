@@ -33,4 +33,6 @@ txs.push(build_precompile_call(ecadd_precompile_address, input_3));
 txs.push(build_precompile_call(ecadd_precompile_address, input_4));
 txs.push(build_precompile_call(ecadd_precompile_address, input_5));
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

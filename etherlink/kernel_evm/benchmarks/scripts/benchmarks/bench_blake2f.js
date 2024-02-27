@@ -27,4 +27,7 @@ for (var i = 0; i < 128; i++) {
     // they should be ignored by the precompiled contract and not impact the performances
     txs.push(build_precompile_call(blake2f_precompile_address, '0x' + i.toString(16).padStart(8, '0') + input));
 }
-utils.print_bench([txs])
+
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

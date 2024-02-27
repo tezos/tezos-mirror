@@ -21,5 +21,6 @@ for (let index = 0; index < 10; index++) {
     txs.push(create.tx);
 }
 
+let mode = utils.bench_args(process.argv);
 
-utils.print_bench([txs])
+utils.print_bench([txs], mode)
