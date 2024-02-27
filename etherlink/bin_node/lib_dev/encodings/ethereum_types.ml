@@ -1362,27 +1362,28 @@ module Evm_events = struct
 
   let encoding =
     let open Data_encoding in
+    let case ~kind ~tag ~event_encoding ~proj ~inj =
+      case
+        ~title:kind
+        (Tag tag)
+        (obj2 (req "kind" string) (req "event" event_encoding))
+        (fun x -> match proj x with None -> None | Some x -> Some (kind, x))
+        (fun (_, x) -> inj x)
+    in
     union
       [
-        (let tag = "kernel_upgrade" in
-         case
-           ~title:tag
-           (Tag 0)
-           (obj2 (req "kind" string) (req "event" Upgrade.encoding))
-           (function
-             | Upgrade_event upgrade -> Some ("kernel_upgrade", upgrade)
-             | _ -> None)
-           (fun (_, upgrade) -> Upgrade_event upgrade));
-        (let tag = "sequencer_upgrade" in
-         case
-           ~title:tag
-           (Tag 1)
-           (obj2 (req "kind" string) (req "event" Sequencer_upgrade.encoding))
-           (function
-             | Sequencer_upgrade_event sequencer_upgrade ->
-                 Some ("sequencer_upgrade", sequencer_upgrade)
-             | _ -> None)
-           (fun (_, sequencer_upgrade) ->
-             Sequencer_upgrade_event sequencer_upgrade));
+        case
+          ~kind:"kernel_upgrade"
+          ~tag:0
+          ~event_encoding:Upgrade.encoding
+          ~proj:(function Upgrade_event upgrade -> Some upgrade | _ -> None)
+          ~inj:(fun upgrade -> Upgrade_event upgrade);
+        case
+          ~kind:"sequencer_upgrade"
+          ~tag:1
+          ~event_encoding:Sequencer_upgrade.encoding
+          ~proj:(function
+            | Sequencer_upgrade_event upgrade -> Some upgrade | _ -> None)
+          ~inj:(fun upgrade -> Sequencer_upgrade_event upgrade);
       ]
 end
