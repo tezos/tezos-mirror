@@ -1770,6 +1770,7 @@ let test_sequencer_upgrade =
         ~sc_rollup_address
         ~sequencer_admin:Constant.bootstrap2.alias
         ~sequencer_admin_contract:l1_contracts.sequencer_admin
+        ~pool_address:Eth_account.bootstrap_accounts.(0).address
         ~client
         ~upgrade_to:new_sequencer_key
         ~activation_timestamp:"0"

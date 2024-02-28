@@ -138,11 +138,13 @@ let check_head_consistency ~left ~right ?error_msg () =
   unit
 
 let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
-    ~sequencer_admin_contract ~client ~upgrade_to ~activation_timestamp =
+    ~sequencer_admin_contract ~client ~upgrade_to ~pool_address
+    ~activation_timestamp =
   let* payload =
     Evm_node.sequencer_upgrade_payload
       ~client
       ~public_key:upgrade_to
+      ~pool_address
       ~activation_timestamp
       ()
   in
