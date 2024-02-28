@@ -193,7 +193,6 @@ sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/oxford" || true
-	@ln -s active "$(BUILDDIR)/paris" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -253,4 +252,4 @@ clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/octez-*.html api/octez-*.txt paris/octez-*.html oxford/octez-*.html alpha/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt oxford/octez-*.html paris/octez-*.html alpha/octez-*.html
