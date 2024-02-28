@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -20,10 +21,30 @@ module Request : sig
 
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
 
-  val eth_estimateGas : (string * Ezjsonm.value) list -> Evm_node.request
+  val eth_estimateGas :
+    eth_call:(string * Ezjsonm.value) list -> block:string -> Evm_node.request
 
-  val eth_getTransactionCount : address:string -> Evm_node.request
+  val eth_getTransactionCount :
+    address:string -> block:string -> Evm_node.request
+
+  val eth_getTransactionByHash : transaction_hash:string -> Evm_node.request
+
+  val eth_getCode : address:string -> block:string -> Evm_node.request
+
+  val net_version : Evm_node.request
 end
+
+(** [net_version evm_node] calls [net_version]. *)
+val net_version : Evm_node.t -> (string, error) result Lwt.t
+
+(** [get_transaction_by_hash ~transaction_hash evm_node] calls [eth_getTransactionByHash]. *)
+val get_transaction_by_hash :
+  transaction_hash:string ->
+  Evm_node.t ->
+  (Transaction.transaction_object, error) result Lwt.t
+
+(** [get_code ~address evm_node] calls [eth_getCode]. *)
+val get_code : address:string -> Evm_node.t -> (string, error) result Lwt.t
 
 (** [block_number evm_node] calls [eth_blockNumber]. *)
 val block_number : Evm_node.t -> (int32, error) result Lwt.t

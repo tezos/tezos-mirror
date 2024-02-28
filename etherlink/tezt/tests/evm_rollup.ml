@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -719,7 +719,9 @@ let test_originate_evm_kernel =
   unit
 
 let test_rpc_getBalance =
-  register_both ~tags:["evm"; "get_balance"] ~title:"RPC method eth_getBalance"
+  register_both
+    ~tags:["evm"; "rpc"; "get_balance"]
+    ~title:"RPC method eth_getBalance"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
   let* balance =
@@ -736,7 +738,7 @@ let test_rpc_getBalance =
 
 let test_rpc_getBlockByNumber =
   register_both
-    ~tags:["evm"; "get_block_by_number"]
+    ~tags:["evm"; "rpc"; "get_block_by_number"]
     ~title:"RPC method eth_getBlockByNumber"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let evm_node_endpoint = Evm_node.endpoint evm_node in
@@ -759,7 +761,7 @@ let get_block_by_hash ?(full_tx_objects = false) evm_setup block_hash =
 
 let test_rpc_getBlockByHash =
   register_both
-    ~tags:["evm"; "get_block_by_hash"]
+    ~tags:["evm"; "rpc"; "get_block_by_hash"]
     ~title:"RPC method eth_getBlockByHash"
   @@ fun ~protocol:_ ~evm_setup ->
   let evm_node_endpoint = Evm_node.endpoint evm_setup.evm_node in
@@ -783,7 +785,7 @@ let test_l2_block_size_non_zero =
 
 let test_rpc_getTransactionCount =
   register_both
-    ~tags:["evm"; "get_transaction_count"]
+    ~tags:["evm"; "rpc"; "get_transaction_count"]
     ~title:"RPC method eth_getTransactionCount"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let*@ transaction_count =
@@ -795,9 +797,34 @@ let test_rpc_getTransactionCount =
     ~error_msg:"Expected a nonce of %R, but got %L" ;
   unit
 
+let test_rpc_blockNumber =
+  register_both
+    ~tags:["evm"; "rpc"; "block_number"]
+    ~title:"RPC method eth_blockNumber"
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; node; sc_rollup_node; client; _} ->
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = next_evm_level ~evm_node ~node ~sc_rollup_node ~client in
+        unit)
+  in
+  let*@ block_number = Rpc.block_number evm_node in
+  Check.((block_number = 2l) int32)
+    ~error_msg:"Expected a block number of %R, but got %L" ;
+  unit
+
+let test_rpc_net_version =
+  register_both
+    ~tags:["evm"; "rpc"; "net_version"]
+    ~title:"RPC method net_version"
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  let*@ net_version = Rpc.net_version evm_node in
+  Check.((net_version = "1337") string)
+    ~error_msg:"Expected net_version is %R, but got %L" ;
+  unit
+
 let test_rpc_getTransactionCountBatch =
   register_both
-    ~tags:["evm"; "get_transaction_count_as_batch"]
+    ~tags:["evm"; "rpc"; "get_transaction_count_as_batch"]
     ~title:"RPC method eth_getTransactionCount in batch"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let*@ transaction_count =
@@ -811,7 +838,8 @@ let test_rpc_getTransactionCountBatch =
         evm_node
         [
           Rpc.Request.eth_getTransactionCount
-            ~address:Eth_account.bootstrap_accounts.(0).address;
+            ~address:Eth_account.bootstrap_accounts.(0).address
+            ~block:"latest";
         ]
     in
     match JSON.as_list transaction_count with
@@ -830,6 +858,7 @@ let test_rpc_batch =
     let transaction_count =
       Rpc.Request.eth_getTransactionCount
         ~address:Eth_account.bootstrap_accounts.(0).address
+        ~block:"latest"
     in
     let chain_id = Evm_node.{method_ = "eth_chainId"; parameters = `Null} in
     let* results =
@@ -1606,7 +1635,7 @@ let test_chunked_transaction =
 
 let test_rpc_txpool_content =
   register_both
-    ~tags:["evm"; "txpool_content"]
+    ~tags:["evm"; "rpc"; "txpool_content"]
     ~title:"Check RPC txpool_content is available"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   (* The content of the txpool is not relevant for now, this test only checks
@@ -1618,7 +1647,7 @@ let test_rpc_txpool_content =
 
 let test_rpc_web3_clientVersion =
   register_both
-    ~tags:["evm"; "client_version"]
+    ~tags:["evm"; "rpc"; "client_version"]
     ~title:"Check RPC web3_clientVersion"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* web3_clientVersion =
@@ -1634,7 +1663,7 @@ let test_rpc_web3_clientVersion =
   unit
 
 let test_rpc_web3_sha3 =
-  register_both ~tags:["evm"; "sha3"] ~title:"Check RPC web3_sha3"
+  register_both ~tags:["evm"; "rpc"; "sha3"] ~title:"Check RPC web3_sha3"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   (* From the example provided in
      https://ethereum.org/en/developers/docs/apis/json-rpc/#web3_sha3 *)
@@ -2496,7 +2525,7 @@ let test_kernel_upgrade_via_governance =
 
 let test_rpc_sendRawTransaction =
   register_both
-    ~tags:["evm"; "tx_hash"]
+    ~tags:["evm"; "rpc"; "tx_hash"]
     ~title:
       "Ensure EVM node returns appropriate hash for any given transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -2578,12 +2607,53 @@ let test_rpc_getTransactionByBlockArgAndIndex ~by ~evm_setup =
       unit)
     hashes
 
+let test_rpc_getCode =
+  register_both ~tags:["evm"; "rpc"; "get_code"] ~title:"RPC method eth_getCode"
+  @@ fun ~protocol:_ ~evm_setup ->
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let* address, _ = deploy ~contract:simple_storage ~sender evm_setup in
+  let*@ code = Rpc.get_code ~address evm_setup.evm_node in
+  let expected_code =
+    "0x608060405234801561001057600080fd5b50600436106100415760003560e01c80634e70b1dc1461004657806360fe47b1146100645780636d4ce63c14610080575b600080fd5b61004e61009e565b60405161005b91906100d0565b60405180910390f35b61007e6004803603810190610079919061011c565b6100a4565b005b6100886100ae565b60405161009591906100d0565b60405180910390f35b60005481565b8060008190555050565b60008054905090565b6000819050919050565b6100ca816100b7565b82525050565b60006020820190506100e560008301846100c1565b92915050565b600080fd5b6100f9816100b7565b811461010457600080fd5b50565b600081359050610116816100f0565b92915050565b600060208284031215610132576101316100eb565b5b600061014084828501610107565b9150509291505056fea2646970667358221220ec57e49a647342208a1f5c9b1f2049bf1a27f02e19940819f38929bf67670a5964736f6c63430008120033"
+  in
+  Check.((code = expected_code) string)
+    ~error_msg:"Expected code is %R, but got %L" ;
+  unit
+
+let test_rpc_getTransactionByHash =
+  register_both
+    ~tags:["evm"; "rpc"; "get_transaction_by"; "transaction_by_hash"]
+    ~title:"RPC method eth_getTransactionByHash"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  @@ fun ~protocol:_ ~evm_setup ->
+  let {evm_node; sc_rollup_node; node; client; _} = evm_setup in
+  let raw_tx =
+    "0xf86c80825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a96a038294f867266c767aee6c3b54a0c444368fb8d5e90353219bce1da78de16aea4a018a7d3c58ddb1f6b33bad5dde106843acfbd6467e5df181d22270229dcfdf601"
+  in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
+  let* _ =
+    wait_for_application
+      ~evm_node
+      ~sc_rollup_node
+      ~node
+      ~client
+      (wait_for_transaction_receipt ~evm_node ~transaction_hash)
+      ()
+  in
+  let*@ transaction_object =
+    Rpc.get_transaction_by_hash ~transaction_hash evm_node
+  in
+  Check.(
+    ((transaction_object.hash = transaction_hash) string)
+      ~error_msg:"Incorrect transaction hash, should be %R, but got %L.") ;
+  unit
+
 let test_rpc_getTransactionByBlockHashAndIndex =
   let config =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
   register_both
-    ~tags:["evm"; "get_transaction_by"; "block_hash_and_index"]
+    ~tags:["evm"; "rpc"; "get_transaction_by"; "block_hash_and_index"]
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~config
@@ -2594,7 +2664,7 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
   register_both
-    ~tags:["evm"; "get_transaction_by"; "block_number_and_index"]
+    ~tags:["evm"; "rpc"; "get_transaction_by"; "block_number_and_index"]
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~config
@@ -2825,7 +2895,7 @@ let test_deposit_dailynet =
 
 let test_rpc_sendRawTransaction_nonce_too_low =
   register_both
-    ~tags:["evm"; "nonce"]
+    ~tags:["evm"; "rpc"; "nonce"]
     ~title:"Returns an error if the nonce is too low"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
@@ -2851,7 +2921,7 @@ let test_rpc_sendRawTransaction_nonce_too_low =
 
 let test_rpc_sendRawTransaction_nonce_too_high =
   register_both
-    ~tags:["evm"; "nonce"]
+    ~tags:["evm"; "rpc"; "nonce"]
     ~title:"Accepts transactions with nonce too high."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
@@ -2977,7 +3047,7 @@ let test_block_storage_before_and_after_migration =
 let test_rpc_sendRawTransaction_invalid_chain_id =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "chain_id"]
+    ~tags:["evm"; "rpc"; "chain_id"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -3144,7 +3214,7 @@ let test_rpc_getBlockTransactionCountBy =
     `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
   register_both
-    ~tags:["evm"; "get_block_transaction_count_by"]
+    ~tags:["evm"; "rpc"; "get_block_transaction_count_by"]
     ~title:
       "RPC methods eth_getBlockTransactionCountByHash and \
        eth_getBlockTransactionCountByNumber"
@@ -3199,7 +3269,7 @@ let get_uncle_count_by_block_arg evm_node ~by arg =
 
 let test_rpc_getUncleCountByBlock =
   register_both
-    ~tags:["evm"; "get_uncle_count_by_block"]
+    ~tags:["evm"; "rpc"; "get_uncle_count_by_block"]
     ~title:
       "RPC methods eth_getUncleCountByBlockHash and \
        eth_getUncleCountByBlockNumber"
@@ -3243,7 +3313,7 @@ let get_uncle_by_block_arg_and_index ~by evm_node arg index =
 
 let test_rpc_getUncleByBlockArgAndIndex =
   register_both
-    ~tags:["evm"; "get_uncle_by_block_arg_and_index"]
+    ~tags:["evm"; "rpc"; "get_uncle_by_block_arg_and_index"]
     ~title:
       "RPC methods eth_getUncleByBlockHashAndIndex and \
        eth_getUncleByBlockNumberAndIndex"
@@ -3326,7 +3396,7 @@ let test_cover_fees =
 
 let test_rpc_sendRawTransaction_with_consecutive_nonce =
   register_both
-    ~tags:["evm"; "tx_nonce"]
+    ~tags:["evm"; "rpc"; "tx_nonce"]
     ~title:"Can submit many transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; node; client; sc_rollup_node; _} ->
@@ -3364,7 +3434,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
 
 let test_rpc_sendRawTransaction_not_included =
   register_both
-    ~tags:["evm"; "tx_nonce"]
+    ~tags:["evm"; "rpc"; "tx_nonce"]
     ~title:
       "Tx with nonce too high are not included without previous transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -3393,7 +3463,9 @@ let test_rpc_sendRawTransaction_not_included =
   unit
 
 let test_rpc_gasPrice =
-  register_both ~tags:["evm"; "gas_price"] ~title:"RPC methods eth_gasPrice"
+  register_both
+    ~tags:["evm"; "rpc"; "gas_price"]
+    ~title:"RPC methods eth_gasPrice"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let expected_gas_price = Wei.of_gwei_string "0.05" in
   let* gas_price =
@@ -3427,7 +3499,7 @@ let send_foo_mapping_storage contract_address sender
 
 let test_rpc_getStorageAt =
   register_both
-    ~tags:["evm"; "get_storage_at"]
+    ~tags:["evm"; "rpc"; "get_storage_at"]
     ~title:"RPC methods eth_getStorageAt"
   @@ fun ~protocol:_ ~evm_setup ->
   let {endpoint; evm_node; _} = evm_setup in
@@ -4936,6 +5008,9 @@ let register_evm_node ~protocols =
   test_evm_node_connection protocols ;
   test_consistent_block_hashes protocols ;
   test_rpc_getBalance protocols ;
+  test_rpc_getCode protocols ;
+  test_rpc_blockNumber protocols ;
+  test_rpc_net_version protocols ;
   test_rpc_getBlockByNumber protocols ;
   test_rpc_getBlockByHash protocols ;
   test_rpc_getTransactionCount protocols ;
@@ -4980,6 +5055,7 @@ let register_evm_node ~protocols =
   test_rpc_sendRawTransaction_invalid_chain_id protocols ;
   test_rpc_getTransactionByBlockHashAndIndex protocols ;
   test_rpc_getTransactionByBlockNumberAndIndex protocols ;
+  test_rpc_getTransactionByHash protocols ;
   test_rpc_getBlockTransactionCountBy protocols ;
   test_rpc_getUncleCountByBlock protocols ;
   test_rpc_getUncleByBlockArgAndIndex protocols ;

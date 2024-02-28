@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -55,17 +56,25 @@ module Request = struct
   let eth_getTransactionReceipt ~tx_hash =
     {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
 
-  let eth_estimateGas eth_call =
-    {
-      method_ = "eth_estimateGas";
-      parameters = `A [`O eth_call; `String "latest"];
-    }
+  let eth_estimateGas ~eth_call ~block =
+    {method_ = "eth_estimateGas"; parameters = `A [`O eth_call; `String block]}
 
-  let eth_getTransactionCount ~address =
+  let eth_getTransactionCount ~address ~block =
     {
       method_ = "eth_getTransactionCount";
-      parameters = `A [`String address; `String "latest"];
+      parameters = `A [`String address; `String block];
     }
+
+  let eth_getTransactionByHash ~transaction_hash =
+    {
+      method_ = "eth_getTransactionByHash";
+      parameters = `A [`String transaction_hash];
+    }
+
+  let eth_getCode ~address ~block =
+    {method_ = "eth_getCode"; parameters = `A [`String address; `String block]}
+
+  let net_version = {method_ = "net_version"; parameters = `A []}
 
   let tez_kernelVersion = {method_ = "tez_kernelVersion"; parameters = `Null}
 
@@ -75,6 +84,32 @@ module Request = struct
       parameters = `A [eth_call_obj ~to_ ~data; `String "latest"];
     }
 end
+
+let net_version evm_node =
+  let* json = Evm_node.call_evm_rpc evm_node Request.net_version in
+  return
+    (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
+
+let get_transaction_by_hash ~transaction_hash evm_node =
+  let* json =
+    Evm_node.call_evm_rpc
+      evm_node
+      (Request.eth_getTransactionByHash ~transaction_hash)
+  in
+  return
+    (decode_or_error
+       (fun json ->
+         JSON.(json |-> "result" |> Transaction.transaction_object_of_json))
+       json)
+
+let get_code ~address evm_node =
+  let* json =
+    Evm_node.call_evm_rpc
+      evm_node
+      (Request.eth_getCode ~address ~block:"latest")
+  in
+  return
+    (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
 
 let block_number evm_node =
   let* json = Evm_node.call_evm_rpc evm_node Request.eth_blockNumber in
@@ -157,7 +192,9 @@ let get_transaction_receipt ~tx_hash evm_node =
 
 let estimate_gas eth_call evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.eth_estimateGas eth_call)
+    Evm_node.call_evm_rpc
+      evm_node
+      (Request.eth_estimateGas ~eth_call ~block:"latest")
   in
   return
   @@ decode_or_error
@@ -166,7 +203,9 @@ let estimate_gas eth_call evm_node =
 
 let get_transaction_count ~address evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.eth_getTransactionCount ~address)
+    Evm_node.call_evm_rpc
+      evm_node
+      (Request.eth_getTransactionCount ~address ~block:"latest")
   in
   return
   @@ decode_or_error
