@@ -27,46 +27,58 @@ open Protocol
 open Alpha_context
 open Baking_state
 
-type block_kind =
-  | Fresh of Operation_pool.pool
-  | Reproposal of {
-      consensus_operations : packed_operation list;
-      payload_hash : Block_payload_hash.t;
-      payload_round : Round.t;
-      payload : Operation_pool.payload;
-    }
-
-type block_to_bake = {
-  predecessor : block_info;
-  round : Round.t;
-  delegate : consensus_key_and_delegate;
-  kind : block_kind;
-  force_apply : bool;
-      (** if true, while baking the block, try and apply the block and its
-          operations instead of only validating them. this can be permanently
-          set using the [--force-apply] flag (see [force_apply_switch_arg] in
-          [baking_commands.ml]). *)
-}
-
 type inject_block_kind =
   | Forge_and_inject of block_to_bake
       (** Forge and inject a freshly forged block. [block_to_bake] should be
           used in the forging process. *)
-  | Inject_only of signed_block
-      (** Inject [signed_block]. The baker can pre-emptively forge a signed
-          block with the [Forge_block] action if it knows it is the next baker
-          and it is idle. *)
+  | Inject_only of prepared_block
+      (** Inject [prepared_block]. The baker can pre-emptively forge a
+          signed block with the [Forge_block] action if it knows it is
+          the next baker and it is idle. *)
+
+type consensus_vote_kind = Attestation | Preattestation
+
+type unsigned_consensus_vote = {
+  vote_kind : consensus_vote_kind;
+  vote_consensus_content : consensus_content;
+  delegate : consensus_key_and_delegate;
+}
+
+type signed_consensus_vote = {
+  unsigned_consensus_vote : unsigned_consensus_vote;
+  signed_operation : packed_operation;
+}
+
+type batch_content = {
+  level : Raw_level.t;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+}
+
+type unsigned_consensus_vote_batch = {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  unsigned_consensus_votes : unsigned_consensus_vote list;
+}
+
+val make_unsigned_consensus_vote_batch :
+  consensus_vote_kind ->
+  batch_content ->
+  (consensus_key_and_delegate * Slot.t) list ->
+  unsigned_consensus_vote_batch
+
+type signed_consensus_vote_batch = private {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  signed_consensus_votes : signed_consensus_vote list;
+}
 
 type action =
   | Do_nothing
   | Inject_block of {kind : inject_block_kind; updated_state : state}
   | Forge_block of {block_to_bake : block_to_bake; updated_state : state}
-  | Inject_preattestations of {
-      preattestations : (consensus_key_and_delegate * consensus_content) list;
-    }
-  | Inject_attestations of {
-      attestations : (consensus_key_and_delegate * consensus_content) list;
-    }
+  | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
+  | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
   | Update_to_level of level_update
   | Synchronize_round of round_update
   | Watch_proposal
@@ -87,28 +99,27 @@ and round_update = {
 
 type t = action
 
+val pp_action : Format.formatter -> action -> unit
+
 val generate_seed_nonce_hash :
   Baking_configuration.nonce_config ->
   consensus_key ->
   Level.t ->
   (Nonce_hash.t * Nonce.t) option tzresult Lwt.t
 
+val prepare_block :
+  global_state -> block_to_bake -> prepared_block tzresult Lwt.t
+
 val inject_block :
-  updated_state:state -> state -> signed_block -> state tzresult Lwt.t
+  updated_state:state -> state -> prepared_block -> state tzresult Lwt.t
 
 val sign_consensus_votes :
   state ->
-  (consensus_key_and_delegate * consensus_content) list ->
-  [`Preattestation | `Attestation] ->
-  ((consensus_key * public_key_hash) * packed_operation * int32 * Round.t) list
-  tzresult
-  Lwt.t
+  unsigned_consensus_vote_batch ->
+  signed_consensus_vote_batch tzresult Lwt.t
 
-val inject_consensus_vote :
-  state ->
-  (consensus_key_and_delegate * consensus_content) list ->
-  [`Preattestation | `Attestation] ->
-  unit tzresult Lwt.t
+val inject_consensus_votes :
+  state -> signed_consensus_vote_batch -> unit tzresult Lwt.t
 
 val sign_dal_attestations :
   state ->
@@ -131,8 +142,6 @@ val start_waiting_for_preattestation_quorum : state -> unit Lwt.t
 val start_waiting_for_attestation_quorum : state -> unit Lwt.t
 
 val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
-
-val pp_action : Format.formatter -> t -> unit
 
 val compute_round : proposal -> Round.round_durations -> Round.t tzresult
 
