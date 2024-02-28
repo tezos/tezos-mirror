@@ -1057,6 +1057,9 @@ module Internal_for_tests = struct
   let init_verifier_dal () =
     initialisation_parameters := Verifier {is_fake = true}
 
+  let init_verifier_dal_default () =
+    initialisation_parameters := Verifier {is_fake = false}
+
   let make_dummy_shards (t : t) ~state =
     Random.set_state state ;
     let rec loop index seq =
