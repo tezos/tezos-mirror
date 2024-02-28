@@ -44,6 +44,11 @@ impl BlockFees {
     pub const fn da_fee_per_byte(&self) -> U256 {
         self.da_fee_per_byte
     }
+
+    /// Update the base fee per gas
+    pub fn set_base_fee_per_gas(&mut self, price: U256) {
+        self.base_fee_per_gas = price
+    }
 }
 
 /// All data for an Ethereum block.

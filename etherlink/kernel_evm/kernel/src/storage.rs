@@ -66,6 +66,9 @@ pub const EVM_BASE_FEE_PER_GAS: RefPath =
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
     RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas");
 const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/world_state/fees/da_fee_per_byte");
+const TICK_BACKLOG_PATH: RefPath = RefPath::assert_from(b"/world_state/fees/backlog");
+const TICK_BACKLOG_TIMESTAMP_PATH: RefPath =
+    RefPath::assert_from(b"/world_state/fees/last_timestamp");
 
 /// The sequencer pool is the designated account that the data-availability fees are sent to.
 ///
@@ -151,6 +154,17 @@ pub fn write_u256(
     let mut bytes: [u8; WORD_SIZE] = value.into();
     value.to_little_endian(&mut bytes);
     host.store_write(path, &bytes, 0).map_err(Error::from)
+}
+
+fn read_u64(host: &impl Runtime, path: &impl Path) -> Result<u64, Error> {
+    let mut bytes = [0; std::mem::size_of::<u64>()];
+    host.store_read_slice(path, 0, bytes.as_mut_slice())?;
+    Ok(u64::from_le_bytes(bytes))
+}
+
+fn write_u64(host: &mut impl Runtime, path: &impl Path, value: u64) -> Result<(), Error> {
+    host.store_write_all(path, value.to_le_bytes().as_slice())?;
+    Ok(())
 }
 
 pub fn block_path(hash: H256) -> Result<OwnedPath, Error> {
@@ -573,10 +587,36 @@ pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
     read_u256(host, &EVM_BASE_FEE_PER_GAS.into())
 }
 
-pub fn read_minimum_base_fee_per_gas<Host: Runtime>(
-    host: &mut Host,
-) -> Result<U256, Error> {
+pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     read_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into())
+}
+
+pub fn read_tick_backlog(host: &impl Runtime) -> Result<u64, Error> {
+    read_u64(host, &TICK_BACKLOG_PATH)
+}
+
+pub fn store_tick_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+    write_u64(host, &TICK_BACKLOG_PATH, value)
+}
+
+pub fn read_tick_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
+    read_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH)
+}
+
+pub fn store_tick_backlog_timestamp(
+    host: &mut impl Runtime,
+    value: u64,
+) -> Result<(), Error> {
+    write_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH, value)?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
+    host: &mut Host,
+    price: U256,
+) -> Result<(), Error> {
+    write_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into(), price)
 }
 
 pub fn store_da_fee(

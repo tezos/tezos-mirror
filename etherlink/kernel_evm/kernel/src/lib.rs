@@ -21,9 +21,8 @@ use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use storage::{
-    read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
-    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
-    read_minimum_base_fee_per_gas, store_base_fee_per_gas, store_chain_id, store_da_fee,
+    read_chain_id, read_da_fee, read_kernel_version, read_last_info_per_level_timestamp,
+    read_last_info_per_level_timestamp_stats, store_chain_id, store_da_fee,
     store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -46,6 +45,7 @@ mod error;
 mod event;
 mod fallback_upgrade;
 mod fees;
+mod gas_price;
 mod inbox;
 mod indexable_storage;
 mod internal_storage;
@@ -134,18 +134,7 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
-    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
-        .unwrap_or_else(|_| fees::MINIMUM_BASE_FEE_PER_GAS.into());
-
-    let base_fee_per_gas = match read_base_fee_per_gas(host) {
-        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
-            base_fee_per_gas
-        }
-        _ => {
-            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
-            minimum_base_fee_per_gas
-        }
-    };
+    let base_fee_per_gas = crate::gas_price::load_gas_price(host)?;
 
     let da_fee = match read_da_fee(host) {
         Ok(da_fee) => da_fee,
@@ -430,6 +419,12 @@ mod tests {
             host: &mut mock_host,
             internal: &mut internal,
         };
+
+        crate::storage::store_minimum_base_fee_per_gas(
+            &mut host,
+            DUMMY_BASE_FEE_PER_GAS.into(),
+        )
+        .unwrap();
 
         // sanity check: no current block
         assert!(
