@@ -97,44 +97,51 @@ module Accountability = struct
      optimized.
   *)
 
-  (* A list of numbers, each representing the number of shards attested by an attester. *)
-  type t = int list
+  module SlotMap = Map.Make (Compare.Int)
 
-  let init ~length =
-    let l =
-      List.init
-        ~when_negative_length:
-          "Dal_attestation_repr.Accountability.init: length cannot be negative"
-        length
-        (fun _ -> 0)
-    in
-    match l with Error msg -> invalid_arg msg | Ok l -> l
+  type t = {number_of_attested_shards : int SlotMap.t; number_of_slots : int}
+
+  let init ~number_of_slots =
+    {number_of_attested_shards = SlotMap.empty; number_of_slots}
 
   (* This function must be called at most once for a given attester; otherwise
      the count will be flawed. *)
-  let record_number_of_attested_shards number_of_attested_shards_per_slot
-      baker_attested_slots number_of_baker_shards =
-    List.mapi
-      (fun slot old_number_of_attested_shards ->
-        match Bitset.mem baker_attested_slots slot with
-        | Error _ ->
-            (* slot index is above the length provided at initialisation *)
-            old_number_of_attested_shards
-        | Ok slot_attested ->
-            if slot_attested then
-              old_number_of_attested_shards + number_of_baker_shards
-            else old_number_of_attested_shards)
-      number_of_attested_shards_per_slot
+  let record_number_of_attested_shards t baker_attested_slots
+      number_of_baker_shards =
+    let rec iter slot_index map =
+      if Compare.Int.(slot_index >= t.number_of_slots) then map
+      else
+        let map =
+          match Bitset.mem baker_attested_slots slot_index with
+          | Error _ ->
+              (* impossible, as [slot_index] is non-negative *)
+              map
+          | Ok true ->
+              (* slot is attested by baker *)
+              SlotMap.update
+                slot_index
+                (function
+                  | None -> Some number_of_baker_shards
+                  | Some old_number_of_attested_shards ->
+                      Some
+                        (old_number_of_attested_shards + number_of_baker_shards))
+                map
+          | Ok false ->
+              (* slot is not attested by baker, nothing to update *)
+              map
+        in
+        iter (slot_index + 1) map
+    in
+    let number_of_attested_shards = iter 0 t.number_of_attested_shards in
+    {t with number_of_attested_shards}
 
-  let is_slot_attested number_of_attested_shards_per_slot ~threshold
-      ~number_of_shards index =
-    match
-      List.nth
-        number_of_attested_shards_per_slot
-        (Dal_slot_index_repr.to_int index)
-    with
-    | None -> false
-    | Some number_of_attested_shards ->
-        Compare.Int.(
-          number_of_attested_shards >= threshold * number_of_shards / 100)
+  let is_slot_attested t ~threshold ~number_of_shards slot_index =
+    let index = Dal_slot_index_repr.to_int slot_index in
+    let number_of_attested_shards =
+      match SlotMap.find index t.number_of_attested_shards with
+      | None -> 0
+      | Some v -> v
+    in
+    Compare.Int.(
+      number_of_attested_shards >= threshold * number_of_shards / 100)
 end

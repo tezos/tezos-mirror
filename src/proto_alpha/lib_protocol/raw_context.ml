@@ -881,7 +881,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
         dal_attestation_slot_accountability =
           Dal_attestation_repr.Accountability.init
-            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
+            ~number_of_slots:
+              constants.Constants_parametric_repr.dal.number_of_slots;
         dal_committee = empty_dal_committee;
         dal_cryptobox = None;
         adaptive_issuance_enable;
