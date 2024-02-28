@@ -233,6 +233,11 @@ module RPC : sig
        identity is given. *)
   val delete_p2p_peer_disconnect : peer_id:string -> unit RPC_core.t
 
+  (**  Call RPC "PATCH /p2p/peers/by-id/<peer_id>" to patch the ACL of the node
+       whose identity is given. Ignores the output of the RPC. *)
+  val patch_p2p_peers_by_id :
+    peer_id:string -> ?acl:string -> unit -> unit RPC_core.t
+
   type topic = {topic_slot_index : int; topic_pkh : string}
 
   (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
