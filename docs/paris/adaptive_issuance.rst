@@ -19,7 +19,6 @@
 :math:`\newcommand\tw{\Sigma_w}`
 :math:`\newcommand\rw[2]{\F{reward_{#1}}{#2}}`
 :math:`\newcommand\tip[2]{\F{tip_{#1}}{#2}}`
-:math:`\newcommand\lbs[1]{\F{subsidy_{LB}}{#1}}`
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
 :math:`\newcommand{\vdf}{\mathit{VDF}}`
 
@@ -270,7 +269,7 @@ being subject to the existing participation conditions.
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
 for contributing to :ref:`random seed generation <randomness_generation_paris>`
-(that is for, revealing nonce seeds and posting VDF proofs) are not paid
+(that is, for revealing nonce seeds and posting VDF proofs) are not paid
 each block, but rather every 192 blocks. The adjusted formulas result:
 
 .. math::
@@ -295,7 +294,7 @@ complementary to the existing :ref:`delegate <def_delegate_paris>`
 (also known as *baker*) and *delegator* roles. A staker must also be a
 *delegator* – that is, they must first choose a delegate.
 
-When stakers **stake**\ funds towards a delegate’s **staking**
+When stakers **stake** funds towards a delegate’s **staking**
 **balance**, the associated **baking** and **voting powers** accrue to
 that delegate. Similarly to how delegated funds work, staked funds
 remain within the staker’s account at all times.
@@ -454,10 +453,10 @@ or more conveniently::
 
    octez-client finalize unstake for <staker>
 
- In some circumstances, unstake and finalize can be done implicitly: any call
- to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending
- unstake requests. Also, as we will see next, change of delegate triggers an
- unstake operation.
+In some circumstances, unstake and finalize can be done implicitly: any call
+to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending
+unstake requests. Also, as we will see next, change of delegate triggers an
+unstake operation.
 
 Change of delegate
 ------------------
@@ -527,7 +526,7 @@ mechanism:
    subsequent *Adoption* phase.
 -  The *Voting* phase is driven by an Exponential moving average (EMA)
    whose *half-life* is 2 weeks. That is, it takes two weeks for the EMA
-   to raise from 0% to 50% assuming only **On**\ votes are cast.
+   to raise from 0% to 50% assuming only **On** votes are cast.
 -  The target threshold is a supermajority of 80% of **On** votes over
    **On plus Off** votes.
 -  There is no time limit or fixed duration for the Voting phase. It
