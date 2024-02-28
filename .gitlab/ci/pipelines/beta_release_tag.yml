@@ -18,6 +18,7 @@ oc.docker:rust-toolchain:
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
+
 oc.build:static-x86_64-linux-binaries:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: build
@@ -39,6 +40,7 @@ oc.build:static-x86_64-linux-binaries:
     expire_in: 90 days
     paths:
     - octez-binaries/$ARCH/*
+
 oc.build:static-arm64-linux-binaries:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: build
@@ -57,6 +59,7 @@ oc.build:static-arm64-linux-binaries:
     expire_in: 90 days
     paths:
     - octez-binaries/$ARCH/*
+
 oc.docker:amd64:
   image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
   stage: build
@@ -78,6 +81,7 @@ oc.docker:amd64:
     IMAGE_ARCH_PREFIX: amd64_
     CI_DOCKER_HUB: "true"
     EXECUTABLE_FILES: script-inputs/released-executables
+
 oc.docker:arm64:
   image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
   stage: build
@@ -99,6 +103,7 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     CI_DOCKER_HUB: "true"
     EXECUTABLE_FILES: script-inputs/released-executables
+
 oc.build:dpkg:amd64:
   image: debian:bookworm
   stage: build
@@ -134,6 +139,7 @@ oc.build:dpkg:amd64:
     paths:
     - octez-*.deb
     when: on_success
+
 oc.build:rpm:amd64:
   image: fedora:39
   stage: build
@@ -170,6 +176,7 @@ oc.build:rpm:amd64:
     paths:
     - octez-*.rpm
     when: on_success
+
 docker:merge_manifests:
   image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
   stage: prepare_release
@@ -188,6 +195,7 @@ docker:merge_manifests:
   variables:
     DOCKER_VERSION: 24.0.6
     CI_DOCKER_HUB: "true"
+
 gitlab:release:
   image: ${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0
   stage: publish_release_gitlab

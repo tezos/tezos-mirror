@@ -262,4 +262,19 @@ let config_element : config_element -> string * value = function
 let to_yaml (config : config) : value = `O (List.map config_element config)
 
 let to_file ?header ~filename config =
-  Base.write_yaml ?header filename (to_yaml config)
+  Base.with_open_out filename @@ fun ch ->
+  let out = output_string ch in
+  Option.iter out header ;
+  let rec loop =
+    let print element =
+      out (Base.yaml_to_string (`O [config_element element]))
+    in
+    function
+    | [] -> ()
+    | [x] -> print x
+    | x :: y :: ys ->
+        print x ;
+        out "\n" ;
+        loop (y :: ys)
+  in
+  loop config

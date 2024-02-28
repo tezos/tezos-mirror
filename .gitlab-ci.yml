@@ -54,8 +54,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_extended_test
     when: always
+
 default:
   interruptible: true
+
 variables:
   build_deps_image_version: d8bd1a0e555b2f9a32bce18a4022f6851c700bca
   build_deps_image_name: ${CI_REGISTRY}/tezos/opam-repository
@@ -69,6 +71,7 @@ variables:
   FF_USE_FASTZIP: "true"
   RUNTEZTALIAS: "false"
   FF_KUBERNETES_HONOR_ENTRYPOINT: "false"
+
 stages:
 - trigger
 - sanity
@@ -82,12 +85,14 @@ stages:
 - publish_release
 - publish_package_gitlab
 - manual
+
 dummy_job:
   rules:
   - if: $foo == "bar" && $foo != "bar"
     when: on_success
   script:
   - echo "This job will never execute"
+
 include:
 - .gitlab/ci/jobs/shared/images.yml
 - .gitlab/ci/jobs/shared/templates.yml

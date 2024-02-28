@@ -49,16 +49,15 @@ let project_root =
              executed, which is closer to what we want. *)
           Sys.getcwd ())
 
+let yaml_to_string yaml =
+  match Yaml.(to_string ~encoding:`Utf8 ~scalar_style:`Plain yaml) with
+  | Ok s -> s
+  | Error (`Msg error_msg) ->
+      failwith
+        ("Could not convert JSON configuration to YAML string: " ^ error_msg)
+
 let write_yaml ?(header = "") filename yaml =
-  let contents =
-    header
-    ^
-    match Yaml.to_string ~encoding:`Utf8 ~scalar_style:`Plain yaml with
-    | Ok s -> s
-    | Error (`Msg error_msg) ->
-        failwith
-          ("Could not convert JSON configuration to YAML string: " ^ error_msg)
-  in
+  let contents = header ^ yaml_to_string yaml in
   write_file filename ~contents
 
 let range a b =
