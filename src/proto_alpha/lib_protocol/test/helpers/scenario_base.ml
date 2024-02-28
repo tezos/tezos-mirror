@@ -535,3 +535,24 @@ let wait_ai_activation = wait_cycle `AI_activation
 (** wait delegate_parameters_activation_delay cycles  *)
 let wait_delegate_parameters_activation =
   wait_cycle `delegate_parameters_activation
+
+let wait_n_cycles_f (n_cycles : t -> int) =
+  let condition ((init_block, _init_state) as t_init)
+      ((current_block, _current_state) as _t_current) =
+    let n = n_cycles t_init in
+    let init_cycle = Block.current_cycle init_block in
+    let current_cycle = Block.current_cycle current_block in
+    Cycle.(current_cycle >= add init_cycle n)
+  in
+  wait_cycle_f condition
+
+let wait_n_cycles_f_es (n_cycles : t -> int tzresult Lwt.t) =
+  let open Lwt_result_syntax in
+  let condition ((init_block, _init_state) as t_init)
+      ((current_block, _current_state) as _t_current) =
+    let* n = n_cycles t_init in
+    let init_cycle = Block.current_cycle init_block in
+    let current_cycle = Block.current_cycle current_block in
+    return Cycle.(current_cycle >= add init_cycle n)
+  in
+  wait_cycle_f_es condition
