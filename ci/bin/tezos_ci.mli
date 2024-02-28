@@ -182,6 +182,7 @@ val job :
   ?coverage:string ->
   ?retry:int ->
   ?parallel:int ->
+  __POS__:string * int * int * int ->
   image:Image.t ->
   stage:Stage.t ->
   name:string ->

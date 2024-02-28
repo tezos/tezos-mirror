@@ -1,6 +1,9 @@
 open Gitlab_ci.Util
 
-type tezos_job = {job : Gitlab_ci.Types.job}
+type tezos_job = {
+  job : Gitlab_ci.Types.job;
+  source_position : string * int * int * int;
+}
 
 let tezos_job_to_config_elements (j : tezos_job) = Gitlab_ci.Types.[Job j.job]
 
@@ -211,8 +214,8 @@ let enc_git_strategy = function
 
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?services ?variables ?rules
-    ?timeout ?tags ?git_strategy ?when_ ?coverage ?retry ?parallel ~image ~stage
-    ~name script : tezos_job =
+    ?timeout ?tags ?git_strategy ?when_ ?coverage ?retry ?parallel ~__POS__
+    ~image ~stage ~name script : tezos_job =
   (match (rules, when_) with
   | Some _, Some _ ->
       failwith
@@ -330,7 +333,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       parallel;
     }
   in
-  {job}
+  {job; source_position = __POS__}
 
 let external_jobs = ref String_set.empty
 
