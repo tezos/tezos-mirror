@@ -1106,3 +1106,18 @@ module Selection = struct
       ~pp1:Operation_hash.pp
       ("op", Operation_hash.encoding)
 end
+
+module Forge_worker = struct
+  include Internal_event.Simple
+
+  let section = section @ ["forge_worker"]
+
+  let error_while_processing_forge_request =
+    declare_1
+      ~section
+      ~name:"error_while_processing_forge_request"
+      ~level:Warning
+      ~msg:"error while processing forge request: {errors}"
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+      ~pp1:pp_print_top_error_of_trace
+end

@@ -453,9 +453,13 @@ let bake_using_automaton ~count config state heads_stream =
   let cctxt = state.global_state.cctxt in
   let* initial_event = first_automaton_event state in
   let current_level = state.level_state.latest_proposal.block.shell.level in
+  let forge_event_stream =
+    state.global_state.forge_worker_hooks.get_forge_event_stream ()
+  in
   let loop_state =
     Baking_scheduling.create_loop_state
       ~heads_stream
+      ~forge_event_stream
       state.global_state.operation_worker
   in
   let stop_on_next_level_block = function

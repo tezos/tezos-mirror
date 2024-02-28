@@ -980,6 +980,7 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | Idle, (Prequorum_reached _ | Quorum_reached _)
   | Awaiting_preattestations, Quorum_reached _
   | (Awaiting_application | Awaiting_attestations), Prequorum_reached _
-  | Awaiting_application, Quorum_reached _ ->
+  | Awaiting_application, Quorum_reached _
+  | _, New_forge_event _ ->
       (* This cannot/should not happen *)
       do_nothing state

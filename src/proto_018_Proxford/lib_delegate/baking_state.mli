@@ -73,6 +73,21 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
+(** [forge_event] type used to return the result of a task completion
+    in the forge worker. *)
+type forge_event
+
+(** [forge_request] type used to push a concurrent forging task in the
+    forge worker. *)
+type forge_request
+
+(** [forge_worker_hooks] type that allows interactions with the forge
+    worker. Hooks are needed in order to break a circular dependency. *)
+type forge_worker_hooks = {
+  push_request : forge_request -> unit;
+  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+}
+
 type global_state = {
   cctxt : Protocol_client_context.full;
   chain_id : Chain_id.t;
@@ -80,6 +95,7 @@ type global_state = {
   constants : Constants.t;
   round_durations : Round.round_durations;
   operation_worker : Operation_worker.t;
+  mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
   delegates : consensus_key list;
   cache : cache;
@@ -210,6 +226,7 @@ type event =
       Operation_worker.candidate * Kind.preattestation operation list
   | Quorum_reached of
       Operation_worker.candidate * Kind.attestation operation list
+  | New_forge_event of forge_event
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t

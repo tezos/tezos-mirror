@@ -31,6 +31,7 @@ type loop_state = {
   heads_stream : Baking_state.proposal Lwt_stream.t;
   get_valid_blocks_stream : Baking_state.proposal Lwt_stream.t Lwt.t;
   qc_stream : Operation_worker.event Lwt_stream.t;
+  forge_event_stream : forge_event Lwt_stream.t;
   future_block_stream :
     [`New_future_head of proposal | `New_future_valid_proposal of proposal]
     Lwt_stream.t;
@@ -47,6 +48,8 @@ type loop_state = {
     option;
   mutable last_get_qc_event :
     [`QC_reached of Operation_worker.event option] Lwt.t option;
+  mutable last_forge_event :
+    [`New_forge_event of forge_event option] Lwt.t option;
 }
 
 type events =
@@ -55,11 +58,13 @@ type events =
   | `New_valid_proposal of proposal option
   | `New_head_proposal of proposal option
   | `QC_reached of Operation_worker.event option
+  | `New_forge_event of forge_event option
   | `Termination
   | `Timeout of timeout_kind ]
   Lwt.t
 
-let create_loop_state ?get_valid_blocks_stream ~heads_stream operation_worker =
+let create_loop_state ?get_valid_blocks_stream ~heads_stream ~forge_event_stream
+    operation_worker =
   let future_block_stream, push_future_block = Lwt_stream.create () in
   let get_valid_blocks_stream =
     match get_valid_blocks_stream with
@@ -70,12 +75,14 @@ let create_loop_state ?get_valid_blocks_stream ~heads_stream operation_worker =
     heads_stream;
     get_valid_blocks_stream;
     qc_stream = Operation_worker.get_quorum_event_stream operation_worker;
+    forge_event_stream;
     future_block_stream;
     push_future_block = (fun x -> push_future_block (Some x));
     last_get_head_event = None;
     last_get_valid_block_event = None;
     last_future_block_event = None;
     last_get_qc_event = None;
+    last_forge_event = None;
   }
 
 let find_in_known_round_intervals known_round_intervals ~predecessor_timestamp
@@ -190,6 +197,17 @@ let rec wait_next_event ~timeout loop_state =
         t
     | Some t -> t
   in
+  let get_forge_event () =
+    match loop_state.last_forge_event with
+    | None ->
+        let t =
+          let*! e = Lwt_stream.get loop_state.forge_event_stream in
+          Lwt.return (`New_forge_event e)
+        in
+        loop_state.last_forge_event <- Some t ;
+        t
+    | Some t -> t
+  in
   (* event construction *)
   let open Baking_state in
   let*! result =
@@ -200,6 +218,7 @@ let rec wait_next_event ~timeout loop_state =
         (get_valid_block_event () :> events);
         (get_future_block_event () :> events);
         (get_qc_event () :> events);
+        (get_forge_event () :> events);
         (timeout :> events);
       ]
   in
@@ -219,6 +238,10 @@ let rec wait_next_event ~timeout loop_state =
   | `QC_reached None ->
       (* Not supposed to happen: exit the loop *)
       loop_state.last_get_qc_event <- None ;
+      return_none
+  | `New_forge_event None ->
+      (* Not supposed to happen: exit the loop *)
+      loop_state.last_forge_event <- None ;
       return_none
   | `New_valid_proposal (Some proposal) -> (
       loop_state.last_get_valid_block_event <- None ;
@@ -271,6 +294,9 @@ let rec wait_next_event ~timeout loop_state =
       (Some (Operation_worker.Quorum_reached (candidate, attestation_qc))) ->
       loop_state.last_get_qc_event <- None ;
       return_some (Quorum_reached (candidate, attestation_qc))
+  | `New_forge_event (Some event) ->
+      loop_state.last_forge_event <- None ;
+      return_some (New_forge_event event)
   | `Timeout e -> return_some (Timeout e)
 
 (** From the current [state], the function returns an optional
@@ -732,6 +758,11 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       constants;
       round_durations;
       operation_worker;
+      forge_worker_hooks =
+        {
+          push_request = (fun _ -> assert false);
+          get_forge_event_stream = (fun _ -> assert false);
+        };
       validation_mode;
       delegates;
       cache;
@@ -741,6 +772,15 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
         Option.map create_dal_node_rpc_ctxt config.dal_node_endpoint;
     }
   in
+  (* Trick to provide the global state to the forge worker without
+     introducing a circular dependency. *)
+  let forge_worker = Forge_worker.start global_state in
+  global_state.forge_worker_hooks <-
+    {
+      push_request = Forge_worker.push_request forge_worker;
+      get_forge_event_stream =
+        (fun () -> Forge_worker.get_event_stream forge_worker);
+    } ;
   let chain = `Hash chain_id in
   let current_level = current_proposal.block.shell.level in
   let* delegate_slots =
@@ -999,9 +1039,13 @@ let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
     | Error _ -> Stdlib.failwith "Failed to get the validated blocks stream"
     | Ok (vbs, _) -> Lwt.return vbs
   in
+  let forge_event_stream =
+    initial_state.global_state.forge_worker_hooks.get_forge_event_stream ()
+  in
   let loop_state =
     create_loop_state
       ~get_valid_blocks_stream
+      ~forge_event_stream
       ~heads_stream
       initial_state.global_state.operation_worker
   in
