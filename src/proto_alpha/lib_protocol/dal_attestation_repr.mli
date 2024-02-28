@@ -102,12 +102,11 @@ module Accountability : sig
      available. *)
   val init : length:int -> t
 
-  (** [record_attested_shards t slots shards] records that for all
-     slots declared available in [slots], the shard indices in [shards]
-     are deemed available. It is the responsibility of the caller to ensure
-     the shard indices are positive numbers. A negative shard index is
-     ignored. *)
-  val record_attested_shards : t -> attested_slots -> shard_index list -> t
+  (** [record_number_of_attested_shards t slots number] records that, for all
+      slots declared available in [slots], the given [number] of shard indices
+      are deemed available. This function must be called at most once for a
+      given attester; otherwise the count will be flawed. *)
+  val record_number_of_attested_shards : t -> attested_slots -> int -> t
 
   (** [is_slot_attested t ~threshold ~number_of_shards slot] returns
      [true] if the number of shards recorded in [t] for the [slot] is

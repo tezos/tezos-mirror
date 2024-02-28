@@ -97,8 +97,8 @@ module Accountability = struct
      optimized.
   *)
 
-  (* A list of set of shard indexes (a set of shards per slot) *)
-  type t = Bitset.t list
+  (* A list of numbers, each representing the number of shards attested by an attester. *)
+  type t = int list
 
   let init ~length =
     let l =
@@ -106,35 +106,35 @@ module Accountability = struct
         ~when_negative_length:
           "Dal_attestation_repr.Accountability.init: length cannot be negative"
         length
-        (fun _ -> Bitset.empty)
+        (fun _ -> 0)
     in
     match l with Error msg -> invalid_arg msg | Ok l -> l
 
-  let record_slot_shard_availability bitset shards =
-    List.fold_left
-      (fun bitset shard ->
-        Bitset.add bitset shard |> Result.value ~default:bitset)
-      bitset
-      shards
-
-  let record_attested_shards shard_bitset_per_slot attested_slots shards =
+  (* This function must be called at most once for a given attester; otherwise
+     the count will be flawed. *)
+  let record_number_of_attested_shards number_of_attested_shards_per_slot
+      baker_attested_slots number_of_baker_shards =
     List.mapi
-      (fun slot bitset ->
-        match Bitset.mem attested_slots slot with
+      (fun slot old_number_of_attested_shards ->
+        match Bitset.mem baker_attested_slots slot with
         | Error _ ->
             (* slot index is above the length provided at initialisation *)
-            bitset
+            old_number_of_attested_shards
         | Ok slot_attested ->
-            if slot_attested then record_slot_shard_availability bitset shards
-            else bitset)
-      shard_bitset_per_slot
+            if slot_attested then
+              old_number_of_attested_shards + number_of_baker_shards
+            else old_number_of_attested_shards)
+      number_of_attested_shards_per_slot
 
-  let is_slot_attested shard_bitset_per_slot ~threshold ~number_of_shards index
-      =
-    match List.nth shard_bitset_per_slot (Dal_slot_index_repr.to_int index) with
+  let is_slot_attested number_of_attested_shards_per_slot ~threshold
+      ~number_of_shards index =
+    match
+      List.nth
+        number_of_attested_shards_per_slot
+        (Dal_slot_index_repr.to_int index)
+    with
     | None -> false
-    | Some bitset ->
-        let number_of_attested_shards = Bitset.hamming_weight bitset in
+    | Some number_of_attested_shards ->
         Compare.Int.(
           number_of_attested_shards >= threshold * number_of_shards / 100)
 end

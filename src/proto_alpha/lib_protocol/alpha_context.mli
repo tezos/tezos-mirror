@@ -2785,10 +2785,9 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
-    val shards_of_attester :
-      context -> attester:public_key_hash -> shard_index list option
+    val power_of_attester : context -> attester:public_key_hash -> int option
 
-    val record_attested_shards : context -> t -> int list -> context
+    val record_number_of_attested_shards : context -> t -> int -> context
 
     type committee = {
       pkh_to_shards : (shard_index * int) Signature.Public_key_hash.Map.t;

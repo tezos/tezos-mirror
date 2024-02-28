@@ -1828,12 +1828,12 @@ module Dal = struct
 
   let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
 
-  let record_attested_shards ctxt attestation shards =
+  let record_number_of_attested_shards ctxt attestation number =
     let dal_attestation_slot_accountability =
-      Dal_attestation_repr.Accountability.record_attested_shards
+      Dal_attestation_repr.Accountability.record_number_of_attested_shards
         ctxt.back.dal_attestation_slot_accountability
         attestation
-        shards
+        number
     in
     {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
 
@@ -1955,15 +1955,11 @@ module Dal = struct
   let init_committee ctxt committee =
     {ctxt with back = {ctxt.back with dal_committee = committee}}
 
-  let shards_of_attester ctxt ~attester:pkh =
-    let rec make acc (initial_shard_index, power) =
-      if Compare.Int.(power <= 0) then List.rev acc
-      else make (initial_shard_index :: acc) (initial_shard_index + 1, power - 1)
-    in
+  let power_of_attester ctxt ~attester:pkh =
     Signature.Public_key_hash.Map.find_opt
       pkh
       ctxt.back.dal_committee.pkh_to_shards
-    |> Option.map (fun pre_shards -> make [] pre_shards)
+    |> Option.map snd
 end
 
 (* The type for relative context accesses instead from the root. In order for

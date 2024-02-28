@@ -67,7 +67,7 @@ let validate_block_attestation ctxt level consensus_key attestation =
   in
   let attester = pkh_of_consensus_key consensus_key in
   fail_when
-    (Option.is_none @@ Dal.Attestation.shards_of_attester ctxt ~attester)
+    (Option.is_none @@ Dal.Attestation.power_of_attester ctxt ~attester)
     (Dal_data_availibility_attester_not_in_committee {attester; level})
 
 let validate_mempool_attestation ctxt attestation =
@@ -85,12 +85,16 @@ let apply_attestation ctxt consensus_key level attestation =
   let open Result_syntax in
   let* () = assert_dal_feature_enabled ctxt in
   let attester = pkh_of_consensus_key consensus_key in
-  match Dal.Attestation.shards_of_attester ctxt ~attester with
+  match Dal.Attestation.power_of_attester ctxt ~attester with
   | None ->
       (* This should not happen: operation validation should have failed. *)
       error (Dal_data_availibility_attester_not_in_committee {attester; level})
-  | Some shards ->
-      return (Dal.Attestation.record_attested_shards ctxt attestation shards)
+  | Some power ->
+      return
+        (Dal.Attestation.record_number_of_attested_shards
+           ctxt
+           attestation
+           power)
 
 (* This function should fail if we don't want the operation to be
    propagated over the L1 gossip network. Because this is a manager
