@@ -26,13 +26,22 @@ let stake_init =
   --> (Tag "no wait after stake" --> Empty
       |+ Tag "wait after stake" --> wait_n_cycles 2)
 
+let ( -- ) a b x = a x - b
+
+let ( ++ ) a b x = a x + b
+
 let wait_for_unfreeze_and_check wait =
   snapshot_balances "wait snap" ["staker"]
-  --> wait_n_cycles (wait - 1)
+  --> wait_n_cycles_f (wait -- 1)
   (* Balance didn't change yet, but will change next cycle *)
   --> check_snapshot_balances "wait snap"
   --> next_cycle
   --> assert_failure (check_snapshot_balances "wait snap")
+
+let unstake_wait (_, state) =
+  let crd = state.State.constants.consensus_rights_delay in
+  let msp = Protocol.Constants_repr.max_slashing_period in
+  crd + msp
 
 let finalize staker =
   assert_failure (check_balance_field staker `Unstaked_finalizable Tez.zero)
@@ -43,7 +52,7 @@ let simple_roundtrip =
   stake_init
   --> (Tag "full unstake" --> unstake "staker" All
       |+ Tag "half unstake" --> unstake "staker" Half)
-  --> wait_for_unfreeze_and_check default_unstake_wait
+  --> wait_for_unfreeze_and_check unstake_wait
   --> finalize "staker" --> next_cycle
 
 let double_roundtrip =
@@ -51,8 +60,8 @@ let double_roundtrip =
   --> (Tag "half then full unstake" --> wait_n_cycles 2 --> unstake "staker" All
       |+ Tag "half then half unstake" --> wait_n_cycles 2
          --> unstake "staker" Half)
-  --> wait_for_unfreeze_and_check (default_unstake_wait - 2)
-  --> wait_for_unfreeze_and_check 2
+  --> wait_for_unfreeze_and_check (unstake_wait -- 2)
+  --> wait_for_unfreeze_and_check (Fun.const 2)
   --> finalize "staker" --> next_cycle
 
 let shorter_roundtrip_for_baker =
@@ -87,13 +96,13 @@ let status_quo_rountrip =
          --> unstake "staker" (Amount amount_1)
          --> next_cycle
          --> unstake "staker" (Amount amount_2))
-  --> wait_n_cycles default_unstake_wait
+  --> wait_n_cycles_f unstake_wait
   --> finalize "staker"
   --> check_snapshot_balances "init"
 
 let scenario_finalize =
   no_tag --> stake "staker" Half --> next_cycle --> unstake "staker" Half
-  --> wait_n_cycles (default_unstake_wait + 2)
+  --> wait_n_cycles_f (unstake_wait ++ 2)
   --> assert_failure
         (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
   --> (Tag "finalize with finalize" --> finalize_unstake "staker"
@@ -106,7 +115,7 @@ let scenario_finalize =
 (* Todo: there might be other cases... like changing delegates *)
 let scenario_not_finalize =
   no_tag --> stake "staker" Half --> next_cycle --> unstake "staker" All
-  --> wait_n_cycles (default_unstake_wait + 2)
+  --> wait_n_cycles_f (unstake_wait ++ 2)
   --> assert_failure
         (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
   --> snapshot_balances "not finalize" ["staker"]
@@ -139,7 +148,7 @@ let scenario_forbidden_operations =
 let full_balance_in_finalizable =
   add_account_with_funds "dummy" "staker" (Amount (Tez.of_mutez 10_000_000L))
   --> stake "staker" All_but_one --> next_cycle --> unstake "staker" All
-  --> wait_n_cycles (default_unstake_wait + 2)
+  --> wait_n_cycles_f (unstake_wait ++ 2)
   (* At this point, almost all the balance (but one mutez) of the stake is in finalizable *)
   (* Staking is possible, but not transfer *)
   --> assert_failure
@@ -174,7 +183,7 @@ let change_delegate =
   --> set_delegate "staker" (Some "delegate2")
   --> next_cycle
   --> assert_failure (stake "staker" Half)
-  --> wait_n_cycles (default_unstake_wait + 1)
+  --> wait_n_cycles_f (unstake_wait ++ 1)
   --> stake "staker" Half
 
 let unset_delegate =
@@ -200,7 +209,7 @@ let unset_delegate =
   --> transfer "staker" "dummy" All
   (* staker has an empty liquid balance, but still has unstaked frozen tokens,
      so it doesn't get deactivated *)
-  --> wait_n_cycles (default_unstake_wait + 1)
+  --> wait_n_cycles_f (unstake_wait ++ 1)
   --> finalize_unstake "staker"
 
 let forbid_costaking =
@@ -248,7 +257,7 @@ let forbid_costaking =
   --> stake "delegate" amount
   (* Can still unstake *)
   --> unstake "staker" Half
-  --> wait_n_cycles (default_unstake_wait + 1)
+  --> wait_n_cycles_f (unstake_wait ++ 1)
   --> finalize_unstake "staker"
   (* Can authorize stake again *)
   --> set_delegate_params "delegate" init_params

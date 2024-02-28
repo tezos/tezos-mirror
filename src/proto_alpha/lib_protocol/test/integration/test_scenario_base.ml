@@ -18,13 +18,6 @@ open State_account
 open Tez_helpers.Ez_tez
 open Scenario
 
-let default_param_wait, default_unstake_wait =
-  let constants = Default_parameters.constants_test in
-  let crd = constants.consensus_rights_delay in
-  let dpad = constants.delegate_parameters_activation_delay in
-  let msp = Protocol.Constants_repr.max_slashing_period in
-  (dpad, crd + msp)
-
 let test_expected_error =
   assert_failure
     ~expected_error:(fun _ -> [Exn (Failure "")])
