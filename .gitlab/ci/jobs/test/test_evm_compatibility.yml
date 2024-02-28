@@ -1,0 +1,23 @@
+test_evm_compatibility:
+  extends:
+    - .oc.kernels_template
+  stage: test
+  script:
+    - make -f etherlink.mk evm-evaluation-assessor
+    - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
+    - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c
+  rules:
+    - changes:
+        - .gitlab-ci.yml
+        # Run if the `rust-toolchain` image is updated
+        - images/**/*
+        - etherlink.mk
+        - etherlink/kernel_evm/evm_execution/**/*
+        - etherlink/kernel_evm/evm_evaluation/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: on_success
+  cache:
+    key: kernels
+    paths:
+      - cargo/
