@@ -8,7 +8,7 @@
 (* Main entrypoint of CI-in-OCaml.
 
    Here we register the set of pipelines, stages and images and
-   generate the top-level [.gitlab-ci.yml] file. *)
+   generate the GitLab CI configuration file. *)
 
 open Gitlab_ci
 open Gitlab_ci.Types
