@@ -3602,8 +3602,17 @@ let test_late_rollup_node =
   in
   Log.info "Start rollup node from scratch with same operator" ;
   let* () = Sc_rollup_node.run sc_rollup_node2 sc_rollup_address [] in
-  let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in
+  let sync_rpc_process =
+    Curl.get (Sc_rollup_node.endpoint sc_rollup_node2 ^ "/local/synchronized")
+  in
+  let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node2 in
+  let*! _ = sync_rpc_process in
   Log.info "Other rollup node synchronized." ;
+  let*! sync_json =
+    Curl.get (Sc_rollup_node.endpoint sc_rollup_node2 ^ "/local/synchronized")
+  in
+  Check.((JSON.encode sync_json = {|"synchronized"|}) string)
+    ~error_msg:"Sync RPC did not respond with synchronized" ;
   let* () = Client.bake_for_and_wait client in
   let* _level = wait_for_current_level node ~timeout:2. sc_rollup_node2 in
   Log.info "Other rollup node progresses." ;
