@@ -69,12 +69,14 @@ pub fn construct_folder_path(
 macro_rules! write_host {
     ($host: expr, $($args: expr),*) => {
         {
-            extern crate alloc;
-            writeln!(
-                $host.buffer.borrow_mut(),
-                "{}",
-                { &alloc::format!($($args), *) },
-            ).unwrap()
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                writeln!(
+                    $host.buffer.borrow_mut(),
+                    "{}",
+                    { &alloc::format!($($args), *) },
+                ).unwrap()
+            }
         }
     };
 }
@@ -83,12 +85,14 @@ macro_rules! write_host {
 macro_rules! write_out {
     ($output_file: expr, $($args: expr),*) => {
         {
-            extern crate alloc;
-            writeln!(
-                $output_file,
-                "{}",
-                { &alloc::format!($($args), *) },
-            ).unwrap()
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                writeln!(
+                    $output_file,
+                    "{}",
+                    { &alloc::format!($($args), *) },
+                ).unwrap()
+            }
         }
     };
 }
