@@ -854,15 +854,6 @@ end = struct
       return_ok ()
 end
 
-(* Main data-structure of the store.
-
-   Each physical file may have a different layout.
-*)
-type ('file, 'key, 'value) t = {
-  layout_of : 'file -> ('key, 'value) layout;
-  files : 'value Files.t;
-}
-
 let layout ?encoded_value_size ~encoding ~filepath ~eq ~index_of () =
   match encoded_value_size with
   | Some value_size -> {filepath; eq; encoding; index_of; value_size}
@@ -873,63 +864,90 @@ let layout ?encoded_value_size ~encoding ~filepath ~eq ~index_of () =
           invalid_arg
             "Key_value_store.layout: encoding does not have fixed size")
 
-let init ~lru_size layout_of =
-  let files = Files.init ~lru_size in
-  {layout_of; files}
+(* Main data-structure of the store.
 
-let close {files; _} = Files.close files
+   Each physical file may have a different layout.
+*)
+type ('file, 'key, 'value) t = {files : 'value Files.t; root_dir : string}
+
+type ('file, 'key, 'value) file_layout =
+  root_dir:string -> 'file -> ('key, 'value) layout
+
+let init ~lru_size ~root_dir =
+  let open Lwt_syntax in
+  let+ () =
+    if not (Sys.file_exists root_dir) then Lwt_utils_unix.create_dir root_dir
+    else return_unit
+  in
+  {files = Files.init ~lru_size; root_dir}
+
+let close t = Files.close t.files
 
 let write_value :
     type file key value.
     ?override:bool ->
     (file, key, value) t ->
+    (file, key, value) file_layout ->
     file ->
     key ->
     value ->
     unit tzresult Lwt.t =
- fun ?override {files; layout_of} file key value ->
-  let layout = layout_of file in
+ fun ?override {files; root_dir} file_layout file key value ->
+  let layout = file_layout ~root_dir file in
   Files.write ?override files layout key value
 
 let read_value :
     type file key value.
-    (file, key, value) t -> file -> key -> value tzresult Lwt.t =
- fun {files; layout_of} file key ->
-  let layout = layout_of file in
+    (file, key, value) t ->
+    (file, key, value) file_layout ->
+    file ->
+    key ->
+    value tzresult Lwt.t =
+ fun {files; root_dir} file_layout file key ->
+  let layout = file_layout ~root_dir file in
   Files.read files layout key
 
 let value_exists :
     type file key value.
-    (file, key, value) t -> file -> key -> bool tzresult Lwt.t =
- fun {files; layout_of} file key ->
-  let layout = layout_of file in
+    (file, key, value) t ->
+    (file, key, value) file_layout ->
+    file ->
+    key ->
+    bool tzresult Lwt.t =
+ fun {files; root_dir} file_layout file key ->
+  let layout = file_layout ~root_dir file in
   Files.value_exists files layout key
 
 let count_values :
-    type file key value. (file, key, value) t -> file -> int tzresult Lwt.t =
- fun {files; layout_of} file ->
-  let layout = layout_of file in
+    type file key value.
+    (file, key, value) t ->
+    (file, key, value) file_layout ->
+    file ->
+    int tzresult Lwt.t =
+ fun {files; root_dir} file_layout file ->
+  let layout = file_layout ~root_dir file in
   Files.count_values files layout
 
-let write_values ?override t seq =
+let write_values ?override t file_layout seq =
   Seq.ES.iter
-    (fun (file, key, value) -> write_value ?override t file key value)
+    (fun (file, key, value) ->
+      write_value ?override t file_layout file key value)
     seq
 
-let read_values t seq =
+let read_values t file_layout seq =
   let open Lwt_syntax in
   Seq_s.of_seq seq
   |> Seq_s.S.map (fun (file, key) ->
-         let* maybe_value = read_value t file key in
+         let* maybe_value = read_value t file_layout file key in
          return (file, key, maybe_value))
 
-let values_exist t seq =
+let values_exist t file_layout seq =
   let open Lwt_syntax in
   Seq_s.of_seq seq
   |> Seq_s.S.map (fun (file, key) ->
-         let* maybe_value = value_exists t file key in
+         let* maybe_value = value_exists t file_layout file key in
          return (file, key, maybe_value))
 
-let remove_file {files; layout_of} file =
-  let layout = layout_of file in
+let remove_file {files; root_dir} file_layout file =
+  let layout = file_layout ~root_dir file in
   Files.remove files layout

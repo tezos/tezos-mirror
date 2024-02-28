@@ -82,14 +82,27 @@ module Value_size_hooks = struct
 end
 
 module Shards = struct
-  include Key_value_store
+  module KVS = Key_value_store
 
-  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) t
+  type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) KVS.t
+
+  let file_layout ~root_dir commitment =
+    let commitment_string = Cryptobox.Commitment.to_b58check commitment in
+    let filepath = Filename.concat root_dir commitment_string in
+    Key_value_store.layout
+      ~encoded_value_size:(Value_size_hooks.share_size ())
+      ~encoding:Cryptobox.share_encoding
+      ~filepath
+      ~eq:Stdlib.( = )
+      ~index_of:Fun.id
+      ()
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
   let are_shards_available store commitment shard_indexes =
-    List.for_all_es (value_exists store commitment) shard_indexes
+    List.for_all_es
+      (KVS.value_exists store file_layout commitment)
+      shard_indexes
 
   let save_and_notify shards_store shards_watcher commitment shards =
     let open Lwt_result_syntax in
@@ -98,7 +111,10 @@ module Shards = struct
         (fun {Cryptobox.index; share} -> (commitment, index, share))
         shards
     in
-    let* () = write_values shards_store shards |> Errors.other_lwt_result in
+    let* () =
+      KVS.write_values shards_store file_layout shards
+      |> Errors.other_lwt_result
+    in
     let*! () =
       List.of_seq shards
       |> Lwt_list.iter_s (fun (_commitment, index, _share) ->
@@ -115,26 +131,16 @@ module Shards = struct
     Seq.ints 0
     |> Seq.take_while (fun x -> x < number_of_shards)
     |> Seq.map (fun shard_index -> (commitment, shard_index))
-    |> read_values shards_store
+    |> KVS.read_values shards_store file_layout
+
+  let read_value store commitment shard_id =
+    KVS.read_value store file_layout commitment shard_id
+
+  let read_values store keys = KVS.read_values store file_layout keys
 
   let init node_store_dir shard_store_dir =
-    let open Lwt_syntax in
-    let ( // ) = Filename.concat in
-    let dir_path = node_store_dir // shard_store_dir in
-    let+ () =
-      if not (Sys.file_exists dir_path) then Lwt_utils_unix.create_dir dir_path
-      else return_unit
-    in
-    init ~lru_size:Constants.shards_store_lru_size (fun commitment ->
-        let commitment_string = Cryptobox.Commitment.to_b58check commitment in
-        let filepath = dir_path // commitment_string in
-        layout
-          ~encoded_value_size:(Value_size_hooks.share_size ())
-          ~encoding:Cryptobox.share_encoding
-          ~filepath
-          ~eq:Stdlib.( = )
-          ~index_of:Fun.id
-          ())
+    let root_dir = Filename.concat node_store_dir shard_store_dir in
+    KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
 end
 
 module Shard_proofs_cache =
