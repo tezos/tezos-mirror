@@ -46,6 +46,7 @@ const print_full = function (rawTx) {
 
 exports.transfer = function (playera, playerb, amount, options = {}) {
     let tx = {
+        gasLimit: 21000,
         ...transfer_prototype_json,
         ...options
     };
@@ -54,7 +55,6 @@ exports.transfer = function (playera, playerb, amount, options = {}) {
     tx.to = playerb.addr;
     // Enforce amount to be in Eth, not Wei
     tx.value = Math.round(amount * 1_000_000_000_000_000_000);
-    tx.gasLimit = 21000;
     add_fee(tx);
     let rawTx = sign(tx, playera.privateKey)
     return rawTx.rawTx;

@@ -22,6 +22,7 @@ txs.push(create.tx)
 
 txs.push(utils.send(player1, create.addr, 1000, deposit))
 txs.push(utils.send(player1, create.addr, 0, withdraw))
-txs.push(utils.send(player1, create.addr, 2000, transfer))
+txs.push(utils.send(player1, create.addr, 1000, deposit))
+txs.push(utils.send(player1, create.addr, 0, transfer))
 
 utils.print_bench([txs])

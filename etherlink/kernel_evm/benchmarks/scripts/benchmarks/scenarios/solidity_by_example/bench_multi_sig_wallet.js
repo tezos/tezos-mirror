@@ -22,10 +22,10 @@ let executeTransaction = contract.interface.encodeFunctionData("executeTransacti
 let txs = [];
 txs.push(utils.transfer(faucet, player1, 100000000))
 txs.push(utils.transfer(faucet, player2, 100000000))
-let create = utils.create(player1, 0, contract.bytecode + encodedParameters)
+let create = utils.create(player1, 0, contract.bytecode + encodedParameters, {gasLimit: 10000000})
 txs.push(create.tx)
 
-txs.push(utils.transfer(player1, create, 10000))
+txs.push(utils.transfer(player1, create, 10000, {gasLimit: 10000000}))
 txs.push(utils.send(player1, create.addr, 0, submitTransaction))
 txs.push(utils.send(player1, create.addr, 0, confirmTransaction))
 txs.push(utils.send(player2, create.addr, 0, confirmTransaction))
