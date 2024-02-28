@@ -225,14 +225,9 @@ end
 type dal_committee = {
   pkh_to_shards :
     (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-  shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
 }
 
-let empty_dal_committee =
-  {
-    pkh_to_shards = Signature.Public_key_hash.Map.empty;
-    shard_to_pkh = Dal_attestation_repr.Shard_map.empty;
-  }
+let empty_dal_committee = {pkh_to_shards = Signature.Public_key_hash.Map.empty}
 
 type back = {
   context : Context.t;
@@ -1881,7 +1876,6 @@ module Dal = struct
   type committee = dal_committee = {
     pkh_to_shards :
       (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
   }
 
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
@@ -1924,12 +1918,6 @@ module Dal = struct
               | Some (initial_shard_index, old_power) ->
                   Some (initial_shard_index, old_power + power))
             committee.pkh_to_shards;
-        shard_to_pkh =
-          List.fold_left
-            (fun shard_to_pkh slot ->
-              Dal_attestation_repr.Shard_map.add slot pkh shard_to_pkh)
-            committee.shard_to_pkh
-            Misc.(slot_index --> (slot_index + (power - 1)));
       }
     in
     let rec compute_power index committee =
@@ -1940,9 +1928,6 @@ module Dal = struct
         let* _ctxt, pkh = pkh_from_tenderbake_slot slot in
         (* The [Slot_repr] module is related to the Tenderbake committee. *)
         let slot_index = Slot_repr.to_int slot in
-        (* An optimisation could be to return only [pkh_to_shards] map
-           because the second one is not used. This can be done later
-           on, if it is a good optimisation. *)
         let committee = update_committee committee pkh ~slot_index ~power:1 in
         compute_power (index - 1) committee
     in

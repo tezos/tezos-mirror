@@ -2789,7 +2789,6 @@ module Dal : sig
 
     type committee = {
       pkh_to_shards : (shard_index * int) Signature.Public_key_hash.Map.t;
-      shard_to_pkh : Signature.Public_key_hash.t Shard_map.t;
     }
 
     val compute_committee :
