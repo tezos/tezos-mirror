@@ -38,7 +38,7 @@ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
 
 const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
 pub const ADMIN: RefPath = RefPath::assert_from(b"/admin");
-const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
+pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
 const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/kernel_governance");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
 
