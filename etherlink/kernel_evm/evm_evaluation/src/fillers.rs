@@ -310,7 +310,7 @@ pub fn parse_result(line: &str) -> Option<(String, TestResult)> {
     }
 }
 
-pub fn output_result(file: &mut File, name: &str, status: TestResult) {
+pub fn output_result(file: &mut Option<File>, name: &str, status: TestResult) {
     // If the format of the following line is modified `parse_result` above
     // should be readapted accordingly to avoid any inconsistency.
     write_out!(file, "{}: {:?}", name, status)
@@ -323,7 +323,7 @@ pub fn process(
     spec_name: &SpecName,
     report_map: &mut ReportMap,
     report_key: String,
-    output_file: &mut File,
+    output_file: &mut Option<File>,
     tx_label: LabelIndexes,
     tx_indices: &TxPartIndices,
     output: &OutputOptions,

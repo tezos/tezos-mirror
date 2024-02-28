@@ -109,7 +109,7 @@ pub struct Opt {
 }
 
 fn generate_final_report(
-    output_file: &mut File,
+    output_file: &mut Option<File>,
     report_map: &mut HashMap<String, ReportValue>,
 ) {
     let mut successes_total = 0;
@@ -298,7 +298,7 @@ fn load_former_result(path: &str) -> HashMap<String, (TestResult, Option<TestRes
 }
 
 fn generate_diff(
-    output_file: &mut File,
+    output_file: &mut Option<File>,
     diff_result_map: &HashMap<String, (TestResult, Option<TestResult>)>,
 ) {
     let mut empty = true;
@@ -473,7 +473,7 @@ pub fn check_skip_parsing(test_file_path: &Path) -> bool {
 
 fn process_skip(
     output: &OutputOptions,
-    output_file: &mut File,
+    output_file: &mut Option<File>,
     report_map: &mut ReportMap,
     report_key: &str,
 ) {
@@ -500,13 +500,19 @@ pub fn main() {
         _ => "evm_evaluation.regression",
     };
 
-    let mut output_file = OpenOptions::new()
-        .write(true)
-        .append(!(opt.from_scratch || opt.result || diff))
-        .truncate(opt.from_scratch || opt.result || diff)
-        .create(true)
-        .open(output_name)
-        .unwrap();
+    let mut output_file = if cfg!(not(feature = "no-logs")) {
+        Some(
+            OpenOptions::new()
+                .write(true)
+                .append(!(opt.from_scratch || opt.result || diff))
+                .truncate(opt.from_scratch || opt.result || diff)
+                .create(true)
+                .open(output_name)
+                .unwrap(),
+        )
+    } else {
+        None
+    };
     let folder_path =
         construct_folder_path("GeneralStateTests", &opt.eth_tests, &opt.sub_dir);
     let test_files = find_all_json_tests(&folder_path);

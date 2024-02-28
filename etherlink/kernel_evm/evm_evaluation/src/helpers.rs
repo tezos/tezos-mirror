@@ -87,11 +87,18 @@ macro_rules! write_out {
         {
             if cfg!(not(feature = "disable-file-logs")) {
                 extern crate alloc;
-                writeln!(
-                    $output_file,
-                    "{}",
-                    { &alloc::format!($($args), *) },
-                ).unwrap()
+                if let Some(ref mut output) = $output_file {
+                    writeln!(
+                        output,
+                        "{}",
+                        { &alloc::format!($($args), *) },
+                    ).unwrap()
+                } else {
+                    println!(
+                        "{}",
+                        { &alloc::format!($($args), *) }
+                    )
+                }
             }
         }
     };

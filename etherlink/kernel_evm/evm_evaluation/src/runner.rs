@@ -305,7 +305,7 @@ pub fn run_test(
     report_map: &mut ReportMap,
     report_key: String,
     opt: &Opt,
-    output_file: &mut File,
+    output_file: &mut Option<File>,
     skip: bool,
     diff_result_map: &mut DiffMap,
     output: &OutputOptions,
