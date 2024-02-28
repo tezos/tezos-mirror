@@ -251,15 +251,17 @@ let enc_includes : include_ list -> value =
   | [{local; rules = []}] -> `String local
   | inc -> array enc_includes inc
 
-let config_element : config_element -> string * value = function
-  | Workflow wf -> ("workflow", enc_workflow wf)
-  | Stages ss -> ("stages", enc_stages ss)
-  | Variables vars -> ("variables", enc_variables vars)
-  | Default def -> ("default", enc_default def)
-  | Job j -> (j.name, enc_job j)
-  | Include i -> ("include", enc_includes i)
+let config_element : config_element -> (string * value) option = function
+  | Workflow wf -> Some ("workflow", enc_workflow wf)
+  | Stages ss -> Some ("stages", enc_stages ss)
+  | Variables vars -> Some ("variables", enc_variables vars)
+  | Default def -> Some ("default", enc_default def)
+  | Job j -> Some (j.name, enc_job j)
+  | Include i -> Some ("include", enc_includes i)
+  | Comment _ -> None
 
-let to_yaml (config : config) : value = `O (List.map config_element config)
+let to_yaml (config : config) : value =
+  `O (List.filter_map config_element config)
 
 let to_file ?header ~filename config =
   Base.with_open_out filename @@ fun ch ->
@@ -267,7 +269,15 @@ let to_file ?header ~filename config =
   Option.iter out header ;
   let rec loop =
     let print element =
-      out (Base.yaml_to_string (`O [config_element element]))
+      (match element with
+      | Comment s ->
+          let lines = String.split_on_char '\n' s in
+          let lines = List.map (fun s -> String.trim ("# " ^ s)) lines in
+          out (String.concat "\n" lines)
+      | _ -> ()) ;
+      Option.iter
+        (fun field -> out (Base.yaml_to_string (`O [field])))
+        (config_element element)
     in
     function
     | [] -> ()
