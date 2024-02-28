@@ -10,6 +10,5 @@ oc.docker:amd64:
     CI_DOCKER_HUB: "false"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
     DOCKER_BUILD_TARGET: "with-evm-artifacts"
-  needs: []
   when: manual
   allow_failure: true

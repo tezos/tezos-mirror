@@ -9,6 +9,5 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: "arm64_"
     CI_DOCKER_HUB: "false"
     EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
-  needs: []
   when: manual
   allow_failure: true
