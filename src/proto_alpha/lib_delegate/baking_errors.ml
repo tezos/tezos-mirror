@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Cannot_open_context_index of {context_path : string}
-
 type error += Node_connection_lost
 
 type error += Cannot_load_local_file of string
@@ -44,19 +42,7 @@ let register_error_kind category ~id ~title ~description ~pp encoding from_error
 let () =
   register_error_kind
     `Temporary
-    ~id:"cannot_open_context_index"
-    ~title:"Cannot open context index"
-    ~description:"Failed to open the context index at the given location"
-    ~pp:(fun fmt path ->
-      Format.fprintf fmt "Cannot open context index at %s" path)
-    Data_encoding.(obj1 (req "cannot_open_context_index" Data_encoding.string))
-    (function
-      | Cannot_open_context_index {context_path} -> Some context_path
-      | _ -> None)
-    (fun context_path -> Cannot_open_context_index {context_path}) ;
-  register_error_kind
-    `Temporary
-    ~id:"baking_scheduling.node_connection_lost"
+    ~id:"Baking_scheduling.node_connection_lost"
     ~title:"Node connection lost"
     ~description:"The connection with the node was lost."
     ~pp:(fun fmt () -> Format.fprintf fmt "Lost connection with the node")
@@ -65,7 +51,7 @@ let () =
     (fun () -> Node_connection_lost) ;
   register_error_kind
     `Temporary
-    ~id:"baking_scheduling.cannot_load_local_file"
+    ~id:"Baking_scheduling.cannot_load_local_file"
     ~title:"Cannot load local file"
     ~description:"Cannot load local file."
     ~pp:(fun fmt filename ->
