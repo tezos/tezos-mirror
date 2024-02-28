@@ -372,9 +372,6 @@ let test_slash_correct_amount_after_stake_from_unstake =
 
 (* Test a non-zero request finalizes for a non-zero amount if it hasn't been slashed 100% *)
 let test_mini_slash =
-  let consensus_rights_delay =
-    Default_parameters.constants_test.consensus_rights_delay
-  in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> (Tag "Yes AI" --> activate_ai true
@@ -392,7 +389,8 @@ let test_mini_slash =
   --> next_cycle
   --> next_cycle
   --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
-  --> wait_n_cycles (consensus_rights_delay + 1)
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.constants.consensus_rights_delay + 1)
 
 let test_slash_rounding =
   init_constants ()
