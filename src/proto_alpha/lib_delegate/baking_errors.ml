@@ -29,12 +29,22 @@ type error += Node_connection_lost
 
 type error += Cannot_load_local_file of string
 
-let make_id id = String.concat "." [Protocol.name; id]
+let register_error_kind category ~id ~title ~description ~pp encoding from_error
+    to_error =
+  Error_monad.register_error_kind
+    category
+    ~id:(String.concat "." ["baker"; Protocol.name; id])
+    ~title
+    ~description
+    ~pp
+    encoding
+    from_error
+    to_error
 
 let () =
-  Error_monad.register_error_kind
+  register_error_kind
     `Temporary
-    ~id:(make_id "cannot_open_context_index")
+    ~id:"cannot_open_context_index"
     ~title:"Cannot open context index"
     ~description:"Failed to open the context index at the given location"
     ~pp:(fun fmt path ->
@@ -46,7 +56,7 @@ let () =
     (fun context_path -> Cannot_open_context_index {context_path}) ;
   register_error_kind
     `Temporary
-    ~id:(make_id "baking_scheduling.node_connection_lost")
+    ~id:"baking_scheduling.node_connection_lost"
     ~title:"Node connection lost"
     ~description:"The connection with the node was lost."
     ~pp:(fun fmt () -> Format.fprintf fmt "Lost connection with the node")
@@ -55,7 +65,7 @@ let () =
     (fun () -> Node_connection_lost) ;
   register_error_kind
     `Temporary
-    ~id:(make_id "baking_scheduling.cannot_load_local_file")
+    ~id:"baking_scheduling.cannot_load_local_file"
     ~title:"Cannot load local file"
     ~description:"Cannot load local file."
     ~pp:(fun fmt filename ->
