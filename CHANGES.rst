@@ -179,6 +179,9 @@ Smart Rollup node
 - Rollup node can recover from degraded mode if they have everything necessary
   to pick back up the main loop. (MR :gl:`!12107`)
 
+- Added RPC ``/local/synchronized`` to wait for the rollup node to be
+  synchronized with L1. (MR :gl:`!12247`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
