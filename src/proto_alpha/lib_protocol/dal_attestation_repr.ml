@@ -91,12 +91,6 @@ end)
 module Accountability = struct
   type attested_slots = t
 
-  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3109
-
-     Think hard about this data structure and whether it needs to be
-     optimized.
-  *)
-
   module SlotMap = Map.Make (Compare.Int)
 
   type t = {number_of_attested_shards : int SlotMap.t; number_of_slots : int}
