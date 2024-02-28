@@ -52,6 +52,9 @@ evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }
 
 # SDK
+tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", features = [
+  "proto-nairobi",
+] }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core", features = [
   "proto-nairobi",
 ] }

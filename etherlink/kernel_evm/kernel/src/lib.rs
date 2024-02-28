@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::apply::WITHDRAWAL_OUTBOX_QUEUE;
 use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
@@ -28,10 +29,11 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::path::{concat, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 mod apply;
@@ -241,32 +243,56 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         .expect("The kernel failed to create the temporary directory");
 
     let mut internal_storage = InternalStorage();
-    let mut host = SafeStorage {
+    let mut safe_host = SafeStorage {
         host,
         internal: &mut internal_storage,
     };
-    match main(&mut host) {
+    match main(&mut safe_host) {
         Ok(()) => {
-            promote_upgrade(&mut host)
+            promote_upgrade(&mut safe_host)
                 .expect("Potential kernel upgrade promotion failed");
-            host.promote(&EVM_PATH)
-                .expect("The kernel failed to promote the temporary directory")
+            safe_host
+                .promote(&EVM_PATH)
+                .expect("The kernel failed to promote the temporary directory");
+
+            // The kernel run went fine, it won't be retried, we can safely
+            // flush the outbox queue:
+            let path = concat(&EVM_PATH, &WITHDRAWAL_OUTBOX_QUEUE)
+                .expect("Failed to concat path");
+            let outbox_queue = OutboxQueue::new(&path, u32::MAX)
+                .expect("Failed to create the outbox queue");
+
+            let written = outbox_queue.flush_queue(safe_host.host);
+            // Log to Info only if we flushed messages.
+            let mut level = Debug;
+            if written > 0 {
+                level = Info;
+            }
+            log!(
+                safe_host,
+                level,
+                "Flushed outbox queue messages ({} flushed)",
+                written
+            );
         }
         Err(e) => {
             if let Some(UpgradeError(Fallback)) = e.downcast_ref::<Error>() {
                 // All the changes from the failed migration are reverted.
-                host.revert()
+                safe_host
+                    .revert()
                     .expect("The kernel failed to delete the temporary directory");
-                fallback_backup_kernel(&mut host).expect("Fallback mechanism failed");
+                fallback_backup_kernel(&mut safe_host)
+                    .expect("Fallback mechanism failed");
             } else {
-                log!(host, Error, "The kernel produced an error: {:?}", e);
+                log!(safe_host, Error, "The kernel produced an error: {:?}", e);
                 log!(
-                    host,
+                    safe_host,
                     Error,
                     "The temporarily modified durable storage is discarded"
                 );
 
-                host.revert()
+                safe_host
+                    .revert()
                     .expect("The kernel failed to delete the temporary directory")
             }
         }

@@ -1,0 +1,22 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "n",
+				"type": "uint256"
+			}
+		],
+		"name": "doWithdrawals",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "giveFunds",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	}
+]

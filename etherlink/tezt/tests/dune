@@ -6,6 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
+  octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
   tezt_etherlink
@@ -15,6 +16,7 @@
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
+  -open Tezos_test_helpers
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos

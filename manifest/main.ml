@@ -8519,6 +8519,7 @@ let _tezt_etherlink =
     ~synopsis:"Tezt integration tests for Etherlink"
     ~deps:
       [
+        octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
