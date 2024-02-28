@@ -18,7 +18,7 @@ use tezos_smart_rollup_host::{path::RefPath, runtime::Runtime};
 
 pub struct DelayedInbox(LinkedList<Hash, DelayedInboxItem>);
 
-pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/delayed-inbox");
+pub const DELAYED_INBOX_PATH: RefPath = RefPath::assert_from(b"/evm/delayed-inbox");
 
 // Maximum number of transaction included in a blueprint when
 // forcing timed-out transactions from the delayed inbox.

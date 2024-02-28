@@ -33,7 +33,7 @@ use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::path::{concat, RefPath};
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 mod apply;
@@ -258,9 +258,7 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
 
             // The kernel run went fine, it won't be retried, we can safely
             // flush the outbox queue:
-            let path = concat(&EVM_PATH, &WITHDRAWAL_OUTBOX_QUEUE)
-                .expect("Failed to concat path");
-            let outbox_queue = OutboxQueue::new(&path, u32::MAX)
+            let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
                 .expect("Failed to create the outbox queue");
 
             let written = outbox_queue.flush_queue(safe_host.host);
@@ -551,7 +549,8 @@ mod tests {
     #[test]
     fn load_block_fees_with_minimum() {
         let min_path =
-            RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas").into();
+            RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas")
+                .into();
 
         // Arrange
         let mut host = MockHost::default();

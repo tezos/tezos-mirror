@@ -46,7 +46,7 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
         allow_path_not_found(
-            host.store_delete(&RefPath::assert_from(b"/blueprints/last")),
+            host.store_delete(&RefPath::assert_from(b"/evm/blueprints/last")),
         )?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;

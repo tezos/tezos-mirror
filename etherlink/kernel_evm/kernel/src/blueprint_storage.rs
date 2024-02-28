@@ -17,7 +17,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
-const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/blueprints");
+const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 
