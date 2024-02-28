@@ -3,7 +3,7 @@ test_evm_compatibility:
     - .oc.kernels_template
   stage: test
   script:
-    - make -f etherlink.mk evm-evaluation-assessor
+    - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
     - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
     - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c
   rules:

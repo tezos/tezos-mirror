@@ -500,7 +500,7 @@ pub fn main() {
         _ => "evm_evaluation.regression",
     };
 
-    let mut output_file = if cfg!(not(feature = "no-logs")) {
+    let mut output_file = if cfg!(not(feature = "disable-file-logs")) {
         Some(
             OpenOptions::new()
                 .write(true)
