@@ -13,9 +13,10 @@ set -eu
 
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
-gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_package_name}/${gitlab_package_version}"
+gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
 gitlab_octez_deb_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_deb_package_name}/${gitlab_package_version}"
 gitlab_octez_rpm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rpm_package_name}/${gitlab_package_version}"
+gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
@@ -65,7 +66,7 @@ for architecture in ${architectures}; do
 
   cd octez-binaries/
   tar -czf "octez-${architecture}.tar.gz" "octez-${architecture}/"
-  gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_package_name}-linux-${architecture}.tar.gz"
+  gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_octez_binaries_package_name}-linux-${architecture}.tar.gz"
   cd ..
 done
 
@@ -88,27 +89,28 @@ done
 # => create and upload manually
 echo 'Upload tarball of source code and its checksums'
 
-source_tarball="${gitlab_octez_package_name}.tar.bz2"
+source_tarball="${gitlab_octez_source_package_name}.tar.bz2"
 
-# We are using the export-subst feature of git onfigured in .gitattributes, requires git version >= 2.35
+# We are using the export-subst feature of git configured in .gitattributes, requires git version >= 2.35
 # https://git-scm.com/docs/git-archive
 # https://git-scm.com/docs/gitattributes#_creating_an_archive
 git --version
 # Verify the placeholder %(describe:tags) is available
 git describe --tags
-# Create tarball
-git archive "${CI_COMMIT_TAG}" --format=tar | bzip2 > "${source_tarball}"
+# Pass '--worktree-attributes' to ensure that ignores written by restrict_export_to_octez_source.sh
+# are respected.
+git archive "${CI_COMMIT_TAG}" --format=tar --worktree-attributes --prefix "${gitlab_octez_source_package_name}/" | bzip2 > "${source_tarball}"
 
 # Check tarball is valid
 tar -tjf "${source_tarball}" > /dev/null
 
 # Verify git expanded placeholders in archive
-tar -Oxf "${source_tarball}" src/lib_version/exe/get_git_info.ml | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
+tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_version/exe/get_git_info.ml" | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""
 
 # Checksums
 sha256sum "${source_tarball}" > "${source_tarball}.sha256"
 sha512sum "${source_tarball}" > "${source_tarball}.sha512"
 
-gitlab_upload "${source_tarball}" "${source_tarball}"
-gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256"
-gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512"
+gitlab_upload "${source_tarball}" "${source_tarball}" "${gitlab_octez_source_package_url}"
+gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256" "${gitlab_octez_source_package_url}"
+gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512" "${gitlab_octez_source_package_url}"

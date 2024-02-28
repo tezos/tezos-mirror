@@ -14,6 +14,8 @@ binaries="$(cat "$script_inputs_dir/released-executables")"
 deb_packages="$(find . -maxdepth 1 -name octez-\*.deb)"
 rpm_packages="$(find . -maxdepth 1 -name octez-\*.rpm)"
 
+octez_source_content="$script_inputs_dir/octez-source-content"
+
 ### Compute GitLab release names
 
 # Remove the 'v' in front
@@ -47,9 +49,10 @@ fi
 
 ### Compute GitLab generic package names
 
-gitlab_octez_package_name="octez-${gitlab_release_no_v}"
+gitlab_octez_binaries_package_name="octez-binaries-${gitlab_release_no_v}"
 gitlab_octez_deb_package_name="octez-debian-${gitlab_release_no_v}"
 gitlab_octez_rpm_package_name="octez-redhat-${gitlab_release_no_v}"
+gitlab_octez_source_package_name="octez-source-${gitlab_release_no_v}"
 
 # X.Y or X.Y-rcZ
 gitlab_package_version="${gitlab_release_no_v}"
