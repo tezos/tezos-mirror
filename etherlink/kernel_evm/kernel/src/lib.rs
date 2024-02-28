@@ -10,7 +10,7 @@ use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
-use crate::safe_storage::{KernelRuntime, SafeStorage, TMP_PATH};
+use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::stage_one::fetch;
 use crate::Error::UpgradeError;
 use anyhow::Context;
@@ -239,20 +239,21 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         );
     }
 
-    host.store_copy(&EVM_PATH, &TMP_PATH)
-        .expect("The kernel failed to create the temporary directory");
-
     let mut internal_storage = InternalStorage();
     let mut safe_host = SafeStorage {
         host,
         internal: &mut internal_storage,
     };
+    safe_host
+        .start()
+        .expect("The kernel failed to create the temporary directory");
+
     match main(&mut safe_host) {
         Ok(()) => {
             promote_upgrade(&mut safe_host)
                 .expect("Potential kernel upgrade promotion failed");
             safe_host
-                .promote(&EVM_PATH)
+                .promote()
                 .expect("The kernel failed to promote the temporary directory");
 
             // The kernel run went fine, it won't be retried, we can safely
