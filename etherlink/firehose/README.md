@@ -50,3 +50,15 @@ $ octez-client --endpoint <L1_ENDPOINT> \
 ```
 
 After a short time, `firehose status` should indeed show an increase in the `controller_balance`.
+
+## Transfer
+
+Firehose can perform transfers from the controller account to any other.
+For simple transfers, you can select `xtz`, `gwei` & `wei` as units.
+
+As an example:
+
+```sh
+$ firehose transfer --amount 1.2 gwei --to 0x63Ec92990F469bC0DD03516E0d32Ee9A4D8Ff214
+0x63ec…f214 funded with 1 | hash: 0x9ef484b4ce9b8223040cde139b582cfcfb55f29cce89fb8f4017c30ef2fbed90
+```

@@ -3,10 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
-use ethers::utils::format_units;
+use clap::{Parser, Subcommand, ValueEnum};
+use ethers::types::H160;
+use ethers::utils::{format_units, parse_units, ConversionError, Units};
 use tokio::task::spawn_blocking;
 use tokio::try_join;
+
+use std::str::FromStr;
 
 mod client;
 mod config;
@@ -26,7 +29,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    #[command(long_about = "Set the RPC endpoint to be used, and optionally the controller private key.")]
+    #[command(
+        long_about = "Set the RPC endpoint to be used, and optionally the controller private key."
+    )]
     Configure {
         #[arg(long)]
         endpoint: String,
@@ -34,10 +39,42 @@ enum Commands {
         controller: Option<String>,
     },
     Status,
+    #[command(long_about = "Perform a transfer from the controller account to another address")]
+    Transfer {
+        #[arg(long)]
+        to: String,
+        #[arg(long)]
+        amount: String,
+        #[arg(default_value = "xtz")]
+        kind: TransferKind,
+    },
     Start {
         // Type (erc-20/transfers/etc)
         // Target TPS
     },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum TransferKind {
+    Xtz,
+    Gwei,
+    Wei,
+    Erc20,
+}
+
+impl TryInto<Units> for TransferKind {
+    type Error = ConversionError;
+
+    fn try_into(self) -> std::result::Result<Units, ConversionError> {
+        let u = match self {
+            TransferKind::Xtz => Units::Ether,
+            TransferKind::Gwei => Units::Gwei,
+            TransferKind::Wei => Units::Wei,
+            k => return Err(ConversionError::UnrecognizedUnits(format!("{k:?}"))),
+        };
+
+        Ok(u)
+    }
 }
 
 #[tokio::main]
@@ -58,6 +95,14 @@ async fn main() -> Result<()> {
             let config = Config::load(&config_path).await?;
             status_check(&config).await?;
         }
+        Commands::Transfer { kind, amount, to } => {
+            let amount = parse_units(amount, kind)?.into();
+            let to = H160::from_str(&to)?;
+
+            let config = Config::load(&config_path).await?;
+            let client = Client::new(&config).await?;
+            client.controller_xtz_transfer(to, amount).await?;
+        }
         command => todo!("handle command {command:?}"),
     };
 
@@ -66,17 +111,12 @@ async fn main() -> Result<()> {
 
 // retrieve controller balance & current gas price
 async fn status_check(config: &Config) -> Result<()> {
-    let client = Client::new(config)?;
-    let (chain_id, gas_price, controller_balance) = try_join!(
-        client.chain_id(),
-        client.gas_price(),
-        client.controller_balance()
-    )?;
-    println!("chain_id\t\t{chain_id}");
+    let client = Client::new(config).await?;
+    let (gas_price, controller_balance) =
+        try_join!(client.gas_price(), client.controller_balance())?;
+    println!("chain_id\t\t{}", client.chain_id());
     println!("gas_price\t\t{}\tGwei", format_units(gas_price, "gwei")?);
-    println!(
-        "\ncontroller_address\t{:?}", client.controller_address()
-    );
+    println!("\ncontroller_address\t{:?}", client.controller_address());
     println!(
         "controller_balance\t{}\tXTZ",
         format_units(controller_balance, "ether")?
