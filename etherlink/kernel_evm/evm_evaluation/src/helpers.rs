@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -72,6 +72,20 @@ macro_rules! write_host {
             extern crate alloc;
             writeln!(
                 $host.buffer.borrow_mut(),
+                "{}",
+                { &alloc::format!($($args), *) },
+            ).unwrap()
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! write_out {
+    ($output_file: expr, $($args: expr),*) => {
+        {
+            extern crate alloc;
+            writeln!(
+                $output_file,
                 "{}",
                 { &alloc::format!($($args), *) },
             ).unwrap()

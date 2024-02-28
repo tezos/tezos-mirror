@@ -253,31 +253,34 @@ fn generate_final_report(
         }
     }
 
-    writeln!(output_file, "@========= FINAL REPORT =========@").unwrap();
+    write_out!(output_file, "@========= FINAL REPORT =========@");
 
     for (section, items) in final_report {
-        writeln!(output_file, "\n••• {} •••\n", section).unwrap();
+        write_out!(output_file, "\n••• {} •••\n", section);
         for (key, successes, failures, skipped) in items {
             let skipped_msg = if skipped == 0 {
                 String::new()
             } else {
                 format!(" with {} test(s) skipped", skipped)
             };
-            writeln!(
+            write_out!(
                 output_file,
                 "For sub-dir {}, there was(were) {} success(es) and {} failure(s){}.",
-                key, successes, failures, skipped_msg
-            )
-            .unwrap();
+                key,
+                successes,
+                failures,
+                skipped_msg
+            );
         }
     }
 
-    writeln!(
+    write_out!(
         output_file,
         "\nSUCCESSES IN TOTAL: {}\nFAILURES IN TOTAL: {}\nSKIPPED IN TOTAL: {}",
-        successes_total, failure_total, skipped_total
-    )
-    .unwrap();
+        successes_total,
+        failure_total,
+        skipped_total
+    );
 }
 
 fn load_former_result(path: &str) -> HashMap<String, (TestResult, Option<TestResult>)> {
@@ -304,23 +307,24 @@ fn generate_diff(
         match new_res {
             None => {
                 empty = false;
-                writeln!(output_file, "{}: UNPROCESSED", test_case).unwrap()
+                write_out!(output_file, "{}: UNPROCESSED", test_case)
             }
             Some(result) if former_res != result => {
                 empty = false;
-                writeln!(
+                write_out!(
                     output_file,
                     "{}: {:?} -> {:?}",
-                    test_case, former_res, result
+                    test_case,
+                    former_res,
+                    result
                 )
-                .unwrap()
             }
             _ => continue,
         }
     }
 
     if empty {
-        writeln!(output_file, "None of the test evaluation was changed.").unwrap()
+        write_out!(output_file, "None of the test evaluation was changed.")
     }
 }
 
@@ -482,7 +486,7 @@ fn process_skip(
             };
         });
     if output.log {
-        writeln!(output_file, "\nSKIPPED\n").unwrap()
+        write_out!(output_file, "\nSKIPPED\n")
     };
 }
 
@@ -517,12 +521,11 @@ pub fn main() {
     };
 
     if output.log {
-        writeln!(
+        write_out!(
             output_file,
             "Start running tests on: {}",
             folder_path.to_str().unwrap()
-        )
-        .unwrap();
+        );
     }
 
     let skip_data_path = Path::new(&opt.resources).join(SKIP_DATA_FILE);
@@ -530,9 +533,9 @@ pub fn main() {
         Ok(reader) => serde_yaml::from_reader(&*reader)
             .expect("Reading data(s) to skip should succeed."),
         Err(_) => {
-            writeln!(output_file, "WARNING: the specified path [{}] can not be found, data(s) \
+            write_out!(output_file, "WARNING: the specified path [{}] can not be found, data(s) \
                                    that should be skipped will not be and the outcome of the \
-                                   evaluation could be erroneous.", skip_data_path.display()).unwrap();
+                                   evaluation could be erroneous.", skip_data_path.display());
             SkipData { datas: vec![] }
         }
     };
@@ -556,8 +559,7 @@ pub fn main() {
         };
 
         if output.log {
-            writeln!(output_file, "---------- Test: {:?} ----------", &test_file)
-                .unwrap();
+            write_out!(output_file, "---------- Test: {:?} ----------", &test_file);
         }
 
         if check_skip_parsing(&test_file) {
@@ -587,7 +589,7 @@ pub fn main() {
     }
 
     if output.log {
-        writeln!(output_file, "@@@@@ END OF TESTING @@@@@\n").unwrap();
+        write_out!(output_file, "@@@@@ END OF TESTING @@@@@\n");
     }
 
     if let Some(map) = diff_result_map {

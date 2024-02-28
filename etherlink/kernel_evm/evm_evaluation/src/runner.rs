@@ -29,7 +29,7 @@ use crate::helpers::{
     construct_folder_path, string_of_hexa, LabelIndexes, OutputOptions,
 };
 use crate::models::{Env, FillerSource, SkipData, SpecName, Test, TestSuite, TestUnit};
-use crate::{write_host, DiffMap, Opt, ReportMap};
+use crate::{write_host, write_out, DiffMap, Opt, ReportMap};
 
 const MAP_CALLER_KEYS: [(H256, H160); 6] = [
     (
@@ -316,7 +316,7 @@ pub fn run_test(
 
     for (name, unit) in suit.0.into_iter() {
         if output.log {
-            writeln!(output_file, "Running unit test: {}", name).unwrap();
+            write_out!(output_file, "Running unit test: {}", name);
         }
         let precompiles = precompile_set::<EvalHost>();
         let mut evm_account_storage = init_account_storage().unwrap();
@@ -360,7 +360,7 @@ pub fn run_test(
                 let data_label = info.labels.get(&data);
                 if let Some(data_label) = data_label {
                     if output.log {
-                        writeln!(output_file, "Executing test {}", data_label).unwrap();
+                        write_out!(output_file, "Executing test {}", data_label);
                     }
                 }
 
