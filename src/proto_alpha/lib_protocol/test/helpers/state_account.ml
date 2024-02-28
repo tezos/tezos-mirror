@@ -115,42 +115,6 @@ let stake_from_unstake amount current_cycle consensus_rights_delay delegate_name
         in
         (account_map, rem_amount)
 
-let tez_to_pseudo ~round amount delegate_account =
-  let {staking_delegate_denominator; frozen_deposits; _} = delegate_account in
-  let total_q = Frozen_tez.total_co_current_q frozen_deposits.co_current in
-  let total, rem = Partial_tez.to_tez_rem total_q in
-  assert (Q.(equal rem zero)) ;
-  if Tez.(equal total zero) then Tez.to_z amount
-  else
-    let r = Tez.ratio amount total in
-    let p = Q.(r * of_bigint staking_delegate_denominator) in
-    Tez.(of_q ~round p |> to_z)
-
-let pseudo_to_partial_tez amount_pseudo delegate_account =
-  let {staking_delegate_denominator; frozen_deposits; _} = delegate_account in
-  let total_q = Frozen_tez.total_co_current_q frozen_deposits.co_current in
-  let total, rem = Partial_tez.to_tez_rem total_q in
-  assert (Q.(equal rem zero)) ;
-  if Z.(equal staking_delegate_denominator zero) then Q.of_bigint amount_pseudo
-  else
-    let q = Q.(amount_pseudo /// staking_delegate_denominator) in
-    Tez.mul_q total q
-
-(* tez_q <= amount *)
-let stake_values_real amount delegate_account =
-  let pseudo = tez_to_pseudo ~round:`Down amount delegate_account in
-  let tez_q = pseudo_to_partial_tez pseudo delegate_account in
-  (pseudo, tez_q)
-
-(* returned_amount <= amount *)
-let unstake_values_real amount delegate_account =
-  let pseudo = tez_to_pseudo ~round:`Up amount delegate_account in
-  let tez_q = pseudo_to_partial_tez pseudo delegate_account in
-  if Tez.equal (Tez.of_q ~round:`Down tez_q) amount then (pseudo, tez_q)
-  else
-    let pseudo = Z.(pseudo - one) in
-    (pseudo, pseudo_to_partial_tez pseudo delegate_account)
-
 let apply_stake amount current_cycle consensus_rights_delay staker_name
     account_map =
   match String.Map.find staker_name account_map with
@@ -200,7 +164,12 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
             (* Call stake_values_real to know the actual amount staked and the pseudotokens minted *)
             (* amount_q would be the effective stake on the delegate's side, while
                amount is the amount removed from the liquid balance *)
-            let pseudo, amount_q = stake_values_real amount delegate_account in
+            let pseudo, amount_q =
+              stake_values_real
+                amount
+                delegate_account.staking_delegate_denominator
+                delegate_account.frozen_deposits
+            in
             let f_staker staker =
               let liquid = Tez.(staker.liquid -! amount) in
               let staking_delegator_numerator =
@@ -285,7 +254,10 @@ let apply_unstake cycle amount staker_name account_map =
                        If those pseudotokens would give strictly more than the requested amount,
                        then give one less pseudotoken. The actual amount unstaked is always lower than
                        the requested amount (except in the unstake all case) *)
-                    unstake_values_real amount delegate
+                    unstake_values_real
+                      amount
+                      delegate.staking_delegate_denominator
+                      delegate.frozen_deposits
                 in
                 (* Actual unstaked amount (that will be finalized) *)
                 let amount = Partial_tez.to_tez ~round:`Down amount_q in

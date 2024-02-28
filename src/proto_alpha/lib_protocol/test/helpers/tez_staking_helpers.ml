@@ -422,3 +422,53 @@ module Unstaked_finalizable = struct
   let get account {map; _} =
     match String.Map.find account map with None -> Tez.zero | Some x -> x
 end
+
+(** Pseudotoken helpers *)
+let tez_to_pseudo ~round amount staking_delegate_denominator frozen_deposits =
+  let total_q = Frozen_tez.(total_co_current_q frozen_deposits.co_current) in
+  let total, rem = Partial_tez.to_tez_rem total_q in
+  assert (Q.(equal rem zero)) ;
+  if Tez.(equal total zero) then Tez.to_z amount
+  else
+    let r = Tez.ratio amount total in
+    let p = Q.(r * of_bigint staking_delegate_denominator) in
+    Tez.(of_q ~round p |> to_z)
+
+let pseudo_to_partial_tez amount_pseudo staking_delegate_denominator
+    frozen_deposits =
+  let total_q = Frozen_tez.(total_co_current_q frozen_deposits.co_current) in
+  let total, rem = Partial_tez.to_tez_rem total_q in
+  assert (Q.(equal rem zero)) ;
+  if Z.(equal staking_delegate_denominator zero) then Q.of_bigint amount_pseudo
+  else
+    let q = Q.(amount_pseudo /// staking_delegate_denominator) in
+    Tez.mul_q total q
+
+(* tez_q <= amount *)
+let stake_values_real amount staking_delegate_denominator frozen_deposits =
+  let pseudo =
+    tez_to_pseudo
+      ~round:`Down
+      amount
+      staking_delegate_denominator
+      frozen_deposits
+  in
+  let tez_q =
+    pseudo_to_partial_tez pseudo staking_delegate_denominator frozen_deposits
+  in
+  (pseudo, tez_q)
+
+(* returned_amount <= amount *)
+let unstake_values_real amount staking_delegate_denominator frozen_deposits =
+  let pseudo =
+    tez_to_pseudo ~round:`Up amount staking_delegate_denominator frozen_deposits
+  in
+  let tez_q =
+    pseudo_to_partial_tez pseudo staking_delegate_denominator frozen_deposits
+  in
+  if Tez.equal (Tez.of_q ~round:`Down tez_q) amount then (pseudo, tez_q)
+  else
+    let pseudo = Z.(pseudo - one) in
+    ( pseudo,
+      pseudo_to_partial_tez pseudo staking_delegate_denominator frozen_deposits
+    )
