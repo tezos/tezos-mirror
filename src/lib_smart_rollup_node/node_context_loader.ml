@@ -76,6 +76,13 @@ let update_metadata ({Metadata.rollup_address; _} as metadata) ~data_dir =
       Metadata.write_metadata_file ~dir:data_dir metadata
   | None -> Metadata.write_metadata_file ~dir:data_dir metadata
 
+let create_sync_info () =
+  {
+    on_synchronized = Lwt_condition.create ();
+    processed_level = 0l;
+    sync_level_input = Lwt_watcher.create_input ();
+  }
+
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ~index_buffer_size ?log_kernel_debug_file ?last_whitelist_update mode
     l1_ctxt genesis_info ~lcc ~lpc kind current_protocol
@@ -164,7 +171,8 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
         })
       last_whitelist_update
   in
-  return
+  let sync = create_sync_info () in
+  let node_ctxt =
     {
       config = configuration;
       cctxt = (cctxt :> Client_context.full);
@@ -186,7 +194,15 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       finaliser = kernel_debug_finaliser;
       current_protocol;
       global_block_watcher;
+      sync;
     }
+  in
+  let* l2_head = Node_context.last_processed_head_opt node_ctxt in
+  let processed_level =
+    match l2_head with Some {header = {level; _}; _} -> level | None -> 0l
+  in
+  sync.processed_level <- processed_level ;
+  return node_ctxt
 
 let close ({cctxt; store; context; l1_ctxt; finaliser; _} as node_ctxt) =
   let open Lwt_result_syntax in
@@ -279,6 +295,7 @@ module For_snapshots = struct
       Lwt_unix.openfile (Filename.temp_file "lock" "") [] 0o644
     in
     let global_block_watcher = Lwt_watcher.create_input () in
+    let sync = create_sync_info () in
     return
       {
         config;
@@ -301,6 +318,7 @@ module For_snapshots = struct
         finaliser = Lwt.return;
         current_protocol;
         global_block_watcher;
+        sync;
       }
 end
 
@@ -390,6 +408,7 @@ module Internal_for_tests = struct
         ]
     in
     let global_block_watcher = Lwt_watcher.create_input () in
+    let sync = create_sync_info () in
     return
       {
         config;
@@ -412,6 +431,7 @@ module Internal_for_tests = struct
         kernel_debug_logger = Event.kernel_debug;
         finaliser = (fun () -> Lwt.return_unit);
         global_block_watcher;
+        sync;
       }
 
   let openapi_context cctxt protocol =
