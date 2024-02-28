@@ -1,9 +1,0 @@
-docker:promote_to_latest:
-  extends:
-    - .docker_auth_template
-    - .image_template__docker
-  stage: publish_release
-  variables:
-    CI_DOCKER_HUB: "false"
-  script:
-    - ./scripts/ci/docker_promote_to_latest.sh

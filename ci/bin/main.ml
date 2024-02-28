@@ -41,7 +41,7 @@ module Stages = struct
 
   let _publish_release_gitlab = Stage.register "publish_release_gitlab"
 
-  let _publish_release = Stage.register "publish_release"
+  let publish_release = Stage.register "publish_release"
 
   let _publish_package_gitlab = Stage.register "publish_package_gitlab"
 
@@ -166,7 +166,7 @@ module Images = struct
      For more info, see {{:https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#use-docker-socket-binding}} here.
 
      This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
-  let _docker =
+  let docker =
     Image.register
       ~name:"docker"
       ~image_path:"${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0"
@@ -193,6 +193,31 @@ let job_dummy : job =
     ~script:[{|echo "This job will never execute"|}]
     ()
 
+(** Helper to create jobs that uses the docker deamon.
+
+    It:
+    - Sets the appropriate image.
+    - Activates the Docker daemon as a service.
+    - It sets up authentification with docker registries *)
+let job_docker_authenticated ?variables ~stage ~name script : job =
+  let docker_version = "24.0.6" in
+  job
+    ~image:Images.docker
+    ~variables:
+      ([("DOCKER_VERSION", docker_version)] @ Option.value ~default:[] variables)
+    ~before_script:["./scripts/ci/docker_initialize.sh"]
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~stage
+    ~name
+    script
+
+let job_docker_promote_to_latest ~ci_docker_hub : job =
+  job_docker_authenticated
+    ~stage:Stages.publish_release
+    ~name:"docker:promote_to_latest"
+    ~variables:[("CI_DOCKER_HUB", Bool.to_string ci_docker_hub)]
+    ["./scripts/ci/docker_promote_to_latest.sh"]
+
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
    pipeline is defined. At the moment, all these pipelines are defined
@@ -215,10 +240,12 @@ let () =
   register "before_merging" If.(on_tezos_namespace && merge_request) ;
   register
     "latest_release"
+    ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:true]
     If.(on_tezos_namespace && push && on_branch "latest-release") ;
   register
     "latest_release_test"
-    If.(not_on_tezos_namespace && push && on_branch "latest-release-test") ;
+    If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
+    ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:false] ;
   register "master_branch" If.(on_tezos_namespace && push && on_branch "master") ;
   register
     "release_tag"
@@ -261,6 +288,7 @@ let config =
     :: {local = ".gitlab/ci/jobs/shared/templates.yml"; rules = []}
     :: includes
   in
+  Pipeline.write () ;
   [
     Workflow workflow;
     Default default;
