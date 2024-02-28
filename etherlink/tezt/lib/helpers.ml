@@ -136,3 +136,24 @@ let check_head_consistency ~left ~right ?error_msg () =
   let*@ right_head = Rpc.get_block_by_number ~block:"latest" right in
   Check.((left_head.hash = right_head.hash) string) ~error_msg ;
   unit
+
+let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
+    ~sequencer_admin_contract ~client ~upgrade_to ~activation_timestamp =
+  let* payload =
+    Evm_node.sequencer_upgrade_payload
+      ~client
+      ~public_key:upgrade_to
+      ~activation_timestamp
+      ()
+  in
+  (* Sends the upgrade to L1. *)
+  let* () =
+    Client.transfer
+      ~amount:Tez.zero
+      ~giver:sequencer_admin
+      ~receiver:sequencer_admin_contract
+      ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
+      ~burn_cap:Tez.one
+      client
+  in
+  Client.bake_for_and_wait ~keys:[] client

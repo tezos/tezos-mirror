@@ -75,13 +75,12 @@ let () =
     ~id:"evm_node_dev_cannot_apply_blueprint"
     ~title:"Cannot apply a blueprint"
     ~description:
-      "The EVM node could not apply apply a blueprint on top of its local EVM \
-       state."
+      "The EVM node could not apply a blueprint on top of its local EVM state."
     ~pp:(fun ppf local_state_level ->
       Format.fprintf
         ppf
-        "The EVM node could not apply apply a blueprint on top of its local \
-         EVM state at level %a."
+        "The EVM node could not apply a blueprint on top of its local EVM \
+         state at level %a."
         Z.pp_print
         local_state_level)
     Data_encoding.(obj1 (req "current_state_level" n))

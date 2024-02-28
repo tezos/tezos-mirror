@@ -4,6 +4,10 @@
 
 ### Features
 
+- Detect when a sequencer upgrade evm event is seen in the rollup node
+  kernel. The sequencer upgrade is applied to the sequencer local
+  storage. (!12046)
+
 ### Bug fixes
 
 ### Breaking changes

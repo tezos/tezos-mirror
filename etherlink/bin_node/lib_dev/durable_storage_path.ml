@@ -32,6 +32,8 @@ let kernel_version = EVM.make "/kernel_version"
 
 let kernel_upgrade = EVM.make "/kernel_upgrade"
 
+let sequencer_upgrade = EVM.make "/sequencer_upgrade"
+
 module Accounts = struct
   let accounts = World_state.make "/eth_accounts"
 

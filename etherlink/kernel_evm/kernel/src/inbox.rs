@@ -316,7 +316,7 @@ pub fn handle_input(
         }
         Input::Upgrade(kernel_upgrade) => store_kernel_upgrade(host, &kernel_upgrade)?,
         Input::SequencerUpgrade(sequencer_upgrade) => {
-            store_sequencer_upgrade(host, &sequencer_upgrade)?
+            store_sequencer_upgrade(host, sequencer_upgrade)?
         }
         Input::RemoveSequencer => remove_sequencer(host)?,
         Input::Info(info) => {

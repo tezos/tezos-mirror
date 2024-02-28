@@ -171,9 +171,13 @@ let empty_hash = Hash (Hex "")
 
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
 
+let encode_hex (Hex hex) = Hex.to_bytes_exn (`Hex hex)
+
 let decode_block_hash bytes = Block_hash (decode_hex bytes)
 
 let decode_address bytes = Address (decode_hex bytes)
+
+let encode_address (Address address) = encode_hex address
 
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
@@ -1278,8 +1282,42 @@ module Upgrade = struct
       (tup2 string Time.Protocol.encoding)
 end
 
+module Sequencer_upgrade = struct
+  type t = {sequencer : Signature.public_key; timestamp : Time.Protocol.t}
+
+  let of_rlp = function
+    | Rlp.List [Value sequencer; Value timestamp] ->
+        let sequencer =
+          Signature.Public_key.of_b58check_exn (String.of_bytes sequencer)
+        in
+        let timestamp = timestamp_of_bytes timestamp in
+        Some {sequencer; timestamp}
+    | _ -> None
+
+  let to_rlp {sequencer; timestamp} =
+    let sequencer =
+      Signature.Public_key.to_b58check sequencer |> String.to_bytes
+    in
+    let timestamp = timestamp_to_bytes timestamp in
+    Rlp.List [Value sequencer; Value timestamp]
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
+
+  let to_bytes sequencer_upgrade = Rlp.encode @@ to_rlp sequencer_upgrade
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {sequencer; timestamp} -> (sequencer, timestamp))
+      (fun (sequencer, timestamp) -> {sequencer; timestamp})
+      (tup2 Signature.Public_key.encoding Time.Protocol.encoding)
+end
+
 module Evm_events = struct
-  type t = Upgrade_event of Upgrade.t
+  type t =
+    | Upgrade_event of Upgrade.t
+    | Sequencer_upgrade_event of Sequencer_upgrade.t
 
   let of_bytes bytes =
     match bytes |> Rlp.decode with
@@ -1288,6 +1326,9 @@ module Evm_events = struct
         | "\x01" ->
             let upgrade = Upgrade.of_rlp rlp_content in
             Option.map (fun u -> Upgrade_event u) upgrade
+        | "\x02" ->
+            let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
+            Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
         | _ -> None)
     | _ -> None
 
@@ -1298,6 +1339,14 @@ module Evm_events = struct
           "upgrade:@ hash %a,@ timestamp: %a"
           pp_hash
           hash
+          Time.Protocol.pp_hum
+          timestamp
+    | Sequencer_upgrade_event {sequencer; timestamp} ->
+        Format.fprintf
+          fmt
+          "Sequencer_upgrade:@ sequencer:@ %a,@ timestamp %a"
+          Signature.Public_key.pp
+          sequencer
           Time.Protocol.pp_hum
           timestamp
 
@@ -1311,7 +1360,19 @@ module Evm_events = struct
            (Tag 0)
            (obj2 (req "kind" string) (req "event" Upgrade.encoding))
            (function
-             | Upgrade_event upgrade -> Some ("kernel_upgrade", upgrade))
+             | Upgrade_event upgrade -> Some ("kernel_upgrade", upgrade)
+             | _ -> None)
            (fun (_, upgrade) -> Upgrade_event upgrade));
+        (let tag = "sequencer_upgrade" in
+         case
+           ~title:tag
+           (Tag 1)
+           (obj2 (req "kind" string) (req "event" Sequencer_upgrade.encoding))
+           (function
+             | Sequencer_upgrade_event sequencer_upgrade ->
+                 Some ("sequencer_upgrade", sequencer_upgrade)
+             | _ -> None)
+           (fun (_, sequencer_upgrade) ->
+             Sequencer_upgrade_event sequencer_upgrade));
       ]
 end

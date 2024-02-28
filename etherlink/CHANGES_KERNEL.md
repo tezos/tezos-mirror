@@ -4,6 +4,9 @@
 
 ### Features
 
+- Add an evm event when a sequencer upgrade is seen by the
+  kernel. (!12046)
+
 - Da fee is sent to sequencer pool address. (!12113)
 
 ### Bug fixes

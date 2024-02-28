@@ -101,3 +101,16 @@ val upgrade :
     are not with [error_msg] *)
 val check_head_consistency :
   left:Evm_node.t -> right:Evm_node.t -> ?error_msg:string -> unit -> unit Lwt.t
+
+(** [sequencer_upgrade ~sc_rollup_address ~sequencer_admin
+    ~sequencer_admin_contract ~client ~upgrade_to
+    ~activation_timestamp] prepares the sequencer upgrade payload and
+    sends it to the layer 1. *)
+val sequencer_upgrade :
+  sc_rollup_address:string ->
+  sequencer_admin:string ->
+  sequencer_admin_contract:string ->
+  client:Client.t ->
+  upgrade_to:string ->
+  activation_timestamp:string ->
+  unit Lwt.t

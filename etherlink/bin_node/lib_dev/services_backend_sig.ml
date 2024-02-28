@@ -111,6 +111,10 @@ module type S = sig
   (** [inject_kernel_upgrade ~payload] injects the kernel upgrade
       payload [payload] in the local state. *)
   val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+
+  (** [inject_sequencer_upgrade ~payload] injects the sequencer
+      upgrade payload [payload] in the local state. *)
+  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module type Backend = sig
@@ -123,6 +127,8 @@ module type Backend = sig
   module SimulatorBackend : Simulator.SimulationBackend
 
   val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+
+  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module Make (Backend : Backend) : S = struct
@@ -131,4 +137,6 @@ module Make (Backend : Backend) : S = struct
   include Simulator.Make (Backend.SimulatorBackend)
 
   let inject_kernel_upgrade = Backend.inject_kernel_upgrade
+
+  let inject_sequencer_upgrade = Backend.inject_sequencer_upgrade
 end
