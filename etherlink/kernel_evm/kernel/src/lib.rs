@@ -9,12 +9,14 @@ use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
-use crate::safe_storage::{InternalStorage, KernelRuntime, SafeStorage, TMP_PATH};
+use crate::safe_storage::{KernelRuntime, SafeStorage, TMP_PATH};
 use crate::stage_one::fetch;
 use crate::Error::UpgradeError;
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
+use fallback_upgrade::{fallback_backup_kernel, promote_upgrade};
+use internal_storage::InternalStorage;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
@@ -42,9 +44,11 @@ mod configuration;
 mod delayed_inbox;
 mod error;
 mod event;
+mod fallback_upgrade;
 mod fees;
 mod inbox;
 mod indexable_storage;
+mod internal_storage;
 mod linked_list;
 mod migration;
 mod mock_internal;
@@ -254,7 +258,7 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     };
     match main(&mut host) {
         Ok(()) => {
-            host.promote_upgrade()
+            promote_upgrade(&mut host)
                 .expect("Potential kernel upgrade promotion failed");
             host.promote(&EVM_PATH)
                 .expect("The kernel failed to promote the temporary directory")
@@ -264,8 +268,7 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
                 // All the changes from the failed migration are reverted.
                 host.revert()
                     .expect("The kernel failed to delete the temporary directory");
-                host.fallback_backup_kernel()
-                    .expect("Fallback mechanism failed");
+                fallback_backup_kernel(&mut host).expect("Fallback mechanism failed");
             } else {
                 log!(host, Error, "The kernel produced an error: {:?}", e);
                 log!(
