@@ -27,6 +27,8 @@ type error += Node_connection_lost
 
 type error += Cannot_load_local_file of string
 
+type error += Broken_locked_values_invariant
+
 let register_error_kind category ~id ~title ~description ~pp encoding from_error
     to_error =
   Error_monad.register_error_kind
@@ -58,4 +60,17 @@ let () =
       Format.fprintf fmt "Cannot load the local file %s" filename)
     Data_encoding.(obj1 (req "file" string))
     (function Cannot_load_local_file s -> Some s | _ -> None)
-    (fun s -> Cannot_load_local_file s)
+    (fun s -> Cannot_load_local_file s) ;
+  register_error_kind
+    `Permanent
+    ~id:"Baking_state.broken_locked_values_invariant"
+    ~title:"Broken locked values invariant"
+    ~description:
+      "The expected consistency invariant on locked values does not hold"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The expected consistency invariant on locked values does not hold")
+    Data_encoding.unit
+    (function Broken_locked_values_invariant -> Some () | _ -> None)
+    (fun () -> Broken_locked_values_invariant)
