@@ -91,6 +91,10 @@ type gc_info = {
   last_context_split_level : int32 option;
 }
 
+type sync_result =
+  | Synchronized
+  | Synchronizing of { processed_level : int32; l1_head_level : int32 }
+
 module Encodings = struct
   open Data_encoding
 
@@ -269,6 +273,32 @@ module Encodings = struct
          (req "last_gc_level" int32)
          (req "first_available_level" int32)
          (opt "last_context_split_level" int32)
+
+  let synchronization_result =
+    union
+      [
+        case
+          ~title:"synchronized"
+          (Tag 0)
+          (constant "synchronized")
+          (function Synchronized -> Some () | _ -> None)
+          (fun () -> Synchronized);
+        case
+          ~title:"synchronizing"
+          (Tag 1)
+          (obj1
+             (req
+                "synchronizing"
+                (obj2
+                   (req "processed_level" int32)
+                   (req "l1_head_level" int32))))
+          (function
+            | Synchronizing {processed_level; l1_head_level} ->
+                Some (processed_level, l1_head_level)
+            | _ -> None)
+          (fun (processed_level, l1_head_level) ->
+            Synchronizing {processed_tezos_level; l1_head_level});
+      ]
 end
 
 module Arg = struct
@@ -473,6 +503,15 @@ module Local = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Encodings.message_status_output
       (path / "batcher" / "queue" /: Arg.l2_message_id)
+
+  let synchronized =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Wait for the node to have synchronized its L2 chain with the L1 \
+         chain, streaming its progress."
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.synchronization_result
+      (path / "synchronized")
 end
 
 module Root = struct
