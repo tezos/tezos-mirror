@@ -75,33 +75,25 @@ type cache = {
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
-(** [forge_event] type used to return the result of a task completion
-    in the forge worker. *)
-type forge_event
+type block_kind =
+  | Fresh of Operation_pool.pool
+  | Reproposal of {
+      consensus_operations : packed_operation list;
+      payload_hash : Block_payload_hash.t;
+      payload_round : Round.t;
+      payload : Operation_pool.payload;
+    }
 
-(** [forge_request] type used to push a concurrent forging task in the
-    forge worker. *)
-type forge_request
-
-(** [forge_worker_hooks] type that allows interactions with the forge
-    worker. Hooks are needed in order to break a circular dependency. *)
-type forge_worker_hooks = {
-  push_request : forge_request -> unit;
-  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
-}
-
-type global_state = {
-  cctxt : Protocol_client_context.full;
-  chain_id : Chain_id.t;
-  config : Baking_configuration.t;
-  constants : Constants.t;
-  round_durations : Round.round_durations;
-  operation_worker : Operation_worker.t;
-  mutable forge_worker_hooks : forge_worker_hooks;
-  validation_mode : validation_mode;
-  delegates : consensus_key list;
-  cache : cache;
-  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
+type block_to_bake = {
+  predecessor : block_info;
+  round : Round.t;
+  delegate : consensus_key_and_delegate;
+  kind : block_kind;
+  force_apply : bool;
+      (** if true, while baking the block, try and apply the block and its
+          operations instead of only validating them. this can be permanently
+          set using the [--force-apply] flag (see [force_apply_switch_arg] in
+          [baking_commands.ml]). *)
 }
 
 val block_info_encoding : block_info Data_encoding.t
@@ -164,11 +156,12 @@ type elected_block = {
   attestation_qc : Kind.attestation operation list;
 }
 
-type signed_block = {
+type prepared_block = {
+  signed_block_header : block_header;
   round : Round.t;
   delegate : consensus_key_and_delegate;
-  block_header : block_header;
   operations : Tezos_base.Operation.t list list;
+  baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
 type level_state = {
@@ -181,7 +174,7 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
-  next_forged_block : signed_block option;
+  next_forged_block : prepared_block option;
 }
 
 type phase =
@@ -196,6 +189,35 @@ type round_state = {
   current_round : Round.t;
   current_phase : phase;
   delayed_quorum : Kind.attestation operation list option;
+}
+
+(** [forge_event] type used to return the result of a task completion
+    in the forge worker. *)
+type forge_event = Block_ready of prepared_block
+
+(** [forge_request] type used to push a concurrent forging task in the
+    forge worker. *)
+type forge_request = Forge_and_sign_block of block_to_bake
+
+(** [forge_worker_hooks] type that allows interactions with the forge
+    worker. Hooks are needed in order to break a circular dependency. *)
+type forge_worker_hooks = {
+  push_request : forge_request -> unit;
+  get_forge_event_stream : unit -> forge_event Lwt_stream.t;
+}
+
+type global_state = {
+  cctxt : Protocol_client_context.full;
+  chain_id : Chain_id.t;
+  config : Baking_configuration.t;
+  constants : Constants.t;
+  round_durations : Round.round_durations;
+  operation_worker : Operation_worker.t;
+  mutable forge_worker_hooks : forge_worker_hooks;
+  validation_mode : validation_mode;
+  delegates : consensus_key list;
+  cache : cache;
+  dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
 
 type state = {
@@ -232,6 +254,8 @@ type event =
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t
+
+val forge_event_encoding : forge_event Data_encoding.t
 
 type state_data = {
   level_data : int32;
@@ -309,3 +333,5 @@ val pp : Format.formatter -> t -> unit
 val pp_timeout_kind : Format.formatter -> timeout_kind -> unit
 
 val pp_event : Format.formatter -> event -> unit
+
+val pp_forge_event : Format.formatter -> forge_event -> unit
