@@ -5,6 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A GitLab CI job annotated with Octez-specific meta-data. *)
+type tezos_job
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)
@@ -49,7 +52,7 @@ module Pipeline : sig
      top-level [.gitlab-ci.yml]. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
-    ?jobs:Gitlab_ci.Types.job list ->
+    ?jobs:tezos_job list ->
     string ->
     Gitlab_ci.If.t ->
     unit
@@ -102,9 +105,9 @@ type arch = Amd64 | Arm64
     - A job that depends on [Artefacts j] will not start until [j] finishes
       and will also have the artefacts of [j] available. *)
 type dependency =
-  | Job of Gitlab_ci.Types.job
-  | Optional of Gitlab_ci.Types.job
-  | Artifacts of Gitlab_ci.Types.job
+  | Job of tezos_job
+  | Optional of tezos_job
+  | Artifacts of tezos_job
 
 (** Job dependencies.
 
@@ -118,9 +121,7 @@ type dependency =
     In practice, prefer using [Dependent]. Only use [Staged
     artifact_deps] when the number of dependencies exceed the GitLab
     imposed limit of 50 [needs:] per job. *)
-type dependencies =
-  | Staged of Gitlab_ci.Types.job list
-  | Dependent of dependency list
+type dependencies = Staged of tezos_job list | Dependent of dependency list
 
 (** Values for the [GIT_STRATEGY] variable.
 
@@ -185,7 +186,7 @@ val job :
   stage:Stage.t ->
   name:string ->
   string list ->
-  Gitlab_ci.Types.job
+  tezos_job
 
 (** Generates a job to an external file.
 
@@ -202,7 +203,4 @@ val job :
     directory. Also [Failure] if destination path has already been
     used to write another job. *)
 val job_external :
-  ?directory:string ->
-  ?filename_suffix:string ->
-  Gitlab_ci.Types.job ->
-  Gitlab_ci.Types.job
+  ?directory:string -> ?filename_suffix:string -> tezos_job -> tezos_job

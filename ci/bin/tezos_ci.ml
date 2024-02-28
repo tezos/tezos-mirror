@@ -1,5 +1,9 @@
 open Gitlab_ci.Util
 
+type tezos_job = {job : Gitlab_ci.Types.job}
+
+let tezos_job_to_config_elements (j : tezos_job) = Gitlab_ci.Types.[Job j.job]
+
 let header =
   {|# This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
@@ -33,7 +37,7 @@ module Pipeline = struct
     name : string;
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
-    jobs : Gitlab_ci.Types.job list;
+    jobs : tezos_job list;
   }
 
   let pipelines : t list ref = ref []
@@ -60,7 +64,7 @@ module Pipeline = struct
     in
     (* Populate [job_by_name] and check that no two different jobs have the same name. *)
     List.iter
-      (fun (job : Gitlab_ci.Types.job) ->
+      (fun ({job; _} : tezos_job) ->
         match Hashtbl.find_opt job_by_name job.name with
         | None -> Hashtbl.add job_by_name job.name job
         | Some _ ->
@@ -70,7 +74,7 @@ module Pipeline = struct
               job.name)
       jobs ;
     (* Check usage of [needs:] & [depends:] *)
-    Fun.flip List.iter jobs @@ fun job ->
+    Fun.flip List.iter jobs @@ fun {job; _} ->
     (* Get the [needs:] / [dependencies:] of job *)
     let opt_set l = String_set.of_list (Option.value ~default:[] l) in
     let needs =
@@ -140,7 +144,7 @@ module Pipeline = struct
        | [] -> ()
        | _ :: _ ->
            let filename = filename ~name in
-           let config = List.map (fun j -> Gitlab_ci.Types.Job j) jobs in
+           let config = List.concat_map tezos_job_to_config_elements jobs in
            Gitlab_ci.To_yaml.to_file ~header ~filename config
 
   let workflow_includes () :
@@ -192,13 +196,11 @@ end
 type arch = Amd64 | Arm64
 
 type dependency =
-  | Job of Gitlab_ci.Types.job
-  | Optional of Gitlab_ci.Types.job
-  | Artifacts of Gitlab_ci.Types.job
+  | Job of tezos_job
+  | Optional of tezos_job
+  | Artifacts of tezos_job
 
-type dependencies =
-  | Staged of Gitlab_ci.Types.job list
-  | Dependent of dependency list
+type dependencies = Staged of tezos_job list | Dependent of dependency list
 
 type git_strategy = Fetch | Clone | No_strategy
 
@@ -210,7 +212,7 @@ let enc_git_strategy = function
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?services ?variables ?rules
     ?timeout ?tags ?git_strategy ?when_ ?coverage ?retry ?parallel ~image ~stage
-    ~name script : Gitlab_ci.Types.job =
+    ~name script : tezos_job =
   (match (rules, when_) with
   | Some _, Some _ ->
       failwith
@@ -243,7 +245,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
   | _ -> ()) ;
   let needs, dependencies =
     let expand_job = function
-      | Gitlab_ci.Types.{name; parallel; _} -> (
+      | {job = Gitlab_ci.Types.{name; parallel; _}; _} -> (
           match parallel with
           | None -> [name]
           | Some n -> List.map (fun i -> sf "%s %d/%d" name i n) (range 1 n))
@@ -299,38 +301,42 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
         retry
         name
   | _ -> ()) ;
-  {
-    name;
-    after_script;
-    allow_failure;
-    artifacts;
-    before_script;
-    cache;
-    image = Some image;
-    interruptible;
-    needs;
-    (* Note that [dependencies] is always filled, because we want to
-       fetch no dependencies by default ([dependencies = Some
-       []]), whereas the absence of [dependencies = None] would
-       fetch all the dependencies of the preceding jobs. *)
-    dependencies = Some dependencies;
-    rules;
-    script;
-    services;
-    stage;
-    variables;
-    timeout;
-    tags;
-    when_;
-    coverage;
-    retry;
-    parallel;
-  }
+  let job : Gitlab_ci.Types.job =
+    {
+      name;
+      after_script;
+      allow_failure;
+      artifacts;
+      before_script;
+      cache;
+      image = Some image;
+      interruptible;
+      needs;
+      (* Note that [dependencies] is always filled, because we want to
+         fetch no dependencies by default ([dependencies = Some
+         []]), whereas the absence of [dependencies = None] would
+         fetch all the dependencies of the preceding jobs. *)
+      dependencies = Some dependencies;
+      rules;
+      script;
+      services;
+      stage;
+      variables;
+      timeout;
+      tags;
+      when_;
+      coverage;
+      retry;
+      parallel;
+    }
+  in
+  {job}
 
 let external_jobs = ref String_set.empty
 
-let job_external ?directory ?filename_suffix (job : Gitlab_ci.Types.job) :
-    Gitlab_ci.Types.job =
+let job_external ?directory ?filename_suffix (tezos_job : tezos_job) : tezos_job
+    =
+  let job = tezos_job.job in
   let stage =
     match job.stage with
     | Some stage -> stage
@@ -340,7 +346,7 @@ let job_external ?directory ?filename_suffix (job : Gitlab_ci.Types.job) :
   in
   let basename =
     match filename_suffix with
-    | None -> job.name
+    | None -> tezos_job.job.name
     | Some suffix -> job.name ^ "-" ^ suffix
   in
   let directory = ".gitlab/ci/jobs" // Option.value ~default:stage directory in
@@ -358,6 +364,6 @@ let job_external ?directory ?filename_suffix (job : Gitlab_ci.Types.job) :
       filename
   else (
     external_jobs := String_set.add filename !external_jobs ;
-    let config = [Gitlab_ci.Types.Job job] in
+    let config = tezos_job_to_config_elements tezos_job in
     Gitlab_ci.To_yaml.to_file ~header ~filename config ;
-    job)
+    tezos_job)
