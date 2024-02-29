@@ -5,13 +5,7 @@ kaitai_checks:
   extends:
     - .test_template
     - .needs__trigger
-  rules:
-    - changes:
-        - src/**/*
-        - contrib/*kaitai*/**/*
-        - .gitlab/**/*
-        - .gitlab-ci.yml
-      when: on_success
+    - .rules__octez_kaitai_e2e_changes
   needs:
     - "oc.build_x86_64-released"
   script:
