@@ -469,14 +469,14 @@ let kernel_arg =
 
 let preimages_arg =
   Tezos_clic.arg
-    ~long:"preimage-dir"
+    ~long:"preimages-dir"
     ~doc:"Path to the preimages directory"
     ~placeholder:"_evm_installer_preimages"
     Params.string
 
 let preimages_endpoint_arg =
   Tezos_clic.arg
-    ~long:"preimage-endpoint"
+    ~long:"preimages-endpoint"
     ~placeholder:"url"
     ~doc:
       (Format.sprintf

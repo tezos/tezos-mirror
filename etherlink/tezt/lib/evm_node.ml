@@ -311,7 +311,7 @@ let run_args evm_node =
           sequencer;
           "--initial-kernel";
           initial_kernel;
-          "--preimage-dir";
+          "--preimages-dir";
           preimage_dir;
           "--private-rpc-port";
           string_of_int private_rpc_port;
@@ -348,7 +348,7 @@ let run_args evm_node =
           "with";
           "endpoint";
           evm_node.persistent_state.endpoint;
-          "--preimage-dir";
+          "--preimages-dir";
           preimage_dir;
           "--initial-kernel";
           initial_kernel;
