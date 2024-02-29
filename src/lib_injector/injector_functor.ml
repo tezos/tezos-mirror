@@ -952,10 +952,15 @@ module Make (Parameters : PARAMETERS) = struct
             Proto_client.manager_pass)
         Lwt.return
 
+  let has_injected_operations state =
+    Injected_operations.length state.injected.injected_operations <> 0
+    || Injected_ophs.length state.injected.injected_ophs <> 0
+
   (** [register_included_operations state (block, level)] marks the known (by
       this injector) manager operations contained in [block] as being included. *)
   let register_included_operations state (block_hash, level) =
     let open Lwt_result_syntax in
+    when_ (has_injected_operations state) @@ fun () ->
     let* operation_hashes =
       manager_operations_hashes_of_block state block_hash
     in
@@ -963,12 +968,17 @@ module Make (Parameters : PARAMETERS) = struct
       (fun oph -> register_included_operation state block_hash level oph)
       operation_hashes
 
+  let has_included_operations state =
+    Included_in_blocks.length state.included.included_in_blocks <> 0
+    || Included_operations.length state.included.included_operations <> 0
+
   (** [revert_included_operations state block] marks the known (by this injector)
     manager operations contained in [block] as not being included any more,
     typically in the case of a reorganization where [block] is on an alternative
     chain. The operations are put back in the pending queue. *)
   let revert_included_operations state block =
     let open Lwt_result_syntax in
+    when_ (has_included_operations state) @@ fun () ->
     let revert_infos = forget_block state block in
     let*! () =
       Event.(emit1 revert_operations)
@@ -1063,6 +1073,10 @@ module Make (Parameters : PARAMETERS) = struct
     let*! reorg =
       match state.last_seen_head with
       | None ->
+          return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
+      | Some {level; _} when Int32.sub head_level level > 120l ->
+          (* Don't analyze reorgs which are too long (more than 120 blocks) as
+             this would be too expensive in the injector. *)
           return {Reorg.no_reorg with new_chain = [(head_hash, head_level)]}
       | Some last_head ->
           Layer_1.get_tezos_reorg_for_new_head
