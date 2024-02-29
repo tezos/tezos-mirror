@@ -114,7 +114,7 @@ module Pipeline = struct
     (* Check that all [dependencies:] are on jobs that produce artifacts *)
     ( Fun.flip String_set.iter dependencies @@ fun dependency ->
       match Hashtbl.find_opt job_by_name dependency with
-      | Some {artifacts = Some {paths = _ :: _; _}; _}
+      | Some {artifacts = Some {paths = Some (_ :: _); _}; _}
       | Some {artifacts = Some {reports = Some {dotenv = Some _; _}; _}; _} ->
           (* This is fine: we depend on a job that define non-report artifacts, or a dotenv file. *)
           ()
@@ -326,3 +326,38 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     retry;
     parallel;
   }
+
+let external_jobs = ref String_set.empty
+
+let job_external ?directory ?filename_suffix (job : Gitlab_ci.Types.job) :
+    Gitlab_ci.Types.job =
+  let stage =
+    match job.stage with
+    | Some stage -> stage
+    | None ->
+        (* Test is the name of the default stage in GitLab CI *)
+        "test"
+  in
+  let basename =
+    match filename_suffix with
+    | None -> job.name
+    | Some suffix -> job.name ^ "-" ^ suffix
+  in
+  let directory = ".gitlab/ci/jobs" // Option.value ~default:stage directory in
+  if not (Sys.file_exists directory && Sys.is_directory directory) then
+    failwith
+      "[job_external] attempted to write job '%s' to non-existing directory \
+       '%s'"
+      job.name
+      directory ;
+  let filename = (directory // basename) ^ ".yml" in
+  if String_set.mem filename !external_jobs then
+    failwith
+      "Attempted to write external job %s twice -- perhaps you need to set \
+       filename_suffix?"
+      filename
+  else (
+    external_jobs := String_set.add filename !external_jobs ;
+    let config = [Gitlab_ci.Types.Job job] in
+    Gitlab_ci.To_yaml.to_file ~header ~filename config ;
+    job)

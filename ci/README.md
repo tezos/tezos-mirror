@@ -13,10 +13,10 @@ This directory is structured like this:
 
 ## Usage
 
-To regenerate `.gitlab-ci.yml` (from the root of the repo):
+To regenerate the GitLab CI configuration, run (from the root of the repo):
 
     make -C ci all
 
-To check that `.gitlab-ci.yml` is up-to-date (from the root of the repo):
+To check that the GitLab CI configuration is up-to-date, run (from the root of the repo):
 
     make -C ci check

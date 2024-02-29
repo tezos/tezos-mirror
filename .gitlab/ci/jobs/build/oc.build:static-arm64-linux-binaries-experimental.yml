@@ -1,8 +1,30 @@
-include: .gitlab/ci/jobs/build/common.yml
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
 
-# See comments in oc.build:static-x86_64-linux-binaries-experimental.yml.
 oc.build:static-arm64-linux-binaries:
-  extends:
-    - .oc.build:static-arm64-linux-binaries
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - changes:
+    - src/**/*
+    - etherlink/**/*
+    - tezt/**/*
+    - .gitlab/**/*
+    - .gitlab-ci.yml
+    - michelson_test_scripts/**/*
+    - tzt_reference_test_suite/**/*
+    when: on_success
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  script:
+  - ./scripts/ci/build_static_binaries.sh
   variables:
-    EXECUTABLE_FILES: "script-inputs/released-executables script-inputs/experimental-executables"
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+  artifacts:
+    paths:
+    - octez-binaries/$ARCH/*

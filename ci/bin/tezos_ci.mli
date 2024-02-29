@@ -186,3 +186,23 @@ val job :
   name:string ->
   string list ->
   Gitlab_ci.Types.job
+
+(** Generates a job to an external file.
+
+    This function is meant to be used in the transition to CI-in-OCaml.
+    It writes {!header} and the given job to the destination path
+    [.gitlab/ci/jobs/DIRECTORY/NAME(-FILENAME_SUFFIX).yml].
+    Directory defaults to the stage name if not set.
+
+    This allows migrating all the jobs of a given pipeline, and
+    including the generated definition of those jobs in other
+    pipelines where it appears.
+
+    Raises [Failure] if [.gitlab/ci/jobs/DIRECTORY] is not an existing
+    directory. Also [Failure] if destination path has already been
+    used to write another job. *)
+val job_external :
+  ?directory:string ->
+  ?filename_suffix:string ->
+  Gitlab_ci.Types.job ->
+  Gitlab_ci.Types.job
