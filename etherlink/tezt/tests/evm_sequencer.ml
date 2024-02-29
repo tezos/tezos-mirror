@@ -150,7 +150,6 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
   in
   let base_config =
     Configuration.make_config
-      ~ghostnet:(Uses.tag kernel = Uses.tag Constant.WASM.ghostnet_evm_kernel)
       ~bootstrap_accounts
       ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge

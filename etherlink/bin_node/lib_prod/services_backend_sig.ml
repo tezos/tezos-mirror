@@ -83,19 +83,21 @@ module type S = sig
   (** [simulate_call call_info] asks the rollup to simulate a call,
       and returns the result. *)
   val simulate_call :
-    Ethereum_types.call -> (Ethereum_types.hash, string) result tzresult Lwt.t
+    Ethereum_types.call ->
+    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
   (** [estimate_gas call_info] asks the rollup to simulate a call, and
       returns the gas used to execute the call. *)
   val estimate_gas :
     Ethereum_types.call ->
-    (Ethereum_types.quantity, string) result tzresult Lwt.t
+    Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
   (** [is_tx_valid tx_raw] checks if the transaction is valid. Checks
       if the nonce is correct and returns the associated public key of
       transaction. *)
   val is_tx_valid :
-    string -> (Ethereum_types.address, string) result tzresult Lwt.t
+    string ->
+    Simulation.validation_result Simulation.simulation_result tzresult Lwt.t
 
   (** [storage_at address pos] returns the value at index [pos] of the
       account [address]'s storage. *)
@@ -109,6 +111,10 @@ module type S = sig
   (** [inject_kernel_upgrade ~payload] injects the kernel upgrade
       payload [payload] in the local state. *)
   val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+
+  (** [inject_sequencer_upgrade ~payload] injects the sequencer
+      upgrade payload [payload] in the local state. *)
+  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module type Backend = sig
@@ -121,6 +127,8 @@ module type Backend = sig
   module SimulatorBackend : Simulator.SimulationBackend
 
   val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+
+  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module Make (Backend : Backend) : S = struct
@@ -129,4 +137,6 @@ module Make (Backend : Backend) : S = struct
   include Simulator.Make (Backend.SimulatorBackend)
 
   let inject_kernel_upgrade = Backend.inject_kernel_upgrade
+
+  let inject_sequencer_upgrade = Backend.inject_sequencer_upgrade
 end

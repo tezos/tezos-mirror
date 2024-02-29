@@ -18,16 +18,24 @@ module EVM = struct
   let make s = root ^ s
 end
 
+module World_state = struct
+  let root = "/world_state"
+
+  let make s = EVM.make (root ^ s)
+end
+
 let chain_id = EVM.make "/chain_id"
 
-let base_fee_per_gas = EVM.make "/base_fee_per_gas"
+let base_fee_per_gas = World_state.make "/fees/base_fee_per_gas"
 
 let kernel_version = EVM.make "/kernel_version"
 
 let kernel_upgrade = EVM.make "/kernel_upgrade"
 
+let sequencer_upgrade = EVM.make "/sequencer_upgrade"
+
 module Accounts = struct
-  let accounts = EVM.make "/eth_accounts"
+  let accounts = World_state.make "/eth_accounts"
 
   let balance = "/balance"
 
@@ -51,7 +59,7 @@ end
 module Block = struct
   type number = Current | Nth of Z.t
 
-  let blocks = EVM.make "/blocks"
+  let blocks = World_state.make "/blocks"
 
   let number = "/number"
 
@@ -63,7 +71,7 @@ module Block = struct
 end
 
 module Indexes = struct
-  let indexes = EVM.make "/indexes"
+  let indexes = World_state.make "/indexes"
 
   let blocks = "/blocks"
 
@@ -77,13 +85,13 @@ module Indexes = struct
 end
 
 module Transaction_receipt = struct
-  let receipts = EVM.make "/transactions_receipts"
+  let receipts = World_state.make "/transactions_receipts"
 
   let receipt (Hash (Hex tx_hash)) = receipts ^ "/" ^ tx_hash
 end
 
 module Transaction_object = struct
-  let objects = EVM.make "/transactions_objects"
+  let objects = World_state.make "/transactions_objects"
 
   let object_ (Hash (Hex tx_hash)) = objects ^ "/" ^ tx_hash
 end

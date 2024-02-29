@@ -20,6 +20,8 @@ val kernel_version : path
 
 val kernel_upgrade : path
 
+val sequencer_upgrade : path
+
 (** Paths related to accounts. *)
 module Accounts : sig
   (** Path to the account's balance. *)

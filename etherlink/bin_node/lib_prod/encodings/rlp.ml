@@ -25,6 +25,18 @@
 
 type error += Rlp_decoding_error of string
 
+let () =
+  register_error_kind
+    ~id:"evm-node.prod.rlp-decoding-error"
+    ~title:"Unable to decode an RLP value"
+    ~description:"Unable to decode an RLP value"
+    ~pp:(fun ppf msg ->
+      Format.fprintf ppf "Unable to decode an RLP value: `%s`" msg)
+    `Permanent
+    Data_encoding.(obj1 (req "msg" string))
+    (function Rlp_decoding_error msg -> Some msg | _ -> None)
+    (fun msg -> Rlp_decoding_error msg)
+
 type item = Value of bytes | List of item list
 
 let rec encode_int buffer i =
@@ -214,3 +226,45 @@ let rec pp ppf = function
            ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
            pp)
         items
+
+(* Implements optional types decoding as in the RLP library from the
+   kernel's library. *)
+let decode_option decode_value =
+  let open Result_syntax in
+  function
+  | List [] -> return_none
+  | List [v] ->
+      let* value = decode_value v in
+      return_some value
+  | _ -> tzfail (Rlp_decoding_error "Inconsistent encoding for optional type")
+
+let decode_result decode_value decode_error =
+  let open Result_syntax in
+  function
+  | List [Value tag; payload] -> (
+      let* () =
+        if Bytes.length tag <> 1 then
+          tzfail
+            (Rlp_decoding_error
+               (Format.sprintf "Inconsistent tag size: %d" (Bytes.length tag)))
+        else return_unit
+      in
+      let tag = Bytes.get_uint8 tag 0 in
+      match tag with
+      | 1 ->
+          let* ok = decode_value payload in
+          return @@ Ok ok
+      | 2 ->
+          let* err = decode_error payload in
+          return @@ Error err
+      | t ->
+          tzfail
+            (Rlp_decoding_error
+               (Format.sprintf "Inconsistent tag [%d] for the result type" t)))
+  | rlp ->
+      tzfail
+        (Rlp_decoding_error
+           (Format.asprintf
+              "Inconsistent encoding for the result type: %a"
+              pp
+              rlp))

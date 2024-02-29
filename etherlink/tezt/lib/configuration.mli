@@ -13,7 +13,6 @@ val default_bootstrap_account_balance : Wei.t
     ?sequencer ()] creates an installer configuration compatible with
     the EVM kernel. *)
 val make_config :
-  ghostnet:bool ->
   ?bootstrap_accounts:Eth_account.t array ->
   ?ticketer:string ->
   ?administrator:string ->
