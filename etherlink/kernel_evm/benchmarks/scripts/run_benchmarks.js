@@ -135,6 +135,7 @@ function run_profiler(path, logs) {
         let bloom_size = [];
         let nb_reboots = 0;
         let blueprint_chunks = [];
+        let tx_type = [];
 
         var profiler_output_path = "";
 
@@ -180,6 +181,7 @@ function run_profiler(path, logs) {
             push_match(output, receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
             push_match(output, bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
             push_match(output, blueprint_chunks, /\[Benchmarking\] number of blueprint chunks read:\s*(\d+)/g)
+            push_match(output, tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
             push_profiler_sections(output, opcodes, precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
@@ -211,10 +213,14 @@ function run_profiler(path, logs) {
             if (block_in_progress_read.length != nb_reboots) {
                 console.log(new Error("Missing read block in progress size value (expected: " + nb_reboots + ", actual: " + block_in_progress_read.length + ")"));
             }
+            if (tx_status.length != tx_type.length) {
+                console.log(new Error("Missing transaction type (expected: " + tx_status.length + ", actual: " + tx_type.length + ")"));
+            }
             resolve({
                 profiler_output_path,
                 gas_costs: gas_used,
                 tx_status,
+                tx_type,
                 estimated_ticks,
                 estimated_ticks_per_tx,
                 tx_size,
@@ -340,6 +346,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     interpreter_decode_ticks = run_benchmark_result.interpreter_decode_ticks;
     stage_one_ticks = run_benchmark_result.stage_one_ticks;
     tx_status = run_benchmark_result.tx_status;
+    tx_type = run_benchmark_result.tx_type;
     estimated_ticks = run_benchmark_result.estimated_ticks;
     estimated_ticks_per_tx = run_benchmark_result.estimated_ticks_per_tx;
     tx_size = run_benchmark_result.tx_size;
@@ -357,6 +364,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             signature_verification_ticks: signature_verification_ticks?.[j],
             status: tx_status[j],
             estimated_ticks: estimated_ticks_per_tx[j],
+            tx_type: tx_type[j],
         }
         if (tx_status[j].includes("OK_UNKNOWN")) {
             // no outcome should mean never invoking sputnik
@@ -373,7 +381,9 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         else if (tx_status[j].includes("OK")) {
             // sputnik runtime called only if not a transfer
             // FIXME: won't work with fees ? + run_time_index unreliable in fast mode
-            sputnik_runtime_tick = (gas_costs[gas_cost_index] > 21000) ? sputnik_runtime_ticks?.[run_time_index++] : 0
+            sputnik_runtime_tick = 0;
+            if (!tx_type[j]?.includes("TRANSFER"))
+                sputnik_runtime_tick = sputnik_runtime_ticks?.[run_time_index++];
 
             rows.push(
                 {
@@ -488,6 +498,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     var benchmark_fields = [
         "benchmark_name",
         "status",
+        "tx_type",
         "gas_cost",
         "signature_verification_ticks",
         "sputnik_runtime_ticks",
