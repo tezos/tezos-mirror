@@ -1,7 +1,7 @@
 Protocol Paris
 ==============
 
-This page documents the changes brought by protocol Alpha with respect
+This page documents the changes brought by protocol Paris with respect
 to Oxford (see :ref:`naming_convention`).
 
 The code can be found in directory :src:`src/proto_019_PtParisA` of the ``master``
