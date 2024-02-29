@@ -165,3 +165,9 @@ val as_rpc_endpoint : t -> Endpoint.t
     [wait_for_connections node n] waits until [node] receives [n]
     ["new_connection.v0"] events. *)
 val wait_for_connections : t -> int -> unit Lwt.t
+
+(** Wait for a node to receive a disconnection for some peer_id.
+
+    [wait_for_disconnection node peer_id] waits until [node] receives a
+    ["disconnected.v0"] event from the given peer id. *)
+val wait_for_disconnection : t -> peer_id:string -> unit Lwt.t
