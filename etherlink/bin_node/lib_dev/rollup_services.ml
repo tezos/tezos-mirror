@@ -116,8 +116,8 @@ let batcher_injection :
     ~output:
       Data_encoding.(
         def
-          "message_hashes"
-          ~description:"Hashes of injected L2 messages"
+          "message_ids"
+          ~description:"Ids of injected L2 messages"
           (list string))
     (open_root / "local" / "batcher" / "injection")
 

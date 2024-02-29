@@ -27,7 +27,7 @@ open Injector_sigs
 
 module Make (O : PARAM_OPERATION) :
   INJECTOR_OPERATION with type operation = O.t = struct
-  module Hash =
+  module Id =
     Tezos_crypto.Blake2B.Make
       (Tezos_crypto.Base58)
       (struct
@@ -41,18 +41,18 @@ module Make (O : PARAM_OPERATION) :
       end)
 
   let () =
-    Tezos_crypto.Base58.check_encoded_prefix Hash.b58check_encoding "iop" 53
+    Tezos_crypto.Base58.check_encoded_prefix Id.b58check_encoding "iop" 53
 
   type operation = O.t
 
-  type hash = Hash.t
+  type id = Id.t
 
   type errors = {count : int; last_error : tztrace option}
 
-  type t = {hash : hash; operation : O.t; mutable errors : errors}
+  type t = {id : id; operation : O.t; mutable errors : errors}
 
   let hash_inner_operation nonce op =
-    Hash.hash_string
+    Id.hash_string
       [
         Option.fold ~none:"" ~some:Z.to_bits nonce;
         Data_encoding.Binary.to_string_exn O.encoding op;
@@ -70,8 +70,8 @@ module Make (O : PARAM_OPERATION) :
         Some c)
       else None
     in
-    let hash = hash_inner_operation nonce operation in
-    {hash; operation; errors = no_errors}
+    let id = hash_inner_operation nonce operation in
+    {id; operation; errors = no_errors}
 
   let errors_encoding =
     let open Data_encoding in
@@ -83,19 +83,19 @@ module Make (O : PARAM_OPERATION) :
   let encoding =
     let open Data_encoding in
     conv
-      (fun {hash; operation; errors} -> (hash, operation, errors))
-      (fun (hash, operation, errors) -> {hash; operation; errors})
+      (fun {id; operation; errors} -> (id, operation, errors))
+      (fun (id, operation, errors) -> {id; operation; errors})
     @@ obj3
-         (req "hash" Hash.encoding)
+         (req "id" Id.encoding)
          (req "operation" O.encoding)
          (dft "errors" errors_encoding no_errors)
 
-  let pp ppf {hash; operation; errors} =
+  let pp ppf {id; operation; errors} =
     let pp_errors ppf errors =
       if errors.count = 0 then ()
       else Format.fprintf ppf " [%d errors]" errors.count
     in
-    Format.fprintf ppf "%a (%a)%a" O.pp operation Hash.pp hash pp_errors errors
+    Format.fprintf ppf "%a (%a)%a" O.pp operation Id.pp id pp_errors errors
 
   let register_error op error_trace =
     op.errors <- {count = op.errors.count + 1; last_error = Some error_trace}

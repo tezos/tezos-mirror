@@ -67,15 +67,15 @@ type slot_header = {level : int; commitment : string; index : int}
 val get_global_block_dal_slot_headers :
   ?block:string -> unit -> slot_header list RPC_core.t
 
-(** RPC: [GET local/batcher/queue] returns the queue of messages, as pairs of message
-    hash and binary message, in the batcher. *)
+(** RPC: [GET local/batcher/queue] returns the queue of messages, as pairs of
+    message id and binary message, in the batcher. *)
 val get_local_batcher_queue : unit -> (string * string) list RPC_core.t
 
-(** RPC: [GET local/batcher/queue/<msg_hash>] fetches the message whose hash is [hash]
-    from the queue. It returns the message together with the full JSON response
-    including the status.*)
-val get_local_batcher_queue_msg_hash :
-  msg_hash:string -> (string * string) RPC_core.t
+(** RPC: [GET local/batcher/queue/<msg_id>] fetches the message whose id is
+    [msg_id] from the queue. It returns the message together with the full JSON
+    response including the status.*)
+val get_local_batcher_queue_msg_id :
+  msg_id:string -> (string * string) RPC_core.t
 
 type simulation_result = {
   state_hash : string;

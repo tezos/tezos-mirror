@@ -198,8 +198,8 @@ module RPC = struct
     let data : RPC_core.data = Data operation in
     make ~data POST ["add_pending_transaction"] JSON.as_string
 
-  let operation_status op_hash =
-    let query_string = [("op_hash", op_hash)] in
+  let operation_status id =
+    let query_string = [("id", id)] in
     make ~query_string GET ["operation_status"] (fun json ->
         Option.map
           (fun status ->

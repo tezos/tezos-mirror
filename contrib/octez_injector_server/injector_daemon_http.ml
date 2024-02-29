@@ -62,11 +62,8 @@ let register_dir () =
         Lwt.return inj_operation_hash)
   in
   let dir =
-    Tezos_rpc.Directory.register0 dir operation_status (fun {op_hash} () ->
-        let op_hash =
-          Injector_server.Inj_operation.Hash.of_b58check_exn op_hash
-        in
-        let status = Injector_server.operation_status op_hash in
+    Tezos_rpc.Directory.register0 dir operation_status (fun {op_id} () ->
+        let status = Injector_server.operation_status op_id in
         return
         @@ Option.map
              (fun (status : Injector_server.status) ->

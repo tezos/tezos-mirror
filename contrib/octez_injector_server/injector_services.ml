@@ -13,21 +13,33 @@ let add_pending_transaction :
       unit,
       unit,
       Injector_server_operation.t,
-      Inj_operation.hash )
+      Inj_operation.id )
     Tezos_rpc.Service.t =
   Tezos_rpc.Service.post_service
     ~description:"Add a pending operation to the injector queue"
     ~query:Tezos_rpc.Query.empty
     ~input:Injector_server_operation.encoding
-    ~output:Inj_operation.Hash.encoding
+    ~output:Inj_operation.Id.encoding
     Tezos_rpc.Path.(root / "add_pending_transaction")
 
-type op_query = {op_hash : string}
+type op_query = {op_id : Inj_operation.Id.t}
+
+let op_id_arg =
+  Tezos_rpc.Arg.make
+    ~name:"op_id"
+    ~descr:"Id of operation in injector"
+    ~destruct:(fun s ->
+      Result.map_error (fun e -> Format.asprintf "%a" pp_print_trace e)
+      @@ Injector_server.Inj_operation.Id.of_b58check s)
+    ~construct:Injector_server.Inj_operation.Id.to_b58check
+    ()
 
 let injector_op_query : op_query Tezos_rpc.Query.t =
   let open Tezos_rpc.Query in
-  query (fun op_hash -> {op_hash})
-  |+ field "op_hash" Tezos_rpc.Arg.string "" (fun t -> t.op_hash)
+  query (function
+      | Some op_id -> {op_id}
+      | None -> Stdlib.failwith "Missing id query parameter")
+  |+ opt_field "id" op_id_arg (fun t -> Some t.op_id)
   |> seal
 
 (* Simplified version of [Injector.status] *)

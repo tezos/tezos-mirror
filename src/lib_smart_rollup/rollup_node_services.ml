@@ -107,9 +107,7 @@ module Encodings = struct
       (opt "published_at_level" int32)
 
   let queued_message =
-    obj2
-      (req "hash" L2_message.Hash.encoding)
-      (req "message" L2_message.encoding)
+    obj2 (req "id" L2_message.Id.encoding) (req "message" L2_message.encoding)
 
   let batcher_queue = list queued_message
 
@@ -305,14 +303,14 @@ module Arg = struct
       ~destruct:destruct_block_id
       ()
 
-  let l2_message_hash : L2_message.hash Tezos_rpc.Arg.t =
+  let l2_message_id : L2_message.id Tezos_rpc.Arg.t =
     Tezos_rpc.Arg.make
-      ~descr:"A L2 message hash."
-      ~name:"l2_message_hash"
-      ~construct:L2_message.Hash.to_b58check
+      ~descr:"A L2 message id."
+      ~name:"l2_message_id"
+      ~construct:L2_message.Id.to_b58check
       ~destruct:(fun s ->
-        L2_message.Hash.of_b58check_opt s
-        |> Option.to_result ~none:"Invalid L2 message hash")
+        L2_message.Id.of_b58check_opt s
+        |> Option.to_result ~none:"Invalid L2 message id")
       ()
 
   let commitment_hash : Commitment.Hash.t Tezos_rpc.Arg.t =
@@ -457,9 +455,9 @@ module Local = struct
       ~output:
         Data_encoding.(
           def
-            "message_hashes"
-            ~description:"Hashes of injected L2 messages"
-            (list L2_message.Hash.encoding))
+            "message_ids"
+            ~description:"Ids of injected L2 messages"
+            (list L2_message.Id.encoding))
       (path / "batcher" / "injection")
 
   let batcher_queue =
@@ -474,7 +472,7 @@ module Local = struct
       ~description:"Retrieve an L2 message and its status"
       ~query:Tezos_rpc.Query.empty
       ~output:Encodings.message_status_output
-      (path / "batcher" / "queue" /: Arg.l2_message_hash)
+      (path / "batcher" / "queue" /: Arg.l2_message_id)
 end
 
 module Root = struct

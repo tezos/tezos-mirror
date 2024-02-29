@@ -33,11 +33,11 @@ val make : string -> t
     [content (make s) = s]. *)
 val content : t -> string
 
-(** Hash with b58check encoding scmsg(55), for hashes of L2 messages. *)
-module Hash : Tezos_crypto.Intfs.HASH
+(** Hash with b58check encoding scmsg(55), for ids of L2 messages. *)
+module Id : Tezos_crypto.Intfs.HASH
 
-(** Alias for message hash *)
-type hash = Hash.t
+(** Alias for message id *)
+type id = Id.t
 
 (**  {2 Serialization} *)
 
@@ -45,4 +45,4 @@ val content_encoding : string Data_encoding.t
 
 val encoding : t Data_encoding.t
 
-val hash : t -> Hash.t
+val id : t -> Id.t
