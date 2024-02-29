@@ -573,7 +573,11 @@ let read_block fd block_number =
     let ofs =
       Data_encoding.(Binary.of_bytes_exn offset_encoding offset_buffer)
     in
-    Int32.to_int ofs
+    (* We interpret the offset, written as an int32, as an unsigned
+       int32. This is allowed by the encoded scheme and allows one
+       additional bit to encode the offset. In enables dealing with
+       files up to 4Gib. *)
+    match Int32.unsigned_to_int ofs with Some v -> v | None -> assert false
   in
   let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)
