@@ -76,6 +76,9 @@ _coverage_report
 .gitignore
 .gitlab-ci.yml
 
+# etherlink
+/etherlink/kernels-*
+
 # Rust
 **/target
 
