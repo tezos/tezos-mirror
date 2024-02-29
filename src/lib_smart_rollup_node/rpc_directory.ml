@@ -135,12 +135,31 @@ let () =
       let levels_stream, stopper =
         Lwt_watcher.create_stream node_ctxt.sync.sync_level_input
       in
+      let first_call = ref true in
       let synced = ref false in
+      let initial_processed_level = ref None in
+      let get_percentage processed_tezos_level known_tezos_level =
+        let initial =
+          match !initial_processed_level with
+          | Some l -> l
+          | None ->
+              initial_processed_level := Some processed_tezos_level ;
+              processed_tezos_level
+        in
+        let total = Int32.sub known_tezos_level initial in
+        let done_ = Int32.sub processed_tezos_level initial in
+        Int32.to_float done_ *. 100. /. Int32.to_float total
+      in
       let next () =
         if !synced then Lwt.return_none
         else
           let levels =
-            let+ processed_level = Lwt_stream.get levels_stream in
+            let+ processed_level =
+              if !first_call then (
+                first_call := false ;
+                Lwt.return_some node_ctxt.sync.processed_level)
+              else Lwt_stream.get levels_stream
+            in
             let l1_head = Layer1.get_latest_head node_ctxt.l1_ctxt in
             match (processed_level, l1_head) with
             | None, _ | _, None ->
@@ -151,7 +170,13 @@ let () =
                 synced := true ;
                 Rollup_node_services.Synchronized
             | Some processed_level, Some l1_head ->
-                Synchronizing {processed_level; l1_head_level = l1_head.level}
+                Synchronizing
+                  {
+                    processed_level;
+                    l1_head_level = l1_head.level;
+                    percentage_done =
+                      get_percentage processed_level l1_head.level;
+                  }
           in
           let synchronized =
             let+ () = Node_context.wait_synchronized node_ctxt in

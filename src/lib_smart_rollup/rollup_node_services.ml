@@ -93,7 +93,11 @@ type gc_info = {
 
 type sync_result =
   | Synchronized
-  | Synchronizing of { processed_level : int32; l1_head_level : int32 }
+  | Synchronizing of {
+      processed_level : int32;
+      l1_head_level : int32;
+      percentage_done : float;
+    }
 
 module Encodings = struct
   open Data_encoding
@@ -289,15 +293,16 @@ module Encodings = struct
           (obj1
              (req
                 "synchronizing"
-                (obj2
+                (obj3
                    (req "processed_level" int32)
-                   (req "l1_head_level" int32))))
+                   (req "l1_head_level" int32)
+                   (req "percentage_done" float))))
           (function
-            | Synchronizing {processed_level; l1_head_level} ->
-                Some (processed_level, l1_head_level)
+            | Synchronizing {processed_level; l1_head_level; percentage_done} ->
+                Some (processed_level, l1_head_level, percentage_done)
             | _ -> None)
-          (fun (processed_level, l1_head_level) ->
-            Synchronizing {processed_tezos_level; l1_head_level});
+          (fun (processed_level, l1_head_level, percentage_done) ->
+            Synchronizing {processed_level; l1_head_level; percentage_done});
       ]
 end
 
