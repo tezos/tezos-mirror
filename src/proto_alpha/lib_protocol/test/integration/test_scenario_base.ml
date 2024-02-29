@@ -36,39 +36,6 @@ let test_expected_error =
              [Inconsistent_number_of_bootstrap_accounts])
            (exec (fun _ -> failwith "")))
 
-(** Initializes the constants for testing, with well chosen default values.
-    Recommended over [start] or [start_with] *)
-let init_constants ?(default = Test) ?(reward_per_block = 0L)
-    ?(deactivate_dynamic = false) ?blocks_per_cycle
-    ?delegate_parameters_activation_delay () =
-  let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
-  start ~constants:default
-  --> (* default for tests: 12 *)
-  set_opt S.blocks_per_cycle blocks_per_cycle
-  --> set_opt
-        S.delegate_parameters_activation_delay
-        delegate_parameters_activation_delay
-  --> set
-        S.issuance_weights
-        {
-          base_total_issued_per_minute;
-          baking_reward_fixed_portion_weight = 1;
-          baking_reward_bonus_weight = 0;
-          attesting_reward_weight = 0;
-          seed_nonce_revelation_tip_weight = 0;
-          vdf_revelation_tip_weight = 0;
-        }
-  --> set S.liquidity_baking_subsidy Tez.zero
-  --> set S.minimal_block_delay Protocol.Alpha_context.Period.one_minute
-  --> set S.cost_per_byte Tez.zero
-  --> set S.consensus_threshold 0
-  --> (if deactivate_dynamic then
-       set
-         S.Adaptive_issuance.Adaptive_rewards_params.max_bonus
-         (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
-      else Empty)
-  --> set S.Adaptive_issuance.ns_enable false
-
 (** Initialization of scenarios with 3 cases:
      - AI activated, staker = delegate
      - AI activated, staker != delegate

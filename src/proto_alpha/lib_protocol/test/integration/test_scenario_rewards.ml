@@ -17,7 +17,6 @@ open Adaptive_issuance_helpers
 open State_account
 open Tez_helpers.Ez_tez
 open Scenario
-open Test_scenario_base
 
 let test_wait_with_rewards =
   let set_edge pct =

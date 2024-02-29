@@ -16,7 +16,6 @@
 open State_account
 open Tez_helpers.Ez_tez
 open Scenario
-open Test_scenario_base
 open Log_helpers
 
 let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
