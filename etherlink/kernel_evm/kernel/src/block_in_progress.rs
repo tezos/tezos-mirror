@@ -250,12 +250,7 @@ impl BlockInProgress {
         // make receipt
         let receipt = self.make_receipt(receipt_info);
         let receipt_bloom_size: u64 = tick_model::bloom_size(&receipt.logs).try_into()?;
-        log!(
-            host,
-            Debug,
-            "[Benchmarking] bloom size: {}",
-            receipt_bloom_size
-        );
+        log!(host, Benchmarking, "bloom size: {}", receipt_bloom_size);
         // extend BIP's logs bloom
         self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
 

@@ -342,7 +342,7 @@ pub fn store_transaction_receipt<Host: Runtime>(
     index_transaction_hash(host, &receipt.hash, &mut transaction_hashes_index)?;
     let receipt_path = receipt_path(&receipt.hash)?;
     let src: &[u8] = &receipt.rlp_bytes();
-    log!(host, Debug, "Storing receipt of size {}", src.len());
+    log!(host, Benchmarking, "Storing receipt of size {}", src.len());
     host.store_write_all(&receipt_path, src)?;
     Ok(src.len().try_into()?)
 }
@@ -355,7 +355,7 @@ pub fn store_transaction_object<Host: Runtime>(
     let encoded: &[u8] = &object.rlp_bytes();
     log!(
         host,
-        Debug,
+        Benchmarking,
         "Storing transaction object of size {}",
         encoded.len()
     );
@@ -889,7 +889,7 @@ pub fn store_block_in_progress<Host: Runtime>(
     let bytes = &bip.rlp_bytes();
     log!(
         host,
-        Debug,
+        Benchmarking,
         "Storing Block In Progress of size {}",
         bytes.len()
     );
@@ -907,7 +907,7 @@ pub fn read_block_in_progress<Host: Runtime>(
             .context("Failed to read current block in progress")?;
         log!(
             host,
-            Debug,
+            Benchmarking,
             "Reading Block In Progress of size {}",
             bytes.len()
         );
