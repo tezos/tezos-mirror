@@ -274,7 +274,7 @@ async function analyze_profiler_output(path) {
     store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
     interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
-    fetch_blueprint_ticks = await get_ticks(path, "blueprint5fetch");
+    stage_one_ticks = await get_ticks(path, "stage_one");
     block_finalize = await get_ticks(path, "store_current_block");
     logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
@@ -286,7 +286,7 @@ async function analyze_profiler_output(path) {
         store_transaction_object_ticks: store_transaction_object_ticks,
         interpreter_init_ticks: interpreter_init_ticks,
         interpreter_decode_ticks: interpreter_decode_ticks,
-        fetch_blueprint_ticks: fetch_blueprint_ticks,
+        stage_one_ticks: stage_one_ticks,
         sputnik_runtime_ticks: sputnik_runtime_ticks,
         store_receipt_ticks,
         block_finalize,
@@ -338,7 +338,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     store_transaction_object_ticks = run_benchmark_result.store_transaction_object_ticks;
     interpreter_init_ticks = run_benchmark_result.interpreter_init_ticks;
     interpreter_decode_ticks = run_benchmark_result.interpreter_decode_ticks;
-    fetch_blueprint_ticks = run_benchmark_result.fetch_blueprint_ticks;
+    stage_one_ticks = run_benchmark_result.stage_one_ticks;
     tx_status = run_benchmark_result.tx_status;
     estimated_ticks = run_benchmark_result.estimated_ticks;
     estimated_ticks_per_tx = run_benchmark_result.estimated_ticks_per_tx;
@@ -409,7 +409,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         benchmark_name: benchmark_name + "(all)",
         interpreter_init_ticks: interpreter_init_ticks?.[0],
         interpreter_decode_ticks: interpreter_decode_ticks?.[0],
-        fetch_blueprint_ticks: fetch_blueprint_ticks?.[0],
+        stage_one_ticks: stage_one_ticks?.[0],
         blueprint_chunks: run_benchmark_result.blueprint_chunks?.[0],
         kernel_run_ticks: kernel_run_ticks?.[0],
         estimated_ticks: estimated_ticks?.[0],
@@ -425,7 +425,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             benchmark_name: benchmark_name + "(all)",
             interpreter_init_ticks: interpreter_init_ticks?.[j],
             interpreter_decode_ticks: interpreter_decode_ticks?.[j],
-            fetch_blueprint_ticks: fetch_blueprint_ticks?.[j],
+            stage_one_ticks: stage_one_ticks?.[j],
             blueprint_chunks: run_benchmark_result.blueprint_chunks?.[j],
             kernel_run_ticks: kernel_run_ticks?.[j],
             estimated_ticks: estimated_ticks?.[j],
@@ -441,7 +441,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     finalize_ticks = sumArray(run_benchmark_result.block_finalize)
     unaccounted_ticks =
         sumArray(kernel_run_ticks)
-        - sumArray(fetch_blueprint_ticks)
+        - sumArray(stage_one_ticks)
         - sumArray(run_transaction_ticks)
         - sumArray(signature_verification_ticks)
         - sumArray(store_transaction_object_ticks)
@@ -503,7 +503,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         "interpreter_init_ticks",
         "nb_tx",
         "inbox_size",
-        "fetch_blueprint_ticks",
+        "stage_one_ticks",
         "blueprint_chunks",
         "block_in_progress_read",
         "block_in_progress_read_ticks",
