@@ -257,9 +257,9 @@ let on_normal_transaction state tx_raw =
           ~transaction:(Hex.of_string tx_raw |> Hex.show)
       in
       return (Error err)
-  | Ok pkey ->
+  | Ok {address} ->
       (* Add the tx to the pool*)
-      let*? pool = Pool.add pool pkey base_fee tx_raw in
+      let*? pool = Pool.add pool address base_fee tx_raw in
       (* compute the hash *)
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
       let hash =

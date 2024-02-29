@@ -106,6 +106,7 @@ module Worker = struct
 
   let catch_up worker =
     let open Lwt_result_syntax in
+    let lower_bound = Z.succ (latest_level_confirmed worker) in
     (* We limit the maximum number of blueprints we send at once *)
     let upper_bound =
       Z.(
@@ -114,9 +115,7 @@ module Worker = struct
           (latest_level_seen worker))
     in
 
-    let*! () =
-      Blueprint_events.catching_up (latest_level_confirmed worker) upper_bound
-    in
+    let*! () = Blueprint_events.catching_up lower_bound upper_bound in
 
     let rec catching_up curr =
       if Z.Compare.(curr <= upper_bound) then
@@ -138,7 +137,7 @@ module Worker = struct
       else return_unit
     in
 
-    let* () = catching_up (latest_level_confirmed worker) in
+    let* () = catching_up lower_bound in
 
     (* We give ourselves a cooldown window Tezos blocks to inject everything *)
     set_cooldown worker (catchup_cooldown worker) ;

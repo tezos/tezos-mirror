@@ -60,5 +60,16 @@ val decode : bytes -> item tzresult
     fails to decode. *)
 val decode_exn : bytes -> item
 
+(** [decode_option decode_value optional_value] decodes the option following
+    Rust's RLP encoding. *)
+val decode_option : (item -> 'a tzresult) -> item -> 'a option tzresult
+
+(** [decode_result decode_ok decode_error value] decodes an encoded result type. *)
+val decode_result :
+  (item -> 'a tzresult) ->
+  (item -> 'b tzresult) ->
+  item ->
+  ('a, 'b) result tzresult
+
 (** [pp ppf item] pretty-prints an item. *)
 val pp : Format.formatter -> item -> unit

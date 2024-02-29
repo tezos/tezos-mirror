@@ -10,6 +10,7 @@ type t = {
   mutable context : Irmin_context.rw;  (** Irmin read and write context. *)
   index : Irmin_context.rw_index;
   preimages : string;  (** Path to the preimages directory. *)
+  preimages_endpoint : Uri.t option;  (** URI to fetch missing pre-images. *)
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
       (** Number for the next bluerpint to be produced. *)
@@ -19,8 +20,8 @@ type t = {
   store : Store.t;
 }
 
-(** [init ~data_dir ~preimages ~smart_rollup_address ()] creates
-    a context where it initializes the {!type-index}, and use a
+(** [init ~data_dir ~preimages ~preimages_endpoint ~smart_rollup_address ()]
+    creates a context where it initializes the {!type-index}, and use a
     checkpoint mechanism to load the latest {!type-store} if any.
 
     Returns an additional boolean telling if the context was loaded from disk
@@ -29,6 +30,7 @@ val init :
   ?kernel_path:string ->
   data_dir:string ->
   preimages:string ->
+  preimages_endpoint:Uri.t option ->
   smart_rollup_address:string ->
   unit ->
   (t * bool) tzresult Lwt.t
