@@ -38,7 +38,7 @@ Smart rollup [SMART_ROLLUP_HASH] memorized as "rollup"
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-client --wait none send smart rollup message '["dal:16:4:16:0:2:4:6"]' from bootstrap2
+./octez-client --wait none send smart rollup message '["dal:16:8:16:0:2:4:6"]' from bootstrap2
 Node is bootstrapped.
 Estimated gas: 170.903 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -70,7 +70,7 @@ GET http://[HOST]:[PORT]/global/block/head/dal/processed_slots
 200 OK
 [{"index":0,"status":"unconfirmed"},{"index":1,"status":"confirmed"},{"index":2,"status":"confirmed"},{"index":3,"status":"unconfirmed"},{"index":4,"status":"unconfirmed"},{"index":5,"status":"unconfirmed"},{"index":6,"status":"unconfirmed"},{"index":7,"status":"unconfirmed"},{"index":8,"status":"unconfirmed"},{"index":9,"status":"unconfirmed"},{"index":10,"status":"unconfirmed"},{"index":11,"status":"unconfirmed"},{"index":12,"status":"unconfirmed"},{"index":13,"status":"unconfirmed"},{"index":14,"status":"unconfirmed"},{"index":15,"status":"unconfirmed"}]
 
-GET http://[HOST]:[PORT]/global/block/8/dal/processed_slots
+GET http://[HOST]:[PORT]/global/block/12/dal/processed_slots
 200 OK
 [{"index":0,"status":"unconfirmed"},{"index":1,"status":"confirmed"},{"index":2,"status":"confirmed"},{"index":3,"status":"unconfirmed"},{"index":4,"status":"unconfirmed"},{"index":5,"status":"unconfirmed"},{"index":6,"status":"unconfirmed"},{"index":7,"status":"unconfirmed"},{"index":8,"status":"unconfirmed"},{"index":9,"status":"unconfirmed"},{"index":10,"status":"unconfirmed"},{"index":11,"status":"unconfirmed"},{"index":12,"status":"unconfirmed"},{"index":13,"status":"unconfirmed"},{"index":14,"status":"unconfirmed"},{"index":15,"status":"unconfirmed"}]
 
