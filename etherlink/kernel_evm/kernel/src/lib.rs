@@ -305,7 +305,7 @@ kernel_entry!(kernel_loop);
 mod tests {
     use std::str::FromStr;
 
-    use crate::blueprint_storage::store_inbox_blueprint;
+    use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::configuration::Configuration;
     use crate::fees;
     use crate::mock_internal::MockInternal;
@@ -494,8 +494,8 @@ mod tests {
             ]),
         ];
         // Store blueprints
-        for blueprint in proposals {
-            store_inbox_blueprint(&mut host, blueprint)
+        for (i, blueprint) in proposals.into_iter().enumerate() {
+            store_inbox_blueprint_by_number(&mut host, blueprint, U256::from(i))
                 .expect("Should have stored blueprint");
         }
         // the upgrade mechanism should not start otherwise it will fail

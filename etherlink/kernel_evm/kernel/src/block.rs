@@ -330,6 +330,7 @@ mod tests {
     use super::*;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
+    use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
@@ -515,8 +516,9 @@ mod tests {
     }
 
     fn store_blueprints<Host: Runtime>(host: &mut Host, blueprints: Vec<Blueprint>) {
-        for blueprint in blueprints {
-            store_inbox_blueprint(host, blueprint).expect("Should have stored blueprint");
+        for (i, blueprint) in blueprints.into_iter().enumerate() {
+            store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
+                .expect("Should have stored blueprint");
         }
     }
 
@@ -1699,7 +1701,7 @@ mod tests {
 
         let proposals_first_reboot = vec![wrap_transaction(0, create_transaction)];
 
-        store_blueprints(&mut host, vec![blueprint(proposals_first_reboot)]);
+        store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
 
         produce(
             &mut host,
@@ -1718,7 +1720,7 @@ mod tests {
 
         let proposals_second_reboot = vec![wrap_transaction(2, loop_5800_tx)];
 
-        store_blueprints(&mut host, vec![blueprint(proposals_second_reboot)]);
+        store_inbox_blueprint(&mut host, blueprint(proposals_second_reboot)).unwrap();
 
         produce(
             &mut host,
