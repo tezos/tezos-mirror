@@ -26,7 +26,7 @@ const commander = require('commander');
 const { mkdirSync } = require('node:fs');
 const { exit } = require('process');
 
-function parse_mode (mode, _) {
+function parse_mode(mode, _) {
     if (mode != "sequencer" && mode != "proxy") {
         console.error("Mode can be either `proxy` or `sequencer`");
         exit(2)
@@ -95,16 +95,16 @@ function parse_data(opcode, gas_and_result) {
 function push_profiler_sections(output, opcodes, precompiles) {
     const section_regex = /\__wasm_debugger__::Section{ticks:(\d+);data:\((0x[0-9a-fA-F]*),0x([0-9a-fA-F]*)\)}/g;
     let precompiled_address_set = new Set([
-      "0x0000000000000000000000000000000000000001",
-      "0x0000000000000000000000000000000000000002",
-      "0x0000000000000000000000000000000000000003",
-      "0x0000000000000000000000000000000000000004",
-      "0x0000000000000000000000000000000000000005",
-      "0x0000000000000000000000000000000000000006",
-      "0x0000000000000000000000000000000000000007",
-      "0x0000000000000000000000000000000000000008",
-      "0x0000000000000000000000000000000000000009",
-      "0xff00000000000000000000000000000000000001"
+        "0x0000000000000000000000000000000000000001",
+        "0x0000000000000000000000000000000000000002",
+        "0x0000000000000000000000000000000000000003",
+        "0x0000000000000000000000000000000000000004",
+        "0x0000000000000000000000000000000000000005",
+        "0x0000000000000000000000000000000000000006",
+        "0x0000000000000000000000000000000000000007",
+        "0x0000000000000000000000000000000000000008",
+        "0x0000000000000000000000000000000000000009",
+        "0xff00000000000000000000000000000000000001"
     ]);
 
     for (const match of output.matchAll(section_regex)) {
@@ -128,6 +128,14 @@ function push_profiler_sections(output, opcodes, precompiles) {
         }
     }
     return opcodes;
+}
+
+/// Raise an error if cmp(expected,actual), with a given message.
+/// In the message, potential $? are replaced by a breakdown of expected and actual:w
+function check(expected, actual, msg, cmp = (x, y) => x == y) {
+    if (!cmp(expected, actual)) {
+        console.log(new Error(msg.replace("$?", `(expected: ${expected}, actual: ${actual})`)))
+    }
 }
 
 function run_profiler(path, logs) {
@@ -200,33 +208,15 @@ function run_profiler(path, logs) {
             if (!FAST_MODE && profiler_output_path == "") {
                 console.log(new Error("Profiler output path not found"));
             }
-            if (gas_used == []) {
-                console.log(new Error("Gas usage data not found"));
-            }
-            if (tx_status.length == 0) {
-                console.log(new Error("Status data not found"));
-            }
-            if (tx_status.length != estimated_ticks_per_tx.length) {
-                console.log(new Error("Tx status array length (" + tx_status.length + ") != estimated ticks per tx array length (" + estimated_ticks_per_tx.length + ")"));
-            }
-            if (tx_status.length != tx_size.length) {
-                console.log(new Error("Missing transaction size data (expected: " + tx_status.length + ", actual: " + tx_size.length + ")"));
-            }
-            if (tx_status.length != receipt_size.length) {
-                console.log(new Error("Missing receipt size value (expected: " + tx_status.length + ", actual: " + receipt_size.length + ")"));
-            }
-            if (tx_status.length != bloom_size.length) {
-                console.log(new Error("Missing bloom size value (expected: " + tx_status.length + ", actual: " + bloom_size.length + ")"));
-            }
-            if (block_in_progress_store.length != nb_reboots) {
-                console.log(new Error("Missing stored block in progress size value (expected: " + nb_reboots + ", actual: " + block_in_progress_store.length + ")"));
-            }
-            if (block_in_progress_read.length != nb_reboots) {
-                console.log(new Error("Missing read block in progress size value (expected: " + nb_reboots + ", actual: " + block_in_progress_read.length + ")"));
-            }
-            if (tx_status.length != tx_type.length) {
-                console.log(new Error("Missing transaction type (expected: " + tx_status.length + ", actual: " + tx_type.length + ")"));
-            }
+            check([], gas_used, "Gas usage data not found", (x, y) => x != y);
+            check(0, tx_status.length, "Status data not found", (x, y) => x != y);
+            check(tx_status.length, estimated_ticks_per_tx.length, "Missing estimated ticks per tx info $?");
+            check(tx_status.length, tx_size.length, "Missing transaction size data $?");
+            check(tx_status.length, receipt_size.length, "Missing receipt size value $?");
+            check(tx_status.length, bloom_size.length, "Missing bloom size value $?")
+            check(block_in_progress_store.length, nb_reboots, "Missing stored block size value $?")
+            check(block_in_progress_read.length, nb_reboots, "Missing read bip size value $?")
+            check(tx_status.length, tx_type.length, "Missing transaction type $?")
             resolve({
                 profiler_output_path,
                 gas_costs: gas_used,
