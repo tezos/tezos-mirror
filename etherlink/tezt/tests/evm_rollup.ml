@@ -385,8 +385,6 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       | Setup_sequencer {sequencer; _} -> Some sequencer.public_key
     in
     Configuration.make_config
-      ~ghostnet:
-        (Uses.tag kernel_installee = Uses.tag Constant.WASM.ghostnet_evm_kernel)
       ~bootstrap_accounts
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
@@ -3204,7 +3202,7 @@ let test_transaction_storage_before_and_after_migration =
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
   let config =
-    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config-ghostnet.yaml")
+    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
   in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
   let raw_txs, tx_hashes = List.split txs in
