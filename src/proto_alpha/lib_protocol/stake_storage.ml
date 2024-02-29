@@ -166,6 +166,10 @@ let remove_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
   | Frozen_staker_repr.Baker delegate ->
       remove_own_frozen_stake ctxt delegate amount
+  | Frozen_staker_repr.Baker_edge delegate ->
+      (* This case should not happen because [Baker_edge] is only
+         intended to be used for rewards. *)
+      remove_own_frozen_stake ctxt delegate amount
   | Single_staker {staker = _; delegate} | Shared_between_stakers {delegate} ->
       remove_staked_frozen_stake ctxt delegate amount
 
@@ -185,6 +189,8 @@ let add_staked_frozen_stake ctxt delegate amount =
 let add_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
   | Frozen_staker_repr.Baker delegate ->
+      add_own_frozen_stake ctxt delegate amount
+  | Frozen_staker_repr.Baker_edge delegate ->
       add_own_frozen_stake ctxt delegate amount
   | Single_staker {staker = _; delegate} | Shared_between_stakers {delegate} ->
       add_staked_frozen_stake ctxt delegate amount

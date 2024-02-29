@@ -2118,8 +2118,11 @@ module Receipt : sig
         delegate : Signature.public_key_hash;
       }
     | Shared_between_stakers of {delegate : Signature.public_key_hash}
+    | Baker_edge of Signature.public_key_hash
 
   val frozen_baker : Signature.public_key_hash -> frozen_staker
+
+  val frozen_baker_edge : Signature.public_key_hash -> frozen_staker
 
   val frozen_single_staker :
     staker:Contract.t -> delegate:Signature.public_key_hash -> frozen_staker
