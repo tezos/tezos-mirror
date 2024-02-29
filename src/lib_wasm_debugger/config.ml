@@ -37,6 +37,8 @@ let default_dal_pages_directory = "dal_pages"
 
 let default_kernel_debug = false
 
+let default_flamecharts_directory = Filename.get_temp_dir_name ()
+
 type config = {
   sender : Protocol.Contract_hash.t;
   source : Tezos_crypto.Signature.public_key_hash;
@@ -45,13 +47,15 @@ type config = {
   preimage_endpoint : Uri.t option;
   dal_pages_directory : string;
   kernel_debug : bool;
+  flamecharts_directory : string;
 }
 
 let config ?(sender = default_sender) ?(source = default_source)
     ?(destination = default_destination)
     ?(preimage_directory = default_preimage_directory) ?preimage_endpoint
     ?(dal_pages_directory = default_dal_pages_directory)
-    ?(kernel_debug = default_kernel_debug) () =
+    ?(kernel_debug = default_kernel_debug)
+    ?(flamecharts_directory = default_flamecharts_directory) () =
   {
     sender;
     source;
@@ -60,4 +64,5 @@ let config ?(sender = default_sender) ?(source = default_source)
     preimage_endpoint;
     dal_pages_directory;
     kernel_debug;
+    flamecharts_directory;
   }
