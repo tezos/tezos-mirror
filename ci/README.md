@@ -20,3 +20,15 @@ To regenerate the GitLab CI configuration, run (from the root of the repo):
 To check that the GitLab CI configuration is up-to-date, run (from the root of the repo):
 
     make -C ci check
+
+To see all available targets, run:
+
+    make -C ci help
+
+To call the underlying generator binary, call
+
+    dune exec bin/ci/main.exe
+
+For more information, see
+
+    dune exec bin/ci/main.exe -- --help
