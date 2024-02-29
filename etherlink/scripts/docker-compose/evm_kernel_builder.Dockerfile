@@ -14,7 +14,7 @@ COPY kernels.mk etherlink.mk /build/
 COPY src/kernel_sdk /build/src/kernel_sdk
 COPY etherlink /build/etherlink
 RUN make -f etherlink.mk build-deps
-RUN make -f etherlink.mk EVM_CONFIG=${EVM_CONFIG} evm_installer.wasm
+RUN make -f etherlink.mk EVM_CONFIG=${EVM_CONFIG} CI_COMMIT_SHA=${CI_COMMIT_SHA} evm_installer.wasm
 
 FROM ${BASE_IMAGE}
 COPY --from=kernel_build /build/*.wasm /kernel/
