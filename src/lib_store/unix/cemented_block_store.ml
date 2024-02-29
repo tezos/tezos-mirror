@@ -356,7 +356,7 @@ let close cemented_store =
 
 let offset_length = 4 (* file offset *)
 
-let offset_encoding = Data_encoding.int31
+let offset_encoding = Data_encoding.int32
 
 let find_block_file cemented_store block_level =
   try
@@ -570,7 +570,10 @@ let read_block fd block_number =
     Lwt_utils_unix.read_bytes ~pos:0 ~len:offset_length fd offset_buffer
   in
   let offset =
-    Data_encoding.(Binary.of_bytes_exn offset_encoding offset_buffer)
+    let ofs =
+      Data_encoding.(Binary.of_bytes_exn offset_encoding offset_buffer)
+    in
+    Int32.to_int ofs
   in
   let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)
