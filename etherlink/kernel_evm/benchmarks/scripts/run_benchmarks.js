@@ -142,19 +142,23 @@ function run_profiler(path, logs) {
 
     profiler_result = new Promise((resolve, _) => {
 
-        var gas_used = [];
-
-        var tx_status = [];
-        var estimated_ticks = [];
-        var estimated_ticks_per_tx = [];
-        var tx_size = [];
-        var block_in_progress_store = [];
-        var block_in_progress_read = [];
-        var receipt_size = [];
-        let bloom_size = [];
+        let results = {
+            profiler_output_path: "",
+            gas_costs: [],
+            tx_status: [],
+            estimated_ticks: [],
+            estimated_ticks_per_tx: [],
+            tx_size: [],
+            block_in_progress_store: [],
+            block_in_progress_read: [],
+            receipt_size: [],
+            opcodes: {},
+            bloom_size: [],
+            precompiles: [],
+            blueprint_chunks: [],
+            tx_type: [],
+        }
         let nb_reboots = 0;
-        let blueprint_chunks = [];
-        let tx_type = [];
 
         var profiler_output_path = "";
 
@@ -167,9 +171,6 @@ function run_profiler(path, logs) {
 
         const childProcess = spawn(RUN_DEBUGGER_COMMAND, args, {});
 
-        let opcodes = {};
-
-        let precompiles = [];
 
         if (FAST_MODE)
             childProcess.stdin.write("step inbox\n");
@@ -187,52 +188,37 @@ function run_profiler(path, logs) {
                 ? profiler_output_path_match[1]
                 : null;
             if (profiler_output_path_result !== null) {
-                profiler_output_path = profiler_output_path_result;
+                results.profiler_output_path = profiler_output_path_result;
                 if (KEEP_TEMP) console.log(`Flamechart: ${profiler_output_path}`)
             }
-            push_match(output, gas_used, /\[Benchmarking\] gas_used:\s*(\d+)/g)
-            push_match(output, tx_status, /\[Benchmarking\] Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
-            push_match(output, estimated_ticks, /\[Benchmarking\] Estimated ticks:\s*(\d+)/g)
-            push_match(output, estimated_ticks_per_tx, /\[Benchmarking\] Estimated ticks after tx:\s*(\d+)/g)
-            push_match(output, tx_size, /\[Benchmarking\] Storing transaction object of size\s*(\d+)/g)
-            push_match(output, block_in_progress_store, /\[Benchmarking\] Storing Block In Progress of size\s*(\d+)/g)
-            push_match(output, block_in_progress_read, /\[Benchmarking\] Reading Block In Progress of size\s*(\d+)/g)
-            push_match(output, receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
-            push_match(output, bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
-            push_match(output, blueprint_chunks, /\[Benchmarking\] number of blueprint chunks read:\s*(\d+)/g)
-            push_match(output, tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
-            push_profiler_sections(output, opcodes, precompiles);
+            push_match(output, results.gas_costs, /\[Benchmarking\] gas_used:\s*(\d+)/g)
+            push_match(output, results.tx_status, /\[Benchmarking\] Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
+            push_match(output, results.estimated_ticks, /\[Benchmarking\] Estimated ticks:\s*(\d+)/g)
+            push_match(output, results.estimated_ticks_per_tx, /\[Benchmarking\] Estimated ticks after tx:\s*(\d+)/g)
+            push_match(output, results.tx_size, /\[Benchmarking\] Storing transaction object of size\s*(\d+)/g)
+            push_match(output, results.block_in_progress_store, /\[Benchmarking\] Storing Block In Progress of size\s*(\d+)/g)
+            push_match(output, results.block_in_progress_read, /\[Benchmarking\] Reading Block In Progress of size\s*(\d+)/g)
+            push_match(output, results.receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
+            push_match(output, results.bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
+            push_match(output, results.blueprint_chunks, /\[Benchmarking\] number of blueprint chunks read:\s*(\d+)/g)
+            push_match(output, results.tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
+            push_profiler_sections(output, results.opcodes, results.precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
         childProcess.on('close', _ => {
-            if (!FAST_MODE && profiler_output_path == "") {
+            if (!FAST_MODE && results.profiler_output_path == "") {
                 console.log(new Error("Profiler output path not found"));
             }
-            check([], gas_used, "Gas usage data not found", (x, y) => x != y);
-            check(0, tx_status.length, "Status data not found", (x, y) => x != y);
-            check(tx_status.length, estimated_ticks_per_tx.length, "Missing estimated ticks per tx info $?");
-            check(tx_status.length, tx_size.length, "Missing transaction size data $?");
-            check(tx_status.length, receipt_size.length, "Missing receipt size value $?");
-            check(tx_status.length, bloom_size.length, "Missing bloom size value $?")
-            check(block_in_progress_store.length, nb_reboots, "Missing stored block size value $?")
-            check(block_in_progress_read.length, nb_reboots, "Missing read bip size value $?")
-            check(tx_status.length, tx_type.length, "Missing transaction type $?")
-            resolve({
-                profiler_output_path,
-                gas_costs: gas_used,
-                tx_status,
-                tx_type,
-                estimated_ticks,
-                estimated_ticks_per_tx,
-                tx_size,
-                block_in_progress_store,
-                block_in_progress_read,
-                receipt_size,
-                opcodes,
-                bloom_size,
-                precompiles,
-                blueprint_chunks,
-            });
+            check([], results.gas_used, "Gas usage data not found", (x, y) => x != y);
+            check(0, results.tx_status.length, "Status data not found", (x, y) => x != y);
+            check(results.tx_status.length, results.estimated_ticks_per_tx.length, "Missing estimated ticks per tx info $?");
+            check(results.tx_status.length, results.tx_size.length, "Missing transaction size data $?");
+            check(results.tx_status.length, results.receipt_size.length, "Missing receipt size value $?");
+            check(results.tx_status.length, results.bloom_size.length, "Missing bloom size value $?")
+            check(results.block_in_progress_store.length, nb_reboots, "Missing stored block size value $?")
+            check(results.block_in_progress_read.length, nb_reboots, "Missing read bip size value $?")
+            check(results.tx_status.length, results.tx_type.length, "Missing transaction type $?")
+            resolve(results);
         });
     })
     return profiler_result;
