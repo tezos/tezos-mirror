@@ -6,12 +6,21 @@
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
 pub enum MigrationStatus {
     None,
     InProgress,
     Done,
+}
+
+fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
+    match res {
+        Ok(()) => Ok(()),
+        Err(RuntimeError::PathNotFound) => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 // The workflow for migration is the following:
@@ -36,6 +45,9 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+        allow_path_not_found(
+            host.store_delete(&RefPath::assert_from(b"/blueprints/last")),
+        )?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);

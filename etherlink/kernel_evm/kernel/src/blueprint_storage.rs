@@ -7,7 +7,7 @@ use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
 use crate::storage::{
-    self, read_current_block_number, read_rlp, store_read_slice, store_rlp, write_u256,
+    self, read_current_block_number, read_rlp, store_read_slice, store_rlp,
 };
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
@@ -20,11 +20,6 @@ use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
-
-/// Number of the last (as in, with larger number) blueprint stored.
-/// This is only used for proxy mode, where the kernel guarantees that
-/// blueprints are added incrementally.
-const EVM_LAST_BLUEPRINT: RefPath = RefPath::assert_from(b"/blueprints/last");
 
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
@@ -78,41 +73,6 @@ impl Decodable for StoreBlueprint {
             _ => Err(DecoderError::Custom("Unknown store blueprint tag.")),
         }
     }
-}
-
-fn read_u256_default<Host: Runtime>(
-    host: &Host,
-    path: OwnedPath,
-    default: U256,
-) -> Result<U256, Error> {
-    let mut buffer = [0_u8; 8];
-    match store_read_slice(host, &path, &mut buffer, 8) {
-        Ok(()) => Ok(U256::from_little_endian(&buffer)),
-        Err(
-            Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))
-            | Error::Storage(StorageError::Runtime(RuntimeError::HostErr(
-                tezos_smart_rollup_host::Error::StoreNotAValue,
-            )))
-            | Error::Storage(StorageError::Runtime(RuntimeError::HostErr(
-                tezos_smart_rollup_host::Error::StoreInvalidAccess,
-            ))),
-            // An InvalidAccess implies that the path does not exist at all
-            // in the storage: store_read fails because reading is out of
-            // bounds since the value has never been allocated before
-        ) => Ok(default),
-        Err(e) => Err(e),
-    }
-}
-
-fn read_last_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
-    read_u256_default(host, EVM_LAST_BLUEPRINT.into(), U256::max_value())
-}
-
-pub fn store_last_blueprint_number<Host: Runtime>(
-    host: &mut Host,
-    number: U256,
-) -> Result<(), Error> {
-    write_u256(host, &EVM_LAST_BLUEPRINT.into(), number)
 }
 
 fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
@@ -170,25 +130,34 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
     store_rlp(&store_blueprint, host, &blueprint_chunk_path)
 }
 
-pub fn store_inbox_blueprint<Host: Runtime>(
+pub fn store_inbox_blueprint_by_number<Host: Runtime>(
     host: &mut Host,
     blueprint: Blueprint,
+    number: U256,
 ) -> Result<(), Error> {
-    let number = read_last_blueprint_number(host)?;
-    // We overflow, as the default is the max U256
-    let (number, _) = number.overflowing_add(U256::one());
     let blueprint_path = blueprint_path(number)?;
-    store_last_blueprint_number(host, number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
     store_rlp(&store_blueprint, host, &chunk_path)
 }
 
+pub fn store_inbox_blueprint<Host: Runtime>(
+    host: &mut Host,
+    blueprint: Blueprint,
+) -> Result<(), Error> {
+    let number = read_next_blueprint_number(host)?;
+    store_inbox_blueprint_by_number(host, blueprint, number)
+}
+
+#[inline(always)]
 pub fn read_next_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     match read_current_block_number(host) {
-        Ok(number) => Ok(number.saturating_add(U256::one())),
-        Err(_) => Ok(U256::zero()),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::HostErr(
+            tezos_smart_rollup_host::Error::StoreNotAValue,
+        )))) => Ok(U256::zero()),
+        Err(err) => Err(err),
+        Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
     }
 }
 
@@ -352,10 +321,7 @@ pub fn drop_head_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 
 pub fn clear_all_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
     if host.store_has(&EVM_BLUEPRINTS)?.is_some() {
-        let last_blueprint_number = read_last_blueprint_number(host)?;
-        host.store_delete(&EVM_BLUEPRINTS)
-            .map_err(StorageError::from)?;
-        store_last_blueprint_number(host, last_blueprint_number)
+        Ok(host.store_delete(&EVM_BLUEPRINTS)?)
     } else {
         Ok(())
     }

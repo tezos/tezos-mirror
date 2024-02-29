@@ -2523,7 +2523,7 @@ let test_kernel_upgrade_failing_migration =
     ~node
     ~client
     ~endpoint
-    ~expected_block_level:3
+    ~expected_block_level:2
 
 let test_kernel_upgrade_via_governance =
   Protocol.register_test
