@@ -465,32 +465,16 @@ module Dal : sig
     t -> attester:Signature.Public_key_hash.t -> int list option
 
   (** The DAL committee is a subset of the Tenderbake committee.  A
-     shard from [0;number_of_shards] is associated to a public key
-     hash. For efficiency reasons, the committee is both:
-     a mapping from public key hashes to shards and
-     a mapping from shards to public key hashes.
+     shard from [0; number_of_shards - 1] is associated to a public key
+     hash. The committee is a mapping from public key hashes to shards and
      The DAL committee ensures the shards associated to the
      same public key hash are contiguous. The list of shards is
      represented as two natural numbers [(initial, power)] which
      encodes the list of shards:
-     [initial; initial + 1; ... ; initial + power - 1].
-
-      This data-type ensures the following invariants:
-
-      - \forall pkh shard, find pkh_to_shards pkh = Some (start,n) ->
-     \forall i, i \in [start; start + n - 1] -> find shard_to_pkh i
-     = Some pkh
-
-      - forall pkh shard, find shard_to_pkh shard = Some pkh ->
-     \exists (start,n), find pkh_to_shards pkh = Some (start,n) /\
-     start <= shard <= start + n - 1
-
-      - Given an attester, all its shard assignments are contiguous
-     *)
+     [initial; initial + 1; ... ; initial + power - 1]. *)
   type committee = {
     pkh_to_shards :
       (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
   }
 
   (** [compute_committee ctxt pkh_from_tenderbake_slot] computes the

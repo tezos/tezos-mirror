@@ -153,8 +153,6 @@ let compute_committee ctxt level =
     let+ ctxt, consensus_key = Stake_distribution.slot_owner ctxt level slot in
     (ctxt, pkh_of_consensus_key consensus_key)
   in
-  (* This committee is cached because it is the one we will use
-     for the validation of the DAL attestations. *)
   Alpha_context.Dal.Attestation.compute_committee ctxt pkh_from_tenderbake_slot
 
 let initialisation ctxt ~level =
@@ -164,4 +162,6 @@ let initialisation ctxt ~level =
     ~default:(fun ctxt -> return ctxt)
     (fun ctxt ->
       let+ committee = compute_committee ctxt level in
+      (* This committee is cached because it is the one we will use
+         for the validation of the DAL attestations. *)
       Alpha_context.Dal.Attestation.init_committee ctxt committee)

@@ -134,12 +134,7 @@ module Accountability = struct
     match List.nth shard_bitset_per_slot (Dal_slot_index_repr.to_int index) with
     | None -> false
     | Some bitset ->
-        let acc = ref 0 in
-        List.iter
-          (fun x ->
-            match Bitset.mem bitset x with
-            | Error _ | Ok false -> ()
-            | Ok true -> incr acc)
-          Misc.(0 --> (number_of_shards - 1)) ;
-        Compare.Int.(!acc >= threshold * number_of_shards / 100)
+        let number_of_attested_shards = Bitset.hamming_weight bitset in
+        Compare.Int.(
+          number_of_attested_shards >= threshold * number_of_shards / 100)
 end

@@ -124,6 +124,24 @@ let test_launch threshold expected_vote_duration () =
   (* Initialize the state with a single delegate. *)
   let constants =
     let default_constants = Default_parameters.constants_test in
+    let default_constants =
+      {
+        default_constants with
+        dal =
+          {
+            default_constants.dal with
+            cryptobox_parameters =
+              {
+                default_constants.dal.cryptobox_parameters with
+                (* Computing the DAL committee takes a bit of time, around 1ms
+                   for [number_of_shards] = 2048, and this adds up when baking
+                   for a long time. As this issue is orthogonal to this test, we
+                   simply pick a lower value. *)
+                number_of_shards = 32;
+              };
+          };
+      }
+    in
     let adaptive_issuance =
       {
         default_constants.adaptive_issuance with
@@ -403,6 +421,21 @@ let test_does_not_launch_without_feature_flag threshold vote_duration () =
   (* Initialize the state with a single delegate. *)
   let constants =
     let default_constants = Default_parameters.constants_test in
+    let default_constants =
+      {
+        default_constants with
+        dal =
+          {
+            default_constants.dal with
+            cryptobox_parameters =
+              {
+                default_constants.dal.cryptobox_parameters with
+                (* same reasoning as for [test_launch] *)
+                number_of_shards = 32;
+              };
+          };
+      }
+    in
     let adaptive_issuance =
       {
         default_constants.adaptive_issuance with
