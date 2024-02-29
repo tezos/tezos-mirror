@@ -1,9 +1,9 @@
 open Gitlab_ci.Util
 
 module Cli = struct
-  type config = {mutable verbose : bool}
+  type config = {mutable verbose : bool; mutable inline_source_info : bool}
 
-  let config = {verbose = false}
+  let config = {verbose = false; inline_source_info = false}
 
   let verbose fmt =
     Format.kasprintf (if config.verbose then print_endline else fun _ -> ()) fmt
@@ -16,6 +16,9 @@ module Cli = struct
             Arg.Unit (fun () -> config.verbose <- true),
             " Show debug output, including the location of each generated job.."
           );
+          ( "--inline-source-info",
+            Arg.Unit (fun () -> config.inline_source_info <- true),
+            " Comment each generated job with source information." );
         ]
     in
     Arg.parse
@@ -31,7 +34,15 @@ type tezos_job = {
   source_position : string * int * int * int;
 }
 
-let tezos_job_to_config_elements (j : tezos_job) = Gitlab_ci.Types.[Job j.job]
+let tezos_job_to_config_elements (j : tezos_job) =
+  let source_comment =
+    if Cli.config.inline_source_info then
+      let file, line, _, _ = j.source_position in
+      let source_info = sf "(generated from %s:%d)" file line in
+      [Gitlab_ci.Types.Comment source_info]
+    else []
+  in
+  source_comment @ [Gitlab_ci.Types.Job j.job]
 
 let header =
   {|# This file was automatically generated, do not edit.

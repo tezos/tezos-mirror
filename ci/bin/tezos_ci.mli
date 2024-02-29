@@ -19,6 +19,8 @@ module Cli : sig
   type config = {
     mutable verbose : bool;
         (** Enable [verbose] output, including the source of generated jobs. *)
+    mutable inline_source_info : bool;
+        (** Enable the emission of source information in generated configuration. *)
   }
 
   (** Populate  {!config} from command-line arguments.
