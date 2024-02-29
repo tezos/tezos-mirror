@@ -37,6 +37,15 @@ type state = {
   mutable last_predecessor : Block_hash.t;
 }
 
+(* This is a feature flag which decides whether the existing "nonces" file is
+   augmented with the new cycle field (and implicitly with the new encoding).
+   For compatibility purposes, we start this "upgrade" by first saving the
+   "upgraded" form of information in a different file. This happens as a first stage,
+   while this flag remains set to false. Once it is set to true, the new file
+   will no longer be needed, as the more detailed information will be directly
+   stored in the legacy nonces file. *)
+let override_legacy_nonces_flag = false
+
 type t = state
 
 type nonce_data = {nonce : Nonce.t; cycle : Cycle.t option}
@@ -105,20 +114,48 @@ let may_migrate (wallet : Protocol_client_context.full) location =
           return_unit
       | true -> Lwt_utils_unix.copy_file ~src:legacy_file ~dst:current_file)
 
+let get_detailed_nonces_location nonces_location = "detailed_" ^ nonces_location
+
 let load (wallet : #Client_context.wallet) location =
   let open Lwt_result_syntax in
-  try wallet#load (Baking_files.filename location) ~default:empty encoding
-  with _exn ->
-    let+ legacy_nonces =
+  let nonces_location = Baking_files.filename location in
+  try
+    (* If the flag is set, then we no longer save into a separate file, so we can
+       try to load the new data format from the legacy file *)
+    if override_legacy_nonces_flag then
+      wallet#load nonces_location ~default:empty encoding
+    else
+      (* Otherwise, we must load from the detailed file *)
       wallet#load
-        (Baking_files.filename location)
+        (get_detailed_nonces_location nonces_location)
         ~default:empty
-        legacy_encoding
+        encoding
+  with _exn ->
+    (* If we fail to load the more detailed format, we try with the legacy format,
+       which can only be found in the legacy file *)
+    let* legacy_nonces =
+      wallet#load nonces_location ~default:empty legacy_encoding
     in
-    Block_hash.Map.map (fun nonce -> {nonce; cycle = None}) legacy_nonces
+    return
+    @@ Block_hash.Map.map (fun nonce -> {nonce; cycle = None}) legacy_nonces
 
 let save (wallet : #Client_context.wallet) location nonces =
-  wallet#write (Baking_files.filename location) nonces encoding
+  let open Lwt_result_syntax in
+  let nonces_location = Baking_files.filename location in
+  (* If the flag is set, we can overwrite the nonces data in the legacy file *)
+  if override_legacy_nonces_flag then
+    wallet#write nonces_location nonces encoding
+    (* Otherwise, we put the detailed data in a specific file, and the legacy data in
+       the legacy file. *)
+  else
+    let* () =
+      wallet#write
+        (get_detailed_nonces_location nonces_location)
+        nonces
+        encoding
+    in
+    let legacy_nonces = Block_hash.Map.map (fun {nonce; _} -> nonce) nonces in
+    wallet#write nonces_location legacy_nonces legacy_encoding
 
 let add nonces hash nonce = Block_hash.Map.add hash nonce nonces
 
@@ -129,6 +166,22 @@ let remove_all nonces nonces_to_remove =
     (fun hash _ acc -> remove acc hash)
     nonces_to_remove
     nonces
+
+let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
+  let open Lwt_result_syntax in
+  let nonces_location = Baking_files.filename location in
+  if not override_legacy_nonces_flag then
+    let* legacy_nonces =
+      wallet#load nonces_location ~default:empty legacy_encoding
+    in
+    let detailed_nonces =
+      Block_hash.Map.map (fun nonce -> {nonce; cycle = None}) legacy_nonces
+    in
+    wallet#write
+      (get_detailed_nonces_location nonces_location)
+      detailed_nonces
+      encoding
+  else return_unit
 
 (** [get_block_level_opt cctxt ~chain ~block] makes an RPC call to 
     retrieve the block level associated to the [~block], given the 
@@ -409,6 +462,7 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
   let open Lwt_result_syntax in
   let nonces_location = Baking_files.resolve_location ~chain_id `Nonce in
   let*! () = may_migrate cctxt nonces_location in
+  let*! _ = may_create_detailed_nonces_file cctxt nonces_location in
   let chain = `Hash chain_id in
   let canceler = Lwt_canceler.create () in
   let should_shutdown = ref false in
