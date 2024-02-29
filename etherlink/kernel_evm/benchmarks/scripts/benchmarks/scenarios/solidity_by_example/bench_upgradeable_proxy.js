@@ -37,7 +37,7 @@ let upgrade_2 = proxy_admin.interface.encodeFunctionData("upgrade", [create_prox
 txs.push(utils.send(player1, create_proxy.addr, 0, changeAdmin))
 txs.push(utils.send(player1, create_proxy_admin.addr, 0, upgrade_1))
 txs.push(utils.send(player2, create_proxy.addr, 0, inc))
-txs.push(utils.send(player2, create_proxy.addr, 0, dec))
+txs.push(utils.send(player2, create_proxy.addr, 0, dec)) // expected to fail because upgrade 1 does not implement dec() 
 txs.push(utils.send(player1, create_proxy_admin.addr, 0, upgrade_2))
 txs.push(utils.send(player2, create_proxy.addr, 0, inc))
 txs.push(utils.send(player2, create_proxy.addr, 0, dec))

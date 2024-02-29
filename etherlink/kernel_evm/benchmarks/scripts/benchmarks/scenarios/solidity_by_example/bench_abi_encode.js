@@ -24,6 +24,6 @@ txs.push(create_encode.tx)
 
 let test = abi_encode.interface.encodeFunctionData("test", [create.addr, player2.addr, 10000]);
 
-txs.push(utils.send(player1, create.addr, 0, test))
+txs.push(utils.send(player1, create_encode.addr, 0, test))
 
 utils.print_bench([txs])
