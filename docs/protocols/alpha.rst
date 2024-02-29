@@ -22,11 +22,11 @@ Smart Rollups
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
-Data Availability Layer (ongoing)
----------------------------------
+Data Availability Layer
+-----------------------
 
-Adaptive Issuance (ongoing)
-----------------------------
+Adaptive Issuance
+-----------------
 
 Gas improvements
 ----------------
