@@ -1,5 +1,31 @@
 open Gitlab_ci.Util
 
+module Cli = struct
+  type config = {mutable verbose : bool}
+
+  let config = {verbose = false}
+
+  let verbose fmt =
+    Format.kasprintf (if config.verbose then print_endline else fun _ -> ()) fmt
+
+  let init () =
+    let speclist =
+      Arg.align
+        [
+          ( "--verbose",
+            Arg.Unit (fun () -> config.verbose <- true),
+            " Show debug output, including the location of each generated job.."
+          );
+        ]
+    in
+    Arg.parse
+      speclist
+      (fun s ->
+        Arg.(usage speclist (sf "No anonymous arguments (got %s)" s)) ;
+        exit 1)
+      (sf "Usage: %s [options]\n\nOptions are:" Sys.argv.(0))
+end
+
 type tezos_job = {
   job : Gitlab_ci.Types.job;
   source_position : string * int * int * int;
@@ -147,6 +173,17 @@ module Pipeline = struct
        | [] -> ()
        | _ :: _ ->
            let filename = filename ~name in
+           List.iter
+             (fun tezos_job ->
+               let source_file, source_line, _, _ = tezos_job.source_position in
+               Cli.verbose
+                 "%s:%d: generates '%s' for pipeline '%s' in %s"
+                 source_file
+                 source_line
+                 tezos_job.job.name
+                 name
+                 filename)
+             jobs ;
            let config = List.concat_map tezos_job_to_config_elements jobs in
            Gitlab_ci.To_yaml.to_file ~header ~filename config
 
@@ -368,5 +405,12 @@ let job_external ?directory ?filename_suffix (tezos_job : tezos_job) : tezos_job
   else (
     external_jobs := String_set.add filename !external_jobs ;
     let config = tezos_job_to_config_elements tezos_job in
+    let source_file, source_line, _, _ = tezos_job.source_position in
+    Cli.verbose
+      "%s:%d: generates '%s' in %s"
+      source_file
+      source_line
+      job.name
+      filename ;
     Gitlab_ci.To_yaml.to_file ~header ~filename config ;
     tezos_job)

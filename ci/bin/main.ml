@@ -15,6 +15,8 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
+let () = Tezos_ci.Cli.init ()
+
 (* Sets up the [default:] top-level configuration element. *)
 let default = default ~interruptible:true ()
 
@@ -891,7 +893,7 @@ let () =
   register "schedule_extended_test" schedule_extended_tests
 
 (* Split pipelines and writes image templates *)
-let config =
+let config () =
   (* Split pipelines types into workflow and includes *)
   let workflow, includes = Pipeline.workflow_includes () in
   (* Write image templates.
@@ -925,5 +927,7 @@ let config =
   ]
 
 let () =
+  (* If argument --verbose is set, then log generation info.
+     If argument --inline-source, then print generation info in yml files. *)
   let filename = Base.(project_root // ".gitlab-ci.yml") in
-  To_yaml.to_file ~header:Tezos_ci.header ~filename config
+  To_yaml.to_file ~header:Tezos_ci.header ~filename (config ())

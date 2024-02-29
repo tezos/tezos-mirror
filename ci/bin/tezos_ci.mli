@@ -13,6 +13,24 @@ type tezos_job
     Warns not to modify the generated files, and refers to the generator. *)
 val header : string
 
+(** Run-time configuration and command-line processing. *)
+module Cli : sig
+  (** Type of the command-line configuration for the generator binary. *)
+  type config = {
+    mutable verbose : bool;
+        (** Enable [verbose] output, including the source of generated jobs. *)
+  }
+
+  (** Populate  {!config} from command-line arguments.
+
+      Terminates the program with usage help if invalid arguments, or
+      [--help] is passed. *)
+  val init : unit -> unit
+
+  (** The current command-line configuration, as populated by {!init}. *)
+  val config : config
+end
+
 (** A facility for registering pipeline stages. *)
 module Stage : sig
   (* Represents a pipeline stage *)
