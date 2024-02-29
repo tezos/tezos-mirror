@@ -338,8 +338,9 @@ module Points : sig
   val ban :
     ('msg, 'peer, 'conn) t -> ?ban_peers:bool -> P2p_point.Id.t -> unit Lwt.t
 
-  (* TODO this isn't consistent with greylist functions where only an addr is
-     provided). *)
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/7028
+     this isn't consistent with greylist functions where only an addr is
+     provided. *)
 
   (** [unban t point_id] removes this point address from the black list.
       and unban all associated peers. The [point_id] port is ignored. *)
