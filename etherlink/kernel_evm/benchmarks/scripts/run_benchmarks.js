@@ -134,6 +134,7 @@ function run_profiler(path, logs) {
         var receipt_size = [];
         let bloom_size = [];
         let nb_reboots = 0;
+        let blueprint_chunks = [];
 
         var profiler_output_path = "";
 
@@ -178,6 +179,7 @@ function run_profiler(path, logs) {
             push_match(output, block_in_progress_read, /\[Benchmarking\] Reading Block In Progress of size\s*(\d+)/g)
             push_match(output, receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
             push_match(output, bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
+            push_match(output, blueprint_chunks, /\[Benchmarking\] number of blueprint chunks read:\s*(\d+)/g)
             push_profiler_sections(output, opcodes, precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
@@ -222,6 +224,7 @@ function run_profiler(path, logs) {
                 opcodes,
                 bloom_size,
                 precompiles,
+                blueprint_chunks,
             });
         });
     })
@@ -407,6 +410,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         interpreter_init_ticks: interpreter_init_ticks?.[0],
         interpreter_decode_ticks: interpreter_decode_ticks?.[0],
         fetch_blueprint_ticks: fetch_blueprint_ticks?.[0],
+        blueprint_chunks: run_benchmark_result.blueprint_chunks?.[0],
         kernel_run_ticks: kernel_run_ticks?.[0],
         estimated_ticks: estimated_ticks?.[0],
         inbox_size: run_benchmark_result.inbox_size,
@@ -422,6 +426,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             interpreter_init_ticks: interpreter_init_ticks?.[j],
             interpreter_decode_ticks: interpreter_decode_ticks?.[j],
             fetch_blueprint_ticks: fetch_blueprint_ticks?.[j],
+            blueprint_chunks: run_benchmark_result.blueprint_chunks?.[j],
             kernel_run_ticks: kernel_run_ticks?.[j],
             estimated_ticks: estimated_ticks?.[j],
             block_in_progress_store: block_in_progress_store[j] ? block_in_progress_store[j] : '',
@@ -499,6 +504,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         "nb_tx",
         "inbox_size",
         "fetch_blueprint_ticks",
+        "blueprint_chunks",
         "block_in_progress_read",
         "block_in_progress_read_ticks",
         "block_in_progress_store",

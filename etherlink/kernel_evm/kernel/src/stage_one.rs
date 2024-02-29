@@ -108,6 +108,12 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
             fetch_delayed_transactions(host, delayed_inbox)?
         } else {
             // Store the sequencer blueprints.
+            log!(
+                host,
+                Benchmarking,
+                "number of blueprint chunks read: {}",
+                sequencer_blueprints.len()
+            );
             for seq_blueprint in sequencer_blueprints {
                 log!(
                     host,
