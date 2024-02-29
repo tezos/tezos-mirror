@@ -110,9 +110,13 @@ type t = {
   protocols : Protocol_hash.t list option;
   reconnection_delay : float;
   cctxt : Client_context.full;
-  mutable running : bool;
   mutable status : connection_status;
 }
+
+let is_running c =
+  match c.status with
+  | Disconnected -> false
+  | Connected _ | Waiting_reconnection _ -> true
 
 let rec connect ?(count = 0)
     ({name; protocols; reconnection_delay = delay; cctxt; _} as l1_ctxt) =
@@ -172,7 +176,6 @@ let create ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
     cctxt = (cctxt :> Client_context.full);
     reconnection_delay;
     protocols;
-    running = false;
     status = Disconnected;
   }
 
@@ -180,7 +183,6 @@ let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
   let open Lwt_syntax in
   let* () = Layer1_event.starting ~name in
   let l1_ctxt = create ~name ~reconnection_delay ?protocols cctxt in
-  l1_ctxt.running <- true ;
   let* (_ : connection_info) = connect l1_ctxt in
   return l1_ctxt
 
@@ -202,7 +204,6 @@ let disconnect l1_ctxt =
 
 let shutdown state =
   disconnect state ;
-  state.running <- false ;
   Lwt.return_unit
 
 let regexp_ocaml_exception_connection_error = Re.Str.regexp ".*in connect:.*"
@@ -279,7 +280,7 @@ let iter_heads l1_ctxt f =
     let* stopping_reason =
       lwt_stream_iter_with_timeout ~min_timeout:10. ~init_timeout:300. f heads
     in
-    when_ l1_ctxt.running @@ fun () ->
+    when_ (is_running l1_ctxt) @@ fun () ->
     stopper () ;
     let*! () =
       match stopping_reason with
@@ -466,7 +467,6 @@ module Internal_for_tests = struct
       reconnection_delay = 5.0;
       cctxt = (cctxt :> Client_context.full);
       protocols = None;
-      running = false;
       status = Disconnected;
     }
 end
