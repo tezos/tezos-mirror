@@ -1,12 +1,26 @@
 # Changelog
 
-## Version for NEXT
+## Version NEXT
+
+### Features
+
+- Fetch WASM preimages from a remote endpoint. (!12060)
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version for 624a144032d6dc6431697c39eb81790bccaacff9
 
 ### Features
 
 - Detect when a sequencer upgrade evm event is seen in the rollup node
   kernel. The sequencer upgrade is applied to the sequencer local
   storage. (!12046)
+- Version the sequencer store and supports migrations. (!12165)
+- Revert message are now propagated in the `data` field of the error. (!11906)
 
 ### Bug fixes
 

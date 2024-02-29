@@ -4,14 +4,28 @@
 
 ### Features
 
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version 624a144032d6dc6431697c39eb81790bccaacff9
+
+### Features
+
 - Add an evm event when a sequencer upgrade is seen by the
   kernel. (!12046)
 
 - Da fee is sent to sequencer pool address. (!12113)
 
+- Gas price adjusts itself to handle congestion. (!12167)
+
 ### Bug fixes
 
 - `BLOCKHASH` opcode now returns the actual block hash instead of `0x00..0`. (!12130)
+- Withdrawals are now compatible with sequencer. (!11733)
+
 
 ### Breaking changes
 
@@ -23,6 +37,9 @@
   anymore. (!12038, !12046)
 
 ### Internal
+
+- Keys modified by block application are moved to `/evm/world_state`. (!12080, !12187)
+- Remove error logs from storage. (!12180)
 
 ## Version 20ab639f09a8c7c76f982383c3d9e1f831f38088
 
