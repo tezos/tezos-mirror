@@ -5,4 +5,4 @@ oc.script:test_release_versions:
     - . ./scripts/version.sh
     - eval $(opam env)
   script:
-    - ./scripts/test_release_version.sh
+    - ./scripts/test_octez_release_version.sh

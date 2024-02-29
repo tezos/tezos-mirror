@@ -25,10 +25,10 @@ test_version() {
 cleanup() {
   set +e
   git tag -d "$RANDOMTAG" > /dev/null 2>&1
-  git tag -d "$VERSION" > /dev/null 2>&1
-  git tag -d "v$VERSION" > /dev/null 2>&1
-  git tag -d "v$VERSION"+rc1 > /dev/null 2>&1
-  git tag -d "v$VERSION"-rc1 > /dev/null 2>&1
+  git tag -d "octez-$VERSION" > /dev/null 2>&1
+  git tag -d "octez-v$VERSION" > /dev/null 2>&1
+  git tag -d "octez-v$VERSION"+rc1 > /dev/null 2>&1
+  git tag -d "octez-v$VERSION"-rc1 > /dev/null 2>&1
   git checkout "$CURRENT_BRANCH"
   git branch -D "$TESTBRANCH"
   set -e
@@ -40,11 +40,11 @@ cleanup
 
 git checkout -b "$TESTBRANCH"
 
-git tag "$VERSION" -m "test"
+git tag "octez-$VERSION" -m "test"
 test_version "$VERSION" "$VERSION"
 
-git tag "v$VERSION" -m "test"
-test_version "$VERSION" "v$VERSION"
+git tag "octez-v$VERSION" -m "test"
+test_version "$VERSION" "octez-v$VERSION"
 
 git commit --allow-empty -m "test" > /dev/null 2>&1
 test_version "$VERSION+dev" "$(git describe --tags)"
@@ -52,11 +52,11 @@ test_version "$VERSION+dev" "$(git describe --tags)"
 git tag "$RANDOMTAG" -m "test"
 test_version "0.0+dev" "$RANDOMTAG"
 
-git tag "v$VERSION+rc1" -m "test"
-test_version "$VERSION+dev" "v$VERSION+rc1"
+git tag "octez-v$VERSION+rc1" -m "test"
+test_version "$VERSION+dev" "octez-v$VERSION+rc1"
 
-git tag "v$VERSION-rc1" -m "test"
-test_version "$VERSION~rc1" "v$VERSION-rc1"
+git tag "octez-v$VERSION-rc1" -m "test"
+test_version "$VERSION~rc1" "octez-v$VERSION-rc1"
 
 git commit --allow-empty -m "test" > /dev/null 2>&1
 test_version "$VERSION~rc1+dev" "$(git describe --tags)"
