@@ -7,6 +7,7 @@
 
 open State_account
 open Scenario_dsl
+open Scenario_bake
 open Scenario_base
 open Log_helpers
 open Adaptive_issuance_helpers

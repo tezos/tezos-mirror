@@ -14,6 +14,7 @@ open State_account
 open Adaptive_issuance_helpers
 open Scenario_dsl
 open Scenario_base
+open Scenario_bake
 open Tez_helpers.Ez_tez
 
 (** Set delegate parameters for the given delegate *)
