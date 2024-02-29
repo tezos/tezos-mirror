@@ -59,4 +59,5 @@ tezos-smart-rollup-panic-hook.workspace = true
 default = ["panic-hook"]
 panic-hook = []
 debug = ["tezos-evm-logging/debug"]
+benchmark = ["tezos-evm-logging/benchmark"]
 testing = ["proptest", "debug"]

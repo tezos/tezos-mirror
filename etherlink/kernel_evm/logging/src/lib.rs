@@ -11,6 +11,7 @@ pub enum Level {
     Error,
     Fatal,
     Debug,
+    Benchmarking,
 }
 
 impl std::fmt::Display for Level {
@@ -20,6 +21,7 @@ impl std::fmt::Display for Level {
             Level::Error => write!(f, "Error"),
             Level::Fatal => write!(f, "Fatal"),
             Level::Debug => write!(f, "Debug"),
+            Level::Benchmarking => write!(f, "Benchmarking"),
         }
     }
 }
@@ -30,7 +32,9 @@ macro_rules! log {
     ($host: expr, $level: expr, $($args: expr),*) => {
         {
             // Display `Debug` level only if the feature flag is actived
-            if $level != $crate::Level::Debug || ($level == $crate::Level::Debug && cfg!(feature = "debug")) {
+            if ($level != $crate::Level::Debug && $level != $crate::Level::Benchmarking)
+                || ($level == $crate::Level::Debug && cfg!(feature = "debug"))
+                || ($level == $crate::Level::Benchmarking && cfg!(feature = "benchmark")) {
                 $crate::debug_msg!($host, "[{}] {}\n", $level, { &alloc::format!($($args), *) });
             }
         }
