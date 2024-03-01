@@ -354,6 +354,8 @@ let close cemented_store =
      terminated which means potential new reads won't be scheduled. *)
   Metadata_fd_cache.clear cemented_store.metadata_fd_cache
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7034 Cemented file
+   cannot exceed 4Gib. *)
 let offset_length = 4 (* file offset *)
 
 let offset_encoding = Data_encoding.int32
