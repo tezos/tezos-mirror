@@ -17,61 +17,6 @@
     expire_in: 1 day
     when: on_success
 
-.oc.build_arm64:
-  extends:
-    - .oc.build
-    - .tags_template__build_arm64
-  variables:
-    ARCH: "arm64"
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: always
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/'
-      when: on_success
-    - changes:
-        - src/**/*
-        - .gitlab/**/*
-        - .gitlab-ci.yml
-      when: manual
-      allow_failure: true
-
-# similar to the build template above, this template
-# compiles all binaries using the static profile.
-.oc.build_static_binaries_template:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_dependencies
-    - .rules__octez_changes
-  stage: build
-  variables:
-    ARCH: ""
-  before_script:
-    - ./scripts/ci/take_ownership.sh
-    - eval $(opam env)
-  script:
-    - ./scripts/ci/build_static_binaries.sh
-  artifacts:
-    paths:
-      - "octez-binaries/$ARCH/*"
-
-.oc.docker:rust-toolchain_template:
-  extends:
-    - .image_template__docker
-    - .docker_auth_template
-  stage: build
-  variables:
-    # These image are not built for external use.
-    CI_DOCKER_HUB: "false"
-  # Handle docker initialization, if necessary, in
-  # './scripts/ci/docker_rust_toolchain_build.sh'.
-  before_script: []
-  script:
-    - ./scripts/ci/docker_rust_toolchain_build.sh
-  artifacts:
-    reports:
-      dotenv: rust_toolchain_image_tag.env
-
 .oc.docker:client-libs-dependencies_template:
   extends:
     - .image_template__docker
@@ -89,17 +34,6 @@
     reports:
       dotenv: client_libs_dependencies_image_tag.env
 
-.oc.build_docker_release_template:
-  extends:
-    - .image_template__docker
-    - .docker_auth_template
-    - .needs__rust_toolchain
-  variables:
-    DOCKER_BUILD_TARGET: "without-evm-artifacts"
-    IMAGE_ARCH_PREFIX: ""
-  script:
-    - ./scripts/ci/docker_release.sh
-
 .oc.build_x86_64:
   extends:
     - .oc.build
@@ -110,21 +44,3 @@
     - .needs__trigger
   variables:
     ARCH: "x86_64"
-
-.oc.build:static-x86_64-linux-binaries:
-  extends:
-    - .tags_template__build
-    - .oc.build_static_binaries_template
-  # Even though not many tests depend on static executables, some of those that do
-  # are limiting factors in the total duration of pipelines.
-  # So we start this job as early as possible, without waiting for sanity_ci.
-    - .needs__trigger
-  variables:
-    ARCH: "x86_64"
-
-.oc.build:static-arm64-linux-binaries:
-  extends:
-    - .oc.build_static_binaries_template
-    - .tags_template__build_arm64
-  variables:
-    ARCH: "arm64"
