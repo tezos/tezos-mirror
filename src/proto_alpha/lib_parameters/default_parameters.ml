@@ -328,13 +328,7 @@ let constants_sandbox =
         {
           constants_mainnet.dal with
           number_of_slots = 16;
-          cryptobox_parameters =
-            {
-              Dal.redundancy_factor = 16;
-              page_size = 4096;
-              number_of_shards = 2048;
-              slot_size = 1 lsl 16;
-            };
+          cryptobox_parameters = default_cryptobox_parameters;
         };
     issuance_weights;
     blocks_preservation_cycles = 1;
@@ -368,13 +362,7 @@ let constants_test =
         {
           constants_mainnet.dal with
           number_of_slots = 8;
-          cryptobox_parameters =
-            {
-              redundancy_factor = 16;
-              page_size = 4096;
-              number_of_shards = 2048;
-              slot_size = 1 lsl 16;
-            };
+          cryptobox_parameters = default_cryptobox_parameters;
         };
     issuance_weights;
     consensus_rights_delay = 3;
