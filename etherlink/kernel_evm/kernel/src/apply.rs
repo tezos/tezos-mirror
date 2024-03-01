@@ -407,7 +407,7 @@ fn apply_deposit<Host: Runtime>(
 }
 
 pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
-    RefPath::assert_from(b"/world_state/__outbox_queue");
+    RefPath::assert_from(b"/evm/world_state/__outbox_queue");
 
 fn post_withdrawals<Host: Runtime>(
     host: &mut Host,

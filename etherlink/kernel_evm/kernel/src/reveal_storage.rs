@@ -2,17 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    storage::{ADMIN, SEQUENCER},
-    EVM_PATH,
-};
+use crate::storage::{ADMIN, SEQUENCER};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::rlp_helpers::{decode_field, next, FromRlpBytes};
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_debug::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::ValueType;
 
 /// This module is a testing device, allowing to replicate the state of an existing EVM rollup
@@ -93,18 +90,16 @@ pub fn reveal_storage(
 
     // Change the sequencer if asked:
     if let Some(sequencer) = sequencer {
-        let sequencer_path = concat(&EVM_PATH, &SEQUENCER).unwrap();
         let pk_b58 = PublicKey::to_b58check(&sequencer);
         let bytes = String::as_bytes(&pk_b58);
-        host.store_write_all(&sequencer_path, bytes).unwrap();
+        host.store_write_all(&SEQUENCER, bytes).unwrap();
     }
 
     // Change the admin if asked:
     if let Some(admin) = admin {
-        let sequencer_path = concat(&EVM_PATH, &ADMIN).unwrap();
         let kt1_b58 = admin.to_base58_check();
         let bytes = String::as_bytes(&kt1_b58);
-        host.store_write_all(&sequencer_path, bytes).unwrap();
+        host.store_write_all(&ADMIN, bytes).unwrap();
     }
 
     log!(host, Info, "Done revealing")

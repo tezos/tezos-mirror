@@ -32,71 +32,74 @@ use tezos_ethereum::wei::Wei;
 use primitive_types::{H160, H256, U256};
 
 pub const STORAGE_VERSION: u64 = 8;
-pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
+pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_version");
 
-const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
+const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
 
-const TICKETER: RefPath = RefPath::assert_from(b"/ticketer");
-pub const ADMIN: RefPath = RefPath::assert_from(b"/admin");
-pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/sequencer_admin");
-const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/kernel_governance");
-const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/delayed_bridge");
+const TICKETER: RefPath = RefPath::assert_from(b"/evm/ticketer");
+pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
+pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/evm/sequencer_admin");
+const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
+const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath =
-    RefPath::assert_from(b"/world_state/blocks/in_progress");
+    RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
 
-const EVM_CURRENT_BLOCK: RefPath = RefPath::assert_from(b"/world_state/blocks/current");
-pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/world_state/blocks");
+const EVM_CURRENT_BLOCK: RefPath =
+    RefPath::assert_from(b"/evm/world_state/blocks/current");
+pub const EVM_BLOCKS: RefPath = RefPath::assert_from(b"/evm/world_state/blocks");
 const BLOCK_NUMBER: RefPath = RefPath::assert_from(b"/number");
 const BLOCK_HASH: RefPath = RefPath::assert_from(b"/hash");
 
-const EVENTS: RefPath = RefPath::assert_from(b"/events");
+const EVENTS: RefPath = RefPath::assert_from(b"/evm/events");
 
 pub const EVM_TRANSACTIONS_RECEIPTS: RefPath =
-    RefPath::assert_from(b"/world_state/transactions_receipts");
+    RefPath::assert_from(b"/evm/world_state/transactions_receipts");
 
 pub const EVM_TRANSACTIONS_OBJECTS: RefPath =
-    RefPath::assert_from(b"/world_state/transactions_objects");
+    RefPath::assert_from(b"/evm/world_state/transactions_objects");
 
-const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/chain_id");
+const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 
 pub const EVM_BASE_FEE_PER_GAS: RefPath =
-    RefPath::assert_from(b"/world_state/fees/base_fee_per_gas");
+    RefPath::assert_from(b"/evm/world_state/fees/base_fee_per_gas");
 const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
-    RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas");
-const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/world_state/fees/da_fee_per_byte");
-const TICK_BACKLOG_PATH: RefPath = RefPath::assert_from(b"/world_state/fees/backlog");
+    RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas");
+const EVM_DA_FEE: RefPath =
+    RefPath::assert_from(b"/evm/world_state/fees/da_fee_per_byte");
+const TICK_BACKLOG_PATH: RefPath = RefPath::assert_from(b"/evm/world_state/fees/backlog");
 const TICK_BACKLOG_TIMESTAMP_PATH: RefPath =
-    RefPath::assert_from(b"/world_state/fees/last_timestamp");
+    RefPath::assert_from(b"/evm/world_state/fees/last_timestamp");
 
 /// The sequencer pool is the designated account that the data-availability fees are sent to.
 ///
 /// This may be updated by the governance mechanism over time. If it is not set, the data-availability
 /// fees are instead burned.
-pub const SEQUENCER_POOL_PATH: RefPath = RefPath::assert_from(b"/sequencer_pool_address");
+pub const SEQUENCER_POOL_PATH: RefPath =
+    RefPath::assert_from(b"/evm/sequencer_pool_address");
 
 /// Path to the last L1 level seen.
-const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/l1_level");
+const EVM_L1_LEVEL: RefPath = RefPath::assert_from(b"/evm/l1_level");
 
-const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/world_state/fees/burned");
+const EVM_BURNED_FEES: RefPath = RefPath::assert_from(b"/evm/world_state/fees/burned");
 
 /// Path to the last info per level timestamp seen.
 const EVM_INFO_PER_LEVEL_TIMESTAMP: RefPath =
-    RefPath::assert_from(b"/info_per_level/timestamp");
+    RefPath::assert_from(b"/evm/info_per_level/timestamp");
 /// Path to the number of timestamps read, use to compute the average block time.
 const EVM_INFO_PER_LEVEL_STATS_NUMBERS: RefPath =
-    RefPath::assert_from(b"/info_per_level/stats/numbers");
+    RefPath::assert_from(b"/evm/info_per_level/stats/numbers");
 /// Path to the sum of distance between blocks, used to compute the average block time.
 const EVM_INFO_PER_LEVEL_STATS_TOTAL: RefPath =
-    RefPath::assert_from(b"/info_per_level/stats/total");
+    RefPath::assert_from(b"/evm/info_per_level/stats/total");
 
-pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/simulation_result");
+pub const SIMULATION_RESULT: RefPath = RefPath::assert_from(b"/evm/simulation_result");
 
-pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/deposit_nonce");
+pub const DEPOSIT_NONCE: RefPath = RefPath::assert_from(b"/evm/deposit_nonce");
 
 /// Path where all indexes are stored.
-pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/world_state/indexes");
+pub const EVM_INDEXES: RefPath = RefPath::assert_from(b"/evm/world_state/indexes");
 
 /// Path where Ethereum accounts are stored.
 const ACCOUNTS_INDEX: RefPath = RefPath::assert_from(b"/accounts");
@@ -109,19 +112,19 @@ const TRANSACTIONS_INDEX: RefPath = RefPath::assert_from(b"/transactions");
 
 // Path to the number of seconds until delayed txs are timed out.
 const EVM_DELAYED_INBOX_TIMEOUT: RefPath =
-    RefPath::assert_from(b"/delayed_inbox_timeout");
+    RefPath::assert_from(b"/evm/delayed_inbox_timeout");
 
 // Path to the number of l1 levels that need to pass for a
 // delayed tx to be timed out.
 const EVM_DELAYED_INBOX_MIN_LEVELS: RefPath =
-    RefPath::assert_from(b"/delayed_inbox_min_levels");
+    RefPath::assert_from(b"/evm/delayed_inbox_min_levels");
 
 /// The size of one 256 bit word. Size in bytes
 pub const WORD_SIZE: usize = 32usize;
 
 // Path to the tz1 administrating the sequencer. If there is nothing
 // at this path, the kernel is in proxy mode.
-pub const SEQUENCER: RefPath = RefPath::assert_from(b"/sequencer");
+pub const SEQUENCER: RefPath = RefPath::assert_from(b"/evm/sequencer");
 
 pub fn store_read_slice<Host: Runtime, T: Path>(
     host: &Host,

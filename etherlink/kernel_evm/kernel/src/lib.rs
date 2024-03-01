@@ -10,7 +10,7 @@ use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
-use crate::safe_storage::{KernelRuntime, SafeStorage, TMP_PATH};
+use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::stage_one::fetch;
 use crate::Error::UpgradeError;
 use anyhow::Context;
@@ -33,7 +33,7 @@ use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::path::{concat, RefPath};
+use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 mod apply;
@@ -239,27 +239,26 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         );
     }
 
-    host.store_copy(&EVM_PATH, &TMP_PATH)
-        .expect("The kernel failed to create the temporary directory");
-
     let mut internal_storage = InternalStorage();
     let mut safe_host = SafeStorage {
         host,
         internal: &mut internal_storage,
     };
+    safe_host
+        .start()
+        .expect("The kernel failed to create the temporary directory");
+
     match main(&mut safe_host) {
         Ok(()) => {
             promote_upgrade(&mut safe_host)
                 .expect("Potential kernel upgrade promotion failed");
             safe_host
-                .promote(&EVM_PATH)
+                .promote()
                 .expect("The kernel failed to promote the temporary directory");
 
             // The kernel run went fine, it won't be retried, we can safely
             // flush the outbox queue:
-            let path = concat(&EVM_PATH, &WITHDRAWAL_OUTBOX_QUEUE)
-                .expect("Failed to concat path");
-            let outbox_queue = OutboxQueue::new(&path, u32::MAX)
+            let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
                 .expect("Failed to create the outbox queue");
 
             let written = outbox_queue.flush_queue(safe_host.host);
@@ -550,7 +549,8 @@ mod tests {
     #[test]
     fn load_block_fees_with_minimum() {
         let min_path =
-            RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas").into();
+            RefPath::assert_from(b"/evm/world_state/fees/minimum_base_fee_per_gas")
+                .into();
 
         // Arrange
         let mut host = MockHost::default();

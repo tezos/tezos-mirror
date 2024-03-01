@@ -35,8 +35,8 @@ use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
-const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/kernel_upgrade");
-const SEQUENCER_UPGRADE: RefPath = RefPath::assert_from(b"/sequencer_upgrade");
+const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
+const SEQUENCER_UPGRADE: RefPath = RefPath::assert_from(b"/evm/sequencer_upgrade");
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct KernelUpgrade {
