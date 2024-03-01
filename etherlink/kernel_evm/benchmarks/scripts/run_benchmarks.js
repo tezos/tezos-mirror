@@ -455,38 +455,23 @@ function dump_bench_opcode(filename, benchmark_name, opcodes, is_first) {
 const PROFILER_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + "/profiling"
 mkdirSync(PROFILER_OUTPUT_DIRECTORY, { recursive: true })
 
+// Determine the header list by looking at object properties
+function get_headers(array, seed) {
+    let acc = seed;
+    array.forEach((value) => acc.push(...Object.getOwnPropertyNames(value)))
+    return acc.filter((v, i) => acc.indexOf(v) === i);
+}
+
+function initialize_headers(output, benchmark_log) {
+    let headers = get_headers(benchmark_log, ["benchmark_name", "status"]);
+    let benchmark_csv_config = { columns: headers }
+    fs.writeFileSync(output, csv.stringify([], { header: true, ...benchmark_csv_config }));
+    return benchmark_csv_config;
+}
+
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Running benchmarks on: \n[ ${benchmark_scripts.join(',\n  ')}]`);
-    var benchmark_fields = [
-        "benchmark_name",
-        "status",
-        "tx_type",
-        "gas_cost",
-        "signature_verification_ticks",
-        "sputnik_runtime_ticks",
-        "run_transaction_ticks",
-        "tx_size",
-        "store_transaction_object_ticks",
-        "receipt_size",
-        "store_receipt_ticks",
-        "logs_to_bloom",
-        "bloom_size",
-        "estimated_ticks",
-        "interpreter_decode_ticks",
-        "interpreter_init_ticks",
-        "nb_tx",
-        "inbox_size",
-        "stage_one_ticks",
-        "blueprint_chunks",
-        "block_in_progress_read",
-        "block_in_progress_read_ticks",
-        "block_in_progress_store",
-        "block_in_progress_store_ticks",
-        "block_finalize",
-        "kernel_run_ticks",
-        "unaccounted_ticks",
-    ];
     var precompiles_field = [
         "address",
         "data_size",
@@ -500,13 +485,12 @@ async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Output in ${output}`);
     console.log(`Dumped opcodes in ${opcodes_dump}`);
     console.log(`Precompiles in ${precompiles_output}`);
-    const benchmark_csv_config = { columns: benchmark_fields };
     const precompile_csv_config = { columns: precompiles_field };
-    fs.writeFileSync(output, csv.stringify([], { header: true, ...benchmark_csv_config }));
     fs.writeFileSync(precompiles_output, csv.stringify([], { header: true, ...precompile_csv_config }));
     fs.writeFileSync(logs, "Logging debugger\n")
     fs.writeFileSync(opcodes_dump, "{");
     console.log(`Full logs in ${logs}`)
+    let benchmark_csv_config = Object();
     for (var i = 0; i < benchmark_scripts.length; i++) {
         var benchmark_script = benchmark_scripts[i];
         var parts = benchmark_script.split("/");
@@ -516,7 +500,8 @@ async function run_all_benchmarks(benchmark_scripts) {
         build_benchmark_scenario(benchmark_script);
         run_benchmark_result = await run_benchmark("transactions.json", logs);
         benchmark_log = log_benchmark_result(benchmark_name, run_benchmark_result);
-        fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config));
+        if (i == 0) benchmark_csv_config = initialize_headers(output, benchmark_log);
+        fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config))
         fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
         dump_bench_opcode(opcodes_dump, benchmark_name, run_benchmark_result.opcodes, i == 0);
     }
