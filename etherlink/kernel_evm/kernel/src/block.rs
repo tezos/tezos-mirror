@@ -23,6 +23,7 @@ use evm_execution::account_storage::{init_account_storage, EthereumAccountStorag
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
 use primitive_types::{H256, U256};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -52,6 +53,7 @@ pub enum ComputationResult {
     Finished,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn compute<Host: Runtime>(
     host: &mut Host,
     block_in_progress: &mut BlockInProgress,
@@ -60,6 +62,7 @@ fn compute<Host: Runtime>(
     evm_account_storage: &mut EthereumAccountStorage,
     accounts_index: &mut IndexableStorage,
     is_first_block_of_reboot: bool,
+    ticketer: &Option<ContractKt1Hash>,
 ) -> Result<ComputationResult, anyhow::Error> {
     log!(
         host,
@@ -92,6 +95,7 @@ fn compute<Host: Runtime>(
             accounts_index,
             allocated_ticks,
             retriable,
+            ticketer,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -198,6 +202,7 @@ fn compute_bip<Host: KernelRuntime>(
     accounts_index: &mut IndexableStorage,
     tick_counter: &mut TickCounter,
     first_block_of_reboot: &mut bool,
+    ticketer: &Option<ContractKt1Hash>,
 ) -> anyhow::Result<ComputationResult> {
     let result = compute(
         host,
@@ -207,6 +212,7 @@ fn compute_bip<Host: KernelRuntime>(
         evm_account_storage,
         accounts_index,
         *first_block_of_reboot,
+        ticketer,
     )?;
     match result {
         ComputationResult::RebootNeeded => {
@@ -291,6 +297,7 @@ pub fn produce<Host: KernelRuntime>(
             &mut accounts_index,
             &mut tick_counter,
             &mut first_block_of_reboot,
+            &config.tezos_contracts.ticketer,
         )? {
             ComputationResult::Finished => storage::delete_block_in_progress(host)?,
             ComputationResult::RebootNeeded => {
@@ -322,6 +329,7 @@ pub fn produce<Host: KernelRuntime>(
             &mut accounts_index,
             &mut tick_counter,
             &mut first_block_of_reboot,
+            &config.tezos_contracts.ticketer,
         )? {
             ComputationResult::Finished => (),
             ComputationResult::RebootNeeded => {
@@ -1191,6 +1199,7 @@ mod tests {
             &mut evm_account_storage,
             &mut accounts_index,
             true,
+            &None,
         )
         .expect("Should have computed block");
 
