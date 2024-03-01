@@ -452,6 +452,12 @@ let job_external ?directory ?filename_suffix (tezos_job : tezos_job) : tezos_job
   to_file ~filename config ;
   tezos_job
 
+let jobs_external ~path (tezos_jobs : tezos_job list) : tezos_job list =
+  let filename = sf ".gitlab/ci/jobs/%s" path in
+  let config = List.map (fun {job; _} -> Gitlab_ci.Types.Job job) tezos_jobs in
+  to_file ~filename config ;
+  tezos_jobs
+
 let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
     (tezos_job : tezos_job) =
   map_job tezos_job @@ fun (job : Gitlab_ci.Types.job) ->

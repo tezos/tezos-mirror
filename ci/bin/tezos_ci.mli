@@ -245,6 +245,20 @@ val job :
 val job_external :
   ?directory:string -> ?filename_suffix:string -> tezos_job -> tezos_job
 
+(** Generates a set of jobs to the same external file.
+
+    This function is meant to be used in the transition to CI-in-OCaml.
+    It writes {!header} and the given jobs to the file
+    [.gitlab/ci/jobs/PATH].
+
+    The use case is the same as [job_external] but for cases where it
+    is impractical to split a set of jobs into one file per job
+    (e.g. opam package test jobs).
+
+    The returned set of jobs is the same as the input, for ease of
+    chaining. *)
+val jobs_external : path:string -> tezos_job list -> tezos_job list
+
 (** Adds artifacts to a job without overriding, if possible, existing artifacts.
 
     - If the job already has an artifact with [old_name] and [name] is given, then
