@@ -258,35 +258,21 @@ async function get_ticks(path, function_call_keyword) {
 
 // Parse the profiler output file and get the tick counts of the differerent function calls
 async function analyze_profiler_output(path) {
-
-    kernel_run_ticks = await get_ticks(path, "kernel_run");
-    run_transaction_ticks = await get_ticks(path, "run_transaction");
-    signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
-    sputnik_runtime_ticks = await get_ticks(path, "EvmHandler$LT$Host$GT$7execute");
-    store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
-    store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
-    interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
-    interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
-    stage_one_ticks = await get_ticks(path, "stage_one");
-    block_finalize = await get_ticks(path, "store_current_block");
-    logs_to_bloom = await get_ticks(path, "logs_to_bloom");
-    block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
-    block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
-    return {
-        kernel_run_ticks: kernel_run_ticks,
-        run_transaction_ticks: run_transaction_ticks,
-        signature_verification_ticks: signature_verification_ticks,
-        store_transaction_object_ticks: store_transaction_object_ticks,
-        interpreter_init_ticks: interpreter_init_ticks,
-        interpreter_decode_ticks: interpreter_decode_ticks,
-        stage_one_ticks: stage_one_ticks,
-        sputnik_runtime_ticks: sputnik_runtime_ticks,
-        store_receipt_ticks,
-        block_finalize,
-        logs_to_bloom,
-        block_in_progress_store_ticks,
-        block_in_progress_read_ticks
-    };
+    let results = Object();
+    results.kernel_run_ticks = await get_ticks(path, "kernel_run");
+    results.run_transaction_ticks = await get_ticks(path, "run_transaction");
+    results.signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
+    results.sputnik_runtime_ticks = await get_ticks(path, "EvmHandler$LT$Host$GT$7execute");
+    results.store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
+    results.store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
+    results.interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
+    results.interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
+    results.stage_one_ticks = await get_ticks(path, "stage_one");
+    results.block_finalize = await get_ticks(path, "store_current_block");
+    results.logs_to_bloom = await get_ticks(path, "logs_to_bloom");
+    results.block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
+    results.block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
+    return results;
 }
 
 // Run given benchmark
