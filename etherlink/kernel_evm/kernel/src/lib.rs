@@ -5,22 +5,19 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::WITHDRAWAL_OUTBOX_QUEUE;
 use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
-use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::stage_one::fetch;
-use crate::Error::UpgradeError;
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
-use fallback_upgrade::{fallback_backup_kernel, promote_upgrade};
-use internal_storage::InternalStorage;
+use fallback_upgrade::{clean_backup_kernel, fallback_backup_kernel};
 use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
+use safe_storage::WORLD_STATE_PATH;
 use storage::{
     read_chain_id, read_da_fee, read_kernel_version, read_last_info_per_level_timestamp,
     read_last_info_per_level_timestamp_stats, store_chain_id, store_da_fee,
@@ -29,11 +26,9 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
-use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 
 mod apply;
@@ -156,12 +151,12 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
     Ok(block_fees)
 }
 
-pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
+pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.
-    match stage_zero(host)? {
-        MigrationStatus::None => {
+    match stage_zero(host) {
+        Ok(MigrationStatus::None) => {
             // No migration in progress. However as we want to have the kernel
             // version written in the storage, we check for its existence
             // at every kernel run.
@@ -171,17 +166,23 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
         }
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
-        MigrationStatus::InProgress => {
+        Ok(MigrationStatus::InProgress) => {
             host.mark_for_reboot()?;
             return Ok(());
         }
-        MigrationStatus::Done => {
+        Ok(MigrationStatus::Done) => {
             // If a migrtion was finished, we update the kernel version
             // in the storage.
             set_kernel_version(host)?;
+            // We remove the backup kernel
+            clean_backup_kernel(host)?;
             host.mark_for_reboot()?;
             return Ok(());
         }
+        Err(Error::UpgradeError(Fallback)) => {
+            fallback_backup_kernel(host)?;
+        }
+        Err(err) => return Err(err.into()),
     };
 
     // In the very worst case, we want to be able to upgrade the kernel at
@@ -215,19 +216,17 @@ pub fn main<Host: KernelRuntime>(host: &mut Host) -> Result<(), anyhow::Error> {
         .context("Failed during stage 2")
 }
 
-const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
-
 pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
 
-    let evm_subkeys = host
-        .store_count_subkeys(&EVM_PATH)
-        .expect("The kernel failed to read the number of /evm subkeys");
+    let world_state_subkeys = host
+        .store_count_subkeys(&WORLD_STATE_PATH)
+        .expect("The kernel failed to read the number of /evm/world_state subkeys");
 
-    if evm_subkeys == 0 {
-        host.store_write(&EVM_PATH, "Un festival de GADT".as_bytes(), 0)
+    if world_state_subkeys == 0 {
+        host.store_write(&WORLD_STATE_PATH, "Un festival de GADT".as_bytes(), 0)
             .unwrap();
     }
 
@@ -243,61 +242,10 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
         );
     }
 
-    let mut internal_storage = InternalStorage();
-    let mut safe_host = SafeStorage {
-        host,
-        internal: &mut internal_storage,
-    };
-    safe_host
-        .start()
-        .expect("The kernel failed to create the temporary directory");
-
-    match main(&mut safe_host) {
-        Ok(()) => {
-            promote_upgrade(&mut safe_host)
-                .expect("Potential kernel upgrade promotion failed");
-            safe_host
-                .promote()
-                .expect("The kernel failed to promote the temporary directory");
-
-            // The kernel run went fine, it won't be retried, we can safely
-            // flush the outbox queue:
-            let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
-                .expect("Failed to create the outbox queue");
-
-            let written = outbox_queue.flush_queue(safe_host.host);
-            // Log to Info only if we flushed messages.
-            let mut level = Debug;
-            if written > 0 {
-                level = Info;
-            }
-            log!(
-                safe_host,
-                level,
-                "Flushed outbox queue messages ({} flushed)",
-                written
-            );
-        }
-        Err(e) => {
-            if let Some(UpgradeError(Fallback)) = e.downcast_ref::<Error>() {
-                // All the changes from the failed migration are reverted.
-                safe_host
-                    .revert()
-                    .expect("The kernel failed to delete the temporary directory");
-                fallback_backup_kernel(&mut safe_host)
-                    .expect("Fallback mechanism failed");
-            } else {
-                log!(safe_host, Error, "The kernel produced an error: {:?}", e);
-                log!(
-                    safe_host,
-                    Error,
-                    "The temporarily modified durable storage is discarded"
-                );
-
-                safe_host
-                    .revert()
-                    .expect("The kernel failed to delete the temporary directory")
-            }
+    match main(host) {
+        Ok(()) => (),
+        Err(err) => {
+            log!(host, Fatal, "The kernel produced an error: {:?}", err);
         }
     }
 }
@@ -311,8 +259,6 @@ mod tests {
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::configuration::Configuration;
     use crate::fees;
-    use crate::mock_internal::MockInternal;
-    use crate::safe_storage::{KernelRuntime, SafeStorage};
     use crate::{
         blueprint::Blueprint,
         inbox::{Transaction, TransactionContent},
@@ -340,7 +286,7 @@ mod tests {
         BlockFees::new(U256::from(DUMMY_BASE_FEE_PER_GAS), DUMMY_DA_FEE.into())
     }
 
-    fn set_balance<Host: KernelRuntime>(
+    fn set_balance<Host: Runtime>(
         host: &mut Host,
         evm_account_storage: &mut EthereumAccountStorage,
         address: &H160,
@@ -442,12 +388,7 @@ mod tests {
     #[test]
     fn test_reboot_during_block_production() {
         // init host
-        let mut mock_host = MockHost::default();
-        let mut internal = MockInternal();
-        let mut host = SafeStorage {
-            host: &mut mock_host,
-            internal: &mut internal,
-        };
+        let mut host = MockHost::default();
 
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -529,7 +470,7 @@ mod tests {
         );
 
         // test reboot is set
-        assert_marked_for_reboot(host.host)
+        assert_marked_for_reboot(&host)
     }
 
     #[test]

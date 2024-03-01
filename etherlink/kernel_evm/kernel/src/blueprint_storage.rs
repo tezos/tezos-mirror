@@ -320,9 +320,7 @@ pub fn read_next_blueprint<Host: Runtime>(
     }
 }
 
-// Removes from the storage the blueprint at index CURRENT_BLOCK_NUMBER
-pub fn drop_head_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    let number = read_current_block_number(host)?;
+pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
     let path = blueprint_path(number)?;
     host.store_delete(&path).map_err(Error::from)
 }

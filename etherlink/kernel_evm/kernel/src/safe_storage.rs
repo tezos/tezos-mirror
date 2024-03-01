@@ -17,8 +17,8 @@ use tezos_smart_rollup_host::{
 };
 
 pub const TMP_PATH: RefPath = RefPath::assert_from(b"/tmp");
-pub const EVM_PATH: RefPath = RefPath::assert_from(b"/evm");
-pub const TMP_EVM_PATH: RefPath = RefPath::assert_from(b"/tmp/evm");
+pub const WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/evm/world_state");
+pub const TMP_WORLD_STATE_PATH: RefPath = RefPath::assert_from(b"/tmp/evm/world_state");
 
 // The kernel runtime requires both the standard Runtime and the
 // new Extended one.
@@ -223,11 +223,13 @@ impl<Host: Runtime, InternalHost> Runtime for SafeStorage<&mut Host, &mut Intern
 
 impl<Host: Runtime, Internal> SafeStorage<&mut Host, &mut Internal> {
     pub fn start(&mut self) -> Result<(), RuntimeError> {
-        self.host.store_copy(&EVM_PATH, &TMP_EVM_PATH)
+        self.host
+            .store_copy(&WORLD_STATE_PATH, &TMP_WORLD_STATE_PATH)
     }
 
     pub fn promote(&mut self) -> Result<(), RuntimeError> {
-        self.host.store_move(&TMP_EVM_PATH, &EVM_PATH)
+        self.host
+            .store_move(&TMP_WORLD_STATE_PATH, &WORLD_STATE_PATH)
     }
 
     pub fn revert(&mut self) -> Result<(), RuntimeError> {

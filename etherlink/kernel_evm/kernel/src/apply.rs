@@ -21,6 +21,7 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::contract::Contract;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
 use tezos_smart_rollup_encoding::michelson::ticket::{FA2_1Ticket, Ticket};
@@ -29,7 +30,7 @@ use tezos_smart_rollup_encoding::michelson::{
 };
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_encoding::outbox::OutboxMessageTransaction;
-use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::error::Error;
@@ -429,6 +430,7 @@ pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
 
 fn post_withdrawals<Host: Runtime>(
     host: &mut Host,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
     withdrawals: &Vec<Withdrawal>,
     ticketer: &Option<ContractKt1Hash>,
 ) -> Result<(), Error> {
@@ -441,10 +443,6 @@ fn post_withdrawals<Host: Runtime>(
         None => return Err(Error::InvalidParsing),
     };
     let entrypoint = Entrypoint::try_from(String::from("burn"))?;
-
-    let outbox_queue =
-        tezos_smart_rollup::outbox::OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
-            .expect("Failed to created the outbox queue");
 
     for withdrawal in withdrawals {
         // Wei is 10^18, whereas mutez is 10^6.
@@ -514,6 +512,7 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
 #[allow(clippy::too_many_arguments)]
 pub fn handle_transaction_result<Host: Runtime>(
     host: &mut Host,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: &Transaction,
     index: u32,
@@ -543,7 +542,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
         log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
         fee_updates.modify_outcome(outcome);
-        post_withdrawals(host, &outcome.withdrawals, ticketer)?
+        post_withdrawals(host, outbox_queue, &outcome.withdrawals, ticketer)?
     }
 
     if pay_fees {
@@ -573,6 +572,7 @@ pub fn handle_transaction_result<Host: Runtime>(
 #[allow(clippy::too_many_arguments)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     transaction: &Transaction,
@@ -603,6 +603,7 @@ pub fn apply_transaction<Host: Runtime>(
         ExecutionResult::Valid(tx_result) => {
             let execution_result = handle_transaction_result(
                 host,
+                outbox_queue,
                 block_constants,
                 transaction,
                 index,
@@ -619,6 +620,7 @@ pub fn apply_transaction<Host: Runtime>(
         ExecutionResult::Retriable(tx_result) => {
             let execution_result = handle_transaction_result(
                 host,
+                outbox_queue,
                 block_constants,
                 transaction,
                 index,

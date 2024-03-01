@@ -5,11 +5,11 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage;
+use crate::fallback_upgrade::backup_current_kernel;
 use core::fmt;
 
 use crate::error::UpgradeProcessError;
 use crate::event::Event;
-use crate::safe_storage::KernelRuntime;
 use crate::storage;
 use crate::storage::read_optional_rlp;
 use crate::storage::store_sequencer;
@@ -115,6 +115,7 @@ pub fn upgrade<Host: Runtime>(
 ) -> anyhow::Result<()> {
     log!(host, Info, "Kernel upgrade initialisation.");
 
+    backup_current_kernel(host)?;
     let config = upgrade_reveal_flow(root_hash);
     config
         .evaluate(host)
@@ -227,9 +228,7 @@ fn sequencer_upgrade<Host: Runtime>(
     Ok(())
 }
 
-pub fn possible_sequencer_upgrade<Host: KernelRuntime>(
-    host: &mut Host,
-) -> anyhow::Result<()> {
+pub fn possible_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
     let upgrade = read_sequencer_upgrade(host)?;
     if let Some(upgrade) = upgrade {
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(host)?;
@@ -239,52 +238,4 @@ pub fn possible_sequencer_upgrade<Host: KernelRuntime>(
         }
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::ffi::OsString;
-    use std::fs;
-    use std::path::Path;
-    use tezos_smart_rollup_encoding::dac::{prepare_preimages, PreimageHash};
-    use tezos_smart_rollup_host::KERNEL_BOOT_PATH;
-    use tezos_smart_rollup_mock::MockHost;
-
-    fn preliminary_upgrade(host: &mut MockHost) -> (PreimageHash, Vec<u8>) {
-        let upgrade_to = OsString::from("tests/resources/debug_kernel.wasm");
-        let upgrade_to = Path::new(&upgrade_to);
-
-        // Preimages preparation
-
-        let original_kernel = fs::read(upgrade_to).unwrap();
-        let save_preimages = |_hash: PreimageHash, preimage: Vec<u8>| {
-            host.set_preimage(preimage);
-        };
-        (
-            prepare_preimages(&original_kernel, save_preimages).unwrap(),
-            original_kernel,
-        )
-    }
-
-    #[test]
-    // Test if we manage to upgrade the kernel from the actual one to
-    // the debug kernel one from `tests/resources/debug_kernel.wasm`.
-    fn test_kernel_upgrade() {
-        let mut host = MockHost::default();
-        let (preimage_hash, original_kernel) = preliminary_upgrade(&mut host);
-        let preimage_hash = preimage_hash.into();
-
-        let kernel_upgrade = KernelUpgrade {
-            preimage_hash,
-            activation_timestamp: Timestamp::from(0),
-        };
-        store_kernel_upgrade(&mut host, &kernel_upgrade)
-            .expect("It should be able to store");
-
-        upgrade(&mut host, preimage_hash).expect("Kernel upgrade must succeed.");
-
-        let boot_kernel = host.store_read_all(&KERNEL_BOOT_PATH).unwrap();
-        assert_eq!(original_kernel, boot_kernel);
-    }
 }
