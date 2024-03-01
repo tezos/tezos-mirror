@@ -50,7 +50,7 @@ let test_simple_slash =
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
-  --> any_flag S.Adaptive_issuance.ns_enable
+  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
   --> (Tag "No AI" --> next_cycle
       |+ Tag "Yes AI" --> next_block --> wait_ai_activation)
@@ -128,7 +128,7 @@ let test_delegate_forbidden =
   init_constants ~blocks_per_cycle:30l ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai false
-  --> any_flag S.Adaptive_issuance.ns_enable
+  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
   --> set_baker "bootstrap1"
   --> (Tag "Many double bakes"
@@ -173,7 +173,7 @@ let test_slash_unstake =
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai false
-  --> any_flag S.Adaptive_issuance.ns_enable
+  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
   --> set_baker "bootstrap1" --> next_cycle --> unstake "delegate" Half
   --> next_cycle --> double_bake "delegate" --> make_denunciations ()
@@ -186,7 +186,7 @@ let test_slash_monotonous_stake =
     init_constants ~blocks_per_cycle:16l ()
     --> set S.Adaptive_issuance.autostaking_enable false
     --> activate_ai false
-    --> any_flag S.Adaptive_issuance.ns_enable
+    --> branch_flag S.Adaptive_issuance.ns_enable
     --> begin_test ["delegate"; "bootstrap1"]
     --> next_cycle
     --> loop
@@ -236,7 +236,7 @@ let test_slash_timing =
   init_constants ~blocks_per_cycle:8l ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai false
-  --> any_flag S.Adaptive_issuance.ns_enable
+  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"] --> next_cycle
   --> (Tag "stake" --> stake "delegate" Half
       |+ Tag "unstake" --> unstake "delegate" Half)
@@ -267,7 +267,7 @@ let init_scenario_with_delegators delegate_name faucet_name delegators_list =
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
-  --> any_flag S.Adaptive_issuance.ns_enable
+  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test [delegate_name; faucet_name]
   --> set_baker faucet_name
   --> set_delegate_params "delegate" init_params
@@ -398,7 +398,7 @@ let test_slash_rounding =
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
-  --> any_flag S.Adaptive_issuance.ns_enable
+  --> branch_flag S.Adaptive_issuance.ns_enable
   --> begin_test ["delegate"; "baker"]
   --> set_baker "baker" --> next_block --> wait_ai_activation
   --> unstake "delegate" (Amount (Tez.of_mutez 2L))

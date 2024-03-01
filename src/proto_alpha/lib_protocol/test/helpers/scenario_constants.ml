@@ -35,13 +35,13 @@ let sets_f :
     (constants, constants) scenarios =
  fun f f_tag -> fold_tag_f (set f) f_tag
 
-let any_flag :
+let branch_flag :
     (constants -> bool -> constants) -> (constants, constants) scenarios =
  fun f -> sets f [("true", true); ("false", false)]
 
-let any_flags :
+let branch_flags :
     (constants -> bool -> constants) list -> (constants, constants) scenarios =
-  unfold any_flag
+  unfold branch_flag
 
 let sets_int :
     (constants -> int -> constants) ->
