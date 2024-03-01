@@ -93,17 +93,13 @@ val create :
 (** [shutdown t] properly shuts the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
 
-(** [iter_heads ?only_new t f] calls [f] on all new heads appearing in the layer
+(** [iter_heads ?name t f] calls [f] on all new heads appearing in the layer
     1 chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection) it,
-    [iter_heads] terminates and returns the error. If [only_new] is [true], [f]
-    will be called only on heads that are produced after the call is made. *)
+    [iter_heads] terminates and returns the error. A [name] can be provided to
+    differentiate iterations on the same connection. *)
 val iter_heads :
-  ?name:string ->
-  ?only_new:bool ->
-  t ->
-  (header -> unit tzresult Lwt.t) ->
-  unit tzresult Lwt.t
+  ?name:string -> t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 
 (** [wait_first t] waits for the first head to appear in the stream and
     returns it. *)

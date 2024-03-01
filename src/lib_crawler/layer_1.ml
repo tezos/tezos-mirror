@@ -103,7 +103,7 @@ type connection_info = {
 type connection_status =
   | Disconnected
   | Connected of connection_info
-  | Waiting_reconnection of connection_info Lwt_condition.t
+  | Connecting of connection_info Lwt_condition.t
 
 type t = {
   name : string;
@@ -116,10 +116,11 @@ type t = {
 let is_running c =
   match c.status with
   | Disconnected -> false
-  | Connected _ | Waiting_reconnection _ -> true
+  | Connected _ | Connecting _ -> true
 
-let rec connect ?(count = 0)
+let rec do_connect ~count ~previous_status
     ({name; protocols; reconnection_delay = delay; cctxt; _} as l1_ctxt) =
+  assert (match l1_ctxt.status with Connecting _ -> true | _ -> false) ;
   let open Lwt_syntax in
   let* () =
     if count = 0 then return_unit
@@ -137,38 +138,46 @@ let rec connect ?(count = 0)
       let* () = Layer1_event.wait_reconnect ~name delay in
       Lwt_unix.sleep delay
   in
+  let* res =
+    Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
+  in
+  match res with
+  | Ok (heads, stopper) ->
+      let heads =
+        Lwt_stream.map_s
+          (fun ( hash,
+                 (Tezos_base.Block_header.{shell = {level; _}; _} as header) ) ->
+            let+ () = Layer1_event.switched_new_head ~name hash level in
+            (hash, header))
+          heads
+      in
+      let conn = {heads; stopper} in
+      l1_ctxt.status <- Connected conn ;
+      return conn
+  | Error e ->
+      let* () = Layer1_event.cannot_connect ~name ~count e in
+      do_connect ~count:(count + 1) ~previous_status l1_ctxt
+
+let do_connect ?(count = 0) l1_ctxt =
+  let open Lwt_syntax in
+  let previous_status = l1_ctxt.status in
+  let cond = Lwt_condition.create () in
+  l1_ctxt.status <- Connecting cond ;
+  (match previous_status with Connected {stopper; _} -> stopper () | _ -> ()) ;
+  let* conn = do_connect ~count ~previous_status l1_ctxt in
+  Lwt_condition.broadcast cond conn ;
+  return conn
+
+let connect l1_ctxt =
+  let open Lwt_syntax in
   match l1_ctxt.status with
   | Connected conn ->
       (* Already connected *)
       return conn
-  | Waiting_reconnection c when count = 0 ->
-      (* Reconnection triggered by someone else *)
+  | Connecting c ->
+      (* Reconnection already triggered by someone else *)
       Lwt_condition.wait c
-  | Disconnected | Waiting_reconnection _ -> (
-      let* res =
-        Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
-      in
-      match res with
-      | Ok (heads, stopper) ->
-          let heads =
-            Lwt_stream.map_s
-              (fun ( hash,
-                     (Tezos_base.Block_header.{shell = {level; _}; _} as header)
-                   ) ->
-                let+ () = Layer1_event.switched_new_head ~name hash level in
-                (hash, header))
-              heads
-          in
-          let conn = {heads; stopper} in
-          let previous_status = l1_ctxt.status in
-          l1_ctxt.status <- Connected conn ;
-          (match previous_status with
-          | Waiting_reconnection c -> Lwt_condition.broadcast c conn
-          | _ -> ()) ;
-          return conn
-      | Error e ->
-          let* () = Layer1_event.cannot_connect ~name ~count e in
-          connect ~count:(count + 1) l1_ctxt)
+  | Disconnected -> do_connect l1_ctxt
 
 let create ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
   {
@@ -188,15 +197,17 @@ let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
 
 let reconnect l1_ctxt =
   match l1_ctxt.status with
-  | Waiting_reconnection c -> Lwt_condition.wait c
-  | _ ->
-      let c = Lwt_condition.create () in
-      l1_ctxt.status <- Waiting_reconnection c ;
-      connect ~count:1 l1_ctxt
+  | Connecting c -> Lwt_condition.wait c
+  | Disconnected ->
+      (* NOTE: same as calling [connect] but one less indirection *)
+      do_connect ~count:1 l1_ctxt
+  | Connected _ ->
+      (* force reconnection: call [do_connect] instead of [connect] *)
+      do_connect ~count:1 l1_ctxt
 
 let disconnect l1_ctxt =
   (match l1_ctxt.status with
-  | Disconnected | Waiting_reconnection _ -> ()
+  | Disconnected | Connecting _ -> ()
   (* disconnect may leak a reconnection attempt but is used only on
      shutdown. *)
   | Connected {stopper; _} -> stopper ()) ;
@@ -274,14 +285,11 @@ let lwt_stream_iter_with_timeout ~min_timeout ~init_timeout f stream =
   in
   loop init_timeout
 
-let iter_heads ?name ?(only_new = false) l1_ctxt f =
+let iter_heads ?name l1_ctxt f =
   let open Lwt_result_syntax in
   let name = Option.value name ~default:l1_ctxt.name in
-  let rec loop {heads; stopper} =
+  let rec loop {heads; stopper; _} =
     let heads = Lwt_stream.clone heads in
-    let*! () =
-      if only_new then Lwt_stream.junk_old heads else Lwt.return_unit
-    in
     let* stopping_reason =
       lwt_stream_iter_with_timeout ~min_timeout:10. ~init_timeout:300. f heads
     in
@@ -308,7 +316,7 @@ let wait_first l1_ctxt =
     match head with
     | Some head -> return head
     | None ->
-        let* conn = reconnect l1_ctxt in
+        let* conn = reconnect ~name:l1_ctxt.name l1_ctxt in
         loop conn
   in
   Lwt.no_cancel
