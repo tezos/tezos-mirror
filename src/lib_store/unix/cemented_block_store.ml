@@ -635,6 +635,8 @@ let get_cemented_block_by_hash ~read_metadata (cemented_store : t) hash =
   | Some level ->
       get_cemented_block_by_level ~read_metadata cemented_store level
 
+(* TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/7035
+   Cemented metadata cannot exceed 4Gib *)
 (* Hypothesis:
    - The block list is expected to be ordered by increasing
      level and no blocks are skipped.
