@@ -51,10 +51,12 @@ impl Client {
     }
 
     pub async fn controller_balance(&self) -> Result<U256> {
-        let balance = self
-            .client
-            .get_balance(self.controller.address(), None)
-            .await?;
+        let balance = self.balance(self.controller.address()).await?;
+        Ok(balance)
+    }
+
+    pub async fn balance(&self, address: H160) -> Result<U256> {
+        let balance = self.client.get_balance(address, None).await?;
         Ok(balance)
     }
 
@@ -73,7 +75,10 @@ impl Client {
 
     pub async fn controller_xtz_transfer(&self, to: H160, amount: U256) -> Result<()> {
         let receipt = self.transfer_xtz(&self.controller, to, amount).await?;
-        println!("{receipt:#?}");
+        println!(
+            "{to} funded with {amount} | hash: {:?}",
+            receipt.transaction_hash
+        );
         Ok(())
     }
 

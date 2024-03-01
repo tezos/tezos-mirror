@@ -13,9 +13,13 @@ use std::str::FromStr;
 
 mod client;
 mod config;
+mod scenario;
 
 use client::Client;
 use config::Config;
+use scenario::Setup;
+
+const ONE_XTZ_IN_WEI: u64 = 10_u64.pow(18);
 
 #[derive(Debug, Parser)]
 #[command(long_about = "CLI-tool for stress-testing etherlink")]
@@ -48,9 +52,13 @@ enum Commands {
         #[arg(default_value = "xtz")]
         kind: TransferKind,
     },
-    Start {
-        // Type (erc-20/transfers/etc)
-        // Target TPS
+    Flood {
+        #[arg(default_value = "wei")]
+        kind: TransferKind,
+        #[arg(long, default_value = "1")]
+        fund_amount: String,
+        #[arg(long)]
+        tps: usize,
     },
 }
 
@@ -103,7 +111,25 @@ async fn main() -> Result<()> {
             let client = Client::new(&config).await?;
             client.controller_xtz_transfer(to, amount).await?;
         }
-        command => todo!("handle command {command:?}"),
+        Commands::Flood {
+            kind,
+            fund_amount,
+            tps,
+        } => {
+            let fund_amount = parse_units(fund_amount, kind)?.into();
+            let required_workers = 2 * tps;
+
+            let mut config = Config::load(&config_path).await?;
+            config.generate_workers(required_workers);
+            config.save(&config_path).await?;
+
+            let client = Client::new(&config).await?;
+
+            let setup = Setup::new(&config, &client, required_workers)?;
+
+            setup.fund_workers_xtz(fund_amount).await?;
+            //    scenario::fund_workers(&config, &client, required_workers).await?;
+        }
     };
 
     Ok(())

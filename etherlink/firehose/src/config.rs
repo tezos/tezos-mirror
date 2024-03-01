@@ -26,6 +26,7 @@ use std::path::{Path, PathBuf};
 pub struct Config {
     endpoint: String,
     controller: Account,
+    workers: Vec<Account>,
 }
 
 impl Config {
@@ -42,6 +43,7 @@ impl Config {
                 Config {
                     endpoint,
                     controller: Account { sk },
+                    workers: vec![],
                 }
             }
             (Ok(mut config), None) => {
@@ -61,6 +63,7 @@ impl Config {
                 Config {
                     endpoint,
                     controller: Account { sk },
+                    workers: vec![],
                 }
             }
         };
@@ -68,6 +71,7 @@ impl Config {
         config.save(path).await?;
         Ok(())
     }
+
     pub async fn load(path: &impl AsRef<Path>) -> Result<Self> {
         let config = read(path).await?;
         let config = serde_json::from_slice(config.as_ref())?;
@@ -91,12 +95,29 @@ impl Config {
         Ok(path)
     }
 
+    /// Ensure configuration contains at least the required number of worker accounts.
+    pub fn generate_workers(&mut self, required: usize) {
+        if self.workers.len() >= required {
+            return;
+        }
+
+        self.workers.reserve(required - self.workers.len());
+        for _ in 0..required {
+            let sk = SecretKey::random(&mut thread_rng());
+            self.workers.push(Account { sk })
+        }
+    }
+
     pub fn endpoint(&self) -> &str {
         self.endpoint.as_str()
     }
 
     pub fn controller(&self) -> LocalWallet {
-        LocalWallet::from(self.controller.sk.clone())
+        self.controller.clone().into()
+    }
+
+    pub fn workers(&self) -> &[Account] {
+        self.workers.as_slice()
     }
 }
 
@@ -105,6 +126,12 @@ impl Config {
 #[serde(into = "AccountRepr", try_from = "AccountRepr")]
 pub struct Account {
     sk: SecretKey<Secp256k1>,
+}
+
+impl Into<LocalWallet> for Account {
+    fn into(self) -> LocalWallet {
+        LocalWallet::from(self.sk.clone())
+    }
 }
 
 // Account representation used when serializing/deserializing
