@@ -150,7 +150,7 @@ module Images = struct
       ~image_path:
         "${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}"
 
-  let _rust_toolchain =
+  let rust_toolchain =
     (* Warning: we are relying on ill-specified behavior from GitLab that allows
        the expansion of dotenv variables (here: $rust_toolchain_image_tag) in
        the image field.
@@ -1096,6 +1096,38 @@ let () =
            ~rules:[job_rule ~changes:changeset_octez_docs ~when_:On_success ()]
            ["./scripts/ci/doc_publish.sh"]
          |> job_external
+       in
+       (* Smart Rollup: Kernel SDK
+
+          See [src/kernel_sdk/RELEASE.md] for more information. *)
+       let _job_publish_kernel_sdk : tezos_job =
+         job
+           ~__POS__
+           ~name:"publish_kernel_sdk"
+           ~image:Images.rust_toolchain
+           ~stage:Stages.manual
+           ~rules:
+             [
+               (* This job is in the last stage {!Stages.manual} so we
+                  can disallow failure without blocking the pipeline.
+                  Furthermore, unlike other manual jobs, this is not
+                  an "optional" job for which failures are
+                  tolerated. *)
+               job_rule ~when_:Manual ~allow_failure:No ();
+             ]
+           ~allow_failure:Yes
+           ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+           ~interruptible:false
+           ~variables:
+             [("CARGO_HOME", Predefined_vars.(show ci_project_dir) // "cargo")]
+           ~cache:[{key = "kernels"; paths = ["cargo/"]}]
+           [
+             "make -f kernels.mk publish-sdk-deps";
+             (* Manually set SSL_CERT_DIR as default setting points to empty dir *)
+             "SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk \
+              publish-sdk";
+           ]
+         |> job_external ~directory:"publish"
        in
        (* The empty list is a placeholder until the full pipeline is generated *)
        []) ;
