@@ -13,6 +13,7 @@ use std::str::FromStr;
 
 mod client;
 mod config;
+mod contracts;
 mod scenario;
 
 use client::Client;
@@ -55,6 +56,8 @@ enum Commands {
     Flood {
         #[arg(long)]
         workers: usize,
+        #[arg(long)]
+        kind: FloodType,
     },
     #[command(long_about = "Move XTZ funds from any workers back to the controller")]
     Cleanup,
@@ -65,6 +68,12 @@ enum TransferKind {
     Xtz,
     Gwei,
     Wei,
+    Erc20,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum FloodType {
+    Xtz,
     Erc20,
 }
 
@@ -101,6 +110,25 @@ async fn main() -> Result<()> {
             let config = Config::load(&config_path).await?;
             status_check(&config).await?;
         }
+        Commands::Transfer {
+            kind: TransferKind::Erc20,
+            amount,
+            to,
+        } => {
+            let amount = amount.parse::<u64>()?.into();
+            let to = H160::from_str(&to)?;
+
+            // deploy erc20 if not already done
+            let config = Config::load(&config_path).await?;
+            let config = ensure_erc20_contract(config).await?;
+            config.save(&config_path).await?;
+
+            // transfer
+            let client = Client::new(&config).await?;
+            let setup = Setup::new(&config, &client, config.workers().len())?;
+
+            setup.mint_and_transfer_erc20(amount, to).await?;
+        }
         Commands::Transfer { kind, amount, to } => {
             let amount = parse_units(amount, kind)?.into();
             let to = H160::from_str(&to)?;
@@ -109,7 +137,10 @@ async fn main() -> Result<()> {
             let client = Client::new(&config).await?;
             client.controller_xtz_transfer(to, amount).await?;
         }
-        Commands::Flood { workers } => {
+        Commands::Flood {
+            workers,
+            kind: FloodType::Xtz,
+        } => {
             let mut config = Config::load(&config_path).await?;
             config.generate_workers(workers);
             config.save(&config_path).await?;
@@ -119,6 +150,30 @@ async fn main() -> Result<()> {
 
             setup.fund_workers_xtz(ONE_XTZ_IN_WEI.into()).await?;
             setup.xtz_transfers().await?;
+        }
+        Commands::Flood {
+            workers,
+            kind: FloodType::Erc20,
+        } => {
+            let config = Config::load(&config_path).await?;
+            // deploy erc20 if not already done
+            let mut config = ensure_erc20_contract(config).await?;
+            config.save(&config_path).await?;
+
+            // workers
+            config.generate_workers(workers);
+            config.save(&config_path).await?;
+
+            let client = Client::new(&config).await?;
+            let setup = Setup::new(&config, &client, workers)?;
+
+            // Have to fund workers with xtz
+            setup.fund_workers_xtz(ONE_XTZ_IN_WEI.into()).await?;
+
+            // Now need to mint ERC20 for all workers
+            setup.fund_workers_erc20(ONE_XTZ_IN_WEI.into()).await?;
+
+            setup.erc20_transfers().await?;
         }
         Commands::Cleanup => {
             let mut config = Config::load(&config_path).await?;
@@ -148,4 +203,16 @@ async fn status_check(config: &Config) -> Result<()> {
         format_units(controller_balance, "ether")?
     );
     Ok(())
+}
+
+async fn ensure_erc20_contract(mut config: Config) -> Result<Config> {
+    if config.erc20.is_none() {
+        let client = Client::new(&config).await?;
+        let setup = Setup::new(&config, &client, 0)?;
+
+        let contract = setup.deploy_erc20().await?;
+
+        config.erc20 = Some(contract);
+    }
+    Ok(config)
 }

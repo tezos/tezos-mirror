@@ -15,10 +15,12 @@ use std::pin::Pin;
 
 use crate::client::Client;
 use crate::config::Config;
+use crate::contracts::ERC20;
 
 pub struct Setup<'a> {
     client: &'a Client,
     workers: Vec<(H160, LocalWallet)>,
+    erc20: Option<H160>,
 }
 
 impl<'a> Setup<'a> {
@@ -39,7 +41,11 @@ impl<'a> Setup<'a> {
             .map(|worker: LocalWallet| (worker.address(), worker))
             .collect();
 
-        Ok(Self { client, workers })
+        Ok(Self {
+            client,
+            workers,
+            erc20: config.erc20,
+        })
     }
 
     pub async fn fund_workers_xtz(&self, amount: U256) -> Result<()> {
@@ -57,6 +63,24 @@ impl<'a> Setup<'a> {
         }
 
         println!("[SCENARIO] fund workers (xtz) done");
+        Ok(())
+    }
+
+    pub async fn fund_workers_erc20(&self, amount: U256) -> Result<()> {
+        println!("[SCENARIO] fund workers (erc20) with {amount}");
+
+        for (worker, account) in self.workers.iter() {
+            let balance = self.balance_erc20(*worker).await?;
+
+            if balance >= amount {
+                println!("{worker} already funded with {balance}");
+                continue;
+            }
+
+            self.mint_erc20(account, amount).await?;
+        }
+
+        println!("[SCENARIO] fund workers (erc20) done");
         Ok(())
     }
 
@@ -122,7 +146,76 @@ impl<'a> Setup<'a> {
             total_transfers += 1.0;
             let tps = total_transfers / Instant::now().duration_since(start_time).as_secs_f32();
 
-            print!("\rTPS {tps}\t\tfailed {total_failed}/{total_transfers} total\t\t| gas_price: {gas_price:?}\t\t\t");
+            print!("\rTPS {tps}\t\tfailed {total_failed}/{total_transfers} succeeded | gas_price: {gas_price:?}\t\t\t");
+
+            queue_transfer!(worker);
+        }
+
+        Ok(())
+    }
+
+    /// Perform erc20 transfers from the workers back to the controller account,
+    /// aiming to match the requested tps.
+    ///
+    /// Each transfer is only 1 token, by default.
+    pub async fn erc20_transfers(&self) -> Result<()> {
+        println!(
+            "[SCENARIO] erc20 transfers with {} workers",
+            self.workers.len()
+        );
+
+        let to = self.client.controller_address();
+
+        let mut tasks = FuturesUnordered::<
+            Pin<
+                Box<
+                    dyn Future<
+                        Output = std::result::Result<
+                            (TransactionReceipt, LocalWallet),
+                            LocalWallet,
+                        >,
+                    >,
+                >,
+            >,
+        >::new();
+
+        macro_rules! queue_transfer {
+            ($worker:ident) => {
+                let task = Box::pin(async move {
+                    let receipt = self
+                        .transfer_erc20(&$worker, U256::one(), to)
+                        .await
+                        .map_err(|_| $worker.clone())?;
+                    Ok((receipt, $worker))
+                });
+                tasks.push(task);
+            };
+        }
+
+        for (_, worker) in self.workers.iter().cloned() {
+            queue_transfer!(worker);
+        }
+
+        let mut total_failed = 0;
+        let mut total_transfers = 0 as f32;
+        let start_time = Instant::now();
+        let mut gas_price = None;
+
+        while let Some(result) = tasks.next().await {
+            let worker = match result {
+                Ok((receipt, worker)) => {
+                    gas_price = receipt.effective_gas_price;
+                    worker
+                }
+                Err(worker) => {
+                    total_failed += 1;
+                    worker
+                }
+            };
+            total_transfers += 1.0;
+            let tps = total_transfers / Instant::now().duration_since(start_time).as_secs_f32();
+
+            print!("\rTPS {tps}\t\tfailed {total_failed}/{total_transfers} total | gas_price: {gas_price:?}\t\t\t");
 
             queue_transfer!(worker);
         }
@@ -150,5 +243,111 @@ impl<'a> Setup<'a> {
         }
 
         Ok(())
+    }
+
+    pub async fn deploy_erc20(&self) -> Result<H160> {
+        println!("[SCENARIO] Deploying ERC20 contract.");
+
+        let provider = self.client.provider();
+        let deploy = ERC20::deploy(provider, ())?.deployer.tx;
+
+        let receipt = self
+            .client
+            .send(&self.client.controller, None, None, deploy.data().cloned())
+            .await?;
+
+        let address = receipt
+            .contract_address
+            .expect("Contract should have been created");
+
+        println!("Deployed ERC20 to {address:?}");
+
+        Ok(address)
+    }
+
+    pub async fn mint_and_transfer_erc20(&self, amount: U256, to: H160) -> Result<()> {
+        let controller = &self.client.controller;
+
+        let balance = self.balance_erc20(controller.address()).await?;
+
+        if balance < amount {
+            self.mint_erc20(&controller, amount - balance).await?;
+        }
+
+        let receipt = self.transfer_erc20(&controller, amount, to).await?;
+
+        println!(
+            "Transferred {amount} ERC20 tokens to {to:?} | hash: {:?}",
+            receipt.transaction_hash
+        );
+        Ok(())
+    }
+
+    pub async fn mint_erc20(&self, account: &LocalWallet, amount: U256) -> Result<()> {
+        println!("[SCENARIO] Minting ERC20 tokens.");
+        let Some(contract_address) = self.erc20 else {
+            anyhow::bail!("ERC20 contract not deployed");
+        };
+
+        let provider = self.client.provider();
+        let contract = ERC20::new(contract_address, provider);
+
+        let data = contract.mint(amount).tx.data().cloned();
+
+        let receipt = self
+            .client
+            .send(&account, Some(contract_address), None, data)
+            .await?;
+
+        let balance = self.balance_erc20(account.address()).await?;
+
+        println!(
+            "Minted {amount} ERC20 to {:?}, new balance {balance:?} | hash: {:?}",
+            account.address(),
+            receipt.transaction_hash
+        );
+
+        Ok(())
+    }
+
+    pub async fn transfer_erc20(
+        &self,
+        account: &LocalWallet,
+        amount: U256,
+        to: H160,
+    ) -> Result<TransactionReceipt> {
+        let Some(contract_address) = self.erc20 else {
+            anyhow::bail!("ERC20 contract not deployed");
+        };
+
+        let provider = self.client.provider();
+        let contract = ERC20::new(contract_address, provider);
+
+        let data = contract.transfer(to, amount).tx.data().cloned();
+
+        let receipt = self
+            .client
+            .send(&account, Some(contract_address), None, data)
+            .await?;
+
+        Ok(receipt)
+    }
+
+    pub async fn balance_erc20(&self, account: H160) -> Result<U256> {
+        let Some(contract_address) = self.erc20 else {
+            anyhow::bail!("ERC20 contract not deployed");
+        };
+
+        let provider = self.client.provider();
+        let contract = ERC20::new(contract_address, provider);
+
+        let call = contract.balance_of(account);
+        let data = call.tx.data().cloned();
+
+        let answer = self.client.call(Some(contract_address), None, data).await?;
+
+        let balance = decode_function_data(&call.function, answer.as_ref(), false)?;
+
+        Ok(balance)
     }
 }

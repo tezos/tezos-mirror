@@ -29,6 +29,7 @@ pub struct Config {
     endpoint: String,
     controller: Account,
     workers: Vec<Account>,
+    pub erc20: Option<H160>,
 }
 
 impl Config {
@@ -46,6 +47,7 @@ impl Config {
                     endpoint,
                     controller: Account { sk },
                     workers: vec![],
+                    erc20: None,
                 }
             }
             (Ok(mut config), None) => {
@@ -66,6 +68,7 @@ impl Config {
                     endpoint,
                     controller: Account { sk },
                     workers: vec![],
+                    erc20: None,
                 }
             }
         };
@@ -134,7 +137,10 @@ impl Config {
             }
         }
 
-        println!("Deleting {} empty worker accounts", self.workers.len() - workers.len());
+        println!(
+            "Deleting {} empty worker accounts",
+            self.workers.len() - workers.len()
+        );
 
         self.workers = workers;
 
