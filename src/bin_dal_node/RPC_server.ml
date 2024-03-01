@@ -229,7 +229,9 @@ module Profile_handlers = struct
             operator_profiles
         with
         | None -> fail Errors.[Profile_incompatibility]
-        | Some pctxt -> return @@ Node_context.set_profile_ctxt ctxt pctxt)
+        | Some pctxt ->
+            let*! () = Node_context.set_profile_ctxt ctxt pctxt in
+            return_unit)
 
   let get_profiles ctxt () () =
     let open Lwt_result_syntax in

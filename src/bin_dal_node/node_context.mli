@@ -95,8 +95,13 @@ val get_ready : t -> ready_ctxt tzresult
 (** [get_profile_ctxt ctxt] returns the profile context.  *)
 val get_profile_ctxt : t -> Profile_manager.t
 
-(** [set_profile_ctxt ctxt pctxt] sets the profile context.  *)
-val set_profile_ctxt : t -> Profile_manager.t -> unit
+(** [load_profile_ctxt ctxt] tries to load the profile context from disk. *)
+val load_profile_ctxt : t -> Profile_manager.t option Lwt.t
+
+(** [set_profile_ctxt ctxt ?save pctxt] sets the profile context. If [save] is
+    set, which is [true] by default, the profile context is saved on
+    disk. *)
+val set_profile_ctxt : t -> ?save:bool -> Profile_manager.t -> unit Lwt.t
 
 (** [get_config ctxt] returns the dal node configuration *)
 val get_config : t -> Configuration_file.t

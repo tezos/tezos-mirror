@@ -238,3 +238,19 @@ let metrics_server_is_ready =
     ~level:Notice
     ("host", Data_encoding.string)
     ("port", Data_encoding.uint16)
+
+let loading_profiles_failed =
+  declare_1
+    ~section
+    ~name:"loading_profiles_failed"
+    ~msg:"loading profiles failed: {error}"
+    ~level:Error
+    ("error", Error_monad.trace_encoding)
+
+let saving_profiles_failed =
+  declare_1
+    ~section
+    ~name:"saving_profiles_failed"
+    ~msg:"saving profiles failed: {error}"
+    ~level:Error
+    ("error", Error_monad.trace_encoding)
