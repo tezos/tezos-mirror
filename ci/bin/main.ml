@@ -355,8 +355,6 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false)
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
 
-let rules_static_build_master = [job_rule ~when_:Always ()]
-
 let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
 
 let _job_static_arm64_experimental =
@@ -367,14 +365,6 @@ let _job_static_arm64_experimental =
     ()
   |> job_external ~filename_suffix:"experimental"
 
-let _job_static_arm64_master =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Arm64
-    ~rules:rules_static_build_master
-    ()
-  |> job_external ~filename_suffix:"master"
-
 let _job_static_x86_64_experimental =
   job_build_static_binaries
     ~__POS__
@@ -383,17 +373,6 @@ let _job_static_x86_64_experimental =
     ~rules:rules_static_build_other
     ()
   |> job_external ~filename_suffix:"experimental"
-
-let _job_static_x86_64_master =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Amd64
-      (* TODO: this job doesn't actually need trigger and there is no
-         need to set it optional since we know this job is only on the master branch. *)
-    ~needs_trigger:true
-    ~rules:rules_static_build_master
-    ()
-  |> job_external ~filename_suffix:"master"
 
 let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
   job_docker_authenticated
@@ -421,10 +400,6 @@ let _job_docker_rust_toolchain_before_merging =
       ]
     ()
   |> job_external ~filename_suffix:"before_merging"
-
-let _job_docker_rust_toolchain_master =
-  job_docker_rust_toolchain ~__POS__ ~rules:[job_rule ~when_:Always ()] ()
-  |> job_external ~filename_suffix:"master"
 
 let _job_docker_rust_toolchain_other =
   job_docker_rust_toolchain ~__POS__ () |> job_external ~filename_suffix:"other"
@@ -534,17 +509,6 @@ let rules_octez_docker_changes_or_master =
     job_rule ~changes:changeset_octez_docker_changes_or_master ();
   ]
 
-let job_docker_amd64_experimental : Tezos_ci.tezos_job =
-  job_docker_build
-    ~__POS__
-    ~external_:true
-      (* TODO: when this is generated for a given pipeline, then the correct variant of [_job_docker_rust_toolchain_*] must be set.
-         For now we can set any variant to get the correct name of the need. *)
-    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
-    ~rules:rules_octez_docker_changes_or_master
-    ~arch:Amd64
-    Experimental
-
 let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
   job_docker_build
     ~__POS__
@@ -553,15 +517,6 @@ let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
       (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
     ~arch:Amd64
     Test_manual
-
-let job_docker_arm64_experimental : Tezos_ci.tezos_job =
-  job_docker_build
-    ~__POS__
-    ~external_:true (* TODO: see above *)
-    ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
-    ~rules:rules_octez_docker_changes_or_master
-    ~arch:Arm64
-    Experimental
 
 let _job_docker_arm64_test_manual : Tezos_ci.tezos_job =
   job_docker_build
@@ -588,21 +543,6 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
     ~variables:[("CI_DOCKER_HUB", Bool.to_string ci_docker_hub)]
     ["./scripts/ci/docker_merge_manifests.sh"]
-
-let _job_docker_merge_manifests_release =
-  job_docker_merge_manifests
-    ~__POS__
-    ~ci_docker_hub:true
-      (* TODO: In theory, actually uses either release or
-         experimental variant of docker jobs depending on
-         pipeline. In practice, this does not matter as these jobs
-         have the same name in the generated files
-         ([oc.build:ARCH]). However, when the merge_manifest jobs
-         are created directly in the appropriate pipeline, the
-         correcty variant must be used. *)
-    ~job_docker_amd64:job_docker_amd64_experimental
-    ~job_docker_arm64:job_docker_arm64_experimental
-  |> job_external ~filename_suffix:"release"
 
 type bin_package_target = Dpkg | Rpm
 
@@ -869,7 +809,73 @@ let () =
     "latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
     ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:false] ;
-  register "master_branch" If.(on_tezos_namespace && push && on_branch "master") ;
+  register
+    "master_branch"
+    If.(on_tezos_namespace && push && on_branch "master")
+    ~jobs:
+      (let job_docker_rust_toolchain =
+         job_docker_rust_toolchain
+           ~__POS__
+           ~rules:[job_rule ~when_:Always ()]
+           ()
+         |> job_external ~filename_suffix:"master"
+       in
+       let job_docker_amd64_experimental : tezos_job =
+         job_docker_build
+           ~__POS__
+           ~external_:true
+             (* TODO: when this is generated for a given pipeline, then the correct variant of [_job_docker_rust_toolchain_*] must be set.
+                For now we can set any variant to get the correct name of the need. *)
+           ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+           ~rules:rules_octez_docker_changes_or_master
+           ~arch:Amd64
+           Experimental
+       in
+       let job_docker_arm64_experimental : tezos_job =
+         job_docker_build
+           ~__POS__
+           ~external_:true (* TODO: see above *)
+           ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+           ~rules:rules_octez_docker_changes_or_master
+           ~arch:Arm64
+           Experimental
+       in
+       let _job_docker_merge_manifests =
+         job_docker_merge_manifests
+           ~__POS__
+           ~ci_docker_hub:true
+             (* TODO: In theory, actually uses either release or
+                experimental variant of docker jobs depending on
+                pipeline. In practice, this does not matter as these jobs
+                have the same name in the generated files
+                ([oc.build:ARCH]). However, when the merge_manifest jobs
+                are created directly in the appropriate pipeline, the
+                correcty variant must be used. *)
+           ~job_docker_amd64:job_docker_amd64_experimental
+           ~job_docker_arm64:job_docker_arm64_experimental
+         |> job_external ~filename_suffix:"release"
+       in
+       let _job_static_arm64 =
+         job_build_static_binaries
+           ~__POS__
+           ~arch:Arm64
+           ~rules:[job_rule ~when_:Always ()]
+           ()
+         |> job_external ~filename_suffix:"master"
+       in
+       let _job_static_x86_64 =
+         job_build_static_binaries
+           ~__POS__
+           ~arch:Amd64
+             (* TODO: this job doesn't actually need trigger and there is no
+                need to set it optional since we know this job is only on the master branch. *)
+           ~needs_trigger:true
+           ~rules:[job_rule ~when_:Always ()]
+           ()
+         |> job_external ~filename_suffix:"master"
+       in
+       (* The empty list is a placeholder until the full pipeline is generated *)
+       []) ;
   register
     "release_tag"
     If.(on_tezos_namespace && push && has_tag_match release_tag_re)
