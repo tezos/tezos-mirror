@@ -56,20 +56,20 @@ end
 
 (** A facility for registering pipelines. *)
 module Pipeline : sig
-  (* Register a pipeline.
+  (** Register a pipeline.
 
-     [register ?variables name rule] will register a pipeline [name]
-     that runs when [rule] is true.
+      [register ?variables name rule] will register a pipeline [name]
+      that runs when [rule] is true.
 
-     If [variables] is set, then these variables will be added to the
-     [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
+      If [variables] is set, then these variables will be added to the
+      [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
 
-     If [jobs] is not set, then the pipeline is a legacy, hand-written
-     .yml file, expected to be defined in
-     [.gitlab/ci/pipelines/NAME.yml]. If [jobs] is set, then the those
-     jobs will be generated to the same file when {!write} is
-     called. In both cases, this file will be included from the
-     top-level [.gitlab-ci.yml]. *)
+      If [jobs] is not set, then the pipeline is a legacy, hand-written
+      .yml file, expected to be defined in
+      [.gitlab/ci/pipelines/NAME.yml]. If [jobs] is set, then the those
+      jobs will be generated to the same file when {!write} is
+      called. In both cases, this file will be included from the
+      top-level [.gitlab-ci.yml]. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
     ?jobs:tezos_job list ->
