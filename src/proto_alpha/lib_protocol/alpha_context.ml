@@ -525,8 +525,11 @@ module Receipt = struct
         delegate : Signature.public_key_hash;
       }
     | Shared_between_stakers of {delegate : Signature.public_key_hash}
+    | Baker_edge of Signature.public_key_hash
 
   let frozen_baker = Frozen_staker_repr.baker
+
+  let frozen_baker_edge = Frozen_staker_repr.baker_edge
 
   let frozen_single_staker = Frozen_staker_repr.single_staker
 

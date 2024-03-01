@@ -648,7 +648,9 @@ let test_staking =
               opr.kind = "freezer"
               && opr.category = Some "deposits"
               && opr.staker
-                 = Some (Baker {baker = Constant.bootstrap2.public_key_hash}));
+                 = Some
+                     (Baker_own_stake
+                        {baker = Constant.bootstrap2.public_key_hash}));
           change = -200000000;
           msg = "Frozen deposits decreased by 200tez";
         };
@@ -722,7 +724,9 @@ let test_staking =
             (fun opr ->
               opr.kind = "freezer"
               && opr.staker
-                 = Some (Baker {baker = Constant.bootstrap2.public_key_hash}));
+                 = Some
+                     (Baker_own_stake
+                        {baker = Constant.bootstrap2.public_key_hash}));
           change = 400000000;
           msg = " Frozen balance deposit of 400tez";
         };
@@ -881,7 +885,8 @@ let test_staking =
                   && opr.category = Some "deposits"
                   && opr.staker
                      = Some
-                         (Baker {baker = Constant.bootstrap2.public_key_hash}));
+                         (Baker_own_stake
+                            {baker = Constant.bootstrap2.public_key_hash}));
               change = amount_baker_share;
               msg = "Baker's frozen deposits increased by baker share";
             };
@@ -918,7 +923,8 @@ let test_staking =
                   && opr.category = Some "deposits"
                   && opr.staker
                      = Some
-                         (Baker {baker = Constant.bootstrap2.public_key_hash}));
+                         (Baker_edge
+                            {baker = Constant.bootstrap2.public_key_hash}));
               change = amount_edge;
               msg =
                 "Baker's frozen deposits increased by its edge on staker \
@@ -1174,7 +1180,8 @@ let test_staking =
         ~kind:"freezer"
         ~category:(Some "deposits")
         ~change:(-amount_slashed_from_baker_deposits)
-        ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
+        ~staker:
+          (Some (Baker_own_stake {baker = Constant.bootstrap2.public_key_hash}))
         ~msg:"Slashed from baker deposits"
         ~delayed_operation_hash:None;
       check_opr
@@ -1214,7 +1221,8 @@ let test_staking =
         ~kind:"freezer"
         ~category:(Some "deposits")
         ~change:(-amount_rewarded_from_baker_deposits)
-        ~staker:(Some (Baker {baker = Constant.bootstrap2.public_key_hash}))
+        ~staker:
+          (Some (Baker_own_stake {baker = Constant.bootstrap2.public_key_hash}))
         ~delayed_operation_hash:(Some denunciation_oph)
         ~msg:"Reward from baker deposits";
       check_opr

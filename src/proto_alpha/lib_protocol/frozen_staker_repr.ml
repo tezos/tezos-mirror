@@ -12,8 +12,11 @@ type t =
       delegate : Signature.public_key_hash;
     }
   | Shared_between_stakers of {delegate : Signature.public_key_hash}
+  | Baker_edge of Signature.public_key_hash
 
 let baker pkh = Baker pkh
+
+let baker_edge pkh = Baker_edge pkh
 
 let single_staker ~staker ~delegate =
   match (staker : Contract_repr.t) with
@@ -35,7 +38,13 @@ let encoding =
     obj1 (req "delegate" Signature.Public_key_hash.encoding)
   in
   let baker_tag = 2 in
-  let baker_encoding = obj1 (req "baker" Signature.Public_key_hash.encoding) in
+  let baker_encoding =
+    obj1 (req "baker_own_stake" Signature.Public_key_hash.encoding)
+  in
+  let baker_edge_tag = 3 in
+  let baker_edge_encoding =
+    obj1 (req "baker_edge" Signature.Public_key_hash.encoding)
+  in
   def
     ~title:"frozen_staker"
     ~description:
@@ -49,7 +58,8 @@ let encoding =
          | Single_staker {staker; delegate} ->
              matched single_tag single_encoding (staker, delegate)
          | Shared_between_stakers {delegate} ->
-             matched shared_tag shared_encoding delegate)
+             matched shared_tag shared_encoding delegate
+         | Baker_edge baker -> matched baker_edge_tag baker_edge_encoding baker)
        [
          case
            ~title:"Single"
@@ -72,6 +82,12 @@ let encoding =
            baker_encoding
            (function Baker baker -> Some baker | _ -> None)
            (fun baker -> Baker baker);
+         case
+           ~title:"Baker_edge"
+           (Tag baker_edge_tag)
+           baker_edge_encoding
+           (function Baker_edge baker -> Some baker | _ -> None)
+           (fun baker -> Baker_edge baker);
        ]
 
 let compare sa sb =
@@ -88,3 +104,6 @@ let compare sa sb =
       Signature.Public_key_hash.compare da db
   | Single_staker _, Shared_between_stakers _ -> -1
   | Shared_between_stakers _, Single_staker _ -> 1
+  | Baker_edge ba, Baker_edge bb -> Signature.Public_key_hash.compare ba bb
+  | Baker_edge _, _ -> -1
+  | _, Baker_edge _ -> 1

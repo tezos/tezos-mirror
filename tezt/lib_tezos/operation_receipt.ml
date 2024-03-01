@@ -48,7 +48,8 @@ let get_block_metadata client =
 module Balance_updates = struct
   type staker =
     | Delegate of {delegate : string; contract : string option}
-    | Baker of {baker : string}
+    | Baker_own_stake of {baker : string}
+    | Baker_edge of {baker : string}
 
   type t = {
     kind : string;
@@ -89,9 +90,16 @@ module Balance_updates = struct
                               JSON.(json |-> "contract" |> as_string_opt);
                           })
                  | None -> (
-                     match JSON.(json |-> "baker" |> as_string_opt) with
-                     | Some baker -> Some (Baker {baker})
-                     | None -> None))
+                     match
+                       JSON.(json |-> "baker_own_stake" |> as_string_opt)
+                     with
+                     | Some baker -> Some (Baker_own_stake {baker})
+                     | None -> (
+                         match
+                           JSON.(json |-> "baker_edge" |> as_string_opt)
+                         with
+                         | Some baker -> Some (Baker_edge {baker})
+                         | None -> None)))
              | None -> None
            in
            let delayed_operation_hash =
@@ -116,7 +124,8 @@ module Balance_updates = struct
             "Delegate %s %s"
             delegate
             (Option.value ~default:"" contract)
-      | Baker {baker} -> Format.sprintf "Baker %s" baker
+      | Baker_own_stake {baker} -> Format.sprintf "Baker_own_stake %s" baker
+      | Baker_edge {baker} -> Format.sprintf "Baker_edge %s" baker
     in
     let staker_to_string = function
       | Some staker -> staker_to_string staker

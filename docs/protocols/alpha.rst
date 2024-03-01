@@ -125,6 +125,7 @@ Adaptive Issuance (ongoing)
 
 - Activating new slashing flag. (MR :gl:`!12013`)
 
+
 Gas improvements
 ----------------
 
@@ -178,6 +179,12 @@ RPC Changes
 
 Operation receipts
 ------------------
+
+- To better differentiate Deposits coming from 'rewards from bakers own stakes'
+  from 'the edge bakers may take from their stakers rewards', the balance updates
+  field has been specialized. The field {"staker":{"baker": <delegate_pkh>}} is now
+  split into {"staker":{"baker_own_stake": <delegate_pkh>}} and {"staker":{"baker_edge":
+  <delegate_pkh>}}. (MR :gl:`!12258`)
 
 Protocol parameters
 -------------------
