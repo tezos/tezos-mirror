@@ -313,9 +313,6 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
-  next_forged_block : prepared_block option;
-      (* Block that is preemptively forged for the next level when baker is
-           round 0 proposer. *)
 }
 
 type phase =
@@ -423,8 +420,7 @@ let update_current_phase state new_phase =
 
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
-  | Time_to_bake_next_level of {at_round : Round.t}
-  | Time_to_forge_block
+  | Time_to_prepare_next_level_block of {at_round : Round.t}
 
 let timeout_kind_encoding =
   let open Data_encoding in
@@ -441,14 +437,14 @@ let timeout_kind_encoding =
         (fun ((), ending_round) -> End_of_round {ending_round});
       case
         (Tag 1)
-        ~title:"Time_to_bake_next_level"
+        ~title:"Time_to_prepare_next_level_block"
         (obj2
-           (req "kind" (constant "Time_to_bake_next_level"))
+           (req "kind" (constant "Time_to_prepare_next_level_block"))
            (req "round" Round.encoding))
         (function
-          | Time_to_bake_next_level {at_round} -> Some ((), at_round)
+          | Time_to_prepare_next_level_block {at_round} -> Some ((), at_round)
           | _ -> None)
-        (fun ((), at_round) -> Time_to_bake_next_level {at_round});
+        (fun ((), at_round) -> Time_to_prepare_next_level_block {at_round});
     ]
 
 type event =
@@ -970,14 +966,13 @@ let pp_level_state fmt
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round;
-      next_forged_block;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
      %a@]@ locked round: %a@ attestable payload: %a@ elected block: %a@ @[<v \
      2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
-     next level proposed round: %a@ @next forged block: %a@]"
+     next level proposed round: %a@]"
     current_level
     is_latest_proposal_applied
     pp_proposal
@@ -994,8 +989,6 @@ let pp_level_state fmt
     next_level_delegate_slots
     (pp_option Round.pp)
     next_level_proposed_round
-    (pp_option pp_prepared_block)
-    next_forged_block
 
 let pp_phase fmt = function
   | Idle -> Format.fprintf fmt "idle"
@@ -1006,7 +999,7 @@ let pp_phase fmt = function
 let pp_round_state fmt {current_round; current_phase; delayed_quorum} =
   Format.fprintf
     fmt
-    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ dealyed quorum: %a@]"
+    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed quorum: %a@]"
     Round.pp
     current_round
     pp_phase
@@ -1028,9 +1021,12 @@ let pp fmt {global_state; level_state; round_state} =
 let pp_timeout_kind fmt = function
   | End_of_round {ending_round} ->
       Format.fprintf fmt "end of round %a" Round.pp ending_round
-  | Time_to_bake_next_level {at_round} ->
-      Format.fprintf fmt "time to bake next level at round %a" Round.pp at_round
-  | Time_to_forge_block -> Format.fprintf fmt "time to forge block"
+  | Time_to_prepare_next_level_block {at_round} ->
+      Format.fprintf
+        fmt
+        "time to prepare next level block at round %a"
+        Round.pp
+        at_round
 
 let pp_forge_event fmt =
   let open Format in
