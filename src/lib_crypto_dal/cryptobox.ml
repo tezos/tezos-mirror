@@ -971,6 +971,60 @@ module Inner = struct
         then Ok ()
         else Error `Invalid_shard
 
+  let verify_shard_multi (t : t) commitment shard_list proof_list =
+    let out_of_range_list =
+      List.filter
+        (fun shard -> shard.index < 0 || shard.index >= t.number_of_shards)
+        shard_list
+    in
+    let error_message =
+      String.concat
+        "\n"
+        (List.map
+           (fun shard ->
+             Printf.sprintf
+               "Shard index out of range: got index %d, expected index within \
+                range [%d, %d]."
+               shard.index
+               0
+               (t.number_of_shards - 1))
+           out_of_range_list)
+    in
+    if out_of_range_list != [] then
+      Error (`Shard_index_out_of_range error_message)
+    else
+      let length_mismatch_list =
+        let expected_shard_length = t.shard_length in
+
+        List.filter
+          (fun shard ->
+            let got_shard_length = Array.length shard.share in
+            expected_shard_length <> got_shard_length)
+          shard_list
+      in
+      if length_mismatch_list != [] then Error `Shard_length_mismatch
+      else
+        let root_list =
+          List.map
+            (fun shard ->
+              Domain.get t.domain_erasure_encoded_polynomial_length shard.index)
+            shard_list
+        in
+        let evaluations_list = List.map (fun shard -> shard.share) shard_list in
+        let domain = Domain.build t.shard_length in
+        let srs_point = t.srs_verifier.shards in
+        if
+          Kate_amortized.verify_multi
+            t.kate_amortized
+            ~commitment
+            ~srs_point
+            ~domain
+            ~root_list
+            ~evaluations_list
+            ~proof_list
+        then Ok ()
+        else Error `Invalid_shard
+
   let prove_page t p page_index =
     if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Page_index_out_of_range
