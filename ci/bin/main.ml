@@ -916,7 +916,7 @@ let build_arm_rules =
 (* Write external files for build_arm64_jobs.
 
    Used in external pipelines [before_merging] and [schedule_extended_test]. *)
-let _job_build_arm64_release : tezos_job =
+let job_build_arm64_release : tezos_job =
   job_build_dynamic_binaries
     ~__POS__
     ~arch:Arm64
@@ -926,7 +926,7 @@ let _job_build_arm64_release : tezos_job =
     ()
   |> job_external
 
-let _job_build_arm64_exp_dev_extra : tezos_job =
+let job_build_arm64_exp_dev_extra : tezos_job =
   job_build_dynamic_binaries
     ~__POS__
     ~arch:Arm64
@@ -990,14 +990,10 @@ let () =
            ~__POS__
            ~rules:[job_rule ~when_:Always ()]
            ()
-         |> job_external ~filename_suffix:"master"
        in
        let job_docker_amd64_experimental : tezos_job =
          job_docker_build
            ~__POS__
-           ~external_:true
-             (* TODO: when this is generated for a given pipeline, then the correct variant of [_job_docker_rust_toolchain_*] must be set.
-                For now we can set any variant to get the correct name of the need. *)
            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
            ~rules:rules_octez_docker_changes_or_master
            ~arch:Amd64
@@ -1006,13 +1002,12 @@ let () =
        let job_docker_arm64_experimental : tezos_job =
          job_docker_build
            ~__POS__
-           ~external_:true (* TODO: see above *)
            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
            ~rules:rules_octez_docker_changes_or_master
            ~arch:Arm64
            Experimental
        in
-       let _job_docker_merge_manifests =
+       let job_docker_merge_manifests =
          job_docker_merge_manifests
            ~__POS__
            ~ci_docker_hub:true
@@ -1025,17 +1020,15 @@ let () =
                 correcty variant must be used. *)
            ~job_docker_amd64:job_docker_amd64_experimental
            ~job_docker_arm64:job_docker_arm64_experimental
-         |> job_external ~filename_suffix:"release"
        in
-       let _job_static_arm64 =
+       let job_static_arm64 =
          job_build_static_binaries
            ~__POS__
            ~arch:Arm64
            ~rules:[job_rule ~when_:Always ()]
            ()
-         |> job_external ~filename_suffix:"master"
        in
-       let _job_static_x86_64 =
+       let job_static_x86_64 =
          job_build_static_binaries
            ~__POS__
            ~arch:Amd64
@@ -1044,9 +1037,8 @@ let () =
            ~needs_trigger:true
            ~rules:[job_rule ~when_:Always ()]
            ()
-         |> job_external ~filename_suffix:"master"
        in
-       let _job_unified_coverage_default : tezos_job =
+       let job_unified_coverage_default : tezos_job =
          job
            ~__POS__
            ~image:Images.runtime_build_test_dependencies
@@ -1072,9 +1064,8 @@ let () =
              "./scripts/ci/report_coverage.sh";
            ]
          |> enable_coverage_location |> enable_coverage_report
-         |> job_external ~directory:"coverage" ~filename_suffix:"default"
        in
-       let _job_publish_documentation : tezos_job =
+       let job_publish_documentation : tezos_job =
          job
            ~__POS__
            ~name:"publish:documentation"
@@ -1095,12 +1086,11 @@ let () =
            ~interruptible:false
            ~rules:[job_rule ~changes:changeset_octez_docs ~when_:On_success ()]
            ["./scripts/ci/doc_publish.sh"]
-         |> job_external
        in
        (* Smart Rollup: Kernel SDK
 
           See [src/kernel_sdk/RELEASE.md] for more information. *)
-       let _job_publish_kernel_sdk : tezos_job =
+       let job_publish_kernel_sdk : tezos_job =
          job
            ~__POS__
            ~name:"publish_kernel_sdk"
@@ -1127,10 +1117,25 @@ let () =
              "SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk \
               publish-sdk";
            ]
-         |> job_external ~directory:"publish"
        in
-       (* The empty list is a placeholder until the full pipeline is generated *)
-       []) ;
+       [
+         (* Stage: build *)
+         job_docker_rust_toolchain;
+         job_static_x86_64;
+         job_static_arm64;
+         job_build_arm64_release;
+         job_build_arm64_exp_dev_extra;
+         job_docker_amd64_experimental;
+         job_docker_arm64_experimental;
+         (* Stage: test_coverage *)
+         job_unified_coverage_default;
+         (* Stage: doc *)
+         job_publish_documentation;
+         (* Stage: prepare_release *)
+         job_docker_merge_manifests;
+         (* Stage: manual *)
+         job_publish_kernel_sdk;
+       ]) ;
   register
     "release_tag"
     If.(on_tezos_namespace && push && has_tag_match release_tag_re)
