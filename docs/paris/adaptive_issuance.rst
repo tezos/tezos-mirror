@@ -19,7 +19,6 @@
 :math:`\newcommand\tw{\Sigma_w}`
 :math:`\newcommand\rw[2]{\F{reward_{#1}}{#2}}`
 :math:`\newcommand\tip[2]{\F{tip_{#1}}{#2}}`
-:math:`\newcommand\lbs[1]{\F{subsidy_{LB}}{#1}}`
 :math:`\newcommand\exp[1]{\F{exp}{#1}}`
 :math:`\newcommand{\vdf}{\mathit{VDF}}`
 
@@ -28,7 +27,7 @@
 Adaptive Issuance and Staking
 =============================
 
-This document describes Adaptive Issuance and Staking, two new features experimented in the Alpha protocol (referred hereafter as the Adaptive-Issuance/Staking proposal), which together constitute a major evolution of Tezos’ :doc:`Proof-of-Stake mechanism <proof_of_stake>`.
+This document describes Adaptive Issuance and Staking, two new features (referred hereafter as the Adaptive-Issuance/Staking proposal) which together constitute a major evolution of Tezos’ :doc:`Proof-of-Stake mechanism <proof_of_stake>`.
 
 .. note::
 
@@ -60,8 +59,7 @@ constants.
 
 The Adaptive-Issuance/Staking proposal
 introduces the possibility to activate Adaptive Issuance: a mechanism where the amount of
-*regularly* issued tez (participation rewards and the LB subsidy, if
-active) depends on the global **staked funds ratio** – that is, the
+participation rewards depends on the global **staked funds ratio** – that is, the
 ratio of staked tez to the total supply. This lets issuance roughly
 match the *actual* security budget the chain requires, the amount needed
 to encourage participants to stake and produce blocks, but *no more*.
@@ -69,7 +67,7 @@ to encourage participants to stake and produce blocks, but *no more*.
 At the end of each blockchain :ref:`cycle <def_cycle_paris>`, the
 regular issuance is adjusted, to nudge the staked funds ratio towards a
 protocol-defined target (set at 50% in the Adaptive-Issuance/Staking proposal). Participation rewards
-and the LB subsidy are recomputed to match that budget. When the staked
+are recomputed to match that budget. When the staked
 funds ratio decreases and diverges from the target, emission rates
 increase, incentivizing participants to stake funds to re-approach the
 target. Conversely, incentives decrease as the ratio increases beyond
@@ -79,7 +77,7 @@ Adaptive issuance rate
 ----------------------
 
 The :ref:`adaptive issuance rate <adaptive_rate_paris>` determines, at the end
-of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 5}`. The
+of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 3}`. The
 adaptive issuance rate is the sum of a :ref:`static rate <static_rate_paris>`
 and a :ref:`dynamic rate <dynamic_rate_paris>`. The final result is clipped to
 ensure nominal emissions remain within :math:`\IL{[\minR,\ \maxR]}` (set
@@ -179,26 +177,26 @@ the adaptive issuance rate is kept within :math:`\IL{[\minR,\ \maxR]}`
 bounds.
 
 Finally, as mentioned before, the nominal adaptive issuance rate [1]_
-for a cycle :math:`\IL{c + 5}` is defined as the sum of the static rate
+for a cycle :math:`\IL{c + 3}` is defined as the sum of the static rate
 and the dynamic rate, clipped to stay within 0.05% – 5% range.
 
 .. _adaptive_rate_paris:
 
 \ **ADAPTIVE ISSUANCE RATE**\     Let :math:`\F{f}{c}` be the staked
 funds ratio at the end of cycle :math:`\IL{c}`, the **adaptive issuance
-rate** for cycle :math:`\IL{c+5}` is defined as:
+rate** for cycle :math:`\IL{c+3}` is defined as:
 
 .. math::
 
-  \adr{c + 5} = \clip{\dyn{c} + \static{\F{f}{c}}}{\minR}{\maxR}
+  \adr{c + 3} = \clip{\dyn{c} + \static{\F{f}{c}}}{\minR}{\maxR}
 
 .. _adaptive_rewards_paris:
 
 Adaptive rewards
 ----------------
 
-Before adaptive issuance activation, participation rewards and
-the LB subsidy are fixed values defined by protocol constants. With the
+Before adaptive issuance activation, participation rewards
+are fixed values defined by protocol constants. With the
 proposed mechanism, the :ref:`adaptive issuance rate <adaptive_rate_paris>`
 provides instead a budget for the whole cycle, which gets allocated
 equally to each block of the cycle and distributed between the various
@@ -206,30 +204,29 @@ rewards, in proportion to their relative :ref:`weights <reward_weights_paris>`.
 
 \ **ADAPTIVE ISSUANCE PER BLOCK**\     Let :math:`\supply{c}` be the
 total supply at the end of cycle :math:`\IL{c}`, the **maximal issuance per
-block** for cycle :math:`\IL{c+5}` is defined as:
+block** for cycle :math:`\IL{c+3}` is defined as:
 
 .. math::
 
-  \isb{c + 5} = \frac{\adr{c + 5}}{2102400} \tmult \supply{c}
+  \isb{c + 3} = \frac{\adr{c + 3}}{3153600} \tmult \supply{c}
 
-Where 2102400 =
-:math:`\IL{\frac{365 \tmult 24 \tmult 60 \tmult 60}{15}}` is the maximal
-number of blocks produced in a year, given a minimal block time of 15
+Where 3153600 =
+:math:`\IL{\frac{365 \tmult 24 \tmult 60 \tmult 60}{10}}` is the maximal
+number of blocks produced in a year, given a minimal block time of 10
 seconds.
 
 .. _reward_weights_paris:
 
 \ **REWARD WEIGHTS**\     The Adaptive-Issuance/Staking proposal defines the weights for
-participation rewards and the LB subsidy as:
+participation rewards as:
 
 -  Attestation (formerly, endorsing) rewards : 10,240.
 -  Fixed baking reward: 5,120.
 -  Bonus baking reward: 5,120.
--  LB subsidy: 1,280.
 -  Nonce revelation tip: 1.
 -  VDF tip: 1.
 
-The total sum of all weights is :math:`\tw` = 21762. The total issuance
+The total sum of all weights is :math:`\tw` = 20482. The total issuance
 per block, :math:`\IL{\isb{c}}`, is distributed amongst the different
 rewards in proportion to their weight.
 
@@ -272,30 +269,18 @@ being subject to the existing participation conditions.
 
 **Nonce and VDF revelation tips.** The rewards allocated to delegates
 for contributing to :ref:`random seed generation <randomness_generation_paris>`
-(that is for, revealing nonce seeds and posting VDF proofs) are not paid
+(that is, for revealing nonce seeds and posting VDF proofs) are not paid
 each block, but rather every 192 blocks. The adjusted formulas result:
 
 .. math::
 
   \tip{\vdf}{c} = \tip{nr}{c} = 192 \tmult \frac{1}{\tw} \tmult \isb{c}
 
-**Liquidity baking subsidy.** The :doc:`LB
-subsidy <liquidity_baking>` per block is determined by the following formula:
-
-.. math::
-
-  \lbs{c} = \frac{1280}{\tw} \tmult \isb{c}
-
-Note that while the subsidy is issued **only if** the feature is on, its
-weight is always counted in the computation of :math:`\IL{\tw}`. In
-other words, the budget for the LB subsidy is always allocated,
-regardless of whether it is issued or not.
-
 The Adaptive-Issuance/Staking proposal implements a new `RPC
-endpoint <https://tezos.gitlab.io/alpha/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
+endpoint <https://tezos.gitlab.io/paris/rpc.html#get-block-id-context-issuance-expected-issuance>`__,
 ``/issuance/expected_issuance``, which reports the precomputed values of
-all participation rewards and the LB subsidy, for the cycle
-corresponding to the queried block level, and the next 4 cycles.
+all participation rewards, for the cycle
+corresponding to the queried block level, and the next 3 cycles.
 
 .. _new_staking_paris:
 
@@ -309,7 +294,7 @@ complementary to the existing :ref:`delegate <def_delegate_paris>`
 (also known as *baker*) and *delegator* roles. A staker must also be a
 *delegator* – that is, they must first choose a delegate.
 
-When stakers **stake**\ funds towards a delegate’s **staking**
+When stakers **stake** funds towards a delegate’s **staking**
 **balance**, the associated **baking** and **voting powers** accrue to
 that delegate. Similarly to how delegated funds work, staked funds
 remain within the staker’s account at all times.
@@ -329,7 +314,7 @@ withdrawal delays – colloquially, they are "frozen".
 Stakers are slashed proportionally to their contribution to the
 delegate’s staking balance. To simplify slashing, double-baking
 penalties are now proportional to staked funds: instead of the previous
-fixed sum of 640 tez they are now set to 10% of the delegate’s stake.
+fixed sum of 640 tez they are now set to 5% of the delegate’s stake.
 Moreover, denunciation rewards (both for double-baking and
 double-attestations) are reduced from one half to one seventh of the
 slashed funds. The chosen value prevents adversarial delegates from
@@ -340,10 +325,10 @@ stakers.
 policy <staking_policy_configuration_paris>` by setting staking parameters
 which regulate whether they accept stakers (the default being to reject
 them), and if so, up to which fraction of their total staking balance.
-They can also configure which proportion of the staking rewards is set
-to accrue to their own staked balance versus their unfrozen, spendable
-balance. As :ref:`participation rewards <adaptive_rewards_paris>` are paid to
-the staked balance, and automatically shared between delegates and their
+They can also configure which proportion of the staking rewards from other stakers is set
+to accrue to their own staked balance instead.
+As :ref:`participation rewards <adaptive_rewards_paris>` are
+automatically shared between delegates and their
 stakers, delegates can use this parameter to collect an *edge* from the
 rewards attributable to their stakers.
 
@@ -351,7 +336,7 @@ If and when the Adaptive-Issuance/Staking proposal activates, freezing and unfre
 will be controlled directly by delegates and stakers, and will no longer
 be automatic. This entails that staked funds are frozen until manually
 unfrozen by stakers. This is a two step process which spans for at least
-7 cycles (cf. :ref:`Staked funds management <staked_funds_management_paris>`).
+4 cycles (cf. :ref:`Staked funds management <staked_funds_management_paris>`).
 
 A new user interface is provided for delegates and stakers to interact
 with the mechanism. It is based on four *pseudo-operations*: ``stake``,
@@ -379,8 +364,8 @@ parameters:
 
 -  ``edge_of_baking_over_staking``: a ratio between 0 and 1, whose
    default value is 1. This parameter determines the fraction of the
-   rewards that accrue to the delegate’s liquid spendable balance – the
-   remainder accrues to frozen stakes.
+   rewards that accrue to the delegate's frozen deposit – the
+   remainder is shared among its stakers.
 -  ``limit_of_staking_over_baking``: a non-negative number, denoting the
    maximum portion of external stake by stakers over the delegate’s own
    staked funds. It defaults to 0 – which entails that delegates do not
@@ -404,7 +389,7 @@ or more conveniently::
 
 **On overstaking and overdelegation.** Note that if a delegate’s
 ``limit_of_staking_over_baking`` is exceeded (that is, the delegate is
-*overstaked*), the exceeding stake is automatically considered a
+*overstaked*), the exceeding stake is automatically considered as
 *delegation* for the delegate’s baking and voting power calculation, but
 it does remain slashable. The new mechanism does not alter
 *overdelegation* (delegated funds beyond 9 times the delegate’s own
@@ -453,7 +438,7 @@ or more conveniently::
    octez-client unstake <amount|"everything"> for <staker>
 
 The requested amount will be **unstaked** but will remain **frozen**.
-After 7 cycles, unstaked frozen tokens are no longer considered at stake
+After 4 cycles, unstaked frozen tokens are no longer considered at stake
 nor slashable. They are said then to be both **unstaked** and
 **finalizable**.
 
@@ -468,10 +453,10 @@ or more conveniently::
 
    octez-client finalize unstake for <staker>
 
- In some circumstances, unstake and finalize can be done implicitly: any call
- to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending
- unstake requests. Also, as we will see next, change of delegate triggers an
- unstake operation.
+In some circumstances, unstake and finalize can be done implicitly: any call
+to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending
+unstake requests. Also, as we will see next, change of delegate triggers an
+unstake operation.
 
 Change of delegate
 ------------------
@@ -499,7 +484,7 @@ In particular, the following changes will require additional approval
 from delegates via separate feature activation vote mechanism:
 
 -  Adaptive issuance – including notably the changes to the computation
-   of consensus rewards and the LB subsidy.
+   of consensus rewards.
 -  Ability for *delegators* to become *stakers* – until feature
    activation delegates continue to be the only participants who can
    **stake** funds.
@@ -516,10 +501,10 @@ activation:
    derived from the frozen deposits at the end of the last cycle of
    Nairobi.
 -  The changes in slashing penalties (double-baking penalties are set to
-   10% of the staked funds) and denunciation rewards (they amount to one
+   5% of the staked funds) and denunciation rewards (they amount to one
    seventh of slashed funds).
 -  Changes to protocol constants. Note that this entails calculating
-   participation rewards and the LB subsidy using the weight-based
+   participation rewards using the weight-based
    formulas, but these are defined so that they match the previous
    values when :ref:`Adaptive Issuance <adaptive_issuance_paris>` is not active.
 
@@ -541,7 +526,7 @@ mechanism:
    subsequent *Adoption* phase.
 -  The *Voting* phase is driven by an Exponential moving average (EMA)
    whose *half-life* is 2 weeks. That is, it takes two weeks for the EMA
-   to raise from 0% to 50% assuming only **On**\ votes are cast.
+   to raise from 0% to 50% assuming only **On** votes are cast.
 -  The target threshold is a supermajority of 80% of **On** votes over
    **On plus Off** votes.
 -  There is no time limit or fixed duration for the Voting phase. It
@@ -552,7 +537,7 @@ mechanism:
 -  If the threshold is met, the Voting phase will complete at the end of
    the current cycle, and the Adoption phase will start at the beginning
    of the following cycle.
--  The Adoption phase lasts 7 cycles. The beginning of the cycle
+-  The Adoption phase lasts 5 cycles. The beginning of the cycle
    following the end of the Adoption phase activates the guarded
    features.
 -  There is **no automatic deactivation** of the guarded features once
@@ -560,7 +545,7 @@ mechanism:
    counted towards an updated EMA, but without any further effect.
 
 **NB** In the implementation in the Adaptive-Issuance/Staking proposal, the issuance rate
-is computed 5 cycles in advance. Thus, in the first 5 cycles where is
+is computed 3 cycles in advance. Thus, in the first 3 cycles where is
 active, the protocol does not use the :ref:`adaptive reward
 formula <adaptive_rewards_paris>` and keeps using the current reward
 values.

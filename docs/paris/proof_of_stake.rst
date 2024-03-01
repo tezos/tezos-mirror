@@ -64,7 +64,7 @@ transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant
 like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
 manager and consensus keys are listed.
 
-On test-network only, if the :ref:`adaptive issuance <adaptive_issuance_oxford>`
+On test-network only, if the :ref:`adaptive issuance <adaptive_issuance_paris>`
 feature is activated, it grants delegators the ability to become
 'stakers' by placing security deposits. These deposits would contribute to their
 delegate's stake and could be subject to slashing penalties if their delegate
@@ -172,7 +172,7 @@ Proof-of-stake parameters
    * - ``BLOCKS_PER_CYCLE``
      - 24576 blocks
    * - ``CONSENSUS_RIGHTS_DELAY``
-     - 5 cycles
+     - 2 cycles
    * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
    * - ``MINIMAL_FROZEN_STAKE``
@@ -189,7 +189,7 @@ found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
 
 
-The adaptive issuance experimental feature :ref:`documentation <adaptive_issuance_oxford>`.
+The adaptive issuance experimental feature :ref:`documentation <adaptive_issuance_paris>`.
 
 Other presentations of the Tezos' proof-of-stake mechanism can be
 found in the
