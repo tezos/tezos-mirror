@@ -82,34 +82,41 @@ let spawn_command dal_node =
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) dal_node =
-  spawn_command dal_node
-  @@ List.filter_map
-       Fun.id
-       [
-         Some "config";
-         Some "init";
-         Some "--data-dir";
-         Some (data_dir dal_node);
-         Some "--rpc-addr";
-         Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
-         Some "--net-addr";
-         Some (listen_addr dal_node);
-         Some "--public-addr";
-         Some (public_addr dal_node);
-         Some "--metrics-addr";
-         Some (metrics_addr dal_node);
-         Some "--expected-pow";
-         Some (string_of_float expected_pow);
-         Some "--peers";
-         Some (String.concat "," peers);
-         Some "--attester-profiles";
-         Some (String.concat "," attester_profiles);
-         Some "--producer-profiles";
-         Some (String.concat "," (List.map string_of_int producer_profiles));
-         Some "--observer-profiles";
-         Some (String.concat "," (List.map string_of_int observer_profiles));
-         (if bootstrap_profile then Some "--bootstrap-profile" else None);
-       ]
+  spawn_command dal_node @@ List.filter_map Fun.id
+  @@ [
+       Some "config";
+       Some "init";
+       Some "--data-dir";
+       Some (data_dir dal_node);
+       Some "--rpc-addr";
+       Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
+       Some "--net-addr";
+       Some (listen_addr dal_node);
+       Some "--public-addr";
+       Some (public_addr dal_node);
+       Some "--metrics-addr";
+       Some (metrics_addr dal_node);
+       Some "--expected-pow";
+       Some (string_of_float expected_pow);
+       Some "--peers";
+       Some (String.concat "," peers);
+     ]
+  @ (if attester_profiles = [] then [None]
+    else
+      [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
+  @ (if observer_profiles = [] then [None]
+    else
+      [
+        Some "--observer-profiles";
+        Some (String.concat "," (List.map string_of_int observer_profiles));
+      ])
+  @ (if producer_profiles = [] then [None]
+    else
+      [
+        Some "--producer-profiles";
+        Some (String.concat "," (List.map string_of_int producer_profiles));
+      ])
+  @ if bootstrap_profile then [Some "--bootstrap-profile"] else [None]
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node

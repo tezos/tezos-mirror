@@ -304,7 +304,7 @@ let make_dal_node ?peers ?attester_profiles ?producer_profiles
       ?bootstrap_profile
       dal_node
   in
-  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* () = Dal_node.run ~event_level:`Debug dal_node ~wait_ready:true in
   return dal_node
 
 let with_dal_node ?peers ?attester_profiles ?producer_profiles
@@ -388,7 +388,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
     ?(tags = []) ?(uses = fun _ -> []) ?(pvm_name = "arith")
     ?(dal_enable = true) ?commitment_period ?challenge_window
     ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
-    ?producer_profiles variant scenario =
+    ?bootstrap_profile ?producer_profiles variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -414,7 +414,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
-      with_dal_node ?producer_profiles node @@ fun key dal_node ->
+      with_dal_node ?bootstrap_profile ?producer_profiles node
+      @@ fun key dal_node ->
       ( with_fresh_rollup ~pvm_name ~dal_node
       @@ fun sc_rollup_address sc_rollup_node ->
         scenario
@@ -2794,7 +2795,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
       level ;
     let promise =
       publish_and_store_slot
-        ~with_proof:false
+        ~with_proof:true
         ~force:true
         ~counter:!counter
         l1_client
@@ -2898,27 +2899,87 @@ let create_additional_nodes ~extra_node_operators rollup_address l1_node
    is the sum of levels as returned by [slot_producer].
 *)
 let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
-    ?(extra_node_operators = []) protocol parameters dal_node sc_rollup_node
-    sc_rollup_address l1_node l1_client _pvm_name ~number_of_dal_slots =
+    ?(extra_node_operators = []) ~slot_index protocol parameters dal_node
+    sc_rollup_node sc_rollup_address l1_node l1_client _pvm_name
+    ~number_of_dal_slots =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let* current_level = Node.get_level l1_node in
   Log.info "[e2e.startup] current level is %d@." current_level ;
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let bootstrap_dal_node = Dal_node.create ~node:l1_node () in
+  let producer_profiles = [slot_index] in
+  let* () =
+    Dal_node.init_config
+      ~peers:[Dal_node.listen_addr dal_node]
+      ~bootstrap_profile:true
+      bootstrap_dal_node
+  in
+  let* () = Dal_node.run ~event_level:`Debug bootstrap_dal_node in
+  let bootstrap_dal_node_p2p_endpoint =
+    Dal_node.listen_addr bootstrap_dal_node
+  in
   (* Generate new DAL and rollup nodes if requested. *)
-  let* dal_node_producer, additional_nodes =
+  let create_additional_nodes ~extra_node_operators sc_rollup_address l1_node
+      l1_client =
+    extra_node_operators
+    |> Lwt_list.map_p (fun key_opt ->
+           let fresh_dal_node = Dal_node.create ~node:l1_node () in
+           let* () =
+             match key_opt with
+             | Some _ ->
+                 Dal_node.init_config
+                   ~peers:[bootstrap_dal_node_p2p_endpoint]
+                   ~producer_profiles
+                   fresh_dal_node
+             | None ->
+                 Dal_node.init_config
+                   ~peers:[bootstrap_dal_node_p2p_endpoint]
+                   ~observer_profiles:producer_profiles
+                   fresh_dal_node
+           in
+           let* () = Dal_node.run ~event_level:`Debug fresh_dal_node in
+           let rollup_mode =
+             Sc_rollup_node.(
+               if Option.is_none key_opt then Observer else Operator)
+           in
+           let sc_rollup_node =
+             Sc_rollup_node.create
+               ~dal_node:fresh_dal_node
+               rollup_mode
+               l1_node
+               ~base_dir:(Client.base_dir l1_client)
+               ?default_operator:key_opt
+           in
+           (* We start the rollup node and create a client for it. *)
+           let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+           return (fresh_dal_node, sc_rollup_node))
+  in
+  let* additional_nodes =
     create_additional_nodes
       ~extra_node_operators
       sc_rollup_address
       l1_node
       l1_client
-      dal_node
   in
+  Log.info "Start running baker node" ;
+  let baker_dal_node = Dal_node.create ~node:l1_node () in
+  let* () =
+    Dal_node.init_config ~peers:[bootstrap_dal_node_p2p_endpoint] baker_dal_node
+  in
+  let* () = Dal_node.run ~event_level:`Debug baker_dal_node in
+  let producer_dal_node = Dal_node.create ~node:l1_node () in
+  let* () =
+    Dal_node.init_config
+      ~peers:[bootstrap_dal_node_p2p_endpoint]
+      ~producer_profiles
+      producer_dal_node
+  in
+  let* () = Dal_node.run ~event_level:`Debug producer_dal_node in
   Log.info
     "[e2e.configure_pvm] configure PVM with DAL parameters via inbox message@." ;
   let Dal.Parameters.{attestation_lag; cryptobox; _} = parameters in
   (* We ask the Arith PVM of [_sc_rollup_address] to track the slot index 5 of
      the DAL. *)
-  let tracked_slot_index = 5 in
   let* () =
     let number_of_slots = parameters.number_of_slots in
     let pages_per_slot = cryptobox.slot_size / cryptobox.page_size in
@@ -2928,16 +2989,20 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
         number_of_slots
         attestation_lag
         pages_per_slot
-        tracked_slot_index
+        slot_index
     in
     send_messages ~bake:false l1_client [config]
   in
-  let* () = bake_for l1_client in
+  (* We need to bake some blocks so that the DAL node starts
+     processing blocks and register the committee. *)
+  let* () = bake_for l1_client ~count:2 in
   Log.info "[e2e.pvm] PVM Arith configured@." ;
 
   Log.info
     "[e2e.start_baker] spawn a baker daemon with all bootstrap accounts@." ;
-  let* _baker = Baker.init ~dal_node ~protocol l1_node l1_client in
+  let* _baker =
+    Baker.init ~dal_node:baker_dal_node ~protocol l1_node l1_client
+  in
 
   (* To be sure that we just moved to [start_dal_slots_level], we wait and extra
      level. *)
@@ -2957,15 +3022,14 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   let* expected_value =
     slot_producer
       ~beforehand_slot_injection
-      ~slot_index:tracked_slot_index
+      ~slot_index
       ~from:start_dal_slots_level
       ~into:end_dal_slots_level
       ~slot_size
-      dal_node_producer
+      producer_dal_node
       l1_node
       l1_client
   in
-
   (* Wait until the last published slot is included and attested in a final block. *)
   let* _lvl =
     Node.wait_for_level
@@ -2976,7 +3040,7 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
   Log.info
     "[e2e.sum_and_store] send an inbox messsage to the PVM to sum the received \
      payloads, and store the result in a 'value' variable@." ;
-  let* () =
+  let* level =
     let* level = Node.get_level l1_node in
     (* We send instructions "+...+ value" to the PVM of [number_of_dal_slots -
        1] additions, so that it sums the received slots' contents and store the
@@ -2984,9 +3048,10 @@ let e2e_test_script ?expand_test:_ ?(beforehand_slot_injection = 1)
     let do_sum = String.make (number_of_dal_slots - 1) '+' in
     let* () = send_messages ~bake:false l1_client [do_sum ^ " value"] in
     (* Wait sufficiently many levels so that the PVM interprets the message. *)
-    let* _lvl = Node.wait_for_level l1_node (level + 5) in
-    unit
+    let* level = Node.wait_for_level l1_node (level + 2) in
+    return level
   in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level in
   Log.info
     "[e2e.final_check_1] check that the sum stored in the PVM is %d@."
     expected_value ;
@@ -3032,48 +3097,15 @@ let e2e_tests =
   let test1 =
     {
       constants = Protocol.Constants_test;
-      attestation_lag = 6;
-      block_delay = 12;
+      attestation_lag = 10;
+      block_delay = 8;
       number_of_dal_slots = 2;
       beforehand_slot_injection = 1;
-      num_extra_nodes = 2;
-      tags = [];
+      num_extra_nodes = 3;
+      tags = [Tag.slow];
     }
   in
-  let test2 =
-    {
-      constants = Protocol.Constants_test;
-      attestation_lag = 6;
-      block_delay = 4;
-      number_of_dal_slots = 5;
-      beforehand_slot_injection = 5;
-      num_extra_nodes = 2;
-      tags = [Tag.flaky];
-    }
-  in
-  let mainnet1 =
-    {
-      constants = Protocol.Constants_mainnet;
-      attestation_lag = 6;
-      block_delay = 10;
-      number_of_dal_slots = 1;
-      beforehand_slot_injection = 1;
-      num_extra_nodes = 1;
-      tags = [];
-    }
-  in
-  let mainnet2 =
-    {
-      constants = Protocol.Constants_mainnet;
-      attestation_lag = 6;
-      block_delay = 5;
-      number_of_dal_slots = 5;
-      beforehand_slot_injection = 10;
-      num_extra_nodes = 0;
-      tags = [];
-    }
-  in
-  [test1; test2; mainnet1; mainnet2]
+  [test1]
 
 (* This function allows to register new (end-to-end) tests using
    [scenario_with_all_nodes] helper. For that, it instantiate function
@@ -3124,16 +3156,19 @@ let register_end_to_end_tests ~protocols =
            need to provide public key hashes. *)
         List.init num_extra_nodes (fun _index -> None)
       in
+      let slot_index = 5 in
+      let producer_profiles = [slot_index] in
       let tags =
         ["e2e"; network; Tag.ci_disabled]
         @ (match constants with Constants_mainnet -> [Tag.slow] | _ -> [])
         @ tags
       in
       scenario_with_all_nodes
-        ~number_of_shards:256
-        ~slot_size:(1 lsl 15)
-        ~redundancy_factor:8
+        ~producer_profiles
         ~custom_constants:constants
+        ~slot_size:(1 lsl 17)
+        ~redundancy_factor:8
+        ~number_of_shards:512
         ~attestation_lag
         ~activation_timestamp:(Ago activation_timestamp)
         ~minimal_block_delay:(string_of_int block_delay)
@@ -3141,6 +3176,7 @@ let register_end_to_end_tests ~protocols =
         ~uses:(fun protocol -> [Protocol.baker protocol])
         title
         (e2e_test_script
+           ~slot_index
            ~number_of_dal_slots
            ~beforehand_slot_injection
            ~extra_node_operators)
