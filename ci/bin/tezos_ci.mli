@@ -222,7 +222,9 @@ val job :
 
     Raises [Failure] if [.gitlab/ci/jobs/DIRECTORY] is not an existing
     directory. Also [Failure] if destination path has already been
-    used to write another job. *)
+    used to write another job.
+
+    The returned job is the same as the input, for ease of chaining. *)
 val job_external :
   ?directory:string -> ?filename_suffix:string -> tezos_job -> tezos_job
 
