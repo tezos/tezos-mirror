@@ -139,6 +139,4 @@ let tests =
        ("Test init", init_scenario () --> Action (fun _ -> return_unit));
      ]
 
-let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("protocol scenario base", tests)]
-  |> Lwt_main.run
+let () = register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "base"] tests

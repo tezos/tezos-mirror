@@ -448,5 +448,4 @@ let tests =
      ]
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("protocol slashing", tests)]
-  |> Lwt_main.run
+  register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "slashing"] tests

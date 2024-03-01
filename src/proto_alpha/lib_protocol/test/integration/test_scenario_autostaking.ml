@@ -186,5 +186,4 @@ let tests =
     ]
 
 let () =
-  Alcotest_lwt.run ~__FILE__ Protocol.name [("protocol autostaking", tests)]
-  |> Lwt_main.run
+  register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "autostaking"] tests
