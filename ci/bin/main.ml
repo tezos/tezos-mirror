@@ -243,7 +243,7 @@ let job_dummy : job =
    necessary and the decision to do so belongs to the developer
 
    §2: We also perform some fast sanity checks. *)
-let trigger =
+let job_trigger =
   job
     ~__POS__
     ~image:Images.alpine
@@ -340,7 +340,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false)
        pipelines. So when requested through [needs_trigger] we start
        this job as early as possible, without waiting for
        sanity_ci. *)
-    if needs_trigger then Dependent [Optional trigger] else Staged []
+    if needs_trigger then Dependent [Optional job_trigger] else Staged []
   in
   job
     ?rules
@@ -413,7 +413,7 @@ let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
 let _job_docker_rust_toolchain_before_merging =
   job_docker_rust_toolchain
     ~__POS__
-    ~dependencies:(Dependent [Optional trigger])
+    ~dependencies:(Dependent [Optional job_trigger])
     ~rules:
       [
         job_rule ~changes:changeset_octez_or_kernels ~when_:On_success ();
