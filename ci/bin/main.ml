@@ -37,7 +37,7 @@ module Stages = struct
 
   let _packaging = Stage.register "packaging"
 
-  let _doc = Stage.register "doc"
+  let doc = Stage.register "doc"
 
   let prepare_release = Stage.register "prepare_release"
 
@@ -243,6 +243,21 @@ let changeset_octez =
 let changeset_octez_or_kernels =
   ["images/**/*"; "scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"]
   @ changeset_octez
+
+let changeset_octez_docs =
+  [
+    "scripts/**/*/";
+    "script-inputs/**/*/";
+    "src/**/*";
+    "tezt/**/*";
+    "vendors/**/*";
+    "dune";
+    "dune-project";
+    "dune-workspace";
+    "docs/**/*";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
 
 (* Dummy job.
 
@@ -1058,6 +1073,29 @@ let () =
            ]
          |> enable_coverage_location |> enable_coverage_report
          |> job_external ~directory:"coverage" ~filename_suffix:"default"
+       in
+       let _job_publish_documentation : tezos_job =
+         job
+           ~__POS__
+           ~name:"publish:documentation"
+           ~image:Images.runtime_build_test_dependencies
+           ~stage:Stages.doc
+           ~dependencies:(Dependent [])
+           ~before_script:
+             (before_script
+                ~eval_opam:true
+                  (* Load the environment poetry previously created in the docker image.
+                     Give access to the Python dependencies/executables. *)
+                ~init_python_venv:true
+                [
+                  {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
+                  {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
+                  {|chmod 400 ~/.ssh/id_ed25519|};
+                ])
+           ~interruptible:false
+           ~rules:[job_rule ~changes:changeset_octez_docs ~when_:On_success ()]
+           ["./scripts/ci/doc_publish.sh"]
+         |> job_external
        in
        (* The empty list is a placeholder until the full pipeline is generated *)
        []) ;
