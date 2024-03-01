@@ -18,8 +18,8 @@ use std::time::Duration;
 
 use crate::config::Config;
 
-const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(200);
-const DEFAULT_CONFIRMATIONS: usize = 1;
+const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const DEFAULT_CONFIRMATIONS: usize = 0;
 
 /// Client for etherlink RPCs
 #[derive(Debug)]
@@ -82,7 +82,7 @@ impl Client {
         Ok(())
     }
 
-    async fn transfer_xtz(
+    pub async fn transfer_xtz(
         &self,
         from_wallet: &LocalWallet,
         to: H160,

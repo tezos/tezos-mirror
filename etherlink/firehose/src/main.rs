@@ -53,12 +53,8 @@ enum Commands {
         kind: TransferKind,
     },
     Flood {
-        #[arg(default_value = "wei")]
-        kind: TransferKind,
-        #[arg(long, default_value = "1")]
-        fund_amount: String,
         #[arg(long)]
-        tps: usize,
+        workers: usize,
     },
 }
 
@@ -111,24 +107,16 @@ async fn main() -> Result<()> {
             let client = Client::new(&config).await?;
             client.controller_xtz_transfer(to, amount).await?;
         }
-        Commands::Flood {
-            kind,
-            fund_amount,
-            tps,
-        } => {
-            let fund_amount = parse_units(fund_amount, kind)?.into();
-            let required_workers = 2 * tps;
-
+        Commands::Flood { workers } => {
             let mut config = Config::load(&config_path).await?;
-            config.generate_workers(required_workers);
+            config.generate_workers(workers);
             config.save(&config_path).await?;
 
             let client = Client::new(&config).await?;
+            let setup = Setup::new(&config, &client, workers)?;
 
-            let setup = Setup::new(&config, &client, required_workers)?;
-
-            setup.fund_workers_xtz(fund_amount).await?;
-            //    scenario::fund_workers(&config, &client, required_workers).await?;
+            setup.fund_workers_xtz(ONE_XTZ_IN_WEI.into()).await?;
+            setup.xtz_transfers().await?;
         }
     };
 
