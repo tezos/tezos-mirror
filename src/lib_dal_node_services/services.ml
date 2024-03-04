@@ -470,7 +470,9 @@ module P2P = struct
            present. With `{acl: open}`: removes the peer from the blacklist \
            and whitelist. With `{acl: trust}`: trust the given peer \
            permanently and remove it from the blacklist if present. The peer \
-           cannot be blocked (but its host IP still can)."
+           cannot be blocked (but its host IP still can). In all cases, the \
+           updated information for the peer is returned. If input is omitted, \
+           this is equivalent to using the `GET` version of this RPC."
         ~query:Tezos_rpc.Query.empty
         ~input:
           Data_encoding.(
