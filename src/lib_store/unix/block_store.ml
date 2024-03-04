@@ -893,7 +893,7 @@ let default_cycle_size_limit = 65_535l
    of a cycle never exceeds the camlzip 32bits limitation. The shrink
    consist in dividing the cycles in two even parts, recursively,
    until the limit is not exceeded anymore. *)
-let may_shrink_cycles cycles =
+let may_shrink_cycles cycles ~cycle_size_limit =
   let rec loop acc cycles =
     match cycles with
     | [] -> List.rev acc
@@ -922,7 +922,7 @@ let may_shrink_cycles cycles =
    savepoint and caboose candidates. *)
 let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     ~new_store ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
-    ~cementing_highwatermark =
+    ~cementing_highwatermark ~cycle_size_limit =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_updating_floating_stores) () in
   let* lpbl_block =
@@ -1064,7 +1064,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
 
   let* cycles_to_cement =
     let* cycles = loop [] initial_pred sorted_lpbl in
-    return (may_shrink_cycles cycles)
+    return (may_shrink_cycles cycles ~cycle_size_limit)
   in
   let* new_savepoint =
     compute_new_savepoint
@@ -1238,7 +1238,7 @@ let instanciate_temporary_floating_store block_store =
 
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
-    ~cementing_highwatermark =
+    ~cementing_highwatermark ~cycle_size_limit =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_merging_thread) () in
   let*! new_ro_store =
@@ -1258,6 +1258,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
             ~new_head_lpbl
             ~lowest_bound_to_preserve_in_floating
             ~cementing_highwatermark
+            ~cycle_size_limit
         in
         let*! () =
           Store_events.(emit cementing_block_ranges) cycles_interval_to_cement
@@ -1379,9 +1380,9 @@ let split_context block_store new_head_lpbl =
       let*! () = Store_events.(emit start_context_split new_head_lpbl) in
       split ()
 
-let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
-    ~finalizer ~history_mode ~new_head ~new_head_metadata
-    ~cementing_highwatermark =
+let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
+    ~(on_error : tztrace -> unit tzresult Lwt.t) ~finalizer ~history_mode
+    ~new_head ~new_head_metadata ~cementing_highwatermark =
   let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
@@ -1441,6 +1442,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                         let* new_ro_store, new_savepoint, new_caboose =
                           create_merging_thread
                             block_store
+                            ~cycle_size_limit
                             ~history_mode
                             ~old_ro_store
                             ~old_rw_store

@@ -468,8 +468,9 @@ let test_merge_with_branches block_store =
   in
   assert_absence_in_block_store block_store (List.flatten blocks_to_gc)
 
-let perform_n_cycles_merge ?(cycle_length = 10) block_store history_mode
-    nb_cycles =
+let perform_n_cycles_merge ?(cycle_length = 10)
+    ?(cycle_size_limit = Block_store.default_cycle_size_limit) block_store
+    history_mode nb_cycles =
   let open Lwt_result_syntax in
   let*! cycles, head =
     make_n_initial_consecutive_cycles block_store ~cycle_length ~nb_cycles
@@ -486,6 +487,7 @@ let perform_n_cycles_merge ?(cycle_length = 10) block_store history_mode
   let* () =
     Block_store.merge_stores
       block_store
+      ~cycle_size_limit
       ~on_error:(fun err ->
         Assert.fail_msg "merging failed: %a" pp_print_trace err)
       ~finalizer:(fun _ -> return_unit)
@@ -695,7 +697,41 @@ let test_rolling_2_merge block_store =
   Assert.Int32.equal ~msg:"caboose" expected_savepoint (snd caboose) ;
   return_unit
 
-let wrap_test ?(keep_dir = false) (name, g) =
+let test_split_cycle_merge block_store =
+  let open Lwt_result_syntax in
+  let* cycles =
+    perform_n_cycles_merge
+      ~cycle_size_limit:3l
+      ~cycle_length:5
+      block_store
+      Archive
+      5
+  in
+  (* All blocks w/ metadata should be present *)
+  let* () =
+    assert_presence_in_block_store
+      ~with_metadata:true
+      block_store
+      (List.concat cycles)
+  in
+  let cemented_cycles =
+    Cemented_block_store.cemented_blocks_files
+      (Block_store.cemented_block_store block_store)
+    |> function
+    | Some a -> Array.to_list a
+    | None -> []
+  in
+  let () =
+    (* Ensure that cemented cycles are split as 2 or 3 block chunks *)
+    List.iter
+      (fun {Cemented_block_store.start_level; end_level; _} ->
+        let diff_nb = succ Int32.(sub end_level start_level |> to_int) in
+        assert (diff_nb >= 2 && diff_nb <= 3))
+      cemented_cycles
+  in
+  return_unit
+
+let wrap_test ?(keep_dir = true) (name, g) =
   let open Lwt_result_syntax in
   let f dir_path =
     let genesis_block =
@@ -759,6 +795,7 @@ let tests : string * unit Alcotest_lwt.test_case list =
         ("consecutive merge (Full + 2 cycles)", test_full_2_merge);
         ("consecutive merge (Rolling + 0 cycles)", test_rolling_0_merge);
         ("consecutive merge (Rolling + 2 cycles)", test_rolling_2_merge);
+        ("split cycle merge", test_split_cycle_merge);
       ]
   in
   ("block store", test_cases)
