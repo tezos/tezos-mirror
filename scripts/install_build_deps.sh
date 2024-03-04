@@ -94,8 +94,8 @@ export OPAMYES="${OPAMYES:=true}"
 
 # install_build_deps.sh calls install_build_deps.rust.sh which checks whether
 # Rust is installed with the right version and explains how to install it if
-# needed, so here we only make opam acknowledge that we have a rust compiler
-# we installed by our own.
+# needed, so here we only make opam acknowledge that we have a Rust compiler
+# we installed on our own.
 # If we use opam depext, it will probably not install the right version.
 OPAMASSUMEDEPEXTS=true opam install conf-rust conf-rust-2021
 
