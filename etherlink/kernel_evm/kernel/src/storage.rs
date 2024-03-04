@@ -31,7 +31,7 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 8;
+pub const STORAGE_VERSION: u64 = 9;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_version");
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
