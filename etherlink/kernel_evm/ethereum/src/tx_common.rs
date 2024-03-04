@@ -478,6 +478,10 @@ impl EthereumTransactionCommon {
     /// for an Ethereum transaction, ie, what address is associated
     /// with the signature of the message.
     // TODO <https://gitlab.com/tezos/tezos/-/milestones/115>
+    // DO NOT RENAME: function name is used during benchmark
+    // Never inlined when the kernel is compiled for benchmarks, to ensure the
+    // function is visible in the profiling results.
+    #[cfg_attr(feature = "benchmark", inline(never))]
     pub fn caller(&self) -> Result<H160, SigError> {
         let mes = self.message();
         let (sig, ri) = self.signature()?;

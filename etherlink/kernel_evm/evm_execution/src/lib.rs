@@ -134,6 +134,10 @@ pub enum EthereumError {
 ///
 /// If the gas limit is given as `None` (there is no gas limit), then there will be no
 /// accounting for gas usage at all. So the gas usage in the return value will be zero.
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 #[allow(clippy::too_many_arguments)]
 pub fn run_transaction<'a, Host>(
     host: &'a mut Host,

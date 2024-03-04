@@ -643,8 +643,9 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
 
     /// Execute a SputnikVM run with this handler
     ///
-    /// Never inlined when the kernel is compiled for benchmarks, to ensure the
-    /// function is visible in the profiling results.
+    // DO NOT RENAME: function name is used during benchmark
+    // Never inlined when the kernel is compiled for benchmarks, to ensure the
+    // function is visible in the profiling results.
     #[cfg_attr(feature = "benchmark", inline(never))]
     fn execute(
         &mut self,
