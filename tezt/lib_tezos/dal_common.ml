@@ -148,7 +148,10 @@ module Dal_RPC = struct
 
   type commitment = string
 
-  type operator_profile = Attester of string | Producer of int
+  type operator_profile =
+    | Attester of string
+    | Producer of int
+    | Observer of int
 
   type operator_profiles = operator_profile list
 
@@ -252,12 +255,19 @@ module Dal_RPC = struct
             ("kind", `String "producer");
             ("slot_index", `Float (float_of_int slot_index));
           ]
+    | Observer slot_index ->
+        `O
+          [
+            ("kind", `String "observer");
+            ("slot_index", `Float (float_of_int slot_index));
+          ]
 
   let operator_profile_of_json json =
     let open JSON in
     match json |-> "kind" |> as_string with
     | "attester" -> Attester (json |-> "public_key_hash" |> as_string)
     | "producer" -> Producer (json |-> "slot_index" |> as_int)
+    | "observer" -> Observer (json |-> "slot_index" |> as_int)
     | _ -> failwith "invalid case"
 
   let profiles_of_json json =
@@ -569,11 +579,14 @@ module Check = struct
     let pp_operator_profile ppf = function
       | Attester pkh -> Format.fprintf ppf "Attester %s" pkh
       | Producer slot_index -> Format.fprintf ppf "Producer %d" slot_index
+      | Observer slot_index -> Format.fprintf ppf "Observer %d" slot_index
     in
     let equal_operator_profile op1 op2 =
       match (op1, op2) with
       | Attester pkh1, Attester pkh2 -> String.equal pkh1 pkh2
       | Producer slot_index1, Producer slot_index2 ->
+          Int.equal slot_index1 slot_index2
+      | Observer slot_index1, Observer slot_index2 ->
           Int.equal slot_index1 slot_index2
       | _, _ -> false
     in
