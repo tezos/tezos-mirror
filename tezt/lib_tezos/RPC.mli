@@ -230,12 +230,6 @@ val get_network_point_trust : string -> JSON.t t
 (** RPC: [GET /network/stat] *)
 val get_network_stat : JSON.t t
 
-(** RPC: [GET /network/version] *)
-val get_network_version : JSON.t t
-
-(** RPC: [GET /network/versions] *)
-val get_network_versions : JSON.t t
-
 (** RPC: [PUT /network/points/<point>] *)
 val put_network_points : string -> JSON.t t
 

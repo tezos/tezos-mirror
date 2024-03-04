@@ -242,10 +242,6 @@ let get_network_point_trust point_id =
 
 let get_network_stat = make GET ["network"; "stat"] Fun.id
 
-let get_network_version = make GET ["network"; "version"] Fun.id
-
-let get_network_versions = make GET ["network"; "versions"] Fun.id
-
 let put_network_points point =
   make PUT ["network"; "points"; point] ~data:(Data (`O [])) Fun.id
 

@@ -63,23 +63,6 @@ module S = struct
       ~output:P2p_peer.Id.encoding
       Tezos_rpc.Path.(root / "network" / "self")
 
-  (* DEPRECATED: use [version] from "lib_shell_services/version_services"
-     instead. *)
-  let version =
-    Tezos_rpc.Service.get_service
-      ~description:"DEPRECATED: use `version` instead."
-      ~query:Tezos_rpc.Query.empty
-      ~output:Network_version.encoding
-      Tezos_rpc.Path.(root / "network" / "version")
-
-  (* DEPRECATED: use [version] instead. *)
-  let versions =
-    Tezos_rpc.Service.get_service
-      ~description:"DEPRECATED: use `version` instead."
-      ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.list Network_version.encoding)
-      Tezos_rpc.Path.(root / "network" / "versions")
-
   let stat =
     Tezos_rpc.Service.get_service
       ~description:"Global network bandwidth statistics in B/s."
@@ -108,12 +91,6 @@ open Tezos_rpc.Context
 let self ctxt = make_call S.self ctxt () () ()
 
 let stat ctxt = make_call S.stat ctxt () () ()
-
-let version ctxt = make_call S.version ctxt () () ()
-
-let versions ctxt = make_call S.versions ctxt () () ()
-
-(* DEPRECATED: use [version] instead. *)
 
 let events ctxt = make_streamed_call S.events ctxt () () ()
 

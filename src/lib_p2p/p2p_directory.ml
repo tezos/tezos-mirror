@@ -32,17 +32,6 @@ let build_rpc_directory net =
   let open Lwt_result_syntax in
   let dir = Tezos_rpc.Directory.empty in
   (* Network : Global *)
-  (* DEPRECATED: use [version] from "lib_shell_services/version_services"
-     instead. *)
-  let dir =
-    Tezos_rpc.Directory.register0 dir P2p_services.S.version (fun () () ->
-        return (P2p.announced_version net))
-  in
-  let dir =
-    (* DEPRECATED: use [version] instead. *)
-    Tezos_rpc.Directory.register0 dir P2p_services.S.versions (fun () () ->
-        return [P2p.announced_version net])
-  in
   let dir =
     Tezos_rpc.Directory.register0 dir P2p_services.S.self (fun () () ->
         match P2p.pool net with

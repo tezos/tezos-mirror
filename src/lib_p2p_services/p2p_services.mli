@@ -30,11 +30,6 @@ val self : #simple -> P2p_peer.Id.t tzresult Lwt.t
 
 val stat : #simple -> P2p_stat.t tzresult Lwt.t
 
-val version : #simple -> Network_version.t tzresult Lwt.t
-
-(* DEPRECATED: use [version] instead. *)
-val versions : #simple -> Network_version.t list tzresult Lwt.t
-
 val events :
   #streamed ->
   (P2p_connection.P2p_event.t Lwt_stream.t * stopper) tzresult Lwt.t
@@ -46,13 +41,6 @@ module S : sig
   val self : ([`GET], unit, unit, unit, unit, P2p_peer.Id.t) Tezos_rpc.Service.t
 
   val stat : ([`GET], unit, unit, unit, unit, P2p_stat.t) Tezos_rpc.Service.t
-
-  val version :
-    ([`GET], unit, unit, unit, unit, Network_version.t) Tezos_rpc.Service.t
-
-  (* DEPRECATED: use [version] instead. *)
-  val versions :
-    ([`GET], unit, unit, unit, unit, Network_version.t list) Tezos_rpc.Service.t
 
   val events :
     ( [`GET],
