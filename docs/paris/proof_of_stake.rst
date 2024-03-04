@@ -64,7 +64,7 @@ transfer the delegate's free balance to an arbitrary account.  In :doc:`relevant
 like ``/chains/main/blocks/head/helpers/baking_rights``, both the delegate's
 manager and consensus keys are listed.
 
-On test-network only, if the :ref:`adaptive issuance <adaptive_issuance_paris>`
+If the :ref:`adaptive issuance <adaptive_issuance_paris>`
 feature is activated, it grants delegators the ability to become
 'stakers' by placing security deposits. These deposits would contribute to their
 delegate's stake and could be subject to slashing penalties if their delegate
@@ -103,29 +103,6 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
-.. _snapshots_paris:
-
-Stake snapshots
-^^^^^^^^^^^^^^^
-
-Before turning to the rights selection mechanism, we first introduce a new
-terminology, *stake snapshot*, to denote the stake distribution for a given block,
-as stored in the :ref:`context<def_context_paris>`.
-Stake snapshots are taken (and stored) every ``BLOCKS_PER_STAKE_SNAPSHOT`` levels.
-More precisely, a snapshot is taken at a level if and only if its cycle
-position modulo ``BLOCKS_PER_STAKE_SNAPSHOT`` is ``BLOCKS_PER_STAKE_SNAPSHOT - 1``.
-Therefore, at the end of a cycle there are ``BLOCKS_PER_CYCLE /
-BLOCKS_PER_STAKE_SNAPSHOT`` stored snapshots.
-
-At the end of cycle ``n-1-CONSENSUS_RIGHTS_DELAY``, the snapshot for cycle
-``n`` is randomly selected from the snapshots stored in cycle
-``n-1-CONSENSUS_RIGHTS_DELAY``. The selection is done through a very simple
-PRNG having as seed the :ref:`random seed<random_seed_paris>` for
-cycle ``n``.
-
-Only the stake of active delegates with the minimal stake of ``MINIMAL_STAKE``
-and frozen deposits greater than ``MINIMAL_FROZEN_STAKE`` is snapshotted.
-
 .. _rights_paris:
 
 Slot selection
@@ -138,9 +115,9 @@ using `Vose's algorithm
 (see also `this more pedagogic description
 <https://www.keithschwarz.com/darts-dice-coins/>`_; the algorithm is the last one listed there).
 This algorithm samples from a discrete probability distribution, which is given by
-the stakes in a particular stake snapshot: the probability to sample a
-particular delegate is its stake in the snapshot over the total stake
-in that snapshot.
+the :ref:`stakes<active_stake_paris>` of a specific cycle: the probability to sample a
+particular delegate is its stake in the cycle over the total stake
+in that cycle.
 
 Concretely, the delegates' rights at a given level are expressed in terms of
 the (quantity of) *slots* that the delegate owns at that level.
@@ -150,8 +127,7 @@ The owner of a slot is obtained by sampling using the algorithm
 mentioned above.
 More precisely, given a level and a slot (which is just a non-negative integer),
 the mentioned algorithm is invoked to assign a delegate to the given slot.
-Its input is the probability distribution given by the :ref:`stake
-snapshot<snapshots_paris>` for the cycle to which the level belongs.
+Its input is the probability distribution given by the stakes retained for the cycle to which the level belongs.
 And whenever the algorithm needs to draw a random value, this is obtained using a
 simple procedure which has as its initial state: the level, the
 :ref:`random seed<random_seed_paris>` for the cycle to which the
@@ -177,9 +153,6 @@ Proof-of-stake parameters
      - 6,000 ꜩ
    * - ``MINIMAL_FROZEN_STAKE``
      - 600 ꜩ
-   * - ``BLOCKS_PER_STAKE_SNAPSHOT``
-     - 1536 blocks
-
 
 Further External Resources
 --------------------------
@@ -189,7 +162,7 @@ found in the `whitepaper
 <https://tezos.com/whitepaper.pdf>`_.
 
 
-The adaptive issuance experimental feature :ref:`documentation <adaptive_issuance_paris>`.
+The adaptive issuance feature :ref:`documentation <adaptive_issuance_paris>`.
 
 Other presentations of the Tezos' proof-of-stake mechanism can be
 found in the
