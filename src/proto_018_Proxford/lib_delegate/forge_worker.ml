@@ -95,7 +95,37 @@ let shutdown state =
   state.push_task None ;
   return_unit
 
-let start (_baking_state : Baking_state.global_state) =
+let get_or_create_queue worker delegate =
+  match
+    Signature.Public_key_hash.Table.find_opt
+      worker.delegate_signing_queues
+      (fst delegate).public_key_hash
+  with
+  | None ->
+      let queue = Delegate_signing_queue.create delegate in
+      Signature.Public_key_hash.Table.add
+        worker.delegate_signing_queues
+        (fst delegate).public_key_hash
+        queue ;
+      queue
+  | Some queue -> queue
+
+let handle_forge_block worker baking_state (block_to_bake : block_to_bake) =
+  let open Lwt_result_syntax in
+  let task () =
+    let* prepared_block =
+      Baking_actions.prepare_block baking_state block_to_bake
+    in
+    worker.push_event (Some (Block_ready prepared_block)) ;
+    return_unit
+  in
+  let queue = get_or_create_queue worker block_to_bake.delegate in
+  Delegate_signing_queue.push_task
+    ~on_error:(fun _err -> Lwt.return_unit)
+    task
+    queue
+
+let start (baking_state : Baking_state.global_state) =
   let open Lwt_result_syntax in
   let task_stream, push_task = Lwt_stream.create () in
   let event_stream, push_event = Lwt_stream.create () in
@@ -107,10 +137,10 @@ let start (_baking_state : Baking_state.global_state) =
     let*! (forge_request_opt : forge_request option) =
       Lwt_stream.get task_stream
     in
-    let process_request _ =
-      ignore Delegate_signing_queue.create ;
-      ignore Delegate_signing_queue.push_task ;
-      return_unit
+    let process_request = function
+      | Forge_and_sign_block block_to_bake ->
+          handle_forge_block state baking_state block_to_bake ;
+          return_unit
     in
     match forge_request_opt with
     | None -> (* Shutdown called *) return_unit

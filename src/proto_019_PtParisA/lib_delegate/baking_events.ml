@@ -71,6 +71,16 @@ module State_transitions = struct
       ~msg:"received new head with level increasing"
       ()
 
+  let new_forge_event =
+    let open Baking_state in
+    declare_1
+      ~section
+      ~name:"new_forge_event"
+      ~level:Notice
+      ~msg:"received new forge event: {event}"
+      ~pp1:pp_forge_event
+      ("event", forge_event_encoding)
+
   let no_proposal_slot =
     declare_3
       ~section

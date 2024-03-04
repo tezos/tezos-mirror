@@ -73,7 +73,7 @@ let is_acceptable_proposal_for_current_level state
          is a predecessor therefore the proposal is valid *)
       return Valid_proposal
 
-let make_consensus_list state proposal =
+let make_consensus_vote_batch state proposal kind =
   let level =
     Raw_level.of_int32 state.level_state.current_level |> function
     | Ok l -> l
@@ -81,17 +81,23 @@ let make_consensus_list state proposal =
   in
   let round = proposal.block.round in
   let block_payload_hash = proposal.block.payload_hash in
-  List.map
-    (fun delegate_slot ->
-      ( delegate_slot.consensus_key_and_delegate,
-        {slot = delegate_slot.first_slot; level; round; block_payload_hash} ))
-    (Delegate_slots.own_delegates state.level_state.delegate_slots)
+  let batch_content = {level; round; block_payload_hash} in
+  let delegates_and_slots =
+    List.map
+      (fun delegate_slot ->
+        (delegate_slot.consensus_key_and_delegate, delegate_slot.first_slot))
+      (Delegate_slots.own_delegates state.level_state.delegate_slots)
+  in
+  Baking_actions.make_unsigned_consensus_vote_batch
+    kind
+    batch_content
+    delegates_and_slots
 
 (* If we do not have any slots, we won't inject any operation but we
    will still participate to determine an elected block *)
 let make_preattest_action state proposal =
-  let preattestations : (consensus_key_and_delegate * consensus_content) list =
-    make_consensus_list state proposal
+  let preattestations : unsigned_consensus_vote_batch =
+    make_consensus_vote_batch state proposal Baking_actions.Preattestation
   in
   Inject_preattestations {preattestations}
 
@@ -510,8 +516,14 @@ let propose_fresh_block_action ~attestations ~dal_attestations ?last_proposal
   let open Lwt_syntax in
   let+ kind, updated_state =
     match state.level_state.next_forged_block with
-    | Some ({delegate; round; block_header = _; operations = _} as signed_block)
-      ->
+    | Some
+        ({
+           signed_block_header = _;
+           delegate;
+           round;
+           operations = _;
+           baking_votes = _;
+         } as signed_block) ->
         let+ () =
           Events.(emit found_preemptively_forged_block (delegate, round))
         in
@@ -754,8 +766,8 @@ let update_locked_round state round payload_hash =
   {state with level_state = new_level_state}
 
 let make_attest_action state proposal =
-  let attestations : (consensus_key_and_delegate * consensus_content) list =
-    make_consensus_list state proposal
+  let attestations : unsigned_consensus_vote_batch =
+    make_consensus_vote_batch state proposal Baking_actions.Attestation
   in
   Inject_attestations {attestations}
 
