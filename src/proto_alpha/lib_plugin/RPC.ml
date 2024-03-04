@@ -3154,15 +3154,42 @@ module Dal = struct
         |+ opt_field "level" Raw_level.rpc_arg (fun t -> t)
         |> seal)
 
+    type shards_query = {
+      level : Raw_level.t option;
+      delegates : Signature.Public_key_hash.t list;
+    }
+
+    let shards_query =
+      let open RPC_query in
+      query (fun level delegates -> {level; delegates})
+      |+ opt_field "level" Raw_level.rpc_arg (fun t -> t.level)
+      |+ multi_field "delegates" Signature.Public_key_hash.rpc_arg (fun t ->
+             t.delegates)
+      |> seal
+
+    type shards_assignment = {
+      delegate : Signature.Public_key_hash.t;
+      indexes : int list;
+    }
+
+    let shards_assignment_encoding =
+      let open Data_encoding in
+      conv
+        (fun {delegate; indexes} -> (delegate, indexes))
+        (fun (delegate, indexes) -> {delegate; indexes})
+        (obj2
+           (req "delegate" Signature.Public_key_hash.encoding)
+           (req "indexes" (list int16)))
+
+    type shards_output = shards_assignment list
+
     let shards =
       RPC_service.get_service
         ~description:
-          "Get the shard assignements for a given level (the default is the \
-           current level)"
-        ~query:level_query
-        ~output:
-          Data_encoding.(
-            list (tup2 Signature.Public_key_hash.encoding (tup2 int16 int16)))
+          "Get the shards assignment for a given level (the default is the \
+           current level) and given delegates (the default is all delegates)"
+        ~query:shards_query
+        ~output:(Data_encoding.list shards_assignment_encoding)
         RPC_path.(path / "shards")
 
     let published_slot_headers =
@@ -3188,13 +3215,31 @@ module Dal = struct
   let dal_confirmed_slots_history ctxt block =
     RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
 
-  let dal_shards ctxt block ?level () =
-    RPC_context.make_call0 S.shards ctxt block level ()
+  let dal_shards ctxt block ?level ?(delegates = []) () =
+    RPC_context.make_call0 S.shards ctxt block {level; delegates} ()
 
   let register_shards () =
-    Registration.register0 ~chunked:true S.shards @@ fun ctxt level () ->
-    let level = Option.value level ~default:(Level.current ctxt).level in
-    Dal_services.shards ctxt ~level
+    Registration.register0 ~chunked:true S.shards @@ fun ctxt q () ->
+    let open Lwt_result_syntax in
+    let*? level_opt =
+      Option.map_e (Level.from_raw_with_offset ctxt ~offset:0l) q.level
+    in
+    let level = Option.value level_opt ~default:(Level.current ctxt) in
+    let* _ctxt, map = Dal_services.shards ctxt ~level in
+    let query_delegates = Signature.Public_key_hash.Set.of_list q.delegates in
+    let all_delegates =
+      Signature.Public_key_hash.Set.is_empty query_delegates
+    in
+    Signature.Public_key_hash.Map.fold
+      (fun delegate indexes acc ->
+        if
+          all_delegates
+          || Signature.Public_key_hash.Set.mem delegate query_delegates
+        then ({delegate; indexes} : S.shards_assignment) :: acc
+        else acc)
+      map
+      []
+    |> return
 
   let dal_published_slot_headers ctxt block ?level () =
     RPC_context.make_call0 S.published_slot_headers ctxt block level ()
@@ -3929,7 +3974,8 @@ module Attestation_rights = struct
                  consensus_pk = _;
                  consensus_pkh = consensus_key;
                },
-               attestation_power )
+               attestation_power,
+               _dal_power )
              acc ->
           {delegate; consensus_key; first_slot; attestation_power} :: acc)
         rights

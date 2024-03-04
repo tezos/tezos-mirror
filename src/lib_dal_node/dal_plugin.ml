@@ -67,7 +67,7 @@ module type T = sig
   val get_committee :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
+    int list Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   val attested_slot_headers :
     block_info -> number_of_slots:int -> slot_index list tzresult

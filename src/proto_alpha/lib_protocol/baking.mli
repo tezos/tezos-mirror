@@ -53,12 +53,12 @@ val attesting_rights :
 
 (** Computes attesting rights for a given level.
 
-   @return  map from allocated first slots to their owner's public key, public key
-   hash, and attesting power. *)
+   @return map from allocated first slots to their owner's public key, consensus
+     attesting power, and DAL attesting power. *)
 val attesting_rights_by_first_slot :
   context ->
   Level.t ->
-  (context * (Consensus_key.pk * int) Slot.Map.t) tzresult Lwt.t
+  (context * (Consensus_key.pk * int * int) Slot.Map.t) tzresult Lwt.t
 
 (** Computes the bonus baking reward depending on the attestation power. *)
 val bonus_baking_reward : context -> attestation_power:int -> Tez.t tzresult

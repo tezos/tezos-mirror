@@ -162,28 +162,26 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
 let get_opt array i =
   if i >= 0 && i < Array.length array then Some array.(i) else None
 
-(** [shards_to_attesters committee] takes a committee [Committee_cache.committee]
-      and returns a function that, given a shard index, yields the pkh of its
-      attester for that level. *)
+module IndexMap = Map.Make (struct
+  type t = int
+
+  let compare = compare
+end)
+
+(** [shards_to_attesters committee] takes a committee
+    [Committee_cache.committee] and returns a function that, given a shard
+    index, yields the pkh of its attester for that level. *)
 let shards_to_attesters committee =
-  let rec do_n ~n f acc = if n <= 0 then acc else do_n ~n:(n - 1) f (f acc) in
   let to_array committee =
-    (* We transform the map to a list *)
-    Tezos_crypto.Signature.Public_key_hash.Map.bindings committee
-    (* We sort the list in decreasing order w.r.t. to start_indices. *)
-    |> List.fast_sort (fun (_pkh1, shard_indices1) (_pkh2, shard_indices2) ->
-           shard_indices2.Committee_cache.start_index
-           - shard_indices1.Committee_cache.start_index)
-       (* We fold on the sorted list, starting from bigger start_indices. *)
-    |> List.fold_left
-         (fun accu (pkh, Committee_cache.{start_index = _; offset}) ->
-           (* We put in the accu list as many [pkh] occurrences as the number
-              of shards this pkh should attest, namely, [offset]. *)
-           do_n ~n:offset (fun acc -> pkh :: acc) accu)
-         []
-    (* We build an array from the list. The array indices coincide with shard
-       indices. *)
-    |> Array.of_list
+    Tezos_crypto.Signature.Public_key_hash.Map.fold
+      (fun pkh indexes index_map ->
+        List.fold_left
+          (fun index_map index -> IndexMap.add index pkh index_map)
+          index_map
+          indexes)
+      committee
+      IndexMap.empty
+    |> IndexMap.bindings |> List.map snd |> Array.of_list
   in
   let committee = to_array committee in
   fun index -> get_opt committee index

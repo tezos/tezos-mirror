@@ -80,6 +80,8 @@ module Slot : sig
 
   val succ : t -> t tzresult
 
+  val to_int : t -> int
+
   val of_int_do_not_use_except_for_parameters : int -> t
 
   val encoding : t Data_encoding.encoding
@@ -2733,6 +2735,8 @@ module Dal : sig
 
   val number_of_slots : context -> int
 
+  val number_of_shards : context -> int
+
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig
     type t
@@ -2785,20 +2789,7 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
-    val power_of_attester : context -> attester:public_key_hash -> int option
-
     val record_number_of_attested_shards : context -> t -> int -> context
-
-    type committee = {
-      pkh_to_shards : (shard_index * int) Signature.Public_key_hash.Map.t;
-    }
-
-    val compute_committee :
-      context ->
-      (Slot.t -> (context * Signature.Public_key_hash.t) tzresult Lwt.t) ->
-      committee tzresult Lwt.t
-
-    val init_committee : context -> committee -> context
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
@@ -2975,6 +2966,7 @@ module Dal_errors : sig
     | Dal_data_availibility_attester_not_in_committee of {
         attester : Signature.Public_key_hash.t;
         level : Raw_level.t;
+        slot : Slot.t;
       }
     | Dal_cryptobox_error of {explanation : string}
 end

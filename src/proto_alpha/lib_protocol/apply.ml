@@ -2237,7 +2237,8 @@ let find_in_slot_map slot slot_map =
       | None ->
           (* This should not happen: operation validation should have failed. *)
           tzfail Faulty_validation_wrong_slot
-      | Some (consensus_key, power) -> return (consensus_key, power))
+      | Some (consensus_key, power, dal_power) ->
+          return (consensus_key, power, dal_power))
 
 let record_preattestation ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preattestation contents_result_list) tzresult Lwt.t =
@@ -2263,7 +2264,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? consensus_key, power =
+      let*? consensus_key, power, _dal_power =
         find_in_slot_map content.slot (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
@@ -2305,7 +2306,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? consensus_key, power =
+      let*? consensus_key, power, dal_power =
         find_in_slot_map consensus.slot (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
@@ -2315,11 +2316,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
         Option.fold
           ~none:(Result_syntax.return ctxt)
           ~some:(fun dal ->
-            Dal_apply.apply_attestation
-              ctxt
-              consensus_key
-              consensus.level
-              dal.attestation)
+            Dal_apply.apply_attestation ctxt dal.attestation ~power:dal_power)
           dal
       in
       return (ctxt, mk_attestation_result consensus_key power)
@@ -2788,7 +2785,9 @@ let record_attesting_participation ctxt =
   | None -> tzfail (Consensus.Slot_map_not_found {loc = __LOC__})
   | Some validators ->
       Slot.Map.fold_es
-        (fun initial_slot ((consensus_pk : Consensus_key.pk), power) ctxt ->
+        (fun initial_slot
+             ((consensus_pk : Consensus_key.pk), power, _dal_power)
+             ctxt ->
           let participation =
             if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
               Delegate.Participated
