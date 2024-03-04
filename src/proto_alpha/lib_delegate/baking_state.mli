@@ -174,7 +174,6 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
-  next_forged_block : prepared_block option;
 }
 
 type phase =
@@ -320,6 +319,8 @@ val pp_elected_block : Format.formatter -> elected_block -> unit
 val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
 
 val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
+
+val pp_prepared_block : Format.formatter -> prepared_block -> unit
 
 val pp_level_state : Format.formatter -> level_state -> unit
 

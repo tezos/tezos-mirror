@@ -300,9 +300,6 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
-  next_forged_block : prepared_block option;
-      (* Block that is preemptively forged for the next level when baker is
-           round 0 proposer. *)
 }
 
 type phase =
@@ -1033,14 +1030,13 @@ let pp_level_state fmt
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round;
-      next_forged_block;
     } =
   Format.fprintf
     fmt
     "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
      %a@]@ locked round: %a@ attestable payload: %a@ elected block: %a@ @[<v \
      2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
-     next level proposed round: %a@ next forged block: %a@]"
+     next level proposed round: %a@]"
     current_level
     is_latest_proposal_applied
     pp_proposal
@@ -1057,8 +1053,6 @@ let pp_level_state fmt
     next_level_delegate_slots
     (pp_option Round.pp)
     next_level_proposed_round
-    (pp_option pp_prepared_block)
-    next_forged_block
 
 let pp_phase fmt = function
   | Idle -> Format.fprintf fmt "idle"

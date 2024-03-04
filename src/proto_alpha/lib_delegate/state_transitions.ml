@@ -352,7 +352,6 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           delegate_slots;
           next_level_delegate_slots;
           next_level_proposed_round = None;
-          next_forged_block = None;
         }
       in
       (* recursive call with the up-to-date state to handle the new
@@ -495,29 +494,13 @@ let prepare_block_to_bake ~attestations ?last_proposal
 let propose_fresh_block_action ~attestations ?last_proposal
     ~(predecessor : block_info) state delegate round =
   (* TODO check if there is a trace where we could not have updated the level *)
-  let open Lwt_syntax in
-  match state.level_state.next_forged_block with
-  | Some
-      ({delegate; round; signed_block_header = _; operations = _; _} as
-      signed_block) ->
-      let* () =
-        Events.(emit found_preemptively_forged_block (delegate, round))
-      in
-      return
-        (Inject_block
-           {
-             prepared_block = signed_block;
-             force_injection = false;
-             asynchronous = true;
-           })
-  | None ->
-      prepare_block_to_bake
-        ~attestations
-        ?last_proposal
-        ~predecessor
-        state
-        delegate
-        round
+  prepare_block_to_bake
+    ~attestations
+    ?last_proposal
+    ~predecessor
+    state
+    delegate
+    round
 
 let propose_block_action state delegate round ~last_proposal =
   let open Lwt_syntax in

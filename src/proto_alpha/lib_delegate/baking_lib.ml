@@ -179,20 +179,19 @@ let bake_at_next_level state =
   let open Lwt_result_syntax in
   let* event = bake_at_next_level_event state in
   let*! state, action = State_transitions.step state event in
-  let* prepared_block =
-    match action with
-    | Inject_block {prepared_block; _} -> return prepared_block
-    | Prepare_block {block_to_bake} ->
+  match action with
+  | Prepare_block {block_to_bake} ->
+      let* prepared_block =
         Baking_actions.prepare_block state.global_state block_to_bake
-    | _ -> assert false
-  in
-  let* new_state =
-    do_action
-      ( state,
-        Inject_block
-          {prepared_block; force_injection = false; asynchronous = false} )
-  in
-  return new_state
+      in
+      let* new_state =
+        do_action
+          ( state,
+            Inject_block
+              {prepared_block; force_injection = false; asynchronous = false} )
+      in
+      return new_state
+  | _ -> assert false
 
 (* Simulate the end of the current round to bootstrap the automaton
    or attest the block if necessary *)

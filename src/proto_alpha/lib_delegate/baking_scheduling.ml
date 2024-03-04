@@ -540,7 +540,6 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
   let should_wait_to_forge_block (_next_baking_time, next_baking_round) =
     Option.is_some state.level_state.elected_block
     && Round.equal next_baking_round Round.zero
-    && Option.is_none state.level_state.next_forged_block
   in
   let waiting_to_forge_block (next_baking_time, next_baking_round) =
     let*! () = Events.(emit first_baker_of_next_level ()) in
@@ -764,7 +763,6 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       delegate_slots;
       next_level_delegate_slots;
       next_level_proposed_round = None;
-      next_forged_block = None;
     }
   in
   let* round_state =
