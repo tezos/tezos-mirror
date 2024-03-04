@@ -201,7 +201,7 @@ module Transport_layer = struct
   let patch_peer p2p peer_id acl =
     let open Lwt_result_syntax in
     match P2p.pool p2p with
-    | None -> return_none
+    | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some pool ->
         let*! () =
           match acl with
