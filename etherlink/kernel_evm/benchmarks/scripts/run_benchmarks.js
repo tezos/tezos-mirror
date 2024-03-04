@@ -379,17 +379,11 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
 
         }
         else if (tx_status[j].includes("OK")) {
-            // sputnik runtime called only if not a transfer
-            // FIXME: won't work with fees ? + run_time_index unreliable in fast mode
-            sputnik_runtime_tick = 0;
-            if (!tx_type[j]?.includes("TRANSFER"))
-                sputnik_runtime_tick = sputnik_runtime_ticks?.[run_time_index++];
-
             rows.push(
                 {
                     gas_cost: gas_costs[gas_cost_index],
                     run_transaction_ticks: run_transaction_ticks?.[j],
-                    sputnik_runtime_ticks: sputnik_runtime_tick ?? 0,
+                    sputnik_runtime_ticks: sputnik_runtime_ticks?.[j],
                     store_transaction_object_ticks: store_transaction_object_ticks?.[j],
                     store_receipt_ticks: run_benchmark_result.store_receipt_ticks?.[j],
                     receipt_size: run_benchmark_result.receipt_size[j],
@@ -405,10 +399,6 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             rows.push(basic_info_row);
 
         }
-    }
-
-    if (!FAST_MODE && run_time_index !== sputnik_runtime_ticks.length) {
-        console.log("Warning: runtime not matched with a transaction in: " + benchmark_name);
     }
 
     // first kernel run
