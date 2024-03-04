@@ -229,10 +229,8 @@ let era_of_cycle ~cycle_eras cycle =
   aux cycle_eras
 
 (* precondition: [level] belongs to [era] *)
-let level_from_raw_with_era era ~first_level_in_alpha_family level =
-  let {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment} =
-    era
-  in
+let cycle_from_raw_with_era era level =
+  let {first_level; first_cycle; blocks_per_cycle; _} = era in
   let level_position_in_era = Raw_level_repr.diff level first_level in
   assert (Compare.Int32.(level_position_in_era >= 0l)) ;
   let cycles_since_era_start =
@@ -241,14 +239,23 @@ let level_from_raw_with_era era ~first_level_in_alpha_family level =
   let cycle =
     Cycle_repr.add first_cycle (Int32.to_int cycles_since_era_start)
   in
-  let cycle_position = Int32.rem level_position_in_era blocks_per_cycle in
+  (cycle, level_position_in_era)
+
+(* precondition: [level] belongs to [era] *)
+let level_from_raw_with_era era ~first_level_in_alpha_family level =
+  let cycle, level_position_in_era = cycle_from_raw_with_era era level in
+  let cycle_position = Int32.rem level_position_in_era era.blocks_per_cycle in
   let level_position = Raw_level_repr.diff level first_level_in_alpha_family in
   let expected_commitment =
     Compare.Int32.(
-      Int32.rem cycle_position blocks_per_commitment
-      = Int32.pred blocks_per_commitment)
+      Int32.rem cycle_position era.blocks_per_commitment
+      = Int32.pred era.blocks_per_commitment)
   in
   {level; level_position; cycle; cycle_position; expected_commitment}
+
+let cycle_from_raw ~cycle_eras l =
+  let era = era_of_level ~cycle_eras l in
+  fst @@ cycle_from_raw_with_era era l
 
 let level_from_raw_aux_exn ~cycle_eras level =
   let first_level_in_alpha_family =
