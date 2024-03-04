@@ -23,33 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol_client_context
 open Protocol
 open Alpha_context
-
-type error += Failed_to_checkout_context
-
-type error += Invalid_context
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Client_baking_simulator.failed_to_checkout_context"
-    ~title:"Failed to checkout context"
-    ~description:"The given context hash does not exists in the context."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Failed to checkout the context")
-    Data_encoding.unit
-    (function Failed_to_checkout_context -> Some () | _ -> None)
-    (fun () -> Failed_to_checkout_context) ;
-  register_error_kind
-    `Permanent
-    ~id:"Client_baking_simulator.invalid_context"
-    ~title:"Invalid context"
-    ~description:"Occurs when the context is inconsistent."
-    ~pp:(fun ppf () -> Format.fprintf ppf "The given context is invalid.")
-    Data_encoding.unit
-    (function Invalid_context -> Some () | _ -> None)
-    (fun () -> Invalid_context)
+open Baking_errors
 
 type incremental = {
   predecessor : Baking_state.block_info;

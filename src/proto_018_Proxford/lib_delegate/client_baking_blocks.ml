@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Protocol_client_context
+open Baking_errors
 
 type block_info = {
   hash : Block_hash.t;
@@ -180,41 +180,6 @@ let monitor_heads cctxt ~next_protocols chain =
           raw_info cctxt ~chain block shell)
         block_stream,
       stop )
-
-type error +=
-  | Unexpected_empty_block_list of {
-      chain : string;
-      block_hash : Block_hash.t;
-      length : int;
-    }
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Client_baking_blocks.unexpected_empty_block_list"
-    ~title:"Unexpected empty blocklist"
-    ~description:
-      "The block list retrieved by Shell_services.Blocks.list is empty"
-    ~pp:(fun ppf (chain, block_hash, length) ->
-      Format.fprintf
-        ppf
-        "Unexpected empty block list retrieved from chain %s at block %a, \
-         length %d"
-        chain
-        Block_hash.pp
-        block_hash
-        length)
-    Data_encoding.(
-      obj3
-        (req "chain" string)
-        (req "block_hash" Block_hash.encoding)
-        (req "length" int31))
-    (function
-      | Unexpected_empty_block_list {chain; block_hash; length} ->
-          Some (chain, block_hash, length)
-      | _ -> None)
-    (fun (chain, block_hash, length) ->
-      Unexpected_empty_block_list {chain; block_hash; length})
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   let open Lwt_result_syntax in
