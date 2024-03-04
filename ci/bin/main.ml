@@ -80,9 +80,9 @@ let variables : variables =
     ("build_deps_image_version", build_deps_image_version);
     ("build_deps_image_name", "${CI_REGISTRY}/tezos/opam-repository");
     ( "rust_toolchain_image_name",
-      "registry.gitlab.com/${CI_PROJECT_PATH}/rust-toolchain" );
+      "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "client_libs_dependencies_image_name",
-      "registry.gitlab.com/${CI_PROJECT_PATH}/client-libs-dependencies" );
+      "${GCP_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies" );
     ("GIT_STRATEGY", "fetch");
     ("GIT_DEPTH", "1");
     ("GET_SOURCES_ATTEMPTS", "2");
