@@ -60,6 +60,24 @@ Node
   ../mempool/pending_operations``. Use ``validated`` instead. (MR
   :gl:`!12157`)
 
+- Removed the deprecated RPCs ``GET /network/version`` and ``GET
+  /network/versions``. Use ``GET /version`` instead. (MR :gl:`!12289`)
+
+- Removed the deprecated RPCs ``GET /network/greylist/clear``. Use ``DELETE
+  /network/greylist`` instead. (MR :gl:`!12289`)
+
+- Removed the deprecated RPCs ``GET /network/points/<point>/ban``, ``GET
+  /network/points/<point>/unban``, ``GET /network/points/<point>/trust`` and
+  ``GET /network/points/<point>/untrust``. Use ``PATCH
+  /network/points/<point>`` with ``{"acl":"ban"}``, ``{"acl":"open"}`` (for
+  both unban and untrust) or ``{"acl":"trust"}`` instead. (MR :gl:`!12289`)
+
+- Removed the deprecated RPCs ``GET /network/peers/<peer>/ban``, ``GET
+  /network/peers/<peer>/unban``, ``GET /network/peers/<peer>/trust`` and ``GET
+  /network/peers/<peer>/untrust``. Use ``PATCH /network/peers/<peer>`` with
+  ``{"acl":"ban"}``, ``{"acl":"open"}`` (for both unban and untrust) or
+  ``{"acl":"trust"}`` instead. (MR :gl:`!12289`)
+
 Client
 ------
 
