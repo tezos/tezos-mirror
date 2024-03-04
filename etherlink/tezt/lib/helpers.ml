@@ -27,19 +27,13 @@
 let evm_type =
   "or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes"
 
-let no_0x s =
-  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
-  else s
-
-let normalize s = String.lowercase_ascii @@ no_0x s
-
 let u16_to_bytes n =
   let bytes = Bytes.make 2 'a' in
   Bytes.set_uint16_le bytes 0 n ;
   Bytes.to_string bytes
 
 let leftPad32 s =
-  let s = no_0x s in
+  let s = Durable_storage_path.no_0x s in
   let len = String.length s in
   String.make (64 - len) '0' ^ s
 

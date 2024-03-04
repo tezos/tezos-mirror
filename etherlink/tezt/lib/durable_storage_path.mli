@@ -25,6 +25,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [no_0x s] removes the prefix [0x] of [s] if it exists. *)
+val no_0x : string -> string
+
+(** [normalize s] calls {!no_0x} and {!String.lowercase_ascii} on [s]. *)
+val normalize : string -> string
+
 (** Path in the Wasm PVM durable storage. *)
 type path = string
 

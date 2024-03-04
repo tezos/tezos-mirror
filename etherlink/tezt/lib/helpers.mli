@@ -27,12 +27,6 @@
 (** Michelson type to use when originating the EVM rollup. *)
 val evm_type : string
 
-(** [no_0x s] removes the prefix [0x] of [s] if it exists. *)
-val no_0x : string -> string
-
-(** [normalize s] calls {!no_0x} and {!String.lowercase_ascii} on [s]. *)
-val normalize : string -> string
-
 (** [u16_to_bytes n] translate an int in a binary string of two bytes
     (little endian).
     NB: Ints greater than 2 bytes are truncated. *)

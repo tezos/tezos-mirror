@@ -654,7 +654,7 @@ let deploy_with_base_checks {contract; expected_address; expected_code}
   Check.(
     list_mem
       string
-      (Helpers.normalize contract_address)
+      (Durable_storage_path.normalize contract_address)
       (List.map String.lowercase_ascii accounts)
       ~error_msg:"Expected %L account to be initialized by contract creation.") ;
   unit
@@ -1282,7 +1282,7 @@ let test_l2_deploy_erc20 =
   Check.(
     list_mem
       string
-      (Helpers.normalize address)
+      (Durable_storage_path.normalize address)
       (List.map String.lowercase_ascii accounts)
       ~error_msg:"Expected %L account to be initialized by contract creation.") ;
 
@@ -3608,7 +3608,8 @@ let test_rpc_getStorageAt =
       in
       return JSON.(value |-> "result" |> as_string))
   in
-  Check.((Helpers.no_0x hex_value = hex_256_of expected_value0) string)
+  Check.(
+    (Durable_storage_path.no_0x hex_value = hex_256_of expected_value0) string)
     ~error_msg:"Expected %R, but got %L" ;
   let pos = Helpers.mapping_position sender.address 1 in
   let* hex_value =
@@ -3623,7 +3624,8 @@ let test_rpc_getStorageAt =
       in
       return JSON.(value |-> "result" |> as_string))
   in
-  Check.((Helpers.no_0x hex_value = hex_256_of expected_value1) string)
+  Check.(
+    (Durable_storage_path.no_0x hex_value = hex_256_of expected_value1) string)
     ~error_msg:"Expected %R, but got %L" ;
   unit
 
