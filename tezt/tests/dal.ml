@@ -3227,7 +3227,7 @@ let check_new_connection_event ~main_node ~other_node ~is_trusted =
   wait_for_gossipsub_worker_event ~name:"new_connection" main_node (fun event ->
       let*?? () =
         check_expected
-          JSON.(Dal_node.read_identity other_node |-> "peer_id" |> as_string)
+          (Dal_node.read_identity other_node)
           JSON.(event |-> "peer" |> as_string)
       in
       check_expected is_trusted JSON.(event |-> "trusted" |> as_bool))
@@ -3500,12 +3500,8 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
     in addition to sending Subscribe messages. *)
 let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
   let profile1 = Dal_RPC.Attester pkh1 in
-  let peer_id1 =
-    JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
-  in
-  let peer_id2 =
-    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
-  in
+  let peer_id1 = Dal_node.read_identity dal_node1 in
+  let peer_id2 = Dal_node.read_identity dal_node2 in
   (* node1 joins topic {pkh} -> it sends subscribe messages to node2. *)
   let event_waiter =
     check_events_with_topic
@@ -3608,9 +3604,7 @@ let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
   let dal_node2 = Dal_node.create ~node () in
   (* Connect the nodes *)
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
-  let peer_id =
-    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
-  in
+  let peer_id = Dal_node.read_identity dal_node2 in
   (* kill dal_node2 and check "disconnection" event in node1. *)
   let disconn_ev_in_node1 = check_disconnection_event dal_node1 ~peer_id in
   let* () = Dal_node.kill dal_node2 in
@@ -3699,8 +3693,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
       ~publish_level
       ~slot_index
       ~pkh:pkh1
-      ~from_peer:
-        JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
+      ~from_peer:(Dal_node.read_identity dal_node1)
   in
   let waiter_app_notifs =
     if expect_app_notification then
@@ -3839,12 +3832,8 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   (* The two nodes join the same topics *)
   let* () = nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 in
 
-  let peer_id1 =
-    JSON.(Dal_node.read_identity dal_node1 |-> "peer_id" |> as_string)
-  in
-  let peer_id2 =
-    JSON.(Dal_node.read_identity dal_node2 |-> "peer_id" |> as_string)
-  in
+  let peer_id1 = Dal_node.read_identity dal_node1 in
+  let peer_id2 = Dal_node.read_identity dal_node2 in
   (* Once a block is baked and shards injected into GS, we expect dal_node1 to
      be pruned by dal_node2 because its score will become negative due to
      invalid messages. *)
@@ -4040,9 +4029,7 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
   in
 
   (* Get the nodes' identities. *)
-  let id dal_node =
-    JSON.(Dal_node.read_identity dal_node |-> "peer_id" |> as_string)
-  in
+  let id dal_node = Dal_node.read_identity dal_node in
   let id_dal_node1 = id dal_node1 in
   let id_dal_node2 = id dal_node2 in
   let id_dal_node3 = id dal_node3 in
@@ -4214,9 +4201,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     dal_parameters.Dal.Parameters.cryptobox.number_of_shards
   in
   let peers = [Dal_node.listen_addr dal_bootstrap] in
-  let peer_id dal_node =
-    JSON.(Dal_node.read_identity dal_node |-> "peer_id" |> as_string)
-  in
+  let peer_id dal_node = Dal_node.read_identity dal_node in
   let bootstrap_peer_id = peer_id dal_bootstrap in
 
   (* Check that the attestation threshold for this test is 100%. If
