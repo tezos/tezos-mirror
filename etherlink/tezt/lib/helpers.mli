@@ -62,7 +62,7 @@ val next_evm_level :
   evm_node:Evm_node.t ->
   sc_rollup_node:Sc_rollup_node.t ->
   client:Client.t ->
-  int Lwt.t
+  unit Lwt.t
 
 (** Path to the directory containing sample inputs. *)
 val kernel_inputs_path : string

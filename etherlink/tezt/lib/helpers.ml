@@ -59,12 +59,12 @@ let next_rollup_node_level ~sc_rollup_node ~client =
 
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
-  | Proxy _ -> next_rollup_node_level ~sc_rollup_node ~client
+  | Proxy _ ->
+      let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
+      unit
   | Sequencer _ ->
-      let open Rpc.Syntax in
-      let* _ = Rpc.produce_block evm_node in
-      let*@ level = Rpc.block_number evm_node in
-      return (Int32.to_int level)
+      let* _l2_level = Rpc.produce_block evm_node in
+      unit
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
 
 let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
