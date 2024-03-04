@@ -88,7 +88,7 @@ oc.install_bin_rc_fedora_37:
   script:
     - ./docs/introduction/install-opam.sh
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
       when: always
       allow_failure: true
     # temporarily disable until these jobs are optimized

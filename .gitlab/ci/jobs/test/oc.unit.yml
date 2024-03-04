@@ -58,7 +58,7 @@
     # [when: manual] since if the build jobs were manual and
     # triggered, then there is no point in having the user do another
     # manual action to also run the tests.
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
       when: always
     - changes:
         - src/**/*
