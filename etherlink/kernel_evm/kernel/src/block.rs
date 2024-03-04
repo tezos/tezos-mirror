@@ -233,7 +233,6 @@ fn compute_bip<Host: KernelRuntime>(
                 &block_in_progress.estimated_ticks
             );
             storage::store_block_in_progress(host, &block_in_progress)?;
-            host.mark_for_reboot()?
         }
         ComputationResult::Finished => {
             crate::gas_price::register_block(host, &block_in_progress)?;
@@ -373,7 +372,14 @@ pub fn produce<Host: Runtime>(
                     // The computation still needs to reboot, we do nothing.
                     return Ok(ComputationResult::RebootNeeded);
                 }
-                Err(err) => revert_block(&mut safe_host, true, processed_blueprint, err)?,
+                Err(err) => {
+                    revert_block(&mut safe_host, true, processed_blueprint, err)?;
+                    // The block was reverted because it failed. We don't know at
+                    // which point did it fail nor why. We cannot make assumption
+                    // on how many ticks it consumed before failing. Therefore
+                    // the safest solution is to simply reboot after a failure.
+                    return Ok(ComputationResult::RebootNeeded);
+                }
             }
         }
     }
@@ -418,7 +424,14 @@ pub fn produce<Host: Runtime>(
                 // storage untouched.
                 return Ok(ComputationResult::RebootNeeded);
             }
-            Err(err) => revert_block(&mut safe_host, false, processed_blueprint, err)?,
+            Err(err) => {
+                revert_block(&mut safe_host, false, processed_blueprint, err)?;
+                // The block was reverted because it failed. We don't know at
+                // which point did it fail nor why. We cannot make assumption
+                // on how many ticks it consumed before failing. Therefore
+                // the safest solution is to simply reboot after a failure.
+                return Ok(ComputationResult::RebootNeeded);
+            }
         }
     }
     log!(
@@ -454,9 +467,7 @@ mod tests {
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
-    use tezos_smart_rollup_core::SmartRollupCore;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-    use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_mock::MockHost;
 
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint {
@@ -1373,18 +1384,6 @@ mod tests {
         hash
     }
 
-    fn is_marked_for_reboot(host: &impl SmartRollupCore) -> bool {
-        const REBOOT_PATH: RefPath = RefPath::assert_from(b"/kernel/env/reboot");
-        host.store_read_all(&REBOOT_PATH).is_ok()
-    }
-
-    fn assert_marked_for_reboot(host: &impl SmartRollupCore) {
-        assert!(
-            is_marked_for_reboot(host),
-            "The kernel should have been marked for reboot"
-        );
-    }
-
     const CREATE_LOOP_DATA: &str = "608060405234801561001057600080fd5b506101d0806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80630b7d796e14610030575b600080fd5b61004a600480360381019061004591906100c2565b61004c565b005b60005b81811015610083576001600080828254610069919061011e565b92505081905550808061007b90610152565b91505061004f565b5050565b600080fd5b6000819050919050565b61009f8161008c565b81146100aa57600080fd5b50565b6000813590506100bc81610096565b92915050565b6000602082840312156100d8576100d7610087565b5b60006100e6848285016100ad565b91505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b60006101298261008c565b91506101348361008c565b925082820190508082111561014c5761014b6100ef565b5b92915050565b600061015d8261008c565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361018f5761018e6100ef565b5b60018201905091905056fea26469706673582212200cd6584173dbec22eba4ce6cc7cc4e702e00e018d340f84fc0ff197faf980ad264736f6c63430008150033";
 
     const LOOP_1300: &str =
@@ -1497,7 +1496,7 @@ mod tests {
 
         host.reboot_left().expect("should be some reboot left");
 
-        produce(
+        let computation_result = produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
@@ -1512,7 +1511,7 @@ mod tests {
         );
 
         // test reboot is set
-        assert_marked_for_reboot(&host)
+        matches!(computation_result, ComputationResult::RebootNeeded);
     }
 
     #[test]
@@ -1569,7 +1568,7 @@ mod tests {
 
         store_blueprints(&mut host, proposals);
 
-        produce(
+        let computation_result = produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
@@ -1586,7 +1585,7 @@ mod tests {
         );
 
         // test reboot is set
-        assert_marked_for_reboot(&host);
+        matches!(computation_result, ComputationResult::RebootNeeded);
 
         // The block is in progress, therefore it is in the safe storage.
         let mut mock_internal = MockHost::default();
