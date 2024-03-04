@@ -45,7 +45,7 @@ type mode =
   | Sequencer of {
       initial_kernel : string;
           (** Path to the initial kernel used by the sequencer. *)
-      preimage_dir : string;
+      preimage_dir : string option;
           (** Path to the directory with the associated preimages. *)
       private_rpc_port : int option;  (** Port for private RPC server*)
       time_between_blocks : time_between_blocks option;

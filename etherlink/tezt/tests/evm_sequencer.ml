@@ -193,7 +193,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
     Evm_node.Sequencer
       {
         initial_kernel = output;
-        preimage_dir = preimages_dir;
+        preimage_dir = Some preimages_dir;
         private_rpc_port;
         time_between_blocks;
         sequencer = sequencer.alias;
