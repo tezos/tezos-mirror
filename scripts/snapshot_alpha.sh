@@ -101,6 +101,7 @@ cd ../..
 # generate docs/protocols/042_jeanmichel.rst from docs/protocols/alpha.rst
 echo "Copying+fixing docs/protocols/alpha.rst to docs/protocols/${version}_${label}.rst"
 sed -e "s/^Protocol Alpha/Protocol ${capitalized_label}/" \
+  -e "s/^protocol Alpha/protocol ${capitalized_label}/" \
   -e "s,src/proto_alpha,src/proto_${version}_${short_hash},g" \
   docs/protocols/alpha.rst > "docs/protocols/${version}_${label}.rst"
 
