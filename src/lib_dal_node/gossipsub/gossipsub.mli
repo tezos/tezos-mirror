@@ -172,7 +172,7 @@ module Transport_layer : sig
   val get_peer_info :
     t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult Lwt.t
 
-  (** [patch_peer t peer_id acl] patches the acl of the corresponding
+  (** [patch_peer t peer acl] patches the acl of the corresponding
       peer if found and returns the info. *)
   val patch_peer :
     t ->
