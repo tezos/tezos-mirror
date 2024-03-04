@@ -163,7 +163,11 @@ type signed_consensus_vote_batch = {
 type action =
   | Do_nothing
   | Prepare_block of {block_to_bake : block_to_bake}
-  | Inject_block of {prepared_block : prepared_block; force_injection : bool}
+  | Inject_block of {
+      prepared_block : prepared_block;
+      force_injection : bool;
+      asynchronous : bool;
+    }
   | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
   | Update_to_level of level_update
@@ -743,7 +747,8 @@ let inject_consensus_votes state
           return_unit))
     signed_consensus_votes
 
-let inject_block ?(force_injection = false) state prepared_block =
+let inject_block ?(force_injection = false) ?(asynchronous = true) state
+    prepared_block =
   let open Lwt_result_syntax in
   let {signed_block_header; round; delegate; operations; baking_votes} =
     prepared_block
@@ -807,24 +812,29 @@ let inject_block ?(force_injection = false) state prepared_block =
             delayed_block_injection
             (delay, signed_block_header.shell.level, round, delegate))
       in
-      Lwt.dont_wait
-        (fun () ->
-          let*! _ =
-            protect
-              ~on_error:(fun err ->
-                let*! () =
-                  Events.(
-                    emit
-                      block_injection_failed
-                      (Block_header.hash signed_block_header, err))
-                in
-                return_unit)
-              (fun () ->
-                let*! () = Lwt_unix.sleep (Ptime.Span.to_float_s delay) in
-                inject_block ())
-          in
+      let t =
+        let*! _ =
+          protect
+            ~on_error:(fun err ->
+              let*! () =
+                Events.(
+                  emit
+                    block_injection_failed
+                    (Block_header.hash signed_block_header, err))
+              in
+              return_unit)
+            (fun () ->
+              let*! () = Lwt_unix.sleep (Ptime.Span.to_float_s delay) in
+              inject_block ())
+        in
+        Lwt.return_unit
+      in
+      let*! () =
+        if asynchronous then (
+          Lwt.dont_wait (fun () -> t) (fun _exn -> ()) ;
           Lwt.return_unit)
-        (fun _exn -> ()) ;
+        else t
+      in
       return_unit
   in
   return new_state
@@ -962,8 +972,10 @@ let rec perform_action ~state_recorder state (action : action) =
       let* () = state_recorder ~new_state:state in
       return state
   | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
-  | Inject_block {prepared_block; force_injection} ->
-      let* new_state = inject_block ~force_injection state prepared_block in
+  | Inject_block {prepared_block; force_injection; asynchronous} ->
+      let* new_state =
+        inject_block ~force_injection ~asynchronous state prepared_block
+      in
       let* () = state_recorder ~new_state in
       return new_state
   | Inject_preattestations {preattestations} ->

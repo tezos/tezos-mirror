@@ -504,7 +504,12 @@ let propose_fresh_block_action ~attestations ?last_proposal
         Events.(emit found_preemptively_forged_block (delegate, round))
       in
       return
-        (Inject_block {prepared_block = signed_block; force_injection = false})
+        (Inject_block
+           {
+             prepared_block = signed_block;
+             force_injection = false;
+             asynchronous = true;
+           })
   | None ->
       prepare_block_to_bake
         ~attestations

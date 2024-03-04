@@ -143,7 +143,13 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   in
   Baking_actions.inject_consensus_votes state signed_consensus_batch
 
-let bake_at_next_level state =
+let do_action (state, action) =
+  let state_recorder ~new_state =
+    Baking_state.may_record_new_state ~previous_state:state ~new_state
+  in
+  Baking_actions.perform_action ~state_recorder state action
+
+let bake_at_next_level_event state =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let*! baking_time =
@@ -169,6 +175,25 @@ let bake_at_next_level state =
         (Baking_state.Timeout
            (Time_to_prepare_next_level_block {at_round = round}))
 
+let bake_at_next_level state =
+  let open Lwt_result_syntax in
+  let* event = bake_at_next_level_event state in
+  let*! state, action = State_transitions.step state event in
+  let* prepared_block =
+    match action with
+    | Inject_block {prepared_block; _} -> return prepared_block
+    | Prepare_block {block_to_bake} ->
+        Baking_actions.prepare_block state.global_state block_to_bake
+    | _ -> assert false
+  in
+  let* new_state =
+    do_action
+      ( state,
+        Inject_block
+          {prepared_block; force_injection = false; asynchronous = false} )
+  in
+  return new_state
+
 (* Simulate the end of the current round to bootstrap the automaton
    or attest the block if necessary *)
 let first_automaton_event state =
@@ -177,7 +202,7 @@ let first_automaton_event state =
   | Some _elected_block ->
       (* If there is an elected block we can directly bake at next
          level after waiting its date *)
-      bake_at_next_level state
+      bake_at_next_level_event state
 
 let attestations_attesting_power state attestations =
   let get_attestation_voting_power {slot; _} =
@@ -234,12 +259,6 @@ let state_attesting_power =
         Kind.attestation operation)
     -> consensus_content)
 
-let do_action (state, action) =
-  let state_recorder ~new_state =
-    Baking_state.may_record_new_state ~previous_state:state ~new_state
-  in
-  Baking_actions.perform_action ~state_recorder state action
-
 let propose_at_next_level ~minimal_timestamp state =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
@@ -278,7 +297,12 @@ let propose_at_next_level ~minimal_timestamp state =
       Baking_actions.perform_action
         ~state_recorder
         state
-        (Inject_block {prepared_block; force_injection = minimal_timestamp})
+        (Inject_block
+           {
+             prepared_block;
+             force_injection = minimal_timestamp;
+             asynchronous = false;
+           })
     in
     let*! () =
       cctxt#message
@@ -290,11 +314,7 @@ let propose_at_next_level ~minimal_timestamp state =
     in
     return state
   else
-    let* event = bake_at_next_level state in
-    let* state =
-      let*! action = State_transitions.step state event in
-      do_action action
-    in
+    let* state = bake_at_next_level state in
     let*! () = cctxt#message "Proposal injected" in
     return state
 
@@ -409,7 +429,11 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                             do_action
                               ( state,
                                 Inject_block
-                                  {prepared_block; force_injection = force} )
+                                  {
+                                    prepared_block;
+                                    force_injection = force;
+                                    asynchronous = false;
+                                  } )
                           in
                           return state
                       | Inject_block {prepared_block; _} ->
@@ -417,7 +441,11 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
                             do_action
                               ( state,
                                 Inject_block
-                                  {prepared_block; force_injection = force} )
+                                  {
+                                    prepared_block;
+                                    force_injection = force;
+                                    asynchronous = false;
+                                  } )
                           in
                           return state
                       | _ -> assert false
@@ -626,7 +654,8 @@ let rec baking_minimal_timestamp ~count state
     Baking_actions.perform_action
       ~state_recorder
       state
-      (Inject_block {prepared_block; force_injection = true})
+      (Inject_block
+         {prepared_block; force_injection = true; asynchronous = false})
   in
   let*! () = cctxt#message "Injected block at minimal timestamp" in
   if count <= 1 then return_unit
