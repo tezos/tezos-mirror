@@ -354,9 +354,9 @@ let close cemented_store =
      terminated which means potential new reads won't be scheduled. *)
   Metadata_fd_cache.clear cemented_store.metadata_fd_cache
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7034 Cemented file
+   cannot exceed 4Gib. *)
 let offset_length = 4 (* file offset *)
-
-let offset_encoding = Data_encoding.int31
 
 let find_block_file cemented_store block_level =
   try
@@ -570,7 +570,18 @@ let read_block fd block_number =
     Lwt_utils_unix.read_bytes ~pos:0 ~len:offset_length fd offset_buffer
   in
   let offset =
-    Data_encoding.(Binary.of_bytes_exn offset_encoding offset_buffer)
+    let ofs = Bytes.get_int32_be offset_buffer 0 in
+    (* We interpret the offset, written as an int32, as an unsigned
+       int32. This is allowed by the encoded scheme and allows one
+       additional bit to encode the offset. In enables dealing with
+       files up to 4Gib. *)
+    match Int32.unsigned_to_int ofs with
+    | Some v -> v
+    | None ->
+        (* It will be [None] on 32-bit machines which is not
+           supported. We default to [Int32.to_int] instead of [assert
+           false] *)
+        Int32.to_int ofs
   in
   let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)
