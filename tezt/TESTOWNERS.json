@@ -16,7 +16,6 @@
       "protocol_cache",
       "protocol_table",
       "stresstest",
-      "transaction",
       "transfer",
       "layer1"
     ],
