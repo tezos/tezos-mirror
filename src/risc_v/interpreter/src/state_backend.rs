@@ -458,7 +458,9 @@ pub mod tests {
     /// Generate a test against all test backends.
     #[macro_export]
     macro_rules! backend_test {
-        ( $name:ident, $fac_name:ident, $expr:block ) => {
+        ($(#[$m:meta])*
+         $name:ident, $fac_name:ident, $expr:block ) => {
+            $(#[$m])*
             #[test]
             fn $name() {
                 fn inner<$fac_name: $crate::state_backend::tests::TestBackendFactory>() {

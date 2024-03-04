@@ -46,7 +46,7 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
 lazy_static! {
     static ref OBJDUMP_EXE: &'static str = {
         // Iterate through the known executable names to find a suitable objdump.
-        for exe in ["riscv64-unknown-linux-gnu-objdump", "objdump"] {
+        for exe in ["riscv64-unknown-linux-gnu-objdump", "riscv64-elf-objdump", "objdump"] {
             let Some(output) = Command::new(exe).arg("--version").output().ok() else {
                 continue;
             };
