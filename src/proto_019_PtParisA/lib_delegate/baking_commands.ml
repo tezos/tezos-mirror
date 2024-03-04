@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Client_proto_args
+open Baking_errors
 
 let pidfile_arg =
   let open Lwt_result_syntax in
@@ -536,14 +537,13 @@ let per_block_vote_file_arg =
          let open Lwt_result_syntax in
          let* file_exists =
            protect
-             ~on_error:(fun _ ->
-               tzfail (Per_block_vote_file.Block_vote_file_not_found file))
+             ~on_error:(fun _ -> tzfail (Block_vote_file_not_found file))
              (fun () ->
                let*! b = Lwt_unix.file_exists file in
                return b)
          in
          if file_exists then return file
-         else tzfail (Per_block_vote_file.Block_vote_file_not_found file)))
+         else tzfail (Block_vote_file_not_found file)))
 
 let pre_emptive_forge_time_arg =
   Tezos_clic.arg
