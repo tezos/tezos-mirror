@@ -360,9 +360,6 @@ let test_publish_blueprints =
 
   let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 5 in
 
-  (* Ask for the current block. *)
-  let*@ sequencer_head = Rpc.get_block_by_number ~block:"latest" sequencer in
-
   (* At this point, the evm node should called the batcher endpoint to publish
      all the blueprints. Stopping the node is then not a problem. *)
   let* () =
@@ -376,10 +373,7 @@ let test_publish_blueprints =
      we wait for it. The source of flakiness is unknown but happens very rarely,
      we put a small sleep to make the least flaky possible. *)
   let* () = Lwt_unix.sleep 2. in
-  let*@ rollup_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((sequencer_head.hash = rollup_head.hash) string)
-    ~error_msg:"Expected the same head on the rollup node and the sequencer" ;
-  unit
+  check_head_consistency ~left:sequencer ~right:proxy ()
 
 let test_resilient_to_rollup_node_disconnect =
   Protocol.register_test
