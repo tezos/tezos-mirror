@@ -179,6 +179,12 @@ function run_profiler(path, logs) {
 
         childProcess.stdin.end();
 
+        childProcess.stderr.on('data', (data) => {
+            const output = data.toString();
+            console.error(`stderr: ${output}`);
+            fs.appendFileSync(logs, output);
+        });
+
         childProcess.stdout.on('data', (data) => {
             const output = data.toString();
             if (!output.includes("__wasm_debugger__")) fs.appendFileSync(logs, output)
