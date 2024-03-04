@@ -158,3 +158,25 @@ let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
       client
   in
   Client.bake_for_and_wait ~keys:[] client
+
+let bake_until_sync ?(timeout = 30.) ~sc_rollup_node ~proxy ~sequencer ~client
+    () =
+  let open Rpc.Syntax in
+  let*@ sequencer_level = Rpc.block_number sequencer in
+  let rec go () =
+    let*@ proxy_level_opt = Rpc.block_number_opt proxy in
+    match proxy_level_opt with
+    | None ->
+        let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        go ()
+    | Some proxy_level ->
+        if sequencer_level < proxy_level then
+          Test.fail
+            ~loc:__LOC__
+            "rollup node has more recent block. Not supposed to happened "
+        else if sequencer_level = proxy_level then unit
+        else
+          let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+          go ()
+  in
+  Lwt.pick [go (); Lwt_unix.sleep timeout]

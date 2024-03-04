@@ -116,3 +116,16 @@ val sequencer_upgrade :
   pool_address:string ->
   activation_timestamp:string ->
   unit Lwt.t
+
+(** [bake_until_sync ?timeout ~sc_rollup_node ~proxy ~sequencer
+    ~client] bakes blocks until the rollup node is synced with
+    evm_node. timeout if it takes more than [timeout] sec, 30. by
+    default. *)
+val bake_until_sync :
+  ?timeout:float ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  proxy:Evm_node.t ->
+  sequencer:Evm_node.t ->
+  client:Client.t ->
+  unit ->
+  unit Lwt.t

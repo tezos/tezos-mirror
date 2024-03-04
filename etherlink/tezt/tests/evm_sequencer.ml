@@ -362,11 +362,7 @@ let test_publish_blueprints =
 
   (* At this point, the evm node should called the batcher endpoint to publish
      all the blueprints. Stopping the node is then not a problem. *)
-  let* () =
-    repeat 10 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   (* We have unfortunately noticed that the test can be flaky. Sometimes,
      the following RPC is done before the proxy being initialised, even though
@@ -417,11 +413,7 @@ let test_resilient_to_rollup_node_disconnect =
   in
 
   (* Produce some L1 blocks so that the rollup node publishes the blueprints. *)
-  let* _ =
-    repeat ensure_rollup_node_publish (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   (* Check sequencer and rollup consistency *)
   let* () =
@@ -492,11 +484,7 @@ let test_resilient_to_rollup_node_disconnect =
 
   (* Go through several cooldown periods to let the sequencer sends the rest of
      the blueprints. *)
-  let* _ =
-    repeat (2 * catchup_cooldown) (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   (* Check the consistency again *)
   let* () =
@@ -880,11 +868,7 @@ let test_init_from_rollup_node_data_dir =
         let* _ = Rpc.produce_block sequencer in
         unit)
   in
-  let* () =
-    repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* () = Evm_node.terminate sequencer in
   let evm_node' =
     Evm_node.create
@@ -903,9 +887,7 @@ let test_init_from_rollup_node_data_dir =
 
   let* _ = Rpc.produce_block evm_node' in
   let* () =
-    repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
+    bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node' ~proxy ()
   in
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
@@ -1064,11 +1046,7 @@ let test_upgrade_kernel_auto_sync =
         in
         unit)
   in
-  let* () =
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   let* () =
     check_head_consistency
@@ -1088,11 +1066,7 @@ let test_upgrade_kernel_auto_sync =
         in
         unit)
   in
-  let* () =
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   let* () =
     check_head_consistency
@@ -1260,15 +1234,19 @@ let test_force_kernel_upgrade_too_early =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  let* {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _} =
+  let* {
+         sc_rollup_node;
+         l1_contracts;
+         sc_rollup_address;
+         client;
+         sequencer;
+         proxy;
+         _;
+       } =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
   in
   (* Wait for the sequencer to publish its genesis block. *)
-  let* () =
-    repeat 3 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
     Evm_node.init
       ~mode:(Proxy {devmode = true})
@@ -1319,15 +1297,19 @@ let test_force_kernel_upgrade =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  let* {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _} =
+  let* {
+         sc_rollup_node;
+         l1_contracts;
+         sc_rollup_address;
+         client;
+         sequencer;
+         proxy;
+         _;
+       } =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
   in
   (* Wait for the sequencer to publish its genesis block. *)
-  let* () =
-    repeat 3 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* proxy =
     Evm_node.init
       ~mode:(Proxy {devmode = true})
@@ -1400,8 +1382,7 @@ let test_external_transaction_to_delayed_inbox_fails =
   in
   let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 0 in
   (* Bake a couple more levels for the blueprint to be final *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let raw_tx, _ = read_tx_from_file () |> List.hd in
   let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
   (* Bake enough levels to make sure the transaction would be processed

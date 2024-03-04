@@ -4550,11 +4550,13 @@ let test_migrate_proxy_to_sequencer_future =
   in
   (* Produce a block in sequencer. *)
   let* _ = Rpc.produce_block sequencer_node in
-  (* Conservative way to make sure the produced block is published to L1. *)
-  let* _ =
-    repeat 5 (fun () ->
-        let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_sync
+      ~sc_rollup_node
+      ~client
+      ~sequencer:sequencer_node
+      ~proxy:proxy_node
+      ()
   in
   (* Same head after first sequencer produced block. *)
   let* () =
@@ -4573,11 +4575,13 @@ let test_migrate_proxy_to_sequencer_future =
     let* tx = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
     check_tx_succeeded ~endpoint:(Evm_node.endpoint sequencer_node) ~tx
   in
-  (* Conservative way to make sure the produced block is published to L1. *)
-  let* _ =
-    repeat 5 (fun () ->
-        let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_sync
+      ~sc_rollup_node
+      ~client
+      ~sequencer:sequencer_node
+      ~proxy:proxy_node
+      ()
   in
   (* Same head after sequencer transaction. *)
   let* () =
@@ -4702,11 +4706,13 @@ let test_migrate_proxy_to_sequencer_past =
 
   (* Produce a block in sequencer. *)
   let* _ = Rpc.produce_block sequencer_node in
-  (* Conservative way to make sure the produced block is published to L1. *)
-  let* _ =
-    repeat 5 (fun () ->
-        let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_sync
+      ~sc_rollup_node
+      ~client
+      ~sequencer:sequencer_node
+      ~proxy:proxy_node
+      ()
   in
   (* Same head after first sequencer produced block. *)
   let* () =
@@ -4725,11 +4731,13 @@ let test_migrate_proxy_to_sequencer_past =
     let* tx = send ~sender ~receiver ~value:Wei.one_eth full_evm_setup in
     check_tx_succeeded ~endpoint:(Evm_node.endpoint sequencer_node) ~tx
   in
-  (* Conservative way to make sure the produced block is published to L1. *)
-  let* _ =
-    repeat 5 (fun () ->
-        let* _ = next_evm_level ~evm_node:proxy_node ~sc_rollup_node ~client in
-        unit)
+  let* () =
+    bake_until_sync
+      ~sc_rollup_node
+      ~client
+      ~sequencer:sequencer_node
+      ~proxy:proxy_node
+      ()
   in
   (* Same head after sequencer transaction. *)
   let* () =
