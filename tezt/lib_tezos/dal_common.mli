@@ -280,4 +280,8 @@ module Check : sig
   val profiles_typ : RPC.profiles Check.typ
 
   val topics_peers_typ : (RPC.topic * string list) list Check.typ
+
+  val slot_header_typ : RPC.slot_header Check.typ
+
+  val slot_headers_typ : RPC.slot_header list Check.typ
 end
