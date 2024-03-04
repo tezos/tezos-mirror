@@ -358,8 +358,6 @@ let close cemented_store =
    cannot exceed 4Gib. *)
 let offset_length = 4 (* file offset *)
 
-let offset_encoding = Data_encoding.int32
-
 let find_block_file cemented_store block_level =
   try
     if Compare.Int32.(block_level < 0l) then None
@@ -572,14 +570,18 @@ let read_block fd block_number =
     Lwt_utils_unix.read_bytes ~pos:0 ~len:offset_length fd offset_buffer
   in
   let offset =
-    let ofs =
-      Data_encoding.(Binary.of_bytes_exn offset_encoding offset_buffer)
-    in
+    let ofs = Bytes.get_int32_be offset_buffer 0 in
     (* We interpret the offset, written as an int32, as an unsigned
        int32. This is allowed by the encoded scheme and allows one
        additional bit to encode the offset. In enables dealing with
        files up to 4Gib. *)
-    match Int32.unsigned_to_int ofs with Some v -> v | None -> assert false
+    match Int32.unsigned_to_int ofs with
+    | Some v -> v
+    | None ->
+        (* It will be [None] on 32-bit machines which is not
+           supported. We default to [Int32.to_int] instead of [assert
+           false] *)
+        Int32.to_int ofs
   in
   let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)
