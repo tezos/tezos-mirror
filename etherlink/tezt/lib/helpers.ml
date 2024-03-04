@@ -53,14 +53,13 @@ let mapping_position index map_position =
 
 let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
 
-let next_rollup_node_level ~sc_rollup_node ~node ~client =
+let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  let* level = Node.get_level node in
-  Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
+  Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node
 
-let next_evm_level ~evm_node ~sc_rollup_node ~node ~client =
+let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
-  | Proxy _ -> next_rollup_node_level ~sc_rollup_node ~node ~client
+  | Proxy _ -> next_rollup_node_level ~sc_rollup_node ~client
   | Sequencer _ ->
       let open Rpc.Syntax in
       let* _ = Rpc.produce_block evm_node in
@@ -78,7 +77,7 @@ let read_tx_from_file () =
          | [tx_raw; tx_hash] -> (tx_raw, tx_hash)
          | _ -> failwith "Unexpected tx_raw and tx_hash.")
 
-let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client ~node =
+let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client =
   let force_kernel_upgrade_payload =
     (* Framed protocol tag. *)
     "\000"
@@ -95,7 +94,7 @@ let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client ~node =
       client
       (sf "hex:[%S]" force_kernel_upgrade_payload)
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client ~node in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
 let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client

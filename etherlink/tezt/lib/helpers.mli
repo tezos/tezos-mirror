@@ -51,17 +51,16 @@ val mapping_position : string -> int -> string
 (** Transform an hexadecimal string to an integer using {!Z.of_bits}. *)
 val hex_string_to_int : string -> int
 
-(** [next_rollup_node_level ~sc_rollup_node ~node ~client] moves [sc_rollup_node] to
-    the [node]'s next level. *)
+(** [next_rollup_node_level ~sc_rollup_node ~client] moves
+    [sc_rollup_node] to the next level l1. *)
 val next_rollup_node_level :
-  sc_rollup_node:Sc_rollup_node.t -> node:Node.t -> client:Client.t -> int Lwt.t
+  sc_rollup_node:Sc_rollup_node.t -> client:Client.t -> int Lwt.t
 
-(** [next_evm_level ~evm_node ~sc_rollup_node ~node ~client] moves
+(** [next_evm_level ~evm_node ~sc_rollup_node ~client] moves
     [evm_node] to the next L2 level. *)
 val next_evm_level :
   evm_node:Evm_node.t ->
   sc_rollup_node:Sc_rollup_node.t ->
-  node:Node.t ->
   client:Client.t ->
   int Lwt.t
 
@@ -80,7 +79,6 @@ val force_kernel_upgrade :
   sc_rollup_address:string ->
   sc_rollup_node:Sc_rollup_node.t ->
   client:Client.t ->
-  node:Node.t ->
   unit Lwt.t
 
 (** [upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract

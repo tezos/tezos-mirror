@@ -220,7 +220,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
     }
 
 let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
-    ~sc_rollup_node ~node ~client ~l1_contracts ~sc_rollup_address raw_tx =
+    ~sc_rollup_node ~client ~l1_contracts ~sc_rollup_address raw_tx =
   let expected_hash =
     `Hex raw_tx |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
     |> Hex.of_bytes |> Hex.show
@@ -236,11 +236,11 @@ let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   Lwt.return expected_hash
 
 let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
-    ~sc_rollup_node ~sc_rollup_address ~node client =
+    ~sc_rollup_node ~sc_rollup_address client =
   let* () =
     Client.transfer
       ~entrypoint:"deposit"
@@ -251,7 +251,7 @@ let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
       ~burn_cap:Tez.one
       client
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
 let test_remove_sequencer =
@@ -265,7 +265,6 @@ let test_remove_sequencer =
          sequencer;
          proxy;
          sc_rollup_node;
-         node;
          client;
          sc_rollup_address;
          l1_contracts;
@@ -277,7 +276,7 @@ let test_remove_sequencer =
      progressing. *)
   let* _ =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Both are at genesis *)
@@ -300,8 +299,8 @@ let test_remove_sequencer =
   let* missing_block_nb, _hash = Evm_node.wait_for_missing_block sequencer
   and* () =
     (* Produce L1 blocks to show that only the proxy is progressing *)
-    repeat 5 (fun _ ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Sequencer is at genesis, proxy is at [advance]. *)
@@ -350,7 +349,7 @@ let test_publish_blueprints =
     ~title:"Sequencer publishes the blueprints to L1"
     ~uses
   @@ fun protocol ->
-  let* {sequencer; proxy; node; client; sc_rollup_node; _} =
+  let* {sequencer; proxy; client; sc_rollup_node; _} =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
   let* _ =
@@ -368,7 +367,7 @@ let test_publish_blueprints =
      all the blueprints. Stopping the node is then not a problem. *)
   let* () =
     repeat 10 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
 
@@ -401,7 +400,7 @@ let test_resilient_to_rollup_node_disconnect =
   let first_batch_blueprints_count = 5 in
   let ensure_rollup_node_publish = 5 in
 
-  let* {sequencer; proxy; sc_rollup_node; sc_rollup_address; node; client; _} =
+  let* {sequencer; proxy; sc_rollup_node; sc_rollup_address; client; _} =
     setup_sequencer
       ~max_blueprints_lag
       ~max_blueprints_catchup
@@ -426,7 +425,7 @@ let test_resilient_to_rollup_node_disconnect =
   (* Produce some L1 blocks so that the rollup node publishes the blueprints. *)
   let* _ =
     repeat ensure_rollup_node_publish (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -485,7 +484,7 @@ let test_resilient_to_rollup_node_disconnect =
      blueprints *)
   let* _ =
     repeat ensure_rollup_node_publish (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -501,7 +500,7 @@ let test_resilient_to_rollup_node_disconnect =
      the blueprints. *)
   let* _ =
     repeat (2 * catchup_cooldown) (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -578,7 +577,7 @@ let test_send_transaction_to_delayed_inbox =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {client; node; l1_contracts; sc_rollup_address; sc_rollup_node; _} =
+  let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} =
     setup_sequencer protocol
   in
   let raw_transfer =
@@ -590,7 +589,6 @@ let test_send_transaction_to_delayed_inbox =
       ~client
       ~l1_contracts
       ~sc_rollup_address
-      ~node
       ~amount
       ?expect_failure
       raw_transfer
@@ -626,7 +624,7 @@ let test_send_deposit_to_delayed_inbox =
     ~title:"Send a deposit to the delayed inbox"
     ~uses
   @@ fun protocol ->
-  let* {client; node; l1_contracts; sc_rollup_address; sc_rollup_node; _} =
+  let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} =
     setup_sequencer protocol
   in
   let amount = Tez.of_int 16 in
@@ -649,7 +647,6 @@ let test_send_deposit_to_delayed_inbox =
       ~receiver:receiver.address
       ~sc_rollup_node
       ~sc_rollup_address
-      ~node
       client
   in
   let* delayed_transactions_hashes =
@@ -685,7 +682,7 @@ let test_rpc_produceBlock =
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
 
-let wait_for_event ?(levels = 10) event_watcher ~sequencer ~sc_rollup_node ~node
+let wait_for_event ?(levels = 10) event_watcher ~sequencer ~sc_rollup_node
     ~client ~error_msg =
   let event_value = ref None in
   let _ =
@@ -696,7 +693,7 @@ let wait_for_event ?(levels = 10) event_watcher ~sequencer ~sc_rollup_node ~node
   let rec rollup_node_loop n =
     if n = 0 then Test.fail error_msg
     else
-      let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+      let* _ = next_rollup_node_level ~sc_rollup_node ~client in
       let* _ = Rpc.produce_block sequencer in
       match !event_value with
       | Some value -> return value
@@ -704,7 +701,7 @@ let wait_for_event ?(levels = 10) event_watcher ~sequencer ~sc_rollup_node ~node
   in
   Lwt.pick [rollup_node_loop levels]
 
-let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node ~node
+let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
     ~client =
   let event_watcher =
     let added =
@@ -728,13 +725,12 @@ let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node ~node
     event_watcher
     ~sequencer
     ~sc_rollup_node
-    ~node
     ~client
     ~error_msg:
       "Timed out while waiting for transaction to be added to the delayed \
        inbox and injected"
 
-let wait_for_delayed_inbox_fetch ~sequencer ~sc_rollup_node ~node ~client =
+let wait_for_delayed_inbox_fetch ~sequencer ~sc_rollup_node ~client =
   let event_watcher =
     Evm_node.wait_for sequencer "delayed_inbox_fetch_succeeded.v0"
     @@ fun json ->
@@ -745,18 +741,17 @@ let wait_for_delayed_inbox_fetch ~sequencer ~sc_rollup_node ~node ~client =
     event_watcher
     ~sequencer
     ~sc_rollup_node
-    ~node
     ~client
     ~error_msg:"Timed out while waiting for delayed inbox to be fetched"
 
-let wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~node ~client =
+let wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~client =
   let levels = 10 in
   let rec go n =
     if n = 0 then
       Test.fail "Timed out waiting for the delayed inbox to be empty"
     else
       let* nb =
-        wait_for_delayed_inbox_fetch ~sequencer ~sc_rollup_node ~node ~client
+        wait_for_delayed_inbox_fetch ~sequencer ~sc_rollup_node ~client
       in
       if nb = 0 then Lwt.return_unit else go (n - 1)
   in
@@ -770,15 +765,7 @@ let test_delayed_transfer_is_included =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {
-         client;
-         node;
-         l1_contracts;
-         sc_rollup_address;
-         sc_rollup_node;
-         sequencer;
-         _;
-       } =
+  let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
     setup_sequencer protocol
   in
   let endpoint = Evm_node.endpoint sequencer in
@@ -797,18 +784,16 @@ let test_delayed_transfer_is_included =
       ~client
       ~l1_contracts
       ~sc_rollup_address
-      ~node
       raw_transfer
   in
   let* () =
     wait_for_delayed_inbox_add_tx_and_injected
       ~sequencer
       ~sc_rollup_node
-      ~node
       ~client
   in
   let* () =
-    wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~node ~client
+    wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~client
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
@@ -830,15 +815,7 @@ let test_delayed_deposit_is_included =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {
-         client;
-         node;
-         l1_contracts;
-         sc_rollup_address;
-         sc_rollup_node;
-         sequencer;
-         _;
-       } =
+  let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
     setup_sequencer protocol
   in
   let endpoint = Evm_node.endpoint sequencer in
@@ -866,18 +843,16 @@ let test_delayed_deposit_is_included =
       ~receiver:receiver.address
       ~sc_rollup_node
       ~sc_rollup_address
-      ~node
       client
   in
   let* () =
     wait_for_delayed_inbox_add_tx_and_injected
       ~sequencer
       ~sc_rollup_node
-      ~node
       ~client
   in
   let* () =
-    wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~node ~client
+    wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~client
   in
   let* receiver_balance_next =
     Eth_cli.balance ~account:receiver.address ~endpoint
@@ -901,7 +876,7 @@ let test_init_from_rollup_node_data_dir =
       ])
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
   @@ fun protocol ->
-  let* {sc_rollup_node; sequencer; proxy; client; node; _} =
+  let* {sc_rollup_node; sequencer; proxy; client; _} =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
   (* a sequencer is needed to produce an initial block *)
@@ -912,7 +887,7 @@ let test_init_from_rollup_node_data_dir =
   in
   let* () =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* () = Evm_node.terminate sequencer in
@@ -934,7 +909,7 @@ let test_init_from_rollup_node_data_dir =
   let* _ = Rpc.produce_block evm_node' in
   let* () =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -1069,7 +1044,6 @@ let test_upgrade_kernel_auto_sync =
          client;
          sequencer;
          proxy;
-         node;
          _;
        } =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
@@ -1097,7 +1071,7 @@ let test_upgrade_kernel_auto_sync =
   in
   let* () =
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
 
@@ -1121,7 +1095,7 @@ let test_upgrade_kernel_auto_sync =
   in
   let* () =
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
 
@@ -1145,7 +1119,7 @@ let test_delayed_transfer_timeout =
   (* Start the evm node *)
   let* {
          client;
-         node;
+         node = _;
          l1_contracts;
          sc_rollup_address;
          sc_rollup_node;
@@ -1160,7 +1134,7 @@ let test_delayed_transfer_timeout =
   (* Kill the sequencer *)
   let* () = Evm_node.terminate sequencer in
   let endpoint = Evm_node.endpoint proxy in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
@@ -1177,14 +1151,13 @@ let test_delayed_transfer_timeout =
       ~client
       ~l1_contracts
       ~sc_rollup_address
-      ~node
       raw_transfer
   in
   (* Bake a few blocks, should be enough for the tx to time out and be
      forced *)
   let* _ =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
@@ -1208,7 +1181,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   @@ fun protocol ->
   let* {
          client;
-         node;
+         node = _;
          l1_contracts;
          sc_rollup_address;
          sc_rollup_node;
@@ -1223,7 +1196,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   (* Kill the sequencer *)
   let* () = Evm_node.terminate sequencer in
   let endpoint = Evm_node.endpoint proxy in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
@@ -1240,7 +1213,6 @@ let test_delayed_transfer_timeout_fails_l1_levels =
       ~client
       ~l1_contracts
       ~sc_rollup_address
-      ~node
       raw_transfer
   in
   (* Bake a few blocks, should be enough for the tx to time out in terms
@@ -1250,7 +1222,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   *)
   let* _ =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
@@ -1266,7 +1238,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   (* Wait until it's forced *)
   let* _ =
     repeat 15 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
@@ -1293,21 +1265,13 @@ let test_force_kernel_upgrade_too_early =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  let* {
-         sc_rollup_node;
-         l1_contracts;
-         sc_rollup_address;
-         client;
-         sequencer;
-         node;
-         _;
-       } =
+  let* {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _} =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
   in
   (* Wait for the sequencer to publish its genesis block. *)
   let* () =
     repeat 3 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* proxy =
@@ -1338,9 +1302,7 @@ let test_force_kernel_upgrade_too_early =
   in
 
   (* Now we try force the kernel upgrade via an external message. *)
-  let* () =
-    force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~node ~client
-  in
+  let* () = force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client in
 
   (* Assert the kernel version are still the same. *)
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
@@ -1362,21 +1324,13 @@ let test_force_kernel_upgrade =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  let* {
-         sc_rollup_node;
-         l1_contracts;
-         sc_rollup_address;
-         client;
-         sequencer;
-         node;
-         _;
-       } =
+  let* {sc_rollup_node; l1_contracts; sc_rollup_address; client; sequencer; _} =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
   in
   (* Wait for the sequencer to publish its genesis block. *)
   let* () =
     repeat 3 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* proxy =
@@ -1410,7 +1364,7 @@ let test_force_kernel_upgrade =
      kernel will not upgrade. *)
   let* () =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Assert the kernel version is the same, it proves the upgrade did not
@@ -1422,9 +1376,7 @@ let test_force_kernel_upgrade =
 
   (* Now we force the kernel upgrade via an external message. They will
      become unsynchronised. *)
-  let* () =
-    force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~node ~client
-  in
+  let* () = force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client in
 
   (* Assert the kernel version are now different, it shows that only the rollup
      node upgraded. *)
@@ -1444,7 +1396,7 @@ let test_external_transaction_to_delayed_inbox_fails =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {client; node; sequencer; proxy; sc_rollup_node; _} =
+  let* {client; sequencer; proxy; sc_rollup_node; _} =
     setup_sequencer
       protocol
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -1453,8 +1405,8 @@ let test_external_transaction_to_delayed_inbox_fails =
   in
   let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 0 in
   (* Bake a couple more levels for the blueprint to be final *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let raw_tx, _ = read_tx_from_file () |> List.hd in
   let*@ tx_hash = Rpc.send_raw_transaction ~raw_tx proxy in
   (* Bake enough levels to make sure the transaction would be processed
@@ -1462,7 +1414,7 @@ let test_external_transaction_to_delayed_inbox_fails =
   let* () =
     repeat 10 (fun () ->
         let* _ = Rpc.produce_block sequencer in
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   (* Response should be none *)
@@ -1489,7 +1441,7 @@ let test_delayed_inbox_flushing =
   *)
   let* {
          client;
-         node;
+         node = _;
          l1_contracts;
          sc_rollup_address;
          sc_rollup_node;
@@ -1504,7 +1456,7 @@ let test_delayed_inbox_flushing =
   (* Kill the sequencer *)
   let* () = Evm_node.terminate sequencer in
   let endpoint = Evm_node.endpoint proxy in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
@@ -1521,13 +1473,12 @@ let test_delayed_inbox_flushing =
       ~client
       ~l1_contracts
       ~sc_rollup_address
-      ~node
       tx1
   in
   (* Bake a few blocks but not enough for the first tx to be forced! *)
   let* _ =
     repeat 10 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Send the second transaction, a transfer from
@@ -1542,14 +1493,13 @@ let test_delayed_inbox_flushing =
       ~client
       ~l1_contracts
       ~sc_rollup_address
-      ~node
       tx2
   in
   (* Bake a few more blocks to make sure the first tx times out, but not
      the second one. However, the latter should also be included. *)
   let* _ =
     repeat 10 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
@@ -1612,7 +1562,6 @@ let test_migration_from_ghostnet =
   (* Creates a sequencer using prod version and ghostnet kernel. *)
   let* {
          sequencer;
-         node;
          client;
          sc_rollup_node;
          sc_rollup_address;
@@ -1627,7 +1576,7 @@ let test_migration_from_ghostnet =
       ~devmode:false
       ~max_blueprints_lag:0
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let check_kernel_version ~evm_node ~equal expected =
     let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
     if equal then
@@ -1660,7 +1609,7 @@ let test_migration_from_ghostnet =
   in
   let* () =
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   (* Check the consistency. *)
@@ -1679,14 +1628,14 @@ let test_migration_from_ghostnet =
   (* Bakes 2 blocks for the event follower to see the upgrade. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   (* Produce a block to trigger the upgrade. *)
   let* _ = Rpc.produce_block sequencer in
   let* _ =
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   (* Check that the prod sequencer has updated. *)
@@ -1719,7 +1668,7 @@ let test_migration_from_ghostnet =
   in
   let* () =
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   (* Final consistency check. *)
@@ -1742,7 +1691,6 @@ let test_sequencer_upgrade =
          client;
          sequencer;
          proxy;
-         node;
          _;
        } =
     setup_sequencer
@@ -1755,7 +1703,7 @@ let test_sequencer_upgrade =
   let* () =
     (* make sure rollup node saw it *)
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   let* () =
@@ -1785,7 +1733,7 @@ let test_sequencer_upgrade =
     (* 2 block so the sequencer sees the event from the rollup
        node. *)
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   let* () =
@@ -1803,7 +1751,7 @@ let test_sequencer_upgrade =
   in
   let* () =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
@@ -1855,7 +1803,7 @@ let test_sequencer_upgrade =
           unit)
     in
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   let previous_proxy_head = proxy_head in
@@ -1884,7 +1832,7 @@ let test_sequencer_diverge =
     ~title:"Runs two sequencers, one diverge and stop"
     ~uses
   @@ fun protocol ->
-  let* {sc_rollup_node; client; sequencer; node; _} =
+  let* {sc_rollup_node; client; sequencer; _} =
     setup_sequencer
       ~sequencer:Constant.bootstrap1
       ~time_between_blocks:Nothing
@@ -1897,7 +1845,7 @@ let test_sequencer_diverge =
   in
   let* () =
     repeat 3 (fun () ->
-        let* _l1_level = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let sequencer_bis =
@@ -1929,7 +1877,7 @@ let test_sequencer_diverge =
     let* _ = Rpc.produce_block ~timestamp:"0" sequencer
     and* _ = Rpc.produce_block ~timestamp:"1" sequencer_bis in
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   unit
