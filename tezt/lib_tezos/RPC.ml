@@ -92,23 +92,21 @@ let get_network_self = make GET ["network"; "self"] JSON.as_string
 
 let get_network_greylist_ips = make GET ["network"; "greylist"; "ips"] Fun.id
 
-let get_network_greylist_clear =
-  make GET ["network"; "greylist"; "clear"] Fun.id
-
 let get_network_peers =
   make GET ["network"; "peers"] @@ fun json ->
   JSON.(json |> as_list |> List.map @@ fun p -> (p |=> 0 |> as_string, p |=> 1))
 
-let get_network_peer peer_id = make GET ["network"; "peers"; peer_id] Fun.id
+let patch_network_peer peer_id data =
+  make
+    PATCH
+    ["network"; "peers"; peer_id]
+    ~data:(Data (JSON.unannotate data))
+    ignore
 
-let get_network_peer_ban peer_id =
-  make GET ["network"; "peers"; peer_id; "ban"] Fun.id
+let get_network_peer peer_id = make GET ["network"; "peers"; peer_id] Fun.id
 
 let get_network_peer_banned peer_id =
   make GET ["network"; "peers"; peer_id; "banned"] Fun.id
-
-let get_network_peer_unban peer_id =
-  make GET ["network"; "peers"; peer_id; "unban"] Fun.id
 
 let get_chain_blocks ?(chain = "main") () =
   make GET ["chains"; chain; "blocks"] Fun.id
@@ -206,12 +204,6 @@ let get_chain_block_context_liquidity_baking_cpmm_address ?(chain = "main")
     ]
     JSON.as_string
 
-let get_network_peer_untrust peer_id =
-  make GET ["network"; "peers"; peer_id; "untrust"] Fun.id
-
-let get_network_peer_trust peer_id =
-  make GET ["network"; "peers"; peer_id; "trust"] Fun.id
-
 let get_network_points =
   make GET ["network"; "points"] @@ fun json ->
   JSON.(json |> as_list |> List.map @@ fun p -> (p |=> 0 |> as_string, p |=> 1))
@@ -225,25 +217,15 @@ let patch_network_point point_id data =
     ~data:(Data (JSON.unannotate data))
     ignore
 
-let get_network_point_ban point_id =
-  make GET ["network"; "points"; point_id; "ban"] Fun.id
-
 let get_network_point_banned point_id =
   make GET ["network"; "points"; point_id; "banned"] Fun.id
-
-let get_network_point_unban point_id =
-  make GET ["network"; "points"; point_id; "unban"] Fun.id
-
-let get_network_point_untrust point_id =
-  make GET ["network"; "points"; point_id; "untrust"] Fun.id
-
-let get_network_point_trust point_id =
-  make GET ["network"; "points"; point_id; "trust"] Fun.id
 
 let get_network_stat = make GET ["network"; "stat"] Fun.id
 
 let put_network_points point =
   make PUT ["network"; "points"; point] ~data:(Data (`O [])) Fun.id
+
+let delete_network_greylist = make DELETE ["network"; "greylist"] Fun.id
 
 let get_version = make GET ["version"] Fun.id
 
