@@ -1183,3 +1183,33 @@ let json_of_output_tx_batch txs =
         `String
           (match parameters_ty with Some _ -> "typed" | None -> "untyped") );
     ]
+
+let serve_files ?(on_request = fun _ -> ()) ~name ~port ~root f =
+  let server =
+    Cohttp_lwt_unix.Server.make () ~callback:(fun _conn request _body ->
+        match request.meth with
+        | `GET ->
+            let fname =
+              Cohttp.Path.resolve_local_file
+                ~docroot:root
+                ~uri:(Cohttp.Request.uri request)
+            in
+            Log.debug ~prefix:name "Request file %s@." fname ;
+            on_request fname ;
+            Cohttp_lwt_unix.Server.respond_file ~fname ()
+        | _ ->
+            Cohttp_lwt_unix.Server.respond_error
+              ~status:`Method_not_allowed
+              ~body:"Static file server only answers GET"
+              ())
+  in
+  let stop, stopper = Lwt.task () in
+  let serve =
+    Cohttp_lwt_unix.Server.create ~stop ~mode:(`TCP (`Port port)) server
+  in
+  let stopper () =
+    Log.debug ~prefix:name "Stopping" ;
+    Lwt.wakeup_later stopper () ;
+    serve
+  in
+  Lwt.finalize f stopper

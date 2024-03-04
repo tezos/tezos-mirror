@@ -386,3 +386,12 @@ val json_of_output_tx_batch : transaction list -> JSON.u
 
 (** Configure the rollup node to pay more fees for its refute operations. *)
 val prioritize_refute_operations : Sc_rollup_node.t -> unit
+
+(** Run simple http server on [port] that servers static files in the [root] directory. *)
+val serve_files :
+  ?on_request:(string -> unit) ->
+  name:string ->
+  port:int ->
+  root:string ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
