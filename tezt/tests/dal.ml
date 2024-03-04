@@ -492,10 +492,20 @@ let different_delegates pkh =
     (fun del -> not @@ String.equal pkh del.Account.public_key_hash)
     (Array.to_list Account.Bootstrap.keys)
 
+(* We support two formats for specifying the attested slots: either a
+   list of slot ids or a bitset. *)
+type attestation_availability = Slots of int list | Bitset of bool array
+
 let inject_dal_attestation ?level ?(round = 0) ?payload_level ?force ?error
     ?request ~signer ~nb_slots availability client =
-  let dal_attestation = Array.make nb_slots false in
-  List.iter (fun i -> dal_attestation.(i) <- true) availability ;
+  let dal_attestation =
+    match availability with
+    | Bitset bitset -> bitset
+    | Slots availability ->
+        let dal_attestation = Array.make nb_slots false in
+        List.iter (fun i -> dal_attestation.(i) <- true) availability ;
+        dal_attestation
+  in
   let* level =
     match level with Some level -> return level | None -> Client.level client
   in
@@ -558,6 +568,24 @@ let inject_dal_attestations_and_bake node client ~number_of_slots indexes =
   in
   bake_for ~delegates:(`For [baker]) client
 
+let inject_dal_attestation_for_assigned_shards ~nb_slots ~attested_level
+    ~attester_account ~attester_dal_node client =
+  let* attestable_slots =
+    Dal_RPC.(
+      call attester_dal_node
+      @@ get_attestable_slots ~attester:attester_account ~attested_level)
+  in
+  match attestable_slots with
+  | Not_in_committee ->
+      Test.fail "attester %s not in committee" attester_account.alias
+  | Attestable_slots slots ->
+      inject_dal_attestation
+        ~level:(attested_level - 1)
+        (Bitset (Array.of_list slots))
+        ~signer:attester_account
+        ~nb_slots
+        client
+
 let get_validated_dal_attestations_in_mempool node for_level =
   let* mempool_json =
     Node.RPC.call node
@@ -614,7 +642,7 @@ let test_feature_flag _protocol _parameters _cryptobox node client
       ~force:true
       ~nb_slots:params.number_of_slots
       ~signer:Constant.bootstrap1
-      []
+      (Slots [])
       client
   in
   let* (`OpHash oph2) =
@@ -866,14 +894,14 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     inject_dal_attestations
       ~nb_slots
       ~signers:[Constant.bootstrap1; Constant.bootstrap2]
-      [1; 0]
+      (Slots [1; 0])
       client
   in
   let* _ =
     inject_dal_attestations
       ~nb_slots
       ~signers:[Constant.bootstrap3; Constant.bootstrap4; Constant.bootstrap5]
-      [1]
+      (Slots [1])
       client
   in
   let* baker =
@@ -917,7 +945,7 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
       ~nb_slots
       ~level
       ~signer
-      [0]
+      (Slots [0])
       client
   in
   let mempool_is ~__LOC__ expected_mempool =
@@ -1032,7 +1060,7 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
       ~nb_slots
       ~level
       ~signer:Constant.bootstrap1
-      []
+      (Slots [])
       client
   in
   (* Set up a new account that holds the right amount of tez and make sure it
@@ -1115,7 +1143,12 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
           ~error_msg:
             "The new account is not a validator, the test needs to be adapted") ;
       let* (`OpHash _oph) =
-        inject_dal_attestation ~nb_slots ~level ~signer:new_account [] client
+        inject_dal_attestation
+          ~nb_slots
+          ~level
+          ~signer:new_account
+          (Slots [])
+          client
       in
       (* Bake with all the bootstrap accounts, but not with the new account. *)
       let* () =
@@ -1250,7 +1283,7 @@ let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client node
       content
   in
   let* () = repeat attestation_lag (fun () -> bake_for client) in
-  inject_dal_attestations_and_bake node client ~number_of_slots [index]
+  inject_dal_attestations_and_bake node client ~number_of_slots (Slots [index])
 
 let check_get_commitment dal_node ~slot_level check_result slots_info =
   Lwt_list.iter_s
@@ -1500,7 +1533,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       node
       client
       ~number_of_slots
-      (List.map fst attested)
+      (Slots (List.map fst attested))
   in
   let* () = bake_for ~count:2 client in
   let* () = wait_block_processing3 in
@@ -2019,7 +2052,7 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
   Log.info "Step 6: attest only slots 1 and 2" ;
   let* () = repeat (attestation_lag - 1) (fun () -> bake_for client) in
   let* () =
-    inject_dal_attestations_and_bake node client ~number_of_slots [2; 1]
+    inject_dal_attestations_and_bake node client ~number_of_slots (Slots [2; 1])
   in
   let* slot_confirmed_level =
     Sc_rollup_node.wait_for_level
