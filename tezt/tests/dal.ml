@@ -237,7 +237,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
     ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) f ~protocol =
+    ?(parameters = []) ?smart_rollup_timeout_period_in_blocks f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -269,8 +269,12 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_string_parameter
         ["delay_increment_per_round"]
         delay_increment_per_round
+    @ make_int_parameter
+        ["smart_rollup_timeout_period_in_blocks"]
+        smart_rollup_timeout_period_in_blocks
     @ parameters
   in
+
   let* node, client, dal_parameters =
     setup_node
       ?custom_constants
@@ -410,8 +414,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
-    ?activation_timestamp ?bootstrap_profile ?producer_profiles variant scenario
-    =
+    ?activation_timestamp ?bootstrap_profile ?producer_profiles
+    ?smart_rollup_timeout_period_in_blocks variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   test
     ~regression:true
@@ -436,6 +440,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?minimal_block_delay
         ?delay_increment_per_round
         ?activation_timestamp
+        ?smart_rollup_timeout_period_in_blocks
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
