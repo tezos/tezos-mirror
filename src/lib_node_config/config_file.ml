@@ -34,7 +34,8 @@ let default_data_dir = home // ".tezos-node"
 
 let default_rpc_port = 8732
 
-let default_max_active_rpc_connections = 100
+let default_max_active_rpc_connections =
+  RPC_server.Max_active_rpc_connections.default
 
 let default_metrics_port = 9932
 
@@ -363,7 +364,7 @@ and rpc = {
   tls : tls option;
   acl : RPC_server.Acl.policy;
   media_type : Media_type.Command_line.t;
-  max_active_rpc_connections : int;
+  max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
 }
 
 and tls = {cert : string; key : string}
@@ -667,7 +668,7 @@ let rpc : rpc Data_encoding.t =
              "max_active_rpc_connections"
              ~description:
                "The maximum number of active connections per RPC endpoint."
-             int31
+             RPC_server.Max_active_rpc_connections.encoding
              default_rpc.max_active_rpc_connections)))
 
 let rpc_encoding = rpc

@@ -66,7 +66,7 @@ type t = {
   latency : int option;
   allow_all_rpc : P2p_point.Id.addr_port_id list;
   media_type : Media_type.Command_line.t;
-  max_active_rpc_connections : int option;
+  max_active_rpc_connections : RPC_server.Max_active_rpc_connections.t;
   metrics_addr : string list;
   operation_metadata_size_limit :
     Shell_limits.operation_metadata_size_limit option;
@@ -727,10 +727,24 @@ module Term = struct
       & info ~docs ~doc ~docv:"MEDIATYPE" ["media-type"])
 
   let max_active_rpc_connections =
+    let open RPC_server.Max_active_rpc_connections in
     let doc = "Sets the maximum number of active connections per RPC server." in
+    let get_max_active_connections str =
+      match int_of_string_opt str with
+      | Some max_active_rpc_connections when max_active_rpc_connections >= 0 ->
+          `Ok (Limited max_active_rpc_connections)
+      | Some _ | None ->
+          if String.equal str "unlimited" then `Ok Unlimited
+          else
+            `Error
+              "max-active-rpc-connection must be a non-negative integer or \
+               \"unlimited\""
+    in
     Arg.(
       value
-      & opt (some int) (Some Config_file.default_max_active_rpc_connections)
+      & opt
+          (get_max_active_connections, pp_parameter)
+          Config_file.default_max_active_rpc_connections
       & info ~docs ~doc ~docv:"NUM" ["max-active-rpc-connections"])
 
   (* Args. *)
@@ -1035,7 +1049,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ~external_rpc_listen_addrs
     ~allow_all_rpc
     ~media_type
-    ?max_active_rpc_connections
+    ~max_active_rpc_connections
     ~metrics_addr
     ?operation_metadata_size_limit
     ~private_mode

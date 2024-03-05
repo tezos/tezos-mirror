@@ -32,6 +32,17 @@ module RPC_logging : Resto_cohttp_server.Server.LOGGING
 include module type of
     Resto_cohttp_server.Server.Make (Tezos_rpc.Encoding) (RPC_logging)
 
+(** Limits (or not) the number of maximum allowed RPC connections at any given time *)
+module Max_active_rpc_connections : sig
+  type t = Unlimited | Limited of int
+
+  val default : t
+
+  val encoding : t Data_encoding.t
+
+  val pp_parameter : Format.formatter -> t -> unit
+end
+
 (** [launch ?host server ?conn_closed ?callback
     ?max_active_connections listening_protocol] starts the given resto
     [server] initiating the listening loop using the
@@ -51,7 +62,7 @@ val launch :
   server ->
   ?conn_closed:(Cohttp_lwt_unix.Server.conn -> unit) ->
   ?callback:callback ->
-  ?max_active_connections:int ->
+  ?max_active_connections:Max_active_rpc_connections.t ->
   Conduit_lwt_unix.server ->
   unit Lwt.t
 
