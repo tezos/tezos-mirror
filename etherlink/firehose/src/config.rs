@@ -22,6 +22,8 @@ use tokio::task::spawn_blocking;
 
 use std::path::{Path, PathBuf};
 
+use crate::client::Client;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     endpoint: String,
@@ -118,6 +120,25 @@ impl Config {
 
     pub fn workers(&self) -> &[Account] {
         self.workers.as_slice()
+    }
+
+    /// Remove any workers with no XTZ balance
+    pub async fn cleanup_workers(&mut self, client: &Client) -> Result<()> {
+        let mut workers = Vec::with_capacity(self.workers.len());
+
+        for worker in self.workers.iter().cloned() {
+            let wallet: LocalWallet = worker.clone().into();
+            let balance = client.balance(wallet.address()).await?;
+            if !balance.is_zero() {
+                workers.push(worker);
+            }
+        }
+
+        println!("Deleting {} empty worker accounts", self.workers.len() - workers.len());
+
+        self.workers = workers;
+
+        Ok(())
     }
 }
 

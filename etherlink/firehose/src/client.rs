@@ -116,4 +116,51 @@ impl Client {
 
         receipt.ok_or_else(|| anyhow::anyhow!("failed to gather receipt"))
     }
+
+    pub async fn transfer_all_xtz(
+        &self,
+        from_wallet: &LocalWallet,
+        to: H160,
+    ) -> Result<(TransactionReceipt, U256)> {
+        let from = from_wallet.address();
+
+        let (gas_price, nonce, balance) =
+            try_join!(self.gas_price(), self.nonce(from), self.balance(from))?;
+
+        if balance.is_zero() {
+            anyhow::bail!("Account {from} contains no XTZ");
+        }
+
+        let mut tx: TypedTransaction = TransactionRequest::new()
+            .from(from)
+            .to(to)
+            .value(U256::zero())
+            .gas_price(gas_price)
+            .nonce(nonce)
+            .chain_id(self.chain_id)
+            .into();
+
+        let gas_limit = self.client.estimate_gas(&tx, None).await?;
+        tx.set_gas(gas_limit);
+
+        let fees = gas_limit * gas_price;
+        if fees >= balance {
+            anyhow::bail!("Account {from} balance {balance} too low to pay for fees {fees}");
+        }
+
+        tx.set_value(balance - fees);
+
+        let sig = from_wallet.sign_transaction_sync(&tx)?;
+        let raw_tx = tx.rlp_signed(&sig);
+
+        let receipt = self
+            .client
+            .send_raw_transaction(raw_tx)
+            .await?
+            .confirmations(DEFAULT_CONFIRMATIONS)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("failed to gather receipt"))?;
+
+        Ok((receipt, balance - fees))
+    }
 }

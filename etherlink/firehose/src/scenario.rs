@@ -129,4 +129,26 @@ impl<'a> Setup<'a> {
 
         Ok(())
     }
+
+    pub async fn defund_workers_xtz(&self) -> Result<()> {
+        println!(
+            "[SCENARIO] transfer all xtz from {} workers",
+            self.workers.len()
+        );
+
+        let to = self.client.controller_address();
+
+        for (_, worker) in self.workers.iter() {
+            let result = self.client.transfer_all_xtz(worker, to).await;
+            match result {
+                Ok((receipt, amount)) => println!(
+                    "controller funded with {} from {} | hash: {:?}",
+                    amount, receipt.from, receipt.transaction_hash
+                ),
+                Err(e) => println!("{e}"),
+            }
+        }
+
+        Ok(())
+    }
 }

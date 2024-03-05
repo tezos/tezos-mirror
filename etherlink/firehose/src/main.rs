@@ -56,6 +56,8 @@ enum Commands {
         #[arg(long)]
         workers: usize,
     },
+    #[command(long_about = "Move XTZ funds from any workers back to the controller")]
+    Cleanup,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -117,6 +119,16 @@ async fn main() -> Result<()> {
 
             setup.fund_workers_xtz(ONE_XTZ_IN_WEI.into()).await?;
             setup.xtz_transfers().await?;
+        }
+        Commands::Cleanup => {
+            let mut config = Config::load(&config_path).await?;
+            let client = Client::new(&config).await?;
+            let setup = Setup::new(&config, &client, config.workers().len())?;
+
+            setup.defund_workers_xtz().await?;
+
+            config.cleanup_workers(&client).await?;
+            config.save(&config_path).await?;
         }
     };
 
