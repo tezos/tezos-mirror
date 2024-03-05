@@ -110,10 +110,11 @@ module Full_denunciation = struct
       list2
 end
 
-let apply_slashing_account
+let apply_slashing_account all_denunciations_to_apply
     ( culprit,
       Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash = _}
     ) (block_before_slash : Block.t) (state : State.t) =
+  let open Lwt_result_syntax in
   let open State_account in
   let constants = state.constants in
   let (account_map : State_account.account_map) = state.account_map in
@@ -139,16 +140,19 @@ let apply_slashing_account
   in
   let culprit_name = find_account_name_from_pkh_exn culprit account_map in
   let rewarded_name = find_account_name_from_pkh_exn rewarded account_map in
-  let slashed_pct =
+  let* slashed_pct =
     match misbehaviour.kind with
     | Double_baking ->
-        constants
-          .Protocol.Alpha_context.Constants.Parametric
-           .percentage_of_frozen_deposits_slashed_per_double_baking
+        return
+          constants
+            .Protocol.Alpha_context.Constants.Parametric
+             .percentage_of_frozen_deposits_slashed_per_double_baking
     | Double_attesting | Double_preattesting ->
         State_ai_flags.NS.get_double_attestation_slashing_percentage
+          all_denunciations_to_apply
           block_before_slash
           state
+          misbehaviour
   in
   let get_total_supply acc_map =
     String.Map.fold
@@ -230,14 +234,17 @@ let apply_slashing_account
   let actual_total_burnt_amount =
     Tez.(total_before_slash -! total_after_slash -! reward_to_snitch)
   in
-  (account_map, actual_total_burnt_amount)
+  return (account_map, actual_total_burnt_amount)
 
-let apply_slashing_state
+let apply_slashing_state all_denunciations_to_apply
     ( culprit,
       Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash} )
-    block_before_slash (state : State.t) : State.t * Tez_helpers.t =
-  let account_map, total_burnt =
+    block_before_slash (state : State.t) :
+    (State.t * Tez_helpers.t) tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let* account_map, total_burnt =
     apply_slashing_account
+      all_denunciations_to_apply
       (culprit, {rewarded; misbehaviour; operation_hash})
       block_before_slash
       state
@@ -249,10 +256,11 @@ let apply_slashing_state
       [culprit; rewarded]
   in
   let state = State.update_map ~log_updates ~f:(fun _ -> account_map) state in
-  (state, total_burnt)
+  return (state, total_burnt)
 
 let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
-    (state : State.t) : State.t =
+    (state : State.t) : State.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
   let to_slash_later, to_slash_now =
     if
       not
@@ -274,15 +282,15 @@ let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
           Protocol.Alpha_context.Cycle.(cycle = current_cycle))
         state.pending_slashes
   in
-  let state, total_burnt =
-    List.fold_left
+  let* state, total_burnt =
+    List.fold_left_es
       (fun (acc_state, acc_total) x ->
-        let state, burnt =
-          apply_slashing_state x block_before_slash acc_state
+        let* state, burnt =
+          apply_slashing_state to_slash_now x block_before_slash acc_state
         in
-        (state, Tez_helpers.(acc_total +! burnt)))
+        return (state, Tez_helpers.(acc_total +! burnt)))
       (state, Tez_helpers.zero)
       to_slash_now
   in
   let total_supply = Tez_helpers.(state.total_supply -! total_burnt) in
-  {state with pending_slashes = to_slash_later; total_supply}
+  return {state with pending_slashes = to_slash_later; total_supply}

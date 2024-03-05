@@ -30,6 +30,8 @@ open Environment
 
 type t = B of Block.t | I of Incremental.t
 
+val get_alpha_ctxt : ?policy:Block.baker_policy -> t -> context tzresult Lwt.t
+
 val branch : t -> Block_hash.t
 
 val pred_branch : t -> Block_hash.t

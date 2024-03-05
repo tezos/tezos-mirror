@@ -53,5 +53,9 @@ module NS : sig
   (** Whatever the value of the flag is, this function returns the
       slashing value for a given double attestation *)
   val get_double_attestation_slashing_percentage :
-    Block.t -> State.t -> Protocol.Percentage.t
+    (Signature.public_key_hash * Protocol.Denunciations_repr.item) list ->
+    Block.t ->
+    State.t ->
+    Protocol.Misbehaviour_repr.t ->
+    Protocol.Percentage.t tzresult Lwt.t
 end

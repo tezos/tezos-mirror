@@ -188,15 +188,45 @@ module NS = struct
   let enabled (block : Block.t) (state : State.t) =
     AI.enabled block state && state.constants.adaptive_issuance.ns_enable
 
-  let get_double_attestation_slashing_percentage block_before_slash state =
+  let get_double_attestation_slashing_percentage all_denunciations_to_apply
+      block_before_slash state (misbehaviour : Protocol.Misbehaviour_repr.t) =
+    let open Lwt_result_wrap_syntax in
     (* We need to get the block before the slash, because after the slash,
        the context gets rid of the required Seed to recompute the rights
        for the misbehaving delegates. *)
     if not (enabled block_before_slash state) then
-      state.constants
-        .percentage_of_frozen_deposits_slashed_per_double_attestation
+      return
+        state.constants
+          .percentage_of_frozen_deposits_slashed_per_double_attestation
     else
-      (* TODO *)
-      state.constants
-        .percentage_of_frozen_deposits_slashed_per_double_attestation
+      let* alpha_ctxt =
+        Context.(
+          get_alpha_ctxt ?policy:state.baking_policy (B block_before_slash))
+      in
+      let raw_ctxt =
+        Protocol.Alpha_context.Internal_for_tests.to_raw alpha_ctxt
+      in
+      let level =
+        Protocol.Level_repr.level_from_raw
+          ~cycle_eras:(Protocol.Raw_context.cycle_eras raw_ctxt)
+          misbehaviour.level
+      in
+      let delegates =
+        List.filter
+          (fun (_, (den : Protocol.Denunciations_repr.item)) ->
+            Compare.Int.(
+              Protocol.Misbehaviour_repr.compare misbehaviour den.misbehaviour
+              = 0))
+          all_denunciations_to_apply
+        |> List.map fst
+        |> List.sort_uniq Signature.Public_key_hash.compare
+      in
+      let*@ _, pct =
+        Protocol.Slash_percentage.get
+          raw_ctxt
+          ~kind:misbehaviour.kind
+          ~level
+          delegates
+      in
+      return pct
 end
