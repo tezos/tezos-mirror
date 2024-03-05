@@ -94,7 +94,18 @@ function parse_data(opcode, gas_and_result) {
 /// Parses the section and push the sample into the set of opcodes.
 function push_profiler_sections(output, opcodes, precompiles) {
     const section_regex = /\__wasm_debugger__::Section{ticks:(\d+);data:\((0x[0-9a-fA-F]*),0x([0-9a-fA-F]*)\)}/g;
-    let precompiled_address_set = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 255 * Math.pow(2, 30) + 1]);
+    let precompiled_address_set = new Set([
+      "0x0000000000000000000000000000000000000001",
+      "0x0000000000000000000000000000000000000002",
+      "0x0000000000000000000000000000000000000003",
+      "0x0000000000000000000000000000000000000004",
+      "0x0000000000000000000000000000000000000005",
+      "0x0000000000000000000000000000000000000006",
+      "0x0000000000000000000000000000000000000007",
+      "0x0000000000000000000000000000000000000008",
+      "0x0000000000000000000000000000000000000009",
+      "0xff00000000000000000000000000000000000001"
+    ]);
 
     for (const match of output.matchAll(section_regex)) {
         let is_opcode_data = match[2].length == 4;
@@ -109,7 +120,7 @@ function push_profiler_sections(output, opcodes, precompiles) {
             }
         } else {
             let ticks = parseInt(match[1]);
-            let address = parseInt(match[2].substring(0, 42));
+            let address = match[2].substring(0, 42);
             let data_size = parseInt("0x" + match[2].substring(42));
             if (precompiled_address_set.has(address)) {
                 precompiles.push({ "address": address, "data_size": data_size, "ticks": ticks })

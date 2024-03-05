@@ -11,7 +11,7 @@ let long_string = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed 
 let sha_precompile_address = "0000000000000000000000000000000000000002"
 let ripemd_precompile_address = "0000000000000000000000000000000000000003"
 let identity_precompile_address = "0000000000000000000000000000000000000004"
-let withdrawal_precompile_address = "0000000000000000000000000000000000000020"
+let withdrawal_precompile_address = "ff00000000000000000000000000000000000001"
 
 let withdraw_calldata_prefix =  "0xcda4fee2"
 
