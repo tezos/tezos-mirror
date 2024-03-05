@@ -1206,16 +1206,18 @@ let start_with_acl address acl =
 let test_network test_mode_tag _protocol ?endpoint client =
   let test peer_id =
     let call rpc = Client.RPC.call ?endpoint client rpc in
+    let patch_acl value =
+      JSON.parse ~origin:"RPC patch data" ("{\"acl\":\"" ^ value ^ "\"}")
+    in
     let* _ = call @@ RPC.get_network_connection peer_id in
-    let* _ = call RPC.get_network_greylist_clear in
+    let* _ = call RPC.delete_network_greylist in
     (* Peers *)
     let* _ = call RPC.get_network_peers in
     let* _ = call @@ RPC.get_network_peer peer_id in
-    let* _ = call @@ RPC.get_network_peer_ban peer_id in
+    let* _ = call @@ RPC.patch_network_peer peer_id (patch_acl "ban") in
     let* _ = call @@ RPC.get_network_peer_banned peer_id in
-    let* _ = call @@ RPC.get_network_peer_unban peer_id in
-    let* _ = call @@ RPC.get_network_peer_untrust peer_id in
-    let* _ = call @@ RPC.get_network_peer_trust peer_id in
+    let* _ = call @@ RPC.patch_network_peer peer_id (patch_acl "open") in
+    let* _ = call @@ RPC.patch_network_peer peer_id (patch_acl "trust") in
     (* Connections *)
     let* points = call @@ RPC.get_network_points in
     let point_id =
@@ -1224,14 +1226,11 @@ let test_network test_mode_tag _protocol ?endpoint client =
       | _ -> Test.fail "Expected at least one point."
     in
     let* _ = call @@ RPC.get_network_point point_id in
-    let* _ = call @@ RPC.get_network_point_ban point_id in
+    let* _ = call @@ RPC.patch_network_point point_id (patch_acl "ban") in
     let* _ = call @@ RPC.get_network_point_banned point_id in
-    let* _ = call @@ RPC.get_network_point_unban point_id in
-    let* _ = call @@ RPC.get_network_point_untrust point_id in
-    let* _ = call @@ RPC.get_network_point_trust point_id in
+    let* _ = call @@ RPC.patch_network_point point_id (patch_acl "open") in
+    let* _ = call @@ RPC.patch_network_point point_id (patch_acl "trust") in
     let* _ = call RPC.get_network_stat in
-    let* _ = call RPC.get_network_version in
-    let* _ = call RPC.get_network_versions in
     unit
   in
   match test_mode_tag with
@@ -1298,6 +1297,7 @@ let test_misc_shell _test_mode_tag protocol ?endpoint client =
   let* _ = Client.RPC.call ?endpoint client @@ RPC.get_stats_gc in
   let* _ = Client.RPC.call ?endpoint client @@ RPC.get_stats_memory in
   let* _ = Client.RPC.call ?endpoint client @@ RPC.get_config in
+  let* _ = Client.RPC.call ?endpoint client @@ RPC.get_version in
   unit
 
 let test_chain _test_mode_tag _protocol ?endpoint client =

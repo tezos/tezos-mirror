@@ -30,11 +30,6 @@ val self : #simple -> P2p_peer.Id.t tzresult Lwt.t
 
 val stat : #simple -> P2p_stat.t tzresult Lwt.t
 
-val version : #simple -> Network_version.t tzresult Lwt.t
-
-(* DEPRECATED: use [version] instead. *)
-val versions : #simple -> Network_version.t list tzresult Lwt.t
-
 val events :
   #streamed ->
   (P2p_connection.P2p_event.t Lwt_stream.t * stopper) tzresult Lwt.t
@@ -46,13 +41,6 @@ module S : sig
   val self : ([`GET], unit, unit, unit, unit, P2p_peer.Id.t) Tezos_rpc.Service.t
 
   val stat : ([`GET], unit, unit, unit, unit, P2p_stat.t) Tezos_rpc.Service.t
-
-  val version :
-    ([`GET], unit, unit, unit, unit, Network_version.t) Tezos_rpc.Service.t
-
-  (* DEPRECATED: use [version] instead. *)
-  val versions :
-    ([`GET], unit, unit, unit, unit, Network_version.t list) Tezos_rpc.Service.t
 
   val events :
     ( [`GET],
@@ -169,46 +157,6 @@ module Points : sig
         P2p_point.Pool_event.t list )
       Tezos_rpc.Service.t
 
-    (* DEPRECATED *)
-    val ban :
-      ( [`GET],
-        unit,
-        unit * P2p_point.Id.t,
-        unit,
-        unit,
-        unit )
-      Tezos_rpc.Service.t
-
-    (* DEPRECATED *)
-    val unban :
-      ( [`GET],
-        unit,
-        unit * P2p_point.Id.t,
-        unit,
-        unit,
-        unit )
-      Tezos_rpc.Service.t
-
-    (* DEPRECATED *)
-    val trust :
-      ( [`GET],
-        unit,
-        unit * P2p_point.Id.t,
-        unit,
-        unit,
-        unit )
-      Tezos_rpc.Service.t
-
-    (* DEPRECATED *)
-    val untrust :
-      ( [`GET],
-        unit,
-        unit * P2p_point.Id.t,
-        unit,
-        unit,
-        unit )
-      Tezos_rpc.Service.t
-
     val banned :
       ( [`GET],
         unit,
@@ -288,18 +236,6 @@ module Peers : sig
         (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )
       Tezos_rpc.Service.service
 
-    val ban :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
-
-    val unban :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
-
-    val trust :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
-
-    val untrust :
-      ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, unit) Tezos_rpc.Service.t
-
     val banned :
       ([`GET], unit, unit * P2p_peer.Id.t, unit, unit, bool) Tezos_rpc.Service.t
   end
@@ -324,8 +260,6 @@ module ACL : sig
   val get_greylisted_ips : #simple -> ip_list tzresult Lwt.t
 
   module S : sig
-    val clear : ([`GET], unit, unit, unit, unit, unit) Tezos_rpc.Service.t
-
     val clear_delete :
       ([`DELETE], unit, unit, unit, unit, unit) Tezos_rpc.Service.t
 

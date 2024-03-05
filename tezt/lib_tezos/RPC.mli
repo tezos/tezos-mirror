@@ -80,9 +80,6 @@ val get_network_self : string t
 (** RPC: [GET /network/greylist/ips] *)
 val get_network_greylist_ips : JSON.t t
 
-(** RPC: [GET /network/greylist/clear] *)
-val get_network_greylist_clear : JSON.t t
-
 (** RPC: [GET /chains/<chain>/blocks]
 
     [chain] defaults to ["main"]. *)
@@ -188,20 +185,11 @@ val get_network_peers : (string * JSON.t) list t
 (** RPC: [GET /network/peers/<peer_id>] *)
 val get_network_peer : string -> JSON.t t
 
-(** RPC: [GET /network/peer/<peer_id>/ban] *)
-val get_network_peer_ban : string -> JSON.t t
+(** RPC: [PATCH /network/peers/<peer_id>] *)
+val patch_network_peer : string -> JSON.t -> unit t
 
 (** RPC: [GET /network/peers/<peer_id>/banned] *)
 val get_network_peer_banned : string -> JSON.t t
-
-(** RPC: [GET /network/peers/<peer_id>/unban] *)
-val get_network_peer_unban : string -> JSON.t t
-
-(** RPC: [GET /network/peers/<peer_id>/untrust] *)
-val get_network_peer_untrust : string -> JSON.t t
-
-(** RPC: [GET /network/peers/<peer_id>/trust] *)
-val get_network_peer_trust : string -> JSON.t t
 
 (** RPC: [GET /network/points] *)
 val get_network_points : (string * JSON.t) list t
@@ -212,32 +200,17 @@ val get_network_point : string -> JSON.t t
 (** RPC: [PATCH /network/points] *)
 val patch_network_point : string -> JSON.t -> unit t
 
-(** RPC: [GET /network/points/<point_id>/ban] *)
-val get_network_point_ban : string -> JSON.t t
-
 (** RPC: [GET /network/points/<point_id>/banned] *)
 val get_network_point_banned : string -> JSON.t t
-
-(** RPC: [GET /network/points/<point_id>/unban] *)
-val get_network_point_unban : string -> JSON.t t
-
-(** RPC: [GET /network/points/<point_id>/untrust] *)
-val get_network_point_untrust : string -> JSON.t t
-
-(** RPC: [GET /network/points/<point_id>/trust] *)
-val get_network_point_trust : string -> JSON.t t
 
 (** RPC: [GET /network/stat] *)
 val get_network_stat : JSON.t t
 
-(** RPC: [GET /network/version] *)
-val get_network_version : JSON.t t
-
-(** RPC: [GET /network/versions] *)
-val get_network_versions : JSON.t t
-
 (** RPC: [PUT /network/points/<point>] *)
 val put_network_points : string -> JSON.t t
+
+(** RPC: [DELETE /network/greylist] *)
+val delete_network_greylist : JSON.t t
 
 (** RPC: [GET /versions] *)
 val get_version : JSON.t t
