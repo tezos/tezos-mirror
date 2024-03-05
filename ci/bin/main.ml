@@ -244,32 +244,32 @@ let job_dummy : job =
 
    §2: We also perform some fast sanity checks. *)
 let trigger =
-  job_external
-  @@ job
-       ~__POS__
-       ~image:Images.alpine
-       ~stage:Stages.trigger
-       ~allow_failure:No
-       ~rules:
-         [
-           job_rule
-             ~if_:(If.not Rules.assigned_to_marge_bot)
-             ~allow_failure:No
-             ~when_:Manual
-             ();
-           job_rule ~when_:Always ();
-         ]
-       ~timeout:(Minutes 10)
-       ~name:"trigger"
-       [
-         "echo 'Trigger pipeline!'";
-         (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
-            [scripts/version.sh]'s [opam_repository_tag] are the same. *)
-         "./scripts/ci/check_opam_repository_tag.sh";
-         (* Check that the Alpine version of the trigger job's image
-            corresponds to the value in scripts/version.sh. *)
-         "./scripts/ci/check_alpine_version.sh";
-       ]
+  job
+    ~__POS__
+    ~image:Images.alpine
+    ~stage:Stages.trigger
+    ~allow_failure:No
+    ~rules:
+      [
+        job_rule
+          ~if_:(If.not Rules.assigned_to_marge_bot)
+          ~allow_failure:No
+          ~when_:Manual
+          ();
+        job_rule ~when_:Always ();
+      ]
+    ~timeout:(Minutes 10)
+    ~name:"trigger"
+    [
+      "echo 'Trigger pipeline!'";
+      (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
+         [scripts/version.sh]'s [opam_repository_tag] are the same. *)
+      "./scripts/ci/check_opam_repository_tag.sh";
+      (* Check that the Alpine version of the trigger job's image
+         corresponds to the value in scripts/version.sh. *)
+      "./scripts/ci/check_alpine_version.sh";
+    ]
+  |> job_external
 
 (** Helper to create jobs that uses the docker deamon.
 
@@ -360,40 +360,40 @@ let rules_static_build_master = [job_rule ~when_:Always ()]
 let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
 
 let _job_static_arm64_experimental =
-  job_external ~filename_suffix:"experimental"
-  @@ job_build_static_binaries
-       ~__POS__
-       ~arch:Arm64
-       ~rules:rules_static_build_other
-       ()
+  job_build_static_binaries
+    ~__POS__
+    ~arch:Arm64
+    ~rules:rules_static_build_other
+    ()
+  |> job_external ~filename_suffix:"experimental"
 
 let _job_static_arm64_master =
-  job_external ~filename_suffix:"master"
-  @@ job_build_static_binaries
-       ~__POS__
-       ~arch:Arm64
-       ~rules:rules_static_build_master
-       ()
+  job_build_static_binaries
+    ~__POS__
+    ~arch:Arm64
+    ~rules:rules_static_build_master
+    ()
+  |> job_external ~filename_suffix:"master"
 
 let _job_static_x86_64_experimental =
-  job_external ~filename_suffix:"experimental"
-  @@ job_build_static_binaries
-       ~__POS__
-       ~arch:Amd64
-       ~needs_trigger:true
-       ~rules:rules_static_build_other
-       ()
+  job_build_static_binaries
+    ~__POS__
+    ~arch:Amd64
+    ~needs_trigger:true
+    ~rules:rules_static_build_other
+    ()
+  |> job_external ~filename_suffix:"experimental"
 
 let _job_static_x86_64_master =
-  job_external ~filename_suffix:"master"
-  @@ job_build_static_binaries
-       ~__POS__
-       ~arch:Amd64
-         (* TODO: this job doesn't actually need trigger and there is no
-            need to set it optional since we know this job is only on the master branch. *)
-       ~needs_trigger:true
-       ~rules:rules_static_build_master
-       ()
+  job_build_static_binaries
+    ~__POS__
+    ~arch:Amd64
+      (* TODO: this job doesn't actually need trigger and there is no
+         need to set it optional since we know this job is only on the master branch. *)
+    ~needs_trigger:true
+    ~rules:rules_static_build_master
+    ()
+  |> job_external ~filename_suffix:"master"
 
 let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
   job_docker_authenticated
@@ -411,23 +411,23 @@ let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
     ["./scripts/ci/docker_rust_toolchain_build.sh"]
 
 let _job_docker_rust_toolchain_before_merging =
-  job_external ~filename_suffix:"before_merging"
-  @@ job_docker_rust_toolchain
-       ~__POS__
-       ~dependencies:(Dependent [Optional trigger])
-       ~rules:
-         [
-           job_rule ~changes:changeset_octez_or_kernels ~when_:On_success ();
-           job_rule ~when_:Manual ();
-         ]
-       ()
+  job_docker_rust_toolchain
+    ~__POS__
+    ~dependencies:(Dependent [Optional trigger])
+    ~rules:
+      [
+        job_rule ~changes:changeset_octez_or_kernels ~when_:On_success ();
+        job_rule ~when_:Manual ();
+      ]
+    ()
+  |> job_external ~filename_suffix:"before_merging"
 
 let _job_docker_rust_toolchain_master =
-  job_external ~filename_suffix:"master"
-  @@ job_docker_rust_toolchain ~__POS__ ~rules:[job_rule ~when_:Always ()] ()
+  job_docker_rust_toolchain ~__POS__ ~rules:[job_rule ~when_:Always ()] ()
+  |> job_external ~filename_suffix:"master"
 
 let _job_docker_rust_toolchain_other =
-  job_external ~filename_suffix:"other" @@ job_docker_rust_toolchain ~__POS__ ()
+  job_docker_rust_toolchain ~__POS__ () |> job_external ~filename_suffix:"other"
 
 (** Type of Docker build jobs.
 
@@ -590,19 +590,19 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ["./scripts/ci/docker_merge_manifests.sh"]
 
 let _job_docker_merge_manifests_release =
-  job_external ~filename_suffix:"release"
-  @@ job_docker_merge_manifests
-       ~__POS__
-       ~ci_docker_hub:true
-         (* TODO: In theory, actually uses either release or
-            experimental variant of docker jobs depending on
-            pipeline. In practice, this does not matter as these jobs
-            have the same name in the generated files
-            ([oc.build:ARCH]). However, when the merge_manifest jobs
-            are created directly in the appropriate pipeline, the
-            correcty variant must be used. *)
-       ~job_docker_amd64:job_docker_amd64_experimental
-       ~job_docker_arm64:job_docker_arm64_experimental
+  job_docker_merge_manifests
+    ~__POS__
+    ~ci_docker_hub:true
+      (* TODO: In theory, actually uses either release or
+         experimental variant of docker jobs depending on
+         pipeline. In practice, this does not matter as these jobs
+         have the same name in the generated files
+         ([oc.build:ARCH]). However, when the merge_manifest jobs
+         are created directly in the appropriate pipeline, the
+         correcty variant must be used. *)
+    ~job_docker_amd64:job_docker_amd64_experimental
+    ~job_docker_arm64:job_docker_arm64_experimental
+  |> job_external ~filename_suffix:"release"
 
 type bin_package_target = Dpkg | Rpm
 
@@ -679,44 +679,44 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
     ]
 
 let job_build_dpkg_amd64 =
-  job_external
-  @@ job_build_bin_package
-       ~__POS__
-       ~name:"oc.build:dpkg:amd64"
-       ~target:Dpkg
-       ~arch:Tezos_ci.Amd64
-       ()
+  job_build_bin_package
+    ~__POS__
+    ~name:"oc.build:dpkg:amd64"
+    ~target:Dpkg
+    ~arch:Tezos_ci.Amd64
+    ()
+  |> job_external
 
 let job_build_rpm_amd64 =
-  job_external
-  @@ job_build_bin_package
-       ~__POS__
-       ~name:"oc.build:rpm:amd64"
-       ~target:Rpm
-       ~arch:Tezos_ci.Amd64
-       ()
+  job_build_bin_package
+    ~__POS__
+    ~name:"oc.build:rpm:amd64"
+    ~target:Rpm
+    ~arch:Tezos_ci.Amd64
+    ()
+  |> job_external
 
 let _job_build_dpkg_amd64_manual =
-  job_external ~directory:"build" ~filename_suffix:"manual"
-  @@ job_build_bin_package
-       ~__POS__
-       ~name:"oc.build:dpkg:amd64"
-       ~target:Dpkg
-       ~arch:Tezos_ci.Amd64
-       ~rules:[job_rule ~when_:Manual ()]
-       ~stage:Stages.manual
-       ()
+  job_build_bin_package
+    ~__POS__
+    ~name:"oc.build:dpkg:amd64"
+    ~target:Dpkg
+    ~arch:Tezos_ci.Amd64
+    ~rules:[job_rule ~when_:Manual ()]
+    ~stage:Stages.manual
+    ()
+  |> job_external ~directory:"build" ~filename_suffix:"manual"
 
 let _job_build_rpm_amd64_manual =
-  job_external ~directory:"build" ~filename_suffix:"manual"
-  @@ job_build_bin_package
-       ~__POS__
-       ~rules:[job_rule ~when_:Manual ()]
-       ~name:"oc.build:rpm:amd64"
-       ~target:Rpm
-       ~arch:Tezos_ci.Amd64
-       ~stage:Stages.manual
-       ()
+  job_build_bin_package
+    ~__POS__
+    ~rules:[job_rule ~when_:Manual ()]
+    ~name:"oc.build:rpm:amd64"
+    ~target:Rpm
+    ~arch:Tezos_ci.Amd64
+    ~stage:Stages.manual
+    ()
+  |> job_external ~directory:"build" ~filename_suffix:"manual"
 
 (** Type of release tag pipelines.
 
