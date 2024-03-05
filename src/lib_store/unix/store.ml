@@ -1079,68 +1079,78 @@ module Chain = struct
     Shared.use chain_store.chain_state (fun {live_blocks; live_operations; _} ->
         Lwt.return (live_blocks, live_operations))
 
-  let locked_compute_live_blocks ?(force = false) ?(update_cache = true)
-      chain_store chain_state block metadata =
+  let locked_compute_live_blocks_with_cache ~update_cache chain_store
+      chain_state block metadata =
     let open Lwt_syntax in
     let {current_head; live_blocks; live_operations; live_data_cache; _} =
       chain_state
     in
+    (* We actually compute max_op_ttl + 1... *)
+    let expected_capacity = Block.max_operations_ttl metadata + 1 in
+    match live_data_cache with
+    | Some live_data_cache
+      when update_cache
+           && Block_hash.equal
+                (Block.predecessor block)
+                (Block.hash current_head)
+           && Ringo.Ring.capacity live_data_cache = expected_capacity -> (
+        let most_recent_block = Block.hash block in
+        let most_recent_ops =
+          Block.all_operation_hashes block
+          |> List.flatten |> Operation_hash.Set.of_list
+        in
+        let new_live_blocks =
+          Block_hash.Set.add most_recent_block live_blocks
+        in
+        let new_live_operations =
+          Operation_hash.Set.union most_recent_ops live_operations
+        in
+        match
+          Ringo.Ring.add_and_return_erased
+            live_data_cache
+            (most_recent_block, most_recent_ops)
+        with
+        | None -> Lwt.return (new_live_blocks, new_live_operations)
+        | Some (last_block, last_ops) ->
+            let diffed_new_live_blocks =
+              Block_hash.Set.remove last_block new_live_blocks
+            in
+            let diffed_new_live_operations =
+              Operation_hash.Set.diff new_live_operations last_ops
+            in
+            Lwt.return (diffed_new_live_blocks, diffed_new_live_operations))
+    | _ when update_cache ->
+        let new_cache = Ringo.Ring.create expected_capacity in
+        let* () =
+          Chain_traversal.live_blocks_with_ring
+            chain_store
+            block
+            expected_capacity
+            new_cache
+        in
+        chain_state.live_data_cache <- Some new_cache ;
+        let live_blocks, live_ops =
+          Ringo.Ring.fold
+            new_cache
+            ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
+            ~f:(fun (bhs, opss) (bh, ops) ->
+              (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
+        in
+        Lwt.return (live_blocks, live_ops)
+    | _ -> Chain_traversal.live_blocks chain_store block expected_capacity
+
+  let locked_compute_live_blocks ?(force = false) ?(update_cache = true)
+      chain_store chain_state block metadata =
+    let {current_head; live_blocks; live_operations; _} = chain_state in
     if Block.equal current_head block && not force then
       Lwt.return (live_blocks, live_operations)
     else
-      (* We actually compute max_op_ttl + 1... *)
-      let expected_capacity = Block.max_operations_ttl metadata + 1 in
-      match live_data_cache with
-      | Some live_data_cache
-        when update_cache
-             && Block_hash.equal
-                  (Block.predecessor block)
-                  (Block.hash current_head)
-             && Ringo.Ring.capacity live_data_cache = expected_capacity -> (
-          let most_recent_block = Block.hash block in
-          let most_recent_ops =
-            Block.all_operation_hashes block
-            |> List.flatten |> Operation_hash.Set.of_list
-          in
-          let new_live_blocks =
-            Block_hash.Set.add most_recent_block live_blocks
-          in
-          let new_live_operations =
-            Operation_hash.Set.union most_recent_ops live_operations
-          in
-          match
-            Ringo.Ring.add_and_return_erased
-              live_data_cache
-              (most_recent_block, most_recent_ops)
-          with
-          | None -> Lwt.return (new_live_blocks, new_live_operations)
-          | Some (last_block, last_ops) ->
-              let diffed_new_live_blocks =
-                Block_hash.Set.remove last_block new_live_blocks
-              in
-              let diffed_new_live_operations =
-                Operation_hash.Set.diff new_live_operations last_ops
-              in
-              Lwt.return (diffed_new_live_blocks, diffed_new_live_operations))
-      | _ when update_cache ->
-          let new_cache = Ringo.Ring.create expected_capacity in
-          let* () =
-            Chain_traversal.live_blocks_with_ring
-              chain_store
-              block
-              expected_capacity
-              new_cache
-          in
-          chain_state.live_data_cache <- Some new_cache ;
-          let live_blocks, live_ops =
-            Ringo.Ring.fold
-              new_cache
-              ~init:(Block_hash.Set.empty, Operation_hash.Set.empty)
-              ~f:(fun (bhs, opss) (bh, ops) ->
-                (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
-          in
-          Lwt.return (live_blocks, live_ops)
-      | _ -> Chain_traversal.live_blocks chain_store block expected_capacity
+      locked_compute_live_blocks_with_cache
+        ~update_cache
+        chain_store
+        chain_state
+        block
+        metadata
 
   let compute_live_blocks chain_store ~block =
     let open Lwt_result_syntax in
