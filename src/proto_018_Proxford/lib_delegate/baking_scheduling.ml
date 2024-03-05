@@ -872,10 +872,12 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
   in
   let*! state', action = State_transitions.step state event in
   let* state'' =
-    let*! state_opt =
-      Baking_actions.perform_action ~state_recorder state' action
+    let*! state_res =
+      let* state'' = Baking_actions.perform_action state' action in
+      let* () = may_record_new_state ~previous_state:state ~new_state:state'' in
+      return state''
     in
-    match state_opt with
+    match state_res with
     | Ok state'' -> return state''
     | Error error ->
         let* () = on_error error in

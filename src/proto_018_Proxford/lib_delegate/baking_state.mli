@@ -162,6 +162,55 @@ type prepared_block = {
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
+type consensus_vote_kind = Attestation | Preattestation
+
+type unsigned_consensus_vote = {
+  vote_kind : consensus_vote_kind;
+  vote_consensus_content : consensus_content;
+  delegate : consensus_key_and_delegate;
+}
+
+type signed_consensus_vote = {
+  unsigned_consensus_vote : unsigned_consensus_vote;
+  signed_operation : packed_operation;
+}
+
+type batch_content = {
+  level : Raw_level.t;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+}
+
+type unsigned_consensus_vote_batch = {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  batch_branch : Block_hash.t;
+  unsigned_consensus_votes : unsigned_consensus_vote list;
+}
+
+val make_unsigned_consensus_vote_batch :
+  consensus_vote_kind ->
+  batch_content ->
+  batch_branch:Block_hash.t ->
+  (consensus_key_and_delegate * Slot.t) list ->
+  unsigned_consensus_vote_batch
+
+type signed_consensus_vote_batch = private {
+  batch_kind : consensus_vote_kind;
+  batch_content : batch_content;
+  batch_branch : Block_hash.t;
+  signed_consensus_votes : signed_consensus_vote list;
+}
+
+type error += Mismatch_signed_consensus_vote_in_batch
+
+val make_signed_consensus_vote_batch :
+  consensus_vote_kind ->
+  batch_content ->
+  batch_branch:Block_hash.t ->
+  signed_consensus_vote list ->
+  signed_consensus_vote_batch tzresult
+
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
@@ -190,11 +239,21 @@ type round_state = {
 
 (** [forge_event] type used to return the result of a task completion
     in the forge worker. *)
-type forge_event = Block_ready of prepared_block
+type forge_event =
+  | Block_ready of prepared_block
+  | Preattestation_ready of signed_consensus_vote
+  | Attestation_ready of signed_consensus_vote
 
 (** [forge_request] type used to push a concurrent forging task in the
     forge worker. *)
-type forge_request = Forge_and_sign_block of block_to_bake
+type forge_request =
+  | Forge_and_sign_block of block_to_bake
+  | Forge_and_sign_preattestations of {
+      unsigned_preattestations : unsigned_consensus_vote_batch;
+    }
+  | Forge_and_sign_attestations of {
+      unsigned_attestations : unsigned_consensus_vote_batch;
+    }
 
 (** [forge_worker_hooks] type that allows interactions with the forge
     worker. Hooks are needed in order to break a circular dependency. *)
