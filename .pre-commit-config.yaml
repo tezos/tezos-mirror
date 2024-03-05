@@ -6,6 +6,7 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        exclude: "tezt/tests/expected|tezt/records|tzt_reference_test_suite|src/proto_[0-9][0-9][0-9]_.*/lib_protocol|src/proto_[0-9][0-9][0-9]_.*/parameters/dune|opam/"
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.9.0
     hooks:
