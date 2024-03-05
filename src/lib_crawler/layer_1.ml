@@ -311,9 +311,7 @@ let iter_heads ?name l1_ctxt f =
       match stopping_reason with
       | Closed -> Layer1_event.connection_lost ~name
       | Timeout timeout -> Layer1_event.connection_timeout ~name ~timeout
-      | Connection_error trace ->
-          Format.eprintf "@[<v 2>Connection error:@ %a@]@." pp_print_trace trace ;
-          Lwt.return_unit
+      | Connection_error trace -> Layer1_event.connection_error ~name trace
     in
     let*! conn = reconnect l1_ctxt in
     loop conn

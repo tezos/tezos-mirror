@@ -92,6 +92,14 @@ module Simple = struct
       ~level:Warning
       ("timeout", Data_encoding.float)
 
+  let connection_error =
+    declare_1
+      ~name:"lib_crawler_connection_error"
+      ~msg:"Connection error: {error}"
+      ~level:Warning
+      ("error", trace_encoding)
+      ~pp1:pp_print_trace
+
   let cannot_connect =
     declare_2
       ~name:"lib_crawler_cannot_connect"
@@ -125,6 +133,8 @@ let connection_lost ~name = Simple.(emit connection_lost) name
 
 let connection_timeout ~name ~timeout =
   Simple.(emit connection_timeout) (name, timeout)
+
+let connection_error ~name error = Simple.(emit connection_error) (name, error)
 
 let cannot_connect ~name ~count error =
   Simple.(emit cannot_connect) (name, count, error)
