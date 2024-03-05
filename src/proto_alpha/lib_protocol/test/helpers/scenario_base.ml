@@ -22,11 +22,13 @@ type error += Unexpected_error
     and the known [State.t] *)
 type t = Block.t * State.t
 
-let log ?color s =
-  let open Lwt_result_syntax in
-  exec_unit (fun _ ->
-      Log.info ?color s ;
-      return_unit)
+let log ?(level = Cli.Logs.Info) ?color format =
+  Format.kasprintf
+    (fun s ->
+      exec_unit (fun _ ->
+          Log.log ~level ?color "%s" s ;
+          return_unit))
+    format
 
 (* ======== Baking ======== *)
 
@@ -520,13 +522,9 @@ let wait_cycle_until condition =
     in
     stopper condition
   in
-  exec_unit (fun _ ->
-      Log.info ~color:time_color "Fast forward to %s" to_ ;
-      return_unit)
+  log ~color:time_color "Fast forward to %s" to_
   --> wait_cycle_f_es condition
-  --> exec_unit (fun _ ->
-          Log.info ~color:event_color "%s" done_ ;
-          return_unit)
+  --> log ~color:event_color "%s" done_
 
 (** Wait until AI activates.
     Fails if AI is not set to be activated in the future. *)
