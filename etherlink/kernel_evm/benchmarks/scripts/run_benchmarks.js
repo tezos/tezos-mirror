@@ -498,5 +498,9 @@ async function run_all_benchmarks(benchmark_scripts) {
     execSync("rm transactions.json");
 }
 
-benchmark_scripts = require("./benchmarks_list.json")
+// we exclude bench_loop_calldataload because with the current tick model it
+// puts the kernel in a stuck mode
+const excluded_benchmark = ["benchmarks/bench_loop_calldataload.js"]
+benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(name))
+
 run_all_benchmarks(benchmark_scripts.filter(filter_name));
