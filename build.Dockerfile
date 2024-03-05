@@ -50,12 +50,12 @@ COPY --chown=tezos:nogroup src evm_kernel/src
 COPY --chown=tezos:nogroup etherlink evm_kernel/etherlink
 RUN make -C evm_kernel -f etherlink.mk build-deps \
   && make -C evm_kernel -f etherlink.mk EVM_CONFIG=etherlink/config/dailynet.yaml evm_installer.wasm \
-  && make -C evm_kernel -f etherlink.mk evm_benchmark_installer.wasm
+  && make -C evm_kernel -f etherlink.mk evm_benchmark_kernel.wasm
 
 # We move the EVM kernel in the final image in a dedicated stage to parallelize
 # the two builder stages.
 FROM without-evm-artifacts as with-evm-artifacts
 COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_installer.wasm evm_kernel
 COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/_evm_installer_preimages/ evm_kernel/_evm_installer_preimages
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/_evm_unstripped_installer_preimages/ evm_kernel/_evm_unstripped_installer_preimages
-COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_benchmark_installer.wasm evm_kernel
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/evm_benchmark_kernel.wasm evm_kernel
+COPY --from=layer2-builder --chown=tezos:nogroup /home/tezos/evm_kernel/etherlink/config/benchmarking.yaml evm_kernel

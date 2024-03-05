@@ -52,12 +52,11 @@ endif
 	--output $@ \
 	${CONFIG}
 
-evm_benchmark_installer.wasm::
+evm_benchmark_kernel.wasm::
 	@${MAKE} -f etherlink.mk \
-	EVM_CONFIG=etherlink/config/benchmarking.yaml \
 	EVM_KERNEL_FEATURES=benchmark,debug \
-	evm_unstripped_installer.wasm
-	cp evm_unstripped_installer.wasm $@
+	evm_kernel_unstripped.wasm
+	cp evm_kernel_unstripped.wasm $@
 
 evm_installer_dev.wasm::
 	@${MAKE} -f etherlink.mk EVM_CONFIG=etherlink/config/dev.yaml evm_installer.wasm

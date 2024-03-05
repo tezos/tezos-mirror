@@ -46,8 +46,8 @@ function filter_name(name) {
 let KEEP_TEMP = commander.opts().keepTemp;
 let FAST_MODE = commander.opts().fastMode;
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
-const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_installer.wasm');
-const PREIMAGE_DIR = external.ressource_dir('_evm_unstripped_installer_preimages');
+const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_kernel.wasm');
+const EVM_BENCHMARK_CONFIG_PATH = external.resource('etherlink/config/benchmarking.yaml');
 const OUTPUT_DIRECTORY = commander.opts().outputDir ? commander.opts().outputDir : external.output()
 mkdirSync(OUTPUT_DIRECTORY, { recursive: true })
 console.log(`Output directory ${OUTPUT_DIRECTORY}`)
@@ -121,17 +121,13 @@ function run_profiler(path, logs) {
 
         var profiler_output_path = "";
 
-        const args = ["--kernel", EVM_INSTALLER_KERNEL_PATH, "--inputs", path, "--preimage-dir", PREIMAGE_DIR, "--flamecharts-dir", PROFILER_OUTPUT_DIRECTORY];
+        const args = ["--kernel", EVM_INSTALLER_KERNEL_PATH, "--inputs", path, "--flamecharts-dir", PROFILER_OUTPUT_DIRECTORY, "--installer-config", EVM_BENCHMARK_CONFIG_PATH];
 
         const childProcess = spawn(RUN_DEBUGGER_COMMAND, args, {});
 
         let opcodes = {};
 
         let precompiles = [];
-
-        childProcess.stdin.write("load inputs\n");
-
-        childProcess.stdin.write("step kernel_run\n");
 
         if (FAST_MODE)
             childProcess.stdin.write("step inbox\n");
