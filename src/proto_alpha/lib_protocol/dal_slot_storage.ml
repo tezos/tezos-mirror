@@ -26,11 +26,10 @@
 let find_slot_headers ctxt level = Storage.Dal.Slot.Headers.find ctxt level
 
 let finalize_current_slot_headers ctxt =
-  let current_level = Raw_context.current_level ctxt in
-  let slot_headers = Raw_context.Dal.candidates ctxt in
-  match slot_headers with
-  | [] -> Lwt.return ctxt
-  | _ :: _ -> Storage.Dal.Slot.Headers.add ctxt current_level.level slot_headers
+  Storage.Dal.Slot.Headers.add
+    ctxt
+    (Raw_context.current_level ctxt).level
+    (Raw_context.Dal.candidates ctxt)
 
 let compute_attested_slot_headers ~is_slot_attested seen_slot_headers =
   let open Dal_slot_repr in
