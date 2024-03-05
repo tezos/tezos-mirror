@@ -4,6 +4,7 @@ use goblin::{
     elf::program_header::{ProgramHeader, PT_LOAD},
     elf::Elf,
 };
+use std::io::{Cursor, Seek, SeekFrom, Write};
 
 #[derive(Debug, From, Error, derive_more::Display)]
 pub enum Error {
@@ -164,5 +165,23 @@ impl Memory for rvemu::bus::Bus {
             })?
         }
         Ok(())
+    }
+}
+
+impl<T> Memory for Cursor<T>
+where
+    Cursor<T>: Write + Seek,
+{
+    fn write_bytes(&mut self, paddr: u64, bytes: &[u8]) -> Result<(), Error> {
+        // XXX: Use try-block when it becomes stable.
+        // https://doc.rust-lang.org/beta/unstable-book/language-features/try-blocks.html
+        (|| {
+            self.seek(SeekFrom::Start(paddr))?;
+            self.write_all(bytes)
+        })()
+        .map_err(|err| Error::Write {
+            msg: Some(err.to_string()),
+            addr: paddr,
+        })
     }
 }

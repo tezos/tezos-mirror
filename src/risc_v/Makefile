@@ -40,7 +40,7 @@ endif
 	@find . -iname 'rust-toolchain*' -execdir rustup show active-toolchain \; 2>/dev/null
 
 .PHONY: test
-test:
+test: build
 	@cargo test --workspace
 	@make -C dummy_kernel test
 	@make -C jstz test
@@ -63,6 +63,5 @@ clean:
 	@cargo clean
 	@make -C dummy_kernel clean
 	@make -C jstz clean
-	@make -C risc-v-sandbox clean
 	@make -C tests clean
 	@rm -f risc-v-sandbox risc-v-dummy.elf

@@ -13,6 +13,9 @@ thiserror = "1.0.57"
 version = "0.26.1"
 features = ["derive"]
 
+[dependencies.kernel-loader]
+path = "../kernel_loader"
+
 [dev-dependencies]
 goblin = "0.7.1"
 hex = "0.4.3"

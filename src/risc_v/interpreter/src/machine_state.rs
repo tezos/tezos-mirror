@@ -354,7 +354,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Install a program and set the program counter to its start.
-    pub fn setup_boot(&mut self, program: &Program) -> Result<(), MachineError> {
+    pub fn setup_boot(&mut self, program: &Program<ML>) -> Result<(), MachineError> {
         // Write program to main memory and point the PC at its start
         for (addr, data) in program.segments.iter() {
             self.bus.write_all(*addr, data)?;
