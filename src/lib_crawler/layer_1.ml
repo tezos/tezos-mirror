@@ -98,6 +98,9 @@ let () =
 type connection_info = {
   heads : (Block_hash.t * Block_header.t) Lwt_stream.t;
   stopper : Tezos_rpc.Context.stopper;
+  consumer : unit Lwt.t;
+      (** This thread is used to consume the stream [heads] in order to prevent
+          a leak.  *)
 }
 
 type connection_status =
@@ -110,6 +113,7 @@ type t = {
   protocols : Protocol_hash.t list option;
   reconnection_delay : float;
   cctxt : Client_context.full;
+  mutable last_seen : (Block_hash.t * Block_header.t) option;
   mutable status : connection_status;
 }
 
@@ -143,15 +147,14 @@ let rec do_connect ~count ~previous_status
   in
   match res with
   | Ok (heads, stopper) ->
-      let heads =
-        Lwt_stream.map_s
-          (fun ( hash,
-                 (Tezos_base.Block_header.{shell = {level; _}; _} as header) ) ->
-            let+ () = Layer1_event.switched_new_head ~name hash level in
-            (hash, header))
+      let consumer =
+        Lwt_stream.iter_s
+          (fun ((hash, Tezos_base.Block_header.{shell = {level; _}; _}) as head) ->
+            l1_ctxt.last_seen <- Some head ;
+            Layer1_event.switched_new_head ~name hash level)
           heads
       in
-      let conn = {heads; stopper} in
+      let conn = {heads; stopper; consumer} in
       l1_ctxt.status <- Connected conn ;
       return conn
   | Error e ->
@@ -185,6 +188,7 @@ let create ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
     cctxt = (cctxt :> Client_context.full);
     reconnection_delay;
     protocols;
+    last_seen = None;
     status = Disconnected;
   }
 
@@ -288,8 +292,16 @@ let lwt_stream_iter_with_timeout ~min_timeout ~init_timeout f stream =
 let iter_heads ?name l1_ctxt f =
   let open Lwt_result_syntax in
   let name = Option.value name ~default:l1_ctxt.name in
-  let rec loop {heads; stopper; _} =
+  let rec loop {heads; stopper; consumer = _} =
     let heads = Lwt_stream.clone heads in
+    let heads =
+      match l1_ctxt.last_seen with
+      | Some l ->
+          (* (Re)connection consumes heads, reconstruct stream with latest
+             available head in order to start iteration from it. *)
+          Lwt_stream.append (Lwt_stream.return l) heads
+      | None -> heads
+    in
     let* stopping_reason =
       lwt_stream_iter_with_timeout ~min_timeout:10. ~init_timeout:300. f heads
     in
@@ -312,12 +324,15 @@ let iter_heads ?name l1_ctxt f =
 let wait_first l1_ctxt =
   let open Lwt_syntax in
   let rec loop conn =
-    let* head = Lwt_stream.peek conn.heads in
-    match head with
-    | Some head -> return head
-    | None ->
-        let* conn = reconnect ~name:l1_ctxt.name l1_ctxt in
-        loop conn
+    match l1_ctxt.last_seen with
+    | Some h -> return h
+    | None -> (
+        let* head = Lwt_stream.peek conn.heads in
+        match head with
+        | Some head -> return head
+        | None ->
+            let* conn = reconnect ~name:l1_ctxt.name l1_ctxt in
+            loop conn)
   in
   Lwt.no_cancel
   @@ let* conn = connect l1_ctxt in
@@ -479,6 +494,7 @@ module Internal_for_tests = struct
       reconnection_delay = 5.0;
       cctxt = (cctxt :> Client_context.full);
       protocols = None;
+      last_seen = None;
       status = Disconnected;
     }
 end
