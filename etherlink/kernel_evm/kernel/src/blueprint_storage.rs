@@ -305,6 +305,14 @@ pub fn read_next_blueprint<Host: Runtime>(
                 read_all_chunks_and_validate(host, &blueprint_path, nb_chunks, config)?;
             Ok(blueprint)
         } else {
+            if available_chunks > nb_chunks {
+                // We are in an inconsistent state (a previous blueprint was submitted with more
+                // chunks).
+                // As-is, the rollup is blocked. Easiest way to recover is to delete the whole
+                // blueprint and let the sequencer re-submit it later.
+                host.store_delete(&blueprint_path).map_err(Error::from)?;
+            }
+
             Ok(None)
         }
     } else {
