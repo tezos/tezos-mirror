@@ -49,3 +49,7 @@ module Full_denunciation : sig
   val check_same_lists_any_order :
     loc:string -> t list -> t list -> unit tzresult Lwt.t
 end
+
+(** Applies all slashes at cycle end in the state *)
+val apply_all_slashes_at_cycle_end :
+  Protocol.Alpha_context.Cycle.t -> State.t -> State.t

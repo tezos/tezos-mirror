@@ -171,56 +171,6 @@ let apply_rewards ~(baker : string) block (state : t) : t tzresult Lwt.t =
     let*? total_supply = Tez.(total_supply +? delta_rewards) in
     return {state with last_level_rewards = current_level; total_supply}
 
-let apply_slashing
-    ( culprit,
-      Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash} )
-    (state : t) : t * Tez.t =
-  let account_map, total_burnt =
-    apply_slashing
-      (culprit, {rewarded; misbehaviour; operation_hash})
-      state.constants
-      state.account_map
-  in
-  (* TODO: add culprit's stakers *)
-  let log_updates =
-    List.map (fun x -> fst @@ find_account_from_pkh x state) [culprit; rewarded]
-  in
-  let state = update_map ~log_updates ~f:(fun _ -> account_map) state in
-  (state, total_burnt)
-
-let apply_all_slashes_at_cycle_end current_cycle (state : t) : t =
-  let to_slash_later, to_slash_now =
-    if
-      not
-        state.constants
-          .Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
-          .ns_enable
-    then ([], state.pending_slashes)
-    else
-      List.partition
-        (fun (_, Protocol.Denunciations_repr.{misbehaviour; _}) ->
-          let cycle =
-            Block.current_cycle_of_level
-              ~blocks_per_cycle:
-                state.constants
-                  .Protocol.Alpha_context.Constants.Parametric.blocks_per_cycle
-              ~current_level:
-                (Protocol.Raw_level_repr.to_int32 misbehaviour.level)
-          in
-          Cycle.(cycle = current_cycle))
-        state.pending_slashes
-  in
-  let state, total_burnt =
-    List.fold_left
-      (fun (acc_state, acc_total) x ->
-        let state, burnt = apply_slashing x acc_state in
-        (state, Tez.(acc_total +! burnt)))
-      (state, Tez.zero)
-      to_slash_now
-  in
-  let total_supply = Tez.(state.total_supply -! total_burnt) in
-  {state with pending_slashes = to_slash_later; total_supply}
-
 (** Given an account name and new account state, updates [state] accordingly
       Preferably use other specific update functions *)
 let update_account (account_name : string) (value : account_state) (state : t) :
