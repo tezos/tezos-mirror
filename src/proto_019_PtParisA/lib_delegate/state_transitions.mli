@@ -73,7 +73,7 @@ val time_to_prepare_next_level_block :
 
 val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state
 
-val make_attest_action : state -> proposal -> action
+val prepare_attest_action : state -> proposal -> action
 
 val prequorum_reached_when_awaiting_preattestations :
   state ->

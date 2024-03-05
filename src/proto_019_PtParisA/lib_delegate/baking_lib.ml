@@ -83,7 +83,6 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let consensus_batch =
     make_consensus_vote_batch state proposal Preattestation
   in
-  let open Baking_actions in
   let*! () =
     cctxt#message
       "@[<v 2>Preattesting for:@ %a@]"
@@ -96,7 +95,7 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
          consensus_batch.unsigned_consensus_votes)
   in
   let* signed_consensus_batch =
-    Baking_actions.sign_consensus_votes state consensus_batch
+    Baking_actions.sign_consensus_votes state.global_state consensus_batch
   in
   Baking_actions.inject_consensus_votes state signed_consensus_batch
 
@@ -123,7 +122,6 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
       | Valid_proposal -> return_unit
   in
   let consensus_batch = make_consensus_vote_batch state proposal Attestation in
-  let open Baking_actions in
   let*! () =
     cctxt#message
       "@[<v 2>Attesting for:@ %a@]"
@@ -136,7 +134,7 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
          consensus_batch.unsigned_consensus_votes)
   in
   let* signed_consensus_batch =
-    Baking_actions.sign_consensus_votes state consensus_batch
+    Baking_actions.sign_consensus_votes state.global_state consensus_batch
   in
   let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state:state
@@ -144,10 +142,12 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   Baking_actions.inject_consensus_votes state signed_consensus_batch
 
 let do_action (state, action) =
-  let state_recorder ~new_state =
+  let open Lwt_result_syntax in
+  let* new_state = Baking_actions.perform_action state action in
+  let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state
   in
-  Baking_actions.perform_action ~state_recorder state action
+  return new_state
 
 let bake_at_next_level_event state =
   let open Lwt_result_syntax in
@@ -286,22 +286,18 @@ let propose_at_next_level ~minimal_timestamp state =
         force_apply = state.global_state.config.force_apply;
       }
     in
-    let state_recorder ~new_state =
-      Baking_state.may_record_new_state ~previous_state:state ~new_state
-    in
     let* prepared_block =
       Baking_actions.prepare_block state.global_state block_to_bake
     in
     let* state =
-      Baking_actions.perform_action
-        ~state_recorder
-        state
-        (Inject_block
-           {
-             prepared_block;
-             force_injection = minimal_timestamp;
-             asynchronous = false;
-           })
+      do_action
+        ( state,
+          Inject_block
+            {
+              prepared_block;
+              force_injection = minimal_timestamp;
+              asynchronous = false;
+            } )
     in
     let*! () =
       cctxt#message
@@ -596,7 +592,7 @@ let rec baking_minimal_timestamp ~count state
   let total_voting_power =
     List.fold_left
       (fun attestations own ->
-        own.Baking_actions.vote_consensus_content :: attestations)
+        own.Baking_state.vote_consensus_content :: attestations)
       attestations_in_mempool
       own_attestations.unsigned_consensus_votes
     |> attestations_attesting_power state
@@ -623,10 +619,16 @@ let rec baking_minimal_timestamp ~count state
     | Some first_potential_round -> return first_potential_round
   in
   let* signed_attestations =
-    Baking_actions.sign_consensus_votes state own_attestations
+    let*! own_attestations_with_dal =
+      dal_content_map_p
+        (Baking_actions.may_get_dal_content state)
+        own_attestations
+    in
+    Baking_actions.sign_consensus_votes
+      state.global_state
+      own_attestations_with_dal
   in
   let pool =
-    let open Baking_actions in
     Operation_pool.add_operations
       current_mempool
       (List.map
@@ -643,18 +645,14 @@ let rec baking_minimal_timestamp ~count state
       force_apply = state.global_state.config.force_apply;
     }
   in
-  let state_recorder ~new_state =
-    Baking_state.may_record_new_state ~previous_state:state ~new_state
-  in
   let* prepared_block =
     Baking_actions.prepare_block state.global_state block_to_bake
   in
   let* new_state =
-    Baking_actions.perform_action
-      ~state_recorder
-      state
-      (Inject_block
-         {prepared_block; force_injection = true; asynchronous = false})
+    do_action
+      ( state,
+        Inject_block
+          {prepared_block; force_injection = true; asynchronous = false} )
   in
   let*! () = cctxt#message "Injected block at minimal timestamp" in
   if count <= 1 then return_unit
