@@ -10,22 +10,27 @@
 
 ### Internal
 
+## Version 5cc8ce8253e0fc4fb31b0d975d20351c25d22bab (Security Upgrade)
+
+### Bug Fixes
+
+- Disable elastic fee model
+- Clean-up pending blueprints
+- Patch timestamps of blocks created by the delayed inbox flushing mechanism
+
 ## Version 624a144032d6dc6431697c39eb81790bccaacff9
 
 ### Features
 
 - Add an evm event when a sequencer upgrade is seen by the
   kernel. (!12046)
-
 - Da fee is sent to sequencer pool address. (!12113)
-
 - Gas price adjusts itself to handle congestion. (!12167)
 
 ### Bug fixes
 
 - `BLOCKHASH` opcode now returns the actual block hash instead of `0x00..0`. (!12130)
 - Withdrawals are now compatible with sequencer. (!11733)
-
 
 ### Breaking changes
 
