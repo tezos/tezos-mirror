@@ -35,15 +35,40 @@ type t = {
   acl : Resto_acl.Acl.t;
 }
 
+module Acl = struct
+  open Resto_acl.Acl
+
+  let allow_all = RPC_server.Acl.allow_all
+
+  let secure =
+    Allow_all
+      {
+        except =
+          List.map
+            parse
+            [
+              "GET /global/block/*/durable/wasm_2_0_0/subkeys";
+              "/local/batcher/**";
+              "/admin/**";
+            ];
+      }
+
+  let default (address : P2p_addr.t) =
+    let open Ipaddr in
+    if V6.scope address = Interface then allow_all else secure
+end
+
 let start configuration dir =
   let open Lwt_result_syntax in
   let Configuration.{rpc_addr; rpc_port; _} = configuration in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2885
-     More restrictive access control. *)
-  let acl = RPC_server.Acl.allow_all in
+  let*! acl_policy = RPC_server.Acl.resolve_domain_names configuration.acl in
+  let acl =
+    RPC_server.Acl.find_policy acl_policy (host, Some rpc_port)
+    |> Option.value_f ~default:(fun () -> Acl.default rpc_addr)
+  in
   let server =
     RPC_server.init_server
       dir
