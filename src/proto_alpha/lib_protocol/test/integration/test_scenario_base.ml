@@ -29,44 +29,33 @@ let test_expected_error =
              [Inconsistent_number_of_bootstrap_accounts])
            (exec (fun _ -> failwith "")))
 
-(** Initialization of scenarios with 3 cases:
+(** Initialization of scenarios with 2 cases:
      - AI activated, staker = delegate
      - AI activated, staker != delegate
-     - AI not activated (and staker = delegate)
-    Any scenario that begins with this will be triplicated.
- *)
-let init_scenario ?(force_ai = true) ?reward_per_block () =
+    Any scenario that begins with this will be duplicated. *)
+let init_scenario () =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
-  let begin_test ~activate_ai ~self_stake =
+  let begin_test ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
-    init_constants ?reward_per_block ()
+    init_constants ()
     --> set S.Adaptive_issuance.autostaking_enable false
-    --> Scenario_begin.activate_ai (if activate_ai then `Force else `No)
+    --> Scenario_begin.activate_ai `Force
     --> begin_test [name]
     --> set_delegate_params name init_params
     --> set_baker "__bootstrap__"
   in
-  let ai_activated =
-    Tag "AI activated"
-    --> (Tag "self stake" --> begin_test ~activate_ai:true ~self_stake:true
-        |+ Tag "external stake"
-           --> begin_test ~activate_ai:true ~self_stake:false
-           --> add_account_with_funds
-                 "staker"
-                 ~funder:"delegate"
-                 (Amount (Tez.of_mutez 2_000_000_000_000L))
-           --> set_delegate "staker" (Some "delegate"))
-    --> wait_delegate_parameters_activation --> next_cycle
-  in
-
-  let ai_deactivated =
-    Tag "AI deactivated, self stake"
-    --> begin_test ~activate_ai:false ~self_stake:true
-  in
-  (if force_ai then ai_activated else ai_activated |+ ai_deactivated)
-  --> next_block
+  Tag "AI activated"
+  --> (Tag "self stake" --> begin_test ~self_stake:true
+      |+ Tag "external stake"
+         --> begin_test ~self_stake:false
+         --> add_account_with_funds
+               "staker"
+               ~funder:"delegate"
+               (Amount (Tez.of_mutez 2_000_000_000_000L))
+         --> set_delegate "staker" (Some "delegate"))
+  --> wait_delegate_parameters_activation --> next_cycle
 
 let tests =
   tests_of_scenarios
