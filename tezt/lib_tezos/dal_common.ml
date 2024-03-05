@@ -83,7 +83,7 @@ module Parameters = struct
 end
 
 module Committee = struct
-  type member = {attester : string; first_shard_index : int; power : int}
+  type member = {attester : string; indexes : int list}
 
   type t = member list
 
@@ -91,21 +91,22 @@ module Committee = struct
     let open Check in
     list
     @@ convert
-         (fun {attester; first_shard_index; power} ->
-           (attester, first_shard_index, power))
-         (tuple3 string int int)
+         (fun {attester; indexes} -> (attester, indexes))
+         (tuple2 string (list int))
 
-  let at_level node ~level =
+  let at_level node ?level ?delegates () =
     let* json =
-      Node.RPC.call node @@ RPC.get_chain_block_context_dal_shards ~level ()
+      Node.RPC.call node
+      @@ RPC.get_chain_block_context_dal_shards ?level ?delegates ()
     in
     return
     @@ List.map
          (fun json ->
-           let pkh = JSON.(json |=> 0 |> as_string) in
-           let first_shard_index = JSON.(json |=> 1 |=> 0 |> as_int) in
-           let power = JSON.(json |=> 1 |=> 1 |> as_int) in
-           {attester = pkh; first_shard_index; power})
+           let attester = JSON.(json |-> "delegate" |> as_string) in
+           let indexes =
+             JSON.(json |-> "indexes" |> as_list |> List.map as_int)
+           in
+           {attester; indexes})
          (JSON.as_list json)
 end
 

@@ -679,10 +679,10 @@ let test_one_committee_per_level _protocol _parameters _cryptobox node _client
      that is indeed the case. *)
   assert (current_level.cycle_position = 0) ;
   let* current_committee =
-    Dal.Committee.at_level node ~level:current_level.level
+    Dal.Committee.at_level node ~level:current_level.level ()
   in
   let* next_committee =
-    Dal.Committee.at_level node ~level:(current_level.level + 1)
+    Dal.Committee.at_level node ~level:(current_level.level + 1) ()
   in
   Check.((current_committee <> next_committee) Dal.Committee.typ)
     ~error_msg:"Unexpected equal DAL committees at subsequent levels: %L and %R" ;
@@ -1107,24 +1107,16 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
   let* () = bake_for ~count:(num_cycles * blocks_per_cycle) client in
   (* We iterate until we find a level for which the new account has no assigned
      shard. Recall that the probability to not be assigned a shard is around
-     3/4, we so a level is found quickly. *)
+     3/4, so a level is found quickly. *)
   let rec iter () =
     let* level = Client.level client in
-    let* json =
-      Node.RPC.(call node @@ get_chain_block_context_dal_shards ~level ())
-    in
-    let committee =
-      JSON.as_list json
-      |> List.map (fun tuple ->
-             let pair = JSON.as_list tuple in
-             match pair with
-             | [pkh; _] -> JSON.as_string pkh
-             | _ ->
-                 Test.fail
-                   "could not parse result of \
-                    [get_chain_block_context_dal_shards] RPC")
-    in
-    if List.mem new_account.public_key_hash committee then (
+    let* committee = Dal.Committee.at_level node ~level () in
+    if
+      List.exists
+        (fun member ->
+          String.equal member.Dal.Committee.attester new_account.public_key_hash)
+        committee
+    then (
       Log.info "Bake another block to change the DAL committee" ;
       let* () = bake_for client in
       iter ())
@@ -1149,6 +1141,7 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
             "The new account is not a validator, the test needs to be adapted") ;
       let* (`OpHash _oph) =
         inject_dal_attestation
+          ~error:Operation.dal_data_availibility_attester_not_in_committee
           ~nb_slots
           ~level
           ~signer:new_account
@@ -2384,7 +2377,7 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
   let* {level; _} =
     Node.RPC.(call node @@ get_chain_block_helper_current_level ())
   in
-  let* committee_from_l1 = Dal.Committee.at_level node ~level in
+  let* committee_from_l1 = Dal.Committee.at_level node ~level () in
   let* shards_from_dal =
     Dal_RPC.(call dal_node @@ get_assigned_shard_indices ~level ~pkh)
   in
@@ -2395,9 +2388,7 @@ let test_dal_node_get_assigned_shard_indices _protocol _parameters _cryptobox
   with
   | None -> Test.fail ~__LOC__ "pkh %S not found in committee from L1." pkh
   | Some member ->
-      let shards_from_l1 =
-        List.init member.power (fun i -> member.first_shard_index + i)
-      in
+      let shards_from_l1 = member.indexes in
       Check.(
         (shards_from_dal = shards_from_l1)
           (list int)
@@ -2687,6 +2678,8 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   let last_checked_level = intermediary_level + unattested_levels - 1 in
   let last_level = last_checked_level + lag + 1 in
 
+  Log.info "attestation_lag = %d" lag ;
+
   (* Publish and bake with client *)
   let publish source ~index message =
     let* _op_hash =
@@ -2706,6 +2699,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
         store_slot ~with_proof:false dal_node
         @@ make_slot ~slot_size slot_content)
     in
+    Log.info "Slot with %d index (normally) published at level %d" index level ;
     unit
   in
   let publish_and_bake ~from_level ~to_level delegates =
@@ -3332,10 +3326,11 @@ let event_with_message_to_string = function
     {!check_events_with_topic}, except that what varies here is the shard index
     instead of slot index. Moreover, shards do not necessiraly start from 0 or
     end at number_of_shards - 1. *)
-let check_events_with_message ~event_with_message dal_node ~from_shard ~to_shard
-    ~expected_commitment ~expected_level ~expected_pkh ~expected_slot =
-  let remaining = ref (to_shard - from_shard + 1) in
-  let seen = Array.make !remaining false in
+let check_events_with_message ~event_with_message dal_node ~number_of_shards
+    ~shard_indexes ~expected_commitment ~expected_level ~expected_pkh
+    ~expected_slot =
+  let remaining = ref (List.length shard_indexes) in
+  let seen = Array.make number_of_shards false in
   let get_shard_index_opt event =
     let topic_slot_index =
       JSON.(event |-> "topic" |-> "slot_index" |> as_int)
@@ -3364,21 +3359,23 @@ let check_events_with_message ~event_with_message dal_node ~from_shard ~to_shard
     in
     Some shard_index
   in
+  let all_seen () =
+    seen |> Array.to_seqi
+    |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
+  in
   wait_for_gossipsub_worker_event
     dal_node
     ~name:(event_with_message_to_string event_with_message)
     (fun event ->
       let*?? shard_index = get_shard_index_opt event in
-      let index = shard_index - from_shard in
       Check.(
-        (seen.(index) = false)
+        (seen.(shard_index) = false)
           bool
           ~error_msg:
             (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
-      seen.(index) <- true ;
+      seen.(shard_index) <- true ;
       let () = remaining := !remaining - 1 in
-      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
-      else None)
+      if !remaining = 0 && all_seen () then Some () else None)
 
 type event_with_message_id = IHave of {pkh : string; slot_index : int} | IWant
 
@@ -3389,11 +3386,11 @@ let event_with_message_id_to_string = function
 (** This function monitors the Gossipsub worker events whose name is given by
     [event_with_message_id]. It's somehow similar to function
     {!check_events_with_message}, but for IHave and IWant messages' events. *)
-let check_events_with_message_id ~event_with_message_id dal_node ~from_shard
-    ~to_shard ~expected_commitment ~expected_level ~expected_pkh ~expected_slot
-    ~expected_peer =
-  let remaining = ref (to_shard - from_shard + 1) in
-  let seen = Array.make !remaining false in
+let check_events_with_message_id ~event_with_message_id dal_node
+    ~number_of_shards ~shard_indexes ~expected_commitment ~expected_level
+    ~expected_pkh ~expected_slot ~expected_peer =
+  let remaining = ref (List.length shard_indexes) in
+  let seen = Array.make number_of_shards false in
   let get_shard_indices_of_messages event =
     let*?? () =
       check_expected expected_peer JSON.(event |-> "peer" |> as_string)
@@ -3423,6 +3420,10 @@ let check_events_with_message_id ~event_with_message_id dal_node ~from_shard
            Some shard_index)
          message_ids
   in
+  let all_seen () =
+    seen |> Array.to_seqi
+    |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
+  in
   wait_for_gossipsub_worker_event
     ~name:(event_with_message_id_to_string event_with_message_id)
     dal_node
@@ -3433,27 +3434,26 @@ let check_events_with_message_id ~event_with_message_id dal_node ~from_shard
           match shard_index_opt with
           | None -> ()
           | Some shard_index ->
-              let index = shard_index - from_shard in
               Check.(
-                (seen.(index) = false)
+                (seen.(shard_index) = false)
                   bool
                   ~error_msg:
                     (sf
                        "Shard_index %d already seen. Invariant broken"
                        shard_index)) ;
-              seen.(index) <- true ;
+              seen.(shard_index) <- true ;
               decr remaining)
         shard_indices ;
-      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
-      else None)
+      if !remaining = 0 && all_seen () then Some () else None)
 
 (** This function is quite similar to those above, except that it checks that a
     range of messages (shards) on a tracked topic have been notified by GS to
     the DAL node. This is typically needed to then be able to attest slots. *)
-let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
-    ~expected_commitment ~expected_level ~expected_pkh ~expected_slot =
-  let remaining = ref (to_shard - from_shard + 1) in
-  let seen = Array.make !remaining false in
+let check_message_notified_to_app_event dal_node ~number_of_shards
+    ~shard_indexes ~expected_commitment ~expected_level ~expected_pkh
+    ~expected_slot =
+  let remaining = ref (List.length shard_indexes) in
+  let seen = Array.make number_of_shards false in
   let get_shard_index_opt event =
     let level = JSON.(event |-> "level" |> as_int) in
     let slot_index = JSON.(event |-> "slot_index" |> as_int) in
@@ -3466,21 +3466,23 @@ let check_message_notified_to_app_event dal_node ~from_shard ~to_shard
     let*?? () = check_expected expected_commitment commitment in
     Some shard_index
   in
+  let all_seen () =
+    seen |> Array.to_seqi
+    |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
+  in
   Dal_node.wait_for
     dal_node
     "gossipsub_transport_event-message_notified_to_app.v0"
     (fun event ->
       let*?? shard_index = get_shard_index_opt event in
-      let index = shard_index - from_shard in
       Check.(
-        (seen.(index) = false)
+        (seen.(shard_index) = false)
           bool
           ~error_msg:
             (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
-      seen.(index) <- true ;
+      seen.(shard_index) <- true ;
       let () = remaining := !remaining - 1 in
-      if !remaining = 0 && Array.for_all (fun b -> b) seen then Some ()
-      else None)
+      if !remaining = 0 && all_seen () then Some () else None)
 
 (** Connect [dal_node1] and [dal_node2] using the bootstrap peer mechanism.
     [dal_node2] will use [dal_node1] as a bootstrap peer.
@@ -3546,15 +3548,15 @@ let nodes_join_the_same_topics dal_node1 dal_node2 ~num_slots ~pkh1 =
     one at the attesattion level corresponding to [publish_level].
 *)
 let waiters_publish_shards l1_committee dal_node commitment ~publish_level
-    ~slot_index =
+    ~slot_index ~number_of_shards =
   let open Dal.Committee in
   List.map
-    (fun {attester; first_shard_index; power} ->
+    (fun {attester; indexes} ->
       check_events_with_message
         ~event_with_message:Publish_message
         dal_node
-        ~from_shard:first_shard_index
-        ~to_shard:(first_shard_index + power - 1)
+        ~number_of_shards
+        ~shard_indexes:indexes
         ~expected_commitment:commitment
         ~expected_level:publish_level
         ~expected_pkh:attester
@@ -3568,15 +3570,15 @@ let waiters_publish_shards l1_committee dal_node commitment ~publish_level
     The [l1_committee] used to determine the topic of published messages is the
     one at the attesattion level corresponding to [publish_level]. *)
 let waiter_receive_shards l1_committee dal_node commitment ~publish_level
-    ~slot_index ~pkh ~from_peer =
+    ~slot_index ~pkh ~from_peer ~number_of_shards =
   let open Dal.Committee in
   match List.find (fun {attester; _} -> attester = pkh) l1_committee with
-  | {attester; first_shard_index; power} ->
+  | {attester; indexes} ->
       check_events_with_message
         ~event_with_message:(Message_with_header from_peer)
         dal_node
-        ~from_shard:first_shard_index
-        ~to_shard:(first_shard_index + power - 1)
+        ~number_of_shards
+        ~shard_indexes:indexes
         ~expected_commitment:commitment
         ~expected_level:publish_level
         ~expected_pkh:attester
@@ -3591,14 +3593,14 @@ let waiter_receive_shards l1_committee dal_node commitment ~publish_level
     The [l1_committee] used to determine the topic of published messages is the
     one at the attesattion level corresponding to [publish_level]. *)
 let waiter_successful_shards_app_notification l1_committee dal_node commitment
-    ~publish_level ~slot_index ~pkh =
+    ~publish_level ~slot_index ~pkh ~number_of_shards =
   let open Dal.Committee in
   match List.find (fun {attester; _} -> attester = pkh) l1_committee with
-  | {attester; first_shard_index; power} ->
+  | {attester; indexes} ->
       check_message_notified_to_app_event
         dal_node
-        ~from_shard:first_shard_index
-        ~to_shard:(first_shard_index + power - 1)
+        ~number_of_shards
+        ~shard_indexes:indexes
         ~expected_commitment:commitment
         ~expected_level:publish_level
         ~expected_pkh:attester
@@ -3653,6 +3655,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   let* () = connect_nodes_via_p2p dal_node1 dal_node2 in
 
   let num_slots = parameters.Dal.Parameters.number_of_slots in
+  let number_of_shards = parameters.Dal.Parameters.cryptobox.number_of_shards in
   let account1 = Constant.bootstrap1 in
   let pkh1 = account1.public_key_hash in
   (* The two nodes join the same topics *)
@@ -3682,7 +3685,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
   let attestation_level = attested_level - 1 in
-  let* committee = Dal.Committee.at_level node ~level:attestation_level in
+  let* committee = Dal.Committee.at_level node ~level:attestation_level () in
 
   let waiter_publish_list =
     waiters_publish_shards
@@ -3691,6 +3694,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
       slot_commitment
       ~publish_level
       ~slot_index
+      ~number_of_shards
   in
   let waiter_receive_shards =
     waiter_receive_shards
@@ -3701,6 +3705,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
       ~slot_index
       ~pkh:pkh1
       ~from_peer:(Dal_node.read_identity dal_node1)
+      ~number_of_shards
   in
   let waiter_app_notifs =
     if expect_app_notification then
@@ -3711,6 +3716,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
         ~publish_level
         ~slot_index
         ~pkh:pkh1
+        ~number_of_shards
     else unit
   in
 
@@ -3800,6 +3806,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       repeat_i (n - 1) f
   in
   let crypto_params = parameters.Dal.Parameters.cryptobox in
+  let number_of_shards = crypto_params.number_of_shards in
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
 
@@ -3874,23 +3881,22 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
   let* publish_level = next_level node in
   let attested_level = publish_level + parameters.attestation_lag in
   let attestation_level = attested_level - 1 in
-  let* committee = Dal.Committee.at_level node ~level:attestation_level in
+  let* committee = Dal.Committee.at_level node ~level:attestation_level () in
 
-  let Dal.Committee.{attester; first_shard_index; power} =
+  let Dal.Committee.{attester; indexes = shard_indexes} =
     match
       List.find (fun Dal.Committee.{attester; _} -> attester = pkh1) committee
     with
-    | {attester; first_shard_index; power} ->
-        {attester; first_shard_index; power}
     | exception Not_found ->
         Test.fail "Should not happen as %s is part of the committee" pkh1
+    | v -> v
   in
   let iwant_events_waiter =
     check_events_with_message_id
       ~event_with_message_id:IWant
       dal_node1
-      ~from_shard:first_shard_index
-      ~to_shard:(first_shard_index + power - 1)
+      ~number_of_shards
+      ~shard_indexes
       ~expected_commitment:commitment
       ~expected_level:publish_level
       ~expected_pkh:attester
@@ -3901,8 +3907,8 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
     check_events_with_message_id
       ~event_with_message_id:(IHave {pkh = pkh1; slot_index = 0})
       dal_node2
-      ~from_shard:first_shard_index
-      ~to_shard:(first_shard_index + power - 1)
+      ~number_of_shards
+      ~shard_indexes
       ~expected_commitment:commitment
       ~expected_level:publish_level
       ~expected_pkh:attester

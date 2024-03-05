@@ -267,13 +267,14 @@ module Commitment : sig
 end
 
 module Committee : sig
-  type member = {attester : string; first_shard_index : int; power : int}
+  type member = {attester : string; indexes : int list}
 
   type t = member list
 
   val typ : t Check.typ
 
-  val at_level : Node.t -> level:int -> t Lwt.t
+  val at_level :
+    Node.t -> ?level:int -> ?delegates:string list -> unit -> t Lwt.t
 end
 
 module Check : sig

@@ -675,6 +675,13 @@ val rejected_by_full_mempool_with_needed_fee : rex
     Captures [hash]. *)
 val rejected_by_full_mempool_no_possible_fee : rex
 
+(** Matches the message produced by
+    [Dal_data_availibility_attester_not_in_committee {attester; level; slot}]
+    from [src/proto_alpha/lib_protocol/dal_errors_repr].
+
+    Captures [attester], [level], and [slot]. *)
+val dal_data_availibility_attester_not_in_committee : rex
+
 (** Calls {!inject_and_capture2_stderr} and checks that the second
     captured group is [expected_fee].
 
