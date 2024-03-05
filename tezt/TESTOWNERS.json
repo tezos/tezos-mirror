@@ -16,7 +16,6 @@
       "protocol_cache",
       "protocol_table",
       "stresstest",
-      "transaction",
       "transfer",
       "layer1"
     ],
@@ -50,7 +49,7 @@
       "^src/lib_gossipsub",
       "^src/lib_stdlib_unix/test/test_key_value_store_fuzzy.ml$",
       "^tezt/tests/injector_test.ml$",
-      "^tezt/manual_tests/dal.ml$",      
+      "^tezt/manual_tests/dal.ml$",
       "^tezt/tests/dal.ml$"
     ]
   },
