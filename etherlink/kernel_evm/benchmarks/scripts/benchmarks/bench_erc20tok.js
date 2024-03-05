@@ -5,6 +5,7 @@
 // usage: node benchmarks/bench_erc20tok.js
 // The source code of the ERC-20 Token contract can be found in etherlink/kernel_evm/solidy_examples/erc20tok.sol
 
+
 const utils = require('./utils');
 const { contracts_directory, compile_contract_file } = require("../lib/contract");
 const path = require("path");
@@ -37,9 +38,6 @@ txs.push(utils.send(player1, create.addr, 0, transfer_token(player2, 5000)));
 txs.push(utils.send(player1, create.addr, 0, burn(15000)));
 txs.push(utils.send(player2, create.addr, 0, burn(5000)));
 
-var args = process.argv.slice(2)
-if (args.length == 1 && args[0] == '--blueprint') {
-    utils.print_bench([txs], { blueprint: true })
-} else {
-    utils.print_bench([txs])
-}
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

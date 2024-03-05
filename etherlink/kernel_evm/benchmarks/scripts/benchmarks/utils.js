@@ -15,6 +15,10 @@ const { sign } = require('../lib/signature');
 const { legacy_contract_address } = require('../lib/contract');
 const { execSync } = require('child_process');
 const external = require("../lib/external")
+const commander = require('commander');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
@@ -93,43 +97,57 @@ exports.send = function (player, contract_addr, amount, data, options = {}) {
     return rawTx.rawTx;
 }
 
-const print_list = function (src, blueprint, blueprint_number) {
+const print_list = function (src, mode, blueprint_number) {
     const txs = src.slice();
     console.log("[")
-    for (var i = 0; i < txs.length; i++) {
-        transaction = txs[i];
-        messages = blueprint ? chunk_data_into_blueprint(transaction, i + blueprint_number) : chunk_data(transaction);
-        for (var j = 0; j < messages.length; j++) {
-            seperator = (i < txs.length - 1 || j < messages.length - 1) ? "," : "";
-            console.log(`{"external": "${messages[j]}"}${seperator}`);
-        }
+    let data = txs.join(" ");
+    let messages = mode.sequencer_key ?
+        chunk_data_into_blueprint(data, blueprint_number, mode.sequencer_key) :
+        chunk_data(data);
+    for (var j = 0; j < messages.length; j++) {
+        seperator = (j < messages.length - 1) ? "," : "";
+        console.log(`{"external": "${messages[j]}"}${seperator}`);
     }
     console.log("]");
     return txs.length
 }
 
+function temporary_data_file(data) {
+    const tmp_dir = os.tmpdir();
+    const tmp_file = path.join(tmp_dir, "chunker_data");
+
+    fs.writeFileSync(tmp_file, data);
+    return tmp_file;
+}
+
+function chunk_data_gen(data, extra_args){
+    let tmp_data_file = temporary_data_file(data, "--devmode")
+    run_chunker_command = `${CHUNKER} chunk data file:${tmp_data_file} --devmode ${extra_args}`;
+    // The buffer for the output is chosen really big to prevent ENOBUF errors, as the output is proportional to the input
+    chunked_message = new Buffer.from(execSync(run_chunker_command, { maxBuffer : data.length * 3 })).toString();
+    fs.unlinkSync(tmp_data_file);
+    return chunked_message.split("\n").slice(1, -1);
+}
+
 const chunk_data = function (src) {
-    run_chunker_command = `${CHUNKER} chunk data "${src}" --devmode`
-    chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
-    return chunked_message.split("\n").slice(1, -1);
+    return chunk_data_gen(src, "");
 }
 
-const chunk_data_into_blueprint = function (src, number) {
-    run_chunker_command = `${CHUNKER} chunk data "${src}" --devmode --as-blueprint --number ${number} --timestamp ${number}`
-    chunked_message = new Buffer.from(execSync(run_chunker_command)).toString();
-    return chunked_message.split("\n").slice(1, -1);
+const chunk_data_into_blueprint = function (src, number, sequencer_key) {
+    let extra_args = `--as-blueprint --number ${number} --timestamp ${number} --sequencer-key text:${sequencer_key}`;
+    return chunk_data_gen(src, extra_args);
 }
 
-exports.print_bench = function (src, options = {}) {
+exports.print_bench = function (src, mode = {}) {
     let number = 0;
     const inputs = src.slice();
     console.log("[")
     while (inputs.length > 1) {
-        let txs_length = print_list(inputs.shift(), options.blueprint, number)
+        let txs_length = print_list(inputs.shift(), mode, number)
         console.log(",");
         number += txs_length;
     }
-    print_list(inputs.shift(), options.blueprint, number)
+    print_list(inputs.shift(), mode, number)
     console.log("]")
 }
 
@@ -145,4 +163,24 @@ exports.encode_number = function (n) {
     let s = "00000000000000000000000000000000"
     var zeroFilled = (s + n.toString(16)).slice(-32)
     return zeroFilled
+}
+
+// Generate the commands for each benchmarks to use a sequencer or not.
+exports.bench_args = function (argv, extra_options = []) {
+    let commands =
+        commander
+            .usage("[OPTIONS]")
+            .option('--sequencer <private key>',
+                'Generates a chunked blueprint signed with <private key>');
+
+    for (option of extra_options) {
+        commands.option(option.flag, option.desc, option.default)
+    }
+
+    commands.parse(argv);
+
+    return commander.opts().sequencer ?
+        { sequencer_key: commander.opts().sequencer, extra : commands.opts() } :
+        { extra: commands.opts() };
+
 }
