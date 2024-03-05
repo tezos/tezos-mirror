@@ -271,6 +271,9 @@ val move_floating_store :
     in [block_store] to finish if any. *)
 val await_merging : block_store -> unit Lwt.t
 
+(** Default cemented cycles maximum size. I.e.: [2^16 - 1] *)
+val default_cycle_size_limit : int32
+
 (**
    (* TODO UPDATE MERGE DOC *)
    [merge_stores block_store ?finalizer ~nb_blocks_to_preserve
@@ -294,11 +297,15 @@ val await_merging : block_store -> unit Lwt.t
     If a merge thread is already occurring, this function will first
     wait for the previous merge to be done.
 
+    The cemented cycles will have a max size of [cycle_size_limit]
+    blocks which default to [default_cycle_size_limit].
+
     {b Warning} For a given [block_store], the caller must wait for
     this function termination before calling it again or it may result
     in concurrent intertwining causing the cementing to be out of
     order. *)
 val merge_stores :
+  ?cycle_size_limit:int32 ->
   block_store ->
   on_error:(tztrace -> unit tzresult Lwt.t) ->
   finalizer:(int32 -> unit tzresult Lwt.t) ->

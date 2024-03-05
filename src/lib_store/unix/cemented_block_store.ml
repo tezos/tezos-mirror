@@ -573,7 +573,7 @@ let read_block fd block_number =
     let ofs = Bytes.get_int32_be offset_buffer 0 in
     (* We interpret the offset, written as an int32, as an unsigned
        int32. This is allowed by the encoded scheme and allows one
-       additional bit to encode the offset. In enables dealing with
+       additional bit to encode the offset. It enables dealing with
        files up to 4Gib. *)
     match Int32.unsigned_to_int ofs with
     | Some v -> v
@@ -635,6 +635,8 @@ let get_cemented_block_by_hash ~read_metadata (cemented_store : t) hash =
   | Some level ->
       get_cemented_block_by_level ~read_metadata cemented_store level
 
+(* TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/7035
+   Cemented metadata cannot exceed 4Gib *)
 (* Hypothesis:
    - The block list is expected to be ordered by increasing
      level and no blocks are skipped.
