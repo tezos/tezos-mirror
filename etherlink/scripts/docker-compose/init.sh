@@ -81,7 +81,7 @@ create_kernel_config() {
 
   # evm accounts config
   for account in "${EVM_ACCOUNTS[@]}"; do
-    add_kernel_config_set "$file" "/evm/eth_accounts/${account}/balance" 0000dc0a0713000c1e0200000000000000000000000000000000000000000000 ""
+    add_kernel_config_set "$file" "/evm/world_state/eth_accounts/${account}/balance" 0000dc0a0713000c1e0200000000000000000000000000000000000000000000 ""
   done
 
   # sequencer_config
