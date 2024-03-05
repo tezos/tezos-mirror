@@ -183,3 +183,20 @@ module Autostake = struct
         state
     else return state
 end
+
+module NS = struct
+  let enabled (block : Block.t) (state : State.t) =
+    AI.enabled block state && state.constants.adaptive_issuance.ns_enable
+
+  let get_double_attestation_slashing_percentage block_before_slash state =
+    (* We need to get the block before the slash, because after the slash,
+       the context gets rid of the required Seed to recompute the rights
+       for the misbehaving delegates. *)
+    if not (enabled block_before_slash state) then
+      state.constants
+        .percentage_of_frozen_deposits_slashed_per_double_attestation
+    else
+      (* TODO *)
+      state.constants
+        .percentage_of_frozen_deposits_slashed_per_double_attestation
+end

@@ -113,8 +113,10 @@ end
 let apply_slashing_account
     ( culprit,
       Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash = _}
-    ) constants (account_map : State_account.account_map) =
+    ) (block_before_slash : Block.t) (state : State.t) =
   let open State_account in
+  let constants = state.constants in
+  let (account_map : State_account.account_map) = state.account_map in
   let find_account_name_from_pkh_exn pkh account_map =
     match
       Option.map
@@ -144,7 +146,9 @@ let apply_slashing_account
           .Protocol.Alpha_context.Constants.Parametric
            .percentage_of_frozen_deposits_slashed_per_double_baking
     | Double_attesting | Double_preattesting ->
-        constants.percentage_of_frozen_deposits_slashed_per_double_attestation
+        State_ai_flags.NS.get_double_attestation_slashing_percentage
+          block_before_slash
+          state
   in
   let get_total_supply acc_map =
     String.Map.fold
@@ -231,12 +235,12 @@ let apply_slashing_account
 let apply_slashing_state
     ( culprit,
       Protocol.Denunciations_repr.{rewarded; misbehaviour; operation_hash} )
-    (state : State.t) : State.t * Tez_helpers.t =
+    block_before_slash (state : State.t) : State.t * Tez_helpers.t =
   let account_map, total_burnt =
     apply_slashing_account
       (culprit, {rewarded; misbehaviour; operation_hash})
-      state.constants
-      state.account_map
+      block_before_slash
+      state
   in
   (* TODO: add culprit's stakers *)
   let log_updates =
@@ -247,7 +251,8 @@ let apply_slashing_state
   let state = State.update_map ~log_updates ~f:(fun _ -> account_map) state in
   (state, total_burnt)
 
-let apply_all_slashes_at_cycle_end current_cycle (state : State.t) : State.t =
+let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
+    (state : State.t) : State.t =
   let to_slash_later, to_slash_now =
     if
       not
@@ -272,7 +277,9 @@ let apply_all_slashes_at_cycle_end current_cycle (state : State.t) : State.t =
   let state, total_burnt =
     List.fold_left
       (fun (acc_state, acc_total) x ->
-        let state, burnt = apply_slashing_state x acc_state in
+        let state, burnt =
+          apply_slashing_state x block_before_slash acc_state
+        in
         (state, Tez_helpers.(acc_total +! burnt)))
       (state, Tez_helpers.zero)
       to_slash_now

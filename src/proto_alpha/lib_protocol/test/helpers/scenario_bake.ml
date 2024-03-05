@@ -13,12 +13,16 @@ open Scenario_base
 open Adaptive_issuance_helpers
 
 (** Applies when baking the last block of a cycle *)
-let apply_end_cycle current_cycle block state : State.t tzresult Lwt.t =
+let apply_end_cycle current_cycle previous_block block state :
+    State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
   (* Apply all slashes *)
   let state =
-    Slashing_helpers.apply_all_slashes_at_cycle_end current_cycle state
+    Slashing_helpers.apply_all_slashes_at_cycle_end
+      current_cycle
+      previous_block
+      state
   in
   (* Sets initial frozen for future cycle *)
   let state =
@@ -133,6 +137,7 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
   let open Lwt_result_wrap_syntax in
+  let previous_block = block in
   let policy =
     match baker with
     | None -> state.baking_policy
@@ -209,7 +214,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
   (* Dawn of a new cycle *)
   let* state =
     if not (Block.last_block_of_cycle block) then return state
-    else apply_end_cycle current_cycle block state
+    else apply_end_cycle current_cycle previous_block block state
   in
   let* () = check_all_balances block state in
   return (block, state)

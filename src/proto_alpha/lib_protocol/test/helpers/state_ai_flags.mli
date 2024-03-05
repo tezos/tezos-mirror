@@ -42,3 +42,16 @@ module Autostake : sig
       [enabled = false]. *)
   val run_at_cycle_end : Block.t -> State.t -> State.t tzresult
 end
+
+module NS : sig
+  (** This module takes care of the new adaptive slashing mechanism.*)
+
+  (** It is enabled iff the flag [ns_enable] is set to true, and AI is
+      also enabled. *)
+  val enabled : Block.t -> State.t -> bool
+
+  (** Whatever the value of the flag is, this function returns the
+      slashing value for a given double attestation *)
+  val get_double_attestation_slashing_percentage :
+    Block.t -> State.t -> Protocol.Percentage.t
+end
