@@ -51,3 +51,15 @@ val wait_reconnect : name:string -> float -> unit Lwt.t
 (** [switched_new_head hash level] emits the event that the layer 1 has notified
     a new head with [hash] at some given [level]. *)
 val switched_new_head : name:string -> Block_hash.t -> int32 -> unit Lwt.t
+
+val connected : name:string -> unit Lwt.t
+
+val stopping_old_connection : name:string -> unit Lwt.t
+
+val reconnect_connecting : name:string -> unit Lwt.t
+
+val reconnect_notified : name:string -> unit Lwt.t
+
+val reconnect_disconnected : name:string -> unit Lwt.t
+
+val reconnect_connected : name:string -> unit Lwt.t

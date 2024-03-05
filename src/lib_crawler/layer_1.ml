@@ -166,8 +166,16 @@ let do_connect ?(count = 0) l1_ctxt =
   let previous_status = l1_ctxt.status in
   let cond = Lwt_condition.create () in
   l1_ctxt.status <- Connecting cond ;
-  (match previous_status with Connected {stopper; _} -> stopper () | _ -> ()) ;
+  let stopper_event =
+    match previous_status with
+    | Connected {stopper; _} ->
+        stopper () ;
+        Layer1_event.stopping_old_connection ~name:l1_ctxt.name
+    | _ -> return_unit
+  in
   let* conn = do_connect ~count ~previous_status l1_ctxt in
+  let* () = stopper_event in
+  let* () = Layer1_event.connected ~name:l1_ctxt.name in
   Lwt_condition.broadcast cond conn ;
   return conn
 
@@ -199,14 +207,21 @@ let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
   let* (_ : connection_info) = connect l1_ctxt in
   return l1_ctxt
 
-let reconnect l1_ctxt =
+let reconnect ~name l1_ctxt =
+  let open Lwt_syntax in
   match l1_ctxt.status with
-  | Connecting c -> Lwt_condition.wait c
+  | Connecting c ->
+      let* () = Layer1_event.reconnect_connecting ~name in
+      let* conn = Lwt_condition.wait c in
+      let* () = Layer1_event.reconnect_notified ~name in
+      return conn
   | Disconnected ->
       (* NOTE: same as calling [connect] but one less indirection *)
+      let* () = Layer1_event.reconnect_disconnected ~name in
       do_connect ~count:1 l1_ctxt
   | Connected _ ->
       (* force reconnection: call [do_connect] instead of [connect] *)
+      let* () = Layer1_event.reconnect_connected ~name in
       do_connect ~count:1 l1_ctxt
 
 let disconnect l1_ctxt =
@@ -313,7 +328,7 @@ let iter_heads ?name l1_ctxt f =
       | Timeout timeout -> Layer1_event.connection_timeout ~name ~timeout
       | Connection_error trace -> Layer1_event.connection_error ~name trace
     in
-    let*! conn = reconnect l1_ctxt in
+    let*! conn = reconnect ~name l1_ctxt in
     loop conn
   in
   let*! conn = connect l1_ctxt in

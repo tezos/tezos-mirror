@@ -123,6 +123,48 @@ module Simple = struct
       ~level:Info
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
+
+  let connected =
+    declare_0
+      ~name:"lib_crawler_connected"
+      ~msg:"Connected to L1 node"
+      ~level:Debug
+      ()
+
+  let stopping_old_connection =
+    declare_0
+      ~name:"lib_crawler_stopping_old_connection"
+      ~msg:"Stopping previous L1 connection before reconnecting"
+      ~level:Debug
+      ()
+
+  let reconnect_connecting =
+    declare_0
+      ~name:"lib_crawler_reconnect_connecting"
+      ~msg:"Reconnect, already pending reconnection, wait"
+      ~level:Debug
+      ()
+
+  let reconnect_notified =
+    declare_0
+      ~name:"lib_crawler_reconnect_notified"
+      ~msg:"Notified of reconnection"
+      ~level:Debug
+      ()
+
+  let reconnect_disconnected =
+    declare_0
+      ~name:"lib_crawler_reconnect_disconnected"
+      ~msg:"Reconnect on disconnected, connect"
+      ~level:Debug
+      ()
+
+  let reconnect_connected =
+    declare_0
+      ~name:"lib_crawler_reconnect_connected"
+      ~msg:"Reconnect on connected, force reconnection"
+      ~level:Debug
+      ()
 end
 
 let starting ~name = Simple.(emit starting) name
@@ -143,3 +185,15 @@ let wait_reconnect ~name delay = Simple.(emit wait_reconnect) (name, delay)
 
 let switched_new_head ~name hash level =
   Simple.(emit switched_new_head) (name, hash, level)
+
+let connected ~name = Simple.(emit connected) name
+
+let stopping_old_connection ~name = Simple.(emit stopping_old_connection) name
+
+let reconnect_connecting ~name = Simple.(emit reconnect_connecting) name
+
+let reconnect_notified ~name = Simple.(emit reconnect_notified) name
+
+let reconnect_disconnected ~name = Simple.(emit reconnect_disconnected) name
+
+let reconnect_connected ~name = Simple.(emit reconnect_connected) name
