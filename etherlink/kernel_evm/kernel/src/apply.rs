@@ -273,6 +273,19 @@ pub struct TransactionResult {
     estimated_ticks_used: u64,
 }
 
+/// Technically incorrect: it is possible to do a call without sending any data,
+/// however it's done for benchmarking only, and benchmarking doesn't include
+/// such a scenario
+fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &Vec<u8>) {
+    if to.is_none() {
+        log!(host, Benchmarking, "Transaction type: CREATE");
+    } else if data.is_empty() {
+        log!(host, Benchmarking, "Transaction type: TRANSFER");
+    } else {
+        log!(host, Benchmarking, "Transaction type: CALL");
+    }
+}
+
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
@@ -291,11 +304,15 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         effective_gas_price,
     )? {
         Validity::Valid(caller, gas_limit) => (caller, gas_limit),
-        _reason => return Ok(ExecutionResult::Invalid),
+        _reason => {
+            log!(host, Benchmarking, "Transaction type: INVALID");
+            return Ok(ExecutionResult::Invalid);
+        }
     };
 
     let to = transaction.to;
     let call_data = transaction.data.clone();
+    log_transaction_type(host, to, &call_data);
     let value = transaction.value;
     let execution_outcome = match run_transaction(
         host,
@@ -573,6 +590,7 @@ pub fn apply_transaction<Host: Runtime>(
             retriable,
         )?,
         TransactionContent::Deposit(deposit) => {
+            log!(host, Benchmarking, "Transaction type: DEPOSIT");
             apply_deposit(host, evm_account_storage, deposit)?
         }
     };

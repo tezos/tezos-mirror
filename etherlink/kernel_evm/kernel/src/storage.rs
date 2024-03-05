@@ -298,6 +298,10 @@ fn store_current_block_nodebug<Host: Runtime>(
     store_block_by_hash(host, block)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_current_block<Host: Runtime>(
     host: &mut Host,
     block: &L2Block,
@@ -330,6 +334,10 @@ pub fn store_simulation_result<Host: Runtime, T: Encodable>(
         .context("Failed to write the simulation result.")
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_transaction_receipt<Host: Runtime>(
     host: &mut Host,
     receipt: &TransactionReceipt,
@@ -347,6 +355,10 @@ pub fn store_transaction_receipt<Host: Runtime>(
     Ok(src.len().try_into()?)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_transaction_object<Host: Runtime>(
     host: &mut Host,
     object: &TransactionObject,
@@ -881,6 +893,10 @@ pub fn store_kernel_version<Host: Runtime>(
         .map_err(Error::from)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn store_block_in_progress<Host: Runtime>(
     host: &mut Host,
     bip: &BlockInProgress,
@@ -897,6 +913,10 @@ pub fn store_block_in_progress<Host: Runtime>(
         .context("Failed to store current block in progress")
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn read_block_in_progress<Host: Runtime>(
     host: &Host,
 ) -> anyhow::Result<Option<BlockInProgress>> {

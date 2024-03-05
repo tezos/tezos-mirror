@@ -143,6 +143,10 @@ pub struct TransactionReceipt {
 }
 
 impl TransactionReceipt {
+    // DO NOT RENAME: function name is used during benchmark
+    // Never inlined when the kernel is compiled for benchmarks, to ensure the
+    // function is visible in the profiling results.
+    #[cfg_attr(feature = "benchmark", inline(never))]
     pub fn logs_to_bloom(logs: &[IndexedLog]) -> Bloom {
         let mut bloom = Bloom::default();
         // According to

@@ -95,6 +95,10 @@ pub fn current_timestamp<Host: Runtime>(host: &mut Host) -> Timestamp {
     Timestamp::from(seconds)
 }
 
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],

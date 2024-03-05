@@ -134,6 +134,8 @@ function run_profiler(path, logs) {
         var receipt_size = [];
         let bloom_size = [];
         let nb_reboots = 0;
+        let blueprint_chunks = [];
+        let tx_type = [];
 
         var profiler_output_path = "";
 
@@ -178,6 +180,8 @@ function run_profiler(path, logs) {
             push_match(output, block_in_progress_read, /\[Benchmarking\] Reading Block In Progress of size\s*(\d+)/g)
             push_match(output, receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
             push_match(output, bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
+            push_match(output, blueprint_chunks, /\[Benchmarking\] number of blueprint chunks read:\s*(\d+)/g)
+            push_match(output, tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
             push_profiler_sections(output, opcodes, precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
@@ -209,10 +213,14 @@ function run_profiler(path, logs) {
             if (block_in_progress_read.length != nb_reboots) {
                 console.log(new Error("Missing read block in progress size value (expected: " + nb_reboots + ", actual: " + block_in_progress_read.length + ")"));
             }
+            if (tx_status.length != tx_type.length) {
+                console.log(new Error("Missing transaction type (expected: " + tx_status.length + ", actual: " + tx_type.length + ")"));
+            }
             resolve({
                 profiler_output_path,
                 gas_costs: gas_used,
                 tx_status,
+                tx_type,
                 estimated_ticks,
                 estimated_ticks_per_tx,
                 tx_size,
@@ -222,6 +230,7 @@ function run_profiler(path, logs) {
                 opcodes,
                 bloom_size,
                 precompiles,
+                blueprint_chunks,
             });
         });
     })
@@ -271,7 +280,7 @@ async function analyze_profiler_output(path) {
     store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
     interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
-    fetch_blueprint_ticks = await get_ticks(path, "blueprint5fetch");
+    stage_one_ticks = await get_ticks(path, "stage_one");
     block_finalize = await get_ticks(path, "store_current_block");
     logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
@@ -283,7 +292,7 @@ async function analyze_profiler_output(path) {
         store_transaction_object_ticks: store_transaction_object_ticks,
         interpreter_init_ticks: interpreter_init_ticks,
         interpreter_decode_ticks: interpreter_decode_ticks,
-        fetch_blueprint_ticks: fetch_blueprint_ticks,
+        stage_one_ticks: stage_one_ticks,
         sputnik_runtime_ticks: sputnik_runtime_ticks,
         store_receipt_ticks,
         block_finalize,
@@ -335,8 +344,9 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     store_transaction_object_ticks = run_benchmark_result.store_transaction_object_ticks;
     interpreter_init_ticks = run_benchmark_result.interpreter_init_ticks;
     interpreter_decode_ticks = run_benchmark_result.interpreter_decode_ticks;
-    fetch_blueprint_ticks = run_benchmark_result.fetch_blueprint_ticks;
+    stage_one_ticks = run_benchmark_result.stage_one_ticks;
     tx_status = run_benchmark_result.tx_status;
+    tx_type = run_benchmark_result.tx_type;
     estimated_ticks = run_benchmark_result.estimated_ticks;
     estimated_ticks_per_tx = run_benchmark_result.estimated_ticks_per_tx;
     tx_size = run_benchmark_result.tx_size;
@@ -354,6 +364,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             signature_verification_ticks: signature_verification_ticks?.[j],
             status: tx_status[j],
             estimated_ticks: estimated_ticks_per_tx[j],
+            tx_type: tx_type[j],
         }
         if (tx_status[j].includes("OK_UNKNOWN")) {
             // no outcome should mean never invoking sputnik
@@ -368,15 +379,11 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
 
         }
         else if (tx_status[j].includes("OK")) {
-            // sputnik runtime called only if not a transfer
-            // FIXME: won't work with fees ? + run_time_index unreliable in fast mode
-            sputnik_runtime_tick = (gas_costs[gas_cost_index] > 21000) ? sputnik_runtime_ticks?.[run_time_index++] : 0
-
             rows.push(
                 {
                     gas_cost: gas_costs[gas_cost_index],
                     run_transaction_ticks: run_transaction_ticks?.[j],
-                    sputnik_runtime_ticks: sputnik_runtime_tick ?? 0,
+                    sputnik_runtime_ticks: sputnik_runtime_ticks?.[j],
                     store_transaction_object_ticks: store_transaction_object_ticks?.[j],
                     store_receipt_ticks: run_benchmark_result.store_receipt_ticks?.[j],
                     receipt_size: run_benchmark_result.receipt_size[j],
@@ -394,10 +401,6 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         }
     }
 
-    if (!FAST_MODE && run_time_index !== sputnik_runtime_ticks.length) {
-        console.log("Warning: runtime not matched with a transaction in: " + benchmark_name);
-    }
-
     // first kernel run
     // the nb of tx correspond to the full inbox, not just those done in first run
     // FIXME: bip_idx unreliable in FAST_MODE
@@ -406,7 +409,8 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
         benchmark_name: benchmark_name + "(all)",
         interpreter_init_ticks: interpreter_init_ticks?.[0],
         interpreter_decode_ticks: interpreter_decode_ticks?.[0],
-        fetch_blueprint_ticks: fetch_blueprint_ticks?.[0],
+        stage_one_ticks: stage_one_ticks?.[0],
+        blueprint_chunks: run_benchmark_result.blueprint_chunks?.[0],
         kernel_run_ticks: kernel_run_ticks?.[0],
         estimated_ticks: estimated_ticks?.[0],
         inbox_size: run_benchmark_result.inbox_size,
@@ -421,7 +425,8 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
             benchmark_name: benchmark_name + "(all)",
             interpreter_init_ticks: interpreter_init_ticks?.[j],
             interpreter_decode_ticks: interpreter_decode_ticks?.[j],
-            fetch_blueprint_ticks: fetch_blueprint_ticks?.[j],
+            stage_one_ticks: stage_one_ticks?.[j],
+            blueprint_chunks: run_benchmark_result.blueprint_chunks?.[j],
             kernel_run_ticks: kernel_run_ticks?.[j],
             estimated_ticks: estimated_ticks?.[j],
             block_in_progress_store: block_in_progress_store[j] ? block_in_progress_store[j] : '',
@@ -436,7 +441,7 @@ function log_benchmark_result(benchmark_name, run_benchmark_result) {
     finalize_ticks = sumArray(run_benchmark_result.block_finalize)
     unaccounted_ticks =
         sumArray(kernel_run_ticks)
-        - sumArray(fetch_blueprint_ticks)
+        - sumArray(stage_one_ticks)
         - sumArray(run_transaction_ticks)
         - sumArray(signature_verification_ticks)
         - sumArray(store_transaction_object_ticks)
@@ -483,6 +488,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     var benchmark_fields = [
         "benchmark_name",
         "status",
+        "tx_type",
         "gas_cost",
         "signature_verification_ticks",
         "sputnik_runtime_ticks",
@@ -498,7 +504,8 @@ async function run_all_benchmarks(benchmark_scripts) {
         "interpreter_init_ticks",
         "nb_tx",
         "inbox_size",
-        "fetch_blueprint_ticks",
+        "stage_one_ticks",
+        "blueprint_chunks",
         "block_in_progress_read",
         "block_in_progress_read_ticks",
         "block_in_progress_store",
