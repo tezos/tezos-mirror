@@ -1,10 +1,18 @@
 .PHONY: all
-all:
+all: # Regenerate GitLab CI configuration.
 	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe)
 
-# Used in the CI to verify that [.gitlab-ci.yml] is up to date.
+.PHONY: verbose
+verbose: # Regenerate GitLab CI configuration with verbose output.
+	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --verbose)
+
+.PHONY: inline-source-info
+inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
+	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info)
+
+
 .PHONY: check
-check:
+check: # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
 	@git diff --exit-code HEAD -- ../.gitlab-ci.yml || (echo "Cannot check generated [.gitlab-ci.yml] file, some changes are uncommitted"; exit 1)
 	@$(MAKE) all
 	@git diff --exit-code HEAD -- ../.gitlab-ci.yml > /dev/null || ( \
@@ -14,3 +22,8 @@ check:
 	  echo "Then run 'make -C ci' and commit the difference."; \
 	  exit 1 \
 	)
+
+help: # Display this help.
+	@echo "GitLab CI configuration generator. Available targets:"
+	@echo
+	@grep '^[^[:space:]]\+: #' makefile | sed 's/^\([^[:space:]]\+\): # \(.*\)/ - \1: \2/'

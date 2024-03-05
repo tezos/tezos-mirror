@@ -15,6 +15,8 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
+let () = Tezos_ci.Cli.init ()
+
 (* Sets up the [default:] top-level configuration element. *)
 let default = default ~interruptible:true ()
 
@@ -244,6 +246,7 @@ let job_dummy : job =
 let trigger =
   job_external
   @@ job
+       ~__POS__
        ~image:Images.alpine
        ~stage:Stages.trigger
        ~allow_failure:No
@@ -275,8 +278,8 @@ let trigger =
     - Activates the Docker daemon as a service.
     - It sets up authentification with docker registries *)
 let job_docker_authenticated ?(skip_docker_initialization = false) ?artifacts
-    ?variables ?rules ?dependencies ?arch ?when_ ?allow_failure ~stage ~name
-    script : job =
+    ?variables ?rules ?dependencies ?arch ?when_ ?allow_failure ~__POS__ ~stage
+    ~name script : Tezos_ci.tezos_job =
   let docker_version = "24.0.6" in
   job
     ?rules
@@ -285,6 +288,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false) ?artifacts
     ?arch
     ?when_
     ?allow_failure
+    ~__POS__
     ~image:Images.docker
     ~variables:
       ([("DOCKER_VERSION", docker_version)] @ Option.value ~default:[] variables)
@@ -297,8 +301,9 @@ let job_docker_authenticated ?(skip_docker_initialization = false) ?artifacts
     ~name
     script
 
-let job_docker_promote_to_latest ~ci_docker_hub : job =
+let job_docker_promote_to_latest ~ci_docker_hub : tezos_job =
   job_docker_authenticated
+    ~__POS__
     ~stage:Stages.publish_release
     ~name:"docker:promote_to_latest"
     ~variables:[("CI_DOCKER_HUB", Bool.to_string ci_docker_hub)]
@@ -314,8 +319,8 @@ let job_docker_promote_to_latest ~ci_docker_hub : job =
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~arch ?(release = false) ?(needs_trigger = false)
-    ?rules () =
+let job_build_static_binaries ~__POS__ ~arch ?(release = false)
+    ?(needs_trigger = false) ?rules () : Tezos_ci.tezos_job =
   let arch_string =
     match arch with Tezos_ci.Amd64 -> "x86_64" | Arm64 -> "arm64"
   in
@@ -339,6 +344,7 @@ let job_build_static_binaries ~arch ?(release = false) ?(needs_trigger = false)
   in
   job
     ?rules
+    ~__POS__
     ~stage:Stages.build
     ~arch
     ~name
@@ -355,15 +361,24 @@ let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
 
 let _job_static_arm64_experimental =
   job_external ~filename_suffix:"experimental"
-  @@ job_build_static_binaries ~arch:Arm64 ~rules:rules_static_build_other ()
+  @@ job_build_static_binaries
+       ~__POS__
+       ~arch:Arm64
+       ~rules:rules_static_build_other
+       ()
 
 let _job_static_arm64_master =
   job_external ~filename_suffix:"master"
-  @@ job_build_static_binaries ~arch:Arm64 ~rules:rules_static_build_master ()
+  @@ job_build_static_binaries
+       ~__POS__
+       ~arch:Arm64
+       ~rules:rules_static_build_master
+       ()
 
 let _job_static_x86_64_experimental =
   job_external ~filename_suffix:"experimental"
   @@ job_build_static_binaries
+       ~__POS__
        ~arch:Amd64
        ~needs_trigger:true
        ~rules:rules_static_build_other
@@ -372,6 +387,7 @@ let _job_static_x86_64_experimental =
 let _job_static_x86_64_master =
   job_external ~filename_suffix:"master"
   @@ job_build_static_binaries
+       ~__POS__
        ~arch:Amd64
          (* TODO: this job doesn't actually need trigger and there is no
             need to set it optional since we know this job is only on the master branch. *)
@@ -379,10 +395,11 @@ let _job_static_x86_64_master =
        ~rules:rules_static_build_master
        ()
 
-let job_docker_rust_toolchain ?rules ?dependencies () =
+let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
   job_docker_authenticated
     ?rules
     ?dependencies
+    ~__POS__
     ~skip_docker_initialization:true
     ~stage:Stages.build
     ~name:"oc.docker:rust-toolchain"
@@ -396,6 +413,7 @@ let job_docker_rust_toolchain ?rules ?dependencies () =
 let _job_docker_rust_toolchain_before_merging =
   job_external ~filename_suffix:"before_merging"
   @@ job_docker_rust_toolchain
+       ~__POS__
        ~dependencies:(Dependent [Optional trigger])
        ~rules:
          [
@@ -406,10 +424,10 @@ let _job_docker_rust_toolchain_before_merging =
 
 let _job_docker_rust_toolchain_master =
   job_external ~filename_suffix:"master"
-  @@ job_docker_rust_toolchain ~rules:[job_rule ~when_:Always ()] ()
+  @@ job_docker_rust_toolchain ~__POS__ ~rules:[job_rule ~when_:Always ()] ()
 
 let _job_docker_rust_toolchain_other =
-  job_external ~filename_suffix:"other" @@ job_docker_rust_toolchain ()
+  job_external ~filename_suffix:"other" @@ job_docker_rust_toolchain ~__POS__ ()
 
 (** Type of Docker build jobs.
 
@@ -437,8 +455,8 @@ type docker_build_type = Experimental | Release | Test | Test_manual
 
     If [external_] is set to true (default [false]), then the job is
     also written to an external file. *)
-let job_docker_build ?rules ?dependencies ~arch ?(external_ = false)
-    docker_build_type : job =
+let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
+    docker_build_type : Tezos_ci.tezos_job =
   let arch_string =
     match arch with Tezos_ci.Amd64 -> "amd64" | Arm64 -> "arm64"
   in
@@ -481,6 +499,7 @@ let job_docker_build ?rules ?dependencies ~arch ?(external_ = false)
       ?allow_failure
       ?rules
       ?dependencies
+      ~__POS__
       ~stage
       ~arch
       ~name
@@ -515,8 +534,9 @@ let rules_octez_docker_changes_or_master =
     job_rule ~changes:changeset_octez_docker_changes_or_master ();
   ]
 
-let job_docker_amd64_experimental : job =
+let job_docker_amd64_experimental : Tezos_ci.tezos_job =
   job_docker_build
+    ~__POS__
     ~external_:true
       (* TODO: when this is generated for a given pipeline, then the correct variant of [_job_docker_rust_toolchain_*] must be set.
          For now we can set any variant to get the correct name of the need. *)
@@ -525,24 +545,27 @@ let job_docker_amd64_experimental : job =
     ~arch:Amd64
     Experimental
 
-let _job_docker_amd64_test_manual : job =
+let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
   job_docker_build
+    ~__POS__
     ~external_:true (* TODO: see above *)
     ~dependencies:
       (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
     ~arch:Amd64
     Test_manual
 
-let job_docker_arm64_experimental : job =
+let job_docker_arm64_experimental : Tezos_ci.tezos_job =
   job_docker_build
+    ~__POS__
     ~external_:true (* TODO: see above *)
     ~dependencies:(Dependent [Artifacts _job_docker_rust_toolchain_master])
     ~rules:rules_octez_docker_changes_or_master
     ~arch:Arm64
     Experimental
 
-let _job_docker_arm64_test_manual : job =
+let _job_docker_arm64_test_manual : Tezos_ci.tezos_job =
   job_docker_build
+    ~__POS__
     ~external_:true (* TODO: see above *)
     ~dependencies:
       (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
@@ -553,9 +576,10 @@ let _job_docker_arm64_test_manual : job =
    Otherwise, [$DOCKER_IMAGE_TAG] would contain [$IMAGE_ARCH_PREFIX] too.
    [$IMAGE_ARCH_PREFIX] is only used when building Docker images,
    here we handle all architectures so there is no such variable. *)
-let job_docker_merge_manifests ~ci_docker_hub ~job_docker_amd64
-    ~job_docker_arm64 : job =
+let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
+    ~job_docker_arm64 : Tezos_ci.tezos_job =
   job_docker_authenticated
+    ~__POS__
     ~stage:Stages.prepare_release
     ~name:"docker:merge_manifests"
       (* This job merges the images produced in the jobs
@@ -568,6 +592,7 @@ let job_docker_merge_manifests ~ci_docker_hub ~job_docker_amd64
 let _job_docker_merge_manifests_release =
   job_external ~filename_suffix:"release"
   @@ job_docker_merge_manifests
+       ~__POS__
        ~ci_docker_hub:true
          (* TODO: In theory, actually uses either release or
             experimental variant of docker jobs depending on
@@ -581,8 +606,8 @@ let _job_docker_merge_manifests_release =
 
 type bin_package_target = Dpkg | Rpm
 
-let job_build_bin_package ?rules ~name ?(stage = Stages.build) ~arch ~target ()
-    : job =
+let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
+    ~target () : Tezos_ci.tezos_job =
   let arch_string =
     match arch with Tezos_ci.Amd64 -> "amd64" | Arm64 -> "arm64"
   in
@@ -625,6 +650,7 @@ let job_build_bin_package ?rules ~name ?(stage = Stages.build) ~arch ~target ()
   in
   job
     ?rules
+    ~__POS__
     ~name
     ~arch
     ~image
@@ -655,6 +681,7 @@ let job_build_bin_package ?rules ~name ?(stage = Stages.build) ~arch ~target ()
 let job_build_dpkg_amd64 =
   job_external
   @@ job_build_bin_package
+       ~__POS__
        ~name:"oc.build:dpkg:amd64"
        ~target:Dpkg
        ~arch:Tezos_ci.Amd64
@@ -663,6 +690,7 @@ let job_build_dpkg_amd64 =
 let job_build_rpm_amd64 =
   job_external
   @@ job_build_bin_package
+       ~__POS__
        ~name:"oc.build:rpm:amd64"
        ~target:Rpm
        ~arch:Tezos_ci.Amd64
@@ -671,6 +699,7 @@ let job_build_rpm_amd64 =
 let _job_build_dpkg_amd64_manual =
   job_external ~directory:"build" ~filename_suffix:"manual"
   @@ job_build_bin_package
+       ~__POS__
        ~name:"oc.build:dpkg:amd64"
        ~target:Dpkg
        ~arch:Tezos_ci.Amd64
@@ -681,6 +710,7 @@ let _job_build_dpkg_amd64_manual =
 let _job_build_rpm_amd64_manual =
   job_external ~directory:"build" ~filename_suffix:"manual"
   @@ job_build_bin_package
+       ~__POS__
        ~rules:[job_rule ~when_:Manual ()]
        ~name:"oc.build:rpm:amd64"
        ~target:Rpm
@@ -716,33 +746,42 @@ type release_tag_pipeline_type =
     built of the [Test] type and are published to the GitLab registry
     instead of Docker hub. *)
 let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
-  let job_docker_rust_toolchain = job_docker_rust_toolchain () in
+  let job_docker_rust_toolchain = job_docker_rust_toolchain ~__POS__ () in
   let job_docker_amd64 =
     job_docker_build
+      ~__POS__
       ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
       ~arch:Amd64
       (if test then Test else Release)
   in
   let job_docker_arm64 =
     job_docker_build
+      ~__POS__
       ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
       ~arch:Arm64
       (if test then Test else Release)
   in
   let job_docker_merge =
     job_docker_merge_manifests
+      ~__POS__
       ~ci_docker_hub:(not test)
       ~job_docker_amd64
       ~job_docker_arm64
   in
   let job_static_arm64_release =
-    job_build_static_binaries ~arch:Arm64 ~release:true ()
+    job_build_static_binaries ~__POS__ ~arch:Arm64 ~release:true ()
   in
   let job_static_x86_64_release =
-    job_build_static_binaries ~arch:Amd64 ~release:true ~needs_trigger:true ()
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Amd64
+      ~release:true
+      ~needs_trigger:true
+      ()
   in
-  let job_gitlab_release ~dependencies : job =
+  let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
+      ~__POS__
       ~image:Images.ci_release
       ~stage:Stages.publish_release_gitlab
       ~interruptible:false
@@ -753,8 +792,9 @@ let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
         "./scripts/ci/gitlab-release.sh";
       ]
   in
-  let job_gitlab_publish ~dependencies : job =
+  let job_gitlab_publish ~dependencies : Tezos_ci.tezos_job =
     job
+      ~__POS__
       ~image:Images.ci_release
       ~stage:Stages.publish_package_gitlab
       ~interruptible:false
@@ -776,8 +816,9 @@ let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
     | Non_release_tag -> job_gitlab_publish ~dependencies
     | _ -> job_gitlab_release ~dependencies
   in
-  let job_opam_release : job =
+  let job_opam_release : Tezos_ci.tezos_job =
     job
+      ~__POS__
       ~image:Images.runtime_build_test_dependencies
       ~stage:Stages.publish_release
       ~interruptible:false
@@ -852,7 +893,7 @@ let () =
   register "schedule_extended_test" schedule_extended_tests
 
 (* Split pipelines and writes image templates *)
-let config =
+let config () =
   (* Split pipelines types into workflow and includes *)
   let workflow, includes = Pipeline.workflow_includes () in
   (* Write image templates.
@@ -886,5 +927,7 @@ let config =
   ]
 
 let () =
+  (* If argument --verbose is set, then log generation info.
+     If argument --inline-source, then print generation info in yml files. *)
   let filename = Base.(project_root // ".gitlab-ci.yml") in
-  To_yaml.to_file ~header:Tezos_ci.header ~filename config
+  To_yaml.to_file ~header:Tezos_ci.header ~filename (config ())

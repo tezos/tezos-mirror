@@ -139,6 +139,7 @@ type config_element =
   | Default of default  (** Corresponds to a [default:] key. *)
   | Job of job  (** Corresponds to a job, identified by it's key. *)
   | Include of include_ list  (** Corresponds to a [include:] key *)
+  | Comment of string  (** Corresponds to a top-level YAML comment. *)
 
 (** A GitLab CI/CD configuration.
 
