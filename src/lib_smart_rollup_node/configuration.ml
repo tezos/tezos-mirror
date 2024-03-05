@@ -56,6 +56,7 @@ type t = {
   operators : Purpose.operators;
   rpc_addr : string;
   rpc_port : int;
+  acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
   metrics_addr : string option;
   reconnection_delay : float;
   fee_parameters : Operation_kind.fee_parameters;
@@ -115,6 +116,8 @@ let default_rpc_addr = "127.0.0.1"
 let default_rpc_port = 8932
 
 let default_metrics_port = 9933
+
+let default_acl = Tezos_rpc_http_server.RPC_server.Acl.empty_policy
 
 let default_reconnection_delay = 2.0 (* seconds *)
 
@@ -413,6 +416,7 @@ let encoding : t Data_encoding.t =
            operators;
            rpc_addr;
            rpc_port;
+           acl;
            metrics_addr;
            reconnection_delay;
            fee_parameters;
@@ -437,16 +441,14 @@ let encoding : t Data_encoding.t =
            history_mode;
            cors;
          } ->
-      ( ( sc_rollup_address,
-          boot_sector_file,
-          operators,
-          rpc_addr,
-          rpc_port,
-          metrics_addr,
-          reconnection_delay,
-          fee_parameters,
-          mode,
-          loser_mode ),
+      ( ( ( sc_rollup_address,
+            boot_sector_file,
+            operators,
+            rpc_addr,
+            rpc_port,
+            acl ),
+          (metrics_addr, reconnection_delay, fee_parameters, mode, loser_mode)
+        ),
         ( ( dal_node_endpoint,
             dac_observer_endpoint,
             dac_timeout,
@@ -465,16 +467,14 @@ let encoding : t Data_encoding.t =
             gc_parameters,
             history_mode,
             cors ) ) ))
-    (fun ( ( sc_rollup_address,
-             boot_sector_file,
-             operators,
-             rpc_addr,
-             rpc_port,
-             metrics_addr,
-             reconnection_delay,
-             fee_parameters,
-             mode,
-             loser_mode ),
+    (fun ( ( ( sc_rollup_address,
+               boot_sector_file,
+               operators,
+               rpc_addr,
+               rpc_port,
+               acl ),
+             (metrics_addr, reconnection_delay, fee_parameters, mode, loser_mode)
+           ),
            ( ( dal_node_endpoint,
                dac_observer_endpoint,
                dac_timeout,
@@ -499,6 +499,7 @@ let encoding : t Data_encoding.t =
         operators;
         rpc_addr;
         rpc_port;
+        acl;
         metrics_addr;
         reconnection_delay;
         fee_parameters;
@@ -524,44 +525,52 @@ let encoding : t Data_encoding.t =
         cors;
       })
     (merge_objs
-       (obj10
-          (req
-             "smart-rollup-address"
-             ~description:"Smart rollup address"
-             Tezos_crypto.Hashed.Smart_rollup_address.encoding)
-          (opt "boot-sector" ~description:"Boot sector" string)
-          (req
-             "smart-rollup-node-operator"
-             ~description:
-               "Operators that sign operations of the smart rollup, by purpose"
-             Purpose.operators_encoding)
-          (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-          (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
-          (opt "metrics-addr" ~description:"Metrics address" string)
-          (dft
-             "reconnection_delay"
-             ~description:
-               "The reconnection (to the tezos node) delay in seconds"
-             float
-             default_reconnection_delay)
-          (dft
-             "fee-parameters"
-             ~description:
-               "The fee parameters for each purpose used when injecting \
-                operations in L1"
-             (Operation_kind.fee_parameters_encoding ~default_fee_parameter)
-             default_fee_parameters)
-          (req
-             ~description:"The mode for this rollup node"
-             "mode"
-             mode_encoding)
-          (dft
-             "loser-mode"
-             ~description:
-               "If enabled, the rollup node will issue wrong commitments (for \
-                test only!)"
-             Loser_mode.encoding
-             Loser_mode.no_failures))
+       (merge_objs
+          (obj6
+             (req
+                "smart-rollup-address"
+                ~description:"Smart rollup address"
+                Tezos_crypto.Hashed.Smart_rollup_address.encoding)
+             (opt "boot-sector" ~description:"Boot sector" string)
+             (req
+                "smart-rollup-node-operator"
+                ~description:
+                  "Operators that sign operations of the smart rollup, by \
+                   purpose"
+                Purpose.operators_encoding)
+             (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
+             (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
+             (dft
+                "acl"
+                ~description:"Access control list"
+                Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
+                default_acl))
+          (obj5
+             (opt "metrics-addr" ~description:"Metrics address" string)
+             (dft
+                "reconnection_delay"
+                ~description:
+                  "The reconnection (to the tezos node) delay in seconds"
+                float
+                default_reconnection_delay)
+             (dft
+                "fee-parameters"
+                ~description:
+                  "The fee parameters for each purpose used when injecting \
+                   operations in L1"
+                (Operation_kind.fee_parameters_encoding ~default_fee_parameter)
+                default_fee_parameters)
+             (req
+                ~description:"The mode for this rollup node"
+                "mode"
+                mode_encoding)
+             (dft
+                "loser-mode"
+                ~description:
+                  "If enabled, the rollup node will issue wrong commitments \
+                   (for test only!)"
+                Loser_mode.encoding
+                Loser_mode.no_failures)))
        (merge_objs
           (obj9
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
@@ -698,6 +707,7 @@ module Cli = struct
       operators;
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
+      acl = default_acl;
       reconnection_delay =
         Option.value ~default:default_reconnection_delay reconnection_delay;
       dal_node_endpoint;
