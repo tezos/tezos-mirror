@@ -5270,6 +5270,8 @@ let register_evm_node ~protocols =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols
 
+let protocols = Protocol.all
+
 let () =
-  register_evm_node ~protocols:[Alpha] ;
-  register_evm_migration ~protocols:[Alpha]
+  register_evm_node ~protocols ;
+  register_evm_migration ~protocols

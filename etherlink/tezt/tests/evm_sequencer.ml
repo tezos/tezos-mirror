@@ -1863,28 +1863,30 @@ let test_sequencer_upgrade =
       "The block number should have incremented (previous: %L, current: %R)" ;
   unit
 
+let protocols = Protocol.all
+
 let () =
-  test_remove_sequencer [Alpha] ;
-  test_persistent_state [Alpha] ;
-  test_publish_blueprints [Alpha] ;
-  test_resilient_to_rollup_node_disconnect [Alpha] ;
-  test_can_fetch_smart_rollup_address [Alpha] ;
-  test_can_fetch_blueprint [Alpha] ;
-  test_send_transaction_to_delayed_inbox [Alpha] ;
-  test_send_deposit_to_delayed_inbox [Alpha] ;
-  test_rpc_produceBlock [Alpha] ;
-  test_delayed_transfer_is_included [Alpha] ;
-  test_delayed_deposit_is_included [Alpha] ;
-  test_init_from_rollup_node_data_dir [Alpha] ;
-  test_observer_applies_blueprint [Alpha] ;
-  test_observer_forwards_transaction [Alpha] ;
-  test_upgrade_kernel_auto_sync [Alpha] ;
-  test_force_kernel_upgrade [Alpha] ;
-  test_force_kernel_upgrade_too_early [Alpha] ;
-  test_external_transaction_to_delayed_inbox_fails [Alpha] ;
-  test_delayed_transfer_timeout [Alpha] ;
-  test_delayed_transfer_timeout_fails_l1_levels [Alpha] ;
-  test_delayed_inbox_flushing [Alpha] ;
-  test_no_automatic_block_production [Alpha] ;
-  test_migration_from_ghostnet [Alpha] ;
-  test_sequencer_upgrade [Alpha]
+  test_remove_sequencer protocols ;
+  test_persistent_state protocols ;
+  test_publish_blueprints protocols ;
+  test_resilient_to_rollup_node_disconnect protocols ;
+  test_can_fetch_smart_rollup_address protocols ;
+  test_can_fetch_blueprint protocols ;
+  test_send_transaction_to_delayed_inbox protocols ;
+  test_send_deposit_to_delayed_inbox protocols ;
+  test_rpc_produceBlock protocols ;
+  test_delayed_transfer_is_included protocols ;
+  test_delayed_deposit_is_included protocols ;
+  test_init_from_rollup_node_data_dir protocols ;
+  test_observer_applies_blueprint protocols ;
+  test_observer_forwards_transaction protocols ;
+  test_upgrade_kernel_auto_sync protocols ;
+  test_force_kernel_upgrade protocols ;
+  test_force_kernel_upgrade_too_early protocols ;
+  test_external_transaction_to_delayed_inbox_fails protocols ;
+  test_delayed_transfer_timeout protocols ;
+  test_delayed_transfer_timeout_fails_l1_levels protocols ;
+  test_delayed_inbox_flushing protocols ;
+  test_no_automatic_block_production protocols ;
+  test_migration_from_ghostnet protocols ;
+  test_sequencer_upgrade protocols
