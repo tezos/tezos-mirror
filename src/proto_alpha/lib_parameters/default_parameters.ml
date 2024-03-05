@@ -315,7 +315,7 @@ let constants_mainnet : Constants.Parametric.t =
   }
 
 let constants_sandbox =
-  let consensus_committee_size = 256 in
+  let consensus_committee_size = 301 in
   let block_time = 1 in
   let Constants.Generated.
         {max_slashing_threshold; consensus_threshold = _; issuance_weights} =
@@ -328,7 +328,8 @@ let constants_sandbox =
         {
           constants_mainnet.dal with
           number_of_slots = 16;
-          cryptobox_parameters = default_cryptobox_parameters;
+          cryptobox_parameters =
+            {default_cryptobox_parameters with number_of_shards = 256};
         };
     issuance_weights;
     blocks_preservation_cycles = 1;
@@ -350,7 +351,7 @@ let constants_sandbox =
   }
 
 let constants_test =
-  let consensus_committee_size = 25 in
+  let consensus_committee_size = 67 in
   let Constants.Generated.
         {max_slashing_threshold = _; consensus_threshold; issuance_weights} =
     Constants.Generated.generate ~consensus_committee_size
@@ -362,7 +363,12 @@ let constants_test =
         {
           constants_mainnet.dal with
           number_of_slots = 8;
-          cryptobox_parameters = default_cryptobox_parameters;
+          cryptobox_parameters =
+            {
+              default_cryptobox_parameters with
+              number_of_shards = 64;
+              redundancy_factor = 2;
+            };
         };
     issuance_weights;
     consensus_rights_delay = 3;
