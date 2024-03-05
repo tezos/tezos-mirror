@@ -106,6 +106,15 @@ let initiated_params descrs nb_accounts =
         Context.default_test_constants with
         consensus_threshold = 0;
         consensus_committee_size;
+        dal =
+          {
+            Context.default_test_constants.dal with
+            cryptobox_parameters =
+              {
+                Context.default_test_constants.dal.cryptobox_parameters with
+                number_of_shards = consensus_committee_size;
+              };
+          };
       }
   in
   let descrs_params = List.map (fun descr -> descr.parameters) descrs in
