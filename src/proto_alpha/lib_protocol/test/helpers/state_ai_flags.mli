@@ -23,3 +23,10 @@ module AI_Activation : sig
       cycle is set only once ever. *)
   val check_activation_cycle : Block.t -> State.t -> State.t tzresult Lwt.t
 end
+
+module AI : sig
+  (** This module only checks (for now) if AI is activated or not *)
+
+  (** AI is enabled iff the activation cycle is set and passed *)
+  val enabled : Block.t -> State.t -> bool
+end

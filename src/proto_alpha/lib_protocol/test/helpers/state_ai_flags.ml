@@ -55,3 +55,12 @@ module AI_Activation = struct
     | true, None, Some block_launch_cycle ->
         return @@ set_activation_cycle block state block_launch_cycle
 end
+
+module AI = struct
+  let enabled (block : Block.t) (state : State.t) =
+    match state.ai_activation_cycle with
+    | None -> false
+    | Some activation_cycle ->
+        let current_cycle = Block.current_cycle block in
+        Protocol.Alpha_context.Cycle.(current_cycle >= activation_cycle)
+end

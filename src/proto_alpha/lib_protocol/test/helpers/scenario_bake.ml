@@ -310,7 +310,11 @@ let wait_cycle_until condition =
 
 (** Wait until AI activates.
     Fails if AI is not set to be activated in the future. *)
-let wait_ai_activation = wait_cycle_until `AI_activation
+let wait_ai_activation =
+  wait_cycle_until `AI_activation
+  --> exec_unit (fun (block, state) ->
+          assert (State_ai_flags.AI.enabled block state) ;
+          return_unit)
 
 (** wait delegate_parameters_activation_delay cycles  *)
 let wait_delegate_parameters_activation =
