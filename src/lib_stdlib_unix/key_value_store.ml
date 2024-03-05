@@ -150,6 +150,22 @@ let () =
       | Decoding_failed {filepath; index} -> Some (filepath, index) | _ -> None)
     (fun (filepath, index) -> Decoding_failed {filepath; index})
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["key value store"]
+
+  let warn_non_opened_file_descriptor =
+    declare_0
+      ~section
+      ~name:"bad_file_descriptor"
+      ~level:Warning
+      ~msg:
+        "Trying to unlock/close a non-open file descriptor, is the file \
+         already closed?\n"
+      ()
+end
+
 type ('key, 'value) layout = {
   encoding : 'value Data_encoding.t;
   eq : 'value -> 'value -> bool;
@@ -868,20 +884,95 @@ let layout ?encoded_value_size ~encoding ~filepath ~eq ~index_of () =
 
    Each physical file may have a different layout.
 *)
-type ('file, 'key, 'value) t = {files : 'value Files.t; root_dir : string}
+type ('file, 'key, 'value) t = {
+  files : 'value Files.t;
+  root_dir : string;
+  lockfile : Lwt_unix.file_descr;
+}
 
 type ('file, 'key, 'value) file_layout =
   root_dir:string -> 'file -> ('key, 'value) layout
 
-let init ~lru_size ~root_dir =
-  let open Lwt_syntax in
-  let+ () =
-    if not (Sys.file_exists root_dir) then Lwt_utils_unix.create_dir root_dir
-    else return_unit
+let with_lockfile_lock fn f =
+  let open Lwt_result_syntax in
+  let* fd =
+    Lwt.catch
+      (fun () ->
+        let*! fd =
+          Lwt_unix.openfile fn [Unix.O_CLOEXEC; O_CREAT; O_RDWR] 0o644
+        in
+        Lwt.return_ok fd)
+      (function
+        | Unix.Unix_error (unix_code, caller, arg) ->
+            tzfail
+              (Lwt_utils_unix.Io_error {action = `Open; unix_code; caller; arg})
+        | exn -> Lwt.reraise exn)
   in
-  {files = Files.init ~lru_size; root_dir}
+  Lwt.catch
+    (fun () ->
+      (* Fails if the lockfile is already taken by another process *)
+      let*! () = Lwt_unix.lockf fd F_TLOCK 0 in
+      f fd)
+    (function
+      | Unix.Unix_error (unix_code, caller, arg) ->
+          let* () =
+            Lwt.catch
+              (fun () ->
+                let*! () = Lwt_unix.close fd in
+                return_unit)
+              (function
+                | Unix.Unix_error (unix_code, caller, arg) ->
+                    tzfail
+                      (Lwt_utils_unix.Io_error
+                         {action = `Close; unix_code; caller; arg})
+                | exn -> Lwt.reraise exn)
+          in
+          tzfail
+            (Lwt_utils_unix.Io_error {action = `Lock; unix_code; caller; arg})
+      | exn -> Lwt.reraise exn)
 
-let close t = Files.close t.files
+let lockfile_unlock fd =
+  let open Lwt_result_syntax in
+  let* () =
+    Lwt.catch
+      (fun () ->
+        let*! () = Lwt_unix.lockf fd Unix.F_ULOCK 0 in
+        return_unit)
+      (function
+        | Unix.Unix_error (Unix.EBADF, _, _) ->
+            let*! () = Events.(emit warn_non_opened_file_descriptor ()) in
+            return_unit
+        | Unix.Unix_error (unix_code, caller, arg) ->
+            tzfail
+              (Lwt_utils_unix.Io_error {action = `Lock; unix_code; caller; arg})
+        | exn -> Lwt.reraise exn)
+  in
+  Lwt.catch
+    (fun () ->
+      let*! () = Lwt_unix.close fd in
+      return_unit)
+    (function
+      | Unix.Unix_error (Unix.EBADF, _, _) ->
+          let*! () = Events.(emit warn_non_opened_file_descriptor ()) in
+          return_unit
+      | Unix.Unix_error (unix_code, caller, arg) ->
+          tzfail
+            (Lwt_utils_unix.Io_error {action = `Close; unix_code; caller; arg})
+      | exn -> Lwt.reraise exn)
+
+let init ~lru_size ~root_dir =
+  let open Lwt_result_syntax in
+  let*! () =
+    if not (Sys.file_exists root_dir) then Lwt_utils_unix.create_dir root_dir
+    else Lwt.return_unit
+  in
+  with_lockfile_lock (Filename.concat root_dir ".lock") @@ fun fd ->
+  return {files = Files.init ~lru_size; root_dir; lockfile = fd}
+
+let close t =
+  let open Lwt_result_syntax in
+  let*! () = Files.close t.files in
+  lockfile_unlock t.lockfile
 
 let write_value :
     type file key value.
@@ -892,7 +983,7 @@ let write_value :
     key ->
     value ->
     unit tzresult Lwt.t =
- fun ?override {files; root_dir} file_layout file key value ->
+ fun ?override {files; root_dir; _} file_layout file key value ->
   let layout = file_layout ~root_dir file in
   Files.write ?override files layout key value
 
@@ -903,7 +994,7 @@ let read_value :
     file ->
     key ->
     value tzresult Lwt.t =
- fun {files; root_dir} file_layout file key ->
+ fun {files; root_dir; _} file_layout file key ->
   let layout = file_layout ~root_dir file in
   Files.read files layout key
 
@@ -914,7 +1005,7 @@ let value_exists :
     file ->
     key ->
     bool tzresult Lwt.t =
- fun {files; root_dir} file_layout file key ->
+ fun {files; root_dir; _} file_layout file key ->
   let layout = file_layout ~root_dir file in
   Files.value_exists files layout key
 
@@ -924,7 +1015,7 @@ let count_values :
     (file, key, value) file_layout ->
     file ->
     int tzresult Lwt.t =
- fun {files; root_dir} file_layout file ->
+ fun {files; root_dir; _} file_layout file ->
   let layout = file_layout ~root_dir file in
   Files.count_values files layout
 
@@ -948,6 +1039,6 @@ let values_exist t file_layout seq =
          let* maybe_value = value_exists t file_layout file key in
          return (file, key, maybe_value))
 
-let remove_file {files; root_dir} file_layout file =
+let remove_file {files; root_dir; _} file_layout file =
   let layout = file_layout ~root_dir file in
   Files.remove files layout

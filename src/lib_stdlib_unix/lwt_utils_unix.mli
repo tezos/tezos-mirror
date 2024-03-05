@@ -144,9 +144,10 @@ type 'action io_error = {
   arg : string;  (** Argument given to the unix function: generally a path. *)
 }
 
-type error += Io_error of [`Close | `Open | `Rename] io_error
+type error += Io_error of [`Close | `Open | `Rename | `Unlink | `Lock] io_error
 
-val tzfail_of_io_error : [`Close | `Open | `Rename] io_error -> 'b tzresult
+val tzfail_of_io_error :
+  [`Close | `Open | `Rename | `Unlink | `Lock] io_error -> 'b tzresult
 
 (** [with_open_file ~flags ~perm filename f] opens the given file
    using {!Lwt_unix.open_file} and passes the resulting file-descriptor
@@ -169,7 +170,7 @@ val with_open_file :
   ?perm:Unix.file_perm ->
   string ->
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
-  ('a, [`Open | `Close] io_error) result Lwt.t
+  ('a, [> `Open | `Close] io_error) result Lwt.t
 
 (** [with_open_out ?overwrite filename f] uses [with_open_file] with
    the flags [O_WRONLY; O_CREAT; O_CLOEXEC] and the default
@@ -179,7 +180,7 @@ val with_open_out :
   ?overwrite:bool ->
   string ->
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
-  ('a, [`Open | `Close] io_error) result Lwt.t
+  ('a, [> `Open | `Close] io_error) result Lwt.t
 
 (** [with_atomic_open_out ?(overwrite=true) filename ?temp_dir f] is a
    wrapper around [with_open_out] that ensures that the data are
@@ -202,7 +203,7 @@ val with_atomic_open_out :
   string ->
   ?temp_dir:string ->
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
-  ('a, [`Open | `Close | `Rename] io_error) result Lwt.t
+  ('a, [> `Open | `Close | `Rename] io_error) result Lwt.t
 
 (** [with_open_in filename f] uses [with_open_file] with the flags
    [O_RDONLY; O_CLOEXEC] and the default permissions. *)

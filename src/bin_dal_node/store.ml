@@ -175,7 +175,7 @@ let init config =
   let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
-  let*! shard_store = Shards.init base_dir shard_store_dir in
+  let* shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {

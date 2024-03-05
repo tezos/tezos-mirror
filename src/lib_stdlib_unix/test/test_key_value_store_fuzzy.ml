@@ -58,9 +58,10 @@ open Error_monad
 module type S = sig
   type ('file, 'key, 'value) t
 
-  val init : lru_size:int -> root_dir:string -> ('file, 'key, 'value) t Lwt.t
+  val init :
+    lru_size:int -> root_dir:string -> ('file, 'key, 'value) t tzresult Lwt.t
 
-  val close : ('file, 'key, 'value) t -> unit Lwt.t
+  val close : ('file, 'key, 'value) t -> unit tzresult Lwt.t
 
   val write_value :
     ?override:bool ->
@@ -104,9 +105,9 @@ module L : S = Key_value_store
 module R : S = struct
   type ('file, 'key, 'value) t = ('file * 'key, 'value) Stdlib.Hashtbl.t
 
-  let init ~lru_size:_ ~root_dir:_ = Stdlib.Hashtbl.create 100 |> Lwt.return
+  let init ~lru_size:_ ~root_dir:_ = Lwt.return_ok @@ Stdlib.Hashtbl.create 100
 
-  let close _ = Lwt.return_unit
+  let close _ = Lwt_syntax.return_ok_unit
 
   let write_value ?(override = false) t _file_layout file key value =
     let open Lwt_result_syntax in
@@ -448,8 +449,8 @@ let run_scenario
       ~index_of:Fun.id
       ()
   in
-  let*! left = L.init ~lru_size ~root_dir in
-  let*! right = R.init ~lru_size ~root_dir in
+  let* left = L.init ~lru_size ~root_dir in
+  let* right = R.init ~lru_size ~root_dir in
   let action, next_actions = scenario in
   let n = ref 0 in
   let compare_tzresult finalization pp_while pp_val left_result right_result =
@@ -544,7 +545,7 @@ let run_scenario
             right_result
     in
     let finalize () =
-      let*! left = L.init ~lru_size:number_of_files ~root_dir in
+      let* left = L.init ~lru_size:number_of_files ~root_dir in
       let* () =
         Seq.ES.iter
           (fun (file, key) ->
@@ -567,7 +568,7 @@ let run_scenario
             (function Ok () -> return_unit | Error err -> fail err)
             promises_running_seq
         in
-        let* () = finalize () in
+        let* _ = finalize () in
         return (left, right)
     | (Sequential, action) :: next_actions ->
         let* () = promise in
@@ -584,7 +585,7 @@ let run_scenario
         run_actions action next_actions promises_running_seq
   in
   let* result = run_actions action next_actions Seq_s.empty in
-  let*! () = L.close left in
+  let*! _ = L.close left in
   return result
 
 let print (parameters, scenario) =
