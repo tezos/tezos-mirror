@@ -40,6 +40,8 @@
   than or equal to the activation timestamp. Blueprint in the storage
   are deleted during the sequencer upgrade as they can be trusted
   anymore. (!12038, !12046)
+- Calling the withdrawals precompiled contract at `0xff00..0001` now costs
+  880 gas units. (!12220)
 
 ### Internal
 
