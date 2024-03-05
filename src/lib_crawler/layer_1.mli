@@ -79,6 +79,11 @@ val iter_heads :
     returns it. *)
 val wait_first : t -> (Block_hash.t * Block_header.t) Lwt.t
 
+(** [get_latest_head t] returns the latest L1 head if at least one was seen by
+    [t]. The head is the one sent by the heads monitoring RPC of the L1 node,
+    independently of how they were processed by the current process. *)
+val get_latest_head : t -> (Block_hash.t * Block_header.t) option
+
 (** {2 Helper functions for the Layer 1 chain} *)
 
 (** [get_predecessor_opt ?max_read state head] returns the predecessor of block

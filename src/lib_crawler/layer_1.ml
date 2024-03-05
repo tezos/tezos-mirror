@@ -338,6 +338,8 @@ let wait_first l1_ctxt =
   @@ let* conn = connect l1_ctxt in
      loop conn
 
+let get_latest_head l1_ctxt = l1_ctxt.last_seen
+
 (** [predecessors_of_blocks hashes] given a list of successive block hashes,
     from newest to oldest, returns an associative list that associates a hash to
     its predecessor in this list. *)
