@@ -152,7 +152,11 @@ let begin_test ?(burn_rewards = false) delegates_name_list :
             pending_operations = [];
             pending_slashes = [];
             double_signings = [];
+            ai_activation_cycle = None;
           }
       in
       let* () = check_all_balances block state in
+      let* state =
+        State_ai_flags.AI_Activation.check_activation_cycle block state
+      in
       return (block, state))

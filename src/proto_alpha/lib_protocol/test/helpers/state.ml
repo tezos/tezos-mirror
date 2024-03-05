@@ -32,6 +32,7 @@ type t = {
   pending_slashes :
     (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list;
   double_signings : double_signing_state list;
+  ai_activation_cycle : Protocol.Alpha_context.Cycle.t option;
 }
 
 (** Expected number of cycles before staking parameters get applied *)

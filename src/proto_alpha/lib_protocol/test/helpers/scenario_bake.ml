@@ -148,6 +148,9 @@ let bake ?baker : t -> t tzresult Lwt.t =
       return (block, state)
     else return (block', state)
   in
+  let* state =
+    State_ai_flags.AI_Activation.check_activation_cycle block state
+  in
   let* state = State.apply_rewards ~baker:baker_name block state in
   (* First block of a new cycle *)
   let new_current_cycle = Block.current_cycle block in
