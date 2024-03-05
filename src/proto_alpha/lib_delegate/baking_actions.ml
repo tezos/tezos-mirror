@@ -942,28 +942,26 @@ let prepare_attestations_request state unsigned_attestations =
    TODO: https://gitlab.com/tezos/tezos/-/issues/4538
    Improve/clarify when the state is recorded.
 *)
-let rec perform_action ~state_recorder state (action : action) =
+let rec perform_action state (action : action) =
   let open Lwt_result_syntax in
   match action with
-  | Do_nothing ->
-      let* () = state_recorder ~new_state:state in
-      return state
+  | Do_nothing -> return state
   | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
   | Prepare_preattestations {preattestations} ->
-      prepare_preattestations_request state preattestations
+      let* new_state = prepare_preattestations_request state preattestations in
+      return new_state
   | Prepare_attestations {attestations} ->
-      prepare_attestations_request state attestations
+      let* new_state = prepare_attestations_request state attestations in
+      return new_state
   | Inject_block {prepared_block; force_injection; asynchronous} ->
       let* new_state =
         inject_block ~force_injection ~asynchronous state prepared_block
       in
-      let* () = state_recorder ~new_state in
       return new_state
   | Inject_preattestation {signed_preattestation} ->
       let* () = inject_consensus_vote state signed_preattestation in
-      perform_action ~state_recorder state Watch_proposal
+      perform_action state Watch_proposal
   | Inject_attestation {signed_attestation} ->
-      let* () = state_recorder ~new_state:state in
       let* () = inject_consensus_vote state signed_attestation in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
@@ -971,10 +969,10 @@ let rec perform_action ~state_recorder state (action : action) =
       return state
   | Update_to_level level_update ->
       let* new_state, new_action = update_to_level state level_update in
-      perform_action ~state_recorder new_state new_action
+      perform_action new_state new_action
   | Synchronize_round round_update ->
       let* new_state, new_action = synchronize_round state round_update in
-      perform_action ~state_recorder new_state new_action
+      perform_action new_state new_action
   | Watch_proposal ->
       (* We wait for preattestations to trigger the
            [Prequorum_reached] event *)

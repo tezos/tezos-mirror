@@ -99,8 +99,4 @@ val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 
 val compute_round : proposal -> Round.round_durations -> Round.t tzresult
 
-val perform_action :
-  state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
-  state ->
-  t ->
-  state tzresult Lwt.t
+val perform_action : state -> t -> state tzresult Lwt.t

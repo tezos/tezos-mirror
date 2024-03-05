@@ -142,10 +142,12 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   Baking_actions.inject_consensus_votes state signed_consensus_batch
 
 let do_action (state, action) =
-  let state_recorder ~new_state =
+  let open Lwt_result_syntax in
+  let* new_state = Baking_actions.perform_action state action in
+  let* () =
     Baking_state.may_record_new_state ~previous_state:state ~new_state
   in
-  Baking_actions.perform_action ~state_recorder state action
+  return new_state
 
 let bake_at_next_level_event state =
   let open Lwt_result_syntax in
@@ -284,22 +286,18 @@ let propose_at_next_level ~minimal_timestamp state =
         force_apply = state.global_state.config.force_apply;
       }
     in
-    let state_recorder ~new_state =
-      Baking_state.may_record_new_state ~previous_state:state ~new_state
-    in
     let* prepared_block =
       Baking_actions.prepare_block state.global_state block_to_bake
     in
     let* state =
-      Baking_actions.perform_action
-        ~state_recorder
-        state
-        (Inject_block
-           {
-             prepared_block;
-             force_injection = minimal_timestamp;
-             asynchronous = false;
-           })
+      do_action
+        ( state,
+          Inject_block
+            {
+              prepared_block;
+              force_injection = minimal_timestamp;
+              asynchronous = false;
+            } )
     in
     let*! () =
       cctxt#message
@@ -647,18 +645,14 @@ let rec baking_minimal_timestamp ~count state
       force_apply = state.global_state.config.force_apply;
     }
   in
-  let state_recorder ~new_state =
-    Baking_state.may_record_new_state ~previous_state:state ~new_state
-  in
   let* prepared_block =
     Baking_actions.prepare_block state.global_state block_to_bake
   in
   let* new_state =
-    Baking_actions.perform_action
-      ~state_recorder
-      state
-      (Inject_block
-         {prepared_block; force_injection = true; asynchronous = false})
+    do_action
+      ( state,
+        Inject_block
+          {prepared_block; force_injection = true; asynchronous = false} )
   in
   let*! () = cctxt#message "Injected block at minimal timestamp" in
   if count <= 1 then return_unit
