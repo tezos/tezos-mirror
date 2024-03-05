@@ -452,6 +452,6 @@ let make_denunciations_ ?(filter = fun {State.denounced; _} -> not denounced)
    until the operations are included in a block (by default the next block) *)
 let make_denunciations ?filter () = exec_op (make_denunciations_ ?filter)
 
-(** Create an account and give an initial balance funded by [source] *)
-let add_account_with_funds name source amount =
-  add_account name --> transfer source name amount --> reveal name
+(** Create an account and give an initial balance funded by [funder] *)
+let add_account_with_funds name ~funder amount =
+  add_account name --> transfer funder name amount --> reveal name

@@ -145,7 +145,10 @@ let scenario_forbidden_operations =
   --> unstake "staker" Nothing
 
 let full_balance_in_finalizable =
-  add_account_with_funds "dummy" "staker" (Amount (Tez.of_mutez 10_000_000L))
+  add_account_with_funds
+    "dummy"
+    ~funder:"staker"
+    (Amount (Tez.of_mutez 10_000_000L))
   --> stake "staker" All_but_one --> next_cycle --> unstake "staker" All
   --> wait_n_cycles_f (unstake_wait ++ 2)
   (* At this point, almost all the balance (but one mutez) of the stake is in finalizable *)
@@ -175,7 +178,7 @@ let change_delegate =
   --> set_delegate_params "delegate2" init_params
   --> add_account_with_funds
         "staker"
-        "delegate1"
+        ~funder:"delegate1"
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> set_delegate "staker" (Some "delegate1")
   --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
@@ -196,11 +199,11 @@ let unset_delegate =
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
-        "delegate"
+        ~funder:"delegate"
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> add_account_with_funds
         "dummy"
-        "delegate"
+        ~funder:"delegate"
         (Amount (Tez.of_mutez 2_000_000L))
   --> set_delegate "staker" (Some "delegate")
   --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
@@ -234,7 +237,7 @@ let forbid_costaking =
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
-        "delegate"
+        ~funder:"delegate"
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> set_delegate "staker" (Some "delegate")
   --> wait_cycle_until (`And (`AI_activation, `delegate_parameters_activation))

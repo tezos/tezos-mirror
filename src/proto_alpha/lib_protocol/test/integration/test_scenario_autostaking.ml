@@ -60,11 +60,11 @@ let setup ~activate_ai =
   --> begin_test [delegate]
   --> add_account_with_funds
         delegator1
-        "__bootstrap__"
+        ~funder:"__bootstrap__"
         (Amount (Tez.of_mutez 2_000_000_000L))
   --> add_account_with_funds
         delegator2
-        "__bootstrap__"
+        ~funder:"__bootstrap__"
         (Amount (Tez.of_mutez 2_000_000_000L))
   --> next_cycle
   --> snapshot_balances "before delegation" [delegate]
@@ -150,7 +150,7 @@ let test_overdelegation =
   --> begin_test ["delegate"; "faucet1"; "faucet2"; "faucet3"]
   --> add_account_with_funds
         "delegator_to_fund"
-        "delegate"
+        ~funder:"delegate"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
   (* Delegate has 200k staked and 200k liquid *)
   --> set_delegate "delegator_to_fund" (Some "delegate")

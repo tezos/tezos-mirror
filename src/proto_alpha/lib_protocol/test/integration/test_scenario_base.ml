@@ -55,7 +55,7 @@ let init_scenario ?(force_ai = true) ?reward_per_block () =
            --> begin_test ~activate_ai:true ~self_stake:false
            --> add_account_with_funds
                  "staker"
-                 "delegate"
+                 ~funder:"delegate"
                  (Amount (Tez.of_mutez 2_000_000_000_000L))
            --> set_delegate "staker" (Some "delegate"))
     --> wait_delegate_parameters_activation --> next_cycle

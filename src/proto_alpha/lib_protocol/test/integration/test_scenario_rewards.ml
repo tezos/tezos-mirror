@@ -39,15 +39,15 @@ let test_wait_with_rewards =
       |+ Tag "edge = 1" --> set_edge 1.)
   --> add_account_with_funds
         "staker1"
-        "faucet"
+        ~funder:"faucet"
         (Amount (Tez.of_mutez 2_000_000_000L))
   --> add_account_with_funds
         "staker2"
-        "faucet"
+        ~funder:"faucet"
         (Amount (Tez.of_mutez 2_000_000_000L))
   --> add_account_with_funds
         "staker3"
-        "faucet"
+        ~funder:"faucet"
         (Amount (Tez.of_mutez 2_000_000_000L))
   --> set_delegate "staker1" (Some "delegate")
   --> set_delegate "staker2" (Some "delegate")
