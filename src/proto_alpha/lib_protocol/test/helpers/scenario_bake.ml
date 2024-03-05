@@ -16,9 +16,6 @@ open Adaptive_issuance_helpers
 let apply_end_cycle current_cycle block state : State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
-  let* launch_cycle_opt =
-    Context.get_adaptive_issuance_launch_cycle (B block)
-  in
   (* Apply all slashes *)
   let state = apply_all_slashes_at_cycle_end current_cycle state in
   (* Sets initial frozen for future cycle *)
@@ -32,18 +29,7 @@ let apply_end_cycle current_cycle block state : State.t tzresult Lwt.t =
       state
   in
   (* Apply autostaking *)
-  let*? state =
-    if not state.constants.adaptive_issuance.autostaking_enable then Ok state
-    else
-      match launch_cycle_opt with
-      | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) -> Ok state
-      | None | Some _ ->
-          String.Map.fold_e
-            (fun name account state ->
-              apply_autostake ~name ~old_cycle:current_cycle account state)
-            state.account_map
-            state
-  in
+  let*? state = State_ai_flags.Autostake.run_at_cycle_end block state in
   (* Apply parameter changes *)
   let state, param_requests =
     List.fold_left

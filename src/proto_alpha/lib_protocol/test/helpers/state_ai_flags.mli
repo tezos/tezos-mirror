@@ -30,3 +30,15 @@ module AI : sig
   (** AI is enabled iff the activation cycle is set and passed *)
   val enabled : Block.t -> State.t -> bool
 end
+
+module Autostake : sig
+  (** This module takes care of autostaking when it is enabled *)
+
+  (** Autostaking is enabled iff the flag [autostaking_enable] is true and
+      AI is not activated ([AI.enabled = false]). *)
+  val enabled : Block.t -> State.t -> bool
+
+  (** Runs the autostake operations at cycle end. Does nothing if
+      [enabled = false]. *)
+  val run_at_cycle_end : Block.t -> State.t -> State.t tzresult
+end
