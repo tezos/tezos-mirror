@@ -201,13 +201,13 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     if transaction.chain_id.is_some()
         && Some(block_constant.chain_id) != transaction.chain_id
     {
-        log!(host, Debug, "Transaction status: ERROR_CHAINID");
+        log!(host, Benchmarking, "Transaction status: ERROR_CHAINID");
         return Ok(Validity::InvalidChainId);
     }
 
     // ensure that the user was willing to at least pay the base fee
     if transaction.max_fee_per_gas < block_constant.base_fee_per_gas() {
-        log!(host, Debug, "Transaction status: ERROR_MAX_BASE_FEE");
+        log!(host, Benchmarking, "Transaction status: ERROR_MAX_BASE_FEE");
         return Ok(Validity::InvalidMaxBaseFee);
     }
 
@@ -215,7 +215,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let caller = match transaction.caller() {
         Ok(caller) => caller,
         Err(_err) => {
-            log!(host, Debug, "Transaction status: ERROR_SIGNATURE.");
+            log!(host, Benchmarking, "Transaction status: ERROR_SIGNATURE.");
             // Transaction with undefined caller are ignored, i.e. the caller
             // could not be derived from the signature.
             return Ok(Validity::InvalidSignature);
@@ -235,7 +235,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
     // The transaction nonce is valid.
     if nonce != transaction.nonce {
-        log!(host, Debug, "Transaction status: ERROR_NONCE.");
+        log!(host, Benchmarking, "Transaction status: ERROR_NONCE.");
         return Ok(Validity::InvalidNonce);
     };
 
@@ -246,20 +246,20 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     let max_fee = total_gas_limit.saturating_mul(transaction.max_fee_per_gas);
 
     if balance < cost || balance < max_fee {
-        log!(host, Debug, "Transaction status: ERROR_PRE_PAY.");
+        log!(host, Benchmarking, "Transaction status: ERROR_PRE_PAY.");
         return Ok(Validity::InvalidPrePay);
     }
 
     // The sender does not have code, see EIP3607.
     if code_exists {
-        log!(host, Debug, "Transaction status: ERROR_CODE.");
+        log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
         return Ok(Validity::InvalidCode);
     }
 
     // check that enough gas is provided to cover fees
     let Ok(gas_limit) =  tx_execution_gas_limit(transaction, &block_constant.block_fees)
     else {
-        log!(host, Debug, "Transaction status: ERROR_GAS_FEE.");
+        log!(host, Benchmarking, "Transaction status: ERROR_GAS_FEE.");
          return Ok(Validity::InvalidNotEnoughGasForFees)
     };
 
@@ -328,7 +328,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         Some(execution_outcome) => {
             log!(
                 host,
-                Debug,
+                Benchmarking,
                 "Transaction status: OK_{}.",
                 execution_outcome.is_success
             );
@@ -339,7 +339,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             )
         }
         None => {
-            log!(host, Debug, "Transaction status: OK_UNKNOWN.");
+            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
             (U256::zero(), 0, false)
         }
     };
@@ -521,6 +521,7 @@ pub fn handle_transaction_result<Host: Runtime>(
 
     if let Some(outcome) = &mut execution_outcome {
         log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
+        log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
         fee_updates.modify_outcome(outcome);
         post_withdrawals(host, &outcome.withdrawals)?
     }

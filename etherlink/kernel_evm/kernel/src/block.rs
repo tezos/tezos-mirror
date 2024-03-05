@@ -106,7 +106,7 @@ fn compute<Host: Runtime>(
                 )?;
                 log!(
                     host,
-                    Debug,
+                    Benchmarking,
                     "Estimated ticks after tx: {}",
                     block_in_progress.estimated_ticks
                 );
@@ -129,7 +129,7 @@ fn compute<Host: Runtime>(
                 block_in_progress.account_for_invalid_transaction(data_size);
                 log!(
                     host,
-                    Debug,
+                    Benchmarking,
                     "Estimated ticks after tx: {}",
                     block_in_progress.estimated_ticks
                 );
@@ -209,9 +209,10 @@ fn compute_bip<Host: KernelRuntime>(
     )?;
     match result {
         ComputationResult::RebootNeeded => {
+            log!(host, Info, "Ask for reboot.");
             log!(
                 host,
-                Info,
+                Benchmarking,
                 "Ask for reboot. Estimated ticks: {}",
                 &block_in_progress.estimated_ticks
             );
@@ -321,7 +322,7 @@ pub fn produce<Host: KernelRuntime>(
             }
         }
     }
-    log!(host, Debug, "Estimated ticks: {}", tick_counter.c);
+    log!(host, Benchmarking, "Estimated ticks: {}", tick_counter.c);
     Ok(ComputationResult::Finished)
 }
 

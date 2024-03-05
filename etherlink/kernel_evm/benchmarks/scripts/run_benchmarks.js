@@ -152,14 +152,14 @@ function run_profiler(path, logs) {
                 profiler_output_path = profiler_output_path_result;
                 if (KEEP_TEMP) console.log(`Flamechart: ${profiler_output_path}`)
             }
-            push_match(output, gas_used, /\bgas_used:\s*(\d+)/g)
-            push_match(output, tx_status, /Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
-            push_match(output, estimated_ticks, /\bEstimated ticks:\s*(\d+)/g)
-            push_match(output, estimated_ticks_per_tx, /\bEstimated ticks after tx:\s*(\d+)/g)
-            push_match(output, tx_size, /\bStoring transaction object of size\s*(\d+)/g)
-            push_match(output, block_in_progress_store, /\bStoring Block In Progress of size\s*(\d+)/g)
-            push_match(output, block_in_progress_read, /\bReading Block In Progress of size\s*(\d+)/g)
-            push_match(output, receipt_size, /\bStoring receipt of size \s*(\d+)/g)
+            push_match(output, gas_used, /\[Benchmarking\] gas_used:\s*(\d+)/g)
+            push_match(output, tx_status, /\[Benchmarking\] Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
+            push_match(output, estimated_ticks, /\[Benchmarking\] Estimated ticks:\s*(\d+)/g)
+            push_match(output, estimated_ticks_per_tx, /\[Benchmarking\] Estimated ticks after tx:\s*(\d+)/g)
+            push_match(output, tx_size, /\[Benchmarking\] Storing transaction object of size\s*(\d+)/g)
+            push_match(output, block_in_progress_store, /\[Benchmarking\] Storing Block In Progress of size\s*(\d+)/g)
+            push_match(output, block_in_progress_read, /\[Benchmarking\] Reading Block In Progress of size\s*(\d+)/g)
+            push_match(output, receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
             push_match(output, bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
             push_profiler_sections(output, opcodes, precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
