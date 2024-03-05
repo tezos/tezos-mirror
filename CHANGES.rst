@@ -191,6 +191,8 @@ Smart Rollup node
 - Added RPC ``/local/synchronized`` to wait for the rollup node to be
   synchronized with L1. (MR :gl:`!12247`)
 
+- Secure ACL by default. (MR :gl:`!12323`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
