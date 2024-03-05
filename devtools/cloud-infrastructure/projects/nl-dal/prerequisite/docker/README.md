@@ -1,29 +1,36 @@
 # Docker
 
-Adds the given SSH key to the docker image and pushes it to Google Docker Image Registry (Artifact Registry) using the `/devtools/cloud-infrastructure/libraries/docker-registry` library.
+Generate a Docker image that can be deployed onto the cloud
 
 ## How to Use
 
-First initialize Terraform:
+1. Initialize Terraform:
 
 ```shell
 terraform init
 ```
 
-The next step would vary depending on what you want to do.
+2. Export an environment variable called `TF_WORKSPACE` that will
+   contain your workspace name. Ensure first this name is not used by
+   anyone.
 
-### Case 1: Add your SSH public key to an existing docker image
+3. Generate an ssh-key with name `<workspace_name>-tf`.
 
-Typically, this is what you would want to do, and in most instances, you should use `debian` as the value for `<os>`.
+	- If a passphrase was set, you might want to add the key to
+      `ssh-agent`:
 
-```shell
-DOCKER_BUILDKIT=1 ./push.sh <os> <ssh_public_key_file>
-```
+	  ```
+	  eval "$(ssh-agent -s)"
+	  ssh-add <ssh-private-file>
+	  ```
 
-### Case 2: Initialize and push a new docker image
+4. Create your docker image called `<workspace_name>.Dockerfile` that
+   corresponds to your needs. This docker image must provide the
+   minimal setup to run Octez binaries (hence the need for zcash
+   parameters) and its entrypoint should run an ssh server to accept
+   Octogram commands.
 
-You would want to do this if, for example, you want to create a new docker image with a separate `<os>`.
+5. Call `./push.sh`
 
-```shell
-DOCKER_BUILDKIT=1 ./push.sh <os> <ssh_public_key_file> bootstrap
-```
+The script `push` will builda docker image from the docker file
+created at step 3 and push it onto the Docker registry on GCP.
