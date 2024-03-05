@@ -8,6 +8,7 @@
 use crate::apply::{apply_transaction, ExecutionInfo, ExecutionResult};
 use crate::blueprint_storage::{drop_head_blueprint, read_next_blueprint};
 use crate::error::Error;
+use crate::event::Event;
 use crate::indexable_storage::IndexableStorage;
 use crate::safe_storage::KernelRuntime;
 use crate::storage;
@@ -231,6 +232,12 @@ fn compute_bip<Host: KernelRuntime>(
                 .constants(current_constants.chain_id, current_constants.block_fees);
             // Drop the processed blueprint from the storage
             drop_head_blueprint(host)?;
+
+            Event::BlueprintApplied {
+                number: new_block.number,
+                hash: new_block.hash,
+            }
+            .store(host)?;
 
             *first_block_of_reboot = false;
         }
