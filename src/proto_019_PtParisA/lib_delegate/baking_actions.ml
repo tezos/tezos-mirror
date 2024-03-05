@@ -118,10 +118,6 @@ module Operations_source = struct
                 Lwt.return_none))
 end
 
-type inject_block_kind =
-  | Forge_and_inject of block_to_bake
-  | Inject_only of prepared_block
-
 type consensus_vote_kind = Attestation | Preattestation
 
 type unsigned_consensus_vote = {
@@ -166,8 +162,12 @@ type signed_consensus_vote_batch = {
 
 type action =
   | Do_nothing
-  | Inject_block of {kind : inject_block_kind; updated_state : state}
-  | Forge_block of {block_to_bake : block_to_bake; updated_state : state}
+  | Prepare_block of {block_to_bake : block_to_bake}
+  | Inject_block of {
+      prepared_block : prepared_block;
+      force_injection : bool;
+      asynchronous : bool;
+    }
   | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
   | Update_to_level of level_update
@@ -192,11 +192,8 @@ type t = action
 
 let pp_action fmt = function
   | Do_nothing -> Format.fprintf fmt "do nothing"
-  | Inject_block {kind; _} -> (
-      match kind with
-      | Forge_and_inject _ -> Format.fprintf fmt "forge and inject block"
-      | Inject_only _ -> Format.fprintf fmt "inject forged block")
-  | Forge_block _ -> Format.fprintf fmt "forge_block"
+  | Prepare_block _ -> Format.fprintf fmt "prepare block"
+  | Inject_block _ -> Format.fprintf fmt "inject block"
   | Inject_preattestations _ -> Format.fprintf fmt "inject preattestations"
   | Inject_attestations _ -> Format.fprintf fmt "inject attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
@@ -413,60 +410,6 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
   in
   return {signed_block_header; round; delegate; operations; baking_votes}
-
-let forge_signed_block ~state_recorder ~updated_state block_to_bake state =
-  let open Lwt_result_syntax in
-  let* {signed_block_header; round; delegate; operations; baking_votes} =
-    prepare_block state.global_state block_to_bake
-  in
-  let new_state =
-    {
-      updated_state with
-      global_state =
-        {
-          state.global_state with
-          config =
-            {
-              state.global_state.config with
-              per_block_votes =
-                {
-                  state.global_state.config.per_block_votes with
-                  liquidity_baking_vote = baking_votes.liquidity_baking_vote;
-                  adaptive_issuance_vote = baking_votes.adaptive_issuance_vote;
-                };
-            };
-        };
-    }
-  in
-  let* () = state_recorder ~new_state in
-  let signed_block =
-    {signed_block_header; round; delegate; operations; baking_votes}
-  in
-  return (signed_block, updated_state)
-
-let inject_block ~updated_state state prepared_block =
-  let open Lwt_result_syntax in
-  let {signed_block_header; round; delegate; operations; baking_votes = _} =
-    prepared_block
-  in
-  let*! () =
-    Events.(
-      emit injecting_block (signed_block_header.shell.level, round, delegate))
-  in
-  let cctxt = state.global_state.cctxt in
-  let* bh =
-    Node_rpc.inject_block
-      cctxt
-      ~force:state.global_state.config.force
-      ~chain:(`Hash state.global_state.chain_id)
-      signed_block_header
-      operations
-  in
-  let*! () =
-    Events.(
-      emit block_injected (bh, signed_block_header.shell.level, round, delegate))
-  in
-  return updated_state
 
 let only_if_dal_feature_enabled =
   let no_dal_node_warning_counter = ref 0 in
@@ -804,6 +747,98 @@ let inject_consensus_votes state
           return_unit))
     signed_consensus_votes
 
+let inject_block ?(force_injection = false) ?(asynchronous = true) state
+    prepared_block =
+  let open Lwt_result_syntax in
+  let {signed_block_header; round; delegate; operations; baking_votes} =
+    prepared_block
+  in
+  (* Cache last per-block votes to use in case of vote file errors *)
+  let new_state =
+    {
+      state with
+      global_state =
+        {
+          state.global_state with
+          config =
+            {
+              state.global_state.config with
+              per_block_votes =
+                {
+                  state.global_state.config.per_block_votes with
+                  liquidity_baking_vote = baking_votes.liquidity_baking_vote;
+                  adaptive_issuance_vote = baking_votes.adaptive_issuance_vote;
+                };
+            };
+        };
+    }
+  in
+  let inject_block () =
+    let*! () =
+      Events.(
+        emit injecting_block (signed_block_header.shell.level, round, delegate))
+    in
+    let* bh =
+      Node_rpc.inject_block
+        state.global_state.cctxt
+        ~force:state.global_state.config.force
+        ~chain:(`Hash state.global_state.chain_id)
+        signed_block_header
+        operations
+    in
+    let*! () =
+      Events.(
+        emit
+          block_injected
+          (bh, signed_block_header.shell.level, round, delegate))
+    in
+    return_unit
+  in
+  let now = Time.System.now () in
+  let block_time =
+    Time.System.of_protocol_exn signed_block_header.shell.timestamp
+  in
+  (* Blocks might be ready before their actual timestamp: when this
+     happens, we wait asynchronously until our clock reaches the
+     block's timestamp before injecting. *)
+  let* () =
+    let delay = Ptime.diff block_time now in
+    if Ptime.Span.(compare delay zero < 0) || force_injection then
+      inject_block ()
+    else
+      let*! () =
+        Events.(
+          emit
+            delayed_block_injection
+            (delay, signed_block_header.shell.level, round, delegate))
+      in
+      let t =
+        let*! _ =
+          protect
+            ~on_error:(fun err ->
+              let*! () =
+                Events.(
+                  emit
+                    block_injection_failed
+                    (Block_header.hash signed_block_header, err))
+              in
+              return_unit)
+            (fun () ->
+              let*! () = Lwt_unix.sleep (Ptime.Span.to_float_s delay) in
+              inject_block ())
+        in
+        Lwt.return_unit
+      in
+      let*! () =
+        if asynchronous then (
+          Lwt.dont_wait (fun () -> t) (fun _exn -> ()) ;
+          Lwt.return_unit)
+        else t
+      in
+      return_unit
+  in
+  return new_state
+
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
     state.global_state.constants.parametric.consensus_threshold
@@ -917,6 +952,12 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
     let*! new_state = handle_proposal new_state in
     return new_state
 
+let prepare_block_request state block_to_bake =
+  let open Lwt_result_syntax in
+  let request = Forge_and_sign_block block_to_bake in
+  state.global_state.forge_worker_hooks.push_request request ;
+  return state
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4539
    Avoid updating the state here.
    (See also comment in {!State_transitions.step}.)
@@ -930,33 +971,13 @@ let rec perform_action ~state_recorder state (action : action) =
   | Do_nothing ->
       let* () = state_recorder ~new_state:state in
       return state
-  | Inject_block {kind; updated_state} ->
-      let* signed_block, updated_state =
-        match kind with
-        | Forge_and_inject block_to_bake ->
-            forge_signed_block
-              ~state_recorder
-              ~updated_state
-              block_to_bake
-              state
-        | Inject_only signed_block -> return (signed_block, updated_state)
+  | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
+  | Inject_block {prepared_block; force_injection; asynchronous} ->
+      let* new_state =
+        inject_block ~force_injection ~asynchronous state prepared_block
       in
-      inject_block ~updated_state state signed_block
-  | Forge_block {block_to_bake; updated_state} ->
-      let+ signed_block, updated_state =
-        forge_signed_block ~state_recorder ~updated_state block_to_bake state
-      in
-      let updated_state =
-        {
-          updated_state with
-          level_state =
-            {
-              updated_state.level_state with
-              next_forged_block = Some signed_block;
-            };
-        }
-      in
-      updated_state
+      let* () = state_recorder ~new_state in
+      return new_state
   | Inject_preattestations {preattestations} ->
       let* signed_preattestations =
         sign_consensus_votes state preattestations

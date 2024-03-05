@@ -67,9 +67,9 @@ val propose_block_action :
 val end_of_round : state -> Round.t -> (state * action) Lwt.t
 
 (** Propose for the first time at a level at the given round. There was no
-    previous proposal at the current level. (The function is called when
-    "moving" to a new level, hence the name.) *)
-val time_to_bake_at_next_level : state -> Round.t -> (state * action) Lwt.t
+    previous proposal at the current level. *)
+val time_to_prepare_next_level_block :
+  state -> Round.t -> (state * action) Lwt.t
 
 val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state
 

@@ -174,7 +174,6 @@ type level_state = {
   delegate_slots : delegate_slots;
   next_level_delegate_slots : delegate_slots;
   next_level_proposed_round : Round.t option;
-  next_forged_block : prepared_block option;
 }
 
 type phase =
@@ -238,8 +237,7 @@ val round_proposer :
 
 type timeout_kind =
   | End_of_round of {ending_round : Round.t}
-  | Time_to_bake_next_level of {at_round : Round.t}
-  | Time_to_forge_block
+  | Time_to_prepare_next_level_block of {at_round : Round.t}
 
 val timeout_kind_encoding : timeout_kind Data_encoding.t
 
@@ -321,6 +319,8 @@ val pp_elected_block : Format.formatter -> elected_block -> unit
 val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
 
 val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
+
+val pp_prepared_block : Format.formatter -> prepared_block -> unit
 
 val pp_level_state : Format.formatter -> level_state -> unit
 

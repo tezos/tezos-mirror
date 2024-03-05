@@ -352,7 +352,6 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           delegate_slots;
           next_level_delegate_slots;
           next_level_proposed_round = None;
-          next_forged_block = None;
         }
       in
       (* recursive call with the up-to-date state to handle the new
@@ -485,63 +484,23 @@ let prepare_block_to_bake ~attestations ?last_proposal
     (* This is used as a safety net by applying blocks on round > 0, in case
        validation-only did not produce a correct round-0 block. *)
   in
-  return {predecessor; round; delegate; kind; force_apply}
-
-let forge_fresh_block_action ~attestations ?last_proposal
-    ~(predecessor : block_info) state delegate =
-  let open Lwt_syntax in
-  let* block_to_bake =
-    prepare_block_to_bake
-      ~attestations
-      ?last_proposal
-      ~predecessor
-      state
-      delegate
-      Round.zero
+  let block_to_bake : block_to_bake =
+    {predecessor; round; delegate; kind; force_apply}
   in
-  let updated_state = update_current_phase state Idle in
-  return @@ Forge_block {block_to_bake; updated_state}
+  return (Prepare_block {block_to_bake})
 
 (** Create an inject action that will inject either a fresh block or the pre-emptively
     forged block if it exists. *)
 let propose_fresh_block_action ~attestations ?last_proposal
     ~(predecessor : block_info) state delegate round =
   (* TODO check if there is a trace where we could not have updated the level *)
-  let open Lwt_syntax in
-  let+ kind, updated_state =
-    match state.level_state.next_forged_block with
-    | Some
-        ({
-           signed_block_header = _;
-           delegate;
-           round;
-           operations = _;
-           baking_votes = _;
-         } as signed_block) ->
-        let+ () =
-          Events.(emit found_preemptively_forged_block (delegate, round))
-        in
-        let updated_state =
-          {
-            state with
-            level_state = {state.level_state with next_forged_block = None};
-          }
-        in
-        (Inject_only signed_block, updated_state)
-    | None ->
-        let+ block_to_bake =
-          prepare_block_to_bake
-            ~attestations
-            ?last_proposal
-            ~predecessor
-            state
-            delegate
-            round
-        in
-        (Forge_and_inject block_to_bake, state)
-  in
-  let updated_state = update_current_phase updated_state Idle in
-  Inject_block {kind; updated_state}
+  prepare_block_to_bake
+    ~attestations
+    ?last_proposal
+    ~predecessor
+    state
+    delegate
+    round
 
 let propose_block_action state delegate round ~last_proposal =
   let open Lwt_syntax in
@@ -633,14 +592,16 @@ let propose_block_action state delegate round ~last_proposal =
       let block_to_bake =
         {predecessor = proposal.predecessor; round; delegate; kind; force_apply}
       in
-      let updated_state = update_current_phase state Idle in
-      return
-      @@ Inject_block {kind = Forge_and_inject block_to_bake; updated_state}
+      return (Prepare_block {block_to_bake})
 
 let end_of_round state current_round =
   let open Lwt_syntax in
   let new_round = Round.succ current_round in
-  let new_round_state = {state.round_state with current_round = new_round} in
+  (* We initialize the round's phase to Idle for the [handle_proposal]
+     transition to trigger the preattestation action. *)
+  let new_round_state =
+    {state.round_state with current_round = new_round; current_phase = Idle}
+  in
   let new_state = {state with round_state = new_round_state} in
   (* we need to check if we need to bake for this round or not *)
   match
@@ -684,27 +645,7 @@ let end_of_round state current_round =
         in
         return (new_state, action)
 
-let time_to_forge_block state =
-  let open Lwt_syntax in
-  let at_round = Round.zero in
-  let round_proposer_opt = round_proposer state ~level:`Next at_round in
-  match (state.level_state.elected_block, round_proposer_opt) with
-  | None, _ | _, None ->
-      (* Unreachable: the [Time_to_forge_Block] event can only be
-         triggered when we have a slot and an elected block *)
-      assert false
-  | Some elected_block, Some {consensus_key_and_delegate; _} ->
-      let attestations = elected_block.attestation_qc in
-      let* action =
-        forge_fresh_block_action
-          ~attestations
-          ~predecessor:elected_block.proposal.block
-          state
-          consensus_key_and_delegate
-      in
-      return (state, action)
-
-let time_to_bake_at_next_level state at_round =
+let time_to_prepare_next_level_block state at_round =
   let open Lwt_syntax in
   (* It is now time to update the state level *)
   (* We need to keep track for which block we have 2f+1 *attestations*, that is,
@@ -713,7 +654,7 @@ let time_to_bake_at_next_level state at_round =
   let round_proposer_opt = round_proposer state ~level:`Next at_round in
   match (state.level_state.elected_block, round_proposer_opt) with
   | None, _ | _, None ->
-      (* Unreachable: the [Time_to_bake_next_level] event can only be
+      (* Unreachable: the [Time_to_prepare_next_level_block] event can only be
          triggered when we have a slot and an elected block *)
       assert false
   | Some elected_block, Some {consensus_key_and_delegate; _} ->
@@ -880,6 +821,14 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
   let new_state = update_current_phase new_state Idle in
   do_nothing new_state
 
+let handle_forge_event state forge_event =
+  match forge_event with
+  | Block_ready prepared_block ->
+      Lwt.return
+        ( state,
+          Inject_block
+            {prepared_block; force_injection = false; asynchronous = true} )
+
 (* Hypothesis:
    - The state is not to be modified outside this module
      (NB: there are exceptions in Baking_actions: the corner cases
@@ -904,11 +853,10 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (* If the round is ending, stop everything currently going on and
          increment the round. *)
       end_of_round state ending_round
-  | _, Timeout (Time_to_bake_next_level {at_round}) ->
+  | _, Timeout (Time_to_prepare_next_level_block {at_round}) ->
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
-      time_to_bake_at_next_level state at_round
-  | _, Timeout Time_to_forge_block -> time_to_forge_block state
+      time_to_prepare_next_level_block state at_round
   | Idle, New_head_proposal proposal ->
       let* () =
         Events.(
@@ -963,6 +911,9 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
               proposal.block.round ))
       in
       handle_proposal ~is_proposal_applied:false state proposal
+  | _, New_forge_event (forge_event : forge_event) ->
+      let* () = Events.(emit new_forge_event forge_event) in
+      handle_forge_event state forge_event
   | Awaiting_application, New_valid_proposal proposal
   | Awaiting_attestations, New_valid_proposal proposal
   | Awaiting_preattestations, New_valid_proposal proposal ->
@@ -992,7 +943,6 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   | Idle, (Prequorum_reached _ | Quorum_reached _)
   | Awaiting_preattestations, Quorum_reached _
   | (Awaiting_application | Awaiting_attestations), Prequorum_reached _
-  | Awaiting_application, Quorum_reached _
-  | _, New_forge_event _ ->
+  | Awaiting_application, Quorum_reached _ ->
       (* This cannot/should not happen *)
       do_nothing state
