@@ -1062,6 +1062,75 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
   in
   check_slots_availability ~__LOC__ ~attested:[]
 
+let test_all_available_slots _protocol parameters cryptobox node client
+    _bootstrap_key =
+  let nb_slots = parameters.Dal.Parameters.number_of_slots in
+  (* We ensure there is at least one account per manager operation to
+     be included. This is because of the 1M restrction. Another way
+     could use batched operations, but the current DAL helpers are
+     difficult to use for batched operations. *)
+  let* accounts =
+    Seq.ints 0 |> Seq.take nb_slots |> List.of_seq
+    |> Lwt_list.map_p (fun index ->
+           Client.show_address
+             ~alias:("bootstrap" ^ string_of_int (1 + index))
+             client)
+  in
+  let* () =
+    Lwt_list.iter_p
+      (fun source ->
+        let*! () = Client.reveal ~src:source.Account.alias client in
+        unit)
+      (List.filteri
+         (fun i _ -> i >= Array.length Account.Bootstrap.keys)
+         accounts)
+  in
+  let* () = bake_for client in
+  let* () =
+    Lwt_list.iteri_p
+      (fun index source ->
+        let* (`OpHash _oph1) =
+          publish_dummy_slot
+            ~source
+            ~fee:1_000
+            ~index
+            ~message:"a"
+            cryptobox
+            client
+        in
+        unit)
+      accounts
+  in
+  let* () = bake_for client in
+  let* result =
+    Node.RPC.(call ~rpc_hooks node @@ get_chain_block_metadata_raw ())
+  in
+  JSON.encode result |> hooks.on_log ;
+  let* operations = Node.RPC.(call node @@ get_chain_block_operations ()) in
+  let () =
+    (* Check validity of operations *)
+    let manager_operations = JSON.(operations |=> 3 |> as_list) in
+    Check.(List.length manager_operations = nb_slots)
+      ~__LOC__
+      ~error_msg:"Expected %R manager operations.Got %L"
+      Check.int ;
+    List.iter
+      (fun operation ->
+        let status =
+          JSON.(
+            operation |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+            |-> "status" |> as_string)
+        in
+        Check.(status = "applied")
+          ~__LOC__
+          ~error_msg:
+            "Expected all slots to be included. At least one operation failed \
+             with status: %L"
+          Check.string)
+      manager_operations
+  in
+  unit
+
 (* Tests that DAL attestations are only included in a block if the attestation
    is from a DAL-committee member. This test may be fail sometimes (with
    [List.hd] on an empty list), though care was taken to avoid this as much as
@@ -4938,6 +5007,17 @@ let register ~protocols =
     ~attestation_lag:5
     "slots attestation operation behavior"
     test_slots_attestation_operation_behavior
+    protocols ;
+  (* We want to test that the number of slots following mainnet
+     parameters can be included into one block. We hard-code the
+     mainnet value. It could be extended to higher values if
+     desired. *)
+  scenario_with_layer1_node
+    ~regression:true
+    ~number_of_slots:32
+    ~additional_bootstrap_accounts:(32 - Array.length Account.Bootstrap.keys)
+    "Use all available slots"
+    test_all_available_slots
     protocols ;
   scenario_with_layer1_node
     "slots attestation operation dal committee membership check"
