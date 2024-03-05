@@ -252,17 +252,6 @@ module Legacy = struct
       val headers : Cryptobox.commitment -> Path.t
 
       val header : Cryptobox.commitment -> Types.slot_id -> Path.t
-
-      val shards : Cryptobox.commitment -> Path.t
-
-      type shard_index := int
-
-      val shard :
-        Cryptobox.commitment ->
-        redundancy_factor:int ->
-        number_of_shards:int ->
-        shard_index ->
-        Path.t
     end
 
     module Level : sig
@@ -312,17 +301,6 @@ module Legacy = struct
         let open Types in
         let prefix = headers commitment in
         prefix / Data_encoding.Binary.to_string_exn slot_id_encoding index
-
-      let shards commitment =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / "shards"
-
-      let shard commitment ~redundancy_factor ~number_of_shards index =
-        let prefix = shards commitment in
-        let parameters_repr =
-          Printf.sprintf "%d-%d" redundancy_factor number_of_shards
-        in
-        prefix / "parameters" / parameters_repr / "index" / Int.to_string index
     end
 
     module Level = struct
