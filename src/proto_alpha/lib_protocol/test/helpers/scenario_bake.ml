@@ -12,6 +12,60 @@ open Log_helpers
 open Scenario_base
 open Adaptive_issuance_helpers
 
+(** Applies when baking the last block of a cycle *)
+let apply_end_cycle current_cycle block state : State.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
+  let* launch_cycle_opt =
+    Context.get_adaptive_issuance_launch_cycle (B block)
+  in
+  (* Apply all slashes *)
+  let state = apply_all_slashes_at_cycle_end current_cycle state in
+  (* Sets initial frozen for future cycle *)
+  let state =
+    update_map
+      ~f:
+        (update_frozen_rights_cycle
+           (Cycle.add
+              current_cycle
+              (state.constants.consensus_rights_delay + 1)))
+      state
+  in
+  (* Apply autostaking *)
+  let*? state =
+    if not state.constants.adaptive_issuance.autostaking_enable then Ok state
+    else
+      match launch_cycle_opt with
+      | Some launch_cycle when Cycle.(current_cycle >= launch_cycle) -> Ok state
+      | None | Some _ ->
+          String.Map.fold_e
+            (fun name account state ->
+              apply_autostake ~name ~old_cycle:current_cycle account state)
+            state.account_map
+            state
+  in
+  (* Apply parameter changes *)
+  let state, param_requests =
+    List.fold_left
+      (fun (state, remaining_requests) (name, params, wait) ->
+        if wait > 0 then (state, (name, params, wait - 1) :: remaining_requests)
+        else
+          let src = find_account name state in
+          let state =
+            update_account name {src with parameters = params} state
+          in
+          (state, remaining_requests))
+      (state, [])
+      state.param_requests
+  in
+  return {state with param_requests}
+
+(** Applies when baking the first block of a cycle.
+      Technically nothing special happens, but we need to update the unslashable unstakes
+      since it's done lazily *)
+let apply_new_cycle new_cycle state : State.t =
+  apply_unslashable_for_all new_cycle state
+
 (** After baking and applying rewards in state *)
 let check_all_balances block state : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -162,12 +216,12 @@ let bake ?baker : t -> t tzresult Lwt.t =
         ~color:time_color
         "Cycle %d"
         (Protocol.Alpha_context.Cycle.to_int32 new_current_cycle |> Int32.to_int) ;
-      return @@ State.apply_new_cycle new_current_cycle state)
+      return @@ apply_new_cycle new_current_cycle state)
   in
   (* Dawn of a new cycle *)
   let* state =
     if not (Block.last_block_of_cycle block) then return state
-    else State.apply_end_cycle current_cycle block state
+    else apply_end_cycle current_cycle block state
   in
   let* () = check_all_balances block state in
   return (block, state)
