@@ -237,7 +237,7 @@ let forbid_costaking =
         "delegate"
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> set_delegate "staker" (Some "delegate")
-  --> wait_cycle (`And (`AI_activation, `delegate_parameters_activation))
+  --> wait_cycle_until (`And (`AI_activation, `delegate_parameters_activation))
   --> next_cycle
   (* try stake in normal conditions *)
   --> stake "staker" amount

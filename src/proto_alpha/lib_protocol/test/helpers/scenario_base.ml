@@ -477,7 +477,7 @@ let wait_cycle_f (condition : t -> t -> bool) : (t, t) scenarios =
 
 (** Wait until we are in a cycle satisfying the given condition.
     Fails if AI_activation is requested and AI is not set to be activated in the future. *)
-let wait_cycle condition =
+let wait_cycle_until condition =
   let to_, done_ =
     let rec get_names condition =
       match condition with
@@ -530,11 +530,11 @@ let wait_cycle condition =
 
 (** Wait until AI activates.
     Fails if AI is not set to be activated in the future. *)
-let wait_ai_activation = wait_cycle `AI_activation
+let wait_ai_activation = wait_cycle_until `AI_activation
 
 (** wait delegate_parameters_activation_delay cycles  *)
 let wait_delegate_parameters_activation =
-  wait_cycle `delegate_parameters_activation
+  wait_cycle_until `delegate_parameters_activation
 
 let wait_n_cycles_f (n_cycles : t -> int) =
   let condition ((init_block, _init_state) as t_init)
