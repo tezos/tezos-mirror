@@ -197,6 +197,33 @@ module Transport_layer = struct
           (P2p_pool.Peers.info_of_peer_info pool)
           (P2p_pool.Peers.info pool peer)
         |> return
+
+  let patch_peer p2p peer acl =
+    let open Lwt_result_syntax in
+    match P2p.pool p2p with
+    | None -> tzfail P2p_errors.P2p_layer_disabled
+    | Some pool ->
+        let*! () =
+          match acl with
+          | None -> Lwt.return_unit
+          | Some `Ban ->
+              (* ban *)
+              P2p_pool.Peers.untrust pool peer ;
+              P2p_pool.Peers.ban pool peer
+          | Some `Trust ->
+              (* trust *)
+              P2p_pool.Peers.trust pool peer ;
+              Lwt.return_unit
+          | Some `Open ->
+              (* unban, untrust *)
+              P2p_pool.Peers.unban pool peer ;
+              P2p_pool.Peers.untrust pool peer ;
+              Lwt.return_unit
+        in
+        return
+        @@ Option.map
+             (P2p_pool.Peers.info_of_peer_info pool)
+             (P2p_pool.Peers.info pool peer)
 end
 
 module Transport_layer_hooks = Gs_transport_connection

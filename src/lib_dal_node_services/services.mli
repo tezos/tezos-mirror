@@ -290,6 +290,15 @@ module P2P : sig
       ; params : unit * P2p_peer.Id.t
       ; query : unit >
       service
+
+    val patch_peer :
+      < meth : [`PATCH]
+      ; input : [`Ban | `Trust | `Open] option
+      ; output : Types.P2P.Peer.Info.t
+      ; prefix : unit
+      ; params : unit * P2p_peer.Id.t
+      ; query : unit >
+      service
   end
 
   module Gossipsub : sig
