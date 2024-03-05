@@ -130,20 +130,6 @@ let ( --> ) a b = concat a b
 (** Branching connector: creates two tests with different execution paths *)
 let ( |+ ) a b = branch a b
 
-let list_to_branch (list : (string * 'a) list) : (unit, 'a) scenarios =
-  match list with
-  | [] ->
-      Stdlib.failwith
-        (Format.asprintf
-           "%s: Cannot build scenarios from\n  empty list"
-           __LOC__)
-  | (tag, h) :: t ->
-      List.fold_left
-        (fun scenarios (tag, elt) ->
-          scenarios |+ Tag tag --> Action (fun () -> return elt))
-        (Tag tag --> Action (fun () -> return h))
-        t
-
 (** Ends the test. Dump the state, returns [unit] *)
 let end_test : ('a, unit) scenarios =
   let open Lwt_result_syntax in
@@ -180,3 +166,34 @@ let exec_unit f =
     (fun input ->
       let* () = f input in
       return input)
+
+(** [fold f l] folds [f] over [l], fails on empty list *)
+let rec fold : ('a -> ('b, 'c) scenarios) -> 'a list -> ('b, 'c) scenarios =
+ fun f list ->
+  match list with
+  | [] -> Stdlib.failwith "Scenario_dsl.fold: empty list"
+  | [x] -> f x
+  | h :: t -> f h |+ fold f t
+
+(** [fold_tag f l] folds [f] over [l], [l] has a tag for each of its elements.
+    Fails on empty list. *)
+let fold_tag :
+    ('a -> ('b, 'c) scenarios) -> (string * 'a) list -> ('b, 'c) scenarios =
+ fun f ->
+  let f (s, x) = Tag s --> f x in
+  fold f
+
+(** [fold_tag_f f tag l] folds [f] over [l], [tag] returns a tag for each element of [l].
+    Fails on empty list. *)
+let fold_tag_f :
+    ('a -> ('b, 'c) scenarios) ->
+    ('a -> string) ->
+    'a list ->
+    ('b, 'c) scenarios =
+ fun f tag ->
+  let f x = Tag (tag x) --> f x in
+  fold f
+
+(** [unfold f l] maps [f] over [l], and runs them in order *)
+let rec unfold : ('a -> ('b, 'b) scenarios) -> 'a list -> ('b, 'b) scenarios =
+ fun f -> function [] -> Empty | [x] -> f x | h :: t -> f h --> unfold f t

@@ -16,15 +16,9 @@
 open Adaptive_issuance_helpers
 open State_account
 open Tez_helpers.Ez_tez
-open Scenario_dsl
-open Scenario_base
-open Scenario_op
-open Test_scenario_base
+open Scenario
 
 let test_wait_with_rewards =
-  let constants =
-    init_constants ~reward_per_block:1_000_000_000L ~autostaking_enable:false ()
-  in
   let set_edge pct =
     let params =
       {
@@ -34,7 +28,10 @@ let test_wait_with_rewards =
     in
     set_delegate_params "delegate" params
   in
-  begin_test ~activate_ai:true ~constants ["delegate"; "faucet"]
+  init_constants ~reward_per_block:1_000_000_000L ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai true
+  --> begin_test ["delegate"; "faucet"]
   --> set_baker "faucet"
   --> (Tag "edge = 0" --> set_edge 0.
       |+ Tag "edge = 0.24" --> set_edge 0.24
@@ -77,15 +74,11 @@ let test_wait_with_rewards =
       |+ Tag "cycle step" --> wait_n_cycles 10)
 
 let test_ai_curve_activation_time =
-  let constants =
-    init_constants
-      ~reward_per_block:1_000_000_000L
-      ~deactivate_dynamic:true
-      ~autostaking_enable:false
-      ()
-  in
-  let pc = constants.consensus_rights_delay in
-  begin_test ~activate_ai:true ~burn_rewards:true ~constants [""]
+  let pc = Default_parameters.constants_test.consensus_rights_delay in
+  init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai true
+  --> begin_test ~burn_rewards:true [""]
   --> next_block --> save_current_rate (* before AI rate *)
   --> wait_ai_activation
   (* Rate remains unchanged right after AI activation, we must wait [pc + 1] cycles *)
@@ -98,14 +91,7 @@ let test_ai_curve_activation_time =
   --> check_rate_evolution Q.gt
 
 let test_static =
-  let constants =
-    init_constants
-      ~reward_per_block:1_000_000_000L
-      ~deactivate_dynamic:true
-      ~autostaking_enable:false
-      ()
-  in
-  let rate_var_lag = constants.consensus_rights_delay in
+  let rate_var_lag = Default_parameters.constants_test.consensus_rights_delay in
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
@@ -121,7 +107,10 @@ let test_static =
   let cycle_stable =
     save_current_rate --> next_cycle --> check_rate_evolution Q.equal
   in
-  begin_test ~activate_ai:true ~burn_rewards:true ~constants ["delegate"]
+  init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai true
+  --> begin_test ~burn_rewards:true ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> save_current_rate --> wait_ai_activation
   (* We stake about 50% of the total supply *)

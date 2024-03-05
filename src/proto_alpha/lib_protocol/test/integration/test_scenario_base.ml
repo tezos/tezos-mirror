@@ -16,9 +16,7 @@
 open Adaptive_issuance_helpers
 open State_account
 open Tez_helpers.Ez_tez
-open Scenario_dsl
-open Scenario_base
-open Scenario_op
+open Scenario
 
 let default_param_wait, default_unstake_wait =
   let constants = Default_parameters.constants_test in
@@ -38,61 +36,6 @@ let test_expected_error =
              [Inconsistent_number_of_bootstrap_accounts])
            (exec (fun _ -> failwith "")))
 
-let init_constants ?reward_per_block ?(deactivate_dynamic = false)
-    ?blocks_per_cycle ?delegate_parameters_activation_delay ~autostaking_enable
-    () =
-  let reward_per_block = Option.value ~default:0L reward_per_block in
-  let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
-  let default_constants = Default_parameters.constants_test in
-  (* default for tests: 12 *)
-  let blocks_per_cycle =
-    Option.value ~default:default_constants.blocks_per_cycle blocks_per_cycle
-  in
-  let delegate_parameters_activation_delay =
-    Option.value
-      ~default:default_constants.delegate_parameters_activation_delay
-      delegate_parameters_activation_delay
-  in
-  let issuance_weights =
-    Protocol.Alpha_context.Constants.Parametric.
-      {
-        base_total_issued_per_minute;
-        baking_reward_fixed_portion_weight = 1;
-        baking_reward_bonus_weight = 0;
-        attesting_reward_weight = 0;
-        seed_nonce_revelation_tip_weight = 0;
-        vdf_revelation_tip_weight = 0;
-      }
-  in
-  let liquidity_baking_subsidy = Tez.zero in
-  let minimal_block_delay = Protocol.Alpha_context.Period.one_minute in
-  let cost_per_byte = Tez.zero in
-  let consensus_threshold = 0 in
-  let adaptive_issuance = default_constants.adaptive_issuance in
-  let adaptive_rewards_params =
-    if deactivate_dynamic then
-      {
-        adaptive_issuance.adaptive_rewards_params with
-        max_bonus =
-          Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero;
-      }
-    else adaptive_issuance.adaptive_rewards_params
-  in
-  let adaptive_issuance =
-    {adaptive_issuance with adaptive_rewards_params; autostaking_enable}
-  in
-  {
-    default_constants with
-    delegate_parameters_activation_delay;
-    consensus_threshold;
-    issuance_weights;
-    minimal_block_delay;
-    cost_per_byte;
-    adaptive_issuance;
-    blocks_per_cycle;
-    liquidity_baking_subsidy;
-  }
-
 (** Initialization of scenarios with 3 cases:
      - AI activated, staker = delegate
      - AI activated, staker != delegate
@@ -100,15 +43,15 @@ let init_constants ?reward_per_block ?(deactivate_dynamic = false)
     Any scenario that begins with this will be triplicated.
  *)
 let init_scenario ?(force_ai = true) ?reward_per_block () =
-  let constants =
-    init_constants ?reward_per_block ~autostaking_enable:false ()
-  in
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
   let begin_test ~activate_ai ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
-    begin_test ~activate_ai ~constants [name]
+    init_constants ?reward_per_block ()
+    --> set S.Adaptive_issuance.autostaking_enable false
+    --> Scenario_begin.activate_ai activate_ai
+    --> begin_test [name]
     --> set_delegate_params name init_params
     --> set_baker "__bootstrap__"
   in
