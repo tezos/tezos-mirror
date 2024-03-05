@@ -1244,8 +1244,7 @@ mod tests {
 
     #[test]
     fn test_privilege_access() {
-        use crate::machine_state::csregisters::check_privilege as check;
-        use crate::machine_state::csregisters::CSRegister as csreg;
+        use crate::machine_state::csregisters::{check_privilege as check, CSRegister as csreg};
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 
@@ -1270,8 +1269,9 @@ mod tests {
 
     #[test]
     fn test_read_write_access() {
-        use crate::machine_state::csregisters::check_write as check;
-        use crate::machine_state::csregisters::{CSRegister as csreg, Exception};
+        use crate::machine_state::csregisters::{
+            check_write as check, CSRegister as csreg, Exception,
+        };
 
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 

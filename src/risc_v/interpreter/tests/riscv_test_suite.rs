@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use lazy_static::lazy_static;
-use risc_v_interpreter::parser::instruction::Instr;
-use risc_v_interpreter::parser::parse_block;
+use risc_v_interpreter::parser::{instruction::Instr, parse_block};
 use std::process::Command;
 
 fn compute_offset(src: &str, dest: &str) -> i64 {

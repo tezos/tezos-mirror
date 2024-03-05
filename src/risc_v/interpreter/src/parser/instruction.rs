@@ -150,6 +150,81 @@ pub enum Instr {
 
 use Instr::*;
 
+impl Instr {
+    /// Return the width of the instruction in bytes.
+    pub fn width(&self) -> u64 {
+        match self {
+            // 4 bytes instructions
+            Add(_)
+            | Sub(_)
+            | Xor(_)
+            | Or(_)
+            | And(_)
+            | Sll(_)
+            | Srl(_)
+            | Sra(_)
+            | Slt(_)
+            | Sltu(_)
+            | Addw(_)
+            | Subw(_)
+            | Sllw(_)
+            | Srlw(_)
+            | Sraw(_)
+            | Addi(_)
+            | Addiw(_)
+            | Xori(_)
+            | Ori(_)
+            | Andi(_)
+            | Slli(_)
+            | Srli(_)
+            | Srai(_)
+            | Slliw(_)
+            | Srliw(_)
+            | Sraiw(_)
+            | Slti(_)
+            | Sltiu(_)
+            | Lb(_)
+            | Lh(_)
+            | Lw(_)
+            | Lbu(_)
+            | Lhu(_)
+            | Lwu(_)
+            | Ld(_)
+            | Fence(_)
+            | FenceTso(_)
+            | Ecall
+            | Ebreak
+            | Sb(_)
+            | Sh(_)
+            | Sw(_)
+            | Sd(_)
+            | Beq(_)
+            | Bne(_)
+            | Blt(_)
+            | Bge(_)
+            | Bltu(_)
+            | Bgeu(_)
+            | Lui(_)
+            | Auipc(_)
+            | Jal(_)
+            | Jalr(_)
+            | Csrrw(_)
+            | Csrrs(_)
+            | Csrrc(_)
+            | Csrrwi(_)
+            | Csrrsi(_)
+            | Csrrci(_)
+            | Mret
+            | Sret
+            | Mnret
+            | Unknown { instr: _ } => 4,
+
+            // 2 bytes instructions (compressed instructions)
+            UnknownCompressed { instr: _ } => 2,
+        }
+    }
+}
+
 macro_rules! r_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {:?},{:?},{:?}", $op, $args.rd, $args.rs1, $args.rs2)

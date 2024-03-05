@@ -6,12 +6,15 @@
 //!
 //! Chapter 5 - Unprivileged spec
 
-use crate::machine_state::{
-    bus::{main_memory::MainMemoryLayout, Addressable, OutOfBounds},
-    registers::{XRegister, XRegisters},
-    Exception, MachineState,
+use crate::{
+    machine_state::{
+        bus::{main_memory::MainMemoryLayout, Addressable, OutOfBounds},
+        registers::{XRegister, XRegisters},
+        MachineState,
+    },
+    state_backend as backend,
+    traps::Exception,
 };
-use crate::state_backend as backend;
 
 impl<M> XRegisters<M>
 where
@@ -369,14 +372,15 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test,
+        backend_test, create_backend, create_state,
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            hart_state::{HartState, HartStateLayout},
             registers::{a0, a1, a2, a3, a4, t0, t1, t2, t3, t4},
-            Exception, HartState, HartStateLayout, MachineState, MachineStateLayout,
+            MachineState, MachineStateLayout,
         },
+        traps::Exception,
     };
-    use crate::{create_backend, create_state};
     use proptest::{arbitrary::any, prop_assert, prop_assert_eq, proptest};
 
     backend_test!(test_add_w, F, {
