@@ -26,9 +26,6 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
    use another storage solution that irmin as we don't need backtracking *)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4097
-   Add an interface to this module *)
-
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
