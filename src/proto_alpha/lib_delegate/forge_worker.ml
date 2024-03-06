@@ -125,6 +125,68 @@ let handle_forge_block worker baking_state (block_to_bake : block_to_bake) =
     task
     queue
 
+let handle_forge_preattestations worker baking_state
+    (unsigned_preattestations : unsigned_consensus_vote_batch) =
+  let task unsigned_preattestation =
+    let open Lwt_result_syntax in
+    (* FIXME split out the signing part *)
+    let single_unsigned_preattestation_batch =
+      {
+        unsigned_preattestations with
+        unsigned_consensus_votes = [unsigned_preattestation];
+      }
+    in
+    let* signed_preattestations =
+      Baking_actions.sign_consensus_votes
+        baking_state
+        single_unsigned_preattestation_batch
+    in
+    List.iter
+      (fun signed_preattestation ->
+        worker.push_event (Some (Preattestation_ready signed_preattestation)))
+      signed_preattestations.signed_consensus_votes ;
+    return_unit
+  in
+  List.iter
+    (fun unsigned_preattestation ->
+      let queue = get_or_create_queue worker unsigned_preattestation.delegate in
+      Delegate_signing_queue.push_task
+        ~on_error:(fun _err -> Lwt.return_unit)
+        (fun () -> task unsigned_preattestation)
+        queue)
+    unsigned_preattestations.unsigned_consensus_votes
+
+let handle_forge_attestations worker baking_state
+    (unsigned_attestations : unsigned_consensus_vote_batch) =
+  let task unsigned_attestation =
+    let open Lwt_result_syntax in
+    (* FIXME split out the signing part *)
+    let single_unsigned_attestation_batch =
+      {
+        unsigned_attestations with
+        unsigned_consensus_votes = [unsigned_attestation];
+      }
+    in
+    let* signed_attestations =
+      Baking_actions.sign_consensus_votes
+        baking_state
+        single_unsigned_attestation_batch
+    in
+    List.iter
+      (fun signed_attestation ->
+        worker.push_event (Some (Attestation_ready signed_attestation)))
+      signed_attestations.signed_consensus_votes ;
+    return_unit
+  in
+  List.iter
+    (fun unsigned_attestation ->
+      let queue = get_or_create_queue worker unsigned_attestation.delegate in
+      Delegate_signing_queue.push_task
+        ~on_error:(fun _err -> Lwt.return_unit)
+        (fun () -> task unsigned_attestation)
+        queue)
+    unsigned_attestations.unsigned_consensus_votes
+
 let start (baking_state : Baking_state.global_state) =
   let open Lwt_result_syntax in
   let task_stream, push_task = Lwt_stream.create () in
@@ -140,6 +202,15 @@ let start (baking_state : Baking_state.global_state) =
     let process_request = function
       | Forge_and_sign_block block_to_bake ->
           handle_forge_block state baking_state block_to_bake ;
+          return_unit
+      | Forge_and_sign_preattestations {unsigned_preattestations} ->
+          handle_forge_preattestations
+            state
+            baking_state
+            unsigned_preattestations ;
+          return_unit
+      | Forge_and_sign_attestations {unsigned_attestations} ->
+          handle_forge_attestations state baking_state unsigned_attestations ;
           return_unit
     in
     match forge_request_opt with

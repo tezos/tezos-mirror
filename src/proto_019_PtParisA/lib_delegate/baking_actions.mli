@@ -27,53 +27,18 @@ open Protocol
 open Alpha_context
 open Baking_state
 
-type consensus_vote_kind = Attestation | Preattestation
-
-type unsigned_consensus_vote = {
-  vote_kind : consensus_vote_kind;
-  vote_consensus_content : consensus_content;
-  delegate : consensus_key_and_delegate;
-}
-
-type signed_consensus_vote = {
-  unsigned_consensus_vote : unsigned_consensus_vote;
-  signed_operation : packed_operation;
-}
-
-type batch_content = {
-  level : Raw_level.t;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-}
-
-type unsigned_consensus_vote_batch = {
-  batch_kind : consensus_vote_kind;
-  batch_content : batch_content;
-  unsigned_consensus_votes : unsigned_consensus_vote list;
-}
-
-val make_unsigned_consensus_vote_batch :
-  consensus_vote_kind ->
-  batch_content ->
-  (consensus_key_and_delegate * Slot.t) list ->
-  unsigned_consensus_vote_batch
-
-type signed_consensus_vote_batch = private {
-  batch_kind : consensus_vote_kind;
-  batch_content : batch_content;
-  signed_consensus_votes : signed_consensus_vote list;
-}
-
 type action =
   | Do_nothing
   | Prepare_block of {block_to_bake : block_to_bake}
+  | Prepare_preattestations of {preattestations : unsigned_consensus_vote_batch}
+  | Prepare_attestations of {attestations : unsigned_consensus_vote_batch}
   | Inject_block of {
       prepared_block : prepared_block;
       force_injection : bool;
       asynchronous : bool;
     }
-  | Inject_preattestations of {preattestations : unsigned_consensus_vote_batch}
-  | Inject_attestations of {attestations : unsigned_consensus_vote_batch}
+  | Inject_preattestation of {signed_preattestation : signed_consensus_vote}
+  | Inject_attestation of {signed_attestation : signed_consensus_vote}
   | Update_to_level of level_update
   | Synchronize_round of round_update
   | Watch_proposal
@@ -112,8 +77,11 @@ val inject_block :
   prepared_block ->
   state tzresult Lwt.t
 
+val may_get_dal_content :
+  state -> unsigned_consensus_vote -> dal_content option tzresult Lwt.t
+
 val sign_consensus_votes :
-  state ->
+  global_state ->
   unsigned_consensus_vote_batch ->
   signed_consensus_vote_batch tzresult Lwt.t
 
@@ -131,8 +99,4 @@ val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 
 val compute_round : proposal -> Round.round_durations -> Round.t tzresult
 
-val perform_action :
-  state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
-  state ->
-  t ->
-  state tzresult Lwt.t
+val perform_action : state -> t -> state tzresult Lwt.t
