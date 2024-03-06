@@ -61,7 +61,7 @@ git fetch --depth 1 origin "$full_opam_repository_tag"
 ## Adding the various tezos packages
 
 mkdir -p "$tmp_dir"/packages/octez-deps/octez-deps.dev
-cp opam/virtual/octez-deps.opam "$tmp_dir"/packages/octez-deps/octez-deps.dev/opam
+cp opam/virtual/octez-deps.opam.locked "$tmp_dir"/packages/octez-deps/octez-deps.dev/opam
 
 ## Filtering unrequired packages
 cd "$tmp_dir"

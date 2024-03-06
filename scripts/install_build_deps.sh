@@ -32,10 +32,14 @@ fi
 opamswitch="$OPAMSWITCH"
 unset OPAMSWITCH
 
+echo "Use opam repository commit: $full_opam_repository_tag"
+opam_repository="https://github.com/ocaml/opam-repository.git#$full_opam_repository_tag"
 opam repository set-url tezos --dont-select "$opam_repository" ||
   opam repository add tezos --dont-select "$opam_repository" > /dev/null 2>&1
 
-opam update --repositories --development
+# Note: there should be no need to 'opam update' since 'opam repository add/set-url'
+# should have fetched already and the repository cannot change since it is
+# a specific commit.
 
 OPAMSWITCH="$opamswitch"
 
@@ -79,8 +83,7 @@ if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
   OPAMCLI=2.0 opam install --yes --unlock-base "ocaml-base-compiler.$ocaml_version"
 fi
 
-# Must be done before install_build_deps.raw.sh because install_build_deps.raw.sh installs
-# opam packages that depend on Rust.
+# Must be done before using 'opam install' to install packages that depend on Rust.
 "$script_dir"/install_build_deps.rust.sh
 
 # Opam < 2.1 requires opam-depext as a plugin, later versions include it
@@ -91,7 +94,30 @@ case $(opam --version) in
   ;;
 esac
 
-"$script_dir"/install_build_deps.raw.sh "$1"
+export OPAMYES="${OPAMYES:=true}"
+
+# install_build_deps.sh calls install_build_deps.rust.sh which checks whether
+# Rust is installed with the right version and explains how to install it if
+# needed, so here we only make opam acknowledge that we have a Rust compiler
+# we installed on our own.
+# If we use opam depext, it will probably not install the right version.
+OPAMASSUMEDEPEXTS=true opam install conf-rust conf-rust-2021
+
+# Opam < 2.1 uses opam-depext as a plugin, later versions provide the option `--depext-only`.
+# We assume Opam >= 2.0.0 (2.0.0 was released in 2018; Debian Buster already had Opam 2.0.3).
+case $(opam --version) in
+2.0.*)
+  opam pin add -n -y octez-deps opam/virtual/ && opam depext octez-deps
+  opam pin remove octez-deps
+  ;;
+*) opam install --depext-only opam/virtual/octez-deps.opam.locked ;;
+esac
+
+opam install opam/virtual/octez-deps.opam.locked --deps-only --criteria="-notuptodate,-changed,-removed"
+
+if [ "$1" = "--tps" ]; then
+  opam install caqti-driver-postgresql
+fi
 
 # add back the default repo if asked to or it was present in the first
 # place.  we add the rank here even if it wasn't there just to be on
@@ -106,5 +132,5 @@ if [ -n "$dev" ]; then
   # enough (for [ppx_yojson_conv_lib] in particular), so we add a
   # minimal bound to ensure it won’t be picked by opam.
   # utop is constrained to avoid reinstalling in all the times.
-  opam install --yes opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam --deps-only --criteria="-changed,-removed"
+  opam install --yes opam/virtual/octez-deps.opam.locked opam/virtual/octez-dev-deps.opam --deps-only --criteria="-changed,-removed"
 fi
