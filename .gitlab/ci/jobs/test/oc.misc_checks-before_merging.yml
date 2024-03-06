@@ -5,3 +5,17 @@ oc.misc_checks:
     - ./scripts/ci/lint_misc_check.sh
     - scripts/check_wasm_pvm_regressions.sh check
     - ./scripts/ci/lint_check_licenses.sh
+  rules:
+    # The linting job runs over the set of [source_directories]
+    # defined in [scripts/lint.sh] that must be included here:
+    - changes:
+      - src/**/*
+      - tezt/**/*
+      - devtools/**/*
+      - scripts/**/*
+      - docs/**/*
+      - client-libs/**/*
+      - etherlink/**/*
+      - .gitlab-ci.yml
+      - .gitlab/**/*
+      when: on_success

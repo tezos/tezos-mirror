@@ -227,20 +227,6 @@
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
-  rules:
-    # The linting job runs over the set of [source_directories]
-    # defined in [scripts/lint.sh] that must be included here:
-    - changes:
-      - src/**/*
-      - tezt/**/*
-      - devtools/**/*
-      - scripts/**/*
-      - docs/**/*
-      - contrib/**/*
-      - client-libs/**/*
-      - etherlink/**/*
-      - .gitlab-ci.yml
-      - .gitlab/**/*
 
 .test_etherlink_kernel:
   extends:
