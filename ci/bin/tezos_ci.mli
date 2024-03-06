@@ -225,3 +225,31 @@ val job :
     used to write another job. *)
 val job_external :
   ?directory:string -> ?filename_suffix:string -> tezos_job -> tezos_job
+
+(** Adds artifacts to a job without overriding, if possible, existing artifacts.
+
+    - If the job already has an artifact with [old_name] and [name] is given, then
+      [name] is used.
+    - If the job already has an artifact exposed as [old_exposed_as] and
+      [exposed_as] is given, then [exposed_as] is used.
+    - If the job already has an artifact added [old_when] and
+      [when_] is given, the new artifact will be added:
+        - at [old_when] if [old_when = when_]
+        - at [Always] if [old_when <> when_]
+    - If the job already has an artifact that expires in [old_expires_in] and
+      [expires_in] is given, then the largest of the two durations is used. Note
+      that for the purpose of this comparison, we consider that a minute is 60
+      seconds, that an hour is 60 minutes, that a week is 7 days, that a
+      month is 31 days, and that a year is 365 days.
+    - Individual fields of a {!report} cannot be combined: a run-time error is
+      raised if [reports] contains a report that is already set in the job.
+    - [paths] are appended to the set of paths in [job]. *)
+val add_artifacts :
+  ?name:string ->
+  ?expose_as:string ->
+  ?reports:Gitlab_ci.Types.reports ->
+  ?expire_in:Gitlab_ci.Types.time_interval ->
+  ?when_:Gitlab_ci.Types.when_artifact ->
+  string list ->
+  tezos_job ->
+  tezos_job

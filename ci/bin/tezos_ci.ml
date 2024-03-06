@@ -34,6 +34,10 @@ type tezos_job = {
   source_position : string * int * int * int;
 }
 
+let map_job (tezos_job : tezos_job)
+    (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
+  {tezos_job with job = f tezos_job.job}
+
 let tezos_job_to_config_elements (j : tezos_job) =
   let source_comment =
     if Cli.config.inline_source_info then
@@ -425,3 +429,75 @@ let job_external ?directory ?filename_suffix (tezos_job : tezos_job) : tezos_job
       filename ;
     Gitlab_ci.To_yaml.to_file ~header ~filename config ;
     tezos_job)
+
+let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
+    (tezos_job : tezos_job) =
+  map_job tezos_job @@ fun (job : Gitlab_ci.Types.job) ->
+  match job.artifacts with
+  | None ->
+      {
+        job with
+        artifacts = Some (artifacts ?expose_as ?reports ?expire_in ?when_ paths);
+      }
+  | Some artifacts ->
+      let opt_merge_right o1 o2 =
+        match (o1, o2) with
+        | _, Some value -> Some value
+        | Some value, None -> Some value
+        | None, None -> None
+      in
+      let opt_combine o1 o2 f =
+        match (o1, o2) with
+        | None, opt | opt, None -> opt
+        | Some value1, Some value2 -> Some (f value1 value2)
+      in
+      let name = opt_merge_right artifacts.name name in
+      let expose_as = opt_merge_right artifacts.expose_as expose_as in
+      let expire_in =
+        opt_combine artifacts.expire_in expire_in @@ fun interval1 interval2 ->
+        (* This function gives a measure of the size of a duration in seconds.
+           It is only used to compare durations. *)
+        let interval_to_seconds = function
+          | Gitlab_ci.Types.Seconds n -> n
+          | Minutes n -> n * 60
+          | Hours n -> n * 3600
+          | Days n -> n * 24 * 3600
+          | Weeks n -> n * 7 * 24 * 3600
+          | Months n -> n * 31 * 7 * 24 * 3600
+          | Years n -> n * 365 * 7 * 24 * 3600
+        in
+        if interval_to_seconds interval1 > interval_to_seconds interval2 then
+          interval1
+        else interval2
+      in
+      let when_ =
+        opt_combine artifacts.when_ when_ @@ fun when1 when2 ->
+        if when1 = when2 then when1 else Always
+      in
+      let paths =
+        match paths with
+        | [] -> artifacts.paths
+        | _ -> Some (Option.value ~default:[] artifacts.paths @ paths)
+      in
+      let reports =
+        opt_combine artifacts.reports reports @@ fun reports1 reports2 ->
+        let opt_combine_fail field o1 o2 =
+          opt_combine o1 o2 @@ fun _v1 _v2 ->
+          failwith
+            "[add_artifacts] attempted to override existing %s report"
+            field
+        in
+        {
+          dotenv = opt_combine_fail "dotenv" reports1.dotenv reports2.dotenv;
+          junit = opt_combine_fail "junit" reports1.junit reports2.junit;
+          coverage_report =
+            opt_combine_fail
+              "coverage_report"
+              reports1.coverage_report
+              reports2.coverage_report;
+        }
+      in
+      {
+        job with
+        artifacts = Some {name; expose_as; expire_in; when_; paths; reports};
+      }
