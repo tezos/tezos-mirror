@@ -240,12 +240,14 @@ module Plugin = struct
              {!add_confirmed_slot_headers}. The function is fed with an empty
              history cache, so the returned [cache] contains exactly the cells
              produced for this [level]. *)
-          let*? level = Raw_level.of_int32 level |> Environment.wrap_tzresult in
           let*? _last_cell, cache =
             Dal.Slots_history.add_confirmed_slot_headers
               previous_cell
               empty_cache
-              level
+              published_level
+              (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+
+                 Not resilient to DAL parameters change. *)
               ~number_of_slots:dal_constants.number_of_slots
               attested_slot_headers
             |> Environment.wrap_tzresult
