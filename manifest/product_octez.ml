@@ -1885,6 +1885,7 @@ let octez_base_unix =
         uri;
         octez_event_logging |> open_;
         lwt_exit;
+        terminal;
       ]
     ~inline_tests:ppx_expect
     ~inline_tests_libraries:[bls12_381_archive]

@@ -271,6 +271,8 @@ let tar = external_lib "tar" V.True
 
 let tar_unix = external_lib "tar-unix" V.(at_least "2.0.1" && less_than "3.0.0")
 
+let terminal = external_lib "terminal" V.True
+
 let tezos_sapling_parameters =
   opam_only ~can_vendor:false "tezos-sapling-parameters" V.(at_least "1.1.0")
 
