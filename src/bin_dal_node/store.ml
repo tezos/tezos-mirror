@@ -87,6 +87,12 @@ module Shards = struct
   type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) KVS.t
 
   let file_layout ~root_dir commitment =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+
+       Make Key-Value store layout resilient to crypto parameters change.  Also,
+       putting a value not far from the real number of shards allows saving disk
+       storage. *)
+    let number_of_shards = 4096 in
     let commitment_string = Cryptobox.Commitment.to_b58check commitment in
     let filepath = Filename.concat root_dir commitment_string in
     Key_value_store.layout
@@ -95,6 +101,7 @@ module Shards = struct
       ~filepath
       ~eq:Stdlib.( = )
       ~index_of:Fun.id
+      ~number_of_keys_per_file:number_of_shards
       ()
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
