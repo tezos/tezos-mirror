@@ -501,3 +501,31 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
         job with
         artifacts = Some {name; expose_as; expire_in; when_; paths; reports};
       }
+
+let append_variables ?(allow_overwrite = false) new_variables
+    (tezos_job : tezos_job) : tezos_job =
+  map_job tezos_job @@ fun job ->
+  let variables =
+    let old_variables, new_variables =
+      List.fold_left
+        (fun (old_variables, new_variables) (name, value) ->
+          let old_variables =
+            match List.assoc_opt name old_variables with
+            | Some old_value ->
+                if not allow_overwrite then
+                  failwith
+                    "[Tezos_ci.append_variables] attempted to overwrite the \
+                     variable '%s' (old value: '%s', new value: '%s')"
+                    name
+                    old_value
+                    value ;
+                List.remove_assoc name old_variables
+            | None -> old_variables
+          in
+          (old_variables, (name, value) :: new_variables))
+        (Option.value ~default:[] job.variables, [])
+        new_variables
+    in
+    old_variables @ List.rev new_variables
+  in
+  {job with variables = Some variables}

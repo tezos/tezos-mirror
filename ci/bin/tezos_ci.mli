@@ -253,3 +253,10 @@ val add_artifacts :
   string list ->
   tezos_job ->
   tezos_job
+
+(** Append the variables [variables] to the variables of [job].
+
+    Raises [Failure] if any of the [variables] is already defined for
+    [job], unless [allow_overwrite] is true (default is [false]). *)
+val append_variables :
+  ?allow_overwrite:bool -> Gitlab_ci.Types.variables -> tezos_job -> tezos_job
