@@ -75,7 +75,8 @@
   test_adaptive_issuance
   test_adaptive_issuance_ema
   test_percentage
-  test_full_staking_balance_repr))
+  test_full_staking_balance_repr
+  test_slashing_percentage))
 
 (executable
  (name main)

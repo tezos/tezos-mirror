@@ -5113,6 +5113,7 @@ end = struct
             ("test_adaptive_issuance_ema", N.(number >= 018));
             ("test_percentage", N.(number >= 019));
             ("test_full_staking_balance_repr", N.(number >= 020));
+            ("test_slashing_percentage", N.(number >= 020));
           ]
           |> conditional_list
         in
