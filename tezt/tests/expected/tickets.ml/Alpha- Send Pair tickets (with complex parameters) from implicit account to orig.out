@@ -1,61 +1,35 @@
 
-./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint store --arg 'Pair 99 {Pair "garbage" (Ticket "[CONTRACT_HASH]" string "Ticket1" 1) ; Pair "garbage" (Ticket "[CONTRACT_HASH]" string "Ticket2" 2)}'
+./octez-client --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --entrypoint store --arg 'Pair 99 {Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket1" 1)) ; Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket2" 2))}'
 Node is bootstrapped.
-Estimated gas: 4001.689 units (will add 100 for safety)
-Estimated storage: 238 bytes added (will add 20 for safety)
-Operation successfully injected in the node.
-Operation hash is '[OPERATION_HASH]'
-NOT waiting for the operation to be included.
-Use command
-  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
-and/or an external block explorer to make sure that it has been included.
-This sequence of operations was run:
+This simulation failed:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000843
+    Fee to the baker: ꜩ0
     Expected counter: 4
-    Gas limit: 4102
-    Storage limit: 258 bytes
-    Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000843
-      payload fees(the block proposer) ....... +ꜩ0.000843
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
       To: [CONTRACT_HASH]
       Entrypoint: store
       Parameter: (Pair 99
-                       { Pair "garbage" (Ticket "[CONTRACT_HASH]" string "Ticket1" 1) ;
-                         Pair "garbage" (Ticket "[CONTRACT_HASH]" string "Ticket2" 2) })
-      This transaction was successfully applied
-      Updated storage:
-        { Ticket 0x01b9ce1609aab1100170d2ea4f94e3407244090b1000 string "Ticket2" 2 ;
-          Ticket 0x01b9ce1609aab1100170d2ea4f94e3407244090b1000 string "Ticket1" 1 }
-      Storage size: 303 bytes
-      Paid storage size diff: 238 bytes
-      Consumed gas: 4001.656
-      Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ0.0595
-        storage fees ........................... +ꜩ0.0595
-      Ticket updates:
-        Ticketer: [CONTRACT_HASH]
-        Content type: string
-        Content: "Ticket1"
-        Account updates:
-          [PUBLIC_KEY_HASH] ... -1
-        Ticketer: [CONTRACT_HASH]
-        Content type: string
-        Content: "Ticket2"
-        Account updates:
-          [PUBLIC_KEY_HASH] ... -2
-        Ticketer: [CONTRACT_HASH]
-        Content type: string
-        Content: "Ticket2"
-        Account updates:
-          [CONTRACT_HASH] ... +2
-        Ticketer: [CONTRACT_HASH]
-        Content type: string
-        Content: "Ticket1"
-        Account updates:
-          [CONTRACT_HASH] ... +1
+                       { Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket1" 1)) ;
+                         Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket2" 2)) })
+      This operation FAILED.
 
+At (unshown) location 0, value
+  (Pair 99
+        { Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket1" 1)) ;
+          Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket2" 2)) })
+is invalid for type pair int (list (pair string (ticket string))).
+At (unshown) location 2, value
+  { Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket1" 1)) ;
+    Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket2" 2)) }
+is invalid for type list (pair string (ticket string)).
+At (unshown) location 10, value
+  (Pair "garbage" (Pair "[CONTRACT_HASH]" (Pair "Ticket2" 2)))
+is invalid for type pair string (ticket string).
+At (unshown) location 12, invalid primitive Pair, only Ticket can be used here.
+Fatal error:
+  transfer simulation failed
