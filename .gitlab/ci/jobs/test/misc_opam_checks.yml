@@ -8,8 +8,3 @@ misc_opam_checks:
   script:
     # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh
-  artifacts:
-    when: always
-    paths:
-      - opam_repo.patch
-    expire_in: 1 day
