@@ -18,6 +18,7 @@ oc.build:rpm:amd64:
     m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam
     rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel
     python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel sqlite-devel
+    jq
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh
