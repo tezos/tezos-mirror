@@ -178,12 +178,13 @@ module Plugin = struct
       in
       (* 1. Before it's possible to attest the slots at the first published
          levels, the list of cells is empty. *)
-      if published_level < 0l then return []
+      if published_level <= 1l then return []
       else
         let* publication_level_dal_constants =
-          (* at published_level - 1 *)
+          (* published_level - 1 is positive. *)
           get_constants `Main (`Level (Int32.pred published_level)) ctxt
         in
+        (* Is DAL activated at at published_level - 1 *)
         if not publication_level_dal_constants.feature_enable then return []
         else
           let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
