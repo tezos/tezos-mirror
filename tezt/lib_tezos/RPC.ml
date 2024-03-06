@@ -1285,6 +1285,22 @@ let get_chain_block_context_delegate_stakers ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; "stakers"]
     Fun.id
 
+let get_chain_block_context_delegate_is_forbidden ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "is_forbidden";
+    ]
+    JSON.as_bool
+
 let get_chain_block_context_delegate_total_delegated_stake ?(chain = "main")
     ?(block = "head") pkh =
   make
