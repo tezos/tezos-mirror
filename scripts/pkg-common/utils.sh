@@ -115,19 +115,25 @@ warnings() {
 
 getOctezVersion() {
 
-  if ! _vers=$(dune exec src/lib_version/exe/tezos_print_version.exe -- --full-with-commit 2> /dev/null); then
+  if ! version=$(dune exec src/lib_version/exe/tezos_print_version.exe -- --json 2> /dev/null); then
     echo "Cannot get version. Try eval \`opam env\`?" >&2
     exit 1
   fi
-  _vers_fix=$(echo "$_vers" | awk -F' ' '{print $1}')
+  major=$(echo "$version" | jq -r .major)
+  minor=$(echo "$version" | jq -r .minor)
+  info=$(echo "$version" | jq -r .info)
+  short_hash=$(echo "$version" | jq -r .hash)
 
-  case $_vers_fix in
+  case $info in
   *dev)
-    _vers_fix="$_vers_fix-$(echo "$_vers" | sed -e 's|.*(||g' -e 's|)||g')"
+    RET="$major.$minor$info+$short_hash"
+    ;;
+  *)
+    RET="$major.$minor$info"
     ;;
   esac
 
-  echo "$_vers_fix"
+  echo "$RET"
 
 }
 
