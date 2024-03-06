@@ -148,13 +148,13 @@ let make_string_parameter name = function
   | None -> []
   | Some value -> [(name, `String value)]
 
-let test ~__FILE__ ?(tags = []) ?uses ?supports title f =
+let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses ?supports title f =
   let tags = Tag.tezos2 :: "dal" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags ?uses ?supports f
-
-let regression_test ~__FILE__ ?(tags = []) ?uses title f =
-  let tags = Tag.tezos2 :: "dal" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags ?uses f
+  let register_test =
+    if regression then Protocol.register_regression_test
+    else Protocol.register_test
+  in
+  register_test ~__FILE__ ~title ~tags ?uses ?supports f
 
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
@@ -333,13 +333,15 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = [team]) ?additional_bootstrap_accounts
-    ?attestation_lag ?number_of_shards ?custom_constants ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?event_sections_levels
-    ?node_arguments ?activation_timestamp ?consensus_committee_size
-    ?minimal_block_delay ?delay_increment_per_round variant scenario =
+let scenario_with_layer1_node ?regression ?(tags = [team])
+    ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
+    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?event_sections_levels ?node_arguments ?activation_timestamp
+    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
+    variant scenario =
   let description = "Testing DAL L1 integration" in
   test
+    ?regression
     ~__FILE__
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
@@ -362,14 +364,15 @@ let scenario_with_layer1_node ?(tags = [team]) ?additional_bootstrap_accounts
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
-    ?custom_constants ?minimal_block_delay ?delay_increment_per_round
-    ?redundancy_factor ?slot_size ?number_of_shards ?number_of_slots
-    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?activation_timestamp ?bootstrap_profile
-    ?producer_profiles variant scenario =
+let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
+    ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
+    ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
+    ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
+    ?challenge_window ?(dal_enable = true) ?activation_timestamp
+    ?bootstrap_profile ?producer_profiles variant scenario =
   let description = "Testing DAL node" in
   test
+    ?regression
     ~__FILE__
     ~tags
     ~uses:(fun protocol -> Constant.octez_dal_node :: uses protocol)
@@ -403,7 +406,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?activation_timestamp ?bootstrap_profile ?producer_profiles variant scenario
     =
   let description = "Testing DAL rollup and node with L1" in
-  regression_test
+  test
+    ~regression:true
     ~__FILE__
     ~tags
     ~uses:(fun protocol ->
