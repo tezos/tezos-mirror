@@ -120,8 +120,11 @@ let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
   let* () = Client.bake_for_and_wait ~keys:[] client in
   unit
 
-let check_head_consistency ~left ~right ?error_msg () =
+let check_block_consistency ~left ~right ?error_msg ~block () =
   let open Rpc.Syntax in
+  let block =
+    match block with `Latest -> "latest" | `Level l -> Int32.to_string l
+  in
   let error_msg =
     Option.value
       ~default:
@@ -132,10 +135,13 @@ let check_head_consistency ~left ~right ?error_msg () =
             (Evm_node.name right))
       error_msg
   in
-  let*@ left_head = Rpc.get_block_by_number ~block:"latest" left in
-  let*@ right_head = Rpc.get_block_by_number ~block:"latest" right in
+  let*@ left_head = Rpc.get_block_by_number ~block left in
+  let*@ right_head = Rpc.get_block_by_number ~block right in
   Check.((left_head.hash = right_head.hash) string) ~error_msg ;
   unit
+
+let check_head_consistency ~left ~right ?error_msg () =
+  check_block_consistency ~left ~right ?error_msg ~block:`Latest ()
 
 let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
     ~sequencer_admin_contract ~client ~upgrade_to ~pool_address

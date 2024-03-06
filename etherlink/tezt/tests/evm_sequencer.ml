@@ -950,7 +950,7 @@ let test_observer_applies_blueprint =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let tbb = 1. in
+  let tbb = 3. in
   let* {sequencer = sequencer_node; sc_rollup_node; _} =
     setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
   in
@@ -983,7 +983,11 @@ let test_observer_applies_blueprint =
   in
 
   let* () =
-    check_head_consistency ~left:sequencer_node ~right:observer_node ()
+    check_block_consistency
+      ~left:sequencer_node
+      ~right:observer_node
+      ~block:(`Level (Int32.of_int levels_to_wait))
+      ()
   in
 
   unit
@@ -1036,7 +1040,7 @@ let test_observer_forwards_transaction =
   | Some receipt when receipt.status -> unit
   | Some _ ->
       Test.fail
-        "transaction receipt received from the sequenecer, but transaction \
+        "transaction receipt received from the sequencer, but transaction \
          failed"
   | None ->
       Test.fail
