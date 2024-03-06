@@ -151,7 +151,9 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
-    let empty_cache = Dal.Slots_history.History_cache.empty ~capacity:0L
+    let empty_cache =
+      (* A capacity of [number_of_slots] is actually sufficient. *)
+      Dal.Slots_history.History_cache.empty ~capacity:Int64.max_int
 
     (*
       This function mimics what the protocol does in
