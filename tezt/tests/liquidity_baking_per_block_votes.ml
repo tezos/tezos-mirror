@@ -111,7 +111,7 @@ let test_all_per_block_votes =
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let ( >|= ) = Lwt.( >|= ) in
-  let error_prefix = "client." ^ Protocol.encoding_prefix protocol ^ "." in
+  let error_prefix = "baker." ^ Protocol.encoding_prefix protocol ^ "." in
 
   if Sys.file_exists default_votefile then
     Test.fail
@@ -241,7 +241,7 @@ let test_all_per_block_votes =
     let p_error =
       baker_wait_for_per_block_vote_file_error
         ~expected_id:
-          (error_prefix ^ "per_block_vote_file.block_vote_file_not_found")
+          (error_prefix ^ "Per_block_vote_file.block_vote_file_not_found")
         ~expected_file_path:default_votefile
         baker
     in

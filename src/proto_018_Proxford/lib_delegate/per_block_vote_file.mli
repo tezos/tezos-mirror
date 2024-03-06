@@ -50,16 +50,6 @@
 
 open Protocol.Alpha_context
 
-type error += Block_vote_file_not_found of string
-
-type error += Block_vote_file_invalid of string
-
-type error += Block_vote_file_wrong_content of string
-
-type error += Block_vote_file_missing_liquidity_baking_toggle_vote of string
-
-type error += Missing_vote_on_startup
-
 (** Default vote file name that should be looked up when the baker
     starts. *)
 val default_vote_json_filename : string

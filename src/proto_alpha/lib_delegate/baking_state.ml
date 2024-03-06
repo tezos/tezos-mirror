@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Protocol_client_context
+open Baking_errors
 
 (** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
@@ -588,23 +588,6 @@ let record_state (state : state) =
   in
   let*! () = Lwt_unix.rename filename_tmp filename in
   return_unit
-
-type error += Broken_locked_values_invariant
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Baking_state.broken_locked_values_invariant"
-    ~title:"Broken locked values invariant"
-    ~description:
-      "The expected consistency invariant on locked values does not hold"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The expected consistency invariant on locked values does not hold")
-    Data_encoding.unit
-    (function Broken_locked_values_invariant -> Some () | _ -> None)
-    (fun () -> Broken_locked_values_invariant)
 
 let may_record_new_state ~previous_state ~new_state =
   let open Lwt_result_syntax in
