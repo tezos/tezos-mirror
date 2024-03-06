@@ -4461,8 +4461,8 @@ let test_migrate_proxy_to_sequencer_future =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
-  (* 10s per block, 6 block.  *)
-  let activation_timestamp = "2020-01-01T00:01:00Z" in
+  (* 1s per block, 10 block. *)
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
   let sequencer_admin = Constant.bootstrap5 in
   let sequencer_key = Constant.bootstrap4 in
   let* ({
@@ -4526,8 +4526,8 @@ let test_migrate_proxy_to_sequencer_future =
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () =
-    repeat 6 (fun () ->
-        let* _ = Client.bake_for_and_wait client in
+    repeat 10 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Run the sequencer from the rollup node state. *)
