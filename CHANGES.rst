@@ -170,6 +170,9 @@ Smart Rollup node
 
 - Compact snapshots with context reconstruction. (MR :gl:`!11651`)
 
+- Prevent some leak of connections to L1 node from rollup node (and avoid
+  duplication). (MR :gl:`!11825`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
