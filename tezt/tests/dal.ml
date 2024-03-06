@@ -335,10 +335,10 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
    writing tests. *)
 let scenario_with_layer1_node ?regression ?(tags = [team])
     ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
-    ?custom_constants ?commitment_period ?challenge_window ?(dal_enable = true)
-    ?event_sections_levels ?node_arguments ?activation_timestamp
-    ?consensus_committee_size ?minimal_block_delay ?delay_increment_per_round
-    variant scenario =
+    ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
+    ?(dal_enable = true) ?event_sections_levels ?node_arguments
+    ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
+    ?delay_increment_per_round variant scenario =
   let description = "Testing DAL L1 integration" in
   test
     ?regression
@@ -354,6 +354,7 @@ let scenario_with_layer1_node ?regression ?(tags = [team])
         ?delay_increment_per_round
         ?attestation_lag
         ?number_of_shards
+        ?number_of_slots
         ?commitment_period
         ?challenge_window
         ?event_sections_levels
