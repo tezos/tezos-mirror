@@ -99,6 +99,13 @@ pub struct Opt {
         about = "Specify the path where the tool needs to retrieve its resources from."
     )]
     resources: String,
+    #[structopt(
+        short = "c",
+        long = "ci-mode",
+        about = "This argument is useful for the CI so the tool can act as a \
+                 non-regression job."
+    )]
+    ci_mode: bool,
 }
 
 fn generate_final_report(

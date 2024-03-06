@@ -54,6 +54,7 @@ include:
   - .gitlab/ci/jobs/test/test_kernels.yml
   - .gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml
   - .gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml
+  - .gitlab/ci/jobs/test/test_evm_compatibility.yml
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
