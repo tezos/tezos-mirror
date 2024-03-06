@@ -33,7 +33,7 @@ module Pool = struct
   let add t pkey base_fee raw_tx =
     let open Result_syntax in
     let {transactions; global_index; delayed_transactions} = t in
-    let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
+    let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price base_fee raw_tx in
     let transaction = {index = global_index; raw_tx; gas_price} in
     (* Add the transaction to the user's transaction map *)
