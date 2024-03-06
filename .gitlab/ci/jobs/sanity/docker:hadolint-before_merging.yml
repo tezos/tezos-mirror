@@ -9,3 +9,4 @@ docker:hadolint-before_merging:
     - changes:
         - build.Dockerfile
         - Dockerfile
+      when: on_success
