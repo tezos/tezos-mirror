@@ -310,6 +310,14 @@ a:hover {
     color: rgb(151, 32, 18);
 }
 
+.rst-content a:visited {
+    color: rgb(13, 50, 200);
+}
+
+.rst-content a:link {
+    color: rgb(13, 50, 255);
+}
+
 .btn.btn-default {
     color: #333;
 }
