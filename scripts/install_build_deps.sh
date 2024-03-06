@@ -103,8 +103,8 @@ export OPAMYES="${OPAMYES:=true}"
 # If we use opam depext, it will probably not install the right version.
 OPAMASSUMEDEPEXTS=true opam install conf-rust conf-rust-2021
 
-# Opam < 2.1 uses opam-depext as a plugin, later versions provide the option
-# `--depext-only`:
+# Opam < 2.1 uses opam-depext as a plugin, later versions provide the option `--depext-only`.
+# We assume Opam >= 2.0.0 (2.0.0 was released in 2018; Debian Buster already had Opam 2.0.3).
 case $(opam --version) in
 2.0.*)
   opam pin add -n -y octez-deps opam/virtual/ && opam depext octez-deps
