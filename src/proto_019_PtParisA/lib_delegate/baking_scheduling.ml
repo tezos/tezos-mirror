@@ -709,6 +709,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
         {
           push_request = (fun _ -> assert false);
           get_forge_event_stream = (fun _ -> assert false);
+          cancel_all_pending_tasks = (fun _ -> assert false);
         };
       validation_mode;
       delegates;
@@ -727,6 +728,8 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       push_request = Forge_worker.push_request forge_worker;
       get_forge_event_stream =
         (fun () -> Forge_worker.get_event_stream forge_worker);
+      cancel_all_pending_tasks =
+        (fun () -> Forge_worker.cancel_all_pending_tasks forge_worker);
     } ;
   let chain = `Hash chain_id in
   let current_level = current_proposal.block.shell.level in

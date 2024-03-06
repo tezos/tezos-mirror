@@ -6,9 +6,12 @@
 (*****************************************************************************)
 
 open Baking_state
+open Protocol
+open Alpha_context
 
 module Events = struct
   include Baking_events.Forge_worker
+  include Baking_events.Actions
 end
 
 module Delegate_signing_queue = struct
@@ -125,27 +128,49 @@ let handle_forge_block worker baking_state (block_to_bake : block_to_bake) =
     task
     queue
 
-let handle_forge_preattestations worker baking_state
-    (unsigned_preattestations : unsigned_consensus_vote_batch) =
-  let task unsigned_preattestation =
-    let open Lwt_result_syntax in
-    (* FIXME split out the signing part *)
-    let single_unsigned_preattestation_batch =
-      {
-        unsigned_preattestations with
-        unsigned_consensus_votes = [unsigned_preattestation];
-      }
-    in
-    let* signed_preattestations =
-      Baking_actions.sign_consensus_votes
+let handle_forge_consensus_votes worker baking_state
+    (unsigned_consensus_votes : unsigned_consensus_vote_batch) =
+  let open Lwt_result_syntax in
+  let batch_branch = unsigned_consensus_votes.batch_branch in
+  let task
+      ({vote_consensus_content; vote_kind; delegate; dal_content = _} as
+      unsigned_consensus_vote) =
+    let*! signed_consensus_vote_r =
+      Baking_actions.forge_and_sign_consensus_vote
         baking_state
-        single_unsigned_preattestation_batch
+        ~branch:batch_branch
+        unsigned_consensus_vote
     in
-    List.iter
-      (fun signed_preattestation ->
-        worker.push_event (Some (Preattestation_ready signed_preattestation)))
-      signed_preattestations.signed_consensus_votes ;
-    return_unit
+    match signed_consensus_vote_r with
+    | Error err ->
+        let level, round =
+          ( Raw_level.to_int32 vote_consensus_content.level,
+            vote_consensus_content.round )
+        in
+        let*! () =
+          Events.(
+            emit skipping_consensus_vote (vote_kind, delegate, level, round, err))
+        in
+        fail err
+    | Ok signed_consensus_vote -> (
+        match vote_kind with
+        | Preattestation ->
+            worker.push_event
+              (Some (Preattestation_ready signed_consensus_vote)) ;
+            return_unit
+        | Attestation ->
+            worker.push_event (Some (Attestation_ready signed_consensus_vote)) ;
+            return_unit)
+  in
+  let* (authorized_consensus_votes : unsigned_consensus_vote list) =
+    protect
+      ~on_error:(fun err ->
+        let*! () = Events.(emit error_while_authorizing_consensus_votes err) in
+        return_nil)
+      (fun () ->
+        Baking_actions.authorized_consensus_votes
+          baking_state
+          unsigned_consensus_votes)
   in
   List.iter
     (fun unsigned_preattestation ->
@@ -154,38 +179,8 @@ let handle_forge_preattestations worker baking_state
         ~on_error:(fun _err -> Lwt.return_unit)
         (fun () -> task unsigned_preattestation)
         queue)
-    unsigned_preattestations.unsigned_consensus_votes
-
-let handle_forge_attestations worker baking_state
-    (unsigned_attestations : unsigned_consensus_vote_batch) =
-  let task unsigned_attestation =
-    let open Lwt_result_syntax in
-    (* FIXME split out the signing part *)
-    let single_unsigned_attestation_batch =
-      {
-        unsigned_attestations with
-        unsigned_consensus_votes = [unsigned_attestation];
-      }
-    in
-    let* signed_attestations =
-      Baking_actions.sign_consensus_votes
-        baking_state
-        single_unsigned_attestation_batch
-    in
-    List.iter
-      (fun signed_attestation ->
-        worker.push_event (Some (Attestation_ready signed_attestation)))
-      signed_attestations.signed_consensus_votes ;
-    return_unit
-  in
-  List.iter
-    (fun unsigned_attestation ->
-      let queue = get_or_create_queue worker unsigned_attestation.delegate in
-      Delegate_signing_queue.push_task
-        ~on_error:(fun _err -> Lwt.return_unit)
-        (fun () -> task unsigned_attestation)
-        queue)
-    unsigned_attestations.unsigned_consensus_votes
+    authorized_consensus_votes ;
+  return_unit
 
 let start (baking_state : Baking_state.global_state) =
   let open Lwt_result_syntax in
@@ -204,14 +199,12 @@ let start (baking_state : Baking_state.global_state) =
           handle_forge_block state baking_state block_to_bake ;
           return_unit
       | Forge_and_sign_preattestations {unsigned_preattestations} ->
-          handle_forge_preattestations
+          handle_forge_consensus_votes
             state
             baking_state
-            unsigned_preattestations ;
-          return_unit
+            unsigned_preattestations
       | Forge_and_sign_attestations {unsigned_attestations} ->
-          handle_forge_attestations state baking_state unsigned_attestations ;
-          return_unit
+          handle_forge_consensus_votes state baking_state unsigned_attestations
     in
     match forge_request_opt with
     | None -> (* Shutdown called *) return_unit
