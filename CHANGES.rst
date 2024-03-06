@@ -78,6 +78,10 @@ Node
   ``{"acl":"ban"}``, ``{"acl":"open"}`` (for both unban and untrust) or
   ``{"acl":"trust"}`` instead. (MR :gl:`!12289`)
 
+- Introduced a new RPC ``GET
+  /chains/main/blocks/<block>/context/delegates/<pkh>/is_forbidden``, to check
+  if a delegate is forbidden after being denounced for misbehaving. (MR :gl:`!12341`)
+
 Client
 ------
 
