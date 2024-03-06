@@ -4122,6 +4122,15 @@ module Staking = struct
         ~query:RPC_query.empty
         ~output:stakers_encoding
         RPC_path.(path / "stakers")
+
+    let is_forbidden =
+      RPC_service.get_service
+        ~description:
+          "Returns true if the delegate is forbidden to participate in \
+           consensus."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.bool
+        RPC_path.(path / "is_forbidden")
   end
 
   let contract_stake ctxt ~delegator_contract ~delegate =
@@ -4149,7 +4158,13 @@ module Staking = struct
     if result then return_unit
     else Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
 
+  let check_is_forbidden ctxt pkh =
+    let open Lwt_result_syntax in
+    return @@ Delegate.is_forbidden_delegate ctxt pkh
+
   let register () =
+    Registration.register1 ~chunked:false S.is_forbidden (fun ctxt pkh () () ->
+        check_is_forbidden ctxt pkh) ;
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
         let open Lwt_result_syntax in
         let* () = check_delegate_registered ctxt pkh in
