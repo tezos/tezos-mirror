@@ -6,7 +6,5 @@ kaitai_checks:
     - .test_template
     - .needs__trigger
     - .rules__octez_kaitai_e2e_changes
-  needs:
-    - "oc.build_x86_64-released"
   script:
     - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files` and commit the resulting diff.' ; false)
