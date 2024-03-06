@@ -77,6 +77,17 @@ val inject_block :
   prepared_block ->
   state tzresult Lwt.t
 
+val authorized_consensus_votes :
+  global_state ->
+  unsigned_consensus_vote_batch ->
+  unsigned_consensus_vote list tzresult Lwt.t
+
+val forge_and_sign_consensus_vote :
+  global_state ->
+  branch:Block_hash.t ->
+  unsigned_consensus_vote ->
+  signed_consensus_vote tzresult Lwt.t
+
 val sign_consensus_votes :
   global_state ->
   unsigned_consensus_vote_batch ->

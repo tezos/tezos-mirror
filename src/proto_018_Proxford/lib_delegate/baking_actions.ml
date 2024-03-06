@@ -454,33 +454,28 @@ let authorized_consensus_votes global_state
   let*! () =
     List.iter_s
       (fun {vote_kind; delegate; _} ->
-        let event, error =
+        let error =
           match vote_kind with
           | Preattestation ->
-              ( Events.skipping_preattestation,
-                Baking_highwatermarks.Block_previously_preattested
-                  {round; level} )
+              Baking_highwatermarks.Block_previously_preattested {round; level}
           | Attestation ->
-              ( Events.skipping_attestation,
-                Baking_highwatermarks.Block_previously_attested {round; level}
-              )
+              Baking_highwatermarks.Block_previously_attested {round; level}
         in
-        Events.emit event (delegate, level, round, [error]))
+        Events.(
+          emit
+            skipping_consensus_vote
+            (vote_kind, delegate, level, round, [error])))
       unauthorized_votes
   in
   return authorized_votes
 
-let forge_and_sign_consensus_vote global_state branch unsigned_consensus_vote :
-    signed_consensus_vote option Lwt.t =
-  let open Lwt_syntax in
+let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
+    signed_consensus_vote tzresult Lwt.t =
+  let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
-  let {vote_kind; vote_consensus_content; delegate = (ck, _) as delegate} =
+  let {vote_kind; vote_consensus_content; delegate = ck, _} =
     unsigned_consensus_vote
-  in
-  let level, round =
-    ( Raw_level.to_int32 vote_consensus_content.level,
-      vote_consensus_content.round )
   in
   let shell = {Tezos_base.Operation.branch} in
   let watermark =
@@ -504,22 +499,9 @@ let forge_and_sign_consensus_vote global_state branch unsigned_consensus_vote :
   let* signature =
     Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
   in
-  match signature with
-  | Error err ->
-      let* () =
-        match vote_kind with
-        | Preattestation ->
-            Events.(emit skipping_preattestation (delegate, level, round, err))
-        | Attestation ->
-            Events.(emit skipping_attestation (delegate, level, round, err))
-      in
-      return_none
-  | Ok signature ->
-      let protocol_data =
-        Operation_data {contents; signature = Some signature}
-      in
-      let signed_operation : Operation.packed = {shell; protocol_data} in
-      return_some {unsigned_consensus_vote; signed_operation}
+  let protocol_data = Operation_data {contents; signature = Some signature} in
+  let signed_operation : Operation.packed = {shell; protocol_data} in
+  return {unsigned_consensus_vote; signed_operation}
 
 let sign_consensus_votes (global_state : global_state)
     ({batch_kind; batch_content; batch_branch; _} as
@@ -529,22 +511,31 @@ let sign_consensus_votes (global_state : global_state)
   let* authorized_consensus_votes =
     authorized_consensus_votes global_state unsigned_consensus_vote_batch
   in
-  let event =
-    match batch_kind with
-    | Preattestation -> Events.signing_preattestation
-    | Attestation -> Events.signing_attestation
-  in
   let* signed_consensus_votes =
     List.filter_map_es
-      (fun ({delegate; _} as unsigned_consensus_vote) ->
-        let*! () = Events.(emit event delegate) in
-        let*! signed_consensus_vote =
+      (fun ({delegate; vote_kind; vote_consensus_content; _} as
+           unsigned_consensus_vote) ->
+        let*! () = Events.(emit signing_consensus_vote (vote_kind, delegate)) in
+        let*! signed_consensus_vote_r =
           forge_and_sign_consensus_vote
             global_state
-            batch_branch
+            ~branch:batch_branch
             unsigned_consensus_vote
         in
-        return signed_consensus_vote)
+        match signed_consensus_vote_r with
+        | Error err ->
+            let level, round =
+              ( Raw_level.to_int32 vote_consensus_content.level,
+                vote_consensus_content.round )
+            in
+            let*! () =
+              Events.(
+                emit
+                  skipping_consensus_vote
+                  (vote_kind, delegate, level, round, err))
+            in
+            return_none
+        | Ok signed_consensus_vote -> return_some signed_consensus_vote)
       authorized_consensus_votes
   in
   let*? signed_consensus_vote_batch =
@@ -568,16 +559,14 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
-  let fail_inject_event, injected_event =
-    match unsigned_consensus_vote.vote_kind with
-    | Preattestation ->
-        (Events.failed_to_inject_preattestation, Events.preattestation_injected)
-    | Attestation ->
-        (Events.failed_to_inject_attestation, Events.attestation_injected)
-  in
   protect
     ~on_error:(fun err ->
-      let*! () = Events.(emit fail_inject_event (delegate, err)) in
+      let*! () =
+        Events.(
+          emit
+            failed_to_inject_consensus_vote
+            (unsigned_consensus_vote.vote_kind, delegate, err))
+      in
       return_unit)
     (fun () ->
       let* oph =
@@ -586,7 +575,12 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
           ~chain:(`Hash chain_id)
           signed_consensus_vote.signed_operation
       in
-      let*! () = Events.(emit injected_event (oph, delegate, level, round)) in
+      let*! () =
+        Events.(
+          emit
+            consensus_vote_injected
+            (unsigned_consensus_vote.vote_kind, oph, delegate, level, round))
+      in
       return_unit)
 
 let inject_consensus_votes state signed_consensus_vote_batch =
