@@ -204,7 +204,7 @@ let cleanup_values_for_protocol_p ctxt
   let new_cycle =
     let next_level = Raw_level_repr.succ level in
     let cycle_eras = Raw_context.cycle_eras ctxt in
-    (Level_repr.level_from_raw ~cycle_eras next_level).cycle
+    Level_repr.cycle_from_raw ~cycle_eras next_level
   in
   let* ctxt =
     Stake_storage.cleanup_values_for_protocol_p

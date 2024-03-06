@@ -171,10 +171,9 @@ let get_applicable_and_remaining_denunciations ctxt current_cycle =
             (fun denunciation ->
               let level = denunciation.Denunciations_repr.misbehaviour.level in
               let misb_cycle =
-                (Level_repr.level_from_raw
-                   ~cycle_eras:(Raw_context.cycle_eras ctxt)
-                   level)
-                  .cycle
+                Level_repr.cycle_from_raw
+                  ~cycle_eras:(Raw_context.cycle_eras ctxt)
+                  level
               in
               Cycle_repr.(misb_cycle < current_cycle))
             denunciations
