@@ -3,5 +3,5 @@ oc.misc_checks:
     - .oc.misc_checks
   script:
     - ./scripts/ci/lint_misc_check.sh
-    - ./scripts/ci/lint_check_licenses.sh
     - scripts/check_wasm_pvm_regressions.sh check
+    - ./scripts/ci/lint_check_licenses.sh
