@@ -11,10 +11,13 @@ if [ "$deps_opam_repository_tag" != "$opam_repository_tag" ]; then
   exit 1
 fi
 
+BUILDDIR=$(pwd)
+
 # Prepare the building area: copying all files from
-# the dependency image in the staging area and
-# updating the source with the latest commits
-cp -a /root/tezos/_opam /builds/tezos/tezos/
+# the dependency image a staging area. This is necessary
+# to build on arm64 where the BUILDDIR is in ram.
+cp -a ./* /root/tezos/
+cd /root/tezos/
 
 # Build tezos as usual
 eval "$(opam env)"
@@ -36,5 +39,5 @@ cd scripts/packaging/octez/
 DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -b --no-sign -sa
 
 # Move the debian package to be packed as artifacts
-mkdir -p "/builds/tezos/tezos/packages/$DISTRIBUTION/$RELEASE"
-mv ../*.deb "/builds/tezos/tezos/packages/$DISTRIBUTION/$RELEASE"
+mkdir -p "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
+mv ../*.deb "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
