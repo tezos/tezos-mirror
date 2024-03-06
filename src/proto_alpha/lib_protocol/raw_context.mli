@@ -433,12 +433,10 @@ module Dal : sig
 
   val number_of_slots : t -> int
 
-  (** [record_attested_shards ctxt attestation shards] records that the
-     list of shards [shards] were attested (declared available by some
-     attester). The function assumes that a shard belongs to the
-     interval [0; number_of_shards - 1]. Otherwise, for each shard
-     outside this interval, it is a no-op. *)
-  val record_attested_shards : t -> Dal_attestation_repr.t -> int list -> t
+  (** [record_number_of_attested_shards ctxt attestation number_of_shards]
+      records that the [number_of_shards] shards were attested (declared
+      available by some attester). *)
+  val record_number_of_attested_shards : t -> Dal_attestation_repr.t -> int -> t
 
   (** [register_slot_header ctxt slot_header] returns a new context
      where the new candidate [slot] have been taken into
@@ -458,11 +456,11 @@ module Dal : sig
      [0;number_of_slots - 1], returns [false]. *)
   val is_slot_index_attested : t -> Dal_slot_index_repr.t -> bool
 
-  (** [shards_of_attester ctxt ~attester] returns the shard assignment
-     of the DAL committee of the current level for [attester]. This
-     function never returns an empty list. *)
-  val shards_of_attester :
-    t -> attester:Signature.Public_key_hash.t -> int list option
+  (** [power_of_attester ctxt ~attester] returns the number of shards assigned
+      to [attester] at the current level. It never returns [Some 0]. Instead, it
+      returns [None] if the attester is not in the DAL committee. *)
+  val power_of_attester :
+    t -> attester:Signature.Public_key_hash.t -> int option
 
   (** The DAL committee is a subset of the Tenderbake committee.  A
      shard from [0; number_of_shards - 1] is associated to a public key

@@ -97,24 +97,23 @@ module Accountability : sig
      Consider using the [Bounded] module. In particular, change the
      semantics of [is_slot_attested] accordingly. *)
 
-  (** [init ~length] initialises a new accountability data-structure
-     with at most [length] slots and where for every slot, no shard is
+  (** [init ~number_of_slots] initialises a new accountability data-structure
+     with [number_of_slots] slots and where for every slot, no shard is
      available. *)
-  val init : length:int -> t
+  val init : number_of_slots:int -> t
 
-  (** [record_attested_shards t slots shards] records that for all
-     slots declared available in [slots], the shard indices in [shards]
-     are deemed available. It is the responsibility of the caller to ensure
-     the shard indices are positive numbers. A negative shard index is
-     ignored. *)
-  val record_attested_shards : t -> attested_slots -> shard_index list -> t
+  (** [record_number_of_attested_shards t slots number] records that, for all
+      slots declared available in [slots], the given [number] of shard indices
+      are deemed available. This function must be called at most once for a
+      given attester; otherwise the count will be flawed. *)
+  val record_number_of_attested_shards : t -> attested_slots -> int -> t
 
-  (** [is_slot_attested t ~threshold ~number_of_shards slot] returns
-     [true] if the number of shards recorded in [t] for the [slot] is
-     above the [threshold] with respect to the total number of shards
-     specified by [number_of_shards]. Returns [false] otherwise or if
-     the [index] is out of the interval [0;length] where [length] is
-     the value provided to the [init] function. *)
+  (** [is_slot_attested t ~threshold ~number_of_shards slot] returns [true] if
+      the number of shards recorded in [t] for the [slot] is above the
+      [threshold] with respect to the total number of shards specified by
+      [number_of_shards]. Returns [false] otherwise or if the [index] is out of
+      the interval [0; number_of_slots - 1] where [number_of_slots] is the value
+      provided to the [init] function. *)
   val is_slot_attested :
     t -> threshold:int -> number_of_shards:int -> Dal_slot_index_repr.t -> bool
 end

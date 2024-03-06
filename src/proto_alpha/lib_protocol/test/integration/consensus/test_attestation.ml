@@ -760,6 +760,65 @@ let test_attester_not_in_dal_committee () =
   let* _ = iter b 0 in
   return_unit
 
+let test_dal_attestation_threshold () =
+  let open Lwt_result_wrap_syntax in
+  let n = 100 in
+  let* genesis, contracts = Context.init_n n ~consensus_threshold:0 () in
+  let contract = Stdlib.List.hd contracts in
+  let* {
+         parametric =
+           {
+             dal =
+               {
+                 attestation_lag;
+                 attestation_threshold;
+                 cryptobox_parameters = {number_of_shards; _};
+                 _;
+               };
+             _;
+           };
+         _;
+       } =
+    Context.get_constants (B genesis)
+  in
+  let slot_index = Dal.Slot_index.zero in
+  let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let commitment_proof = Alpha_context.Dal.Slot.Commitment_proof.zero in
+  let slot_header =
+    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
+  in
+  let* op = Op.dal_publish_commitment (B genesis) contract slot_header in
+  let* b = Block.bake genesis ~operation:op in
+  let* b = Block.bake_n (attestation_lag - 1) b in
+  let* dal_committee = Context.Dal.shards (B b) () in
+  let attestation = Dal.Attestation.commit Dal.Attestation.empty slot_index in
+  let dal_content = {attestation} in
+  let min_power = attestation_threshold * number_of_shards / 100 in
+  Log.info "Number of minimum required attested shards: %d" min_power ;
+  let* _ =
+    List.fold_left_es
+      (fun (acc_ops, acc_power) (pkh, (_first_index, power)) ->
+        let* op = Op.attestation ~delegate:pkh ~dal_content b in
+        let ops = op :: acc_ops in
+        let power = acc_power + power in
+        let* _b, (metadata, _ops) =
+          Block.bake_with_metadata ~operations:ops b
+        in
+        let attested_expected = power >= min_power in
+        let attested =
+          Dal.Attestation.is_attested metadata.dal_attestation slot_index
+        in
+        Log.info "With %d power, the slot is attested: %b " power attested ;
+        Check.(attested = attested_expected)
+          Check.bool
+          ~error_msg:
+            "Unexpected attestation status for slot 0: got %L, expected %R " ;
+        return (ops, power))
+      ([], 0)
+      dal_committee
+  in
+  return_unit
+
 let tests =
   [
     (* Positive tests *)
@@ -819,6 +878,10 @@ let tests =
       "attester not in DAL committee"
       `Quick
       test_attester_not_in_dal_committee;
+    Tztest.tztest
+      "DAL attestation_threshold"
+      `Quick
+      test_dal_attestation_threshold;
   ]
 
 let () =
