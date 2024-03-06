@@ -63,8 +63,9 @@ type ('key, 'value) layout
 type ('file, 'key, 'value) file_layout =
   root_dir:string -> 'file -> ('key, 'value) layout
 
-(** [layout ?encoded_value_size value_encoding path eq index_of] describes a
-    virtual file layout.
+(** [layout ?encoded_value_size value_encoding path eq index_of
+    ~number_of_keys_per_file] describes a virtual file layout.
+
     - [encoded_value_size] is the size in bytes of any encoded value.  If
     encoded values have different sizes, the behaviour of the store is
     undefined. If [encoded_value_size] is not given, then the encoded value size
@@ -74,14 +75,19 @@ type ('file, 'key, 'value) file_layout =
     - [eq] is an equality function on values.
     - [index_of] gives the index of a given key.
 
-   @raise Invalid_argument if [encoded_value_size=None] and [value_encoding] does not have a fixed length.
- *)
+   @raise Invalid_argument if [encoded_value_size=None] and [value_encoding]
+     does not have a fixed length.
+
+   The user should provide the number of keys stored per file, which should not
+   exceed 4096.
+*)
 val layout :
   ?encoded_value_size:int ->
   encoding:'value Data_encoding.t ->
   filepath:string ->
   eq:('value -> 'value -> bool) ->
   index_of:('key -> int) ->
+  number_of_keys_per_file:int ->
   unit ->
   ('key, 'value) layout
 

@@ -447,6 +447,7 @@ let run_scenario
       ~filepath
       ~eq:( = )
       ~index_of:Fun.id
+      ~number_of_keys_per_file:4096
       ()
   in
   let* left = L.init ~lru_size ~root_dir in

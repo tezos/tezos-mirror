@@ -172,11 +172,26 @@ type ('key, 'value) layout = {
   index_of : 'key -> int;
   filepath : string;
   value_size : int;
+  number_of_keys_per_file : int;
 }
+
+(* The bitset of each file takes 4096 bytes. Because the bitset is
+   actually a byte set, it means that the maximum number of keys is
+   bounded by this size. We could optimize this to store `8` times
+   more keys in the future or also increase the size of the
+   bitset. *)
+let max_number_of_keys_per_file = 4096
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
+   For now the bitset is a byte set...
+   With a true bitset, we'd have [max_number_of_keys_per_file/8].
+   Should be ok in practice since an atomic read/write on Linux is 4KiB.
+*)
+let bitset_size = max_number_of_keys_per_file
 
 (** The module [Files] handles writing and reading into memory-mapped files. A
     virtual file is backed by a physical file and a key is just an index (from 0
-    to [max_number_of_keys - 1]). As values within a file have a fixed size, the
+    to [max_number_of_keys_per_file - 1]). As values within a file have a fixed size, the
     index encodes the position of the associated value within the physical file.
 
     This module basically implements the key-value store, by grouping sets of
@@ -220,20 +235,6 @@ end = struct
 
     let hash = Hashtbl.hash
   end)
-
-  (* The bitset of each file takes 4096 bytes. Because the bitset is
-     actually a byte set, it means that the maximum number of keys is
-     bounded by this size. We could optimize this to store `8` times
-     more keys in the future or also increase the size of the
-     bitset. *)
-  let max_number_of_keys = 4096
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6033
-     For now the bitset is a byte set...
-     With a true bitset, we'd have [max_number_of_keys/8].
-     Should be ok in practice since an atomic read/write on Linux is 4KiB.
-  *)
-  let bitset_size = max_number_of_keys
 
   (* The following cache allows to cache in memory values that were
      accessed recently. There is one cache per file opened. *)
@@ -708,13 +709,18 @@ end = struct
 
   (* This function aims to be used when a write action is performed on
      a file that does not exist yet. *)
-  let initialize_file files last_actions lru filename value_size =
+  let initialize_file files last_actions lru layout =
     let open Lwt_syntax in
-    let* lru_node = add_lru files last_actions lru filename in
+    let* lru_node = add_lru files last_actions lru layout.filepath in
     let* fd =
-      Lwt_unix.openfile filename [O_RDWR; O_CREAT; O_EXCL; O_CLOEXEC] 0o660
+      Lwt_unix.openfile
+        layout.filepath
+        [O_RDWR; O_CREAT; O_EXCL; O_CLOEXEC]
+        0o660
     in
-    let total_size = bitset_size + (max_number_of_keys * value_size) in
+    let total_size =
+      bitset_size + (layout.number_of_keys_per_file * layout.value_size)
+    in
     let* () = Lwt_unix.ftruncate fd total_size in
     let unix_fd = Lwt_unix.unix_file_descr fd in
     let bitset =
@@ -740,8 +746,7 @@ end = struct
     let open Lwt_syntax in
     let* b = Lwt_unix.file_exists layout.filepath in
     if b then load_file files last_actions lru layout.filepath
-    else
-      initialize_file files last_actions lru layout.filepath layout.value_size
+    else initialize_file files last_actions lru layout
 
   let read {files; last_actions; lru; closed} layout key =
     let open Lwt_syntax in
@@ -870,12 +875,29 @@ end = struct
       return_ok ()
 end
 
-let layout ?encoded_value_size ~encoding ~filepath ~eq ~index_of () =
+let layout ?encoded_value_size ~encoding ~filepath ~eq ~index_of
+    ~number_of_keys_per_file () =
+  if number_of_keys_per_file > max_number_of_keys_per_file then
+    invalid_arg
+    @@ Format.sprintf
+         "Key_value_store.layout: cannot have more than %d keys per file. \
+          Given %d."
+         max_number_of_keys_per_file
+         number_of_keys_per_file ;
   match encoded_value_size with
-  | Some value_size -> {filepath; eq; encoding; index_of; value_size}
+  | Some value_size ->
+      {filepath; eq; encoding; index_of; value_size; number_of_keys_per_file}
   | None -> (
       match Data_encoding.classify encoding with
-      | `Fixed value_size -> {filepath; eq; encoding; index_of; value_size}
+      | `Fixed value_size ->
+          {
+            filepath;
+            eq;
+            encoding;
+            index_of;
+            value_size;
+            number_of_keys_per_file;
+          }
       | `Dynamic | `Variable ->
           invalid_arg
             "Key_value_store.layout: encoding does not have fixed size")
