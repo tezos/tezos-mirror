@@ -29,6 +29,16 @@ To call the underlying generator binary, call
 
     dune exec bin/ci/main.exe
 
+If you do not have an OCaml environment installed, then you can
+regenerate the configuration through Docker, with the following
+command:
+
+    make -C ci docker-all
+
+This will work with all the other targets, such that `make -C ci
+docker-TGT` runs `make -C ci TGT` inside a Docker image with the
+required prerequisites installed.
+
 For more information, see
 
     dune exec bin/ci/main.exe -- --help

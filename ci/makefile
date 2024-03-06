@@ -10,6 +10,22 @@ verbose: # Regenerate GitLab CI configuration with verbose output.
 inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
 	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info)
 
+.PHONY: docker-%
+docker-%:
+	@( cd .. \
+	    && . ./scripts/version.sh \
+	    && docker run -it -w$$(pwd) -v$$(pwd):$$(pwd) --entrypoint opam \
+	         registry.gitlab.com/tezos/opam-repository:runtime-build-dependencies--$${opam_repository_tag} exec -- \
+	         make -C ci $* )
+
+.PHONY: docker-all
+docker-all: # Build the target 'all' using the 'runtime-build-dependencies' Docker image.
+
+.PHONY: docker-verbose
+docker-verbose: # Build the target 'verbose' using the 'runtime-build-dependencies' Docker image.
+
+.PHONY: docker-inline-source-info
+docker-inline-source-info: # Build the target 'inline-source-info' using the 'runtime-build-dependencies' Docker image.
 
 .PHONY: check
 check: # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
