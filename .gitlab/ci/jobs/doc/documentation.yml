@@ -10,13 +10,12 @@
     - .needs__trigger
     - .rules__octez_docs_changes
   stage: doc
-  before_script:
-    - eval $(opam env)
-    - . $HOME/.venv/bin/activate
 
 documentation:odoc:
   extends:
     - .doc_job_template
+  before_script:
+    - eval $(opam env)
   script:
     - make -C docs odoc-lite
   artifacts:
@@ -27,6 +26,8 @@ documentation:odoc:
 documentation:manuals:
   extends:
     - .doc_job_template
+  before_script:
+    - eval $(opam env)
   script:
     - ./.gitlab/ci/jobs/doc/documentation:manuals.sh
   artifacts:
@@ -40,6 +41,8 @@ documentation:manuals:
 documentation:docgen:
   extends:
     - .doc_job_template
+  before_script:
+    - eval $(opam env)
   script:
     - make -C docs -j docexes-gen
   artifacts:
@@ -62,6 +65,9 @@ documentation:build_all:
     - documentation:odoc
     - documentation:manuals
     - documentation:docgen
+  before_script:
+    - eval $(opam env)
+    - . $HOME/.venv/bin/activate
   script:
     - make -C docs -j sphinx
   artifacts:
