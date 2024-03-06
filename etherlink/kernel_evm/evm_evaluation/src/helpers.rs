@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -69,12 +69,37 @@ pub fn construct_folder_path(
 macro_rules! write_host {
     ($host: expr, $($args: expr),*) => {
         {
-            extern crate alloc;
-            writeln!(
-                $host.buffer.borrow_mut(),
-                "{}",
-                { &alloc::format!($($args), *) },
-            ).unwrap()
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                writeln!(
+                    $host.buffer.borrow_mut(),
+                    "{}",
+                    { &alloc::format!($($args), *) },
+                ).unwrap()
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! write_out {
+    ($output_file: expr, $($args: expr),*) => {
+        {
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                if let Some(ref mut output) = $output_file {
+                    writeln!(
+                        output,
+                        "{}",
+                        { &alloc::format!($($args), *) },
+                    ).unwrap()
+                } else {
+                    println!(
+                        "{}",
+                        { &alloc::format!($($args), *) }
+                    )
+                }
+            }
         }
     };
 }

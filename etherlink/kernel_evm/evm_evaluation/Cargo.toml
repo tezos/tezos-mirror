@@ -32,4 +32,6 @@ primitive-types = { version = "0.12.1", features = ["rlp", "serde"] }
 regex = "1.10.2"
 
 [features]
+default = ["debug"]
+disable-file-logs = []
 debug = ["tezos-evm-logging/debug"]

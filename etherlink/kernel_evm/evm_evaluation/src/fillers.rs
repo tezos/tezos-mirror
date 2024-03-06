@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,7 +8,7 @@ use crate::models::spec::SpecId;
 use crate::models::{
     AccountInfoFiller, FillerResultIndexes, FillerSource, IndexKind, SpecName,
 };
-use crate::{write_host, DiffMap, ReportMap, ReportValue};
+use crate::{write_host, write_out, DiffMap, ReportMap, ReportValue};
 
 use crate::models::TxPartIndices;
 use evm_execution::account_storage::EthereumAccount;
@@ -310,10 +310,10 @@ pub fn parse_result(line: &str) -> Option<(String, TestResult)> {
     }
 }
 
-pub fn output_result(file: &mut File, name: &str, status: TestResult) {
+pub fn output_result(file: &mut Option<File>, name: &str, status: TestResult) {
     // If the format of the following line is modified `parse_result` above
     // should be readapted accordingly to avoid any inconsistency.
-    writeln!(file, "{}: {:?}", name, status).unwrap()
+    write_out!(file, "{}: {:?}", name, status)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -323,7 +323,7 @@ pub fn process(
     spec_name: &SpecName,
     report_map: &mut ReportMap,
     report_key: String,
-    output_file: &mut File,
+    output_file: &mut Option<File>,
     tx_label: LabelIndexes,
     tx_indices: &TxPartIndices,
     output: &OutputOptions,
@@ -372,12 +372,11 @@ pub fn process(
         }
         TestResult::Failure => {
             if output.log {
-                write!(
+                write_out!(
                     output_file,
                     "{}",
                     String::from_utf8(host.buffer.borrow_mut().to_vec()).unwrap()
-                )
-                .unwrap();
+                );
             }
             report_map.entry(report_key).and_modify(|report_value| {
                 *report_value = ReportValue {
@@ -389,7 +388,7 @@ pub fn process(
         _ => (),
     }
     if output.log {
-        writeln!(output_file, "\nFINAL RESULT: {:?}\n", status).unwrap();
+        write_out!(output_file, "\nFINAL RESULT: {:?}\n", status);
     }
     if output.result {
         output_result(output_file, &full_name, status);

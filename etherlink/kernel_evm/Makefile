@@ -27,7 +27,11 @@ build-evm-execution:
 
 .PHONY: build-evm-evaluation
 build-evm-evaluation:
+ifdef EVM_EVALUATION_FEATURES
+	@cargo build --features ${EVM_EVALUATION_FEATURES} --release --package evm-evaluation
+else
 	@cargo build --release --package evm-evaluation
+endif
 
 .PHONY: build-deps
 build-deps:
