@@ -137,7 +137,7 @@ let make_with_pp_rfc5424 pp wrapped_event name =
 
 type color_setting = Enabled of string option | Disabled
 
-let make_with_pp_short ~color pp wrapped_event =
+let make_with_pp_short ?cols ~color pp wrapped_event =
   let pp_date fmt time =
     let time = Ptime.to_float_s time in
     let tm = Unix.localtime time in
@@ -169,12 +169,17 @@ let make_with_pp_short ~color pp wrapped_event =
       tm.Unix.tm_sec
       ms
   in
+  let timestamp = Format.asprintf "%a: " pp_date wrapped_event.time_stamp in
+  let timestamp_size = String.length timestamp in
+  let line_size = Option.map (fun cols -> max 1 (cols - timestamp_size)) cols in
   let lines =
     String.split_on_char
       '\n'
       (Format.asprintf
          "%a"
-         (pp ~all_fields:false ~block:true)
+         (fun ppf ->
+           Option.iter (Format.pp_set_margin ppf) line_size ;
+           pp ~all_fields:false ~block:true ppf)
          wrapped_event.event)
   in
   let color_total_size, bold_total_size =
@@ -190,8 +195,6 @@ let make_with_pp_short ~color pp wrapped_event =
     | Disabled -> (0, fun _i -> 0)
   in
 
-  let timestamp = Format.asprintf "%a: " pp_date wrapped_event.time_stamp in
-  let timestamp_size = String.length timestamp in
   let lines_size =
     List.fold_left_i
       (fun i acc s ->
@@ -650,6 +653,14 @@ end) : Internal_event.SINK with type t = t = struct
         return (is_a_tty && Sys.getenv_opt "TERM" <> Some "dumb")
     | Syslog _ | Rotating _ -> return_false
 
+  let output_columns out =
+    let open Lwt_syntax in
+    match out with
+    | Static fd ->
+        let* is_a_tty = Lwt_unix.isatty fd in
+        if is_a_tty then return (Terminal.Size.get_columns ()) else return_none
+    | Syslog _ | Rotating _ -> return_none
+
   let handle (type a) {output; format; colors; _} m
       ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
@@ -678,7 +689,8 @@ end) : Internal_event.SINK with type t = t = struct
                 else Lwt.return Disabled
               else Lwt.return Disabled
             in
-            Lwt.return @@ make_with_pp_short ~color M.pp wrapped_event
+            let*! cols = output_columns output in
+            Lwt.return @@ make_with_pp_short ?cols ~color M.pp wrapped_event
         | `One_per_line ->
             Lwt.return @@ Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
         | `Netstring ->
