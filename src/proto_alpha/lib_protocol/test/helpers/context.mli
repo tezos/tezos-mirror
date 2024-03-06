@@ -458,3 +458,8 @@ val init_with_parameters2 :
 (** [default_raw_context] returns a [Raw_context.t] for use in tests
     below [Alpha_context] *)
 val default_raw_context : unit -> Raw_context.t tzresult Lwt.t
+
+(** [raw_context_from_constants] returns a [Raw_context.t] for use in tests
+    below [Alpha_context] *)
+val raw_context_from_constants :
+  Constants.Parametric.t -> Raw_context.t tzresult Lwt.t
