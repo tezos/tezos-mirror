@@ -1077,6 +1077,13 @@ val get_chain_block_context_delegate_delegated_contracts :
 val get_chain_block_context_delegate_stakers :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/is_forbidden]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_is_forbidden :
+  ?chain:string -> ?block:string -> string -> bool t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/total_delegated_stake]
 
     [chain] defaults to ["main"].

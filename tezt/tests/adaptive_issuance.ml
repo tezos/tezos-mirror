@@ -1045,6 +1045,13 @@ let test_staking =
 
   let* _ = Node.wait_for_level node_2 (common_ancestor + node_2_branch_size) in
 
+  (* Bootstrap2 has not yet been denounced, check it is not forbidden *)
+  let* is_forbidden =
+    Client.RPC.call client_2
+    @@ RPC.get_chain_block_context_delegate_is_forbidden
+         Constant.bootstrap2.public_key_hash
+  in
+  assert (not is_forbidden) ;
   log_step 16 "Run Node 3, bake one block and wait for the accuser to be ready." ;
   let* node_3 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client_3 = Client.init ~endpoint:(Node node_3) () in
@@ -1087,6 +1094,14 @@ let test_staking =
     if is_operation_in_operations ops denunciation_oph then unit
     else Test.fail "Double baking evidence was not found"
   in
+
+  (* Bootstrap2 has been denounced, check it is not forbidden *)
+  let* is_forbidden =
+    Client.RPC.call client_1
+    @@ RPC.get_chain_block_context_delegate_is_forbidden
+         Constant.bootstrap2.public_key_hash
+  in
+  assert is_forbidden ;
 
   (* Bake a cycle to wait for the slashing *)
   let* () =
