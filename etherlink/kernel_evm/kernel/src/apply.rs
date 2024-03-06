@@ -14,12 +14,14 @@ use evm_execution::handler::{ExecutionOutcome, ExtendedExitReason};
 use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::run_transaction;
 use primitive_types::{H160, U256};
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_encoding::contract::Contract;
 use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
 use tezos_smart_rollup_encoding::michelson::ticket::{FA2_1Ticket, Ticket};
@@ -28,14 +30,14 @@ use tezos_smart_rollup_encoding::michelson::{
 };
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_encoding::outbox::OutboxMessageTransaction;
-use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::inbox::{Deposit, Transaction, TransactionContent};
 use crate::indexable_storage::IndexableStorage;
-use crate::storage::{index_account, read_ticketer};
+use crate::storage::index_account;
 use crate::{tick_model, CONFIG};
 
 // This implementation of `Transaction` is used to share the logic of
@@ -428,21 +430,19 @@ pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
 
 fn post_withdrawals<Host: Runtime>(
     host: &mut Host,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
     withdrawals: &Vec<Withdrawal>,
+    ticketer: &Option<ContractKt1Hash>,
 ) -> Result<(), Error> {
     if withdrawals.is_empty() {
         return Ok(());
     };
 
-    let destination = match read_ticketer(host) {
-        Some(x) => Contract::Originated(x),
+    let destination = match ticketer {
+        Some(x) => Contract::Originated(x.clone()),
         None => return Err(Error::InvalidParsing),
     };
     let entrypoint = Entrypoint::try_from(String::from("burn"))?;
-
-    let outbox_queue =
-        tezos_smart_rollup::outbox::OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)
-            .expect("Failed to created the outbox queue");
 
     for withdrawal in withdrawals {
         // Wei is 10^18, whereas mutez is 10^6.
@@ -512,6 +512,7 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
 #[allow(clippy::too_many_arguments)]
 pub fn handle_transaction_result<Host: Runtime>(
     host: &mut Host,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     transaction: &Transaction,
     index: u32,
@@ -519,6 +520,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     accounts_index: &mut IndexableStorage,
     transaction_result: TransactionResult,
     pay_fees: bool,
+    ticketer: &Option<ContractKt1Hash>,
 ) -> Result<ExecutionInfo, anyhow::Error> {
     let TransactionResult {
         caller,
@@ -540,7 +542,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
         log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
         fee_updates.modify_outcome(outcome);
-        post_withdrawals(host, &outcome.withdrawals)?
+        post_withdrawals(host, outbox_queue, &outcome.withdrawals, ticketer)?
     }
 
     if pay_fees {
@@ -570,6 +572,7 @@ pub fn handle_transaction_result<Host: Runtime>(
 #[allow(clippy::too_many_arguments)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
+    outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
     precompiles: &PrecompileBTreeMap<Host>,
     transaction: &Transaction,
@@ -578,6 +581,7 @@ pub fn apply_transaction<Host: Runtime>(
     accounts_index: &mut IndexableStorage,
     allocated_ticks: u64,
     retriable: bool,
+    ticketer: &Option<ContractKt1Hash>,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
@@ -599,6 +603,7 @@ pub fn apply_transaction<Host: Runtime>(
         ExecutionResult::Valid(tx_result) => {
             let execution_result = handle_transaction_result(
                 host,
+                outbox_queue,
                 block_constants,
                 transaction,
                 index,
@@ -606,6 +611,7 @@ pub fn apply_transaction<Host: Runtime>(
                 accounts_index,
                 tx_result,
                 true,
+                ticketer,
             )?;
             Ok(ExecutionResult::Valid(execution_result))
         }
@@ -614,6 +620,7 @@ pub fn apply_transaction<Host: Runtime>(
         ExecutionResult::Retriable(tx_result) => {
             let execution_result = handle_transaction_result(
                 host,
+                outbox_queue,
                 block_constants,
                 transaction,
                 index,
@@ -621,6 +628,7 @@ pub fn apply_transaction<Host: Runtime>(
                 accounts_index,
                 tx_result,
                 false,
+                ticketer,
             )?;
             Ok(ExecutionResult::Retriable(execution_result))
         }
