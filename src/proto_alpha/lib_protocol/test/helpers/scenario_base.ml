@@ -22,11 +22,13 @@ type error += Unexpected_error
     and the known [State.t] *)
 type t = Block.t * State.t
 
-let log ?color s =
-  let open Lwt_result_syntax in
-  exec_unit (fun _ ->
-      Log.info ?color s ;
-      return_unit)
+let log ?(level = Cli.Logs.Info) ?color format =
+  Format.kasprintf
+    (fun s ->
+      exec_unit (fun _ ->
+          Log.log ~level ?color "%s" s ;
+          return_unit))
+    format
 
 (* ======== Baking ======== *)
 
@@ -324,10 +326,12 @@ let next_block_with_baker baker =
       bake ~baker input)
 
 (** Bake until the end of a cycle *)
-let next_cycle =
-  exec (fun input ->
-      Log.info ~color:action_color "[Next cycle]" ;
-      bake_until_next_cycle input)
+let next_cycle_ input =
+  Log.info ~color:action_color "[Next cycle]" ;
+  bake_until_next_cycle input
+
+(** Bake until the end of a cycle *)
+let next_cycle = exec next_cycle_
 
 (** Executes an operation: f should return a new state and a list of operations, which are then applied *)
 let exec_op f =
@@ -445,60 +449,108 @@ let rec wait_n_blocks n =
   else if n = 1 then next_block
   else wait_n_blocks (n - 1) --> next_block
 
+let wait_cycle_f_es (condition : t -> t -> bool tzresult Lwt.t) :
+    (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec (fun init_t ->
+      let rec bake_while t =
+        let* b = condition init_t t in
+        if b then return t
+        else
+          let* t = next_cycle_ t in
+          bake_while t
+      in
+      bake_while init_t)
+
+(** Waits until [condition init_t current_t] is fulfilled.
+    It is checked on the first block of every cycle. If it returns false,
+    another cycle is baked, until it succeeds.
+*)
+let wait_cycle_f (condition : t -> t -> bool) : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec (fun init_t ->
+      let rec bake_while t =
+        if condition init_t t then return t
+        else
+          let* t = next_cycle_ t in
+          bake_while t
+      in
+      bake_while init_t)
+
 (** Wait until we are in a cycle satisfying the given condition.
     Fails if AI_activation is requested and AI is not set to be activated in the future. *)
-let wait_cycle condition =
-  exec (fun (block, state) ->
-      let open Lwt_result_syntax in
-      let rec stopper condition =
-        match condition with
-        | `AI_activation ->
-            if state.State.activate_ai then
-              let* launch_cycle = get_launch_cycle ~loc:__LOC__ block in
-              return
-              @@ ( (fun block _state ->
-                     let current_cycle = Block.current_cycle block in
-                     Cycle.(current_cycle >= launch_cycle)),
-                   "AI activation",
-                   "AI activated" )
+let wait_cycle_until condition =
+  let to_, done_ =
+    let rec get_names condition =
+      match condition with
+      | `AI_activation -> ("AI activation", "AI activated")
+      | `delegate_parameters_activation ->
+          ("delegate parameters activation", "delegate parameters activated")
+      | `And (cond1, cond2) ->
+          let to1, done1 = get_names cond1 in
+          let to2, done2 = get_names cond2 in
+          (to1 ^ " and " ^ to2, done1 ^ " and " ^ done2)
+    in
+    get_names condition
+  in
+  let condition (init_block, init_state) =
+    let open Lwt_result_syntax in
+    let rec stopper condition =
+      match condition with
+      | `AI_activation ->
+          fun (block, _state) ->
+            if init_state.State.activate_ai then
+              let* launch_cycle = get_launch_cycle ~loc:__LOC__ init_block in
+              let current_cycle = Block.current_cycle block in
+              return Cycle.(current_cycle >= launch_cycle)
             else assert false
-        | `delegate_parameters_activation ->
-            let init_cycle = Block.current_cycle block in
+      | `delegate_parameters_activation ->
+          fun (block, _state) ->
+            let init_cycle = Block.current_cycle init_block in
             let cycles_to_wait =
-              state.constants.delegate_parameters_activation_delay
+              init_state.constants.delegate_parameters_activation_delay
             in
             return
-            @@ ( (fun block _state ->
-                   Cycle.(
-                     Block.current_cycle block >= add init_cycle cycles_to_wait)),
-                 "delegate parameters activation",
-                 "delegate parameters activated" )
-        | `And (cond1, cond2) ->
-            let* stop1, to1, done1 = stopper cond1 in
-            let* stop2, to2, done2 = stopper cond2 in
-            return
-            @@ ( (fun block state -> stop1 block state && stop2 block state),
-                 to1 ^ " and " ^ to2,
-                 done1 ^ " and " ^ done2 )
-      in
-      let* stopper, to_, done_ = stopper condition in
-      Log.info ~color:time_color "Fast forward to %s" to_ ;
-      let* output =
-        let rec bake_while (block, state) =
-          if stopper block state then return (block, state)
-          else
-            let* input = bake_until_next_cycle (block, state) in
-            bake_while input
-        in
-        bake_while (block, state)
-      in
-      Log.info ~color:event_color "%s" done_ ;
-      return output)
+              Cycle.(Block.current_cycle block >= add init_cycle cycles_to_wait)
+      | `And (cond1, cond2) ->
+          let stop1 = stopper cond1 in
+          let stop2 = stopper cond2 in
+          fun (block, state) ->
+            let* b1 = stop1 (block, state) in
+            let* b2 = stop2 (block, state) in
+            return (b1 && b2)
+    in
+    stopper condition
+  in
+  log ~color:time_color "Fast forward to %s" to_
+  --> wait_cycle_f_es condition
+  --> log ~color:event_color "%s" done_
 
 (** Wait until AI activates.
     Fails if AI is not set to be activated in the future. *)
-let wait_ai_activation = wait_cycle `AI_activation
+let wait_ai_activation = wait_cycle_until `AI_activation
 
 (** wait delegate_parameters_activation_delay cycles  *)
 let wait_delegate_parameters_activation =
-  wait_cycle `delegate_parameters_activation
+  wait_cycle_until `delegate_parameters_activation
+
+let wait_n_cycles_f (n_cycles : t -> int) =
+  let condition ((init_block, _init_state) as t_init)
+      ((current_block, _current_state) as _t_current) =
+    let n = n_cycles t_init in
+    let init_cycle = Block.current_cycle init_block in
+    let current_cycle = Block.current_cycle current_block in
+    Cycle.(current_cycle >= add init_cycle n)
+  in
+  wait_cycle_f condition
+
+let wait_n_cycles_f_es (n_cycles : t -> int tzresult Lwt.t) =
+  let open Lwt_result_syntax in
+  let condition ((init_block, _init_state) as t_init)
+      ((current_block, _current_state) as _t_current) =
+    let* n = n_cycles t_init in
+    let init_cycle = Block.current_cycle init_block in
+    let current_cycle = Block.current_cycle current_block in
+    return Cycle.(current_cycle >= add init_cycle n)
+  in
+  wait_cycle_f_es condition

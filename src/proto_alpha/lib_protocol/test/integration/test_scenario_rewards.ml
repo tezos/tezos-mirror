@@ -74,7 +74,9 @@ let test_wait_with_rewards =
       |+ Tag "cycle step" --> wait_n_cycles 10)
 
 let test_ai_curve_activation_time =
-  let pc = Default_parameters.constants_test.consensus_rights_delay in
+  let consensus_rights_delay (_, state) =
+    state.State.constants.consensus_rights_delay
+  in
   init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> activate_ai true
@@ -83,7 +85,7 @@ let test_ai_curve_activation_time =
   --> wait_ai_activation
   (* Rate remains unchanged right after AI activation, we must wait [pc + 1] cycles *)
   --> check_rate_evolution Q.equal
-  --> wait_n_cycles pc
+  --> wait_n_cycles_f consensus_rights_delay
   --> check_rate_evolution Q.equal
   --> next_cycle
   (* The new rate should be active now. With the chosen constants, it should be lower.
