@@ -190,15 +190,14 @@ module Plugin = struct
           let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
           (* 2. We retrieve the slot headers published at level [level -
              attestation_lag] from the context. *)
-          let*? published_level =
-            Raw_level.of_int32 published_level |> Environment.wrap_tzresult
-          in
           let* published_slot_headers =
             Plugin.RPC.Dal.dal_published_slot_headers
               cpctxt
-              (`Main, `Level level)
-              ~level:published_level
+              (`Main, `Level published_level)
               ()
+          in
+          let*? published_level =
+            Raw_level.of_int32 published_level |> Environment.wrap_tzresult
           in
           (* 3. We retrieve the last cell of the DAL skip list from the context,
              if any. It's the one stored in the context at [level - 1]. If no cell
