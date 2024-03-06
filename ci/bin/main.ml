@@ -33,7 +33,7 @@ module Stages = struct
 
   let _test = Stage.register "test"
 
-  let _test_coverage = Stage.register "test_coverage"
+  let test_coverage = Stage.register "test_coverage"
 
   let _packaging = Stage.register "packaging"
 
@@ -217,6 +217,17 @@ let before_script ?(take_ownership = false) ?(source_version = false)
 let enable_coverage_instrumentation : tezos_job -> tezos_job =
   Tezos_ci.append_variables
     [("COVERAGE_OPTIONS", "--instrument-with bisect_ppx")]
+
+(** Add variable specifying coverage trace storage.
+
+    This function should be applied to jobs that either produce (like
+    test jobs) or consume (like the [unified_coverage] job) coverage
+    traces. In addition to specifying the location of traces, setting
+    this variable also _enables_ coverage trace output for
+    instrumented binaries. *)
+let enable_coverage_location : tezos_job -> tezos_job =
+  Tezos_ci.append_variables
+    [("BISECT_FILE", "$CI_PROJECT_DIR/_coverage_output/")]
 
 let changeset_octez =
   [
@@ -910,6 +921,23 @@ let _job_build_arm64_exp_dev_extra : tezos_job =
     ()
   |> job_external
 
+let enable_coverage_report job : tezos_job =
+  job
+  |> Tezos_ci.add_artifacts
+       ~expose_as:"Coverage report"
+       ~reports:
+         (reports
+            ~coverage_report:
+              {
+                coverage_format = Cobertura;
+                path = "_coverage_report/cobertura.xml";
+              }
+            ())
+       ~expire_in:(Days 15)
+       ~when_:Always
+       ["_coverage_report/"; "$BISECT_FILE"]
+  |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
+
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
    pipeline is defined. At the moment, all these pipelines are defined
@@ -1002,6 +1030,34 @@ let () =
            ~rules:[job_rule ~when_:Always ()]
            ()
          |> job_external ~filename_suffix:"master"
+       in
+       let _job_unified_coverage_default : tezos_job =
+         job
+           ~__POS__
+           ~image:Images.runtime_build_test_dependencies
+           ~name:"oc.unified_coverage"
+           ~stage:Stages.test_coverage
+           ~variables:
+             [
+               ("PROJECT", Predefined_vars.(show ci_project_path));
+               ("DEFAULT_BRANCH", Predefined_vars.(show ci_commit_sha));
+             ]
+           ~allow_failure:Yes
+           ~before_script:
+             ((* sets COVERAGE_OUTPUT *)
+              before_script ~source_version:true [])
+           ~when_:Always
+           ~coverage:"/Coverage: ([^%]+%)/"
+           [
+             (* On the project default branch, we fetch coverage from the last merged MR *)
+             "mkdir -p _coverage_report";
+             "dune exec scripts/ci/download_coverage/download.exe -- -a \
+              from=last-merged-pipeline --info --log-file \
+              _coverage_report/download_coverage.log";
+             "./scripts/ci/report_coverage.sh";
+           ]
+         |> enable_coverage_location |> enable_coverage_report
+         |> job_external ~directory:"coverage" ~filename_suffix:"default"
        in
        (* The empty list is a placeholder until the full pipeline is generated *)
        []) ;
