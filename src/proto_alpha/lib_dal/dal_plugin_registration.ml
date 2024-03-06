@@ -203,14 +203,15 @@ module Plugin = struct
              if any. It's the one stored in the context at [level - 1]. If no cell
              is stored yet, we return the genesis cell. *)
           let* previous_cell =
-            let+ previous_cell_opt =
+            let* previous_cell_opt =
               (* Should not be negative as attestation_lag > 0. *)
               let prev_level = Int32.pred level in
               Plugin.RPC.Dal.dal_confirmed_slots_history
                 cpctxt
                 (`Main, `Level prev_level)
             in
-            Option.value previous_cell_opt ~default:Dal.Slots_history.genesis
+            return
+            @@ Option.value previous_cell_opt ~default:Dal.Slots_history.genesis
           in
           (* 4. We retrieve the bitset of attested slots at level [level]. *)
           let* attested_slots =
