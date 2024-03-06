@@ -4,6 +4,8 @@
 
 ### Features
 
+- Add detailed tick model for the `modexp` precompiled contract (!12278)
+
 ### Bug fixes
 
 ### Breaking changes

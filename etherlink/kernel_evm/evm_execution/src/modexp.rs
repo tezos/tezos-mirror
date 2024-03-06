@@ -83,13 +83,13 @@ pub fn modexp_precompile<Host: Runtime>(
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
     log!(handler.borrow_host(), Info, "Calling modexp precompile");
-    // TODO: Make the actual tick estimation (remove the stub value).
-    let estimated_ticks = 1_000_000;
 
     // Extract the header.
     let base_len = U256::from_big_endian(&get_right_padded::<32>(input, 0));
     let exp_len = U256::from_big_endian(&get_right_padded::<32>(input, 32));
     let mod_len = U256::from_big_endian(&get_right_padded::<32>(input, 64));
+
+    let estimated_ticks = tick::model(base_len, exp_len, mod_len);
 
     // cast base and modulus to usize, it does not make sense to handle larger values
     let Ok(base_len) = usize::try_from(base_len) else {
@@ -170,4 +170,42 @@ pub fn modexp_precompile<Host: Runtime>(
         withdrawals: vec![],
         estimated_ticks,
     })
+}
+
+mod tick {
+    use primitive_types::U256;
+
+    const MIN_LEADING_ZEROS: u32 = 256 - 32;
+    const TICKS_BASE_COST: u64 = 100_000;
+
+    const ESIZE_FACTOR1: u64 = 241;
+    const ESIZE_FACTOR2: u64 = 6480;
+    const ESIZE_FACTOR3: u64 = 114172;
+    const MSIZE_FACTOR: u64 = 9346;
+    const CONSTANT_TERM: u64 = 112053;
+
+    pub fn model(bsize: U256, esize: U256, msize: U256) -> u64 {
+        // If either of bsize, esize or msize are bigger than what can be held in 63 bits, then
+        // the number of ticks needed to compute modexp is way too high.
+        if bsize.leading_zeros() < MIN_LEADING_ZEROS {
+            return TICKS_BASE_COST;
+        }
+        if esize.leading_zeros() < MIN_LEADING_ZEROS {
+            return TICKS_BASE_COST;
+        }
+        if msize.leading_zeros() < MIN_LEADING_ZEROS {
+            return TICKS_BASE_COST;
+        }
+
+        let esize: u64 = esize.low_u64();
+        let msize: u64 = msize.low_u64();
+
+        let estimated_ticks = ESIZE_FACTOR1 * msize * msize * esize
+            + ESIZE_FACTOR2 * msize * esize
+            + ESIZE_FACTOR3 * esize
+            + MSIZE_FACTOR * msize
+            + CONSTANT_TERM;
+
+        estimated_ticks.max(TICKS_BASE_COST)
+    }
 }
