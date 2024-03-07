@@ -40,7 +40,7 @@
 let num = ['0'-'9']+
 
 rule version_tag = parse
-  | 'v'? (num as major) '.' (num as minor) ".0"?
+  | "octez-" 'v'? (num as major) '.' (num as minor) ".0"?
       { Some {
         major = int major;
         minor = int minor;

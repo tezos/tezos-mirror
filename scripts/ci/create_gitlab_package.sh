@@ -8,8 +8,8 @@ set -eu
 # you should manually delete any previously created package, otherwise it will
 # reupload the files inside the same package, creating duplicates
 
-# shellcheck source=./scripts/ci/release.sh
-. ./scripts/ci/release.sh
+# shellcheck source=./scripts/ci/octez-release.sh
+. ./scripts/ci/octez-release.sh
 
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name

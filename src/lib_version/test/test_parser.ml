@@ -43,14 +43,15 @@ end
 
 let legal_versions =
   [
-    ("10.93", {Version.major = 10; minor = 93; additional_info = Release});
-    ("v10.93", {Version.major = 10; minor = 93; additional_info = Release});
-    ("10.93+dev", {Version.major = 10; minor = 93; additional_info = Dev});
-    ("10.93-rc1", {Version.major = 10; minor = 93; additional_info = RC 1});
-    ( "10.93-rc1+dev",
+    ("octez-10.93", {Version.major = 10; minor = 93; additional_info = Release});
+    ("octez-v10.93", {Version.major = 10; minor = 93; additional_info = Release});
+    ("octez-10.93+dev", {Version.major = 10; minor = 93; additional_info = Dev});
+    ("octez-10.93-rc1", {Version.major = 10; minor = 93; additional_info = RC 1});
+    ( "octez-10.93-rc1+dev",
       {Version.major = 10; minor = 93; additional_info = RC_dev 1} );
-    ("10.93-beta1", {Version.major = 10; minor = 93; additional_info = Beta 1});
-    ( "10.93-beta1+dev",
+    ( "octez-10.93-beta1",
+      {Version.major = 10; minor = 93; additional_info = Beta 1} );
+    ( "octez-10.93-beta1+dev",
       {Version.major = 10; minor = 93; additional_info = Beta_dev 1} );
   ]
 

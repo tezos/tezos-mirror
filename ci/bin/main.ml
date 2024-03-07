@@ -959,26 +959,28 @@ let enable_coverage_report job : tezos_job =
    manually in .yml, but will eventually be generated. *)
 let () =
   (* Matches release tags, e.g. [v1.2.3] or [v1.2.3-rc4]. *)
-  let release_tag_re = "/^v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
+  let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
   (* Matches beta release tags, e.g. [v1.2.3-beta5]. *)
-  let beta_release_tag_re = "/^v\\d+\\.\\d+\\-beta\\d*$/" in
+  let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
   let open Rules in
   let open Pipeline in
-  (* Matches either release tags or beta release tags, e.g. [v1.2.3],
-     [v1.2.3-rc4] or [v1.2.3-beta5]. *)
-  let has_any_release_tag =
-    If.(has_tag_match release_tag_re || has_tag_match beta_release_tag_re)
+  (* Matches either Octez release tags or Octez beta release tags,
+     e.g. [octez-v1.2.3], [octez-v1.2.3-rc4] or [octez-v1.2.3-beta5]. *)
+  let has_any_octez_release_tag =
+    If.(
+      has_tag_match octez_release_tag_re
+      || has_tag_match octez_beta_release_tag_re)
   in
   let has_non_release_tag =
-    If.(Predefined_vars.ci_commit_tag != null && not has_any_release_tag)
+    If.(Predefined_vars.ci_commit_tag != null && not has_any_octez_release_tag)
   in
   register "before_merging" If.(on_tezos_namespace && merge_request) ;
   register
-    "latest_release"
+    "octez_latest_release"
     ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:true]
     If.(on_tezos_namespace && push && on_branch "latest-release") ;
   register
-    "latest_release_test"
+    "octez_latest_release_test"
     If.(not_on_tezos_namespace && push && on_branch "latest-release-test")
     ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:false] ;
   register
@@ -1137,16 +1139,16 @@ let () =
          job_publish_kernel_sdk;
        ]) ;
   register
-    "release_tag"
-    If.(on_tezos_namespace && push && has_tag_match release_tag_re)
+    "octez_release_tag"
+    If.(on_tezos_namespace && push && has_tag_match octez_release_tag_re)
     ~jobs:(release_tag_pipeline Release_tag) ;
   register
-    "beta_release_tag"
-    If.(on_tezos_namespace && push && has_tag_match beta_release_tag_re)
+    "octez_beta_release_tag"
+    If.(on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
     ~jobs:(release_tag_pipeline Beta_release_tag) ;
   register
-    "release_tag_test"
-    If.(not_on_tezos_namespace && push && has_any_release_tag)
+    "octez_release_tag_test"
+    If.(not_on_tezos_namespace && push && has_any_octez_release_tag)
     ~jobs:(release_tag_pipeline ~test:true Release_tag) ;
   register
     "non_release_tag"
