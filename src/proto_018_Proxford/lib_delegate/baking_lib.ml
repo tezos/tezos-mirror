@@ -67,7 +67,9 @@ let preattest (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let proposal = state.level_state.latest_proposal in
   let*! () =
     Events.(
-      emit attempting_preattest_proposal state.level_state.latest_proposal)
+      emit
+        attempting_to_vote_for_proposal
+        (Preattestation, state.level_state.latest_proposal))
   in
   let* () =
     if force then return_unit
@@ -108,7 +110,10 @@ let attest (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let* state = create_state cctxt ~config ~current_proposal delegates in
   let proposal = state.level_state.latest_proposal in
   let*! () =
-    Events.(emit attempting_attest_proposal state.level_state.latest_proposal)
+    Events.(
+      emit
+        attempting_to_vote_for_proposal
+        (Attestation, state.level_state.latest_proposal))
   in
   let* () =
     if force then return_unit

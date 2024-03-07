@@ -552,23 +552,19 @@ module Lib = struct
 
   let section = section @ ["lib"]
 
-  let attempting_preattest_proposal =
-    declare_1
+  let attempting_to_vote_for_proposal =
+    declare_2
       ~section
       ~name:"attempting_preattest_proposal"
       ~level:Debug
-      ~msg:"attempting to preattest proposal {proposal}"
-      ~pp1:Baking_state.pp_proposal
+      ~msg:"attempting to {action} proposal {proposal}"
+      ("action", Baking_state.consensus_vote_kind_encoding)
+      ~pp1:
+        (fun fmt -> function
+          | Baking_state.Preattestation -> Format.fprintf fmt "preattest"
+          | Attestation -> Format.fprintf fmt "attest")
       ("proposal", Baking_state.proposal_encoding)
-
-  let attempting_attest_proposal =
-    declare_1
-      ~section
-      ~name:"attempting_attest_proposal"
-      ~level:Debug
-      ~msg:"attempting to attest proposal {proposal}"
-      ~pp1:Baking_state.pp_proposal
-      ("proposal", Baking_state.proposal_encoding)
+      ~pp2:Baking_state.pp_proposal
 end
 
 module Actions = struct
@@ -576,38 +572,23 @@ module Actions = struct
 
   let section = section @ ["actions"]
 
-  let skipping_preattestation =
-    declare_4
+  let skipping_consensus_vote =
+    declare_5
       ~section
-      ~name:"skipping_preattestation"
+      ~name:"skipping_consensus_vote"
       ~level:Error
       ~msg:
-        "unable to sign preattestation for {delegate} at level {level}, round \
+        "unable to sign {vote_kind} for {delegate} at level {level}, round \
          {round} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:pp_int32
+      ~pp3:pp_int32
       ("level", Data_encoding.int32)
-      ~pp3:Round.pp
+      ~pp4:Round.pp
       ("round", Round.encoding)
-      ~pp4:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let skipping_attestation =
-    declare_4
-      ~section
-      ~name:"skipping_attestation"
-      ~level:Error
-      ~msg:
-        "unable to sign attestation for {delegate} at level {level}, round \
-         {round} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp3:Round.pp
-      ("round", Round.encoding)
-      ~pp4:Error_monad.pp_print_trace
+      ~pp5:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let failed_to_get_dal_attestations =
@@ -632,26 +613,17 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_inject_preattestation =
-    declare_2
+  let failed_to_inject_consensus_vote =
+    declare_3
       ~section
-      ~name:"failed_to_inject_preattestation"
+      ~name:"failed_to_inject_consensus_vote"
       ~level:Error
-      ~msg:"failed to inject preattestation for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ~msg:"failed to inject {vote_kind} for {delegate} -- {trace}"
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let failed_to_inject_attestation =
-    declare_2
-      ~section
-      ~name:"failed_to_inject_attestation"
-      ~level:Error
-      ~msg:"failed to inject attestation for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp2:Error_monad.pp_print_trace
+      ~pp3:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let potential_double_baking =
@@ -665,38 +637,23 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
 
-  let preattestation_injected =
-    declare_4
+  let consensus_vote_injected =
+    declare_5
       ~section
-      ~name:"preattestation_injected"
+      ~name:"consensus_vote_injected"
       ~level:Notice
       ~msg:
-        "injected preattestation {ophash} for {delegate} for level {level}, \
-         round {round}"
-      ~pp1:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
-      ~pp2:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp3:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp4:Round.pp
-      ("round", Round.encoding)
-
-  let attestation_injected =
-    declare_4
-      ~section
-      ~name:"attestation_injected"
-      ~level:Notice
-      ~msg:
-        "injected attestation {ophash} for {delegate} for level {level}, round \
+        "injected {vote_kind} {ophash} for {delegate} for level {level}, round \
          {round}"
-      ~pp1:Operation_hash.pp
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
-      ~pp2:Baking_state.pp_consensus_key_and_delegate
+      ~pp3:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-      ~pp3:pp_int32
+      ~pp4:pp_int32
       ("level", Data_encoding.int32)
-      ~pp4:Round.pp
+      ~pp5:Round.pp
       ("round", Round.encoding)
 
   let dal_attestation_injected =
@@ -824,22 +781,15 @@ module Actions = struct
       ("trace", Error_monad.trace_encoding)
       ~pp2:Error_monad.pp_print_trace
 
-  let signing_preattestation =
-    declare_1
+  let signing_consensus_vote =
+    declare_2
       ~section
-      ~name:"signing_preattestation"
+      ~name:"signing_consensus_vote"
       ~level:Info
-      ~msg:"signing preattestation for {delegate}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
-      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
-
-  let signing_attestation =
-    declare_1
-      ~section
-      ~name:"signing_attestation"
-      ~level:Info
-      ~msg:"signing attestation for {delegate}"
-      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ~msg:"signing {vote_kind} for {delegate}"
+      ~pp1:Baking_state.pp_consensus_vote_kind
+      ("vote_kind", Baking_state.consensus_vote_kind_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
       ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let invalid_json_file =
@@ -1156,6 +1106,15 @@ module Forge_worker = struct
       ~name:"error_while_processing_forge_request"
       ~level:Warning
       ~msg:"error while processing forge request: {errors}"
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+      ~pp1:pp_print_top_error_of_trace
+
+  let error_while_authorizing_consensus_votes =
+    declare_1
+      ~section
+      ~name:"error_while_authorizing_consensus_votes"
+      ~level:Error
+      ~msg:"error while authorizing consensus votes: {errors}"
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
       ~pp1:pp_print_top_error_of_trace
 end

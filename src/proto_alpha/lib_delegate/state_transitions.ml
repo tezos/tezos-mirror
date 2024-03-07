@@ -147,6 +147,8 @@ let preattest state proposal =
          We switch to the `Awaiting_preattestations` phase. *)
       update_current_phase state Awaiting_preattestations
     in
+    (* Here, we do not cancel pending signatures as it is already done
+       in [handle_proposal]. *)
     return (new_state, prepare_preattest_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
@@ -206,8 +208,33 @@ let may_update_attestable_payload_with_internal_pqc state
       in
       {state with level_state = new_level_state}
 
-let may_update_is_latest_proposal_applied ~is_proposal_applied state
-    new_proposal =
+let has_already_been_handled state new_proposal =
+  let current_proposal = state.level_state.latest_proposal in
+  Block_hash.(current_proposal.block.hash = new_proposal.block.hash)
+  && state.level_state.is_latest_proposal_applied
+
+let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
+  let open Lwt_syntax in
+  (* We need to avoid to send preattestations, if we are in phases were
+     preattestations have been sent already. This is needed to avoid switching
+     back from Awaiting_attestations to Awaiting_preattestations.
+     Hypothesis: a fresh round's initial phase is Idle
+  *)
+  let may_preattest state proposal =
+    match state.round_state.current_phase with
+    | Idle ->
+        (* We prioritize the new and meaningful consensus vote signing
+           by cancelling all pending forge and signing tasks. In this
+           current context, preattesting means that it is now too late
+           to include outdated consensus votes and blocks. However,
+           active forge requests are still processed until
+           completion. *)
+        state.global_state.forge_worker_hooks.cancel_all_pending_tasks () ;
+        preattest state proposal
+    | _ -> do_nothing state
+  in
+  let current_level = state.level_state.current_level in
+  let new_proposal_level = new_proposal.block.shell.level in
   let current_proposal = state.level_state.latest_proposal in
   if
     is_proposal_applied
@@ -217,37 +244,8 @@ let may_update_is_latest_proposal_applied ~is_proposal_applied state
       {state.level_state with is_latest_proposal_applied = true}
     in
     let new_state = {state with level_state = new_level_state} in
-    new_state
-  else state
-
-let has_already_been_handled state new_proposal =
-  let current_proposal = state.level_state.latest_proposal in
-  Block_hash.(current_proposal.block.hash = new_proposal.block.hash)
-  && state.level_state.is_latest_proposal_applied
-
-let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
-  let open Lwt_syntax in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6648
-     Do not handle proposals that have been applied already.
-  *)
-  (* We need to avoid to send preattestations, if we are in phases were
-     preattestations have been sent already. This is needed to avoid switching
-     back from Awaiting_attestations to Awaiting_preattestations. *)
-  let may_preattest state proposal =
-    match state.round_state.current_phase with
-    | Idle -> preattest state proposal
-    | _ -> do_nothing state
-  in
-  let current_level = state.level_state.current_level in
-  let new_proposal_level = new_proposal.block.shell.level in
-  let current_proposal = state.level_state.latest_proposal in
-  let state =
-    may_update_is_latest_proposal_applied
-      ~is_proposal_applied
-      state
-      new_proposal
-  in
-  if Compare.Int32.(current_level > new_proposal_level) then
+    do_nothing new_state
+  else if Compare.Int32.(current_level > new_proposal_level) then
     (* The baker is ahead, a reorg may have happened. Do nothing:
        wait for the node to send us the branch's head. This new head
        should have a fitness that is greater than our current
