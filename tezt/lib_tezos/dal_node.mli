@@ -159,3 +159,9 @@ val read_identity : t -> string
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
 val as_rpc_endpoint : t -> Endpoint.t
+
+(** Wait for a node to receive a given number of connections.
+
+    [wait_for_connections node n] waits until [node] receives [n]
+    ["new_connection.v0"] events. *)
+val wait_for_connections : t -> int -> unit Lwt.t
