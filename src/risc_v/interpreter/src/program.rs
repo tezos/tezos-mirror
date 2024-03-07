@@ -107,6 +107,16 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 
         Ok(myself)
     }
+
+    /// Construct a program from raw RISC-V machine code.
+    pub fn from_raw(code: &'a [u8]) -> Self {
+        let entrypoint = bus::start_of_main_memory::<ML>();
+        Self {
+            _pd: PhantomData,
+            entrypoint,
+            segments: BTreeMap::from_iter([(entrypoint, Cow::Borrowed(code))]),
+        }
+    }
 }
 
 #[cfg(test)]

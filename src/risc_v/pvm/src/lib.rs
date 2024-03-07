@@ -1,3 +1,4 @@
+mod exec_env;
 mod state;
 
 use risc_v_interpreter::add;

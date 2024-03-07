@@ -26,6 +26,7 @@ macro_rules! gen_memory_layout {
     };
 }
 
+gen_memory_layout!(M1K = 1 KiB);
 gen_memory_layout!(M1G = 1 GiB);
 gen_memory_layout!(M4G = 4 GiB);
 
