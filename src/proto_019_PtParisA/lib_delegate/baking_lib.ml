@@ -468,13 +468,13 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   in
   return_unit
 
-let repropose (cctxt : Protocol_client_context.full) ?force ?force_round
-    delegates =
+let repropose (cctxt : Protocol_client_context.full) ?(force = false)
+    ?force_round delegates =
   let open Lwt_result_syntax in
   let open Baking_state in
   let cache = Baking_cache.Block_cache.create 10 in
   let* _block_stream, current_proposal = get_current_proposal cctxt ~cache () in
-  let config = Baking_configuration.make ?force () in
+  let config = Baking_configuration.make ~force () in
   let* state = create_state cctxt ~config ~current_proposal delegates in
   (* Make sure the operation worker is populated to avoid empty blocks
      being proposed. *)
@@ -501,13 +501,31 @@ let repropose (cctxt : Protocol_client_context.full) ?force ?force_round
               round
               ~last_proposal:state.level_state.latest_proposal
           in
-          let* state = do_action (state, action) in
+          let* signed_block =
+            match action with
+            | Prepare_block {block_to_bake} ->
+                let* signed_block =
+                  Baking_actions.prepare_block state.global_state block_to_bake
+                in
+                let* _state =
+                  do_action
+                    ( state,
+                      Inject_block
+                        {
+                          prepared_block = signed_block;
+                          force_injection = force;
+                          asynchronous = false;
+                        } )
+                in
+                return signed_block
+            | _ -> assert false
+          in
           let*! () =
             cctxt#message
               "Reproposed block at level %ld on round %a"
-              state.level_state.current_level
+              signed_block.signed_block_header.shell.level
               Round.pp
-              state.round_state.current_round
+              signed_block.round
           in
           return_unit
       | None -> cctxt#error "No slots for current round")
