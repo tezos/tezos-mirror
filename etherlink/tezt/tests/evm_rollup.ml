@@ -29,6 +29,7 @@ type l1_contracts = {
   bridge : string;
   admin : string;
   kernel_governance : string;
+  kernel_security_governance : string;
   sequencer_governance : string option;
 }
 
@@ -333,6 +334,19 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
 
+  (* Originates the governance contract (using the administrator contract). *)
+  let* kernel_security_governance =
+    Client.originate_contract
+      ~alias:"security-governance"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:(sf "%S" admin.Account.public_key_hash)
+      ~prg:(admin_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
   return
     {
       exchanger;
@@ -340,6 +354,7 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
       admin = admin_contract;
       kernel_governance;
       sequencer_governance;
+      kernel_security_governance;
     }
 
 type setup_mode =
@@ -379,6 +394,11 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
     let kernel_governance =
       Option.map (fun {kernel_governance; _} -> kernel_governance) l1_contracts
     in
+    let kernel_security_governance =
+      Option.map
+        (fun {kernel_security_governance; _} -> kernel_security_governance)
+        l1_contracts
+    in
     let sequencer =
       match setup_mode with
       | Setup_proxy _ -> None
@@ -391,6 +411,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       ?ticketer
       ?administrator
       ?kernel_governance
+      ?kernel_security_governance
       ?sequencer
       ?sequencer_governance:
         (Option.bind l1_contracts (fun {sequencer_governance; _} ->
@@ -2241,6 +2262,7 @@ let test_deposit_and_withdraw =
     kernel_governance = _;
     exchanger = _;
     sequencer_governance = _;
+    kernel_security_governance = _;
   } =
     match l1_contracts with
     | Some x -> x
@@ -2550,6 +2572,34 @@ let test_kernel_upgrade_via_governance =
       ~evm_setup
       ~installee:Constant.WASM.debug_kernel
       ~admin_contract:l1_contracts.kernel_governance
+      protocol
+  in
+  unit
+
+let test_kernel_upgrade_via_kernel_security_governance =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["migration"; "upgrade"; "kernel_security_governance"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
+      ])
+    ~title:"Kernel upgrades using security governance contract"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap1 in
+  let* evm_setup =
+    setup_evm_kernel ~with_administrator:true ~admin:(Some admin) protocol
+  in
+  let l1_contracts = Option.get evm_setup.l1_contracts in
+  let* _ =
+    gen_test_kernel_upgrade
+      ~evm_setup
+      ~installee:Constant.WASM.debug_kernel
+      ~admin_contract:l1_contracts.kernel_security_governance
       protocol
   in
   unit
@@ -5235,6 +5285,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_failing_migration protocols ;
   test_kernel_upgrade_version_change protocols ;
   test_kernel_upgrade_via_governance protocols ;
+  test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;

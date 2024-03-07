@@ -41,6 +41,8 @@ pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/sequencer_governance");
 const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
+const SECURITY_GOVERNANCE: RefPath =
+    RefPath::assert_from(b"/evm/kernel_security_governance");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
 
 // Path to the block in progress, used between reboots
@@ -817,6 +819,12 @@ pub fn read_sequencer_governance<Host: Runtime>(
 
 pub fn read_kernel_governance<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &KERNEL_GOVERNANCE.into())
+}
+
+pub fn read_kernel_security_governance<Host: Runtime>(
+    host: &mut Host,
+) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &SECURITY_GOVERNANCE.into())
 }
 
 pub fn get_and_increment_deposit_nonce<Host: Runtime>(

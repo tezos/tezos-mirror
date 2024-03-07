@@ -2,7 +2,8 @@ use crate::{
     delayed_inbox::DelayedInbox,
     storage::{
         read_admin, read_delayed_transaction_bridge, read_kernel_governance,
-        read_sequencer_governance, read_ticketer, sequencer,
+        read_kernel_security_governance, read_sequencer_governance, read_ticketer,
+        sequencer,
     },
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -66,6 +67,7 @@ pub struct TezosContracts {
     pub admin: Option<ContractKt1Hash>,
     pub sequencer_governance: Option<ContractKt1Hash>,
     pub kernel_governance: Option<ContractKt1Hash>,
+    pub kernel_security_governance: Option<ContractKt1Hash>,
 }
 
 impl std::fmt::Display for TezosContracts {
@@ -75,11 +77,12 @@ impl std::fmt::Display for TezosContracts {
             admin,
             sequencer_governance,
             kernel_governance,
+            kernel_security_governance,
         } = self;
         write!(
             f,
-            "Ticketer is {:?}. Administrator is {:?}. Sequencer governance is {:?}. Kernel governance is {:?}.",
-            ticketer, admin, sequencer_governance, kernel_governance
+            "Ticketer is {:?}. Administrator is {:?}. Sequencer governance is {:?}. Kernel governance is {:?}. Kernel security governance is {:?}.",
+            ticketer, admin, sequencer_governance, kernel_governance, kernel_security_governance
         )
     }
 }
@@ -100,6 +103,10 @@ impl TezosContracts {
     pub fn is_kernel_governance(&self, contract: &ContractKt1Hash) -> bool {
         contains(&self.kernel_governance, contract)
     }
+
+    pub fn is_kernel_security_governance(&self, contract: &ContractKt1Hash) -> bool {
+        contains(&self.kernel_security_governance, contract)
+    }
 }
 
 fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
@@ -115,12 +122,16 @@ fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
     // 4. Fetch the kernel_governance contract, returns `None` if it is badly
     //    encoded or absent.
     let kernel_governance = read_kernel_governance(host);
+    // 5. Fetch the kernel_security_governance contract, returns `None` if it is badly
+    //    encoded or absent.
+    let kernel_security_governance = read_kernel_security_governance(host);
 
     TezosContracts {
         ticketer,
         admin,
         sequencer_governance,
         kernel_governance,
+        kernel_security_governance,
     }
 }
 
