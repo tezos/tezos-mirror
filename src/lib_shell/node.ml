@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2018-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -392,6 +392,7 @@ let build_rpc_directory ~node_version ~commit_info node =
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
   merge (Version_directory.rpc_directory node_version) ;
+  merge (Health_directory.build_rpc_directory ()) ;
   register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

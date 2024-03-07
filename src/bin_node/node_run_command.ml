@@ -728,6 +728,19 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Event.(emit shutting_down_node) ())
   in
+  Lwt.dont_wait
+    (fun () ->
+      let*! r = metrics_serve config.metrics_addr in
+      match r with
+      | Ok _ -> Lwt.return_unit
+      | Error err ->
+          Event.(emit metrics_ended (Format.asprintf "%a" pp_print_trace err)))
+    (fun exn ->
+      Event.(
+        emit__dont_wait__use_with_care metrics_ended (Printexc.to_string exn))) ;
+  (* The initialization of the RPC server concludes the node's
+     initialization. This is necessary to start answering to RPC only
+     when the node is fully initialized. *)
   let* rpc_servers = init_rpc config node internal_events in
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
@@ -760,7 +773,6 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
       ~after:[rpc_downer]
       (fun _ -> Node.shutdown node)
   in
-  let*! () = Event.(emit node_is_ready) () in
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
@@ -769,16 +781,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())
   in
-  Lwt.dont_wait
-    (fun () ->
-      let*! r = metrics_serve config.metrics_addr in
-      match r with
-      | Ok _ -> Lwt.return_unit
-      | Error err ->
-          Event.(emit metrics_ended (Format.asprintf "%a" pp_print_trace err)))
-    (fun exn ->
-      Event.(
-        emit__dont_wait__use_with_care metrics_ended (Printexc.to_string exn))) ;
+  let*! () = Event.(emit node_is_ready) () in
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
