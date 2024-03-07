@@ -5,11 +5,13 @@
 
 override_dh_auto_build:
 	binaries/octez-node --help=groff > manpages/octez-node.1
+	binaries/octez-dal-node --help=groff > manpages/octez-dal-node.1
 	dh_auto_build --parallel
 
 override_dh_builddeb:
 	dh_builddeb
 	cp debian/octez-node.lintian-overrides debian/octez-node/DEBIAN/
+	cp debian/copyright debian/octez-dal-node/usr/share/doc/octez-dal-node/
 
 override_dh_installman:
 	dh_installman --name octez-node manpages/octez-node.1
@@ -26,6 +28,7 @@ override_dh_installdocs:
 override_dh_installsystemd:
 	dh_installsystemd -p octez-node --no-enable --no-start
 	dh_installsystemd -p octez-smart-rollup-node --no-enable --no-start
+	dh_installsystemd -p octez-dal-node --no-enable --no-start
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-next
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-active
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-next
