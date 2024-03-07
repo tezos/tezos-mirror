@@ -31,11 +31,15 @@ use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::path::Path;
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
+const APPLIED_KERNEL_UPGRADE: RefPath =
+    RefPath::assert_from(b"/evm/__applied_kernel_upgrade");
+const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
 const SEQUENCER_UPGRADE: RefPath = RefPath::assert_from(b"/evm/sequencer_upgrade");
 
 #[derive(Debug, PartialEq, Clone)]
@@ -97,16 +101,17 @@ pub fn store_kernel_upgrade<Host: Runtime>(
         .context("Failed to store kernel upgrade")
 }
 
+fn read_kernel_upgrade_at(
+    host: &impl Runtime,
+    path: &impl Path,
+) -> anyhow::Result<Option<KernelUpgrade>> {
+    read_optional_rlp(host, path).context("Failed to decode kernel upgrade")
+}
+
 pub fn read_kernel_upgrade<Host: Runtime>(
     host: &Host,
 ) -> anyhow::Result<Option<KernelUpgrade>> {
-    let path = OwnedPath::from(KERNEL_UPGRADE);
-    read_optional_rlp(host, &path).context("Failed to decode kernel upgrade")
-}
-
-fn delete_kernel_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
-    host.store_delete(&KERNEL_UPGRADE)
-        .context("Failed to delete kernel upgrade")
+    read_kernel_upgrade_at(host, &KERNEL_UPGRADE)
 }
 
 pub fn upgrade<Host: Runtime>(
@@ -121,7 +126,7 @@ pub fn upgrade<Host: Runtime>(
         .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
 
-    delete_kernel_upgrade(host)?;
+    host.store_move(&KERNEL_UPGRADE, &APPLIED_KERNEL_UPGRADE)?;
 
     // Mark for reboot, the upgrade/migration will happen at next
     // kernel run, it doesn't matter if it is within the Tezos level
@@ -129,6 +134,13 @@ pub fn upgrade<Host: Runtime>(
     host.mark_for_reboot()?;
 
     log!(host, Info, "Kernel is ready to be upgraded.");
+    Ok(())
+}
+
+pub fn set_kernel_root_hash(host: &mut impl Runtime) -> anyhow::Result<()> {
+    if let Some(kernel_upgrade) = read_kernel_upgrade_at(host, &APPLIED_KERNEL_UPGRADE)? {
+        host.store_write_all(&KERNEL_ROOT_HASH, &kernel_upgrade.preimage_hash)?;
+    };
     Ok(())
 }
 
