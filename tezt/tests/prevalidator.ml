@@ -2457,6 +2457,137 @@ module Revamped = struct
     Log.info "The [source] filter has filtered the sources correctly." ;
     unit
 
+  (** This test injects consensus operations and management operations from
+      several sources and checks that the [source] filter on mempool correctly
+      filters operations by consensus_key. *)
+  let test_filter_mempool_operations_by_consensus_key =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Filter mempool operations by consensus key"
+      ~tags:["mempool"; "source"; "consensus_key"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+
+    let blocks_per_cycle = 4 in
+    let consensus_rights_delay = 1 in
+    let parameters =
+      (* we update paramaters for faster testing: no need to wait
+         5 cycles for the consensus key to activate. *)
+      let consensus_rights_delay_str =
+        if Protocol.number protocol > Protocol.number Protocol.Oxford then
+          "consensus_rights_delay"
+        else "preserved_cycles"
+      in
+      [
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (["nonce_revelation_threshold"], `Int 2);
+        ([consensus_rights_delay_str], `Int consensus_rights_delay);
+      ]
+    in
+    let* parameter_file =
+      Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
+    in
+
+    let* node, client =
+      Client.init_with_protocol ~parameter_file ~protocol `Client ()
+    in
+
+    log_step 2 "Generate new account." ;
+    let* account = Client.gen_and_show_keys client in
+
+    log_step
+      3
+      "Update %s consensus_key with %s."
+      Constant.bootstrap2.alias
+      account.alias ;
+    let* () =
+      Client.update_consensus_key
+        ~src:Constant.bootstrap2.alias
+        ~pk:account.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+
+    log_step 4 "Bake until the end of the next cycle with bootstrap1..." ;
+    let* () =
+      Consensus_key.Helpers.bake_n_cycles
+        (consensus_rights_delay + 1)
+        ~keys:[Constant.bootstrap1.alias]
+        client
+    in
+
+    log_step 5 "Bake an empty block to be able to attest it." ;
+    let* level =
+      bake_for ~empty:true ~protocol ~wait_for_flush:true node client
+    in
+
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let inject_attestation ~(account : Account.key) ~(signer : Account.key) =
+      Operation.Consensus.inject
+        (Operation.Consensus.attestation
+           ~use_legacy_name:true
+           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~level
+           ~round:0
+           ~block_payload_hash
+           ())
+        ~signer
+        client
+    in
+
+    log_step 6 "Attest with %s." Constant.bootstrap1.alias ;
+    let* (`OpHash _) =
+      inject_attestation
+        ~account:Constant.bootstrap1
+        ~signer:Constant.bootstrap1
+    in
+
+    log_step 7 "Attest with %s." account.alias ;
+    let* (`OpHash oph) =
+      inject_attestation ~account:Constant.bootstrap2 ~signer:account
+    in
+
+    log_step
+      8
+      "Check that only %s operations are recovered when using the [source] \
+       filter on %s"
+      Constant.bootstrap2.alias
+      Constant.bootstrap2.alias ;
+    let* mempool =
+      Mempool.get_mempool client ~sources:[Constant.bootstrap2.public_key_hash]
+    in
+    Mempool.check_mempool ~validated:[oph] mempool ;
+
+    log_step
+      9
+      "Check that only %s operations are recovered when using the [account] \
+       filter on %s"
+      Constant.bootstrap2.alias
+      account.alias ;
+    let* mempool =
+      Mempool.get_mempool client ~sources:[account.public_key_hash]
+    in
+    Mempool.check_mempool ~validated:[oph] mempool ;
+
+    Log.info "The [source] filter has filtered the consensus-key correctly." ;
+
+    log_step
+      10
+      "Check that the mempool only contain one operation when using the \
+       [source] filter on the consensus key %s and the source %s"
+      account.alias
+      Constant.bootstrap2.alias ;
+    let* mempool =
+      Mempool.get_mempool
+        client
+        ~sources:[Constant.bootstrap2.public_key_hash; account.public_key_hash]
+    in
+    Mempool.check_mempool ~validated:[oph] mempool ;
+    unit
+
   (** Runs a network of three nodes, one of which has a disabled mempool.
       Check that operations do not propagate to the node with disable mempool and
       that this node does not run a prevalidator nor accepts operation injections. *)
@@ -3958,6 +4089,7 @@ let register ~protocols =
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
   Revamped.test_filter_mempool_operations_by_sources protocols ;
+  Revamped.test_filter_mempool_operations_by_consensus_key protocols ;
   Revamped.mempool_disabled protocols ;
   Revamped.propagation_future_attestation protocols ;
   Revamped.test_mempool_config_operation_filtering protocols ;
