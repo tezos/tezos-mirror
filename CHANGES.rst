@@ -80,7 +80,8 @@ Node
 
 - Introduced a new RPC ``GET
   /chains/main/blocks/<block>/context/delegates/<pkh>/is_forbidden``, to check
-  if a delegate is forbidden after being denounced for misbehaving. (MR :gl:`!12341`)
+  if a delegate is forbidden after being denounced for misbehaving. This RPC
+  will become available when protocol P is activated. (MR :gl:`!12341`)
 
 - Introduced a new ``/health/ready`` RPC endpoint that aims to return
   whether or node the node is fully initialized and ready to answer to
