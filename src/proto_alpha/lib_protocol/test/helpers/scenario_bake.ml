@@ -322,7 +322,6 @@ let wait_cycle_until condition =
     get_names condition
   in
   let condition (init_block, init_state) =
-    let open Lwt_result_syntax in
     let rec stopper condition =
       match condition with
       | `AI_activation -> (
@@ -331,7 +330,7 @@ let wait_cycle_until condition =
             match init_state.State.ai_activation_cycle with
             | Some launch_cycle ->
                 let current_cycle = Block.current_cycle block in
-                return Cycle.(current_cycle >= launch_cycle)
+                Cycle.(current_cycle >= launch_cycle)
             | _ -> assert false)
       | `delegate_parameters_activation ->
           fun (block, _state) ->
@@ -339,20 +338,19 @@ let wait_cycle_until condition =
             let cycles_to_wait =
               init_state.constants.delegate_parameters_activation_delay
             in
-            return
-              Cycle.(Block.current_cycle block >= add init_cycle cycles_to_wait)
+            Cycle.(Block.current_cycle block >= add init_cycle cycles_to_wait)
       | `And (cond1, cond2) ->
           let stop1 = stopper cond1 in
           let stop2 = stopper cond2 in
           fun (block, state) ->
-            let* b1 = stop1 (block, state) in
-            let* b2 = stop2 (block, state) in
-            return (b1 && b2)
+            let b1 = stop1 (block, state) in
+            let b2 = stop2 (block, state) in
+            b1 && b2
     in
     stopper condition
   in
   log ~color:time_color "Fast forward to %s" to_
-  --> wait_cycle_f_es condition
+  --> wait_cycle_f condition
   --> log ~color:event_color "%s" done_
 
 (** Wait until AI activates.
