@@ -100,6 +100,10 @@ val get_transaction_count :
     kernel commit hash. *)
 val tez_kernelVersion : Evm_node.t -> (string, error) result Lwt.t
 
+(** [tez_kernelRootHash evm_node] calls [tez_kernelRootHash]. Returns the
+    kernel root hash. *)
+val tez_kernelRootHash : Evm_node.t -> (string option, error) result Lwt.t
+
 (** [call ~to_ ~data] call [eth_call] with [to] and [data] as argument (on block
     latest) *)
 val call :

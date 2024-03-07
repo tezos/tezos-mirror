@@ -28,6 +28,9 @@
 (** Path in the Wasm PVM durable storage. *)
 type path = string
 
+(** [kernel_root_hash] is the path to the current kernel root hash. *)
+val kernel_root_hash : path
+
 (** [eth_accounts] is the path to ethereum accounts. *)
 val eth_accounts : path
 

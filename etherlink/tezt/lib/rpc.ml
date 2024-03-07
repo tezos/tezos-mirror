@@ -78,6 +78,8 @@ module Request = struct
 
   let tez_kernelVersion = {method_ = "tez_kernelVersion"; parameters = `Null}
 
+  let tez_kernelRootHash = {method_ = "tez_kernelRootHash"; parameters = `Null}
+
   let eth_call ~to_ ~data =
     {
       method_ = "eth_call";
@@ -217,6 +219,13 @@ let tez_kernelVersion evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
+       response
+
+let tez_kernelRootHash evm_node =
+  let* response = Evm_node.call_evm_rpc evm_node Request.tez_kernelRootHash in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string_opt)
        response
 
 let call ~to_ ~data evm_node =

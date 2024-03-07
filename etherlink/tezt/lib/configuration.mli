@@ -9,10 +9,9 @@
 (** Default balance given to bootstrap account. *)
 val default_bootstrap_account_balance : Wei.t
 
-(** [make_config ?bootstrap_accounts ?ticketer ?administrator
-    ?sequencer ()] creates an installer configuration compatible with
-    the EVM kernel. *)
+(** Creates an installer configuration compatible with the EVM kernel. *)
 val make_config :
+  ?kernel_root_hash:string ->
   ?bootstrap_accounts:Eth_account.t array ->
   ?ticketer:string ->
   ?administrator:string ->

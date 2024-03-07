@@ -49,6 +49,7 @@ type full_evm_setup = {
     | `Both of Installer_kernel_config.instr list * string ]
     option;
   kernel : string;
+  kernel_root_hash : string;
 }
 
 let hex_256_of n = Printf.sprintf "%064x" n
@@ -365,7 +366,8 @@ type setup_mode =
     }
   | Setup_proxy of {devmode : bool}
 
-let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
+let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
+    ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
@@ -382,6 +384,16 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
         let* res = setup_l1_contracts ~admin ?sequencer_admin client in
         return (Some res)
     | None -> return None
+  in
+  let* kernel_root_hash =
+    if setup_kernel_root_hash then
+      let* {root_hash; _} =
+        prepare_installer_kernel
+          ~preimages_dir:(Temp.dir "ignored_preimages")
+          kernel_installee
+      in
+      return (Some root_hash)
+    else return None
   in
   (* If a L1 bridge was set up, we make the kernel aware of the address. *)
   let base_config =
@@ -405,6 +417,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       | Setup_sequencer {sequencer; _} -> Some sequencer.public_key
     in
     Configuration.make_config
+      ?kernel_root_hash
       ~bootstrap_accounts
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
@@ -438,7 +451,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
   let preimages_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
-  let* {output; _} =
+  let* {output; root_hash; _} =
     prepare_installer_kernel ~preimages_dir ?config kernel_installee
   in
   let* sc_rollup_address =
@@ -502,6 +515,7 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       l1_contracts;
       config;
       kernel = output;
+      kernel_root_hash = root_hash;
     }
 
 let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
@@ -2372,12 +2386,10 @@ let gen_test_kernel_upgrade ?admin_contract ?timestamp
     Option.value ~default:sc_rollup_address rollup_address
   in
   let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let* payload =
-    let* {root_hash; _} =
-      Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
-    in
-    Evm_node.upgrade_payload ~root_hash ~activation_timestamp
+  let* {root_hash; _} =
+    Sc_rollup_helpers.prepare_installer_kernel ~preimages_dir installee
   in
+  let* payload = Evm_node.upgrade_payload ~root_hash ~activation_timestamp in
   let* kernel_boot_wasm_before_upgrade = get_kernel_boot_wasm ~sc_rollup_node in
   let* expected_kernel_boot_wasm =
     if should_fail then return kernel_boot_wasm_before_upgrade
@@ -2401,7 +2413,12 @@ let gen_test_kernel_upgrade ?admin_contract ?timestamp
   Check.((expected_kernel_boot_wasm = kernel_boot_wasm_after_upgrade) string)
     ~error_msg:(sf "Unexpected `boot.wasm`.") ;
   return
-    (sc_rollup_node, node, client, evm_node, kernel_boot_wasm_before_upgrade)
+    ( sc_rollup_node,
+      node,
+      client,
+      evm_node,
+      kernel_boot_wasm_before_upgrade,
+      root_hash )
 
 let test_kernel_upgrade_evm_to_evm =
   Protocol.register_test
@@ -2416,7 +2433,7 @@ let test_kernel_upgrade_evm_to_evm =
       ])
     ~title:"Ensures EVM kernel's upgrade integrity to itself"
   @@ fun protocol ->
-  let* sc_rollup_node, node, client, evm_node, _ =
+  let* sc_rollup_node, node, client, evm_node, _, _root_hash =
     gen_test_kernel_upgrade ~installee:Constant.WASM.evm_kernel protocol
   in
   (* We ensure the upgrade went well by checking if the kernel still produces
@@ -2516,7 +2533,12 @@ let test_kernel_upgrade_failing_migration =
       ])
     ~title:"Ensures EVM kernel's upgrade rollback when migration fails"
   @@ fun protocol ->
-  let* sc_rollup_node, node, client, evm_node, _original_kernel_boot_wasm =
+  let* ( sc_rollup_node,
+         node,
+         client,
+         evm_node,
+         _original_kernel_boot_wasm,
+         _root_hash ) =
     gen_test_kernel_upgrade
       ~installee:Constant.WASM.failed_migration
       ~should_fail:true
@@ -3219,7 +3241,7 @@ let test_kernel_upgrade_delay =
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   (* It shoulnd't be upgrade in a single block, which {!gen_test_kernel_upgrade}
      expect. *)
-  let* sc_rollup_node, node, client, evm_node, _ =
+  let* sc_rollup_node, node, client, evm_node, _, _root_hash =
     gen_test_kernel_upgrade
       ~timestamp
       ~activation_timestamp
@@ -3273,6 +3295,73 @@ let test_transaction_storage_before_and_after_migration =
     Lwt_list.iter_p (check_one evm_setup) tx_hashes
   in
   gen_kernel_migration_test ~config ~scenario_prior ~scenario_after protocol
+
+let test_kernel_root_hash_originate_absent =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "kernel_root_hash"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"Kernel root hash is absent at origination if not provided"
+  @@ fun protocol ->
+  let* {evm_node; _} =
+    setup_evm_kernel ~admin:None ~setup_kernel_root_hash:false protocol
+  in
+  let*@ kernel_root_hash_opt = Rpc.tez_kernelRootHash evm_node in
+  Assert.is_none ~loc:__LOC__ kernel_root_hash_opt ;
+  unit
+
+let test_kernel_root_hash_originate_present =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "kernel_root_hash"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"tez_kernelRootHash takes root hash provided by the installer"
+  @@ fun protocol ->
+  let* {evm_node; kernel_root_hash; _} =
+    setup_evm_kernel ~admin:None ~setup_kernel_root_hash:true protocol
+  in
+  let*@! found_kernel_root_hash = Rpc.tez_kernelRootHash evm_node in
+  Check.((kernel_root_hash = found_kernel_root_hash) string)
+    ~error_msg:
+      "tez_kernelRootHash should return root hash set by installer after \
+       origination" ;
+  unit
+
+let test_kernel_root_hash_after_upgrade =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "kernel_root_hash"; "upgrade"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:"tez_kernelRootHash is set after upgrade"
+  @@ fun protocol ->
+  let* _sc_rollup_node, _node, _client, evm_node, _, root_hash =
+    gen_test_kernel_upgrade
+      ~activation_timestamp:"0"
+      ~installee:Constant.WASM.evm_kernel
+      protocol
+  in
+  let*@! found_kernel_root_hash = Rpc.tez_kernelRootHash evm_node in
+  Check.((found_kernel_root_hash = root_hash) string)
+    ~error_msg:"Found incorrect kernel root hash (expected %L, got %R)" ;
+  unit
 
 let register_evm_migration ~protocols =
   test_kernel_migration protocols ;
@@ -5242,6 +5331,9 @@ let test_outbox_size_limit_resilience ~slow =
 
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
+  test_kernel_root_hash_originate_absent protocols ;
+  test_kernel_root_hash_originate_present protocols ;
+  test_kernel_root_hash_after_upgrade protocols ;
   test_evm_node_connection protocols ;
   test_consistent_block_hashes protocols ;
   test_rpc_getBalance protocols ;

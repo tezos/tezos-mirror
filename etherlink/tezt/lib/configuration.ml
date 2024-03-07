@@ -8,11 +8,20 @@
 
 let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
-let make_config ?bootstrap_accounts ?ticketer ?administrator ?kernel_governance
-    ?kernel_security_governance ?sequencer_governance ?sequencer ?delayed_bridge
-    ?(da_fee_per_byte = Wei.zero) ?minimum_base_fee_per_gas
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels () =
+let make_config ?kernel_root_hash ?bootstrap_accounts ?ticketer ?administrator
+    ?kernel_governance ?kernel_security_governance ?sequencer_governance
+    ?sequencer ?delayed_bridge ?(da_fee_per_byte = Wei.zero)
+    ?minimum_base_fee_per_gas ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    () =
   let open Sc_rollup_helpers.Installer_kernel_config in
+  let kernel_root_hash =
+    Option.fold
+      ~some:(fun kernel_root_hash ->
+        let to_ = Durable_storage_path.kernel_root_hash in
+        [Set {value = kernel_root_hash; to_}])
+      ~none:[]
+      kernel_root_hash
+  in
   let ticketer =
     Option.fold
       ~some:(fun ticketer ->
@@ -122,9 +131,9 @@ let make_config ?bootstrap_accounts ?ticketer ?administrator ?kernel_governance
       minimum_base_fee_per_gas
   in
   match
-    ticketer @ bootstrap_accounts @ administrator @ kernel_governance
-    @ kernel_security_governance @ sequencer_governance @ sequencer
-    @ delayed_bridge @ da_fee_per_byte @ minimum_base_fee_per_gas
+    kernel_root_hash @ ticketer @ bootstrap_accounts @ administrator
+    @ kernel_governance @ kernel_security_governance @ sequencer_governance
+    @ sequencer @ delayed_bridge @ da_fee_per_byte @ minimum_base_fee_per_gas
     @ delayed_inbox_timeout @ delayed_inbox_min_levels
   with
   | [] -> None

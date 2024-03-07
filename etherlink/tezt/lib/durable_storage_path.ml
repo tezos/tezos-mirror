@@ -33,6 +33,8 @@ let world_state rst = evm (sf "/world_state%s" rst)
 
 let kernel rst = sf "/kernel%s" rst
 
+let kernel_root_hash = evm "/kernel_root_hash"
+
 let eth_accounts = world_state "/eth_accounts"
 
 let eth_account addr = sf "%s/%s" eth_accounts (Helpers.normalize addr)
