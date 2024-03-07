@@ -42,6 +42,24 @@ module Q = struct
         @@ Context_hash.of_b58check_opt bytes)
       string
 
+  let root_hash =
+    let open Ethereum_types in
+    custom
+      ~encode:(fun (Hash (Hex hash)) ->
+        Result.of_option ~error:"not a valid hash" @@ Hex.to_string (`Hex hash))
+      ~decode:(fun hash ->
+        let (`Hex hash) = Hex.of_string hash in
+        Ok (Hash (Hex hash)))
+      string
+
+  let timestamp =
+    custom
+      ~encode:(fun t -> Ok (Time.Protocol.to_seconds t))
+      ~decode:(fun i ->
+        if i >= 0L then Ok (Time.Protocol.of_seconds i)
+        else Error "invalid negative timestamp")
+      int64
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -105,7 +123,24 @@ module Q = struct
         ]
     end
 
-    let all : migration list = [(module V0)]
+    module V1 = struct
+      let name = "create_upgrade_events_table"
+
+      let up =
+        [
+          migration_step
+            {|
+        CREATE TABLE kernel_upgrades (
+          applied_before INT NOT NULL,
+          root_hash TEXT NOT NULL,
+          activation_timestamp INT NOT NULL,
+          applied INT
+        )
+        |};
+        ]
+    end
+
+    let all : migration list = [(module V0); (module V1)]
   end
 
   module Executable_blueprints = struct
@@ -140,6 +175,12 @@ module Q = struct
     let get_latest =
       (unit ->? t2 level context_hash)
       @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id DESC LIMIT 1|eos}
+  end
+
+  module Kernel_upgrades = struct
+    let insert =
+      (t3 level root_hash timestamp ->. unit)
+      @@ {|INSERT INTO kernel_upgrades (applied_before, root_hash, activation_timestamp) VALUES (?, ?, ?)|}
   end
 end
 
@@ -292,4 +333,14 @@ module Context_hashes = struct
     @@ Caqti_lwt_unix.with_connection db_uri
     @@ fun (module Db : Caqti_lwt.CONNECTION) ->
     Db.find_opt Q.Context_hashes.get_latest ()
+end
+
+module Kernel_upgrades = struct
+  let store {db_uri} next_blueprint_number (event : Ethereum_types.Upgrade.t) =
+    with_caqti_error
+    @@ Caqti_lwt_unix.with_connection db_uri
+    @@ fun (module Db : Caqti_lwt.CONNECTION) ->
+    Db.exec
+      Q.Kernel_upgrades.insert
+      (next_blueprint_number, event.hash, event.timestamp)
 end

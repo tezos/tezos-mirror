@@ -49,3 +49,11 @@ module Context_hashes : sig
   val find_latest :
     t -> (Ethereum_types.quantity * Context_hash.t) option tzresult Lwt.t
 end
+
+module Kernel_upgrades : sig
+  val store :
+    t ->
+    Ethereum_types.quantity ->
+    Ethereum_types.Upgrade.t ->
+    unit tzresult Lwt.t
+end
