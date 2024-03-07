@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -580,7 +580,7 @@ let commands_ro () =
          type, and content."
       no_options
       (prefixes ["get"; "ticket"; "balance"; "for"]
-      @@ Contract_alias.destination_param ~name:"src" ~desc:"Source contract."
+      @@ Destination_alias.destination_param ~name:"src" ~desc:"Source address."
       @@ prefixes ["with"; "ticketer"]
       @@ Contract_alias.destination_param
            ~name:"ticketer"
@@ -596,20 +596,37 @@ let commands_ro () =
            ~desc:"Content of the ticket."
            data_parameter
       @@ stop)
-      (fun () contract ticketer content_type content cctxt ->
+      (fun () destination ticketer content_type content cctxt ->
         let open Lwt_result_syntax in
         let* balance =
-          get_contract_ticket_balance
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            contract
-            Ticket_token.
-              {
-                ticketer;
-                contents_type = content_type.expanded;
-                contents = content.expanded;
-              }
+          match destination with
+          | Contract contract ->
+              get_contract_ticket_balance
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                contract
+                Ticket_token.
+                  {
+                    ticketer;
+                    contents_type = content_type.expanded;
+                    contents = content.expanded;
+                  }
+          | Sc_rollup smart_rollup ->
+              get_smart_rollup_ticket_balance
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                smart_rollup
+                Ticket_token.
+                  {
+                    ticketer;
+                    contents_type = content_type.expanded;
+                    contents = content.expanded;
+                  }
+          | _ ->
+              cctxt#error
+                "Invalid address, must be a contract or smart rollup address"
         in
         let*! () = cctxt#answer "%a" Z.pp_print balance in
         return_unit);

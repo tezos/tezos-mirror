@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -895,6 +896,15 @@ val sc_rollup_timeout :
   * Kind.sc_rollup_timeout Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
+
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Sc_rollup.get_ticket_balance}. *)
+val get_smart_rollup_ticket_balance :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Sc_rollup.t ->
+  Ticket_token.unparsed_token ->
+  Z.t tzresult Lwt.t
 
 val zk_rollup_originate :
   #Protocol_client_context.full ->

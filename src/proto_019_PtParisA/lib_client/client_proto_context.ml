@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1354,6 +1355,10 @@ let sc_rollup_timeout (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
+
+let get_smart_rollup_ticket_balance (rpc : #rpc_context) ~chain ~block contract
+    key =
+  Plugin.RPC.Sc_rollup.get_ticket_balance rpc (chain, block) contract key
 
 let zk_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?safety_guard ?storage_limit
