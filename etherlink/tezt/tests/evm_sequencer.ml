@@ -489,7 +489,9 @@ let test_resilient_to_rollup_node_disconnect =
   (* Check the consistency again *)
   let* () =
     check_head_consistency
-      ~error_msg:"The head should be the same after the outage"
+      ~error_msg:
+        "The head should be the same after the outage. Sequencer: {%L}, proxy: \
+         {%R}"
       ~left:sequencer
       ~right:proxy
       ()
