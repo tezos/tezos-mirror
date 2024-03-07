@@ -99,7 +99,6 @@ exports.send = function (player, contract_addr, amount, data, options = {}) {
 
 const print_list = function (src, mode, blueprint_number) {
     const txs = src.slice();
-    console.log("[")
     let data = txs.join(" ");
     let messages = mode.sequencer_key ?
         chunk_data_into_blueprint(data, blueprint_number, mode.sequencer_key) :
@@ -108,7 +107,6 @@ const print_list = function (src, mode, blueprint_number) {
         seperator = (j < messages.length - 1) ? "," : "";
         console.log(`{"external": "${messages[j]}"}${seperator}`);
     }
-    console.log("]");
     return txs.length
 }
 
@@ -138,16 +136,23 @@ const chunk_data_into_blueprint = function (src, number, sequencer_key) {
     return chunk_data_gen(src, extra_args);
 }
 
+function split_blueprints(blueprints){
+    return blueprints.flatMap((bp) => bp.map((tx) => [tx]))
+}
+
 exports.print_bench = function (src, mode = {}) {
     let number = 0;
-    const inputs = src.slice();
+    let inputs = src.slice();
     console.log("[")
+    console.log("[")
+    if (mode.extra.multiBlueprint) inputs = split_blueprints(inputs)
     while (inputs.length > 1) {
         let txs_length = print_list(inputs.shift(), mode, number)
         console.log(",");
         number += txs_length;
     }
     print_list(inputs.shift(), mode, number)
+    console.log("]")
     console.log("]")
 }
 
@@ -170,6 +175,7 @@ exports.bench_args = function (argv, extra_options = []) {
     let commands =
         commander
             .usage("[OPTIONS]")
+            .option('--multi-blueprint', 'Put each transaction in one blueprint', false)
             .option('--sequencer <private key>',
                 'Generates a chunked blueprint signed with <private key>');
 

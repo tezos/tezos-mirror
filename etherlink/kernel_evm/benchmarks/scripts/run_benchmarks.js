@@ -44,6 +44,7 @@ commander
     .option('--keep-temp', "Keep temporary files", false)
     .option('--mode <mode>', 'Kernel mode: `proxy` or `sequencer`', parse_mode)
     .option('--no-computation', 'Don\'t expect stage 2', true)
+    .option('--multi-blueprint', 'Send each transaction in a separate blueprint',false)
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -56,6 +57,7 @@ function filter_name(name) {
 }
 let COMPUTATION = commander.opts().computation;
 let MODE = commander.opts().mode || "proxy";
+let MULTI_BLUEPRINT = commander.opts().multiBlueprint;
 let KEEP_TEMP = commander.opts().keepTemp;
 let FAST_MODE = commander.opts().fastMode;
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
@@ -311,6 +313,7 @@ function build_benchmark_scenario(benchmark_script) {
     try {
         let bench_path = path.format({ dir: __dirname, base: benchmark_script })
         let extra = MODE == 'sequencer' ? `--sequencer ${SEQUENCER_KEY}` : "";
+        extra += MULTI_BLUEPRINT ? ` --multi-blueprint` : ``;
         execSync(`node ${bench_path} ${extra} > transactions.json`);
     } catch (error) {
         console.log(`Error running script ${benchmark_script}. Please fixed the error in the script before running this benchmark script`)
@@ -478,6 +481,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Output in ${output}`);
     console.log(`Dumped opcodes in ${opcodes_dump}`);
     console.log(`Precompiles in ${precompiles_output}`);
+    if(MULTI_BLUEPRINT) console.log(`For every scenario, one tx per blueprint`)
     const precompile_csv_config = { columns: precompiles_field };
     fs.writeFileSync(precompiles_output, csv.stringify([], { header: true, ...precompile_csv_config }));
     fs.writeFileSync(logs, "Logging debugger\n")
