@@ -56,20 +56,20 @@ end
 
 (** A facility for registering pipelines. *)
 module Pipeline : sig
-  (* Register a pipeline.
+  (** Register a pipeline.
 
-     [register ?variables name rule] will register a pipeline [name]
-     that runs when [rule] is true.
+      [register ?variables name rule] will register a pipeline [name]
+      that runs when [rule] is true.
 
-     If [variables] is set, then these variables will be added to the
-     [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
+      If [variables] is set, then these variables will be added to the
+      [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
 
-     If [jobs] is not set, then the pipeline is a legacy, hand-written
-     .yml file, expected to be defined in
-     [.gitlab/ci/pipelines/NAME.yml]. If [jobs] is set, then the those
-     jobs will be generated to the same file when {!write} is
-     called. In both cases, this file will be included from the
-     top-level [.gitlab-ci.yml]. *)
+      If [jobs] is not set, then the pipeline is a legacy, hand-written
+      .yml file, expected to be defined in
+      [.gitlab/ci/pipelines/NAME.yml]. If [jobs] is set, then the those
+      jobs will be generated to the same file when {!write} is
+      called. In both cases, this file will be included from the
+      top-level [.gitlab-ci.yml]. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
     ?jobs:tezos_job list ->
@@ -225,3 +225,38 @@ val job :
     used to write another job. *)
 val job_external :
   ?directory:string -> ?filename_suffix:string -> tezos_job -> tezos_job
+
+(** Adds artifacts to a job without overriding, if possible, existing artifacts.
+
+    - If the job already has an artifact with [old_name] and [name] is given, then
+      [name] is used.
+    - If the job already has an artifact exposed as [old_exposed_as] and
+      [exposed_as] is given, then [exposed_as] is used.
+    - If the job already has an artifact added [old_when] and
+      [when_] is given, the new artifact will be added:
+        - at [old_when] if [old_when = when_]
+        - at [Always] if [old_when <> when_]
+    - If the job already has an artifact that expires in [old_expires_in] and
+      [expires_in] is given, then the largest of the two durations is used. Note
+      that for the purpose of this comparison, we consider that a minute is 60
+      seconds, that an hour is 60 minutes, that a week is 7 days, that a
+      month is 31 days, and that a year is 365 days.
+    - Individual fields of a {!report} cannot be combined: a run-time error is
+      raised if [reports] contains a report that is already set in the job.
+    - [paths] are appended to the set of paths in [job]. *)
+val add_artifacts :
+  ?name:string ->
+  ?expose_as:string ->
+  ?reports:Gitlab_ci.Types.reports ->
+  ?expire_in:Gitlab_ci.Types.time_interval ->
+  ?when_:Gitlab_ci.Types.when_artifact ->
+  string list ->
+  tezos_job ->
+  tezos_job
+
+(** Append the variables [variables] to the variables of [job].
+
+    Raises [Failure] if any of the [variables] is already defined for
+    [job], unless [allow_overwrite] is true (default is [false]). *)
+val append_variables :
+  ?allow_overwrite:bool -> Gitlab_ci.Types.variables -> tezos_job -> tezos_job
