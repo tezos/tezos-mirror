@@ -1701,8 +1701,7 @@ let test_sequencer_upgrade =
   (* Sends the upgrade to L1. *)
   Log.info "Sending the sequencer upgrade to the L1 contract" ;
   let new_sequencer_key = Constant.bootstrap2.alias in
-  let* () =
-    Evm_node.wait_for_evm_event sequencer ~event_kind:"sequencer_upgrade"
+  let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
   and* () =
     let* () =
       sequencer_upgrade
