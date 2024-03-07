@@ -312,6 +312,8 @@ let wait_cycle_until condition =
     let rec get_names condition =
       match condition with
       | `AI_activation -> ("AI activation", "AI activated")
+      | `AI_activation_with_votes ->
+          ("AI activation (with votes)", "AI activated")
       | `delegate_parameters_activation ->
           ("delegate parameters activation", "delegate parameters activated")
       | `And (cond1, cond2) ->
@@ -331,7 +333,26 @@ let wait_cycle_until condition =
             | Some launch_cycle ->
                 let current_cycle = Block.current_cycle block in
                 Cycle.(current_cycle >= launch_cycle)
-            | _ -> assert false)
+            | _ ->
+                Log.error
+                  "wait_cycle_until `AI_activation: launch cycle not found, \
+                   aborting." ;
+                assert false)
+      | `AI_activation_with_votes ->
+          fun (block, state) ->
+            if State_ai_flags.AI_Activation.enabled init_state then
+              match state.State.ai_activation_cycle with
+              (* Since AI_activation is enabled, we expect the activation
+                 cycle to be set eventually *)
+              | Some launch_cycle ->
+                  let current_cycle = Block.current_cycle block in
+                  Cycle.(current_cycle >= launch_cycle)
+              | _ -> false
+            else (
+              Log.error
+                "wait_cycle_until `AI_activation_with_votes: AI cannot \
+                 activate with the current protocol parameters, aborting." ;
+              assert false)
       | `delegate_parameters_activation ->
           fun (block, _state) ->
             let init_cycle = Block.current_cycle init_block in
