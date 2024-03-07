@@ -105,6 +105,11 @@ val iter_heads :
     returns it. *)
 val wait_first : t -> header Lwt.t
 
+(** [get_latest_head t] returns the latest L1 head if at least one was seen by
+    [t]. The head is the one sent by the heads monitoring RPC of the L1 node,
+    independently of how they were processed by the current process. *)
+val get_latest_head : t -> header option
+
 val get_predecessor_opt :
   ?max_read:int ->
   t ->
