@@ -3,16 +3,12 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint::Blueprint;
-use crate::blueprint_storage::{
-    store_immediate_blueprint, store_inbox_blueprint, store_sequencer_blueprint,
-};
+use crate::blueprint_storage::{store_immediate_blueprint, store_inbox_blueprint};
 use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
+use crate::inbox::ProxyInboxContent;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
-use crate::inbox::{ProxyInboxContent, SequencerInboxContent};
-use crate::read_last_info_per_level_timestamp;
-use crate::storage::read_l1_level;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -79,49 +75,20 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
 ) -> Result<(), anyhow::Error> {
-    if let Some(SequencerInboxContent {
-        delayed_transactions,
-        sequencer_blueprints,
-    }) = read_sequencer_inbox(
+    // Returns true if the inbox has been emptied during this round of reading,
+    // so that the delayed inbox is not flushed twice in the same L1 level.
+    if read_sequencer_inbox(
         host,
         smart_rollup_address,
         tezos_contracts,
         delayed_bridge,
         sequencer,
+        delayed_inbox,
     )? {
-        let previous_timestamp = read_last_info_per_level_timestamp(host)?;
-        let level = read_l1_level(host)?;
-        // Store the transactions in the delayed inbox.
-        for transaction in delayed_transactions {
-            delayed_inbox.save_transaction(
-                host,
-                transaction,
-                previous_timestamp,
-                level,
-            )?;
-        }
         // Check if there are timed-out transactions in the delayed inbox
         let timed_out = delayed_inbox.first_has_timed_out(host)?;
         if timed_out {
             fetch_delayed_transactions(host, delayed_inbox)?
-        } else {
-            // Store the sequencer blueprints.
-            log!(
-                host,
-                Benchmarking,
-                "number of blueprint chunks read: {}",
-                sequencer_blueprints.len()
-            );
-            for seq_blueprint in sequencer_blueprints {
-                log!(
-                    host,
-                    Debug,
-                    "Storing chunk {} of sequencer blueprint number {}",
-                    seq_blueprint.blueprint.chunk_index,
-                    seq_blueprint.blueprint.number
-                );
-                store_sequencer_blueprint(host, seq_blueprint)?
-            }
         }
     }
     Ok(())
@@ -153,6 +120,7 @@ pub fn fetch<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use primitive_types::U256;
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_data_encoding::types::Bytes;
     use tezos_smart_rollup::{
@@ -165,7 +133,10 @@ mod tests {
     use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_mock::{MockHost, TransferMetadata};
 
-    use crate::{blueprint_storage::read_next_blueprint, parsing::RollupType};
+    use crate::{
+        blueprint_storage::read_next_blueprint, parsing::RollupType,
+        storage::store_current_block_number,
+    };
 
     use super::*;
 
@@ -207,7 +178,8 @@ mod tests {
         }
     }
 
-    const DUMMY_BLUEPRINT_CHUNK: &str = "00000000000000000000000000000000000000000003f897adeca0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0c0880000000000000000a00000000000000000000000000000000000000000000000000000000000000000820100820000b84093cc9ec356f5cf9d61d1f0cda20d6546aafd77de31737066af586c2f681d41492b7a1a5cceff6620dd2fe848f134c86bfde1ec10f435f25e9a7be9657e867f03";
+    // Those blueprints are produced with `chunk data --as-blueprint --sequencer-key unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh --number 10`
+    const DUMMY_BLUEPRINT_CHUNK_NUMBER_10: &str = "00000000000000000000000000000000000000000003f897adeca0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0c0880000000000000000a00a00000000000000000000000000000000000000000000000000000000000000820100820000b84063cdece4fc53ba967664f29e7fe214ece817d72bd8b122c186d48b43d9d8b7e650f1503e7656fc48ac187b84f59f010959c83ea5df3ec4e30242b59ee0523609";
     const DUMMY_BLUEPRINT_CHUNK_UNPARSABLE: &str = "00000000000000000000000000000000000000000003f897adeca0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0c0880000000000000000a00000000000000000000000000000000000000000000000000000000000000000820100820000b8403b4f48059e64cbe8a60fef482bff04ed453291d17fe888d2bae4420a623157570af4bd7ab944354583bcdce1149d004a4699b027c7370cd5e0b16172f3340406";
 
     const DUMMY_RAW_TRANSACTION: &str = "f873808402faf08083c71b0094f0affc80a5f69f4a9a3ee01a640873b6ba53e5398d01431e0fae6d7210000000000080820a96a0a4160335a080cd3501fd88fe4d28cc3cd8f1283fa597c10f59028c0517efce27a0444512519b3346609d2ca7c400dc1f5263d2bdad8a2ac0a5ab942336e7ed603a";
@@ -331,10 +303,14 @@ mod tests {
     #[test]
     fn test_parsing_valid_sequencer_chunk() {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(hex::decode(DUMMY_BLUEPRINT_CHUNK).unwrap()));
+        host.add_external(Bytes::from(
+            hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
+        ));
         let mut conf = dummy_sequencer_config();
         fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
+        // The dummy chunk in the inbox is registered at block 10
+        store_current_block_number(&mut host, U256::from(9)).unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
             .is_none()
@@ -363,22 +339,30 @@ mod tests {
     #[test]
     fn test_proxy_rejects_sequencer_chunk() {
         let mut host = MockHost::default();
-        host.add_external(Bytes::from(hex::decode(DUMMY_BLUEPRINT_CHUNK).unwrap()));
-        let conf = dummy_sequencer_config();
+        host.add_external(Bytes::from(
+            hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
+        ));
+        let mut conf = dummy_sequencer_config();
 
         match read_proxy_inbox(&mut host, DEFAULT_SR_ADDRESS, &conf.tezos_contracts)
             .unwrap()
         {
             None => panic!("There should be an InboxContent"),
-            Some(ProxyInboxContent {
-                sequencer_blueprints,
-                ..
-            }) => assert_eq!(
-                sequencer_blueprints,
+            Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
+                transactions,
                 vec![],
-                "The blueprint shouldn't contain any transaction as it has been "
+                "The proxy shouldn't have read any transaction"
             ),
         };
+
+        // The dummy chunk in the inbox is registered at block 10
+        store_current_block_number(&mut host, U256::from(9)).unwrap();
+        if read_next_blueprint(&mut host, &mut conf)
+            .expect("Blueprint reading shouldn't fail")
+            .is_some()
+        {
+            panic!("The sequencer chunk shouldn't have been injected")
+        }
     }
 
     #[test]
