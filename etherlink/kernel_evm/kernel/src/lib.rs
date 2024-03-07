@@ -13,7 +13,7 @@ use crate::stage_one::fetch;
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
-use fallback_upgrade::{clean_backup_kernel, fallback_backup_kernel};
+use fallback_upgrade::fallback_backup_kernel;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
@@ -174,13 +174,15 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // If a migrtion was finished, we update the kernel version
             // in the storage.
             set_kernel_version(host)?;
-            // We remove the backup kernel
-            clean_backup_kernel(host)?;
             host.mark_for_reboot()?;
             return Ok(());
         }
         Err(Error::UpgradeError(Fallback)) => {
+            // If the migration failed we backup to the previous kernel
+            // and force a reboot to reload the kernel.
             fallback_backup_kernel(host)?;
+            host.mark_for_reboot()?;
+            return Ok(());
         }
         Err(err) => return Err(err.into()),
     };

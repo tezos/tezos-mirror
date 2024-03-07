@@ -28,10 +28,5 @@ pub fn fallback_backup_kernel(host: &mut impl Runtime) -> Result<(), RuntimeErro
         Error,
         "Something went wrong, fallback mechanism is triggered."
     );
-    host.store_move(&BACKUP_KERNEL_BOOT_PATH, &KERNEL_BOOT_PATH)
-}
-
-pub fn clean_backup_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError> {
-    log!(host, Info, "Cleaning the backup kernel.");
-    host.store_delete(&BACKUP_KERNEL_BOOT_PATH)
+    host.store_copy(&BACKUP_KERNEL_BOOT_PATH, &KERNEL_BOOT_PATH)
 }
