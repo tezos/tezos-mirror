@@ -214,6 +214,7 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
 let test_AI_activation =
   Protocol.register_test
     ~__FILE__
+    ~supports:Protocol.(From_protocol (number Paris))
     ~title:"AI Activation - test AI activation after feature vote"
     ~tags:["adaptive_issuance"; "staking"]
   @@ fun protocol ->
@@ -302,6 +303,7 @@ let test_AI_activation =
 let test_AI_activation_bypass_vote =
   Protocol.register_test
     ~__FILE__
+    ~supports:Protocol.(From_protocol (number Paris))
     ~title:
       "AI Activation - test AI activation with feature flag force_activation \
        set"
@@ -471,6 +473,7 @@ let test_staking =
     ~__FILE__
     ~title:
       "Staking - test staking with delegate and staker in a simple scenario"
+    ~supports:Protocol.(From_protocol (number Paris))
     ~tags:
       [
         "adaptive_issuance";
