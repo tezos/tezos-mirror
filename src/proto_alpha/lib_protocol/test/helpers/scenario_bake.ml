@@ -10,7 +10,6 @@ open State
 open Scenario_dsl
 open Log_helpers
 open Scenario_base
-open Adaptive_issuance_helpers
 
 (** Applies when baking the last block of a cycle *)
 let apply_end_cycle current_cycle previous_block block state :
@@ -164,7 +163,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
     baker_name ;
   let current_cycle = Block.current_cycle block in
   let adaptive_issuance_vote =
-    if state.activate_ai then
+    if state.force_ai_vote_yes then
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
   in
@@ -326,13 +325,14 @@ let wait_cycle_until condition =
     let open Lwt_result_syntax in
     let rec stopper condition =
       match condition with
-      | `AI_activation ->
+      | `AI_activation -> (
           fun (block, _state) ->
-            if init_state.State.activate_ai then
-              let* launch_cycle = get_launch_cycle ~loc:__LOC__ init_block in
-              let current_cycle = Block.current_cycle block in
-              return Cycle.(current_cycle >= launch_cycle)
-            else assert false
+            (* Expects the launch cycle to be already set *)
+            match init_state.State.ai_activation_cycle with
+            | Some launch_cycle ->
+                let current_cycle = Block.current_cycle block in
+                return Cycle.(current_cycle >= launch_cycle)
+            | _ -> assert false)
       | `delegate_parameters_activation ->
           fun (block, _state) ->
             let init_cycle = Block.current_cycle init_block in

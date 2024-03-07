@@ -141,9 +141,7 @@ let begin_test ?(burn_rewards = false) delegates_name_list :
             total_supply;
             constants;
             param_requests = [];
-            activate_ai =
-              constants.adaptive_issuance.activation_vote_enable
-              && constants.adaptive_issuance.launch_ema_threshold = 0l;
+            force_ai_vote_yes = true;
             baking_policy = None;
             last_level_rewards = init_level;
             snapshot_balances = String.Map.empty;
