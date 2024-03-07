@@ -4258,8 +4258,16 @@ let test_regression_block_hash_gen =
       ])
     ~title:"Random generation based on block hash and timestamp"
   @@ fun protocol ->
+  (* Ok this one is tricky. As far as I understand the test can be
+     flaky because the estimateGas does not provide enough
+     gas. However, all estimateGas are run on the same block but do
+     not provide the same response, as the block number is constant I
+     make the timestamp constant as well to make the test more
+     predictible. I am not sure about the fix. In the worst case it
+     does not change the test semantics. *)
+  let timestamp = Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z")) in
   let* ({evm_node; sc_rollup_node; node; client; _} as evm_setup) =
-    setup_evm_kernel ~admin:None protocol
+    setup_evm_kernel ~admin:None ~timestamp protocol
   in
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~node ~client in
   let sender = Eth_account.bootstrap_accounts.(0) in
