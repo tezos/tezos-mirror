@@ -31,7 +31,7 @@ mod tests {
         let mut backend = create_backend!(MachineStateLayout<M1G>, F);
         let mut state = create_state!(MachineState, MachineStateLayout<M1G>, F, backend, M1G);
         state
-            .setup_boot(&program, Mode::Machine)
+            .setup_boot(&program, None, Mode::Machine)
             .expect("Boot failed");
         for _ in 1..MAX_STEPS {
             let result = state.step();
