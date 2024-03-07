@@ -87,6 +87,12 @@ type private_info = {
           is public then it's None. *)
 }
 
+type sync_info = {
+  on_synchronized : unit Lwt_condition.t;
+  mutable processed_level : int32;
+  sync_level_input : int32 Lwt_watcher.input;
+}
+
 type 'a t = {
   config : Configuration.t;  (** Inlined configuration for the rollup node. *)
   cctxt : Client_context.full;  (** Client context used by the rollup node. *)
@@ -128,6 +134,7 @@ type 'a t = {
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
       (** Watcher for the L2 chain, which enables RPC services to access
           a stream of L2 blocks. *)
+  sync : sync_info;  (** Synchronization status with respect to the L1 node.  *)
 }
 
 (** Read/write node context {!t}. *)
@@ -561,6 +568,17 @@ val make_kernel_logger :
   ?log_kernel_debug_file:string ->
   string ->
   ((string -> unit Lwt.t) * (unit -> unit Lwt.t)) Lwt.t
+
+(** {2 Synchronization tracking} *)
+
+(** [is_synchronized node_ctxt] returns [true] iff the rollup node has processed
+    the latest available L1 head. *)
+val is_synchronized : _ t -> bool
+
+(** [wait_synchronized node_ctxt] is a promise that resolves when the rollup
+    node whose state is [node_ctxt] is synchronized with L1. If the node is
+    already synchronized, it resolves immediately. *)
+val wait_synchronized : _ t -> unit Lwt.t
 
 module Internal_for_tests : sig
   val write_protocols_in_store :

@@ -164,6 +164,12 @@ let wait_first l1_ctxt =
   let+ hash, {shell = {level; _} as header; _} = wait_first l1_ctxt.l1 in
   {hash; level; header}
 
+let get_latest_head l1_ctxt =
+  Option.map
+    (fun (hash, {Tezos_base.Block_header.shell = {level; _} as header; _}) ->
+      {hash; level; header})
+    (get_latest_head l1_ctxt.l1)
+
 let get_predecessor_opt ?max_read {l1; _} = get_predecessor_opt ?max_read l1
 
 let get_predecessor ?max_read {l1; _} = get_predecessor ?max_read l1

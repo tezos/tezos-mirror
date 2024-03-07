@@ -240,13 +240,9 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
            the predecessor. In this case, we don't update the head or notify the
            block. *)
         return_unit
-      else
-        let* () = Node_context.set_l2_head node_ctxt l2_block in
-        Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
-        return_unit
+      else Node_context.set_l2_head node_ctxt l2_block
   | `New l2_block ->
       let* () = Node_context.set_l2_head node_ctxt l2_block in
-      Lwt_watcher.notify node_ctxt.global_block_watcher l2_block ;
       let stop_timestamp = Time.System.now () in
       let process_time = Ptime.diff stop_timestamp start_timestamp in
       Metrics.Inbox.set_process_time process_time ;
@@ -289,6 +285,17 @@ let report_missing_data result =
                   Block_hash.pp
                   hash)
                trace))
+
+let notify_synchronized (node_ctxt : _ Node_context.t) =
+  Lwt_condition.broadcast node_ctxt.sync.on_synchronized ()
+
+let notify_synchronization (node_ctxt : _ Node_context.t) head_level =
+  let latest_l1_head = Layer1.get_latest_head node_ctxt.l1_ctxt in
+  match latest_l1_head with
+  | None -> notify_synchronized node_ctxt
+  | Some l1_head when head_level = l1_head.level ->
+      notify_synchronized node_ctxt
+  | Some _ -> ()
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
    also processes any missing blocks that were not processed. *)
@@ -335,6 +342,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
         update_l2_chain state ~catching_up header)
       new_chain_prefetching
   in
+  notify_synchronization node_ctxt head.level ;
   let* () = Publisher.publish_commitments () in
   let* () = Publisher.cement_commitments () in
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
@@ -680,7 +688,6 @@ module Internal_for_tests = struct
     in
     let* () = Node_context.save_l2_block node_ctxt l2_block in
     let* () = Node_context.set_l2_head node_ctxt l2_block in
-    let () = Lwt_watcher.notify node_ctxt.global_block_watcher l2_block in
     return l2_block
 end
 
