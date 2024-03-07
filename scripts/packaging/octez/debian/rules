@@ -1,7 +1,5 @@
 #!/usr/bin/make -f
 
-export DEB_BUILD_OPTIONS=noautodbgsym
-
 %:
 	dh $@
 
@@ -16,20 +14,42 @@ override_dh_builddeb:
 override_dh_installman:
 	dh_installman --name octez-node manpages/octez-node.1
 	dh_installman --name octez-client manpages/octez-client.1
+	dh_installman --name octez-baker manpages/octez-baker.1
+	dh_installman --name octez-signer manpages/octez-signer.1
 
 override_dh_installdocs:
 	dh_installdocs -p octez-node docs/README.octez-node
+	dh_installdocs -p octez-baker docs/README.octez-baker
+	dh_installdocs -p octez-signer docs/octez-signer.service
+	dh_installdocs -p octez-signer docs/README.octez-signer
 
 override_dh_installsystemd:
-	dh_installsystemd --no-enable --no-start --name octez-node
+	dh_installsystemd -p octez-node --no-enable --no-start
+	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-next
+	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-active
+	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-next
+	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-active
 
 override_dh_installlogrotate:
 	dh_installlogrotate --package=octez-node
+	dh_installlogrotate --package=octez-baker
 
 override_dh_install:
 	dh_install
 	# Include debconf configuration
+	mkdir -p debian/octez-baker/etc/default/
+	cp debian/octez-baker.octez-accuser-next.default debian/octez-baker/etc/default/octez-accuser-next
+	cp debian/octez-baker.octez-accuser-active.default debian/octez-baker/etc/default/octez-accuser-active
+	cp debian/octez-baker.octez-baker-next.default debian/octez-baker/etc/default/octez-baker-next
+	cp debian/octez-baker.octez-baker-active.default debian/octez-baker/etc/default/octez-baker-active
 	dh_installdebconf
+
+override_dh_fixperms:
+		dh_fixperms
+		chmod 644  debian/octez-baker/etc/default/octez-accuser-next
+		chmod 644  debian/octez-baker/etc/default/octez-accuser-active
+		chmod 644  debian/octez-baker/etc/default/octez-baker-active
+		chmod 644  debian/octez-baker/etc/default/octez-baker-next
 
 # avoid creating debug symbols
 override_dh_dwz:

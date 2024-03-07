@@ -1,0 +1,38 @@
+#!/bin/sh
+
+set -e
+
+# Load debconf library
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+case "${1}" in
+purge)
+  rm -Rf /var/lib/octez-baker
+  # Purge debconf data for the package in any case
+  # shellcheck disable=SC2119
+  db_purge || true
+  ;;
+upgrade)
+  for s in baker accuser; do
+    for p in next active; do
+      # Check if the daemon was running before the upgrade
+      if [ -f "/var/lib/octez-baker/$s-$p-daemon_was_running" ] &&
+        [ "$(cat "/var/lib/octez-baker/$s-$p-daemon_was_running")" = "1" ]; then
+        # Start the daemon if it was running
+        systemctl "start octez-$s-$p.service"
+      fi
+    done
+  done
+  ;;
+remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+*)
+  echo "postrm called with unknown argument \`$1'" >&2
+  exit 1
+  ;;
+esac
+
+# Clean up the temporary file
+rm -f /var/lib/octez-baker/*daemon_was_running
+
+#DEBHELPER#

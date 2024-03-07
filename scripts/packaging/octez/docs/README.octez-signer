@@ -1,0 +1,53 @@
+This package provides the octez remote signer.
+
+We provide below an example of a systemd service that the user can use
+to run the signer.
+
+For more details please refer to the official documentation about key
+management: https://tezos.gitlab.io/user/key-management.html#signer
+
+```
+# create a siging key
+$ octez-signer gen keys alice
+# create a authentication key
+$ octez-client gen keys auth
+
+$ octez-signer show address auth
+Hash: tz1e5dLhLkovZE43obFVdztGBRR5op7Z99zr
+Public Key: edpkvQZjxdikAtuWtT1BREEERQ64z26AMQkaMWgsDyCBnSJ5Muk1YG
+
+$ octez-signer add authorized key edpkvQZjxdikAtuWtT1BREEERQ64z26AMQkaMWgsDyCBnSJ5Muk1YG --name auth
+
+$ octez-signer show address auth --show-secret
+Hash: tz1e5dLhLkovZE43obFVdztGBRR5op7Z99zr
+Public Key: edpkvQZjxdikAtuWtT1BREEERQ64z26AMQkaMWgsDyCBnSJ5Muk1YG
+Secret Key: unencrypted:edsk3Q9asoarfKtFzrcZyxPwE62DJVuRkSr6HkSCJ7T5zXeM7kKcuQ
+
+# add auth key to the baker
+$ sudo su tezos -c "octez-client import secret key auth unencrypted:edsk3Q9asoarfKtFzrcZyxPwE62DJVuRkSr6HkSCJ7T5zXeM7kKcuQ"
+
+# install the signer service
+$ mkdir -p ~/.config/systemd/user/
+$ cp /usr/share/doc/octez-signer/octez-signer.service ~/.config/systemd/user/
+
+$ start the service
+systemctl --user start octez-signer
+
+$ examine the logs
+journalctl --user-unit octez-signer
+
+# Tell the baker about this signer
+$ sudo su tezos -c "octez-client -R tcp://localhost:7732 config update"
+
+# add the remote key to the baker
+$ sudo su tezos -c "octez-client -R tcp://localhost:7732 import secret key alice remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
+
+# Test is everything is ok
+$ sudo su tezos -c "octez-client sign bytes 0x03 for alice"
+```
+
+If you are experimenting on ghostnet you can request tokens here:
+https://faucet.ghostnet.teztnets.com/
+
+We recommend to associate the signer to a ledger and to take all relevant
+precautions to secure the private keys.

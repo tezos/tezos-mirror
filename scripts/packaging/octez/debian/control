@@ -3,6 +3,16 @@ Section: devel
 Priority: optional
 Maintainer: Nomadic Labs <pkg@nomadic-labs.com>
 Homepage: https://gitlab.com/tezos/tezos
+Build-Depends: rsync,
+  git, m4,
+  build-essential,
+  patch, unzip, wget, opam, jq, bc,
+  autoconf, cmake, libev-dev,
+  libffi-dev, libgmp-dev,
+  libhidapi-dev, pkg-config,
+  zlib1g-dev, debhelper, debconf,
+  libprotobuf-dev, protobuf-compiler,
+  libsqlite3-dev
 
 Package: octez-zcash-params
 Architecture: all
@@ -25,6 +35,8 @@ Description: L1 Octez node for the Tezos network
  This package serves as the core implementation for the Tezos blockchain node.
  It contains the fundamental components required for protocol execution,
  consensus, and network communication within the Tezos blockchain network
+ .
+ This package installs the Octez node.
 
 Package: octez-client
 Architecture: amd64 arm64
@@ -34,3 +46,35 @@ Description: Octez client
  Tezos blockchain. It includes command-line tools and functionalities for
  querying blockchain data, broadcasting transactions, and interacting with
  smart contracts on the Tezos network.
+ .
+ This package installs the Octez client. For key management it is
+ recommended to install a remote signer of a different host.
+
+Package: octez-baker
+Architecture: amd64 arm64
+Depends:
+ ${misc:Depends}, ${shlibs:Depends},
+ octez-client (= ${source:Version}),
+ octez-node (= ${source:Version}),
+Recommends: octez-signer (= ${source:Version}),
+Description: Octez baker
+ Octez baking software for the Tezos blockchain.
+ It includes the necessary tools and functionalities for participating in the
+ baking process, such as block creation, attestations, and protocol-specific
+ consensus mechanisms.
+ .
+ This package installs the baker, the accuser and the Octez node. For key
+ management it is recommended to install a remote signer of a different host.
+
+Package: octez-signer
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends}, octez-client (= ${source:Version}),
+Suggests: wireguard, openssh-client
+Description: Octez signer
+ This package is designed as a signing component for the Tezos blockchain. It
+ provides the essential tools and functionalities for securely signing
+ transactions, blocks, and other protocol-related data within the Tezos
+ network.
+ .
+ This package installs the Octez remote signer. It's recommended to run the signer
+ and the baker on different hosts and use a hardware ledger for key management.

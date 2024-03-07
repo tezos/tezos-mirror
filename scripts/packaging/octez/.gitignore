@@ -30,8 +30,15 @@ debian/*.debhelper
 debian/*.substvars
 debian/files
 debian/substvars
-debian/octez-client/
-debian/octez-node/
 binaries
 manpages/octez-node.1
 zcash-params
+
+debian/octez-client/
+debian/octez-node/
+debian/octez-baker/
+debian/octez-evm-node/
+debian/octez-experimental/
+debian/octez-signer/
+debian/octez-smartrollup-node/
+debian/octez-zcash-params/

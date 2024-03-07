@@ -14,9 +14,9 @@ mode.
 Execute the following command to obtain a new data directory:
 
 
-    curl -L -o snapshot <SNAPSHOT_URL>
+    curl -L -o snapshot.file <SNAPSHOT_URL>
 
-    octez-node snapshot import snapshot --block <BLOCK_HASH> --data-dir /var/tezos/.tezos-node
+    octez-node snapshot import snapshot.file --block <BLOCK_HASH> --data-dir /var/tezos/.tezos-node
 
 Check here the full documentation on how to import a snapshot: https://tezos.gitlab.io/user/snapshots.html#importing-a-snapshot
 

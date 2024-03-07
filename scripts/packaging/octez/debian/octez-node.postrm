@@ -23,15 +23,27 @@ purge)
     echo "Not purging DATADIR. Octez-node data is intact"
     ;;
   esac
+  rm -Rf /var/lib/octez-node
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
   db_purge || true
   ;;
-remove | upgrade | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+upgrade)
+  # Check if the daemon was running before the upgrade
+  if [ -f /var/lib/octez-node/daemon_was_running ] &&
+    [ "$(cat /var/lib/octez-node/daemon_was_running)" = "1" ]; then
+    # Start the daemon if it was running
+    systemctl start octez-node.service
+  fi
+  ;;
+remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 *)
   echo "postrm called with unknown argument \`$1'" >&2
   exit 1
   ;;
 esac
+
+# Clean up the temporary file
+rm -f /var/lib/octez-node/daemon_was_running
 
 #DEBHELPER#
