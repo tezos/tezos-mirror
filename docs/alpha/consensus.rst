@@ -153,10 +153,7 @@ balance*. Let us first (re)define these and related concepts.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
   staking balance. We explain below how it is computed.
-- The *frozen deposit* represents a percentage ``FROZEN_DEPOSIT_PERCENTAGE`` of
-  the active stake at the end of the cycle that precedes the consensus rights
-  snapshoting.
-  This amount represents the delegate's skin in the game: in the case that the
+- The *frozen deposit* represents the delegate's skin in the game: in the case that the
   delegate behaves badly, its frozen deposit is partly slashed (see
   :ref:`slashing_alpha`).
   The frozen deposits are updated at the end of each cycle.  It must be at least

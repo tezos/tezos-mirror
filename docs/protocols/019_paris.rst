@@ -108,9 +108,8 @@ Adaptive Issuance
 
 - Updated the estimation for Mainnet's total tez supply which would be used while eventually migrating from Oxford to protocol P. (MR :gl:`!11996`)
 
-- Added a ``min_delegated_in_current_cycle`` field to the delegates' information reported via ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]'``. (MR :gl:`!12018`)
-
-- Added RPC to get ``min_delegated_in_current_cycle`` for a delegate using ``GET '/chains/main/blocks/[BLOCK_ID]]/context/delegates/[PUBLIC_KEY_HASH]/min_delegated_in_current_cycle'``. (MR :gl:`!12018`)
+- Added a ``min_delegated_in_current_cycle`` field to the delegates' information reported via
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>``. (MR :gl:`!12018`)
 
 - Activating new slashing flag. (MR :gl:`!12013`)
 
@@ -134,8 +133,8 @@ RPC Changes
 -----------
 
 - Make ``liquidity_baking_subsidy`` a protocol constant independent of Adaptive Issuance (MR :gl:`!11971`).
-  This changes the JSON from the RPC ``/chains/main/blocks/head/context/constants``
-  and ``/chains/main/blocks/head/context/issuance/expected_issuance``.
+  This changes the JSON from the RPC ``/chains/<chain_id>/blocks/<block_id>/context/constants``
+  and ``/chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``.
 
 - Add RPC to get contract's estimated own pending slashed amount according to the currently
   available denunciations.
@@ -145,15 +144,13 @@ RPC Changes
   currently available denunciations.
   ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/estimated_shared_pending_slashed_amount``. (MR :gl:`!12016`)
 
-- Extend the delegate info RPC response by adding a new boolean field named 'pending_denunciations'.
+- Extend the delegate info RPC response by adding a new boolean field named ``pending_denunciations``.
   This field is set to true if there are any pending denunciations associated with the
   specified delegate, and set to false otherwise.
   ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/``. (MR :gl:`!12042`)
 
-- Added min_delegated_in_current_cycle field in delegates info obtained via
-  ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>``. (MR :gl:`!12018`)
-
-- Added RPC to get min_delegated_in_current_cycle for a delegate using ``GET '/chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/min_delegated_in_current_cycle'``. (MR :gl:`!12018`)
+- Added RPC to get ``min_delegated_in_current_cycle`` for a delegate using
+  ``GET '/chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/min_delegated_in_current_cycle'``. (MR :gl:`!12018`)
 
 - New RPC to list the pending denunciations of a given delegate. ``GET /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_id>/denunciations``. (MR :gl:`!11885`)
 
@@ -194,7 +191,6 @@ the following quantities are kept the same:
 - the minimal time period of a cycle (namely, 2 days, 20 hours, and 16 minutes),
 - the length of the nonce revelation period (namely, around 2 hours and 8 minutes)
 - the number of nonce commitments per cycle (namely, 128),
-- the number of stake snapshots per cycle (namely, 16),
 - the maximum rewards per minute (namely 80 tez), and therefore roughly the same inflation,
 - the minimal "time to live" of an operation (namely, 1 hour),
 - the block gas limit per minute (namely 10400000 gas),
@@ -222,9 +218,6 @@ the following quantities are kept the same:
    * - ``nonce_revelation_threshold`` (blocks)
      - ``512``
      - ``768``
-   * - ``blocks_per_stake_snapshot`` (blocks)
-     - ``1024``
-     - ``1536``
    * - ``max_operations_time_to_live`` (blocks)
      - ``240``
      - ``360``
