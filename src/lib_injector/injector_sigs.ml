@@ -296,10 +296,6 @@ module type S = sig
       [injection_ttl] is the number of blocks after which an operation that is
       injected but never include is retried.
 
-      The injector monitors L1 heads to update the statuses of its operations
-      accordingly. The argument [reconnection_delay] gives an initial value for
-      the delay before attempting a reconnection (see {!Layer_1.init}).
-
       Each pkh's list and tag list of [signers] must be disjoint. *)
   val init :
     #Client_context.full ->
@@ -307,7 +303,7 @@ module type S = sig
     ?retention_period:int ->
     ?allowed_attempts:int ->
     ?injection_ttl:int ->
-    ?reconnection_delay:float ->
+    Layer_1.t ->
     state ->
     signers:
       (Signature.public_key_hash list * injection_strategy * tag list) list ->

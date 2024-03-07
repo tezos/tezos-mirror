@@ -343,7 +343,10 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   return_unit
 
 let daemonize state =
-  Layer1.iter_heads state.node_ctxt.l1_ctxt (on_layer_1_head state)
+  Layer1.iter_heads
+    ~name:"daemon"
+    state.node_ctxt.l1_ctxt
+    (on_layer_1_head state)
 
 let degraded_refutation_mode state =
   let open Lwt_result_syntax in
@@ -480,6 +483,7 @@ let run ({node_ctxt; configuration; plugin; _} as state) =
       unless (signers = []) @@ fun () ->
       Injector.init
         node_ctxt.cctxt
+        (Layer1.raw_l1_connection node_ctxt.l1_ctxt)
         {
           cctxt = (node_ctxt.cctxt :> Client_context.full);
           fee_parameters = configuration.fee_parameters;

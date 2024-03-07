@@ -60,18 +60,17 @@ val create :
   #Client_context.full ->
   t
 
-(** Connect a Layer 1 context created with {!create} to the L1 node for
-    monitoring.  *)
-val connect : t -> t tzresult Lwt.t
-
-(** [shutdown t] properly shuts the layer 1 down. *)
+(** [shutdown t] properly shuts the layer 1 down. This function is to be used on
+    exit. *)
 val shutdown : t -> unit Lwt.t
 
-(** [iter_heads t f] calls [f] on all new heads appearing in the layer 1
+(** [iter_heads ?name t f] calls [f] on all new heads appearing in the layer 1
     chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection),
-    [iter_heads] terminates and returns the error.  *)
+    [iter_heads] terminates and returns the error. A [name] can be provided to
+    differentiate iterations on the same connection. *)
 val iter_heads :
+  ?name:string ->
   t ->
   (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
   unit tzresult Lwt.t
@@ -79,6 +78,11 @@ val iter_heads :
 (** [wait_first t] waits for the first head to appear in the stream and
     returns it. *)
 val wait_first : t -> (Block_hash.t * Block_header.t) Lwt.t
+
+(** [get_latest_head t] returns the latest L1 head if at least one was seen by
+    [t]. The head is the one sent by the heads monitoring RPC of the L1 node,
+    independently of how they were processed by the current process. *)
+val get_latest_head : t -> (Block_hash.t * Block_header.t) option
 
 (** {2 Helper functions for the Layer 1 chain} *)
 

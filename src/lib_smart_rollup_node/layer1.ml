@@ -112,6 +112,8 @@ type nonrec t = {
   prefetch_blocks : int;  (** Number of blocks to prefetch by default. *)
 }
 
+let raw_l1_connection {l1; _} = l1
+
 let start ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
     ?(prefetch_blocks = l1_blocks_cache_size) cctxt =
   let open Lwt_result_syntax in
@@ -151,8 +153,9 @@ let cache_shell_header {headers_cache; _} hash header =
 
 let client_context {cctxt; _} = cctxt
 
-let iter_heads l1_ctxt f =
-  iter_heads l1_ctxt.l1 @@ fun (hash, {shell = {level; _} as header; _}) ->
+let iter_heads ?name l1_ctxt f =
+  iter_heads ?name l1_ctxt.l1
+  @@ fun (hash, {shell = {level; _} as header; _}) ->
   cache_shell_header l1_ctxt hash header ;
   f {hash; level; header}
 

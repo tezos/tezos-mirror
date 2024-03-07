@@ -1342,7 +1342,7 @@ module Make (Parameters : PARAMETERS) = struct
   let rec monitor_l1_chain (cctxt : #Client_context.full) l1_ctxt =
     let open Lwt_result_syntax in
     let*! res =
-      Layer_1.iter_heads l1_ctxt @@ fun (head_hash, header) ->
+      Layer_1.iter_heads ~name:"injector" l1_ctxt @@ fun (head_hash, header) ->
       let head = {block_hash = head_hash; level = header.shell.level} in
       let* next_protocol =
         next_protocol_of_block (cctxt :> Client_context.full) (head_hash, header)
@@ -1451,13 +1451,11 @@ module Make (Parameters : PARAMETERS) = struct
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
   let init (cctxt : #Client_context.full) ~data_dir ?(retention_period = 0)
-      ?(allowed_attempts = 10) ?(injection_ttl = 120)
-      ?(reconnection_delay = 2.0) state ~signers =
+      ?(allowed_attempts = 10) ?(injection_ttl = 120) l1_ctxt state ~signers =
     let open Lwt_result_syntax in
     assert (retention_period >= 0) ;
     assert (allowed_attempts >= 0) ;
     assert (injection_ttl > 0) ;
-    let*! l1_ctxt = Layer_1.start ~name:"injector" ~reconnection_delay cctxt in
     let* () =
       register_disjoint_signers
         (cctxt : #Client_context.full)
