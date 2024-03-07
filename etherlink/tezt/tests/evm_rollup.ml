@@ -2956,6 +2956,49 @@ let test_cannot_prepayed_leads_to_no_inclusion =
       ~error_msg:"The transaction should fail") ;
   unit
 
+let test_cannot_prepayed_with_delay_leads_to_no_injection =
+  register_both
+    ~tags:["evm"; "prepay"; "injection"]
+    ~title:
+      "Not being able to prepay a transaction that was included leads to it \
+       not being injected."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; endpoint; _}
+    ->
+  let sender, to_public_key =
+    ( Eth_account.bootstrap_accounts.(0),
+      "0xE7f682c226d7269C7247b878B3F94c7a8d31FEf5" )
+  in
+  let transaction_included =
+    Eth_cli.transaction_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~to_public_key
+      ~value:Wei.one
+      ~endpoint
+  in
+  (* Transaction from previous sender to the same address but with nonce 1 and
+     a gas computation that will lead it to not being able to be prepayed hence
+     rejected at injection. *)
+  let raw_tx =
+    "f86501830186a0830186a094e7f682c226d7269c7247b878b3f94c7a8d31fef58080820a95a0a9afcb6020f31b62e45778a051c62e71ce5c52789ba6ab487812f21271a98291a03673d60e267b6d32ecd22403cb54c088ee897e0c1862aa3f48039671503957d1"
+  in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
+  let* _will_succeed =
+    wait_for_application ~evm_node ~sc_rollup_node ~client transaction_included
+  in
+  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
+  let wait_for_failure () =
+    let* _ =
+      wait_for_application
+        ~evm_node
+        ~sc_rollup_node
+        ~client
+        (wait_for_transaction_receipt ~evm_node ~transaction_hash)
+    in
+    Test.fail "Unreachable state, transaction will never be injected."
+  in
+  Lwt.catch wait_for_failure (function _ -> unit)
+
 let test_rpc_sendRawTransaction_nonce_too_low =
   register_both
     ~tags:["evm"; "rpc"; "nonce"]
@@ -5248,6 +5291,7 @@ let register_evm_node ~protocols =
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
   test_cannot_prepayed_leads_to_no_inclusion protocols ;
+  test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
   test_rpc_sendRawTransaction_nonce_too_high protocols ;
   test_rpc_sendRawTransaction_invalid_chain_id protocols ;
