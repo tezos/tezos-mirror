@@ -108,9 +108,9 @@ module type S = sig
 
   (**/**)
 
-  (** [inject_kernel_upgrade ~payload] injects the kernel upgrade
-      payload [payload] in the local state. *)
-  val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+  (** [inject_kernel_upgrade upgrade] injects the kernel [upgrade]
+      in the local state. *)
+  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
 
   (** [inject_sequencer_upgrade ~payload] injects the sequencer
       upgrade payload [payload] in the local state. *)
@@ -126,7 +126,7 @@ module type Backend = sig
 
   module SimulatorBackend : Simulator.SimulationBackend
 
-  val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
 
   val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end

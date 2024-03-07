@@ -78,9 +78,7 @@ let on_new_event ({backend; _} : Types.state) event =
   let (module Backend) = backend in
   let* () = Evm_events_follower_events.new_event event in
   match event with
-  | Evm_events.Upgrade_event upgrade ->
-      let payload = Upgrade.to_bytes upgrade |> String.of_bytes in
-      Backend.inject_kernel_upgrade ~payload
+  | Evm_events.Upgrade_event upgrade -> Backend.inject_kernel_upgrade upgrade
   | Evm_events.Sequencer_upgrade_event sequencer_upgrade ->
       let payload =
         Sequencer_upgrade.to_bytes sequencer_upgrade |> String.of_bytes
