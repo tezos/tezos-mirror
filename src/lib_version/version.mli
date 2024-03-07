@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -64,7 +64,13 @@ type additional_info = Tezos_version_parser.additional_info =
     The result is a string of the form ["+dev"], ["~rcX"], ["~rcX+dev"] or [""]. *)
 val string_of_additional_info : additional_info -> string
 
-(** Version information.
+(** Product information. *)
+type product = Tezos_version_parser.product = Octez
+
+(** Convert the product information to a string. *)
+val string_of_product : product -> string
+
+(** Version information of the [product].
 
     Major versions include significant new features and are usually
     released in new branches which start from master.
@@ -73,6 +79,7 @@ val string_of_additional_info : additional_info -> string
     branches which start from the previous release.
     When the major version is incremented, the minor version is reset to 0. *)
 type t = Tezos_version_parser.t = {
+  product : product;
   major : int;
   minor : int;
   additional_info : additional_info;

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,10 +29,11 @@
 open Version
 open Current_git_info
 
-let to_json {major; minor; additional_info} =
+let to_json {product; major; minor; additional_info} =
   Format.sprintf
-    "{ \"major\": \"%i\", \"minor\": \"%i\", \"info\": \"%s\", \"hash\": \
-     \"%s\" }"
+    "{ \"product\": \"%s\", \"major\": \"%i\", \"minor\": \"%i\", \"info\": \
+     \"%s\", \"hash\": \"%s\" }"
+    (string_of_product product)
     major
     minor
     (string_of_additional_info additional_info)
