@@ -184,6 +184,27 @@ module Autostake = struct
     else return state
 end
 
+module Delayed_slashing = struct
+  let enabled (state : State.t) = state.constants.adaptive_issuance.ns_enable
+
+  (* Returns a pair, fst is the delayed slashes, snd is the slashes to apply now *)
+  let partition_slashes state current_cycle =
+    if not (enabled state) then ([], state.pending_slashes)
+    else
+      List.partition
+        (fun (_, Protocol.Denunciations_repr.{misbehaviour; _}) ->
+          let cycle =
+            Block.current_cycle_of_level
+              ~blocks_per_cycle:
+                state.constants
+                  .Protocol.Alpha_context.Constants.Parametric.blocks_per_cycle
+              ~current_level:
+                (Protocol.Raw_level_repr.to_int32 misbehaviour.level)
+          in
+          Protocol.Alpha_context.Cycle.(cycle = current_cycle))
+        state.pending_slashes
+end
+
 module NS = struct
   let enabled (block : Block.t) (state : State.t) =
     AI.enabled block state && state.constants.adaptive_issuance.ns_enable

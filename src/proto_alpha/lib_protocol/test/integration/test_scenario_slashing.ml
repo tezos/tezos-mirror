@@ -73,7 +73,7 @@ let test_simple_slash =
        --> next_cycle
        --> assert_failure
              (exec_unit (fun (_block, state) ->
-                  if state.State.constants.adaptive_issuance.ns_enable then
+                  if State_ai_flags.Delayed_slashing.enabled state then
                     failwith "ns_enable = true: slash not applied yet"
                   else return_unit)
              --> check_snapshot_balances "before slash")

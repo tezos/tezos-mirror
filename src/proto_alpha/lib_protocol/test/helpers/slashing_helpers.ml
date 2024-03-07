@@ -262,25 +262,7 @@ let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
     (state : State.t) : State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let to_slash_later, to_slash_now =
-    if
-      not
-        state.constants
-          .Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
-          .ns_enable
-    then ([], state.pending_slashes)
-    else
-      List.partition
-        (fun (_, Protocol.Denunciations_repr.{misbehaviour; _}) ->
-          let cycle =
-            Block.current_cycle_of_level
-              ~blocks_per_cycle:
-                state.constants
-                  .Protocol.Alpha_context.Constants.Parametric.blocks_per_cycle
-              ~current_level:
-                (Protocol.Raw_level_repr.to_int32 misbehaviour.level)
-          in
-          Protocol.Alpha_context.Cycle.(cycle = current_cycle))
-        state.pending_slashes
+    State_ai_flags.Delayed_slashing.partition_slashes state current_cycle
   in
   let* state, total_burnt =
     List.fold_left_es
