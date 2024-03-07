@@ -1109,12 +1109,29 @@ impl<M: backend::Manager> CSRegisters<M> {
     /// Sections 3.1.6 & 4.1.1
     #[inline(always)]
     fn transform_write(&self, reg: CSRegister, value: CSRValue) -> (CSRegister, CSRValue) {
+        // the update of a shadow register follows the steps:
+        // 1. keep the shadowed fields from [value]
+        // 2. all the other, non-shadowed fields are the underlying register
+        //    masked with the inverse of the shadowed fields mask
+        // Note: This works because currently there are no shadowed WLRL registers
         match reg {
             CSRegister::sstatus => {
                 let mstatus = self.registers.read(CSRegister::mstatus as usize);
                 let sstatus_only = xstatus::sstatus_from_mstatus(value);
                 let mstatus_only = mstatus & !xstatus::SSTATUS_FIELDS_MASK;
                 (CSRegister::mstatus, sstatus_only | mstatus_only)
+            }
+            CSRegister::sip => {
+                let mip = self.registers.read(CSRegister::mip as usize);
+                let sip_only = value & CSRegister::WARL_MASK_SIP_SIE;
+                let mip_only = mip & !CSRegister::WARL_MASK_SIP_SIE;
+                (CSRegister::mip, sip_only | mip_only)
+            }
+            CSRegister::sie => {
+                let mie = self.registers.read(CSRegister::mie as usize);
+                let sie_only = value & CSRegister::WARL_MASK_SIP_SIE;
+                let mie_only = mie & !CSRegister::WARL_MASK_SIP_SIE;
+                (CSRegister::mie, sie_only | mie_only)
             }
             _ => (reg, value),
         }
@@ -1137,6 +1154,14 @@ impl<M: backend::Manager> CSRegisters<M> {
                 xstatus::sstatus_from_mstatus(mstatus)
             }
             CSRegister::mstatus => mstatus_value.unwrap_or_else(read_mstatus),
+            CSRegister::sip => {
+                // sip is a shadow of mip where the machine interrupt pending bits are masked
+                self.registers.read(CSRegister::mip as usize) & CSRegister::WARL_MASK_SIP_SIE
+            }
+            CSRegister::sie => {
+                // sie is a shadow of mie where the machine interrupt enable bits are masked
+                self.registers.read(CSRegister::mie as usize) & CSRegister::WARL_MASK_SIP_SIE
+            }
             _ => self.registers.read(reg as usize),
         }
     }
@@ -1231,7 +1256,7 @@ impl<M: backend::Manager> CSRegisters<M> {
 #[allow(clippy::identity_op)]
 mod tests {
     use crate::{
-        backend_test,
+        backend_test, create_backend, create_state,
         machine_state::{
             backend::{
                 tests::{test_determinism, ManagerFor},
@@ -1493,6 +1518,33 @@ mod tests {
         // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
         let read_sstatus = csrs.read(CSRegister::sstatus);
         assert_eq!(read_sstatus, 1 << 63 | 0b10 << 32 | 0b11 << 9 | 0 << 8);
+    });
+
+    backend_test!(test_xip_xie, F, {
+        let mut backend = create_backend!(CSRegistersLayout, F);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+
+        // check shadowing of MTIP
+        csrs.write(CSRegister::mip, CSRegister::SEIP_BIT | CSRegister::MTIP_BIT);
+        assert_eq!(
+            csrs.read(CSRegister::mip),
+            CSRegister::SEIP_BIT | CSRegister::MTIP_BIT
+        );
+        assert_eq!(csrs.read(CSRegister::sip), CSRegister::SEIP_BIT);
+
+        // MSIP bit should not be written
+        csrs.write(
+            CSRegister::sie,
+            CSRegister::STIP_BIT | CSRegister::SEIP_BIT | CSRegister::MSIP_BIT,
+        );
+        assert_eq!(
+            csrs.read(CSRegister::mie),
+            CSRegister::STIP_BIT | CSRegister::SEIP_BIT
+        );
+        assert_eq!(
+            csrs.read(CSRegister::sie),
+            CSRegister::STIP_BIT | CSRegister::SEIP_BIT
+        );
     });
 
     backend_test!(test_reset, F, {
