@@ -29,6 +29,15 @@
 open Version
 open Current_git_info
 
+let to_json {major; minor; additional_info} =
+  Format.sprintf
+    "{ \"major\": \"%i\", \"minor\": \"%i\", \"info\": \"%s\", \"hash\": \
+     \"%s\" }"
+    major
+    minor
+    (string_of_additional_info additional_info)
+    Tezos_version_value.Current_git_info.abbreviated_commit_hash
+
 let help_string =
   "This script prints out the current version of the\n\
    node as it is deduced from the git tag of the current branch.\n\
@@ -46,6 +55,7 @@ let () =
       print_endline Tezos_version_value.Bin_version.simple_version_string
   | [|_; "--commit"|] ->
       print_endline Tezos_version_value.Current_git_info.abbreviated_commit_hash
+  | [|_; "--json"|] -> print_endline (to_json version)
   | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;

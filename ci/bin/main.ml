@@ -612,7 +612,7 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
           "apt-get install -y rsync git m4 build-essential patch unzip wget \
            opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev \
            libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev \
-           protobuf-compiler libsqlite3-dev";
+           protobuf-compiler libsqlite3-dev jq";
         ]
     | Rpm ->
         [
@@ -622,7 +622,7 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
            python3-devel python3-setuptools wget opam rsync which cargo \
            autoconf mock systemd systemd-rpm-macros cmake python3-wheel \
            python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel \
-           sqlite-devel";
+           sqlite-devel jq";
         ])
   in
   job
