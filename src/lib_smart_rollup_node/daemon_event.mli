@@ -75,6 +75,8 @@ val error : tztrace -> unit Lwt.t
     refutations. *)
 val degraded_mode : unit -> unit Lwt.t
 
+val refutation_loop_retry : float -> unit Lwt.t
+
 (** Emit an event when the node exits after recovering the operator's
     stakes. *)
 val exit_bailout_mode : unit -> unit Lwt.t

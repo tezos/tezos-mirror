@@ -527,10 +527,12 @@ let sc_rollup_node_stops_scenario sc_rollup_node sc_rollup _node client =
   unit
 
 let sc_rollup_node_disconnects_scenario sc_rollup_node sc_rollup node client =
-  let num_messages = 2 in
+  let num_messages = 5 in
   let* level = Node.get_level node in
   Log.info "we are at level %d" level ;
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup ~event_level:`Debug []
+  in
   let* () = send_messages num_messages client in
   let* level = wait_for_current_level node sc_rollup_node in
   let* () = Lwt_unix.sleep 1. in
@@ -538,6 +540,16 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node sc_rollup node client =
   let* () = Node.terminate node in
   Log.info "Waiting before restarting Tezos node" ;
   let* () = Lwt_unix.sleep 3. in
+  let refutation_loop_request =
+    Sc_rollup_node.wait_for sc_rollup_node "request_completed.v0" @@ fun json ->
+    let open JSON in
+    if
+      json |-> "view" |-> "request" |> as_string = "process"
+      && json |-> "view" |-> "block" |-> "level" |> as_int
+         = level + num_messages
+    then Some ()
+    else None
+  in
   Log.info "Restarting Tezos node" ;
   let* () = Node.run node Node.[Connections 0; Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node in
@@ -545,7 +557,12 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node sc_rollup node client =
   let* _ =
     Sc_rollup_node.wait_for_level sc_rollup_node (level + num_messages)
   in
-  unit
+  Lwt.choose
+    [
+      refutation_loop_request;
+      (let* () = Lwt_unix.sleep 10. in
+       Test.fail "Refutation loop did not process after reconnection");
+    ]
 
 let sc_rollup_node_handles_chain_reorg sc_rollup_node sc_rollup node client =
   let num_messages = 1 in

@@ -104,6 +104,9 @@ type t = {
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
   l1_rpc_timeout : float;
+  loop_retry_delay : float;
+      (** Delay in seconds to retry the main loop and the refutation loop after
+          an error. *)
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;

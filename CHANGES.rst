@@ -173,6 +173,9 @@ Smart Rollup node
 - Prevent some leak of connections to L1 node from rollup node (and avoid
   duplication). (MR :gl:`!11825`)
 
+- Playing the refutation games completely asynchronous with the rest of the
+  rollup node. (MR :gl:`!12106`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
