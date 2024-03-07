@@ -206,7 +206,7 @@ module Term = struct
                 tzfail (Node_run_command.Invalid_sandbox_file filename)
             | Ok json -> return_some ("sandbox_parameter", json))
       in
-      let* () =
+      let*? () =
         Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal
           node_config.blockchain_network.dal_config
       in

@@ -87,7 +87,9 @@ let init_cryptobox config dal_config
     if prover_srs then
       let find_srs_files () = Tezos_base.Dal_srs.find_trusted_setup_files () in
       Cryptobox.Config.init_prover_dal ~find_srs_files dal_config
-    else Cryptobox.Config.init_verifier_dal dal_config
+    else
+      let*? () = Cryptobox.Config.init_verifier_dal dal_config in
+      return_unit
   in
   match Cryptobox.make proto_parameters.cryptobox_parameters with
   | Ok cryptobox ->

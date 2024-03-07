@@ -1213,14 +1213,14 @@ module Config = struct
   let default = Dal_config.default
 
   let init_verifier_dal dal_config =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     if dal_config.activated then
       let* initialisation_parameters =
         match dal_config.use_mock_srs_for_testing with
         | Some _parameters -> return (Verifier {is_fake = true})
         | None -> return (Verifier {is_fake = false})
       in
-      Lwt.return (load_parameters initialisation_parameters)
+      load_parameters initialisation_parameters
     else return_unit
 
   let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =

@@ -598,7 +598,7 @@ module Config : sig
      same initialization parameters. (To ensure this property, an integrity
      check is run.) In this case, [init_dal] can take several seconds
      to run. *)
-  val init_verifier_dal : t -> unit Error_monad.tzresult Lwt.t
+  val init_verifier_dal : t -> unit Error_monad.tzresult
 
   val init_prover_dal :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
