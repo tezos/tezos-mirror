@@ -180,7 +180,11 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             return Ok(());
         }
         Err(Error::UpgradeError(Fallback)) => {
+            // If the migration failed we backup to the previous kernel
+            // and force a reboot to reload the kernel.
             fallback_backup_kernel(host)?;
+            host.mark_for_reboot()?;
+            return Ok(());
         }
         Err(err) => return Err(err.into()),
     };
