@@ -176,6 +176,9 @@ Smart Rollup node
 - Playing the refutation games completely asynchronous with the rest of the
   rollup node. (MR :gl:`!12106`)
 
+- Rollup node can recover from degraded mode if they have everything necessary
+  to pick back up the main loop. (MR :gl:`!12107`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

@@ -2621,9 +2621,11 @@ let test_reveals_fails_on_wrong_hash =
 
 let test_reveals_fails_on_unknown_hash =
   let kind = "arith" in
+  let commitment_period = 10 in
   test_full_scenario
     ~supports:(Protocol.From_protocol 18)
     ~timeout:120
+    ~commitment_period
     ~kind
     ~allow_degraded:true
     {
@@ -2631,10 +2633,8 @@ let test_reveals_fails_on_unknown_hash =
       variant = None;
       description = "reveal data fails with unknown hash";
     }
-  @@ fun _protocol sc_rollup_node sc_rollup node client ->
-  let unknown_hash =
-    "0027782d2a7020be332cc42c4e66592ec50305f559a4011981f1d5af81428ecafe"
-  in
+  @@ fun protocol sc_rollup_node sc_rollup node client ->
+  let unknown_hash = reveal_hash ~protocol ~kind "Some data" in
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let error_promise =
     Sc_rollup_node.wait_for
@@ -2647,18 +2647,27 @@ let test_reveals_fails_on_unknown_hash =
   in
   (* We need to check that the rollup has entered the degraded mode,
       so we wait for 60 blocks (commitment period) + 2. *)
-  let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
   let* () =
-    repeat (commitment_period_in_blocks + 2) (fun () ->
-        Client.bake_for_and_wait client)
+    repeat (commitment_period + 2) (fun () -> Client.bake_for_and_wait client)
   in
   (* Then, we finally send the message with the unknown hash. *)
-  let* () = send_text_messages client ["hash:" ^ unknown_hash] in
+  let* () = send_text_messages client [unknown_hash.message] in
   let should_not_sync =
     let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node in
     Test.fail "The rollup node processed the unknown reveal without failing"
   in
-  Lwt.choose [error_promise; should_not_sync]
+  let* () = Lwt.choose [error_promise; should_not_sync] in
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+  Log.info "Adding missing pre-image." ;
+  let pvm_dir = Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) kind in
+  let filename = Filename.concat pvm_dir unknown_hash.filename in
+  let () = Sys.mkdir pvm_dir 0o700 in
+  let cout = open_out filename in
+  let () = output_string cout "Some data" in
+  let () = close_out cout in
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+  let* _level = wait_for_current_level node ~timeout:10. sc_rollup_node in
+  unit
 
 let test_reveals_4k =
   let kind = "arith" in

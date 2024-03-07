@@ -77,6 +77,8 @@ val degraded_mode : unit -> unit Lwt.t
 
 val refutation_loop_retry : float -> unit Lwt.t
 
+val main_loop_retry : float -> unit Lwt.t
+
 (** Emit an event when the node exits after recovering the operator's
     stakes. *)
 val exit_bailout_mode : unit -> unit Lwt.t
