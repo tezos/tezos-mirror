@@ -364,6 +364,28 @@ type block_to_bake = {
 
 type consensus_vote_kind = Attestation | Preattestation
 
+let consensus_vote_kind_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"preattestation"
+        unit
+        (function Preattestation -> Some () | _ -> None)
+        (fun () -> Preattestation);
+      case
+        (Tag 1)
+        ~title:"attestation"
+        unit
+        (function Attestation -> Some () | _ -> None)
+        (fun () -> Attestation);
+    ]
+
+let pp_consensus_vote_kind fmt = function
+  | Attestation -> Format.fprintf fmt "attestation"
+  | Preattestation -> Format.fprintf fmt "preattestation"
+
 type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;

@@ -166,6 +166,10 @@ type prepared_block = {
 
 type consensus_vote_kind = Attestation | Preattestation
 
+val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
+
+val consensus_vote_kind_encoding : consensus_vote_kind Data_encoding.t
+
 type unsigned_consensus_vote = {
   vote_kind : consensus_vote_kind;
   vote_consensus_content : consensus_content;

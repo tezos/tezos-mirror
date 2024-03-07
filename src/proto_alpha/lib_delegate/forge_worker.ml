@@ -148,12 +148,8 @@ let handle_forge_consensus_votes worker baking_state
             vote_consensus_content.round )
         in
         let*! () =
-          match vote_kind with
-          | Preattestation ->
-              Events.(
-                emit skipping_preattestation (delegate, level, round, err))
-          | Attestation ->
-              Events.(emit skipping_attestation (delegate, level, round, err))
+          Events.(
+            emit skipping_consensus_vote (vote_kind, delegate, level, round, err))
         in
         fail err
     | Ok signed_consensus_vote -> (
