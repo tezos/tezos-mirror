@@ -13,6 +13,10 @@ module Tez = struct
   include Tez_helpers.Compare
 end
 
+let fail_account_not_found func_name account_name =
+  Log.error "State_account.%s: account %s not found" func_name account_name ;
+  assert false
+
 let join_errors e1 e2 =
   let open Lwt_result_syntax in
   match (e1, e2) with
@@ -116,7 +120,7 @@ module Frozen_tez = struct
     assert (Q.(equal rem zero)) ;
     Tez.(tez +! a.self_current)
 
-  (* 0 <= quantity < 1 && co_current + quantity is int *)
+  (* Precondition: 0 <= quantity < 1 && co_current + quantity is int *)
   let add_q_to_all_co_current quantity co_current =
     let s = total_co_current_q co_current in
     if Q.(equal quantity zero) then co_current
@@ -210,12 +214,12 @@ module Frozen_tez = struct
             in
             ({a with co_current}, amount)
 
-  (* Remove a partial amount to the co frozen tez table. *)
+  (* Remove a partial amount from the co frozen tez table. *)
   let sub_current_q amount_q account a =
     if account = a.delegate then assert false
     else
       match String.Map.find account a.co_current with
-      | None -> a
+      | None -> assert false
       | Some frozen ->
           if Q.(geq amount_q frozen) then
             let co_current = String.Map.remove account a.co_current in
@@ -498,7 +502,7 @@ let balance_zero =
 
 let balance_of_account account_name (account_map : account_map) =
   match String.Map.find account_name account_map with
-  | None -> raise Not_found
+  | None -> fail_account_not_found "balance_of_account.src" account_name
   | Some
       {
         pkh = _;
@@ -529,7 +533,7 @@ let balance_of_account account_name (account_map : account_map) =
         | None -> balance
         | Some d -> (
             match String.Map.find d account_map with
-            | None -> raise Not_found
+            | None -> fail_account_not_found "balance_of_account.delegate" d
             | Some delegate_account ->
                 {
                   balance with
@@ -742,7 +746,9 @@ let assert_balance_equal ~loc account_name
 let update_account ~f account_name account_map =
   String.Map.update
     account_name
-    (function None -> raise Not_found | Some x -> Some (f x))
+    (function
+      | None -> fail_account_not_found "update_account" account_name
+      | Some x -> Some (f x))
     account_map
 
 let add_liquid_rewards amount account_name account_map =
@@ -793,12 +799,13 @@ let apply_transfer amount src_name dst_name account_map =
         in
         let account_map = update_account ~f:f_src src_name account_map in
         update_account ~f:f_dst dst_name account_map
-  | _ -> raise Not_found
+  | None, _ -> fail_account_not_found "apply_transfer.src" src_name
+  | _, None -> fail_account_not_found "apply_transfer.dst" dst_name
 
 let stake_from_unstake amount current_cycle consensus_rights_delay delegate_name
     account_map =
   match String.Map.find delegate_name account_map with
-  | None -> raise Not_found
+  | None -> fail_account_not_found "stake_from_unstake" delegate_name
   | Some ({unstaked_frozen; frozen_deposits; slashed_cycles; _} as account) ->
       let oldest_slashable_cycle =
         Cycle.(sub current_cycle (consensus_rights_delay + 1))
@@ -884,7 +891,7 @@ let unstake_values_real amount delegate_account =
 let apply_stake amount current_cycle consensus_rights_delay staker_name
     account_map =
   match String.Map.find staker_name account_map with
-  | None -> raise Not_found
+  | None -> fail_account_not_found "apply_stake" staker_name
   | Some staker -> (
       match staker.delegate with
       | None ->
@@ -971,13 +978,14 @@ let apply_stake amount current_cycle consensus_rights_delay staker_name
 
 let apply_unstake cycle amount staker_name account_map =
   match String.Map.find staker_name account_map with
-  | None -> raise Not_found
+  | None -> fail_account_not_found "apply_unstake.staker" staker_name
   | Some staker -> (
       match staker.delegate with
       | None -> (* Invalid operation: no delegate *) account_map
       | Some delegate_name -> (
           match String.Map.find delegate_name account_map with
-          | None -> raise Not_found
+          | None ->
+              fail_account_not_found "apply_unstake.delegate" delegate_name
           | Some delegate ->
               if delegate_name = staker_name then
                 (* Case self stake *)
@@ -1090,7 +1098,7 @@ let apply_unslashable_for_all cycle account_map =
 
 let apply_finalize staker_name account_map =
   match String.Map.find staker_name account_map with
-  | None -> raise Not_found
+  | None -> fail_account_not_found "apply_finalize" staker_name
   | Some _staker ->
       (* Because an account can still have finalizable funds from a delegate
          that is not its own, we iterate over all of them *)
@@ -1229,7 +1237,8 @@ let apply_slashing
   in
   let culprit_account =
     String.Map.find culprit_name account_map
-    |> Option.value_f ~default:(fun () -> raise Not_found)
+    |> Option.value_f ~default:(fun () ->
+           fail_account_not_found "apply_slashing" culprit_name)
   in
   let slashed_culprit_account, total_slashed = slash_culprit culprit_account in
   let account_map =
@@ -1324,7 +1333,10 @@ let assert_pseudotokens_consistency ~loc balance account account_name
       if account_name = delegate_name then return_unit
       else
         match String.Map.find delegate_name account_map with
-        | None -> raise Not_found
+        | None ->
+            fail_account_not_found
+              "assert_pseudotokens_consistency"
+              delegate_name
         | Some delegate_account ->
             let total_co =
               Frozen_tez.total_co_current_q
@@ -1357,7 +1369,7 @@ let assert_pseudotokens_consistency ~loc balance account account_name
 let assert_balance_check ~loc ctxt account_name account_map =
   let open Lwt_result_syntax in
   match String.Map.find account_name account_map with
-  | None -> raise Not_found
+  | None -> fail_account_not_found "assert_balance_check" account_name
   | Some account ->
       let* balance_ctxt, total_balance_ctxt =
         get_balance_from_context ctxt account.contract

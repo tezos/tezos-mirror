@@ -46,7 +46,9 @@ let unstake_wait state =
 (** From a name, returns the corresponding account *)
 let find_account (account_name : string) (state : t) : account_state =
   match String.Map.find account_name state.account_map with
-  | None -> raise Not_found
+  | None ->
+      Log.error "State.find_account: account %s not found" account_name ;
+      assert false
   | Some r -> r
 
 let find_account_from_pkh (pkh : Signature.public_key_hash) (state : t) :
@@ -56,7 +58,12 @@ let find_account_from_pkh (pkh : Signature.public_key_hash) (state : t) :
     state.account_map
   |> String.Map.choose
   |> function
-  | None -> raise Not_found
+  | None ->
+      Log.error
+        "State.find_account_from_pkh: account %a not found"
+        Signature.Public_key_hash.pp
+        pkh ;
+      assert false
   | Some (name, acc) -> (name, acc)
 
 let liquid_delegated ~name state =
