@@ -51,9 +51,9 @@ val admin : path
 (** [kernel_governance] is the path to the kernel governance contract. *)
 val kernel_governance : path
 
-(** [sequencer_admin] is the path to the contract administrating the
-    sequencer. *)
-val sequencer_admin : path
+(** [sequencer_governance] is the path to the governance contract
+    administrating the sequencer. *)
+val sequencer_governance : path
 
 (** [ticketer] is the path to the ticketer contract. *)
 val ticketer : path

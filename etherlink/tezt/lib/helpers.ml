@@ -144,7 +144,7 @@ let check_head_consistency ~left ~right ?error_msg () =
   check_block_consistency ~left ~right ?error_msg ~block:`Latest ()
 
 let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
-    ~sequencer_admin_contract ~client ~upgrade_to ~pool_address
+    ~sequencer_governance_contract ~client ~upgrade_to ~pool_address
     ~activation_timestamp =
   let* payload =
     Evm_node.sequencer_upgrade_payload
@@ -159,7 +159,7 @@ let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
     Client.transfer
       ~amount:Tez.zero
       ~giver:sequencer_admin
-      ~receiver:sequencer_admin_contract
+      ~receiver:sequencer_governance_contract
       ~arg:(sf {|Pair "%s" 0x%s|} sc_rollup_address payload)
       ~burn_cap:Tez.one
       client

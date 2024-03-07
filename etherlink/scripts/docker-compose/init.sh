@@ -74,7 +74,7 @@ create_kernel_config() {
   add_kernel_config_contract "$file" /evm/admin "${EVM_ADMIN_ALIAS}_contract" "ADMIN"
 
   # sequencer admin config
-  add_kernel_config_contract "$file" /evm/sequencer_admin "${SEQUENCER_ADMIN_ALIAS}_contract" "SEQUENCER_ADMIN"
+  add_kernel_config_contract "$file" /evm/sequencer_governance "${SEQUENCER_GOVERNANCE_ALIAS}_contract" "SEQUENCER_GOVERNANCE"
 
   # delayed bridge config
   add_kernel_config_contract "$file" /evm/delayed_bridge "${DELAYED_BRIDGE_ALIAS}" "DELAYED_BRIDGE"
@@ -172,10 +172,10 @@ originate_contracts() {
     evm_admin_address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${EVM_ADMIN_ALIAS}" | grep Hash | grep -oE "tz.*")
     originate_admin "${EVM_ADMIN_ALIAS}_contract" "${evm_admin_address}"
   fi
-  if [[ -n ${SEQUENCER_ADMIN_ALIAS} ]]; then
-    generate_key "${SEQUENCER_ADMIN_ALIAS}"
-    sequencer_admin_address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${SEQUENCER_ADMIN_ALIAS}" | grep Hash | grep -oE "tz.*")
-    originate_admin "${SEQUENCER_ADMIN_ALIAS}_contract" "${sequencer_admin_address}"
+  if [[ -n ${SEQUENCER_GOVERNANCE_ALIAS} ]]; then
+    generate_key "${SEQUENCER_GOVERNANCE_ALIAS}"
+    sequencer_governance_address=$(run_in_docker octez-client --endpoint "${ENDPOINT}" show address "${SEQUENCER_GOVERNANCE_ALIAS}" | grep Hash | grep -oE "tz.*")
+    originate_admin "${SEQUENCER_GOVERNANCE_ALIAS}_contract" "${sequencer_governance_address}"
   fi
   if [[ -n ${DELAYED_BRIDGE_ALIAS} ]]; then
     originate_contract delayed_transaction_bridge.tz "${DELAYED_BRIDGE_ALIAS}" Unit

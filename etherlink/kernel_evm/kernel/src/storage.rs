@@ -38,7 +38,8 @@ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version"
 
 const TICKETER: RefPath = RefPath::assert_from(b"/evm/ticketer");
 pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
-pub const SEQUENCER_ADMIN: RefPath = RefPath::assert_from(b"/evm/sequencer_admin");
+pub const SEQUENCER_GOVERNANCE: RefPath =
+    RefPath::assert_from(b"/evm/sequencer_governance");
 const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
 
@@ -808,8 +809,10 @@ pub fn read_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &ADMIN.into())
 }
 
-pub fn read_sequencer_admin<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {
-    read_b58_kt1(host, &SEQUENCER_ADMIN.into())
+pub fn read_sequencer_governance<Host: Runtime>(
+    host: &mut Host,
+) -> Option<ContractKt1Hash> {
+    read_b58_kt1(host, &SEQUENCER_GOVERNANCE.into())
 }
 
 pub fn read_kernel_governance<Host: Runtime>(host: &mut Host) -> Option<ContractKt1Hash> {

@@ -29,7 +29,7 @@ type l1_contracts = {
   bridge : string;
   admin : string;
   kernel_governance : string;
-  sequencer_admin : string option;
+  sequencer_governance : string option;
 }
 
 type full_evm_setup = {
@@ -289,7 +289,7 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
 
   (* Originates the sequencer administrator contract. *)
-  let* sequencer_admin =
+  let* sequencer_governance =
     match sequencer_admin with
     | Some sequencer_admin ->
         let* sequencer_admin =
@@ -339,7 +339,7 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
       bridge;
       admin = admin_contract;
       kernel_governance;
-      sequencer_admin;
+      sequencer_governance;
     }
 
 type setup_mode =
@@ -392,8 +392,9 @@ let setup_evm_kernel ?config ?(kernel_installee = Constant.WASM.evm_kernel)
       ?administrator
       ?kernel_governance
       ?sequencer
-      ?sequencer_administrator:
-        (Option.bind l1_contracts (fun {sequencer_admin; _} -> sequencer_admin))
+      ?sequencer_governance:
+        (Option.bind l1_contracts (fun {sequencer_governance; _} ->
+             sequencer_governance))
       ()
   in
   let config =
@@ -2239,7 +2240,7 @@ let test_deposit_and_withdraw =
     admin = _;
     kernel_governance = _;
     exchanger = _;
-    sequencer_admin = _;
+    sequencer_governance = _;
   } =
     match l1_contracts with
     | Some x -> x
@@ -4479,9 +4480,10 @@ let test_migrate_proxy_to_sequencer_future =
     check_tx_succeeded ~endpoint:(Evm_node.endpoint proxy_node) ~tx
   in
   (* Send the internal message to add a sequencer on the rollup. *)
-  let sequencer_admin_contract =
+  let sequencer_governance_contract =
     match
-      Option.bind l1_contracts (fun {sequencer_admin; _} -> sequencer_admin)
+      Option.bind l1_contracts (fun {sequencer_governance; _} ->
+          sequencer_governance)
     with
     | Some contract -> contract
     | None -> Test.fail "missing sequencer admin contract"
@@ -4490,7 +4492,7 @@ let test_migrate_proxy_to_sequencer_future =
     sequencer_upgrade
       ~sc_rollup_address
       ~sequencer_admin:sequencer_admin.alias
-      ~sequencer_admin_contract
+      ~sequencer_governance_contract
       ~client
       ~upgrade_to:sequencer_key.alias
       ~activation_timestamp
@@ -4618,9 +4620,10 @@ let test_migrate_proxy_to_sequencer_past =
     check_tx_succeeded ~endpoint:(Evm_node.endpoint proxy_node) ~tx
   in
   (* Send the internal message to add a sequencer on the rollup. *)
-  let sequencer_admin_contract =
+  let sequencer_governance_contract =
     match
-      Option.bind l1_contracts (fun {sequencer_admin; _} -> sequencer_admin)
+      Option.bind l1_contracts (fun {sequencer_governance; _} ->
+          sequencer_governance)
     with
     | Some contract -> contract
     | None -> Test.fail "missing sequencer admin contract"
@@ -4629,7 +4632,7 @@ let test_migrate_proxy_to_sequencer_past =
     sequencer_upgrade
       ~sc_rollup_address
       ~sequencer_admin:sequencer_admin.alias
-      ~sequencer_admin_contract
+      ~sequencer_governance_contract
       ~client
       ~upgrade_to:sequencer_key.alias
       ~activation_timestamp:"0"

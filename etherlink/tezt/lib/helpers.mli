@@ -118,7 +118,7 @@ val check_head_consistency :
 val sequencer_upgrade :
   sc_rollup_address:string ->
   sequencer_admin:string ->
-  sequencer_admin_contract:string ->
+  sequencer_governance_contract:string ->
   client:Client.t ->
   upgrade_to:string ->
   pool_address:string ->

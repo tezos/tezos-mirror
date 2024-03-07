@@ -51,7 +51,7 @@ let admin = evm "/admin"
 
 let kernel_governance = evm "/kernel_governance"
 
-let sequencer_admin = evm "/sequencer_admin"
+let sequencer_governance = evm "/sequencer_governance"
 
 let ticketer = evm "/ticketer"
 

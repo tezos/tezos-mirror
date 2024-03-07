@@ -53,7 +53,7 @@ type l1_contracts = {
   exchanger : string;
   bridge : string;
   admin : string;
-  sequencer_admin : string;
+  sequencer_governance : string;
 }
 
 type sequencer_setup = {
@@ -115,7 +115,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
   (* Originates the administrator contract. *)
-  let* sequencer_admin =
+  let* sequencer_governance =
     Client.originate_contract
       ~alias:"evm-sequencer-admin"
       ~amount:Tez.zero
@@ -126,7 +126,8 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  return {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_admin}
+  return
+    {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_governance}
 
 let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_catchup
@@ -155,7 +156,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
       ~administrator:l1_contracts.admin
-      ~sequencer_administrator:l1_contracts.sequencer_admin
+      ~sequencer_governance:l1_contracts.sequencer_governance
       ?minimum_base_fee_per_gas
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
@@ -291,7 +292,7 @@ let test_remove_sequencer =
     Client.transfer
       ~amount:Tez.zero
       ~giver:Constant.bootstrap2.public_key_hash
-      ~receiver:l1_contracts.sequencer_admin
+      ~receiver:l1_contracts.sequencer_governance
       ~arg:(sf "Pair %S 0x" sc_rollup_address)
       ~burn_cap:Tez.one
       client
@@ -1776,7 +1777,7 @@ let test_sequencer_upgrade =
       sequencer_upgrade
         ~sc_rollup_address
         ~sequencer_admin:Constant.bootstrap2.alias
-        ~sequencer_admin_contract:l1_contracts.sequencer_admin
+        ~sequencer_governance_contract:l1_contracts.sequencer_governance
         ~pool_address:Eth_account.bootstrap_accounts.(0).address
         ~client
         ~upgrade_to:new_sequencer_key
