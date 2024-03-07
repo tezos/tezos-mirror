@@ -6,7 +6,7 @@
 #![allow(dead_code)]
 
 use risc_v_interpreter::{
-    machine_state::{self, MachineState, StepManyResult},
+    machine_state::{self, StepManyResult},
     state_backend,
     traps::EnvironException,
 };
@@ -60,10 +60,9 @@ impl<M: state_backend::Manager> Pvm<M> {
         Status::Eval
     }
 
-    fn execution_environment_trap_handler(
-        _machine_state: &MachineState<MemorySize, M>,
-        _exception: EnvironException,
-    ) {
+    /// Defines how to handle exceptions in the PVM execution environment.
+    /// Returns `true` in case the PVM may continue evaluation afterwards.
+    fn handle_exception(&mut self, _exception: EnvironException) -> bool {
         // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
         todo!("PVM Trap handler for execution environment traps not implemented")
     }
@@ -71,8 +70,9 @@ impl<M: state_backend::Manager> Pvm<M> {
     /// Perform one step. Returns `false` if the PVM is not in [`Status::Eval`] status.
     pub fn step(&mut self) -> bool {
         if let Err(exc) = self.machine_state.step() {
-            Pvm::execution_environment_trap_handler(&self.machine_state, exc)
-        };
+            self.handle_exception(exc);
+        }
+
         true
     }
 
@@ -91,13 +91,34 @@ impl<M: state_backend::Manager> Pvm<M> {
     /// (a possible case: the privilege mode access violation is treated in EE,
     /// but a page fault is not)
     pub fn step_many(&mut self, max_steps: usize) -> usize {
-        let StepManyResult { steps, exception } = self.machine_state.step_many(max_steps, |_| true);
+        self.step_many_accum(max_steps, 0)
+    }
+
+    // Tail-recursive helper function for [step_many]
+    fn step_many_accum(&mut self, max_steps: usize, accum: usize) -> usize {
+        let StepManyResult {
+            mut steps,
+            exception,
+        } = self.machine_state.step_many(max_steps, |_| true);
+
+        // Total steps done
+        let mut total_steps = accum.saturating_add(steps);
 
         if let Some(exc) = exception {
-            Pvm::execution_environment_trap_handler(&self.machine_state, exc)
+            // Raising the exception is not a completed step. Trying to handle it is.
+            // We don't have to check against `max_steps` because running the
+            // instruction that triggered the exception meant that `max_steps > 0`.
+            total_steps = total_steps.saturating_add(1);
+            steps = steps.saturating_add(1);
+
+            // Exception was handled in a way that allows us to evaluate more.
+            if self.handle_exception(exc) {
+                let steps_left = max_steps.saturating_sub(steps);
+                return self.step_many_accum(steps_left, total_steps);
+            }
         }
 
-        steps
+        total_steps
     }
 }
 
