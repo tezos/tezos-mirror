@@ -2935,6 +2935,27 @@ let test_deposit_dailynet =
   (* Check the balance in the EVM rollup. *)
   check_balance ~receiver ~endpoint amount_mutez
 
+let test_cannot_prepayed_leads_to_no_inclusion =
+  register_both
+    ~tags:["evm"; "prepay"; "inclusion"]
+    ~title:
+      "Not being able to prepay a transaction leads to it not being included."
+    ~bootstrap_accounts:[||]
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  (* No bootstrap accounts, so no one has funds. *)
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1).  We do not use eth-cli in
+     this test because we want the results of the simulation. *)
+  let raw_transfer =
+    "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  let*@? error = Rpc.send_raw_transaction ~raw_tx:raw_transfer evm_node in
+  Check.(
+    ((error.message = "Cannot prepay transaction.") string)
+      ~error_msg:"The transaction should fail") ;
+  unit
+
 let test_rpc_sendRawTransaction_nonce_too_low =
   register_both
     ~tags:["evm"; "rpc"; "nonce"]
@@ -5226,6 +5247,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
+  test_cannot_prepayed_leads_to_no_inclusion protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
   test_rpc_sendRawTransaction_nonce_too_high protocols ;
   test_rpc_sendRawTransaction_invalid_chain_id protocols ;
