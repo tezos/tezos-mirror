@@ -1,8 +1,8 @@
-// SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
+// SPDX-FileCopyrightText: 2023-2024 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
 
-const { is_transfer, is_create, is_call, is_transaction, BASE_GAS } = require('./utils')
+const { is_transfer, is_create, is_call, is_transaction, is_scenario, is_blueprint_reading, is_run } = require('./utils')
 const fs = require('fs')
 const path = require('path')
 const pdf_utils = require('./pdf_utils')
@@ -10,6 +10,7 @@ const block_finalization = require('./block_finalization')
 const tx_register = require('./tx_register')
 const tx_overhead = require('./tx_overhead')
 const queue = require('./queue')
+const stage_one = require('./stage_one')
 
 const tmp = require("tmp");
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
@@ -61,18 +62,23 @@ function init_analysis() {
         block_finalization: [],
         tx_register: [],
         tx_overhead: [],
-        runs_infos: []
-
+        runs_infos: [],
+        stage_one_data: [],
+        tmp_stage_one_data: [],
     };
     return empty
 }
 
-async function print_analysis({filename, report, analysis_acc}, dir) {
+async function print_analysis({ filename, report, analysis_acc }, dir) {
     let infos = analysis_acc;
 
     const doc = new PDFDocument();
     pdf_utils.output_msg(`Data: ${path.basename(filename)}`, doc);
 
+    console.info(`-------------------------------------------------------`)
+    console.info(`Stage One analysis`)
+    console.info(`----------------------------------`)
+    let error_stage_one = stage_one.print_analysis(infos, dir, doc)
     console.info(`-------------------------------------------------------`)
     console.info(`Block Finalization Analysis`)
     console.info(`----------------------------------`)
@@ -111,22 +117,36 @@ async function print_analysis({filename, report, analysis_acc}, dir) {
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
     await savePdfToFile(doc, report);
-    return error_block_finalization + error_register + error_queue
+    return error_stage_one + error_block_finalization + error_register + error_queue
 }
 
 function process_record(record, acc) {
     if (is_transaction(record)) process_transaction_record(record, acc)
-    else process_bench_record(record, acc)
+    else if (is_scenario(record)) process_bench_record(record, acc)
+    else if (is_blueprint_reading(record)) process_blueprint_reading_record(record, acc)
+    else if (is_run(record)) process_run_record(record, acc)
+    else console.log("[WARNING] couldn't sort record " + JSON.stringify(record))
 }
 
-function process_bench_record(record, acc) {
+function process_blueprint_reading_record(record, acc) {
+}
+
+function process_run_record(record, acc) {
     acc.runs_infos.push(record)
+    if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
     if (!isNaN(record.interpreter_decode_ticks)) {
         acc.nb_kernel_run += 1
         acc.decode = Math.max(acc.decode, record.interpreter_decode_ticks)
         acc.init = Math.max(acc.init, record.interpreter_init_ticks)
     }
-    if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
+    // add stage one infos
+    // each kernel_run will have some, even if inbox is empty
+    if (!isNaN(record.stage_one_ticks)) {
+        acc.tmp_stage_one_data.push(record.stage_one_ticks);
+    }
+}
+
+function process_bench_record(record, acc) {
 
     // Adds infos needed for block finalization analysis
     if (!isNaN(record.inbox_size)) {
@@ -141,6 +161,22 @@ function process_bench_record(record, acc) {
         } else {
             console.error("[Error] couldn't find correct finalize information")
         }
+    }
+
+    // add inbox infos to stage one data and reset
+    let tmp = acc.tmp_stage_one_data;
+    if (tmp.length !== 0) {
+        let data = {
+            benchmark_name: record.benchmark_name,
+            nb_chunks: record.blueprint_chunks,
+            nb_msg: record.nb_msg,
+            delayed_inputs: record.delayed_inputs,
+            run_data: tmp,
+        };
+        acc.stage_one_data.push(data);
+        acc.tmp_stage_one_data = [];
+    } else {
+        console.error(`[Error] Missing stage one data for ${record.benchmark_name}`)
     }
 }
 
@@ -157,6 +193,12 @@ function process_transaction_record(record, acc) {
     // Adds infos for transaction overhead analysis
     if (!isNaN(record.tx_size) && !isNaN(record.sputnik_runtime_ticks) && !isNaN(record.run_transaction_ticks))
         acc.tx_overhead.push(record)
+
+    if(acc.tmp_stage_one_data.length !== 0) {
+        // Shouldn't happen: tmp data is flushed when encountering scenario record
+        console.error(`[Error] Entered ${record.benchmark_name} transaction record with leftover stage_one data  -> ${acc.tmp_stage_one_data}`)
+        acc.tmp_stage_one_data = [];
+    }
 }
 
 function process_transfer(record, acc) {
