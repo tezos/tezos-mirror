@@ -9,8 +9,8 @@ use crate::blueprint_storage::{
 use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
-use crate::inbox::read_inbox;
 use crate::inbox::InboxContent;
+use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::read_last_info_per_level_timestamp;
 use crate::storage::read_l1_level;
 use anyhow::Ok;
@@ -30,7 +30,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     if let Some(InboxContent {
         transactions,
         sequencer_blueprints: _,
-    }) = read_inbox(host, smart_rollup_address, tezos_contracts, None, None)?
+    }) = read_proxy_inbox(host, smart_rollup_address, tezos_contracts, None, None)?
     {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -84,7 +84,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     if let Some(InboxContent {
         transactions,
         sequencer_blueprints,
-    }) = read_inbox(
+    }) = read_sequencer_inbox(
         host,
         smart_rollup_address,
         tezos_contracts,

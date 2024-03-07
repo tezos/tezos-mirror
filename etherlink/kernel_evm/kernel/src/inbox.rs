@@ -387,7 +387,53 @@ fn read_and_dispatch_input<Host: Runtime>(
     }
 }
 
-pub fn read_inbox<Host: Runtime>(
+pub fn read_proxy_inbox<Host: Runtime>(
+    host: &mut Host,
+    smart_rollup_address: [u8; 20],
+    tezos_contracts: &TezosContracts,
+    delayed_bridge: Option<ContractKt1Hash>,
+    sequencer: Option<PublicKey>,
+) -> Result<Option<InboxContent>, anyhow::Error> {
+    let mut res = InboxContent {
+        transactions: vec![],
+        sequencer_blueprints: vec![],
+    };
+    // The mutable variable is used to retrieve the information of whether the
+    // inbox was empty or not. As we consume all the inbox in one go, if the
+    // variable remains true, that means that the inbox was already consumed
+    // during this kernel run.
+    let mut inbox_is_empty = true;
+    loop {
+        match read_and_dispatch_input(
+            host,
+            smart_rollup_address,
+            tezos_contracts,
+            &delayed_bridge,
+            &sequencer,
+            &mut inbox_is_empty,
+            &mut res,
+        ) {
+            Err(err) =>
+            // If we failed to read or dispatch the input.
+            // We allow ourselves to continue with the inbox consumption.
+            // In order to make sure we can retrieve any kernel upgrade
+            // present in the inbox.
+            {
+                log!(
+                    host,
+                    Fatal,
+                    "An input made `read_and_dispatch_input` fail, we ignore it ({:?})",
+                    err
+                )
+            }
+            Ok(ReadStatus::Ongoing) => (),
+            Ok(ReadStatus::FinishedRead) => return Ok(Some(res)),
+            Ok(ReadStatus::FinishedIgnore) => return Ok(None),
+        }
+    }
+}
+
+pub fn read_sequencer_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
@@ -563,7 +609,7 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content = read_inbox(
+        let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -593,7 +639,7 @@ mod tests {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content = read_inbox(
+        let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -643,7 +689,7 @@ mod tests {
 
         let transfer_metadata = TransferMetadata::new(sender.clone(), source);
         host.add_transfer(payload, &transfer_metadata);
-        let _inbox_content = read_inbox(
+        let _inbox_content = read_proxy_inbox(
             &mut host,
             [0; 20],
             &TezosContracts {
@@ -695,7 +741,7 @@ mod tests {
             new_chunk2,
         )));
 
-        let _inbox_content = read_inbox(
+        let _inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -744,7 +790,7 @@ mod tests {
         };
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_inbox(
+        let _inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -782,7 +828,7 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_inbox(
+        let _inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -836,7 +882,7 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content = read_inbox(
+        let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -857,7 +903,7 @@ mod tests {
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content = read_inbox(
+        let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -918,7 +964,7 @@ mod tests {
 
         host.add_external(framed);
 
-        let inbox_content = read_inbox(
+        let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -942,7 +988,7 @@ mod tests {
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         host.add_external(Bytes::from(vec![]));
-        let inbox_content = read_inbox(
+        let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
@@ -953,7 +999,7 @@ mod tests {
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
-        let inbox_content = read_inbox(
+        let inbox_content = read_proxy_inbox(
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
