@@ -43,10 +43,11 @@ let help_string =
   "This script prints out the current version of the\n\
    node as it is deduced from the git tag of the current branch.\n\
    print_version \
-   [--major|--minor|--additional-info|--full|--full-with-commit|--commit]"
+   [--product|--major|--minor|--additional-info|--full|--full-with-commit|--commit]"
 
 let () =
   match Sys.argv with
+  | [|_; "--product"|] -> print_endline (string_of_product version.product)
   | [|_; "--major"|] -> print_endline (string_of_int version.major)
   | [|_; "--minor"|] -> print_endline (string_of_int version.minor)
   | [|_; "--additional-info"|] ->
