@@ -5414,7 +5414,7 @@ end = struct
             [
               (if N.(number >= 015) then Some tezt_lib else None) |> if_some;
               octez_context;
-              alcotezt;
+              alcotezt |> if_ N.(number <= 019);
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
               client |> if_some |> open_;
