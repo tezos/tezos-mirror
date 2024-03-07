@@ -46,6 +46,16 @@ let migrations_from_the_future =
     ("applied", Data_encoding.int31)
     ("known", Data_encoding.int31)
 
+let no_l1_latest_level_to_catch_up =
+  declare_0
+    ~section
+    ~name:"no_l1_latest_level"
+    ~msg:
+      "The store is missing the l1 latest level row in its table. We assume no \
+       evm events catch up is needed."
+    ~level:Warning
+    ()
+
 let init_store () = emit init_store ()
 
 let applied_migration name = emit applied_migration name
@@ -54,3 +64,5 @@ let assume_old_store () = emit assume_old_store ()
 
 let migrations_from_the_future ~applied ~known =
   emit migrations_from_the_future (applied, known)
+
+let no_l1_latest_level_to_catch_up () = emit no_l1_latest_level_to_catch_up ()

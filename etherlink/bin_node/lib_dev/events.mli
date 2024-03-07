@@ -19,6 +19,11 @@ val received_upgrade : string -> unit Lwt.t
     since its EVM state was already initialized. *)
 val ignored_kernel_arg : unit -> unit Lwt.t
 
+(** [catching_up_evm_event ~from ~to_] advertises that the sequencer
+    is catching up on event produced by the evm kernel in the rollup
+    node from L1 level [from] to [to_]. *)
+val catching_up_evm_event : from:int32 -> to_:int32 -> unit Lwt.t
+
 (** [is_ready ~rpc_addr ~rpc_port] advertises that the sequencer is
     ready and listens to [rpc_addr]:[rpc_port]. *)
 val is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t

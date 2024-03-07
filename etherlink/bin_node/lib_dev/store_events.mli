@@ -23,3 +23,8 @@ val assume_old_store : unit -> unit Lwt.t
     migrations applied to the store than known from the EVM node, which
     suggests the EVM node is outdated. *)
 val migrations_from_the_future : applied:int -> known:int -> unit Lwt.t
+
+(** [no_l1_latest_level_to_catch_up ()] advertizes that the EVM node
+    is missing l1 latest level in its store. This means the evm node
+    can't catch up on evm events and might misses some. *)
+val no_l1_latest_level_to_catch_up : unit -> unit Lwt.t
