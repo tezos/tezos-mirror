@@ -52,7 +52,7 @@ pub fn register_block(
         anyhow::bail!("update_gas_price on non-empty block");
     }
 
-    update_tick_backlog(host, bip.estimated_ticks, bip.timestamp)
+    update_tick_backlog(host, bip.estimated_ticks_in_block, bip.timestamp)
 }
 
 /// Update the kernel-wide base fee per gas with a new value.
@@ -216,15 +216,16 @@ mod test {
         let timestamp = 0_i64;
         let mut block_fees = BlockFees::new(U256::zero(), U256::zero());
 
-        let bip = BlockInProgress::new_with_ticks(
+        let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
             Default::default(),
             U256::zero(),
             VecDeque::new(),
-            // estimated ticks
-            TOLERANCE,
+            // estimated ticks in run (ignored)
+            0,
             timestamp.into(),
         );
+        bip.estimated_ticks_in_block = TOLERANCE;
 
         register_block(&mut host, &bip).unwrap();
 

@@ -8,6 +8,8 @@
 
 ### Bug fixes
 
+- Ticks for gas price adjustments are counted per block, rather than per run. (!12279)
+
 ### Breaking changes
 
 ### Internal

@@ -84,7 +84,7 @@ fn compute<Host: Runtime>(
 
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
-            block_in_progress.estimated_ticks,
+            block_in_progress.estimated_ticks_in_run,
             data_size,
         );
 
@@ -120,7 +120,7 @@ fn compute<Host: Runtime>(
                     host,
                     Benchmarking,
                     "Estimated ticks after tx: {}",
-                    block_in_progress.estimated_ticks
+                    block_in_progress.estimated_ticks_in_run
                 );
             }
 
@@ -143,7 +143,7 @@ fn compute<Host: Runtime>(
                     host,
                     Benchmarking,
                     "Estimated ticks after tx: {}",
-                    block_in_progress.estimated_ticks
+                    block_in_progress.estimated_ticks_in_run
                 );
             }
         };
@@ -230,13 +230,14 @@ fn compute_bip<Host: KernelRuntime>(
                 host,
                 Benchmarking,
                 "Ask for reboot. Estimated ticks: {}",
-                &block_in_progress.estimated_ticks
+                &block_in_progress.estimated_ticks_in_run
             );
             storage::store_block_in_progress(host, &block_in_progress)?;
         }
         ComputationResult::Finished => {
             crate::gas_price::register_block(host, &block_in_progress)?;
-            *tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
+            *tick_counter =
+                TickCounter::finalize(block_in_progress.estimated_ticks_in_run);
             let new_block = block_in_progress
                 .finalize_and_store(host)
                 .context("Failed to finalize the block in progress")?;
@@ -1222,8 +1223,9 @@ mod tests {
         // init block in progress
         let mut block_in_progress =
             BlockInProgress::new(U256::from(1), U256::from(1), transactions);
-        // block is almost full wrt ticks
-        block_in_progress.estimated_ticks = tick_model::constants::MAX_TICKS - 1000;
+        // run is almost full wrt ticks
+        block_in_progress.estimated_ticks_in_run =
+            tick_model::constants::MAX_TICKS - 1000;
 
         let data_length = valid_tx.data_size();
         let ticks_for_invalid = tick_model::ticks_of_invalid_transaction(data_length);
@@ -1251,8 +1253,12 @@ mod tests {
             "should not have consumed any gas"
         );
         assert_eq!(
-            block_in_progress.estimated_ticks,
+            block_in_progress.estimated_ticks_in_run,
             tick_model::constants::MAX_TICKS - 1000 + ticks_for_invalid,
+            "should not have consumed any tick"
+        );
+        assert_eq!(
+            block_in_progress.estimated_ticks_in_block, ticks_for_invalid,
             "should not have consumed any tick"
         );
 
