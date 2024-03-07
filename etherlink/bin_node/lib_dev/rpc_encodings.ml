@@ -150,6 +150,20 @@ module Kernel_version = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Kernel_root_hash = struct
+  type input = unit
+
+  type output = string option
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = Data_encoding.(option (string' Hex))
+
+  let method_ = "tez_kernelRootHash"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Network_id = struct
   type input = unit
 
@@ -650,6 +664,7 @@ type map_result =
 let supported_methods : (module METHOD) list =
   [
     (module Kernel_version);
+    (module Kernel_root_hash);
     (module Network_id);
     (module Chain_id);
     (module Accounts);

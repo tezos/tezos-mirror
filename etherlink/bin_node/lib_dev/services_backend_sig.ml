@@ -80,6 +80,10 @@ module type S = sig
       commit hash where the kernel was compiled). *)
   val kernel_version : unit -> string tzresult Lwt.t
 
+  (** [kernel_root_hash ()] returns the internal kernel root hash (i.e the
+      latest root hash that was applied during an upgrade). *)
+  val kernel_root_hash : unit -> string option tzresult Lwt.t
+
   (** [simulate_call call_info] asks the rollup to simulate a call,
       and returns the result. *)
   val simulate_call :
