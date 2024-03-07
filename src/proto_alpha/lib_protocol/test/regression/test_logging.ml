@@ -378,11 +378,11 @@ let () =
         ~storage:"{}"
         "spawn_identities";
       transaction
-        ~parameter:"Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3"
+        ~parameter:"Ticket \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" nat 17 3"
         ~storage:"None"
         "ticket_join";
       transaction
-        ~parameter:"Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3"
+        ~parameter:"Ticket \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" nat 17 3"
         ~storage:"Unit"
         "ticket_split";
       transaction ~parameter:"5" ~storage:"3" "view_toplevel_lib";

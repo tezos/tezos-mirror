@@ -147,24 +147,39 @@ let test_spending ~direct_ticket_spending_enable ~constructor () =
       (Destination.Contract implicit)
       block
   in
-  let arg =
-    match constructor with
-    | Pair -> sf "Pair %S Unit 1" boomerang_str
-    | Ticket -> sf "Ticket %S unit Unit 1" boomerang_str
-  in
-  if direct_ticket_spending_enable then
-    let* block = call_contract ~source:implicit ~contract:consumer ~arg block in
-    assert_ticket_balance
-      ~loc:__LOC__
-      ~ticketer:boomerang
-      ~expected_balance:0
-      (Destination.Contract implicit)
-      block
-  else
-    let*! res = call_contract ~source:implicit ~contract:consumer ~arg block in
-    Assert.proto_error ~loc:__LOC__ res (function
-        | Script_interpreter.Bad_contract_parameter _ -> true
-        | _ -> false)
+  match constructor with
+  | Pair ->
+      let arg = sf "Pair %S Unit 1" boomerang_str in
+      let*! res =
+        call_contract ~source:implicit ~contract:consumer ~arg block
+      in
+      if direct_ticket_spending_enable then
+        Assert.proto_error ~loc:__LOC__ res (function
+            | Script_tc_errors.Invalid_primitive _ -> true
+            | _ -> false)
+      else
+        Assert.proto_error ~loc:__LOC__ res (function
+            | Script_interpreter.Bad_contract_parameter _ -> true
+            | _ -> false)
+  | Ticket ->
+      let arg = sf "Ticket %S unit Unit 1" boomerang_str in
+      if direct_ticket_spending_enable then
+        let* block =
+          call_contract ~source:implicit ~contract:consumer ~arg block
+        in
+        assert_ticket_balance
+          ~loc:__LOC__
+          ~ticketer:boomerang
+          ~expected_balance:0
+          (Destination.Contract implicit)
+          block
+      else
+        let*! res =
+          call_contract ~source:implicit ~contract:consumer ~arg block
+        in
+        Assert.proto_error ~loc:__LOC__ res (function
+            | Script_interpreter.Bad_contract_parameter _ -> true
+            | _ -> false)
 
 let tests =
   [
