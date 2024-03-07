@@ -53,4 +53,6 @@ txs.push(create.tx);
 txs.push(utils.send(player1, create.addr, 0, batchMint_data, { gasLimit }));
 txs.push(utils.send(player1, create.addr, 0, safeBatchTransferFrom_data, { gasLimit }));
 
-utils.print_bench([txs]);
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode);

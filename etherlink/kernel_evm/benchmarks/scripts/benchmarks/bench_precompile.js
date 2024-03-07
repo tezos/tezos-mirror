@@ -28,10 +28,12 @@ for (var i = 0; i < 10; i++) {
     txs.push(build_precompile_call(sha_precompile_address, i * 32));
     txs.push(build_precompile_call(ripemd_precompile_address, i * 32));
     txs.push(build_precompile_call(identity_precompile_address, i * 32));
-}   
+}
 
 txs.push(utils.send(player1, withdrawal_precompile_address, 0, withdraw_calldata_prefix + valid_withdraw_destination))
 txs.push(utils.send(player1, withdrawal_precompile_address, 1000, withdraw_calldata_prefix + valid_withdraw_destination))
 txs.push(utils.send(player1, withdrawal_precompile_address, 1000, withdraw_calldata_prefix + invalid_withdraw_destination))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

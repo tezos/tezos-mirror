@@ -23,4 +23,6 @@ let setVars = contract2.interface.encodeFunctionData("setVars", [create1.addr, 1
 
 txs.push(utils.send(player1, create2.addr, 0, setVars))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

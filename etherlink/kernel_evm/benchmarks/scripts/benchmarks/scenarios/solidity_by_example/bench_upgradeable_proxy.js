@@ -42,4 +42,6 @@ txs.push(utils.send(player1, create_proxy_admin.addr, 0, upgrade_2))
 txs.push(utils.send(player2, create_proxy.addr, 0, inc))
 txs.push(utils.send(player2, create_proxy.addr, 0, dec))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

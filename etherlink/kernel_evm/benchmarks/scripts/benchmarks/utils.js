@@ -124,7 +124,7 @@ function chunk_data_gen(data, extra_args){
     let tmp_data_file = temporary_data_file(data, "--devmode")
     run_chunker_command = `${CHUNKER} chunk data file:${tmp_data_file} --devmode ${extra_args}`;
     // The buffer for the output is chosen really big to prevent ENOBUF errors, as the output is proportional to the input
-    chunked_message = new Buffer.from(execSync(run_chunker_command, { maxBuffer : data.length * 3 })).toString();
+    chunked_message = new Buffer.from(execSync(run_chunker_command, { maxBuffer : data.length * 5 })).toString();
     fs.unlinkSync(tmp_data_file);
     return chunked_message.split("\n").slice(1, -1);
 }

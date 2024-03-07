@@ -32,4 +32,6 @@ txs.push(utils.send(player1, create.addr, 0, pop))
 txs.push(utils.send(player1, create.addr, 0, remove))
 txs.push(utils.send(player1, create.addr, 0, examples))
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

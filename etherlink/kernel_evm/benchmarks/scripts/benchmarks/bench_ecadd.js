@@ -25,4 +25,6 @@ txs.push(build_precompile_call(ecadd_precompile_address, input_small_int));
 txs.push(build_precompile_call(ecadd_precompile_address, input_large_int));
 txs.push(build_precompile_call(ecadd_precompile_address, input_large_int_2));
 
-utils.print_bench([txs])
+let mode = utils.bench_args(process.argv);
+
+utils.print_bench([txs], mode)

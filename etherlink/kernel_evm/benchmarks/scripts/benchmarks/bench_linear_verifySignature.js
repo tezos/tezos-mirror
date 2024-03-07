@@ -10,7 +10,9 @@ const { contracts_directory, compile_contract_file } = require("../lib/contract"
 let faucet = require('./players/faucet.json');
 let player1 = require('./players/player1.json');
 
-let nb_iter = process.argv.length > 2 ? process.argv[2] : 1;
+let mode = utils.bench_args(process.argv, [{flag: '--count <n>', desc: 'Number of transfers', default: 0}]);
+
+let nb_iter = mode.extra.count > 2 ? mode.extra.count : 1;
 if (nb_iter < 0) nb_iter = 0;
 
 let contract = compile_contract_file(contracts_directory, "verifySignature.sol")[0];
@@ -33,4 +35,4 @@ txs.push(create.tx)
 for (let i = 0; i < nb_iter; i++) {
     txs.push(utils.send(player1, create.addr, 0, call_getMessageHash))
 }
-utils.print_bench([txs])
+utils.print_bench([txs], mode)
