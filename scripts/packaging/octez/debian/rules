@@ -25,6 +25,7 @@ override_dh_installdocs:
 
 override_dh_installsystemd:
 	dh_installsystemd -p octez-node --no-enable --no-start
+	dh_installsystemd -p octez-smart-rollup-node --no-enable --no-start
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-next
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-baker-active
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser-next
