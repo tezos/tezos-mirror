@@ -17,7 +17,20 @@ retrieve all JSON and binary schemas, e.g.::
 
     octez-client rpc get /describe/chains/main/blocks/head/context/constants
 
+
+
 .. note::
 
     The protocol-specific RPCs are all served under the prefix ``/chains/<chain_id>/blocks/<block_id>/``.
-    To make the RPC reference more readable, this prefix is not repeated every time below, but instead shortened as ``../``.
+    To make the RPC reference more readable, this prefix is not repeated every time below, but instead shortened as ``../<block_id>``.
+
+The ``<block_id>`` can be:
+
+1. Block-hash - Hash in Base58Check notation.
+2. Alias - One of the following: ``genesis`` / ``head`` / ``caboose`` / ``savepoint`` / ``checkpoint``.
+3. Block-level - as an integer
+
+   One can also specify the relative positions of the block with respect to the above
+   block identifiers. For ex. ``head~N`` or ``<Block-hash>+N``, where
+   N is an integer, denotes the Nth block before (~) or after (+) the
+   given block identifier, respectively.
