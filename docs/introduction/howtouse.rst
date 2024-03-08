@@ -459,8 +459,8 @@ Implicit Accounts and Smart Contracts
 
 In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts*.
 
-- The implicit accounts are the addresses starting with *tz1*, *tz2*,
-  and *tz3* we have used up to now. They are created with a transfer
+- The implicit accounts are the addresses starting with *tz1*
+  we have used up to now (or other :ref:`address prefixes <address_prefixes>` starting with *tz*). They are created with a transfer
   operation to the account's public key hash.
 
 - Smart contracts have addresses starting with *KT1* and are created

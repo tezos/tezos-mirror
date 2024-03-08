@@ -103,7 +103,7 @@ Now verify that the correct version is called when running ``python``:
    :start-after: [print python version]
    :end-before: [verify python version]
 
-Now, on to installing ``poetry``. We'll use `poetry's official installer <https://python-poetry.org/docs/master/#installing-with-the-official-installer>`__:
+Now, on to installing ``poetry``. We'll use `poetry's official installer <https://python-poetry.org/docs#installing-with-the-official-installer>`__:
 
 .. literalinclude:: install-python-debian-ubuntu.sh
    :language: shell

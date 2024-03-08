@@ -64,6 +64,8 @@ in-use and upcoming protocols:
 
   - other possible terms: "(new) protocol proposal", "current proposal"
 
+* A protocol proposal that has successfully passed all the votes in the :doc:`voting process <../active/voting>` and is waiting for activation during the Adoption period: "voted protocol (proposal)".
+
 External resources
 ------------------
 
