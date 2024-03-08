@@ -780,6 +780,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
           current_phase = Idle;
           delayed_quorum = None;
           early_attestations = [];
+          awaiting_unlocking_pqc = false;
         }
     else
       return
@@ -788,6 +789,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
           current_phase = Idle;
           delayed_quorum = None;
           early_attestations = [];
+          awaiting_unlocking_pqc = false;
         }
   in
   let state = {global_state; level_state; round_state} in

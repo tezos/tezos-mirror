@@ -713,6 +713,7 @@ let rec baking_minimal_timestamp ~count state
                   current_phase = Idle;
                   delayed_quorum = None;
                   early_attestations = [];
+                  awaiting_unlocking_pqc = false;
                 };
             }
       | _ ->

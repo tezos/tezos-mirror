@@ -213,6 +213,13 @@ let has_already_been_handled state new_proposal =
   Block_hash.(current_proposal.block.hash = new_proposal.block.hash)
   && state.level_state.is_latest_proposal_applied
 
+let mark_awaiting_pqc state =
+  let new_round_state =
+    {state.round_state with awaiting_unlocking_pqc = true}
+  in
+  let new_state = {state with round_state = new_round_state} in
+  new_state
+
 let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
   let open Lwt_syntax in
   (* We need to avoid to send preattestations, if we are in phases were
@@ -325,6 +332,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                        should at least watch (pre)quorums events on it
                        but only when it is applied otherwise we await
                        for the proposal to be applied. *)
+                    let new_state = mark_awaiting_pqc new_state in
                     let new_state =
                       update_current_phase new_state Awaiting_preattestations
                     in
@@ -349,6 +357,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           current_phase = Idle;
           delayed_quorum = None;
           early_attestations = [];
+          awaiting_unlocking_pqc = false;
         }
       in
       let level_state =
@@ -611,7 +620,13 @@ let end_of_round state current_round =
   (* We initialize the round's phase to Idle for the [handle_proposal]
      transition to trigger the preattestation action. *)
   let new_round_state =
-    {state.round_state with current_round = new_round; current_phase = Idle}
+    {
+      current_round = new_round;
+      current_phase = Idle;
+      delayed_quorum = None;
+      early_attestations = [];
+      awaiting_unlocking_pqc = false;
+    }
   in
   let new_state = {state with round_state = new_round_state} in
   (* we need to check if we need to bake for this round or not *)
@@ -695,6 +710,35 @@ let prepare_attest_action state proposal =
   in
   Prepare_attestations {attestations}
 
+let inject_early_arrived_attestations state =
+  let early_attestations = state.round_state.early_attestations in
+  match early_attestations with
+  | [] -> do_nothing state
+  | first_signed_attestation :: _ as unbatched_signed_attestations -> (
+      let new_round_state = {state.round_state with early_attestations = []} in
+      let new_state = {state with round_state = new_round_state} in
+      let batch_branch = state.level_state.latest_proposal.predecessor.hash in
+      let batch_content =
+        let vote_consensus_content =
+          first_signed_attestation.unsigned_consensus_vote
+            .vote_consensus_content
+        in
+        {
+          level = vote_consensus_content.level;
+          round = vote_consensus_content.round;
+          block_payload_hash = vote_consensus_content.block_payload_hash;
+        }
+      in
+      make_signed_consensus_vote_batch
+        Attestation
+        batch_content
+        ~batch_branch
+        unbatched_signed_attestations
+      |> function
+      | Ok signed_attestations ->
+          Lwt.return (new_state, Inject_attestations {signed_attestations})
+      | Error _err -> (* Unreachable *) do_nothing new_state)
+
 let prequorum_reached_when_awaiting_preattestations state candidate
     preattestations =
   let open Lwt_syntax in
@@ -744,7 +788,14 @@ let prequorum_reached_when_awaiting_preattestations state candidate
         latest_proposal.block.payload_hash
     in
     let new_state = update_current_phase new_state Awaiting_attestations in
-    return (new_state, prepare_attest_action new_state latest_proposal)
+    if new_state.round_state.awaiting_unlocking_pqc then
+      (* We were locked and did not trigger preemptive
+         consensus votes: we need to start attesting now. *)
+      return (new_state, prepare_attest_action new_state latest_proposal)
+    else
+      (* We already triggered preemptive attestation forging, we
+         either have those already or we are waiting for them. *)
+      inject_early_arrived_attestations new_state
 
 let quorum_reached_when_waiting_attestations state candidate attestation_qc =
   let open Lwt_syntax in

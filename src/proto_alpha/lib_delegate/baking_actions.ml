@@ -906,6 +906,7 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
         current_phase = Idle;
         delayed_quorum = None;
         early_attestations = [];
+        awaiting_unlocking_pqc = false;
       }
     in
     let new_state = {state with round_state = new_round_state} in

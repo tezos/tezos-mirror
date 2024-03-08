@@ -500,6 +500,7 @@ type round_state = {
   current_phase : phase;
   delayed_quorum : Kind.attestation operation list option;
   early_attestations : signed_consensus_vote list;
+  awaiting_unlocking_pqc : bool;
 }
 
 type forge_event =
@@ -1260,11 +1261,17 @@ let pp_phase fmt = function
   | Awaiting_attestations -> Format.fprintf fmt "awaiting attestations"
 
 let pp_round_state fmt
-    {current_round; current_phase; delayed_quorum; early_attestations} =
+    {
+      current_round;
+      current_phase;
+      delayed_quorum;
+      early_attestations;
+      awaiting_unlocking_pqc;
+    } =
   Format.fprintf
     fmt
     "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed quorum: %a,@ early \
-     attestations: %d@]"
+     attestations: %d,@ awaiting unlocking pqc: %b@]"
     Round.pp
     current_round
     pp_phase
@@ -1272,6 +1279,7 @@ let pp_round_state fmt
     (pp_option Format.pp_print_int)
     (Option.map List.length delayed_quorum)
     (List.length early_attestations)
+    awaiting_unlocking_pqc
 
 let pp fmt {global_state; level_state; round_state} =
   Format.fprintf
