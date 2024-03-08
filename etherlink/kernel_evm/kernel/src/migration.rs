@@ -5,10 +5,15 @@
 // SPDX-License-Identifier: MIT
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
+use crate::indexable_storage::IndexableStorage;
 use crate::storage::{
-    read_storage_version, store_storage_version, KERNEL_GOVERNANCE,
-    KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE, STORAGE_VERSION,
+    block_path, init_blocks_index, read_rlp, read_storage_version, store_rlp,
+    store_storage_version, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
+    SEQUENCER_GOVERNANCE, STORAGE_VERSION,
 };
+use primitive_types::H256;
+use tezos_ethereum::block::L2Block;
+use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
@@ -16,6 +21,17 @@ pub enum MigrationStatus {
     None,
     InProgress,
     Done,
+}
+
+fn read_block<Host: Runtime>(
+    host: &mut Host,
+    blocks_index: &mut IndexableStorage,
+    block_number: u64,
+) -> anyhow::Result<L2Block> {
+    let hash = H256::from_slice(&blocks_index.unsafe_get_value(host, block_number)?);
+    let block_path = block_path(hash)?;
+    let block = read_rlp(host, &block_path)?;
+    Ok(block)
 }
 
 fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
@@ -66,6 +82,22 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
             &SEQUENCER_GOVERNANCE,
             b"KT1ECwsLV29BjuuzHtFeNs84tarB7ryYcpRR",
         )?;
+
+        // If it exists, we are on ghostnet.
+        let mut index = init_blocks_index()?;
+        if let Ok(block_813) = read_block(host, &mut index, 1232813) {
+            log!(host, Info, "Block 813: {:?}", block_813);
+            let block_814 = read_block(host, &mut index, 1232814)?;
+            log!(host, Info, "Block 814: {:?}", block_814);
+            let patched_block_814 = L2Block {
+                parent_hash: block_813.hash,
+                ..block_814
+            };
+            let path_814 = block_path(patched_block_814.hash)?;
+            store_rlp(&patched_block_814, host, &path_814)?;
+            log!(host, Info, "Block 814 replaced by: {:?}", patched_block_814);
+        }
+
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);
