@@ -136,6 +136,10 @@ val args1 : ('a, 'ctx) arg -> ('a, 'ctx) options
 (** Include 2 optional parameters *)
 val args2 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('a * 'b, 'ctx) options
 
+(** Merge optional parameters  *)
+val merge_options :
+  ('a, 'ctx) options -> ('b, 'ctx) options -> ('a * 'b, 'ctx) options
+
 (** Include 3 optional parameters *)
 val args3 :
   ('a, 'ctx) arg ->
