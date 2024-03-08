@@ -40,8 +40,8 @@ const TICKETER: RefPath = RefPath::assert_from(b"/evm/ticketer");
 pub const ADMIN: RefPath = RefPath::assert_from(b"/evm/admin");
 pub const SEQUENCER_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/sequencer_governance");
-const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
-const KERNEL_SECURITY_GOVERNANCE: RefPath =
+pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
+pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/kernel_security_governance");
 const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
 
