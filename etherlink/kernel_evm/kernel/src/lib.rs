@@ -72,7 +72,7 @@ pub const CONFIG: Config = Config::shanghai();
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
-    log!(host, Info, "Entering stage zero.");
+    log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
     storage_migration(host)
 }
@@ -100,8 +100,8 @@ pub fn stage_one<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     configuration: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
-    log!(host, Info, "Entering stage one.");
-    log!(host, Info, "Configuration: {}", configuration);
+    log!(host, Debug, "Entering stage one.");
+    log!(host, Debug, "Configuration: {}", configuration);
 
     fetch(host, smart_rollup_address, configuration)
 }
@@ -184,6 +184,13 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // We also update the current root hash of the kernel.
             set_kernel_root_hash(host)?;
             host.mark_for_reboot()?;
+            let configuration = fetch_configuration(host);
+            log!(
+                host,
+                Info,
+                "Configuration after migration: {}",
+                configuration
+            );
             return Ok(());
         }
         Err(Error::UpgradeError(Fallback)) => {
@@ -222,6 +229,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 
     let block_fees = retrieve_block_fees(host)?;
     // Start processing blueprints
+    log!(host, Debug, "Entering stage two.");
     if let block::ComputationResult::RebootNeeded =
         block::produce(host, chain_id, block_fees, &mut configuration)
             .context("Failed during stage 2")?
@@ -235,6 +243,16 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // In order to setup the temporary directory, we need to move something
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
+
+    let reboot_counter = host
+        .reboot_left()
+        .expect("The kernel failed to get the number of reboot left");
+    if reboot_counter == 1000 {
+        tezos_smart_rollup_debug::debug_msg!(
+            host,
+            "------------------ Kernel Invocation ------------------\n"
+        )
+    }
 
     let world_state_subkeys = host
         .store_count_subkeys(&WORLD_STATE_PATH)

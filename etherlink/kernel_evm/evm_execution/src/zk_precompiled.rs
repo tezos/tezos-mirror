@@ -12,7 +12,7 @@ use evm::{Context, Transfer};
 use host::runtime::Runtime;
 use primitive_types::U256;
 use tezos_evm_logging::log;
-use tezos_evm_logging::Level::Info;
+use tezos_evm_logging::Level::Debug;
 
 /// Input length for the add operation.
 const ADD_INPUT_LEN: usize = 128;
@@ -65,7 +65,7 @@ fn ecadd_precompile_without_gas_draining<Host: Runtime>(
     input: &[u8],
 ) -> Result<PrecompileOutcome, EthereumError> {
     use bn::AffineG1;
-    log!(handler.borrow_host(), Info, "Calling ecAdd precompile");
+    log!(handler.borrow_host(), Debug, "Calling ecAdd precompile");
     let estimated_ticks = 1_700_000;
 
     if let Err(record_err) = handler.record_cost(150) {
@@ -122,7 +122,7 @@ fn ecmul_precompile_without_gas_draining<Host: Runtime>(
     input: &[u8],
 ) -> Result<PrecompileOutcome, EthereumError> {
     use bn::AffineG1;
-    log!(handler.borrow_host(), Info, "Calling ecMul precompile");
+    log!(handler.borrow_host(), Debug, "Calling ecMul precompile");
     let estimated_ticks = 100_000_000;
 
     if let Err(record_err) = handler.record_cost(6_000) {
@@ -176,7 +176,7 @@ fn ecpairing_precompile_without_gas_draining<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Info, "Calling ecPairing precompile");
+    log!(handler.borrow_host(), Debug, "Calling ecPairing precompile");
 
     let mut estimated_ticks = 70_000;
 

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::configuration::fetch_configuration;
 use crate::storage::{ADMIN, SEQUENCER};
 use rlp::{Decodable, DecoderError, Rlp};
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -102,5 +103,8 @@ pub fn reveal_storage(
         host.store_write_all(&ADMIN, bytes).unwrap();
     }
 
-    log!(host, Info, "Done revealing")
+    log!(host, Info, "Done revealing");
+
+    let configuration = fetch_configuration(host);
+    log!(host, Info, "Configuration {}", configuration);
 }

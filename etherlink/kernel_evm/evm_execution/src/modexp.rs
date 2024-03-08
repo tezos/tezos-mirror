@@ -19,7 +19,7 @@ use evm::{Context, ExitError, ExitReason, ExitSucceed, Transfer};
 use host::runtime::Runtime;
 use primitive_types::U256;
 use tezos_evm_logging::log;
-use tezos_evm_logging::Level::Info;
+use tezos_evm_logging::Level::Debug;
 
 fn calculate_iteration_count(exp_length: u64, exp_highp: &U256) -> u64 {
     let mut iteration_count: u64 = 0;
@@ -82,7 +82,7 @@ pub fn modexp_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Info, "Calling modexp precompile");
+    log!(handler.borrow_host(), Debug, "Calling modexp precompile");
 
     // Extract the header.
     let base_len = U256::from_big_endian(&get_right_padded::<32>(input, 0));
