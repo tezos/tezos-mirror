@@ -418,26 +418,6 @@ let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
          [])
     ["./scripts/ci/docker_rust_toolchain_build.sh"]
 
-let _job_docker_rust_toolchain_before_merging =
-  job_docker_rust_toolchain
-    ~__POS__
-    ~dependencies:(Dependent [Optional job_trigger])
-    ~rules:
-      [
-        job_rule ~changes:changeset_octez_or_kernels ~when_:On_success ();
-        job_rule ~when_:Manual ();
-      ]
-    ()
-  |> job_external ~filename_suffix:"before_merging"
-
-(* Used in external [scheduled_extended_test] pipeline *)
-let _job_docker_rust_toolchain_other =
-  job_docker_rust_toolchain
-    ~__POS__
-    ~rules:[(* Scheduled jobs should run [Always] *) job_rule ~when_:Always ()]
-    ()
-  |> job_external ~filename_suffix:"other"
-
 (** Type of Docker build jobs.
 
     The semantics of the type is summed up in this table:
@@ -542,24 +522,6 @@ let rules_octez_docker_changes_or_master =
     job_rule ~if_:Rules.on_master ~when_:Always ();
     job_rule ~changes:changeset_octez_docker_changes_or_master ();
   ]
-
-let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
-  job_docker_build
-    ~__POS__
-    ~external_:true (* TODO: see above *)
-    ~dependencies:
-      (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
-    ~arch:Amd64
-    Test_manual
-
-let _job_docker_arm64_test_manual : Tezos_ci.tezos_job =
-  job_docker_build
-    ~__POS__
-    ~external_:true (* TODO: see above *)
-    ~dependencies:
-      (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
-    ~arch:Arm64
-    Test_manual
 
 (* Note: here we rely on [$IMAGE_ARCH_PREFIX] to be empty.
    Otherwise, [$DOCKER_IMAGE_TAG] would contain [$IMAGE_ARCH_PREFIX] too.
@@ -950,6 +912,101 @@ let enable_coverage_report job : tezos_job =
        ["_coverage_report/"; "$BISECT_FILE"]
   |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
 
+type code_verification_pipeline = Before_merging | Schedule_extended_test
+
+(* Encodes the conditional [before_merging] pipeline and its unconditional variant
+   [schedule_extended_test]. *)
+let code_verification_pipeline pipeline_type =
+  (* Externalization *)
+  let job_external_split ?(before_merging_suffix = "before_merging")
+      ?(scheduled_suffix = "scheduled_extended_test") job =
+    job_external
+      ~filename_suffix:
+        (match pipeline_type with
+        | Before_merging -> before_merging_suffix
+        | Schedule_extended_test -> scheduled_suffix)
+      job
+  in
+  (* [make_rules] makes rules for jobs that are:
+     - automatic in scheduled pipelines;
+     - conditional in [before_merging] pipelines.
+
+     If [label], [changes] and [manual] are omitted, then rules will
+     enable the job [On_success] in the [before_merging]
+     pipeline. This is safe, but prefer specifying a [changes] clause
+     if possible. *)
+  let make_rules ?label ?changes ?(manual = false) () =
+    match pipeline_type with
+    | Schedule_extended_test ->
+        (* The scheduled pipeline always runs all tests unconditionally. *)
+        [job_rule ~when_:Always ()]
+    | Before_merging ->
+        (* MR labels can be used to force tests to run. *)
+        (match label with
+        | Some label ->
+            [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
+        | None -> [])
+        (* Modifying some files can force tests to run. *)
+        @ (match changes with
+          | None -> []
+          | Some changes -> [job_rule ~changes ~when_:On_success ()])
+        (* For some tests, it can be relevant to have a manual trigger. *)
+        @ if manual then [job_rule ~when_:Manual ()] else []
+  in
+  (* Stages *)
+  (* All stages should be empty, as explained below, until the full pipeline is generated. *)
+  let trigger = [] in
+  let sanity = [] in
+  let job_docker_rust_toolchain =
+    job_docker_rust_toolchain
+      ~__POS__
+      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:true ())
+      ~dependencies:
+        (match pipeline_type with
+        | Schedule_extended_test -> Staged []
+        | Before_merging -> Dependent [Optional job_trigger])
+      ()
+    |> job_external_split
+         ~before_merging_suffix:"before_merging"
+         ~scheduled_suffix:"other"
+  in
+  let build = [] in
+  let packaging = [] in
+  let test = [] in
+  let doc = [] in
+  let manual =
+    match pipeline_type with
+    | Before_merging ->
+        let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
+          job_docker_build
+            ~__POS__
+            ~external_:true
+            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+            ~arch:Amd64
+            Test_manual
+        in
+        let _job_docker_arm64_test_manual : Tezos_ci.tezos_job =
+          job_docker_build
+            ~__POS__
+            ~external_:true
+            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+            ~arch:Arm64
+            Test_manual
+        in
+        []
+    (* No manual jobs on the scheduled pipeline *)
+    | Schedule_extended_test -> []
+  in
+  (* Empty place-holder: this has the effect of not overwriting the pipeline file in question.
+     Once all the jobs in these pipelines are defined, we will return them here which
+     will cause the pipeline files to contain the definition of all those jobs.
+
+     Until that time, all the jobs are written ot external files
+     (using {!job_external} or {!jobs_external}) and included by hand
+     in the files [.gitlab/ci/pipelines/before_merging.yml] and
+     [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
+  trigger @ sanity @ build @ packaging @ test @ doc @ manual
+
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
    pipeline is defined. At the moment, all these pipelines are defined
@@ -971,7 +1028,10 @@ let () =
   let has_non_release_tag =
     If.(Predefined_vars.ci_commit_tag != null && not has_any_octez_release_tag)
   in
-  register "before_merging" If.(on_tezos_namespace && merge_request) ;
+  register
+    "before_merging"
+    If.(on_tezos_namespace && merge_request)
+    ~jobs:(code_verification_pipeline Before_merging) ;
   register
     "octez_latest_release"
     ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:true]
@@ -1155,7 +1215,10 @@ let () =
     "non_release_tag_test"
     If.(not_on_tezos_namespace && push && has_non_release_tag)
     ~jobs:(release_tag_pipeline ~test:true Non_release_tag) ;
-  register "schedule_extended_test" schedule_extended_tests
+  register
+    "schedule_extended_test"
+    schedule_extended_tests
+    ~jobs:(code_verification_pipeline Schedule_extended_test)
 
 (* Split pipelines and writes image templates *)
 let config () =
