@@ -1182,6 +1182,7 @@ dependencies = [
  "rand 0.8.5",
  "strum 0.26.1",
  "thiserror",
+ "twiddle",
 ]
 
 [[package]]
@@ -1653,6 +1654,12 @@ dependencies = [
  "toml_datetime",
  "winnow",
 ]
+
+[[package]]
+name = "twiddle"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "088763b1ca6b94b878376544cb983a8c77f30de8282008e3dec3d6cceb27b771"
 
 [[package]]
 name = "typenum"

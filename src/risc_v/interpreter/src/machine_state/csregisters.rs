@@ -4,10 +4,10 @@
 
 pub mod xstatus;
 
-use crate::machine_state::{
-    backend::{self, Region},
-    mode::Mode,
-    Exception,
+use crate::{
+    machine_state::mode::Mode,
+    state_backend::{self as backend, Region},
+    traps::{Exception, Interrupt},
 };
 use num_enum::TryFromPrimitive;
 use strum::IntoEnumIterator;
@@ -469,8 +469,8 @@ impl CSRegister {
     }
 
     /// Possible `mcause` values, table 3.6
-    const WLRL_MCAUSE_VALUES: [u64; 20] = {
-        const INTERRUPT_BIT: u64 = 1 << 63;
+    const WLRL_MCAUSE_VALUES: [CSRValue; 20] = {
+        const INTERRUPT_BIT: CSRValue = 1 << (CSRValue::BITS - 1);
         [
             // interrupt exception codes
             INTERRUPT_BIT | 1,  // Supervisor software interrupt
@@ -658,35 +658,16 @@ impl CSRegister {
     /// The same applies for stvec. Sections 3.1.7 & 4.1.2
     const WARL_MASK_XTVEC: CSRValue = !(ones(1) << 1);
 
-    // List of possible standard interrupt bits
-    /// Supervisor software interrupt
-    const SSIP_BIT: CSRValue = 1 << 1;
-    /// Machine software interrupt
-    const MSIP_BIT: CSRValue = 1 << 3;
-    /// Supervisor timer interrupt
-    const STIP_BIT: CSRValue = 1 << 5;
-    /// Machine timer interrupt
-    const MTIP_BIT: CSRValue = 1 << 7;
-    /// Supervisor external interrupt
-    const SEIP_BIT: CSRValue = 1 << 9;
-    /// Machine external interrupt
-    const MEIP_BIT: CSRValue = 1 << 11;
-
     /// WARL mask for mip/mie interrupt bits.
     ///
     /// 0-15 are for standard interrupts. The rest are for custom used and are treated as reserved
-    const WARL_MASK_MIP_MIE: CSRValue = (CSRegister::SSIP_BIT
-        | CSRegister::MSIP_BIT
-        | CSRegister::STIP_BIT
-        | CSRegister::MTIP_BIT
-        | CSRegister::SEIP_BIT
-        | CSRegister::MEIP_BIT);
+    const WARL_MASK_MIP_MIE: CSRValue =
+        Interrupt::MACHINE_BIT_MASK | Interrupt::SUPERVISOR_BIT_MASK;
 
     /// WARL mask for sip/sie interrupt bits.
     ///
     /// 0-15 are for standard interrupts. The rest are for custom used and are treated as reserved
-    const WARL_MASK_SIP_SIE: CSRValue =
-        (CSRegister::SSIP_BIT | CSRegister::STIP_BIT | CSRegister::SEIP_BIT);
+    const WARL_MASK_SIP_SIE: CSRValue = Interrupt::SUPERVISOR_BIT_MASK;
 
     /// WARL mask for mepc/sepc/mnepc addresses.
     ///
@@ -1180,7 +1161,7 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Read from a CSR.
     #[inline(always)]
-    pub fn read(&mut self, reg: CSRegister) -> CSRValue {
+    pub fn read(&self, reg: CSRegister) -> CSRValue {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
 
@@ -1227,6 +1208,36 @@ impl<M: backend::Manager> CSRegisters<M> {
         self.write(reg, new_value);
         old_value
     }
+
+    /// Get a mask of possible interrupts when in `current_mode`.
+    pub fn possible_interrupts(&self, current_mode: Mode) -> CSRValue {
+        // 3.1.6.1 Privilege and Global Interrupt-Enable Stack in mstatus register
+        // "When a hart is executing in privilege mode x, interrupts are globally enabled when
+        // xIE=1 and globally disabled when xIE=0.
+        // Interrupts for lower-privilege modes, w<x, are always globally
+        // disabled regardless of the setting of any global wIE bit
+        // for the lower-privilege mode. Interrupts for
+        // higher-privilege modes, y>x, are always globally enabled
+        // regardless of the setting of the global yIE
+        // bit for the higher-privilege mode."
+
+        let mstatus = self.read(CSRegister::mstatus);
+        let ie_machine = match xstatus::get_MIE(mstatus) {
+            true => self.read(CSRegister::mie),
+            false => 0,
+        };
+        let ie_supervisor = match xstatus::get_SIE(mstatus) {
+            true => self.read(CSRegister::sie),
+            false => 0,
+        };
+
+        match current_mode {
+            Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
+            Mode::Supervisor => ie_supervisor | Interrupt::MACHINE_BIT_MASK,
+            Mode::Machine => ie_machine,
+            Mode::Debug => 0,
+        }
+    }
 }
 
 /// Layout for [CSRegisters]
@@ -1265,6 +1276,7 @@ mod tests {
             csregisters::{CSRegister, CSRegisters, CSRegistersLayout, Exception},
             mode::Mode,
         },
+        traps::{Interrupt, TrapContext},
     };
 
     #[test]
@@ -1524,27 +1536,20 @@ mod tests {
         let mut backend = create_backend!(CSRegistersLayout, F);
         let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
 
+        let mtip: u64 = 1 << Interrupt::MachineTimer.exception_code();
+        let msip: u64 = 1 << Interrupt::MachineSoftware.exception_code();
+        let seip: u64 = 1 << Interrupt::SupervisorExternal.exception_code();
+        let stip: u64 = 1 << Interrupt::SupervisorTimer.exception_code();
+
         // check shadowing of MTIP
-        csrs.write(CSRegister::mip, CSRegister::SEIP_BIT | CSRegister::MTIP_BIT);
-        assert_eq!(
-            csrs.read(CSRegister::mip),
-            CSRegister::SEIP_BIT | CSRegister::MTIP_BIT
-        );
-        assert_eq!(csrs.read(CSRegister::sip), CSRegister::SEIP_BIT);
+        csrs.write(CSRegister::mip, mtip | seip);
+        assert_eq!(csrs.read(CSRegister::mip), mtip | seip);
+        assert_eq!(csrs.read(CSRegister::sip), seip);
 
         // MSIP bit should not be written
-        csrs.write(
-            CSRegister::sie,
-            CSRegister::STIP_BIT | CSRegister::SEIP_BIT | CSRegister::MSIP_BIT,
-        );
-        assert_eq!(
-            csrs.read(CSRegister::mie),
-            CSRegister::STIP_BIT | CSRegister::SEIP_BIT
-        );
-        assert_eq!(
-            csrs.read(CSRegister::sie),
-            CSRegister::STIP_BIT | CSRegister::SEIP_BIT
-        );
+        csrs.write(CSRegister::sie, stip | seip | msip);
+        assert_eq!(csrs.read(CSRegister::mie), stip | seip);
+        assert_eq!(csrs.read(CSRegister::sie), stip | seip);
     });
 
     backend_test!(test_reset, F, {
