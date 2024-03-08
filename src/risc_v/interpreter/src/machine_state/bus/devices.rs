@@ -9,7 +9,7 @@ use super::Addressable;
 use crate::machine_state::backend::{self, Region};
 
 /// Length of the devices address space
-pub const DEVICES_ADDRESS_SPACE_LENGTH: u64 = 1024 * 1024 * 1024;
+pub const DEVICES_ADDRESS_SPACE_LENGTH: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Layout for the devices state
 // Note, the [DevicesLayout] is not required to have the same size as the

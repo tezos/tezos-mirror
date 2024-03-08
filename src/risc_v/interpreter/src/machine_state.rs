@@ -286,7 +286,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
     /// Handle an [`Exception`] if one was risen during execution
     /// of an instruction (also known as synchronous exception) by taking a trap
-    fn trap_exception(&mut self, _e: Exception) -> Result<Address, EnvironException> {
+    fn trap_exception(&mut self, exception: Exception) -> Result<Address, EnvironException> {
+        if let Ok(exc) = EnvironException::try_from(&exception) {
+            return Err(exc);
+        }
+
         // TODO: https://gitlab.com/tezos/tezos/-/issues/7010
         todo!("Trap handling for synchronous exception not implemented")
     }
@@ -354,7 +358,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Install a program and set the program counter to its start.
-    pub fn setup_boot(&mut self, program: &Program<ML>) -> Result<(), MachineError> {
+    pub fn setup_boot(
+        &mut self,
+        program: &Program<ML>,
+        mode: mode::Mode,
+    ) -> Result<(), MachineError> {
         // Write program to main memory and point the PC at its start
         for (addr, data) in program.segments.iter() {
             self.bus.write_all(*addr, data)?;
@@ -377,7 +385,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         self.hart.xregisters.write(registers::a1, dtb_addr);
 
         // Start in supervisor mode
-        self.hart.mode.write(mode::Mode::Supervisor);
+        self.hart.mode.write(mode);
 
         // Make sure to forward all exceptions and interrupts to supervisor mode
         self.hart

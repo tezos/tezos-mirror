@@ -47,10 +47,10 @@ pub enum Interrupt {
     SupervisorExternal,
 }
 
-impl TryFrom<Exception> for EnvironException {
+impl TryFrom<&Exception> for EnvironException {
     type Error = &'static str;
 
-    fn try_from(value: Exception) -> Result<Self, Self::Error> {
+    fn try_from(value: &Exception) -> Result<Self, Self::Error> {
         match value {
             Exception::EnvCallFromUMode => Ok(EnvironException::EnvCallFromUMode),
             Exception::EnvCallFromSMode => Ok(EnvironException::EnvCallFromSMode),
