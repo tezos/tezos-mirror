@@ -6,7 +6,8 @@
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
-    read_storage_version, store_storage_version, SEQUENCER_GOVERNANCE, STORAGE_VERSION,
+    read_storage_version, store_storage_version, KERNEL_GOVERNANCE,
+    KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE, STORAGE_VERSION,
 };
 use tezos_smart_rollup_host::path::RefPath;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
@@ -50,10 +51,21 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
         allow_path_not_found(
             host.store_delete(&RefPath::assert_from(b"/evm/blueprints/last")),
         )?;
-        allow_path_not_found(host.store_move(
-            &RefPath::assert_from(b"/evm/sequencer_admin"),
+        allow_path_not_found(
+            host.store_delete(&RefPath::assert_from(b"/evm/sequencer_admin")),
+        )?;
+        host.store_write_all(
+            &KERNEL_GOVERNANCE,
+            b"KT1RPmPCBGztHpNWHPmyzo7k5YqVapYoryvg",
+        )?;
+        host.store_write_all(
+            &KERNEL_SECURITY_GOVERNANCE,
+            b"KT1PH48LrVFLvHPHnAVhmKAYGAp1Z2Ure5R4",
+        )?;
+        host.store_write_all(
             &SEQUENCER_GOVERNANCE,
-        ))?;
+            b"KT1ECwsLV29BjuuzHtFeNs84tarB7ryYcpRR",
+        )?;
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);
