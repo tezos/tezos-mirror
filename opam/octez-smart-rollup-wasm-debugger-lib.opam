@@ -10,12 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-protocol-alpha-libs"
+  "octez-libs" { = version }
+  "octez-protocol-alpha-libs" { = version }
   "cohttp-lwt-unix" { >= "5.2.0" }
-  "octez-l2-libs"
-  "octez-version"
-  "octez-smart-rollup-wasm-debugger-plugin"
+  "octez-l2-libs" { = version }
+  "octez-version" { = version }
+  "octez-smart-rollup-wasm-debugger-plugin" { = version }
   "lambda-term" { >= "3.3.1" }
 ]
 build: [

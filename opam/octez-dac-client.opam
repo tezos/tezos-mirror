@@ -10,15 +10,18 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-shell-libs"
-  "tezos-dac-lib"
-  "tezos-dac-client-lib"
-  "octez-protocol-018-Proxford-libs"
-  "octez-protocol-019-PtParisA-libs"
+  "octez-libs" { = version }
+  "octez-shell-libs" { = version }
+  "tezos-dac-lib" { = version }
+  "tezos-dac-client-lib" { = version }
+  "octez-protocol-018-Proxford-libs" { = version }
+  "octez-protocol-019-PtParisA-libs" { = version }
 ]
 depopts: [
   "octez-protocol-alpha-libs"
+]
+conflicts: [
+  "octez-protocol-alpha-libs" { != version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

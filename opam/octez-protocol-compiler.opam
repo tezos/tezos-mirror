@@ -10,12 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-proto-libs"
+  "octez-libs" { = version }
+  "octez-proto-libs" { = version }
   "lwt" { >= "5.7.0" }
   "ocp-ocamlres" { >= "0.4" }
   "base-unix"
-  "octez-version"
+  "octez-version" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

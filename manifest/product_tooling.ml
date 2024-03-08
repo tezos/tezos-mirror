@@ -10,6 +10,10 @@
 open Manifest
 open Externals
 
+include Product (struct
+  let name = "tooling"
+end)
+
 let _octez_tooling =
   public_lib
     "tezos-tooling"

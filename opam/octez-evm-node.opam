@@ -13,7 +13,7 @@ depends: [
   "octez-libs"
   "octez-version"
   "octez-shell-libs"
-  "octez-evm-node-libs"
+  "octez-evm-node-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

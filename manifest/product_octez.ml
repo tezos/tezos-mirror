@@ -10,6 +10,11 @@
 open Manifest
 open Externals
 open Internals
+
+include Product (struct
+  let name = "octez"
+end)
+
 module String_set = Set.Make (String)
 
 let final_protocol_versions =

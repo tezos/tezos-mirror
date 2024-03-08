@@ -10,23 +10,23 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-shell-libs"
-  "octez-protocol-019-PtParisA-libs"
-  "tezos-protocol-019-PtParisA"
-  "tezos-dal-node-services"
-  "tezos-dal-node-lib"
-  "tezos-dac-lib"
-  "tezos-dac-client-lib"
-  "octez-l2-libs"
-  "octez-crawler"
+  "octez-libs" { = version }
+  "octez-shell-libs" { = version }
+  "octez-protocol-019-PtParisA-libs" { = version }
+  "tezos-protocol-019-PtParisA" { = version }
+  "tezos-dal-node-services" { = version }
+  "tezos-dal-node-lib" { = version }
+  "tezos-dac-lib" { = version }
+  "tezos-dac-client-lib" { = version }
+  "octez-l2-libs" { = version }
+  "octez-crawler" { = version }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "octez-internal-libs"
+  "octez-internal-libs" { = version }
   "aches" { >= "1.0.0" }
   "aches-lwt" { >= "1.0.0" }
-  "octez-injector"
-  "octez-smart-rollup-node-lib"
-  "octez-version"
+  "octez-injector" { = version }
+  "octez-smart-rollup-node-lib" { = version }
+  "octez-version" { = version }
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }

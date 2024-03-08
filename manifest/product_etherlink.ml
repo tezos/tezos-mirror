@@ -12,6 +12,10 @@ open Externals
 open Internals
 open Product_octez
 
+include Product (struct
+  let name = "etherlink"
+end)
+
 let tezt_etherlink =
   private_lib
     "tezt_etherlink"

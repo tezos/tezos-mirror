@@ -9,7 +9,12 @@
 
 open Manifest
 open Externals
+open Internals
 open Product_octez
+
+include Product (struct
+  let name = "client-libs"
+end)
 
 let kaitai =
   public_lib

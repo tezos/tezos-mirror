@@ -653,6 +653,7 @@ module Opam = struct
     build : build_instruction list;
     available : available;
     synopsis : string;
+    version : Version.t option;
     url : url option;
     description : string option;
     x_opam_monorepo_opam_provided : string list;
@@ -672,6 +673,7 @@ module Opam = struct
         build;
         available;
         synopsis;
+        version;
         url;
         description;
         x_opam_monorepo_opam_provided;
@@ -717,7 +719,7 @@ module Opam = struct
          In any case the following piece of code converts version constraints
          on optional dependencies into conflicts. *)
       let optional_dep_conflicts =
-        let negate_dependency_constraint dependency =
+        let negate_dependency_constraint (dependency : dependency) =
           match dependency.version with
           | True ->
               (* No conflict to introduce. *)
@@ -727,7 +729,9 @@ module Opam = struct
         List.filter_map negate_dependency_constraint depopts
       in
       let depopts =
-        let remove_constraint dependency = {dependency with version = True} in
+        let remove_constraint (dependency : dependency) =
+          {dependency with version = True}
+        in
         List.map remove_constraint depopts
       in
       let conflicts = conflicts @ optional_dep_conflicts in
@@ -936,6 +940,7 @@ module Opam = struct
            Format.pp_print_string)
         available ;
     pp_line "synopsis: %a" pp_string synopsis ;
+    Option.iter (pp_line "version: %s") version ;
     Option.iter pp_url url ;
     Option.iter (pp_line "description: %a" pp_string) description
 end
@@ -1237,6 +1242,7 @@ module Target = struct
     opam_doc : string option;
     opam_homepage : string option;
     opam_with_test : with_test;
+    opam_version : Version.t option;
     optional : bool;
     opens : string list;
     path : string;
@@ -1260,6 +1266,7 @@ module Target = struct
     extra_authors : string list;
     ctypes : Ctypes.t option;
     with_macos_security_framework : bool;
+    product : string;
   }
 
   and preprocessor =
@@ -1435,6 +1442,7 @@ module Target = struct
     ?opam_doc:string ->
     ?opam_homepage:string ->
     ?opam_with_test:with_test ->
+    ?opam_version:Version.t ->
     ?optional:bool ->
     ?ppx_kind:Dune.ppx_kind ->
     ?ppx_runtime_libraries:t option list ->
@@ -1510,15 +1518,15 @@ module Target = struct
     in
     snd (collect deps)
 
-  let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
-      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
+  let internal ~product make_kind ?all_modules_except ?bisect_ppx
+      ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
       ?inline_tests_deps ?js_compatible ?js_of_ocaml ?documentation
       ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
       ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
       ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
-      ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
+      ?opam_version ?(optional = false) ?ppx_kind ?(ppx_runtime_libraries = [])
       ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
       ?profile ?(opam_only_deps = []) ?(release_status = Auto_opam) ?static
       ?synopsis ?description ?(time_measurement_ppx = false)
@@ -1889,6 +1897,7 @@ module Target = struct
         opam_doc;
         opam_homepage;
         opam_with_test;
+        opam_version;
         optional;
         opens;
         path;
@@ -1913,6 +1922,7 @@ module Target = struct
         ctypes;
         with_macos_security_framework;
         tests_deps;
+        product;
       }
 
   let public_lib ?internal_name =
@@ -2158,6 +2168,7 @@ type tezt_target = {
   tezt_local_test_lib : target;
   preprocess : Target.preprocessor list;
   preprocessor_deps : Target.preprocessor_dep list;
+  product : string;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
@@ -2166,7 +2177,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
     ?(js_deps = []) ?(dep_globs = []) ?(dep_globs_rec = []) ?(dep_files = [])
     ?synopsis ?opam_with_test ?dune_with_test
     ?(with_macos_security_framework = false) ?flags ?(dune = Dune.[])
-    ?(preprocess = []) ?(preprocessor_deps = []) modules =
+    ?(preprocess = []) ?(preprocessor_deps = []) ~product modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -2186,6 +2197,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
         ~linkall:true
         ?flags
         ~dune
+        ~product
         tezt_local_test_lib_name)
   in
   let tezt_target =
@@ -2209,6 +2221,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       tezt_local_test_lib;
       preprocess;
       preprocessor_deps;
+      product;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path ;
@@ -2281,6 +2294,7 @@ let register_tezt_targets ~make_tezt_exe =
                       [S "echo"; S ("let () = " ^ main ^ ".Test.run ()")];
                     ];
               ]
+          ~product:"tezt-tests"
       in
       ()
     in
@@ -2324,9 +2338,9 @@ module Sub_lib = struct
     documentation_type : documentation_entrypoint;
   }
 
-  type container = sub_lib list ref
+  type container = {mutable content : sub_lib list; product : string}
 
-  let make_container () = ref []
+  let make_container ~product = {content = []; product}
 
   let make_documentation ~package ~public_name ~name ~synopsis = function
     | Some docs when not (docs = Dune.[[S "package"; S package]]) ->
@@ -2369,7 +2383,8 @@ module Sub_lib = struct
         (* In case it's a sub_lib, we don't link anything *) ()
 
   (* Prints all the registered libs of a container package. *)
-  let pp_documentation_of_container ~header fmt registered_libs =
+  let pp_documentation_of_container ~header fmt
+      {content = registered_libs; product = _} =
     Format.fprintf
       fmt
       "%s%a"
@@ -2380,7 +2395,7 @@ module Sub_lib = struct
            String.compare
              (String.capitalize_ascii name1)
              (String.capitalize_ascii name2))
-         !registered_libs
+         registered_libs
 
   type maker = ?internal_name:string -> string Target.maker
 
@@ -2413,6 +2428,7 @@ module Sub_lib = struct
        ?opam_doc
        ?opam_homepage
        ?opam_with_test
+       ?opam_version
        ?optional
        ?ppx_kind
        ?ppx_runtime_libraries
@@ -2435,6 +2451,7 @@ module Sub_lib = struct
        ?with_macos_security_framework
        ~path
        public_name ->
+    let product = container.product in
     if Option.is_some opam then
       invalid_arg "sub-libraries cannot be given custom `opam` parameters." ;
     let name =
@@ -2453,7 +2470,7 @@ module Sub_lib = struct
     if
       List.exists
         (fun registered -> String.equal registered.name name)
-        !container
+        container.content
     then
       invalid_arg
         (Format.sprintf
@@ -2462,8 +2479,9 @@ module Sub_lib = struct
            package
            (Option.value ~default:public_name internal_name)
            name)
-    else container := registered :: !container ;
+    else container.content <- registered :: container.content ;
     Target.public_lib
+      ~product
       (package ^ "." ^ public_name)
       ~path
       ~internal_name:name
@@ -2495,6 +2513,7 @@ module Sub_lib = struct
       ?opam_doc
       ?opam_homepage
       ?opam_with_test
+      ?opam_version
       ?optional
       ?ppx_kind
       ?ppx_runtime_libraries
@@ -2514,6 +2533,33 @@ module Sub_lib = struct
       ?license
       ?extra_authors
       ?with_macos_security_framework
+end
+
+module Product (M : sig
+  val name : string
+end) =
+struct
+  let public_lib = Target.public_lib ~product:M.name
+
+  let private_lib = Target.private_lib ~product:M.name
+
+  let public_exe = Target.public_exe ~product:M.name
+
+  let public_exes = Target.public_exes ~product:M.name
+
+  let private_exe = Target.private_exe ~product:M.name
+
+  let private_exes = Target.private_exes ~product:M.name
+
+  let test = Target.test ~product:M.name
+
+  let tests = Target.tests ~product:M.name
+
+  module Sub_lib = struct
+    include Sub_lib
+
+    let make_container () = make_container ~product:M.name
+  end
 end
 
 (*****************************************************************************)
@@ -3035,15 +3081,17 @@ let generate_dune_files () =
 
    If [for_release] is [false] but [for_conflicts] is [true],
    ignore vendored libraries. *)
-let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
-    ~with_test ~optional (target : Target.t) : Opam.dependency list =
+let rec as_opam_dependency ~product ~for_release ~for_conflicts
+    ~(for_package : string) ~with_test ~optional (target : Target.t) :
+    Opam.dependency list =
   match target with
   | External {opam = None; _} -> []
-  | Internal {opam = Some package; _} ->
+  | Internal {opam = Some package; product = dep_product; _} ->
       if package = for_package then []
       else
         let version =
-          if for_release then Version.(Exactly Version) else Version.True
+          if product = dep_product then Version.(Exactly Version)
+          else Version.True
         in
         [{Opam.package; version; with_test; optional}]
   | Internal ({opam = None; _} as internal) ->
@@ -3052,6 +3100,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
       let deps = Target.all_internal_deps internal in
       List.concat_map
         (as_opam_dependency
+           ~product
            ~for_release
            ~for_conflicts
            ~for_package
@@ -3069,6 +3118,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
       List.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
         (as_opam_dependency
+           ~product
            ~for_release
            ~for_conflicts
            ~for_package
@@ -3077,6 +3127,7 @@ let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
            target)
   | Re_export target | Open (target, _) ->
       as_opam_dependency
+        ~product
         ~for_release
         ~for_conflicts
         ~for_package
@@ -3101,6 +3152,27 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     Opam.t =
   let for_release = release <> None in
   let map l f = List.map f l in
+  let product =
+    (* We check that all the internals belong to the same product (thus
+       enforcing that the granularity level of the product is bigger than the
+       granularity level of the opam packages). We also have to exclude the
+       "tezt-tests" product which is a dummy product used to bundle some tests
+       for the CI. *)
+    match
+      List.map (fun (i : Target.internal) -> i.product) internals
+      |> String_set.of_list |> String_set.elements
+      |> List.filter (function "tezt-tests" -> false | _ -> true)
+    with
+    | [] -> "tezt-tests"
+    | [product] -> product
+    | p1 :: p2 :: _ ->
+        error
+          "different product (%s, %s, etc.) in the same opam\n    (%s)"
+          p1
+          p2
+          for_package ;
+        exit 1
+  in
   let depends, x_opam_monorepo_opam_provided =
     List.split @@ map internals
     @@ fun internal ->
@@ -3114,6 +3186,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     let deps =
       List.concat_map
         (as_opam_dependency
+           ~product
            ~for_release
            ~for_conflicts:false
            ~for_package
@@ -3206,12 +3279,28 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     @@ fun internal ->
     List.concat_map
       (as_opam_dependency
+         ~product
          ~for_release
          ~for_conflicts:true
          ~for_package
          ~with_test:Never
          ~optional:false)
       internal.conflicts
+  in
+  let get_consistent_optional_value ~name
+      (get : Target.internal -> string option) : string option =
+    match
+      List.filter_map get internals |> String_set.of_list |> String_set.elements
+    with
+    | [] -> None
+    | [value] -> Some value
+    | value :: _ :: _ as list ->
+        error
+          "Package %s was declared with multiple different values for %s: %s\n"
+          for_package
+          name
+          (String.concat ", " (List.map (Format.sprintf "%S") list)) ;
+        Some value
   in
   let get_consistent_value ~name ?default
       (get : Target.internal -> string option) =
@@ -3343,6 +3432,8 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     build;
     available;
     synopsis = get_consistent_value ~name:"synopsis" (fun x -> x.synopsis);
+    version =
+      get_consistent_optional_value ~name:"version" (fun x -> x.opam_version);
     url = Option.map (fun {url; _} -> url) release;
     description;
     x_opam_monorepo_opam_provided;
@@ -3355,6 +3446,7 @@ let generate_opam_meta_package opam_release_graph add_to_meta_package : Opam.t =
     | None -> []
     | Some target ->
         as_opam_dependency
+          ~product:"none-this-is-for-meta-package-dependencies"
           ~for_release:true
           ~for_conflicts:false
           ~for_package:"octez"
@@ -3394,6 +3486,7 @@ let generate_opam_meta_package opam_release_graph add_to_meta_package : Opam.t =
     build = [];
     available = Always;
     synopsis = "Main virtual package for Octez, an implementation of Tezos";
+    version = None;
     url = None;
     description = None;
     x_opam_monorepo_opam_provided = [];
@@ -4066,6 +4159,7 @@ let generate_profiles ~default_profile =
           Printf.sprintf
             "Virtual package depending on Octez dependencies (profile: %s)"
             profile;
+        version = None;
         url = None;
         description =
           Some
@@ -4348,6 +4442,7 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
                tezt_local_test_lib;
                preprocess;
                preprocessor_deps;
+               product = _;
              } ->
     if
       List.exists target_option_has_changed lib_deps

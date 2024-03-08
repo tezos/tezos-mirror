@@ -11,9 +11,9 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "tezt" { >= "4.0.0" & < "5.0.0" }
-  "tezt-tezos"
-  "tezos-protocol-alpha"
-  "octez-libs"
+  "tezt-tezos" { = version }
+  "tezos-protocol-alpha" { = version }
+  "octez-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

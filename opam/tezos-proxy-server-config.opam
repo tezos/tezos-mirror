@@ -10,11 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
+  "octez-libs" { = version }
   "uri" { >= "3.1.0" }
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "qcheck-alcotest" { with-test & >= "0.20" }
-  "octez-alcotezt" {with-test}
+  "octez-alcotezt" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

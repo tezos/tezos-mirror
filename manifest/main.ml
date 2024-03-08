@@ -77,6 +77,9 @@ let () =
   (* [make_tezt_exe] makes the global executable that contains all tests.
      [generate] gives it the list of libraries that register Tezt tests
      so that it can link all of them. *)
+  let module GlobalTezt = Internals.Product (struct
+    let name = "tezt-tests"
+  end) in
   let tezt_exe_deps =
     [
       octez_test_helpers |> open_;
@@ -94,7 +97,7 @@ let () =
     ]
   in
   let make_tezt_exe test_libs =
-    test
+    GlobalTezt.test
       "main"
       ~with_macos_security_framework:true
       ~alias:""

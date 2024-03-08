@@ -12,10 +12,10 @@ depends: [
   "ocaml" { >= "4.14" }
   "zarith" { >= "1.13" & < "1.14" }
   "zarith_stubs_js" { >= "0.16.1" }
-  "octez-libs"
+  "octez-libs" { = version }
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
-  "tezos-protocol-alpha" {with-test}
-  "octez-protocol-alpha-libs" {with-test}
+  "tezos-protocol-alpha" { with-test & = version }
+  "octez-protocol-alpha-libs" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

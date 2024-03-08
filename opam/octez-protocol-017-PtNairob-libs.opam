@@ -11,13 +11,13 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "ppx_expect"
-  "octez-libs"
-  "tezos-protocol-017-PtNairob"
-  "octez-shell-libs"
+  "octez-libs" { = version }
+  "tezos-protocol-017-PtNairob" { = version }
+  "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
-  "octez-proto-libs"
-  "octez-injector"
-  "octez-l2-libs"
+  "octez-proto-libs" { = version }
+  "octez-injector" { = version }
+  "octez-l2-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

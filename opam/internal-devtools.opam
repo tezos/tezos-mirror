@@ -12,8 +12,8 @@ depends: [
   "ocaml" { >= "4.14" }
   "num"
   "re" { >= "1.10.0" }
-  "octez-protocol-compiler"
-  "octez-libs"
+  "octez-protocol-compiler" { = version }
+  "octez-libs" { = version }
 ]
 depopts: [
   "utop"

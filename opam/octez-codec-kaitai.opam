@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "kaitai-of-data-encoding"
-  "kaitai"
+  "kaitai-of-data-encoding" { = version }
+  "kaitai" { = version }
   "octez-libs"
   "octez-shell-libs"
   "octez-version"

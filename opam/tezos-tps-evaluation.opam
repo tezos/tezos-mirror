@@ -10,17 +10,17 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
+  "octez-libs" { = version }
   "caqti"
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
   "lwt" { >= "5.7.0" }
-  "octez-protocol-alpha-libs"
-  "octez-shell-libs"
-  "tezos-protocol-alpha"
+  "octez-protocol-alpha-libs" { = version }
+  "octez-shell-libs" { = version }
+  "tezos-protocol-alpha" { = version }
   "tezt" { >= "4.0.0" & < "5.0.0" }
-  "tezt-tezos"
+  "tezt-tezos" { = version }
   "uri" { >= "3.1.0" }
 ]
 build: [

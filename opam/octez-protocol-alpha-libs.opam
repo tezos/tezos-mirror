@@ -11,27 +11,27 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "ppx_expect"
-  "octez-libs"
-  "tezos-protocol-alpha"
-  "octez-shell-libs"
+  "octez-libs" { = version }
+  "tezos-protocol-alpha" { = version }
+  "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "tezt" { >= "4.0.0" & < "5.0.0" }
-  "tezt-tezos"
+  "tezt-tezos" { = version }
   "qcheck-alcotest" { >= "0.20" }
-  "octez-proto-libs"
-  "octez-version"
-  "tezos-dal-node-services"
+  "octez-proto-libs" { = version }
+  "octez-version" { = version }
+  "tezos-dal-node-services" { = version }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "octez-protocol-compiler"
-  "tezos-dal-node-lib"
-  "tezos-dac-lib"
-  "tezos-dac-client-lib"
-  "octez-injector"
-  "octez-l2-libs"
-  "octez-alcotezt" {with-test}
-  "tezos-dac-node-lib" {with-test}
+  "octez-protocol-compiler" { = version }
+  "tezos-dal-node-lib" { = version }
+  "tezos-dac-lib" { = version }
+  "tezos-dac-client-lib" { = version }
+  "octez-injector" { = version }
+  "octez-l2-libs" { = version }
+  "octez-alcotezt" { with-test & = version }
+  "tezos-dac-node-lib" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

@@ -10,6 +10,10 @@
 open Manifest
 open Externals
 
+include Product (struct
+  let name = "CIAO"
+end)
+
 let ci_lib_gitlab_ci_main =
   public_lib
     "gitlab_ci"

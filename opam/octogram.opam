@@ -10,10 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-shell-libs"
-  "octez-libs"
+  "octez-shell-libs" { = version }
+  "octez-libs" { = version }
   "tezt" { >= "4.0.0" & < "5.0.0" }
-  "tezt-tezos"
+  "tezt-tezos" { = version }
   "jingoo"
   "dmap"
   "yaml" { >= "3.1.0" }
