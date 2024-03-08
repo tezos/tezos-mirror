@@ -339,12 +339,6 @@ let phase_encoding =
         (fun () -> Awaiting_attestations);
     ]
 
-type round_state = {
-  current_round : Round.t;
-  current_phase : phase;
-  delayed_quorum : Kind.attestation operation list option;
-}
-
 type block_kind =
   | Fresh of Operation_pool.pool
   | Reproposal of {
@@ -399,8 +393,6 @@ type batch_content = {
   block_payload_hash : Block_payload_hash.t;
 }
 
-(* TODO: make this type private when we will not need to break
-   abstraction *)
 type unsigned_consensus_vote_batch = {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
@@ -502,6 +494,32 @@ let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
       signed_consensus_votes
   in
   return {batch_kind; batch_content; batch_branch; signed_consensus_votes}
+
+let make_singleton_consensus_vote_batch
+    (signed_consensus_vote : signed_consensus_vote) =
+  let {unsigned_consensus_vote; _} = signed_consensus_vote in
+  let batch_content =
+    {
+      level = unsigned_consensus_vote.vote_consensus_content.level;
+      round = unsigned_consensus_vote.vote_consensus_content.round;
+      block_payload_hash =
+        unsigned_consensus_vote.vote_consensus_content.block_payload_hash;
+    }
+  in
+  {
+    batch_kind = unsigned_consensus_vote.vote_kind;
+    batch_content;
+    batch_branch = signed_consensus_vote.signed_operation.shell.branch;
+    signed_consensus_votes = [signed_consensus_vote];
+  }
+
+type round_state = {
+  current_round : Round.t;
+  current_phase : phase;
+  delayed_quorum : Kind.attestation operation list option;
+  early_attestations : signed_consensus_vote list;
+  awaiting_unlocking_pqc : bool;
+}
 
 type forge_event =
   | Block_ready of prepared_block
@@ -1260,16 +1278,26 @@ let pp_phase fmt = function
   | Awaiting_application -> Format.fprintf fmt "awaiting application"
   | Awaiting_attestations -> Format.fprintf fmt "awaiting attestations"
 
-let pp_round_state fmt {current_round; current_phase; delayed_quorum} =
+let pp_round_state fmt
+    {
+      current_round;
+      current_phase;
+      delayed_quorum;
+      early_attestations;
+      awaiting_unlocking_pqc;
+    } =
   Format.fprintf
     fmt
-    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed_quorum: %a@]"
+    "@[<v 2>Round state:@ round: %a,@ phase: %a,@ delayed quorum: %a,@ early \
+     attestations: %d,@ awaiting unlocking pqc: %b@]"
     Round.pp
     current_round
     pp_phase
     current_phase
     (pp_option Format.pp_print_int)
     (Option.map List.length delayed_quorum)
+    (List.length early_attestations)
+    awaiting_unlocking_pqc
 
 let pp fmt {global_state; level_state; round_state} =
   Format.fprintf
