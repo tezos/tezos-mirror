@@ -831,13 +831,22 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       let*? current_round =
         Baking_actions.compute_round current_proposal round_durations
       in
-      return {current_round; current_phase = Idle; delayed_quorum = None}
+      return
+        {
+          current_round;
+          current_phase = Idle;
+          delayed_quorum = None;
+          early_attestations = [];
+          awaiting_unlocking_pqc = false;
+        }
     else
       return
         {
           Baking_state.current_round = Round.zero;
           current_phase = Idle;
           delayed_quorum = None;
+          early_attestations = [];
+          awaiting_unlocking_pqc = false;
         }
   in
   let state = {global_state; level_state; round_state} in
