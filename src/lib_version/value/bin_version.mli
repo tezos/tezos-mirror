@@ -22,10 +22,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** octez version string containing the abbreviated hash, commiter date and the current version.
-
+(** Octez version string containing the abbreviated hash, committer date and the current version.
     This string is suitable for binaries to show when e.g. a [--version] flag is given.  *)
 val octez_version_string : string
 
 (** Octez version string containing only the current version and the abbreviated hash. *)
 val octez_simple_version_string : string
+
+(** Etherlink version string containing the abbreviated hash, committer date and the current version.
+
+    This string is suitable for binaries to show when e.g. a [--version] flag is given.  *)
+val etherlink_version_string : string
+
+(** Etherlink version string containing only the current version and the abbreviated hash. *)
+val etherlink_simple_version_string : string

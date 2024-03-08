@@ -34,3 +34,16 @@ let octez_simple_version_string =
     "%s (%s)"
     (Tezos_version.Version.to_string Current_git_info.octez_version)
     Current_git_info.abbreviated_commit_hash
+
+let etherlink_version_string =
+  Format.asprintf
+    "%s (%s) (%s)"
+    Current_git_info.abbreviated_commit_hash
+    Current_git_info.committer_date
+    (Tezos_version.Version.to_string Current_git_info.etherlink_version)
+
+let etherlink_simple_version_string =
+  Format.asprintf
+    "%s (%s)"
+    (Tezos_version.Version.to_string Current_git_info.etherlink_version)
+    Current_git_info.abbreviated_commit_hash
