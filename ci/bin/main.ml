@@ -560,45 +560,19 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
       "make $TARGET";
     ]
 
-let job_build_dpkg_amd64 =
+let job_build_dpkg_amd64 : unit -> tezos_job =
   job_build_bin_package
     ~__POS__
     ~name:"oc.build:dpkg:amd64"
     ~target:Dpkg
     ~arch:Tezos_ci.Amd64
-    ()
-  |> job_external
 
-let job_build_rpm_amd64 =
+let job_build_rpm_amd64 : unit -> tezos_job =
   job_build_bin_package
     ~__POS__
     ~name:"oc.build:rpm:amd64"
     ~target:Rpm
     ~arch:Tezos_ci.Amd64
-    ()
-  |> job_external
-
-let _job_build_dpkg_amd64_manual =
-  job_build_bin_package
-    ~__POS__
-    ~name:"oc.build:dpkg:amd64"
-    ~target:Dpkg
-    ~arch:Tezos_ci.Amd64
-    ~rules:[job_rule ~when_:Manual ()]
-    ~stage:Stages.manual
-    ()
-  |> job_external ~directory:"build" ~filename_suffix:"manual"
-
-let _job_build_rpm_amd64_manual =
-  job_build_bin_package
-    ~__POS__
-    ~rules:[job_rule ~when_:Manual ()]
-    ~name:"oc.build:rpm:amd64"
-    ~target:Rpm
-    ~arch:Tezos_ci.Amd64
-    ~stage:Stages.manual
-    ()
-  |> job_external ~directory:"build" ~filename_suffix:"manual"
 
 (** Type of release tag pipelines.
 
@@ -679,6 +653,8 @@ let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
       ~name:"gitlab:publish"
       ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
   in
+  let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
+  let job_build_rpm_amd64 = job_build_rpm_amd64 () in
   let job_gitlab_release_or_publish =
     let dependencies =
       Dependent
@@ -938,6 +914,18 @@ let code_verification_pipeline pipeline_type =
         ()
       |> job_external_split
     in
+    (* TODO: The code is a bit convulted here because these jobs are
+       either in the build or in the manual stage depeneding on the
+       pipeline type. However, we can put them in the build stage on
+       [before_merging] pipelines as long as we're careful to put
+       [allow_failure: true]. *)
+    (match pipeline_type with
+    | Schedule_extended_test ->
+        let _job_build_dpkg_amd64 = job_build_dpkg_amd64 () |> job_external in
+        let _job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
+        ()
+    | Before_merging -> ()) ;
+    (* TODO: include the jobs defined above when full pipeline is generated *)
     []
   in
   let packaging = [] in
@@ -962,6 +950,29 @@ let code_verification_pipeline pipeline_type =
             ~arch:Arm64
             Test_manual
         in
+        let _job_build_dpkg_amd64_manual =
+          job_build_bin_package
+            ~__POS__
+            ~name:"oc.build:dpkg:amd64"
+            ~target:Dpkg
+            ~arch:Tezos_ci.Amd64
+            ~rules:[job_rule ~when_:Manual ()]
+            ~stage:Stages.manual
+            ()
+          |> job_external ~directory:"build" ~filename_suffix:"manual"
+        in
+        let _job_build_rpm_amd64_manual =
+          job_build_bin_package
+            ~__POS__
+            ~rules:[job_rule ~when_:Manual ()]
+            ~name:"oc.build:rpm:amd64"
+            ~target:Rpm
+            ~arch:Tezos_ci.Amd64
+            ~stage:Stages.manual
+            ()
+          |> job_external ~directory:"build" ~filename_suffix:"manual"
+        in
+        (* TODO: include the jobs defined above when full pipeline is generated *)
         []
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
