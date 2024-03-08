@@ -430,8 +430,13 @@ let _job_docker_rust_toolchain_before_merging =
     ()
   |> job_external ~filename_suffix:"before_merging"
 
+(* Used in external [scheduled_extended_test] pipeline *)
 let _job_docker_rust_toolchain_other =
-  job_docker_rust_toolchain ~__POS__ () |> job_external ~filename_suffix:"other"
+  job_docker_rust_toolchain
+    ~__POS__
+    ~rules:[(* Scheduled jobs should run [Always] *) job_rule ~when_:Always ()]
+    ()
+  |> job_external ~filename_suffix:"other"
 
 (** Type of Docker build jobs.
 

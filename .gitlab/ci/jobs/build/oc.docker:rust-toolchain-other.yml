@@ -6,6 +6,8 @@ oc.docker:rust-toolchain:
   stage: build
   tags:
   - gcp
+  rules:
+  - when: always
   dependencies: []
   before_script: []
   script:
