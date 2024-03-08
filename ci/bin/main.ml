@@ -394,14 +394,6 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false)
 
 let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
 
-let _job_static_arm64_experimental =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Arm64
-    ~rules:rules_static_build_other
-    ()
-  |> job_external ~filename_suffix:"experimental"
-
 let _job_static_x86_64_experimental =
   job_build_static_binaries
     ~__POS__
