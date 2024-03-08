@@ -1,3 +1,0 @@
-(executables
- (names eval_perf eval_numsizes)
- (libraries data_encoding))
