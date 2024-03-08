@@ -1,0 +1,975 @@
+diff --git a/etherlink/kernel_evm/Cargo.lock b/etherlink/kernel_evm/Cargo.lock
+index 5fb0daae72..2e32ca84ac 100644
+--- a/etherlink/kernel_evm/Cargo.lock
++++ b/etherlink/kernel_evm/Cargo.lock
+@@ -621,7 +621,6 @@ dependencies = [
+  "proptest",
+  "rlp",
+  "sha3",
+- "softfloat",
+  "tezos-evm-logging",
+  "tezos-smart-rollup",
+  "tezos-smart-rollup-core",
+@@ -1793,12 +1792,6 @@ version = "2.1.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "5e1788eed21689f9cf370582dfc467ef36ed9c707f073528ddafa8d83e3b8500"
+ 
+-[[package]]
+-name = "softfloat"
+-version = "1.0.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "359a2aa2309eed307acc397678f7fbb43989db6ee417a11752248fc98451e696"
+-
+ [[package]]
+ name = "spin"
+ version = "0.5.2"
+diff --git a/etherlink/kernel_evm/Cargo.toml b/etherlink/kernel_evm/Cargo.toml
+index 10582bfe16..2333e3a1be 100644
+--- a/etherlink/kernel_evm/Cargo.toml
++++ b/etherlink/kernel_evm/Cargo.toml
+@@ -21,7 +21,6 @@ num-bigint = "0.3"
+ num-traits = "0.2.8"
+ ethereum = { version = "0.14.0", default-features = false }
+ ethbloom = { version = "0.13.0", default-features = false, features = ["rlp"] }
+-softfloat = "1.0.0"
+ 
+ # serialization
+ hex = "0.4"
+@@ -77,4 +76,4 @@ tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
+ 
+ # property based testing
+ rand = { version = "0.8" }
+-proptest = { version = "1.0" }
++proptest = { version = "1.0" }
+\ No newline at end of file
+diff --git a/etherlink/kernel_evm/ethereum/src/block.rs b/etherlink/kernel_evm/ethereum/src/block.rs
+index fd123db297..33bee1c139 100644
+--- a/etherlink/kernel_evm/ethereum/src/block.rs
++++ b/etherlink/kernel_evm/ethereum/src/block.rs
+@@ -44,11 +44,6 @@ impl BlockFees {
+     pub const fn da_fee_per_byte(&self) -> U256 {
+         self.da_fee_per_byte
+     }
+-
+-    /// Update the base fee per gas
+-    pub fn set_base_fee_per_gas(&mut self, price: U256) {
+-        self.base_fee_per_gas = price
+-    }
+ }
+ 
+ /// All data for an Ethereum block.
+diff --git a/etherlink/kernel_evm/kernel/Cargo.toml b/etherlink/kernel_evm/kernel/Cargo.toml
+index 7e5b7dc32a..045badbf98 100644
+--- a/etherlink/kernel_evm/kernel/Cargo.toml
++++ b/etherlink/kernel_evm/kernel/Cargo.toml
+@@ -21,7 +21,6 @@ anyhow.workspace = true
+ 
+ primitive-types.workspace = true
+ num-traits.workspace = true
+-softfloat.workspace = true
+ 
+ rlp.workspace = true
+ hex.workspace = true
+diff --git a/etherlink/kernel_evm/kernel/build.rs b/etherlink/kernel_evm/kernel/build.rs
+index 59360655df..110c524ff1 100644
+--- a/etherlink/kernel_evm/kernel/build.rs
++++ b/etherlink/kernel_evm/kernel/build.rs
+@@ -6,9 +6,13 @@ use std::process::Command;
+ 
+ fn main() {
+     println!("cargo:rerun-if-changed=src/*");
+-    let git_hash = match Command::new("git").args(["rev-parse", "HEAD"]).output() {
+-        Ok(output) => String::from_utf8(output.stdout).unwrap(),
+-        Err(_) => env!("CI_COMMIT_SHA").to_string(),
++    let git_hash = match (
++        option_env!("CI_COMMIT_SHA"),
++        Command::new("git").args(["rev-parse", "HEAD"]).output(),
++    ) {
++        (Some(commit), _) => commit.to_string(),
++        (_, Ok(output)) => String::from_utf8(output.stdout).unwrap(),
++        (None, Err(_)) => "unknown version".to_string(),
+     };
+     println!("cargo:rustc-env=GIT_HASH={}", git_hash)
+ }
+diff --git a/etherlink/kernel_evm/kernel/src/block.rs b/etherlink/kernel_evm/kernel/src/block.rs
+index c30b6544b5..b87115af85 100644
+--- a/etherlink/kernel_evm/kernel/src/block.rs
++++ b/etherlink/kernel_evm/kernel/src/block.rs
+@@ -144,7 +144,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
+     host: &mut Host,
+     current_block_number: U256,
+     current_block_parent_hash: H256,
+-    current_constants: &mut BlockConstants,
++    current_constants: &BlockConstants,
+     tick_counter: &TickCounter,
+     config: &mut Configuration,
+     kernel_upgrade: &Option<KernelUpgrade>,
+@@ -159,13 +159,6 @@ fn next_bip_from_blueprints<Host: Runtime>(
+                     return Ok(None);
+                 }
+             }
+-            let gas_price = crate::gas_price::base_fee_per_gas(host, blueprint.timestamp);
+-            crate::gas_price::store_new_base_fee_per_gas(
+-                host,
+-                gas_price,
+-                &mut current_constants.block_fees,
+-            )?;
+-
+             let bip = block_in_progress::BlockInProgress::from_blueprint(
+                 blueprint,
+                 current_block_number,
+@@ -173,12 +166,6 @@ fn next_bip_from_blueprints<Host: Runtime>(
+                 current_constants,
+                 tick_counter.c,
+             );
+-
+-            tezos_evm_logging::log!(
+-                host,
+-                tezos_evm_logging::Level::Debug,
+-                "bip: {bip:?}"
+-            );
+             Ok(Some(bip))
+         }
+         None => Ok(None),
+@@ -219,7 +206,6 @@ fn compute_bip<Host: KernelRuntime>(
+             host.mark_for_reboot()?
+         }
+         ComputationResult::Finished => {
+-            crate::gas_price::register_block(host, &block_in_progress)?;
+             *tick_counter = TickCounter::finalize(block_in_progress.estimated_ticks);
+             let new_block = block_in_progress
+                 .finalize_and_store(host)
+@@ -298,7 +284,7 @@ pub fn produce<Host: KernelRuntime>(
+         host,
+         current_block_number,
+         current_block_parent_hash,
+-        &mut current_constants,
++        &current_constants,
+         &tick_counter,
+         config,
+         &kernel_upgrade,
+@@ -575,11 +561,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let tx_hash = [0; TRANSACTION_HASH_SIZE];
+ 
+@@ -615,18 +596,13 @@ mod tests {
+ 
+     #[test]
+     // Test if a valid transaction is producing a receipt with a success status
+-    fn tst_valid_transactions_receipt_status() {
++    fn test_valid_transactions_receipt_status() {
+         let mut mock_host = MockHost::default();
+         let mut internal = MockInternal();
+         let mut host = SafeStorage {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let tx_hash = [0; TRANSACTION_HASH_SIZE];
+ 
+@@ -669,11 +645,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let tx_hash = [0; TRANSACTION_HASH_SIZE];
+         let tx = dummy_eth_transaction_deploy();
+@@ -727,12 +698,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+-
+         let mut evm_account_storage = init_account_storage().unwrap();
+ 
+         produce_block_with_several_valid_txs(&mut host, &mut evm_account_storage);
+@@ -754,11 +719,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
+         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
+@@ -812,9 +772,7 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-
+         let base_gas = U256::from(21000);
+-        crate::storage::store_minimum_base_fee_per_gas(&mut host, base_gas).unwrap();
+         let gas_for_fees = U256::from(7479012);
+ 
+         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
+@@ -888,11 +846,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let tx = Transaction {
+             tx_hash: [0; TRANSACTION_HASH_SIZE],
+@@ -952,11 +905,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let accounts_index = init_account_index().unwrap();
+ 
+@@ -1053,11 +1001,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let blocks_index = init_blocks_index().unwrap();
+         let transaction_hashes_index = init_transaction_hashes_index().unwrap();
+@@ -1415,11 +1358,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         // sanity check: no current block
+         assert!(
+@@ -1493,12 +1431,6 @@ mod tests {
+             internal: &mut internal,
+         };
+ 
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+-
+         // sanity check: no current block
+         assert!(
+             storage::read_current_block_number(&host).is_err(),
+@@ -1659,11 +1591,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         // sanity check: no current block
+         assert!(
+@@ -1772,11 +1699,6 @@ mod tests {
+             host: &mut mock_host,
+             internal: &mut internal,
+         };
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+ 
+         let tx_hash = [0; TRANSACTION_HASH_SIZE];
+         let tx_hash_eip1559 = [1; TRANSACTION_HASH_SIZE];
+diff --git a/etherlink/kernel_evm/kernel/src/blueprint_storage.rs b/etherlink/kernel_evm/kernel/src/blueprint_storage.rs
+index 03f6f4d33f..bf5ca68eff 100644
+--- a/etherlink/kernel_evm/kernel/src/blueprint_storage.rs
++++ b/etherlink/kernel_evm/kernel/src/blueprint_storage.rs
+@@ -17,7 +17,7 @@ use tezos_evm_logging::{log, Level::*};
+ use tezos_smart_rollup_host::path::*;
+ use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
+ 
+-const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/blueprints");
++pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/blueprints");
+ 
+ const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
+ 
+@@ -104,7 +104,7 @@ fn read_u256_default<Host: Runtime>(
+     }
+ }
+ 
+-fn read_last_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
++pub fn read_last_blueprint_number<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+     read_u256_default(host, EVM_LAST_BLUEPRINT.into(), U256::max_value())
+ }
+ 
+@@ -115,7 +115,7 @@ pub fn store_last_blueprint_number<Host: Runtime>(
+     write_u256(host, &EVM_LAST_BLUEPRINT.into(), number)
+ }
+ 
+-fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
++pub fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
+     let number_as_path: Vec<u8> = format!("/{}", number).into();
+     // The key being an integer value, it will always be valid as a path,
+     // `assert_from` cannot fail.
+diff --git a/etherlink/kernel_evm/kernel/src/gas_price.rs b/etherlink/kernel_evm/kernel/src/gas_price.rs
+deleted file mode 100644
+index 636c7b1eb9..0000000000
+--- a/etherlink/kernel_evm/kernel/src/gas_price.rs
++++ /dev/null
+@@ -1,253 +0,0 @@
+-// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+-//
+-// SPDX-License-Identifier: MIT
+-
+-//! Adjustments of the gas price (a.k.a `base_fee_per_gas`), in response to load.
+-
+-use crate::block_in_progress::BlockInProgress;
+-use crate::storage::{
+-    read_base_fee_per_gas, read_minimum_base_fee_per_gas, store_base_fee_per_gas,
+-};
+-
+-use primitive_types::U256;
+-use softfloat::F64;
+-use tezos_ethereum::block::BlockFees;
+-use tezos_smart_rollup_encoding::timestamp::Timestamp;
+-use tezos_smart_rollup_host::runtime::Runtime;
+-
+-// actual ~34M, allow some overhead for less effecient ERC20 transfers.
+-const ERC20_TICKS: u64 = 40_000_000;
+-// 50 TPS of ERC20 transfers should be sustained without increasing price.
+-const SPEED_LIMIT: u64 = 50 * ERC20_TICKS;
+-const TOLERANCE: u64 = 10 * SPEED_LIMIT;
+-
+-// chosen so that gas price will decrease ~7/8 if there's no usage for ~10 seconds.
+-// ALPHA = -ln(7/8)/(SPEED_LIMIT * 10)
+-const ALPHA: F64 = softfloat::f64!(0.000_000_000_007);
+-
+-/// Load the current base fee per gas from storage.
+-pub fn load_gas_price(host: &mut impl Runtime) -> Result<U256, crate::Error> {
+-    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
+-        .unwrap_or_else(|_| crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
+-
+-    let base_fee_per_gas = match read_base_fee_per_gas(host) {
+-        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
+-            base_fee_per_gas
+-        }
+-        _ => {
+-            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+-            minimum_base_fee_per_gas
+-        }
+-    };
+-
+-    Ok(base_fee_per_gas)
+-}
+-
+-/// Register a completed block into the tick backlog
+-pub fn register_block(
+-    host: &mut impl Runtime,
+-    bip: &BlockInProgress,
+-) -> anyhow::Result<()> {
+-    if bip.queue_length() > 0 {
+-        anyhow::bail!("update_gas_price on non-empty block");
+-    }
+-
+-    update_tick_backlog(host, bip.estimated_ticks, bip.timestamp)
+-}
+-
+-/// Update the kernel-wide base fee per gas with a new value.
+-pub fn store_new_base_fee_per_gas(
+-    host: &mut impl Runtime,
+-    gas_price: U256,
+-    constants: &mut BlockFees,
+-) -> anyhow::Result<()> {
+-    crate::storage::store_base_fee_per_gas(host, gas_price)?;
+-    constants.set_base_fee_per_gas(gas_price);
+-    Ok(())
+-}
+-
+-/// Retrieve *base fee per gas*, according to the current timestamp.
+-pub fn base_fee_per_gas(host: &impl Runtime, timestamp: Timestamp) -> U256 {
+-    let timestamp = timestamp.as_u64();
+-
+-    let last_timestamp =
+-        crate::storage::read_tick_backlog_timestamp(host).unwrap_or(timestamp);
+-
+-    let backlog = backlog_with_time_elapsed(host, 0, timestamp, last_timestamp);
+-
+-    let minimum_gas_price = read_minimum_base_fee_per_gas(host)
+-        .map(|p| p.as_u64())
+-        .unwrap_or(crate::fees::MINIMUM_BASE_FEE_PER_GAS);
+-
+-    price_from_tick_backlog(backlog, minimum_gas_price).into()
+-}
+-
+-fn backlog_with_time_elapsed(
+-    host: &impl Runtime,
+-    extra_ticks: u64,
+-    current_timestamp: u64,
+-    last_timestamp: u64,
+-) -> u64 {
+-    let diff = current_timestamp
+-        .saturating_sub(last_timestamp)
+-        .saturating_mul(SPEED_LIMIT);
+-
+-    crate::storage::read_tick_backlog(host)
+-        .unwrap_or_default()
+-        .saturating_sub(diff) // first take into account time elapsed
+-        .saturating_add(extra_ticks) // then add the extra ticks just consumed
+-}
+-
+-fn update_tick_backlog(
+-    host: &mut impl Runtime,
+-    ticks_in_block: u64,
+-    timestamp: Timestamp,
+-) -> anyhow::Result<()> {
+-    let timestamp = timestamp.as_u64();
+-
+-    let last_timestamp_opt = crate::storage::read_tick_backlog_timestamp(host).ok();
+-    let last_timestamp = last_timestamp_opt.unwrap_or(timestamp);
+-
+-    if last_timestamp_opt.is_none() || timestamp > last_timestamp {
+-        crate::storage::store_tick_backlog_timestamp(host, timestamp)?;
+-    }
+-
+-    let backlog =
+-        backlog_with_time_elapsed(host, ticks_in_block, timestamp, last_timestamp);
+-
+-    crate::storage::store_tick_backlog(host, backlog)?;
+-
+-    Ok(())
+-}
+-
+-fn price_from_tick_backlog(backlog: u64, minimum: u64) -> u64 {
+-    if backlog <= TOLERANCE {
+-        return minimum;
+-    }
+-
+-    let min = u64_to_f64(minimum);
+-
+-    let price = min * F64::exp(ALPHA * u64_to_f64(backlog - TOLERANCE));
+-
+-    let price = f64_to_u64(price);
+-
+-    if price < minimum {
+-        minimum
+-    } else {
+-        price
+-    }
+-}
+-
+-fn u64_to_f64(i: u64) -> F64 {
+-    F64::from_bits(u64_to_f64_bits(i))
+-}
+-
+-// compiler builtins
+-// https://github.com/rust-lang/compiler-builtins/blob/351d48e4b95f1665cfd3360e3ba8f3dd4d3fb3c1/src/float/conv.rs
+-//
+-// SPDX-License-Identifier: MIT
+-fn u64_to_f64_bits(i: u64) -> u64 {
+-    if i == 0 {
+-        return 0;
+-    }
+-    let n = i.leading_zeros();
+-    let a = (i << n) >> 11; // Significant bits, with bit 53 still in tact.
+-    let b = (i << n) << 53; // Insignificant bits, only relevant for rounding.
+-    let m = a + ((b - (b >> 63 & !a)) >> 63); // Add one when we need to round up. Break ties to even.
+-    let e = 1085 - n as u64; // Exponent plus 1023, minus one.
+-    (e << 52) + m // + not |, so the mantissa can overflow into the exponent.
+-}
+-
+-fn f64_to_u64(f: F64) -> u64 {
+-    let fbits = f.to_bits();
+-    if fbits < 1023 << 52 {
+-        // >= 0, < 1
+-        0
+-    } else if fbits < 1087 << 52 {
+-        // >= 1, < max
+-        let m = 1 << 63 | fbits << 11; // Mantissa and the implicit 1-bit.
+-        let s = 1086 - (fbits >> 52); // Shift based on the exponent and bias.
+-        m >> s
+-    } else if fbits <= 2047 << 52 {
+-        // >= max (incl. inf)
+-        u64::MAX
+-    } else {
+-        // Negative or NaN
+-        0
+-    }
+-}
+-// end 'compiler builtins'
+-
+-#[cfg(test)]
+-mod test {
+-    use super::*;
+-    use proptest::prelude::*;
+-    use std::collections::VecDeque;
+-    use tezos_smart_rollup_mock::MockHost;
+-
+-    proptest! {
+-        #[test]
+-        fn f64_to_u64_conv(f in any::<f64>()) {
+-            assert_eq!(f as u64, f64_to_u64(f.into()));
+-        }
+-
+-        #[test]
+-        fn u64_to_f64_conv(u in any::<u64>()) {
+-            assert_eq!(u as f64, u64_to_f64(u).into());
+-        }
+-
+-        #[test]
+-        fn gas_price(backlog in any::<u64>(), minimum in any::<u64>()) {
+-            let price = price_from_tick_backlog(backlog, minimum);
+-
+-            if backlog <= TOLERANCE {
+-                assert_eq!(price, minimum);
+-            } else {
+-                let exponent = 0.000_000_000_007_f64 * (backlog - TOLERANCE) as f64;
+-                let expected = (minimum as f64) * f64::exp(exponent);
+-                assert_eq!(expected as u64, price);
+-            }
+-        }
+-    }
+-
+-    #[test]
+-    fn gas_price_responds_to_load() {
+-        let mut host = MockHost::default();
+-        let timestamp = 0_i64;
+-        let mut block_fees = BlockFees::new(U256::zero(), U256::zero());
+-
+-        let bip = BlockInProgress::new_with_ticks(
+-            U256::zero(),
+-            Default::default(),
+-            U256::zero(),
+-            VecDeque::new(),
+-            // estimated ticks
+-            TOLERANCE,
+-            timestamp.into(),
+-        );
+-
+-        register_block(&mut host, &bip).unwrap();
+-
+-        // At tolerance, gas price should be min.
+-        let gas_price = load_gas_price(&mut host).unwrap();
+-        assert_eq!(gas_price, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
+-        let gas_price_now = base_fee_per_gas(&host, timestamp.into());
+-        assert_eq!(gas_price, gas_price_now);
+-
+-        // register more blocks - now double tolerance
+-        register_block(&mut host, &bip).unwrap();
+-        let gas_price_now = base_fee_per_gas(&host, timestamp.into());
+-        store_new_base_fee_per_gas(&mut host, gas_price_now, &mut block_fees).unwrap();
+-
+-        let gas_price = load_gas_price(&mut host).unwrap();
+-        assert!(gas_price > crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
+-        assert_eq!(gas_price, gas_price_now);
+-
+-        // after 10 seconds, reduces back to tolerance
+-        let gas_price_after_10 = base_fee_per_gas(&host, (timestamp + 10).into());
+-        assert_eq!(
+-            gas_price_after_10,
+-            crate::fees::MINIMUM_BASE_FEE_PER_GAS.into()
+-        );
+-    }
+-}
+diff --git a/etherlink/kernel_evm/kernel/src/indexable_storage.rs b/etherlink/kernel_evm/kernel/src/indexable_storage.rs
+index 9080124d31..8f7cffdbc6 100644
+--- a/etherlink/kernel_evm/kernel/src/indexable_storage.rs
++++ b/etherlink/kernel_evm/kernel/src/indexable_storage.rs
+@@ -53,7 +53,7 @@ impl IndexableStorage {
+         concat(&self.path, &index_subkey).map_err(StorageError::from)
+     }
+ 
+-    fn store_index<Host: Runtime>(
++    pub fn store_index<Host: Runtime>(
+         &self,
+         host: &mut Host,
+         index: u64,
+diff --git a/etherlink/kernel_evm/kernel/src/lib.rs b/etherlink/kernel_evm/kernel/src/lib.rs
+index 2802b6d781..0c0c25389a 100644
+--- a/etherlink/kernel_evm/kernel/src/lib.rs
++++ b/etherlink/kernel_evm/kernel/src/lib.rs
+@@ -22,8 +22,9 @@ use migration::MigrationStatus;
+ use primitive_types::U256;
+ use reveal_storage::{is_revealed_storage, reveal_storage};
+ use storage::{
+-    read_chain_id, read_da_fee, read_kernel_version, read_last_info_per_level_timestamp,
+-    read_last_info_per_level_timestamp_stats, store_chain_id, store_da_fee,
++    read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
++    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
++    read_minimum_base_fee_per_gas, store_base_fee_per_gas, store_chain_id, store_da_fee,
+     store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
+ };
+ use tezos_crypto_rs::hash::ContractKt1Hash;
+@@ -47,7 +48,6 @@ mod error;
+ mod event;
+ mod fallback_upgrade;
+ mod fees;
+-mod gas_price;
+ mod inbox;
+ mod indexable_storage;
+ mod internal_storage;
+@@ -136,7 +136,18 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+     }
+ }
+ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
+-    let base_fee_per_gas = crate::gas_price::load_gas_price(host)?;
++    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
++        .unwrap_or_else(|_| fees::MINIMUM_BASE_FEE_PER_GAS.into());
++
++    let base_fee_per_gas = match read_base_fee_per_gas(host) {
++        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
++            base_fee_per_gas
++        }
++        _ => {
++            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
++            minimum_base_fee_per_gas
++        }
++    };
+ 
+     let da_fee = match read_da_fee(host) {
+         Ok(da_fee) => da_fee,
+@@ -446,12 +457,6 @@ mod tests {
+             internal: &mut internal,
+         };
+ 
+-        crate::storage::store_minimum_base_fee_per_gas(
+-            &mut host,
+-            DUMMY_BASE_FEE_PER_GAS.into(),
+-        )
+-        .unwrap();
+-
+         // sanity check: no current block
+         assert!(
+             storage::read_current_block_number(&host).is_err(),
+diff --git a/etherlink/kernel_evm/kernel/src/migration.rs b/etherlink/kernel_evm/kernel/src/migration.rs
+index 9d85c34368..f4e6aa8aa8 100644
+--- a/etherlink/kernel_evm/kernel/src/migration.rs
++++ b/etherlink/kernel_evm/kernel/src/migration.rs
+@@ -6,13 +6,13 @@
+ use crate::error::Error;
+ use crate::error::UpgradeProcessError::Fallback;
+ use crate::storage::{
+-    read_storage_version, store_storage_version, EVM_BASE_FEE_PER_GAS, EVM_BLOCKS,
+-    EVM_INDEXES, EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS, SEQUENCER_ADMIN,
+-    SEQUENCER_POOL_PATH, STORAGE_VERSION,
++    block_path, init_blocks_index, read_current_block_number, read_rlp,
++    read_storage_version, store_block_by_hash_no_index, store_storage_version,
++    STORAGE_VERSION,
+ };
+-use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
+-use tezos_smart_rollup_host::path::RefPath;
+-use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
++use tezos_smart_rollup_host::runtime::Runtime;
++
++use primitive_types::H256;
+ 
+ pub enum MigrationStatus {
+     None,
+@@ -20,51 +20,103 @@ pub enum MigrationStatus {
+     Done,
+ }
+ 
+-fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
+-    match res {
+-        Ok(()) => Ok(()),
+-        Err(RuntimeError::PathNotFound) => Ok(()),
+-        Err(err) => Err(err),
+-    }
++use crate::indexable_storage::IndexableStorage;
++use primitive_types::U256;
++use tezos_ethereum::block::L2Block;
++use tezos_smart_rollup_encoding::timestamp::Timestamp;
++
++use anyhow::Context;
++use tezos_evm_logging::{log, Level::*};
++
++fn read_block<Host: Runtime>(
++    host: &mut Host,
++    blocks_index: &mut IndexableStorage,
++    block_number: u64,
++) -> anyhow::Result<L2Block> {
++    let hash = H256::from_slice(&blocks_index.unsafe_get_value(host, block_number)?);
++    let block_path = block_path(hash)?;
++    let block = read_rlp(host, &block_path)?;
++    Ok(block)
++}
++
++fn patch_block_no_debug<Host: Runtime>(
++    host: &mut Host,
++    block_number: U256,
++    timestamp: Timestamp,
++    parent_hash: H256,
++    index: &mut IndexableStorage,
++) -> anyhow::Result<()> {
++    let block_index: u64 = block_number.as_u64();
++    let block = read_block(host, index, block_index)?;
++    let patched_block = L2Block::new(
++        block_number,
++        block.transactions,
++        timestamp,
++        parent_hash,
++        block.logs_bloom,
++        block.transactions_root,
++        block.state_root,
++        block.receipts_root,
++        block.gas_used,
++    );
++    index.store_index(host, block_index, patched_block.hash.as_bytes())?;
++    store_block_by_hash_no_index(host, &patched_block).context("store block by hash")
+ }
+ 
+-fn migrate_world_state(host: &mut impl Runtime) -> Result<(), Error> {
+-    allow_path_not_found(
+-        host.store_move(&RefPath::assert_from(b"/eth_accounts"), &EVM_ACCOUNTS_PATH),
+-    )?;
+-    allow_path_not_found(host.store_move(
+-        &RefPath::assert_from(b"/transactions_receipts"),
+-        &EVM_TRANSACTIONS_RECEIPTS,
+-    ))?;
+-    allow_path_not_found(host.store_move(
+-        &RefPath::assert_from(b"/transactions_objects"),
+-        &EVM_TRANSACTIONS_OBJECTS,
+-    ))?;
+-    allow_path_not_found(
+-        host.store_move(&RefPath::assert_from(b"/blocks"), &EVM_BLOCKS),
+-    )?;
+-    allow_path_not_found(
+-        host.store_move(&RefPath::assert_from(b"/indexes"), &EVM_INDEXES),
+-    )?;
+-    allow_path_not_found(host.store_move(
+-        &RefPath::assert_from(b"/fees/sequencer_pool_address"),
+-        &SEQUENCER_POOL_PATH,
+-    ))?;
+-    allow_path_not_found(host.store_move(
+-        &RefPath::assert_from(b"/fees"),
+-        &RefPath::assert_from(b"/world_state/fees"),
+-    ))?;
+-    allow_path_not_found(host.store_move(
+-        &RefPath::assert_from(b"/base_fee_per_gas"),
+-        &EVM_BASE_FEE_PER_GAS,
+-    ))?;
+-    Ok(())
++fn patch_block<Host: Runtime>(
++    host: &mut Host,
++    parent: L2Block,
++    index: &mut IndexableStorage,
++) -> anyhow::Result<L2Block> {
++    let block_number = parent.number + U256::one();
++    let block = read_block(host, index, block_number.as_u64())?;
++    log!(
++        host,
++        Info,
++        "Initial block at {}:\n{:?}",
++        block_number,
++        block
++    );
++    patch_block_no_debug(host, block_number, parent.timestamp, parent.hash, index)?;
++    let patched_block = read_block(host, index, block_number.as_u64())?;
++    log!(
++        host,
++        Info,
++        "Patched block {}:\n{:?}",
++        block_number,
++        patched_block
++    );
++    Ok(patched_block)
+ }
+-fn update_sequencer_admin(host: &mut impl Runtime) -> Result<(), Error> {
+-    let contract_b58 = "KT1Cy5nsZnCMVLhwMafYDQ46QQLngYifb1Yh";
+-    let bytes = contract_b58.as_bytes();
+-    host.store_write_all(&SEQUENCER_ADMIN, bytes)
+-        .map_err(Into::into)
++
++use crate::blueprint_storage::*;
++use tezos_smart_rollup_host::path::*;
++
++fn wipe_blueprints<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
++    let last_blueprint_number = read_last_blueprint_number(host)?;
++    let next_blueprint = read_next_blueprint_number(host)?;
++    let path = blueprint_path(next_blueprint)?;
++    let tmp = concat(&RefPath::assert_from(b"/tmp"), &path)?;
++    if host.store_move(&path, &tmp).is_err() {
++        log!(
++            host,
++            Info,
++            "Moving the next blueprint failed, but it can be expected."
++        )
++    };
++    if let Err(e) = host.store_delete(&crate::blueprint_storage::EVM_BLUEPRINTS) {
++        log!(host, Info, "Deleting the blueprints failed");
++        return Err(e).context("store delete");
++    };
++    if host.store_move(&tmp, &path).is_err() {
++        log!(
++            host,
++            Info,
++            "Moving back the next blueprint failed, but it can be expected."
++        );
++    };
++    store_last_blueprint_number(host, last_blueprint_number)
++        .context("store last blueprint")
+ }
+ 
+ // The workflow for migration is the following:
+@@ -89,8 +141,19 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus>
+     let current_version = read_storage_version(host)?;
+     if STORAGE_VERSION == current_version + 1 {
+         // MIGRATION CODE - START
+-        migrate_world_state(host)?;
+-        update_sequencer_admin(host)?;
++        let mut index = init_blocks_index()?;
++        log!(host, Info, "Reading block 810");
++        let block_810 = read_block(host, &mut index, 1232810)?;
++        log!(host, Info, "Initial block 810:\n{:?}", block_810);
++        let head = read_current_block_number(host)?;
++        let mut parent = block_810;
++        while parent.number != head {
++            let next_block = patch_block(host, parent, &mut index)?;
++            parent = next_block
++        }
++
++        wipe_blueprints(host)?;
++        log!(host, Info, "Removed all old blueprints");
+         // MIGRATION CODE - END
+         store_storage_version(host, STORAGE_VERSION)?;
+         return Ok(MigrationStatus::Done);
+diff --git a/etherlink/kernel_evm/kernel/src/storage.rs b/etherlink/kernel_evm/kernel/src/storage.rs
+index a0b29be17e..7be8a5a514 100644
+--- a/etherlink/kernel_evm/kernel/src/storage.rs
++++ b/etherlink/kernel_evm/kernel/src/storage.rs
+@@ -31,7 +31,7 @@ use tezos_ethereum::wei::Wei;
+ 
+ use primitive_types::{H160, H256, U256};
+ 
+-pub const STORAGE_VERSION: u64 = 7;
++pub const STORAGE_VERSION: u64 = 8;
+ pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/storage_version");
+ 
+ const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/kernel_version");
+@@ -66,9 +66,6 @@ pub const EVM_BASE_FEE_PER_GAS: RefPath =
+ const EVM_MINIMUM_BASE_FEE_PER_GAS: RefPath =
+     RefPath::assert_from(b"/world_state/fees/minimum_base_fee_per_gas");
+ const EVM_DA_FEE: RefPath = RefPath::assert_from(b"/world_state/fees/da_fee_per_byte");
+-const TICK_BACKLOG_PATH: RefPath = RefPath::assert_from(b"/world_state/fees/backlog");
+-const TICK_BACKLOG_TIMESTAMP_PATH: RefPath =
+-    RefPath::assert_from(b"/world_state/fees/last_timestamp");
+ 
+ /// The sequencer pool is the designated account that the data-availability fees are sent to.
+ ///
+@@ -156,17 +153,6 @@ pub fn write_u256(
+     host.store_write(path, &bytes, 0).map_err(Error::from)
+ }
+ 
+-fn read_u64(host: &impl Runtime, path: &impl Path) -> Result<u64, Error> {
+-    let mut bytes = [0; std::mem::size_of::<u64>()];
+-    host.store_read_slice(path, 0, bytes.as_mut_slice())?;
+-    Ok(u64::from_le_bytes(bytes))
+-}
+-
+-fn write_u64(host: &mut impl Runtime, path: &impl Path, value: u64) -> Result<(), Error> {
+-    host.store_write_all(path, value.to_le_bytes().as_slice())?;
+-    Ok(())
+-}
+-
+ pub fn block_path(hash: H256) -> Result<OwnedPath, Error> {
+     let hash = hex::encode(hash);
+     let raw_hash_path: Vec<u8> = format!("/{}", &hash).into();
+@@ -266,6 +252,14 @@ fn store_block<Host: Runtime>(
+     store_rlp(block, host, block_path)
+ }
+ 
++pub fn store_block_by_hash_no_index<Host: Runtime>(
++    host: &mut Host,
++    block: &L2Block,
++) -> Result<(), Error> {
++    let block_path = block_path(block.hash)?;
++    store_rlp(block, host, &block_path)
++}
++
+ pub fn store_block_by_hash<Host: Runtime>(
+     host: &mut Host,
+     block: &L2Block,
+@@ -587,36 +581,10 @@ pub fn read_base_fee_per_gas<Host: Runtime>(host: &mut Host) -> Result<U256, Err
+     read_u256(host, &EVM_BASE_FEE_PER_GAS.into())
+ }
+ 
+-pub fn read_minimum_base_fee_per_gas<Host: Runtime>(host: &Host) -> Result<U256, Error> {
+-    read_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into())
+-}
+-
+-pub fn read_tick_backlog(host: &impl Runtime) -> Result<u64, Error> {
+-    read_u64(host, &TICK_BACKLOG_PATH)
+-}
+-
+-pub fn store_tick_backlog(host: &mut impl Runtime, value: u64) -> Result<(), Error> {
+-    write_u64(host, &TICK_BACKLOG_PATH, value)
+-}
+-
+-pub fn read_tick_backlog_timestamp(host: &impl Runtime) -> Result<u64, Error> {
+-    read_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH)
+-}
+-
+-pub fn store_tick_backlog_timestamp(
+-    host: &mut impl Runtime,
+-    value: u64,
+-) -> Result<(), Error> {
+-    write_u64(host, &TICK_BACKLOG_TIMESTAMP_PATH, value)?;
+-    Ok(())
+-}
+-
+-#[cfg(test)]
+-pub fn store_minimum_base_fee_per_gas<Host: Runtime>(
++pub fn read_minimum_base_fee_per_gas<Host: Runtime>(
+     host: &mut Host,
+-    price: U256,
+-) -> Result<(), Error> {
+-    write_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into(), price)
++) -> Result<U256, Error> {
++    read_u256(host, &EVM_MINIMUM_BASE_FEE_PER_GAS.into())
+ }
+ 
+ pub fn store_da_fee(
+diff --git a/etherlink/scripts/docker-compose/evm_kernel_builder.Dockerfile b/etherlink/scripts/docker-compose/evm_kernel_builder.Dockerfile
+index f45582caef..6b52ad8485 100644
+--- a/etherlink/scripts/docker-compose/evm_kernel_builder.Dockerfile
++++ b/etherlink/scripts/docker-compose/evm_kernel_builder.Dockerfile
+@@ -14,7 +14,7 @@ COPY kernels.mk etherlink.mk /build/
+ COPY src/kernel_sdk /build/src/kernel_sdk
+ COPY etherlink /build/etherlink
+ RUN make -f etherlink.mk build-deps
+-RUN make -f etherlink.mk EVM_CONFIG=${EVM_CONFIG} evm_installer.wasm
++RUN make -f etherlink.mk EVM_CONFIG=${EVM_CONFIG} CI_COMMIT_SHA=${CI_COMMIT_SHA} evm_installer.wasm
+ 
+ FROM ${BASE_IMAGE}
+ COPY --from=kernel_build /build/*.wasm /kernel/
