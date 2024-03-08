@@ -933,7 +933,7 @@ let code_verification_pipeline pipeline_type =
              of pipelines. So we start this job as early as possible,
              without waiting for sanity_ci. *)
         ~dependencies:dependencies_needs_trigger
-        ~rules:[job_rule ~changes:changeset_octez ()]
+        ~rules:(make_rules ~changes:changeset_octez ())
         ()
       |> job_external_split
     in
