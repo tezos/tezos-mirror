@@ -188,7 +188,7 @@ type batch_content = {
   block_payload_hash : Block_payload_hash.t;
 }
 
-type unsigned_consensus_vote_batch = {
+type unsigned_consensus_vote_batch = private {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
   batch_branch : Block_hash.t;

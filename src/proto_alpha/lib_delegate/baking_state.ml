@@ -399,8 +399,6 @@ type batch_content = {
   block_payload_hash : Block_payload_hash.t;
 }
 
-(* TODO: make this type private when we will not need to break
-   abstraction *)
 type unsigned_consensus_vote_batch = {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
