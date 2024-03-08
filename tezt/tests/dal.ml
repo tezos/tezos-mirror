@@ -148,13 +148,14 @@ let make_string_parameter name = function
   | None -> []
   | Some value -> [(name, `String value)]
 
-let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses ?supports title f =
+let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses
+    ?(supports = Protocol.From_protocol 19) title f =
   let tags = Tag.tezos2 :: "dal" :: tags in
   let register_test =
     if regression then Protocol.register_regression_test
     else Protocol.register_test
   in
-  register_test ~__FILE__ ~title ~tags ?uses ?supports f
+  register_test ~__FILE__ ~title ~tags ?uses ~supports f
 
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
@@ -1959,6 +1960,7 @@ let test_dal_node_startup =
     ~title:"dal node startup"
     ~tags:[Tag.tezos2; "dal"]
     ~uses:(fun _protocol -> [Constant.octez_dal_node])
+    ~supports:(Protocol.From_protocol 19)
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in
