@@ -3,4 +3,5 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: @MAINT@
 Description: The Octez node server
-Depends: bash, adduser, @DPKG@-client (>=@VERSION@), @DEPENDS@
+Recommends: @DPKG@-client (>=@VERSION@)
+Depends: bash, adduser, @DEPENDS@
