@@ -13,6 +13,21 @@ type tezos_job
     Warns not to modify the generated files, and refers to the generator. *)
 val header : string
 
+(** Write a CI configuration to a file *)
+val to_file : filename:string -> Gitlab_ci.Types.config -> unit
+
+(** Checks that should be performed after {!Pipeline.write}.
+
+    Checks that the file [.gitlab-ci.yml] and all the [.yml] files in [.gitlab]
+    are either generated or excluded. It is an error if a generated file is excluded.
+    You can use [exclude] to specify which files should be excluded.
+    [exclude] is given a path relative to the [root] directory
+    and shall return [true] for excluded paths.
+
+    In case of errors, errors are printed and the process exits with exit code 1. *)
+val check_files :
+  remove_extra_files:bool -> ?exclude:(string -> bool) -> unit -> unit
+
 (** Run-time configuration and command-line processing. *)
 module Cli : sig
   (** Type of the command-line configuration for the generator binary. *)
@@ -21,6 +36,8 @@ module Cli : sig
         (** Enable [verbose] output, including the source of generated jobs. *)
     mutable inline_source_info : bool;
         (** Enable the emission of source information in generated configuration. *)
+    mutable remove_extra_files : bool;
+        (** Remove files that are neither generated nor excluded. *)
   }
 
   (** Populate  {!config} from command-line arguments.

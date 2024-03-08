@@ -10,6 +10,10 @@ verbose: # Regenerate GitLab CI configuration with verbose output.
 inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
 	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info)
 
+.PHONY: verbose
+remove-extra-files: # Regenerate GitLab CI configuration and remove any non-generated files.
+	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files)
+
 .PHONY: docker-do-%
 docker-do-%:
 	@( cd .. \
@@ -26,6 +30,9 @@ docker-verbose: docker-do-verbose # Build the target 'verbose' using the 'runtim
 
 .PHONY: docker-inline-source-info
 docker-inline-source-info: docker-do-inline-source-info # Build the target 'inline-source-info' using the 'runtime-build-dependencies' Docker image.
+
+.PHONY: docker-remove-extra-files
+docker-remove-extra-files: docker-do-remove-extra-files # Build the target 'remove-extra-files' using the 'runtime-build-dependencies' Docker image.
 
 .PHONY: check
 check: # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
