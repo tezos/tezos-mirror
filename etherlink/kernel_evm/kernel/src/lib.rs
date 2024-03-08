@@ -244,6 +244,16 @@ pub fn kernel_loop<Host: Runtime>(host: &mut Host) {
     // from /evm to /tmp, so /evm must be non empty, this only happen
     // at the first run.
 
+    let reboot_counter = host
+        .reboot_left()
+        .expect("The kernel failed to get the number of reboot left");
+    if reboot_counter == 1000 {
+        tezos_smart_rollup_debug::debug_msg!(
+            host,
+            "------------------ Kernel Invocation ------------------\n"
+        )
+    }
+
     let world_state_subkeys = host
         .store_count_subkeys(&WORLD_STATE_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
