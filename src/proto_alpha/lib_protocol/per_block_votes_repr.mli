@@ -81,3 +81,8 @@ val compute_new_adaptive_issuance_ema :
   per_block_vote:per_block_vote ->
   Adaptive_issuance_launch_EMA.t ->
   Adaptive_issuance_launch_EMA.t
+
+module Internal_for_tests : sig
+  (* Maximum value for EMA representation (both LB and AI) *)
+  val ema_max : Int32.t
+end

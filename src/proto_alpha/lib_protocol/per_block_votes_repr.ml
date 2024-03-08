@@ -36,6 +36,8 @@ type per_block_votes = {
   adaptive_issuance_vote : per_block_vote;
 }
 
+let ema_max = 2_000_000_000l
+
 let per_block_vote_compact_encoding =
   let open Data_encoding in
   let open Compact in
@@ -93,7 +95,7 @@ let per_block_votes_encoding =
 module Liquidity_baking_toggle_EMA = Votes_EMA_repr.Make (struct
   let baker_contribution = Z.of_int 500_000
 
-  let ema_max = 2_000_000_000l
+  let ema_max = ema_max
 end)
 
 module Adaptive_issuance_launch_EMA = Votes_EMA_repr.Make (struct
@@ -111,7 +113,7 @@ module Adaptive_issuance_launch_EMA = Votes_EMA_repr.Make (struct
      blocks are actually needed. *)
   let baker_contribution = Z.of_int 5730
 
-  let ema_max = 2_000_000_000l
+  let ema_max = ema_max
 end)
 
 let compute_new_liquidity_baking_ema ~per_block_vote ema =
@@ -125,3 +127,7 @@ let compute_new_adaptive_issuance_ema ~per_block_vote ema =
   | Per_block_vote_pass -> ema
   | Per_block_vote_off -> Adaptive_issuance_launch_EMA.update_ema_down ema
   | Per_block_vote_on -> Adaptive_issuance_launch_EMA.update_ema_up ema
+
+module Internal_for_tests = struct
+  let ema_max = ema_max
+end
