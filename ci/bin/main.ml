@@ -273,41 +273,6 @@ let job_dummy : job =
     ~script:[{|echo "This job will never execute"|}]
     ()
 
-(* Define the [trigger] job
-
-   §1: The purpose of this job is to launch the CI manually in certain cases.
-   The objective is not to run computing when it is not
-   necessary and the decision to do so belongs to the developer
-
-   §2: We also perform some fast sanity checks. *)
-let job_trigger =
-  job
-    ~__POS__
-    ~image:Images.alpine
-    ~stage:Stages.trigger
-    ~allow_failure:No
-    ~rules:
-      [
-        job_rule
-          ~if_:(If.not Rules.assigned_to_marge_bot)
-          ~allow_failure:No
-          ~when_:Manual
-          ();
-        job_rule ~when_:Always ();
-      ]
-    ~timeout:(Minutes 10)
-    ~name:"trigger"
-    [
-      "echo 'Trigger pipeline!'";
-      (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
-         [scripts/version.sh]'s [opam_repository_tag] are the same. *)
-      "./scripts/ci/check_opam_repository_tag.sh";
-      (* Check that the Alpine version of the trigger job's image
-         corresponds to the value in scripts/version.sh. *)
-      "./scripts/ci/check_alpine_version.sh";
-    ]
-  |> job_external
-
 (** Helper to create jobs that uses the docker deamon.
 
     It:
@@ -898,13 +863,49 @@ let code_verification_pipeline pipeline_type =
   in
   (* Stages *)
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
-  let trigger = [] in
-  let sanity = [] in
-  let dependencies_needs_trigger =
+  let trigger, dependencies_needs_trigger =
     match pipeline_type with
-    | Schedule_extended_test -> Staged []
-    | Before_merging -> Dependent [Optional job_trigger]
+    | Schedule_extended_test -> ([], Staged [])
+    | Before_merging ->
+        (* Define the [trigger] job
+
+           §1: The purpose of this job is to launch the CI manually in certain cases.
+           The objective is not to run computing when it is not
+           necessary and the decision to do so belongs to the developer
+
+           §2: We also perform some fast sanity checks. *)
+        let job_trigger =
+          job
+            ~__POS__
+            ~image:Images.alpine
+            ~stage:Stages.trigger
+            ~allow_failure:No
+            ~rules:
+              [
+                job_rule
+                  ~if_:(If.not Rules.assigned_to_marge_bot)
+                  ~allow_failure:No
+                  ~when_:Manual
+                  ();
+                job_rule ~when_:Always ();
+              ]
+            ~timeout:(Minutes 10)
+            ~name:"trigger"
+            [
+              "echo 'Trigger pipeline!'";
+              (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
+                 [scripts/version.sh]'s [opam_repository_tag] are the same. *)
+              "./scripts/ci/check_opam_repository_tag.sh";
+              (* Check that the Alpine version of the trigger job's image
+                 corresponds to the value in scripts/version.sh. *)
+              "./scripts/ci/check_alpine_version.sh";
+            ]
+          |> job_external
+        in
+        (* TODO: put job_trigger here when full pipeline is generated *)
+        ([], Dependent [Optional job_trigger])
   in
+  let sanity = [] in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
       ~__POS__
