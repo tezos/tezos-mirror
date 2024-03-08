@@ -359,7 +359,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
                     let new_state =
                       update_current_phase new_state Awaiting_preattestations
                     in
-                    return (new_state, Watch_proposal))
+                    return (new_state, Watch_prequorum))
           | None ->
               (* Otherwise, we did not lock on any payload, thus we can
                  vote for it it *)
@@ -736,7 +736,7 @@ let prepare_attest_action state proposal =
 let inject_early_arrived_attestations state =
   let early_attestations = state.round_state.early_attestations in
   match early_attestations with
-  | [] -> do_nothing state
+  | [] -> Lwt.return (state, Watch_quorum)
   | first_signed_attestation :: _ as unbatched_signed_attestations -> (
       let new_round_state = {state.round_state with early_attestations = []} in
       let new_state = {state with round_state = new_round_state} in
