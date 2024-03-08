@@ -402,6 +402,12 @@ let dispatch_request (config : 'a Configuration.t)
           rpc_ok kernel_version
         in
         build ~f module_ parameters
+    | Method (Kernel_root_hash.Method, module_) ->
+        let f (_ : unit option) =
+          let* kernel_root_hash = Backend_rpc.kernel_root_hash () in
+          rpc_ok kernel_root_hash
+        in
+        build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
   Lwt.return JSONRPC.{value; id}

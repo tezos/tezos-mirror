@@ -200,6 +200,11 @@ module Make (Reader : READER) = struct
       Durable_storage_path.kernel_version
       Bytes.to_string
 
+  let kernel_root_hash () =
+    inspect_durable_and_decode_opt
+      Durable_storage_path.kernel_root_hash
+      Bytes.to_string
+
   let storage_at address (Qty pos) =
     let open Lwt_result_syntax in
     let pad32left0 s =
