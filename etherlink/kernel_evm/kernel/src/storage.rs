@@ -1005,7 +1005,7 @@ pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> 
         let timeout = u64::from_le_bytes(buffer);
         log!(
             host,
-            Info,
+            Debug,
             "Using delayed inbox timeout of {} seconds ({} hours)",
             timeout,
             timeout / 3600
@@ -1014,7 +1014,7 @@ pub fn delayed_inbox_timeout<Host: Runtime>(host: &Host) -> anyhow::Result<u64> 
     } else {
         log!(
             host,
-            Info,
+            Debug,
             "Using default delayed inbox timeout of {} seconds ({} hours)",
             default_timeout,
             default_timeout / 3600
@@ -1031,7 +1031,7 @@ pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u3
         let min_levels = u32::from_le_bytes(buffer);
         log!(
             host,
-            Info,
+            Debug,
             "Using delayed inbox minimum levels: {}",
             min_levels
         );
@@ -1039,7 +1039,7 @@ pub fn delayed_inbox_min_levels<Host: Runtime>(host: &Host) -> anyhow::Result<u3
     } else {
         log!(
             host,
-            Info,
+            Debug,
             "Using default delayed inbox minimum levels: {}",
             default_min_levels
         );

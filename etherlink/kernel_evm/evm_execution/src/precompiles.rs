@@ -200,7 +200,7 @@ fn ecrecover_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Info, "Calling ecrecover precompile");
+    log!(handler.borrow_host(), Debug, "Calling ecrecover precompile");
 
     // check that enough resources to execute (gas / ticks) are available
     let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_ecrecover(), handler);
@@ -267,7 +267,7 @@ fn identity_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Info, "Calling identity precompile");
+    log!(handler.borrow_host(), Debug, "Calling identity precompile");
     let estimated_ticks =
         fail_if_too_much!(tick_model::ticks_of_identity(input.len())?, handler);
 
@@ -302,7 +302,7 @@ fn sha256_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Info, "Calling sha2-256 precompile");
+    log!(handler.borrow_host(), Debug, "Calling sha2-256 precompile");
     let estimated_ticks =
         fail_if_too_much!(tick_model::ticks_of_sha256(input.len())?, handler);
 
@@ -337,7 +337,11 @@ fn ripemd160_precompile<Host: Runtime>(
     _is_static: bool,
     _transfer: Option<Transfer>,
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Info, "Calling ripemd-160 precompile");
+    log!(
+        handler.borrow_host(),
+        Debug,
+        "Calling ripemd-160 precompile"
+    );
     let estimated_ticks =
         fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len())?, handler);
 
@@ -391,7 +395,7 @@ fn blake2f_precompile_without_gas_draining<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
 ) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Info, "Calling blake2f precompile");
+    log!(handler.borrow_host(), Debug, "Calling blake2f precompile");
 
     // The precompile requires 6 inputs tightly encoded, taking exactly 213 bytes
     if input.len() != 213 {

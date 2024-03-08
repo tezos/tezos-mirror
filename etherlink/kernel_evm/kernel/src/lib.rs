@@ -72,7 +72,7 @@ pub const CONFIG: Config = Config::shanghai();
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
-    log!(host, Info, "Entering stage zero.");
+    log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
     storage_migration(host)
 }
@@ -100,8 +100,8 @@ pub fn stage_one<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     configuration: &mut Configuration,
 ) -> Result<(), anyhow::Error> {
-    log!(host, Info, "Entering stage one.");
-    log!(host, Info, "Configuration: {}", configuration);
+    log!(host, Debug, "Entering stage one.");
+    log!(host, Debug, "Configuration: {}", configuration);
 
     fetch(host, smart_rollup_address, configuration)
 }
@@ -229,6 +229,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 
     let block_fees = retrieve_block_fees(host)?;
     // Start processing blueprints
+    log!(host, Debug, "Entering stage two.");
     if let block::ComputationResult::RebootNeeded =
         block::produce(host, chain_id, block_fees, &mut configuration)
             .context("Failed during stage 2")?
