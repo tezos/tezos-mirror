@@ -45,7 +45,7 @@ let check_all_balances block state : unit tzresult Lwt.t =
         let*! r =
           assert_balance_check ~loc:__LOC__ (B block) name account_map
         in
-        join_errors r acc)
+        Assert.join_errors r acc)
       account_map
       Result.return_unit
   in
@@ -58,7 +58,7 @@ let check_all_balances block state : unit tzresult Lwt.t =
       actual_total_supply
       total_supply
   in
-  join_errors r1 r2
+  Assert.join_errors r1 r2
 
 let check_issuance_rpc block : unit tzresult Lwt.t =
   let open Lwt_result_syntax in

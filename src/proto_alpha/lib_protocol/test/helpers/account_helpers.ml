@@ -16,13 +16,6 @@
 open Adaptive_issuance_helpers
 open Tez_staking_helpers
 
-let join_errors e1 e2 =
-  let open Lwt_result_syntax in
-  match (e1, e2) with
-  | Ok (), Ok () -> return_unit
-  | Error e, Ok () | Ok (), Error e -> fail e
-  | Error e1, Error e2 -> fail (e1 @ e2)
-
 let fail_account_not_found func_name account_name =
   Log.error "State_account.%s: account %s not found" func_name account_name ;
   assert false
@@ -284,7 +277,7 @@ let assert_balance_equal ~loc account_name
       (fun a b ->
         let*! a in
         let*! b in
-        join_errors a b)
+        Assert.join_errors a b)
       return_unit
       [
         Assert.equal
@@ -475,7 +468,7 @@ let assert_balance_check ~loc ctxt account_name account_map =
           account_map
       in
       let*! r1 = assert_balance_equal ~loc account_name balance_ctxt balance in
-      let*! r1 = join_errors r0 r1 in
+      let*! r1 = Assert.join_errors r0 r1 in
       let*! r2 =
         Assert.equal
           ~loc
@@ -485,7 +478,7 @@ let assert_balance_check ~loc ctxt account_name account_map =
           total_balance_ctxt
           total_balance
       in
-      join_errors r1 r2
+      Assert.join_errors r1 r2
 
 let log_debug_balance account_name account_map : unit =
   let balance, total_balance =
