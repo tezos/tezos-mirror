@@ -85,17 +85,17 @@ This sequence of operations was run:
 
 GET http://[HOST]:[PORT]/global/block/head/state?key=vars/value
 200 OK
-"00000011"
+"0000000d"
 
 GET http://[HOST]:[PORT]/global/block/head/state?key=vars/value
 200 OK
-"00000011"
+"0000000d"
 
 GET http://[HOST]:[PORT]/global/block/head/state?key=vars/value
 200 OK
-"00000011"
+"0000000d"
 
 GET http://[HOST]:[PORT]/global/block/head/state?key=vars/value
 200 OK
-"00000011"
+"0000000d"
 

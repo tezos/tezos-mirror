@@ -161,6 +161,9 @@ let sc_rollup_activation_dal_params dal_enable =
 let redundancy_factor_param redundancy_factor =
   make_int_parameter ["dal_parametric"; "redundancy_factor"] redundancy_factor
 
+let slot_size_param slot_size =
+  make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+
 (* Some initialization functions to start needed nodes. *)
 
 let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
@@ -383,12 +386,13 @@ let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 
-let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
-    ?page_size ?number_of_shards ?redundancy_factor ?attestation_lag
-    ?(tags = []) ?(uses = fun _ -> []) ?(pvm_name = "arith")
-    ?(dal_enable = true) ?commitment_period ?challenge_window
-    ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
-    ?bootstrap_profile ?producer_profiles variant scenario =
+let scenario_with_all_nodes ?custom_constants ?node_arguments
+    ?consensus_committee_size ?slot_size ?page_size ?number_of_shards
+    ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
+    ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
+    ?challenge_window ?minimal_block_delay ?delay_increment_per_round
+    ?activation_timestamp ?bootstrap_profile ?producer_profiles variant scenario
+    =
   let description = "Testing DAL rollup and node with L1" in
   regression_test
     ~__FILE__
@@ -401,6 +405,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments ?slot_size
       with_layer1
         ~custom_constants
         ?node_arguments
+        ?consensus_committee_size
         ?slot_size
         ?page_size
         ?number_of_shards
@@ -3200,8 +3205,10 @@ let register_end_to_end_tests ~protocols =
         ~producer_profiles
         ~custom_constants:constants
         ~slot_size:(1 lsl 17)
+        ~page_size:4096
         ~redundancy_factor:8
         ~number_of_shards:512
+        ~consensus_committee_size:512
         ~attestation_lag
         ~activation_timestamp:(Ago activation_timestamp)
         ~minimal_block_delay:(string_of_int block_delay)
@@ -3755,7 +3762,8 @@ let make_invalid_dal_node protocol parameters =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
     let parameters =
       dal_enable_param (Some true)
-      @ redundancy_factor_param (Some (2 * crypto_params.redundancy_factor))
+      @ redundancy_factor_param (Some (crypto_params.redundancy_factor / 2))
+      @ slot_size_param (Some (crypto_params.slot_size / 2))
     in
     setup_node ~protocol ~parameters ()
   in

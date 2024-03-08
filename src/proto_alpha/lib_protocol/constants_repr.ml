@@ -327,6 +327,14 @@ let check_constants constants =
   let* () =
     error_unless
       Compare.Int.(
+        constants.dal.cryptobox_parameters.number_of_shards
+        <= constants.consensus_committee_size)
+      (Invalid_protocol_constants
+         "The DAL committee must be a subset of the Tenderbake committee.")
+  in
+  let* () =
+    error_unless
+      Compare.Int.(
         constants.sc_rollup.max_number_of_stored_cemented_commitments > 0)
       (Invalid_protocol_constants
          "The number of maximum stored cemented commitments must be strictly \
