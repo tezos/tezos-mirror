@@ -70,15 +70,7 @@ oc.build_arm64-released:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: always
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - changes:
-    - src/**/*
-    - .gitlab/**/*
-    - .gitlab-ci.yml
-    when: manual
+  - when: manual
     allow_failure: true
   dependencies: []
   before_script:
@@ -107,15 +99,7 @@ oc.build_arm64-exp-dev-extra:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: always
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - changes:
-    - src/**/*
-    - .gitlab/**/*
-    - .gitlab-ci.yml
-    when: manual
+  - when: manual
     allow_failure: true
   dependencies: []
   before_script:

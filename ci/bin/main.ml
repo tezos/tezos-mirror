@@ -861,39 +861,26 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
 
-let build_arm_rules =
-  [
-    job_rule ~if_:Rules.schedule_extended_tests ~when_:Always ();
-    job_rule ~if_:Rules.(has_mr_label "ci--arm64") ~when_:On_success ();
-    job_rule
-      ~changes:["src/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"]
-      ~when_:Manual
-      ~allow_failure:Yes
-      ();
-  ]
-
 (* Write external files for build_arm64_jobs.
 
    Used in external pipelines [before_merging] and [schedule_extended_test]. *)
-let job_build_arm64_release : tezos_job =
+let job_build_arm64_release ?rules () : tezos_job =
   job_build_dynamic_binaries
+    ?rules
     ~__POS__
     ~arch:Arm64
     ~needs_trigger:false
     ~release:true
-    ~rules:build_arm_rules
     ()
-  |> job_external
 
-let job_build_arm64_exp_dev_extra : tezos_job =
+let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
   job_build_dynamic_binaries
+    ?rules
     ~__POS__
     ~arch:Arm64
     ~needs_trigger:false
     ~release:false
-    ~rules:build_arm_rules
     ()
-  |> job_external
 
 let enable_coverage_report job : tezos_job =
   job
@@ -970,7 +957,17 @@ let code_verification_pipeline pipeline_type =
          ~before_merging_suffix:"before_merging"
          ~scheduled_suffix:"other"
   in
-  let build = [] in
+  let build =
+    let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
+    let _job_build_arm64_release : Tezos_ci.tezos_job =
+      job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
+    in
+    let _job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
+      job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
+      |> job_external_split
+    in
+    []
+  in
   let packaging = [] in
   let test = [] in
   let doc = [] in
@@ -1176,6 +1173,14 @@ let () =
              "SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk \
               publish-sdk";
            ]
+       in
+       (* arm builds are manual on the master branch pipeline *)
+       let build_arm_rules = [job_rule ~when_:Manual ~allow_failure:Yes ()] in
+       let job_build_arm64_release =
+         job_build_arm64_release ~rules:build_arm_rules ()
+       in
+       let job_build_arm64_exp_dev_extra =
+         job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
        in
        [
          (* Stage: build *)
