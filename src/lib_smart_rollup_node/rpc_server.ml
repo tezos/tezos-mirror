@@ -58,13 +58,12 @@ module Acl = struct
     if V6.scope address = Interface then allow_all else secure
 end
 
-let start configuration dir =
+let start ~rpc_addr ~rpc_port ~acl ~cors dir =
   let open Lwt_result_syntax in
-  let Configuration.{rpc_addr; rpc_port; _} = configuration in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
-  let*! acl_policy = RPC_server.Acl.resolve_domain_names configuration.acl in
+  let*! acl_policy = RPC_server.Acl.resolve_domain_names acl in
   let acl =
     RPC_server.Acl.find_policy acl_policy (host, Some rpc_port)
     |> Option.value_f ~default:(fun () -> Acl.default rpc_addr)
@@ -72,7 +71,7 @@ let start configuration dir =
   let server =
     RPC_server.init_server
       dir
-      ~cors:configuration.cors
+      ~cors
       ~acl
       ~media_types:Media_type.all_media_types
   in

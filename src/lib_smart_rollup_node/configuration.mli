@@ -253,6 +253,7 @@ module Cli : sig
   val configuration_from_args :
     rpc_addr:string option ->
     rpc_port:int option ->
+    acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->
@@ -284,6 +285,7 @@ module Cli : sig
     data_dir:string ->
     rpc_addr:string option ->
     rpc_port:int option ->
+    acl_override:[`Allow_all | `Secure] option ->
     metrics_addr:string option ->
     loser_mode:Loser_mode.t option ->
     reconnection_delay:float option ->

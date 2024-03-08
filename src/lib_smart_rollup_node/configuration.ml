@@ -649,6 +649,19 @@ This should be used for test only!
 ************ WARNING *************
 |}
 
+let override_acl ~rpc_addr ~rpc_port acl = function
+  | None -> acl
+  | Some kind ->
+      let new_acl =
+        match kind with
+        | `Secure -> Rpc_server.Acl.secure
+        | `Allow_all -> Rpc_server.Acl.allow_all
+      in
+      let addr =
+        P2p_point.Id.{addr = rpc_addr; port = Some rpc_port; peer_id = None}
+      in
+      Tezos_rpc_http_server.RPC_server.Acl.put_policy (addr, new_acl) acl
+
 let save ~force ~data_dir config =
   loser_warning_message config ;
   let open Lwt_result_syntax in
@@ -684,12 +697,13 @@ module Cli = struct
       ([], None)
       operators
 
-  let configuration_from_args ~rpc_addr ~rpc_port ~metrics_addr ~loser_mode
-      ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
-      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
-      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
-      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
+  let configuration_from_args ~rpc_addr ~rpc_port ~acl_override ~metrics_addr
+      ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
+      ~dac_timeout ~pre_images_endpoint ~injector_retention_period
+      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
+      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
+      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
+      ~allowed_origins ~allowed_headers =
     let open Result_syntax in
     let* purposed_operator, default_operator =
       get_purposed_and_default_operators operators
@@ -700,14 +714,17 @@ module Cli = struct
         ~needed_purposes:(purposes_of_mode mode)
         purposed_operator
     in
+    let rpc_addr = Option.value ~default:default_rpc_addr rpc_addr in
+    let rpc_port = Option.value ~default:default_rpc_port rpc_port in
+    let acl = override_acl ~rpc_addr ~rpc_port default_acl acl_override in
     let+ () = check_custom_mode mode in
     {
       sc_rollup_address;
       boot_sector_file;
       operators;
-      rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
-      rpc_port = Option.value ~default:default_rpc_port rpc_port;
-      acl = default_acl;
+      rpc_addr;
+      rpc_port;
+      acl;
       reconnection_delay =
         Option.value ~default:default_reconnection_delay reconnection_delay;
       dal_node_endpoint;
@@ -759,12 +776,12 @@ module Cli = struct
     }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
-      ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
-      ~dac_observer_endpoint ~dac_timeout ~pre_images_endpoint
-      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
-      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers =
+      ~acl_override ~metrics_addr ~loser_mode ~reconnection_delay
+      ~dal_node_endpoint ~dac_observer_endpoint ~dac_timeout
+      ~pre_images_endpoint ~injector_retention_period ~injector_attempts
+      ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
+      ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
     let open Result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let* () = check_custom_mode mode in
@@ -778,6 +795,9 @@ module Cli = struct
         purposed_operator
         configuration.operators
     in
+    let rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr in
+    let rpc_port = Option.value ~default:configuration.rpc_port rpc_port in
+    let acl = override_acl ~rpc_addr ~rpc_port configuration.acl acl_override in
     return
       {
         configuration with
@@ -789,8 +809,9 @@ module Cli = struct
           Option.either boot_sector_file configuration.boot_sector_file;
         operators;
         mode;
-        rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
-        rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
+        rpc_addr;
+        rpc_port;
+        acl;
         dal_node_endpoint =
           Option.either dal_node_endpoint configuration.dal_node_endpoint;
         dac_observer_endpoint =
@@ -847,13 +868,13 @@ module Cli = struct
             };
       }
 
-  let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~metrics_addr
-      ~loser_mode ~reconnection_delay ~dal_node_endpoint ~dac_observer_endpoint
-      ~dac_timeout ~pre_images_endpoint ~injector_retention_period
-      ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
-      ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers =
+  let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
+      ~metrics_addr ~loser_mode ~reconnection_delay ~dal_node_endpoint
+      ~dac_observer_endpoint ~dac_timeout ~pre_images_endpoint
+      ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
+      ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
+      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -878,6 +899,7 @@ module Cli = struct
           configuration
           ~rpc_addr
           ~rpc_port
+          ~acl_override
           ~metrics_addr
           ~loser_mode
           ~reconnection_delay
@@ -926,6 +948,7 @@ module Cli = struct
         configuration_from_args
           ~rpc_addr
           ~rpc_port
+          ~acl_override
           ~metrics_addr
           ~loser_mode
           ~reconnection_delay

@@ -224,6 +224,23 @@ struct
            default)
       int_parameter
 
+  let acl_override_arg : ([`Allow_all | `Secure] option, _) Tezos_clic.arg =
+    Tezos_clic.arg
+      ~long:"acl-override"
+      ~placeholder:"kind"
+      ~doc:
+        "Specify a different ACL for the rpc server to override the default \
+         one. Possible values are 'secure' and 'allow-all'"
+      (Tezos_clic.parameter (fun (_cctxt : Client_context.full) ->
+           let open Lwt_result_syntax in
+           function
+           | "secure" -> return `Secure
+           | "allow-all" | "allow_all" -> return `Allow_all
+           | _ ->
+               failwith
+                 "Bad value for acl-override, possible values are 'secure' and \
+                  'allow-all'"))
+
   let data_dir_arg =
     let default = Configuration.default_data_dir in
     Tezos_clic.default_arg
