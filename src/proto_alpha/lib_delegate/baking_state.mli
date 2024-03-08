@@ -223,6 +223,9 @@ val make_signed_consensus_vote_batch :
   signed_consensus_vote list ->
   signed_consensus_vote_batch tzresult
 
+val make_singleton_consensus_vote_batch :
+  signed_consensus_vote -> signed_consensus_vote_batch
+
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;

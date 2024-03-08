@@ -495,6 +495,24 @@ let make_signed_consensus_vote_batch batch_kind (batch_content : batch_content)
   in
   return {batch_kind; batch_content; batch_branch; signed_consensus_votes}
 
+let make_singleton_consensus_vote_batch
+    (signed_consensus_vote : signed_consensus_vote) =
+  let {unsigned_consensus_vote; _} = signed_consensus_vote in
+  let batch_content =
+    {
+      level = unsigned_consensus_vote.vote_consensus_content.level;
+      round = unsigned_consensus_vote.vote_consensus_content.round;
+      block_payload_hash =
+        unsigned_consensus_vote.vote_consensus_content.block_payload_hash;
+    }
+  in
+  {
+    batch_kind = unsigned_consensus_vote.vote_kind;
+    batch_content;
+    batch_branch = signed_consensus_vote.signed_operation.shell.branch;
+    signed_consensus_votes = [signed_consensus_vote];
+  }
+
 type round_state = {
   current_round : Round.t;
   current_phase : phase;

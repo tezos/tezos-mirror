@@ -952,7 +952,10 @@ let handle_arriving_attestation state signed_attestation =
     | Idle | Awaiting_attestations | Awaiting_application ->
         (* For these three phases, we have necessarily already reached the
            prequorum: we are safe to inject. *)
-        Lwt.return (state, Inject_attestation {signed_attestation})
+        let signed_attestations =
+          make_singleton_consensus_vote_batch signed_attestation
+        in
+        Lwt.return (state, Inject_attestations {signed_attestations})
 
 let handle_forge_event state forge_event =
   match forge_event with

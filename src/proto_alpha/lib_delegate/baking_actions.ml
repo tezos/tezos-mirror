@@ -133,7 +133,6 @@ type action =
       asynchronous : bool;
     }
   | Inject_preattestation of {signed_preattestation : signed_consensus_vote}
-  | Inject_attestation of {signed_attestation : signed_consensus_vote}
   | Inject_attestations of {signed_attestations : signed_consensus_vote_batch}
   | Update_to_level of level_update
   | Synchronize_round of round_update
@@ -164,7 +163,6 @@ let pp_action fmt = function
   | Prepare_consensus_votes _ -> Format.fprintf fmt "prepare consensus votes"
   | Inject_block _ -> Format.fprintf fmt "inject block"
   | Inject_preattestation _ -> Format.fprintf fmt "inject preattestation"
-  | Inject_attestation _ -> Format.fprintf fmt "inject attestation"
   | Inject_attestations _ -> Format.fprintf fmt "inject multiple attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
@@ -978,11 +976,6 @@ let rec perform_action state (action : action) =
          already been triggered by the
          [Prepare_(preattestation|consensus_votes)] action *)
       return state
-  | Inject_attestation {signed_attestation} ->
-      let* () = inject_consensus_vote state signed_attestation in
-      (* We wait for attestations to trigger the [Quorum_reached]
-         event *)
-      perform_action state Watch_quorum
   | Inject_attestations {signed_attestations} ->
       let* () = inject_consensus_votes state signed_attestations in
       (* We wait for attestations to trigger the [Quorum_reached]
