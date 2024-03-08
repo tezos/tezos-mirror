@@ -6789,42 +6789,6 @@ let _octez_shell_tests =
 (* INTERNAL EXES *)
 
 (* Not released, so no ~opam. *)
-let _git_gas_diff =
-  public_exe
-    "git-gas-diff"
-    ~path:"devtools/git-gas-diff/bin"
-    ~release_status:Unreleased
-    ~synopsis:"Internal dev tools"
-    ~internal_name:"main"
-    ~opam:"internal-devtools"
-    ~deps:[external_lib "num" V.True; re]
-    ~static:false
-    ~bisect_ppx:No
-
-let _gas_parameter_diff =
-  public_exe
-    "gas_parameter_diff"
-    ~path:"devtools/gas_parameter_diff/bin"
-    ~release_status:Unreleased
-    ~synopsis:"Internal dev tools"
-    ~internal_name:"main"
-    ~opam:"internal-devtools"
-    ~deps:[]
-    ~static:false
-    ~bisect_ppx:No
-
-let _benchmark_tools_purge_disk_cache =
-  public_exe
-    "purge_disk_cache"
-    ~path:"devtools/benchmarks-tools/purge_disk_cache"
-    ~synopsis:"Internal dev tools"
-    ~internal_name:"purge_disk_cache"
-    ~opam:"internal-devtools"
-    ~release_status:Unreleased
-    ~deps:[]
-    ~static:false
-    ~bisect_ppx:No
-
 let remove_if_exists fname = if Sys.file_exists fname then Sys.remove fname
 
 let get_contracts_lib =
@@ -7517,6 +7481,7 @@ let _tztop =
     ~path:"devtools/tztop"
     ~release_status:Unreleased
     ~internal_name:"tztop_main"
+    ~synopsis:"Internal dev tools"
     ~opam:"internal-devtools"
     ~modes:[Byte]
     ~bisect_ppx:No

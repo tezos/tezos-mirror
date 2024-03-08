@@ -57,3 +57,36 @@ let _octez_tooling_opam_lint =
     ~path:"src/tooling/opam-lint"
     ~opam:"tezos-tooling"
     ~deps:[octez_tooling_opam_file_format; unix]
+
+let _git_gas_diff =
+  public_exe
+    "git-gas-diff"
+    ~path:"devtools/git-gas-diff/bin"
+    ~release_status:Unreleased
+    ~internal_name:"main"
+    ~opam:"tezos-tooling"
+    ~deps:[external_lib "num" V.True; re]
+    ~static:false
+    ~bisect_ppx:No
+
+let _gas_parameter_diff =
+  public_exe
+    "gas_parameter_diff"
+    ~path:"devtools/gas_parameter_diff/bin"
+    ~release_status:Unreleased
+    ~internal_name:"main"
+    ~opam:"tezos-tooling"
+    ~deps:[]
+    ~static:false
+    ~bisect_ppx:No
+
+let _benchmark_tools_purge_disk_cache =
+  public_exe
+    "purge_disk_cache"
+    ~path:"devtools/benchmarks-tools/purge_disk_cache"
+    ~internal_name:"purge_disk_cache"
+    ~opam:"tezos-tooling"
+    ~release_status:Unreleased
+    ~deps:[]
+    ~static:false
+    ~bisect_ppx:No

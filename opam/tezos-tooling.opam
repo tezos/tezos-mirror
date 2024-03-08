@@ -13,6 +13,8 @@ depends: [
   "bisect_ppx" { >= "2.7.0" }
   "ocamlformat" { = "0.24.1" }
   "base-unix"
+  "num"
+  "re" { >= "1.10.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
