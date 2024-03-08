@@ -184,6 +184,13 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // We also update the current root hash of the kernel.
             set_kernel_root_hash(host)?;
             host.mark_for_reboot()?;
+            let configuration = fetch_configuration(host);
+            log!(
+                host,
+                Info,
+                "Configuration after migration: {}",
+                configuration
+            );
             return Ok(());
         }
         Err(Error::UpgradeError(Fallback)) => {
