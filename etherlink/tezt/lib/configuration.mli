@@ -17,6 +17,7 @@ val make_config :
   ?ticketer:string ->
   ?administrator:string ->
   ?kernel_governance:string ->
+  ?kernel_security_governance:string ->
   ?sequencer_governance:string ->
   ?sequencer:string ->
   ?delayed_bridge:string ->

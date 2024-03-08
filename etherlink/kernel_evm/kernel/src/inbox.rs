@@ -651,6 +651,7 @@ mod tests {
                 admin: Some(sender),
                 sequencer_governance: None,
                 kernel_governance: None,
+                kernel_security_governance: None,
             },
             None,
             None,
