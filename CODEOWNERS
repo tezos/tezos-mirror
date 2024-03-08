@@ -60,7 +60,8 @@
 
 /manifest                    @romain.nl
 
-/.gitlab                     @romain.nl
+/.gitlab                     @romain.nl @arvidnl
+/ci                          @arvidnl
 
 # Octez Merge Team
 #
