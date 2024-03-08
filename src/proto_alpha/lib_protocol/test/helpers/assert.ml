@@ -33,6 +33,13 @@ let error ~loc v f =
   | Ok _ -> failwith "Unexpected successful result (%s)" loc
   | Error err -> failwith "@[Unexpected error (%s): %a@]" loc pp_print_trace err
 
+let join_errors e1 e2 =
+  let open Lwt_result_syntax in
+  match (e1, e2) with
+  | Ok (), Ok () -> return_unit
+  | Error e, Ok () | Ok (), Error e -> fail e
+  | Error e1, Error e2 -> fail (e1 @ e2)
+
 let test_error_encodings e =
   let module E = Environment.Error_monad in
   ignore (E.pp Format.str_formatter e) ;
