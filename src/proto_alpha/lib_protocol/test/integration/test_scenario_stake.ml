@@ -17,9 +17,39 @@ open Adaptive_issuance_helpers
 open State_account
 open Tez_helpers.Ez_tez
 open Scenario
-open Test_scenario_base
 
 let fs = Format.asprintf
+
+(** Initializes of scenarios with 2 cases:
+     - staker = delegate
+     - staker != delegate
+    Any scenario that begins with this will be duplicated.
+
+    Also, ensures that AI is activated (sets EMA threshold to zero,
+    enables activation vote, and waits for AI activation). *)
+let init_staker_delegate_or_external =
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
+  in
+  let begin_test ~self_stake =
+    let name = if self_stake then "staker" else "delegate" in
+    init_constants ()
+    --> set S.Adaptive_issuance.autostaking_enable false
+    --> Scenario_begin.activate_ai `Force
+    --> begin_test [name]
+    --> set_delegate_params name init_params
+    --> set_baker "__bootstrap__"
+  in
+  Tag "AI activated"
+  --> (Tag "self stake" --> begin_test ~self_stake:true
+      |+ Tag "external stake"
+         --> begin_test ~self_stake:false
+         --> add_account_with_funds
+               "staker"
+               ~funder:"delegate"
+               (Amount (Tez.of_mutez 2_000_000_000_000L))
+         --> set_delegate "staker" (Some "delegate"))
+  --> wait_delegate_parameters_activation --> next_cycle
 
 let stake_init =
   stake "staker" Half
@@ -49,14 +79,14 @@ let finalize staker =
   --> check_balance_field staker `Unstaked_finalizable Tez.zero
 
 let simple_roundtrip =
-  stake_init
+  init_staker_delegate_or_external --> stake_init
   --> (Tag "full unstake" --> unstake "staker" All
       |+ Tag "half unstake" --> unstake "staker" Half)
   --> wait_for_unfreeze_and_check unstake_wait
   --> finalize "staker" --> next_cycle
 
 let double_roundtrip =
-  stake_init --> unstake "staker" Half
+  init_staker_delegate_or_external --> stake_init --> unstake "staker" Half
   --> (Tag "half then full unstake" --> wait_n_cycles 2 --> unstake "staker" All
       |+ Tag "half then half unstake" --> wait_n_cycles 2
          --> unstake "staker" Half)
@@ -87,7 +117,8 @@ let status_quo_rountrip =
   let full_amount = Tez.of_mutez 10_000_000L in
   let amount_1 = Tez.of_mutez 2_999_999L in
   let amount_2 = Tez.of_mutez 7_000_001L in
-  snapshot_balances "init" ["staker"]
+  init_staker_delegate_or_external
+  --> snapshot_balances "init" ["staker"]
   --> stake "staker" (Amount full_amount)
   --> next_cycle
   --> (Tag "1 unstake" --> unstake "staker" (Amount full_amount)
@@ -100,7 +131,8 @@ let status_quo_rountrip =
   --> check_snapshot_balances "init"
 
 let scenario_finalize =
-  no_tag --> stake "staker" Half --> next_cycle --> unstake "staker" Half
+  init_staker_delegate_or_external --> stake "staker" Half --> next_cycle
+  --> unstake "staker" Half
   --> wait_n_cycles_f (unstake_wait ++ 2)
   --> assert_failure
         (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
@@ -113,7 +145,8 @@ let scenario_finalize =
 (* Finalize does not go through when unstake does nothing *)
 (* Todo: there might be other cases... like changing delegates *)
 let scenario_not_finalize =
-  no_tag --> stake "staker" Half --> next_cycle --> unstake "staker" All
+  init_staker_delegate_or_external --> stake "staker" Half --> next_cycle
+  --> unstake "staker" All
   --> wait_n_cycles_f (unstake_wait ++ 2)
   --> assert_failure
         (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
@@ -133,10 +166,10 @@ let scenario_forbidden_operations =
           failwith "_self_delegate_exit_"
         else return input)
   in
-  no_tag
-  (* Staking everything works for self delegates, but not for delegated accounts *)
-  --> assert_failure
-        (fail_if_staker_is_self_delegate "staker" --> stake "staker" All)
+  init_staker_delegate_or_external
+  --> (* Staking everything works for self delegates, but not for delegated accounts *)
+  assert_failure
+    (fail_if_staker_is_self_delegate "staker" --> stake "staker" All)
   (* stake is always forbidden when amount is zero *)
   --> assert_failure (stake "staker" Nothing)
   (* One cannot stake more that one has *)
@@ -145,10 +178,11 @@ let scenario_forbidden_operations =
   --> unstake "staker" Nothing
 
 let full_balance_in_finalizable =
-  add_account_with_funds
-    "dummy"
-    ~funder:"staker"
-    (Amount (Tez.of_mutez 10_000_000L))
+  init_staker_delegate_or_external
+  --> add_account_with_funds
+        "dummy"
+        ~funder:"staker"
+        (Amount (Tez.of_mutez 10_000_000L))
   --> stake "staker" All_but_one --> next_cycle --> unstake "staker" All
   --> wait_n_cycles_f (unstake_wait ++ 2)
   (* At this point, almost all the balance (but one mutez) of the stake is in finalizable *)
@@ -161,6 +195,8 @@ let full_balance_in_finalizable =
 
 (* Stress test: what happens if someone were to stake and unstake every cycle? *)
 let odd_behavior =
+  init_staker_delegate_or_external
+  -->
   let one_cycle =
     no_tag --> stake "staker" Half --> unstake "staker" Half --> next_cycle
   in
@@ -274,16 +310,14 @@ let forbid_costaking =
 let tests =
   tests_of_scenarios
   @@ [
-       ("Test simple roundtrip", init_scenario () --> simple_roundtrip);
-       ("Test double roundtrip", init_scenario () --> double_roundtrip);
-       ("Test preserved balance", init_scenario () --> status_quo_rountrip);
-       ("Test finalize", init_scenario () --> scenario_finalize);
-       ("Test no finalize", init_scenario () --> scenario_not_finalize);
-       ( "Test forbidden operations",
-         init_scenario () --> scenario_forbidden_operations );
-       ( "Test full balance in finalizable",
-         init_scenario () --> full_balance_in_finalizable );
-       ("Test stake unstake every cycle", init_scenario () --> odd_behavior);
+       ("Test simple roundtrip", simple_roundtrip);
+       ("Test double roundtrip", double_roundtrip);
+       ("Test preserved balance", status_quo_rountrip);
+       ("Test finalize", scenario_finalize);
+       ("Test no finalize", scenario_not_finalize);
+       ("Test forbidden operations", scenario_forbidden_operations);
+       ("Test full balance in finalizable", full_balance_in_finalizable);
+       ("Test stake unstake every cycle", odd_behavior);
        ("Test change delegate", change_delegate);
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
