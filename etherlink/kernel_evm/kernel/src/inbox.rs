@@ -649,7 +649,7 @@ mod tests {
             &TezosContracts {
                 ticketer: None,
                 admin: Some(sender),
-                sequencer_admin: None,
+                sequencer_governance: None,
                 kernel_governance: None,
             },
             None,

@@ -48,7 +48,7 @@ DELAYED_BRIDGE_ALIAS=${DELAYED_BRIDGE_ALIAS-"delayed_bridge"}
 # alias to use for the evm admin contract
 EVM_ADMIN_ALIAS=${EVM_ADMIN_ALIAS-"evm_admin"}
 # alias to use for the evm admin contract
-SEQUENCER_ADMIN_ALIAS=${SEQUENCER_ADMIN_ALIAS-"sequencer_admin"}
+SEQUENCER_GOVERNANCE_ALIAS=${SEQUENCER_GOVERNANCE_ALIAS-"sequencer_governance"}
 
 ## Rollup options
 
