@@ -28,9 +28,6 @@ oc.build:static-x86_64-linux-binaries:
   - gcp
   rules:
   - when: always
-  needs:
-  - job: trigger
-    optional: true
   dependencies: []
   before_script:
   - ./scripts/ci/take_ownership.sh

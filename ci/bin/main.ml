@@ -356,8 +356,8 @@ let job_docker_promote_to_latest ~ci_docker_hub : tezos_job =
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(release = false)
-    ?(needs_trigger = false) ?rules () : Tezos_ci.tezos_job =
+let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
+    ?dependencies () : Tezos_ci.tezos_job =
   let arch_string =
     match arch with Tezos_ci.Amd64 -> "x86_64" | Arm64 -> "arm64"
   in
@@ -371,16 +371,9 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false)
     "script-inputs/released-executables"
     ^ if not release then " script-inputs/experimental-executables" else ""
   in
-  let dependencies =
-    (* Even though not many tests depend on static executables, some
-       of those that do are limiting factors in the total duration of
-       pipelines. So when requested through [needs_trigger] we start
-       this job as early as possible, without waiting for
-       sanity_ci. *)
-    if needs_trigger then Dependent [Optional job_trigger] else Staged []
-  in
   job
     ?rules
+    ?dependencies
     ~__POS__
     ~stage:Stages.build
     ~arch
@@ -388,7 +381,6 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false)
     ~image:Images.runtime_build_dependencies
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
     ~variables:[("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
-    ~dependencies
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
 
@@ -398,7 +390,11 @@ let _job_static_x86_64_experimental =
   job_build_static_binaries
     ~__POS__
     ~arch:Amd64
-    ~needs_trigger:true
+      (* Even though not many tests depend on static executables, some
+         of those that do are limiting factors in the total duration
+         of pipelines. So we start this job as early as possible,
+         without waiting for sanity_ci. *)
+    ~dependencies:(Dependent [Optional job_trigger])
     ~rules:rules_static_build_other
     ()
   |> job_external ~filename_suffix:"experimental"
@@ -708,12 +704,7 @@ let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
     job_build_static_binaries ~__POS__ ~arch:Arm64 ~release:true ()
   in
   let job_static_x86_64_release =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~release:true
-      ~needs_trigger:true
-      ()
+    job_build_static_binaries ~__POS__ ~arch:Amd64 ~release:true ()
   in
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
@@ -792,7 +783,7 @@ let amd64_build_extra =
   ]
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
-    ?(needs_trigger = false) () =
+    ?dependencies () =
   let arch_string = match arch with Amd64 -> "x86_64" | Arm64 -> "arm64" in
   let name =
     sf
@@ -831,17 +822,10 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
         "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
       ]
   in
-  let dependencies =
-    (* Even though not many tests depend on static executables, some
-       of those that do are limiting factors in the total duration of
-       pipelines. So when requested through [needs_trigger] we start
-       this job as early as possible, without waiting for
-       sanity_ci. *)
-    if needs_trigger then Dependent [Optional job_trigger] else Staged []
-  in
   let job =
     job
       ?rules
+      ?dependencies
       ~__POS__
       ~stage:Stages.build
       ~arch
@@ -854,7 +838,6 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
            ~eval_opam:true
            [])
       ~variables
-      ~dependencies
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
   in
@@ -865,22 +848,10 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
 
    Used in external pipelines [before_merging] and [schedule_extended_test]. *)
 let job_build_arm64_release ?rules () : tezos_job =
-  job_build_dynamic_binaries
-    ?rules
-    ~__POS__
-    ~arch:Arm64
-    ~needs_trigger:false
-    ~release:true
-    ()
+  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:true ()
 
 let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
-  job_build_dynamic_binaries
-    ?rules
-    ~__POS__
-    ~arch:Arm64
-    ~needs_trigger:false
-    ~release:false
-    ()
+  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:false ()
 
 let enable_coverage_report job : tezos_job =
   job
@@ -1088,9 +1059,6 @@ let () =
          job_build_static_binaries
            ~__POS__
            ~arch:Amd64
-             (* TODO: this job doesn't actually need trigger and there is no
-                need to set it optional since we know this job is only on the master branch. *)
-           ~needs_trigger:true
            ~rules:[job_rule ~when_:Always ()]
            ()
        in
