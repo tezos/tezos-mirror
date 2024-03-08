@@ -54,6 +54,15 @@ module Shared = struct
         | None, res -> return res)
 end
 
+(* Caches the current state of the live blocks and operations. *)
+type live_data_cache = {
+  (* Live blocks and operations cache. *)
+  live_data : (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
+  (* Trailing cache containing the latest block/operations that were
+     considered as non-live. *)
+  pred : (Block_hash.t * Operation_hash.Set.t) option;
+}
+
 type store = {
   store_dir : [`Store_dir] Naming.directory;
   (* Mutability allows a back-reference from chain_store to store: not
@@ -103,8 +112,7 @@ and chain_state = {
   mempool : Mempool.t;
   live_blocks : Block_hash.Set.t;
   live_operations : Operation_hash.Set.t;
-  mutable live_data_cache :
-    (Block_hash.t * Operation_hash.Set.t) Ringo.Ring.t option;
+  mutable live_data_cache : live_data_cache;
   validated_blocks : Block_repr.t Block_lru_cache.t;
 }
 
@@ -1079,29 +1087,120 @@ module Chain = struct
     Shared.use chain_store.chain_state (fun {live_blocks; live_operations; _} ->
         Lwt.return (live_blocks, live_operations))
 
+  (* Returns the live_blocks and live_operations sets after removing
+     the current_head from it, and adding the block candidate. This is
+     particularly useful when computing the liveblocks for a new block
+     candidate that is not on top of the current head, but rather at
+     the same level with a higher round -- as it avoids recomputing
+     the whole livedata *)
+  let replace_head_from_live_data chain_state ~update_cache ~current_head
+      live_blocks live_operations ~new_head ~cache_expected_capacity =
+    let open Lwt_result_syntax in
+    let most_recent_block = Block.hash new_head in
+    let most_recent_ops =
+      Block.all_operation_hashes new_head
+      |> List.flatten |> Operation_hash.Set.of_list
+    in
+    let blocks_without_current_head =
+      Block_hash.Set.remove (Block.hash current_head) live_blocks
+    in
+    let new_live_blocks =
+      Block_hash.Set.add most_recent_block blocks_without_current_head
+    in
+    let current_head_ops =
+      Block.all_operation_hashes current_head
+      |> List.flatten |> Operation_hash.Set.of_list
+    in
+    let ops_without_current_head =
+      Operation_hash.Set.diff live_operations current_head_ops
+    in
+    let new_live_ops =
+      Operation_hash.Set.union ops_without_current_head most_recent_ops
+    in
+    let new_livedata = (new_live_blocks, new_live_ops) in
+    let () =
+      if update_cache then
+        (* Updating live_data_cache by re-adding the oldest elements
+           first (to maintain the cache ordering) thanks to the
+           ordered Ringo.Ring.elements. Then, when reaching the last
+           element of the elements, that is the current_head, drop it
+           a add the block candidate instead. *)
+        let new_cache =
+          match chain_state.live_data_cache.live_data with
+          | Some cache ->
+              let lbe = Ringo.Ring.elements cache in
+              let rec loop acc = function
+                | _current_head_to_drop :: [] ->
+                    Ringo.Ring.add acc (most_recent_block, most_recent_ops) ;
+                    acc
+                | hd :: tl ->
+                    Ringo.Ring.add acc hd ;
+                    loop acc tl
+                | [] ->
+                    (* The live_data_cache is expected to be None. *)
+                    assert false
+              in
+              let new_cache =
+                loop (Ringo.Ring.create cache_expected_capacity) lbe
+              in
+              Some new_cache
+          | None -> None
+        in
+        (* Updating the cache with the new one. The pred_cache remains
+           the same. *)
+        chain_state.live_data_cache <-
+          {chain_state.live_data_cache with live_data = new_cache}
+    in
+    return new_livedata
+
+  (* Returns the live_blocks and live_operations shifted by one block
+     in the past. This is particularly useful when applying a block of
+     a round >= 1, and avoids recomputing the whole livedata. *)
+  let rollback_livedata ~current_head live_blocks live_operations
+      ~pred_cache:(pred_hash, pred_ops) =
+    let open Lwt_result_syntax in
+    let blocks_without_current_head =
+      Block_hash.Set.remove (Block.hash current_head) live_blocks
+    in
+    let new_live_blocks =
+      Block_hash.Set.add pred_hash blocks_without_current_head
+    in
+    let head_ops =
+      Block.all_operation_hashes current_head
+      |> List.flatten |> Operation_hash.Set.of_list
+    in
+    let ops_without_current_head =
+      Operation_hash.Set.diff live_operations head_ops
+    in
+    let new_live_ops =
+      Operation_hash.Set.union ops_without_current_head pred_ops
+    in
+    let new_cache = (new_live_blocks, new_live_ops) in
+    return new_cache
+
   (* Computes the set of live blocks/operations for a given
      block. [update_cache] updates the chain_state's cache, typically
      on new heads. *)
   let locked_compute_live_blocks_with_cache ~update_cache chain_store
       chain_state block metadata =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let {current_head; live_blocks; live_operations; live_data_cache; _} =
       chain_state
     in
     (* We actually compute max_op_ttl + 1... *)
     let expected_capacity = Block.max_operations_ttl metadata + 1 in
-    match live_data_cache with
-    | Some live_data_cache
+    match (live_data_cache.live_data, live_data_cache.pred) with
+    | Some live_data, _
       when update_cache
            && Block_hash.equal
                 (Block.predecessor block)
                 (Block.hash current_head)
-           && Ringo.Ring.capacity live_data_cache = expected_capacity -> (
+           && Ringo.Ring.capacity live_data = expected_capacity -> (
         (* The block candidate is on top of the current head. It
            corresponds to a new promoted head. We need to move the
            live data window one stop forward, including that new head
            and discarding the oldest block of the previous
-           state. Checking the [expected_capacity] allows to force
+           state. Checking the expected capacity allows to force
            recomputing the livedata as soon as a max_op_ttl changes
            between blocks. *)
         let most_recent_block = Block.hash block in
@@ -1117,10 +1216,10 @@ module Chain = struct
         in
         match
           Ringo.Ring.add_and_return_erased
-            live_data_cache
+            live_data
             (most_recent_block, most_recent_ops)
         with
-        | None -> Lwt.return (new_live_blocks, new_live_operations)
+        | None -> return (new_live_blocks, new_live_operations)
         | Some (last_block, last_ops) ->
             let diffed_new_live_blocks =
               Block_hash.Set.remove last_block new_live_blocks
@@ -1128,20 +1227,42 @@ module Chain = struct
             let diffed_new_live_operations =
               Operation_hash.Set.diff new_live_operations last_ops
             in
-            Lwt.return (diffed_new_live_blocks, diffed_new_live_operations))
+            chain_state.live_data_cache <-
+              {
+                chain_state.live_data_cache with
+                pred = Some (last_block, last_ops);
+              } ;
+            return (diffed_new_live_blocks, diffed_new_live_operations))
+    | Some live_data, Some _
+      when Block_hash.equal
+             (Block.predecessor block)
+             (Block.predecessor current_head)
+           && Ringo.Ring.capacity live_data = expected_capacity ->
+        (* The block candidate's predecessor equals the current head
+           predecessor. It is an alternate head. We update the current
+           cache by substituting the current head live data with the
+           block's candidate one. *)
+        replace_head_from_live_data
+          chain_state
+          ~update_cache
+          ~current_head
+          live_blocks
+          live_operations
+          ~new_head:block
+          ~cache_expected_capacity:expected_capacity
     | _ when update_cache ->
         (* The block candidate is not on top of the current head. It is
-           likely to be an alternate head. We recompute the whole live
+           likely to be an alternate branch. We recompute the whole live
            data. We may keep this new state in the cache. *)
         let new_cache = Ringo.Ring.create expected_capacity in
-        let* () =
+        let*! () =
           Chain_traversal.live_blocks_with_ring
             chain_store
             block
             expected_capacity
             new_cache
         in
-        chain_state.live_data_cache <- Some new_cache ;
+        chain_state.live_data_cache <- {live_data = Some new_cache; pred = None} ;
         let live_blocks, live_ops =
           Ringo.Ring.fold
             new_cache
@@ -1149,33 +1270,57 @@ module Chain = struct
             ~f:(fun (bhs, opss) (bh, ops) ->
               (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
         in
-        Lwt.return (live_blocks, live_ops)
+        return (live_blocks, live_ops)
     | _ ->
         (* The block candidate is not on top of the current head. It
            is likely to be an alternate head. We recompute the whole
            live data. *)
-        Chain_traversal.live_blocks chain_store block expected_capacity
+        let*! new_live_blocks =
+          Chain_traversal.live_blocks chain_store block expected_capacity
+        in
+        return new_live_blocks
 
   let locked_compute_live_blocks ?(force = false) ?(update_cache = true)
       chain_store chain_state block metadata =
-    let {current_head; live_blocks; live_operations; _} = chain_state in
-    if Block.equal current_head block && not force then
-      (* Computing live blocks/operations of the current head. The
-         cache is valid and returned as is. *)
-      Lwt.return (live_blocks, live_operations)
-    else
-      locked_compute_live_blocks_with_cache
-        ~update_cache
-        chain_store
-        chain_state
-        block
-        metadata
+    let open Lwt_result_syntax in
+    let {current_head; live_blocks; live_operations; live_data_cache; _} =
+      chain_state
+    in
+    let is_pred_cache_set = Option.is_some live_data_cache.pred in
+    let* res =
+      if Block.equal current_head block && not force then
+        (* Computing live blocks/operations of the current head. The
+           cache is valid and returned as is. *)
+        return (live_blocks, live_operations)
+      else if
+        Block_hash.equal (Block.predecessor current_head) (Block.hash block)
+        && is_pred_cache_set && not force
+      then
+        (* Computing the live blocks/operations of the current head
+           predecessor. We rollback the livedata window by one step to
+           align with the predecessors livedata window, thanks to the
+           pred_cache. This is valid as a block max_op_ttl change will
+           force recomputing the livedata, invalidation the
+           pred_cache. *)
+        let pred_cache =
+          WithExceptions.Option.get ~loc:__LOC__ live_data_cache.pred
+        in
+        rollback_livedata ~current_head live_blocks live_operations ~pred_cache
+      else
+        locked_compute_live_blocks_with_cache
+          ~update_cache
+          chain_store
+          chain_state
+          block
+          metadata
+    in
+    return res
 
   let compute_live_blocks chain_store ~block =
     let open Lwt_result_syntax in
     Shared.use chain_store.chain_state (fun chain_state ->
         let* metadata = Block.get_block_metadata chain_store block in
-        let*! r =
+        let* r =
           locked_compute_live_blocks
             ~update_cache:false
             chain_store
@@ -1645,7 +1790,7 @@ module Chain = struct
         in
         let* () = Stored_data.write chain_state.target_data new_target in
         (* Update live_data *)
-        let*! live_blocks, live_operations =
+        let* live_blocks, live_operations =
           locked_compute_live_blocks
             ~update_cache:true
             chain_store
@@ -1825,7 +1970,7 @@ module Chain = struct
     let mempool = Mempool.empty in
     let live_blocks = Block_hash.Set.singleton genesis_block.hash in
     let live_operations = Operation_hash.Set.empty in
-    let live_data_cache = None in
+    let live_data_cache = {live_data = None; pred = None} in
     let validated_blocks = Block_lru_cache.create 10 in
     return
       {
@@ -1923,7 +2068,7 @@ module Chain = struct
         let mempool = Mempool.empty in
         let live_blocks = Block_hash.Set.empty in
         let live_operations = Operation_hash.Set.empty in
-        let live_data_cache = None in
+        let live_data_cache = {live_data = None; pred = None} in
         let validated_blocks = Block_lru_cache.create 10 in
         return
           {
@@ -2039,7 +2184,7 @@ module Chain = struct
     | None -> tzfail Inconsistent_chain_store
     | Some metadata ->
         Shared.update_with chain_state (fun chain_state ->
-            let*! live_blocks, live_operations =
+            let* live_blocks, live_operations =
               locked_compute_live_blocks
                 ~force:true
                 ~update_cache:true
