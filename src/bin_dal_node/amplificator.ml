@@ -6,14 +6,14 @@
 (*****************************************************************************)
 
 let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
-    commitment node_ctxt =
+    commitment published_level slot_index gs_worker node_ctxt =
   let open Lwt_result_syntax in
   match Node_context.get_status node_ctxt with
   | Starting ->
       (* The cryptobox is not yet available so we cannot reconstruct
          slots yet. *)
       return_unit
-  | Ready {cryptobox; shards_proofs_precomputation; _} ->
+  | Ready {cryptobox; shards_proofs_precomputation; proto_parameters; _} ->
       let dal_parameters = Cryptobox.parameters cryptobox in
       let number_of_shards = dal_parameters.number_of_shards in
       let redundancy_factor = dal_parameters.redundancy_factor in
@@ -55,6 +55,17 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
             commitment
             ~with_proof:true
           |> Errors.to_option_tzresult
+        in
+        let* () =
+          Slot_manager.publish_slot_data
+            ~level_committee:(Node_context.fetch_committee node_ctxt)
+            slot_store
+            gs_worker
+            cryptobox
+            proto_parameters
+            commitment
+            published_level
+            slot_index
         in
         let*! () = Event.(emit reconstruct_finished commitment) in
         return_unit
