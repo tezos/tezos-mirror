@@ -457,7 +457,7 @@ Once your transaction is included in a block, you can retrieve it in one of the 
 Implicit Accounts and Smart Contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts*.
+In Tezos there are two kinds of accounts: *implicit accounts* and *smart contracts* (see :doc:`../active/accounts` for more details).
 
 - The implicit accounts are the addresses starting with *tz1*
   we have used up to now (or other :ref:`address prefixes <address_prefixes>` starting with *tz*). They are created with a transfer
