@@ -61,7 +61,11 @@ impl<const BYTES: usize> backend::Layout for Sizes<BYTES> {
     type Placed = backend::Location<[u8; BYTES]>;
 
     fn place_with(alloc: &mut backend::Choreographer) -> Self::Placed {
-        backend::Array::<u8, BYTES>::place_with(alloc)
+        // Most architectures have a 4 KiB minimum page size. We use it to
+        // ensure our main memory is not only well-aligned with respect to the
+        // values you might access in it, but also with respect to host's page
+        // layout where our main memory lies.
+        alloc.alloc_min_align(4096)
     }
 
     type Allocated<M: backend::Manager> = MainMemory<Self, M>;

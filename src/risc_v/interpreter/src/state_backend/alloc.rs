@@ -118,6 +118,11 @@ impl Choreographer {
 
     /// Allocate a location for `T`.
     pub fn alloc<T>(&mut self) -> Location<T> {
+        self.alloc_min_align(1)
+    }
+
+    /// Allocate a location for `T` ensuring a minimum alignment.
+    pub fn alloc_min_align<T>(&mut self, min_align: usize) -> Location<T> {
         let size = mem::size_of::<T>();
         assert!(
             size > 0,
@@ -125,7 +130,7 @@ impl Choreographer {
             type_name::<T>()
         );
 
-        let align = mem::align_of::<T>();
+        let align = mem::align_of::<T>().max(min_align);
         let align = if let Some(with_align) = self.one_time_align_hook.take() {
             let new_align = (with_align)(align);
             assert!(new_align >= align);
