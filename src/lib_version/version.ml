@@ -31,7 +31,7 @@ type additional_info = Tezos_version_parser.additional_info =
   | RC_dev of int
   | Release
 
-type product = Tezos_version_parser.product = Octez
+type product = Tezos_version_parser.product = Octez | Etherlink
 
 type t = Tezos_version_parser.t = {
   product : product;
@@ -50,7 +50,7 @@ let string_of_additional_info = function
   | RC_dev n -> Format.asprintf "~rc%d+dev" n
   | Release -> ""
 
-let string_of_product = function Octez -> "Octez"
+let string_of_product = function Octez -> "Octez" | Etherlink -> "Etherlink"
 
 let pp f {product; major; minor; additional_info} =
   Format.fprintf
