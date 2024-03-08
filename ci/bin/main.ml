@@ -384,21 +384,6 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
 
-let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
-
-let _job_static_x86_64_experimental =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Amd64
-      (* Even though not many tests depend on static executables, some
-         of those that do are limiting factors in the total duration
-         of pipelines. So we start this job as early as possible,
-         without waiting for sanity_ci. *)
-    ~dependencies:(Dependent [Optional job_trigger])
-    ~rules:rules_static_build_other
-    ()
-  |> job_external ~filename_suffix:"experimental"
-
 let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
   job_docker_authenticated
     ?rules
@@ -915,14 +900,16 @@ let code_verification_pipeline pipeline_type =
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
   let trigger = [] in
   let sanity = [] in
+  let dependencies_needs_trigger =
+    match pipeline_type with
+    | Schedule_extended_test -> Staged []
+    | Before_merging -> Dependent [Optional job_trigger]
+  in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
       ~__POS__
       ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:true ())
-      ~dependencies:
-        (match pipeline_type with
-        | Schedule_extended_test -> Staged []
-        | Before_merging -> Dependent [Optional job_trigger])
+      ~dependencies:dependencies_needs_trigger
       ()
     |> job_external_split
          ~before_merging_suffix:"before_merging"
@@ -935,6 +922,19 @@ let code_verification_pipeline pipeline_type =
     in
     let _job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
       job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
+      |> job_external_split
+    in
+    let _job_static_x86_64_experimental =
+      job_build_static_binaries
+        ~__POS__
+        ~arch:Amd64
+          (* Even though not many tests depend on static executables, some
+             of those that do are limiting factors in the total duration
+             of pipelines. So we start this job as early as possible,
+             without waiting for sanity_ci. *)
+        ~dependencies:dependencies_needs_trigger
+        ~rules:[job_rule ~changes:changeset_octez ()]
+        ()
       |> job_external_split
     in
     []
