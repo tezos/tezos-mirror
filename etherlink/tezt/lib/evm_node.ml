@@ -143,16 +143,16 @@ let handle_is_ready_event (evm_node : t) {name; value = _; timestamp = _} =
 let handle_blueprint_injected_event (evm_node : t) {name; value; timestamp = _}
     =
   if name = event_blueprint_injected_name then
-    trigger_blueprint_injected
-      evm_node
-      JSON.(value |> as_string |> int_of_string)
+    trigger_blueprint_injected evm_node JSON.(value |> as_int)
   else ()
 
 let handle_blueprint_applied_event (evm_node : t) {name; value; timestamp = _} =
   if name = event_blueprint_applied_name then
-    trigger_blueprint_applied
-      evm_node
-      JSON.(value |> as_string |> int_of_string)
+    trigger_blueprint_applied evm_node
+    @@ JSON.(
+         match value |-> "level" |> as_int_opt with
+         | Some i -> i (* in devmode. To delete at next upgrade *)
+         | None -> value |> as_int (* in prod *))
   else ()
 
 let check_event ?timeout evm_node name promise =
@@ -235,6 +235,25 @@ let wait_for_evm_event evm_node ~event_kind =
       fun json ->
         let found_event_kind = json |-> "kind" |> as_string in
         if event_kind = found_event_kind then Some () else None)
+
+let wait_for_shutdown_event evm_node =
+  wait_for evm_node "shutting_down.v0" @@ fun json ->
+  JSON.(json |> as_int |> Option.some)
+
+let wait_for_diverged evm_node =
+  wait_for evm_node "evm_events_follower_diverged.v0" @@ fun json ->
+  let open JSON in
+  let level = json |-> "level" |> as_int in
+  let expected_hash = json |-> "expected_hash" |> as_string in
+  let found_hash = json |-> "found_hash" |> as_string in
+  Some (level, expected_hash, found_hash)
+
+let wait_for_missing_block evm_node =
+  wait_for evm_node "evm_events_follower_missing_block.v0" @@ fun json ->
+  let open JSON in
+  let level = json |-> "level" |> as_int in
+  let expected_hash = json |-> "expected_hash" |> as_string in
+  Some (level, expected_hash)
 
 let create ?name ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
     ?rpc_port endpoint =

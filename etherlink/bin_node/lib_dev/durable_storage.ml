@@ -176,6 +176,12 @@ module Make (Reader : READER) = struct
       ~full_transaction_object
       ~number:Durable_storage_path.Block.(Nth n)
 
+  let nth_block_hash n =
+    let number = Durable_storage_path.Block.(Nth n) in
+    inspect_durable_and_decode_opt
+      (Durable_storage_path.Indexes.block_by_number number)
+      decode_block_hash
+
   let block_by_hash ~full_transaction_object block_hash =
     let open Lwt_result_syntax in
     let* block_opt =

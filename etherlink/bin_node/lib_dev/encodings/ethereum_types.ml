@@ -167,6 +167,8 @@ let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
 let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
 
+let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
+
 let empty_hash = Hash (Hex "")
 
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
@@ -174,6 +176,8 @@ let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
 let encode_hex (Hex hex) = Hex.to_bytes_exn (`Hex hex)
 
 let decode_block_hash bytes = Block_hash (decode_hex bytes)
+
+let encode_block_hash (Block_hash hash) = encode_hex hash
 
 let decode_address bytes = Address (decode_hex bytes)
 
@@ -1322,10 +1326,39 @@ module Sequencer_upgrade = struct
       (tup3 Signature.Public_key.encoding string Time.Protocol.encoding)
 end
 
+module Blueprint_applied = struct
+  type t = {number : quantity; hash : block_hash}
+
+  let of_rlp = function
+    | Rlp.List [Value number; Value hash] ->
+        let number = decode_number number in
+        let hash = decode_block_hash hash in
+        Some {number; hash}
+    | _ -> None
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
+
+  let to_bytes {number; hash} =
+    let number = encode_number number in
+    let hash = encode_block_hash hash in
+    Rlp.(encode (List [Value number; Value hash]))
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {number = Qty number; hash = Block_hash (Hex hash)} ->
+        (number, hash))
+      (fun (number, hash) ->
+        {number = Qty number; hash = Block_hash (Hex hash)})
+      (tup2 z string)
+end
+
 module Evm_events = struct
   type t =
     | Upgrade_event of Upgrade.t
     | Sequencer_upgrade_event of Sequencer_upgrade.t
+    | Blueprint_applied of Blueprint_applied.t
 
   let of_bytes bytes =
     match bytes |> Rlp.decode with
@@ -1337,6 +1370,9 @@ module Evm_events = struct
         | "\x02" ->
             let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
             Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
+        | "\x03" ->
+            let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
+            Option.map (fun u -> Blueprint_applied u) blueprint_applied
         | _ -> None)
     | _ -> None
 
@@ -1344,7 +1380,7 @@ module Evm_events = struct
     | Upgrade_event {hash; timestamp} ->
         Format.fprintf
           fmt
-          "upgrade:@ hash %a,@ timestamp: %a"
+          "Upgrade:@ hash %a,@ timestamp: %a"
           pp_hash
           hash
           Time.Protocol.pp_hum
@@ -1353,12 +1389,19 @@ module Evm_events = struct
         {sequencer; pool_address = Address (Hex address); timestamp} ->
         Format.fprintf
           fmt
-          "SequencerUpgrade:@ sequencer:@ %a,pool_address %s,@ timestamp: %a"
+          "Sequencer upgrade:@ sequencer:@ %a,pool_address %s,@ timestamp: %a"
           Signature.Public_key.pp
           sequencer
           address
           Time.Protocol.pp_hum
           timestamp
+    | Blueprint_applied {number = Qty number; hash = Block_hash (Hex hash)} ->
+        Format.fprintf
+          fmt
+          "Blueprint applied:@,number:%a@ hash: %s"
+          Z.pp_print
+          number
+          hash
 
   let encoding =
     let open Data_encoding in
@@ -1385,5 +1428,11 @@ module Evm_events = struct
           ~proj:(function
             | Sequencer_upgrade_event upgrade -> Some upgrade | _ -> None)
           ~inj:(fun upgrade -> Sequencer_upgrade_event upgrade);
+        case
+          ~kind:"blueprint_applied"
+          ~tag:2
+          ~event_encoding:Blueprint_applied.encoding
+          ~proj:(function Blueprint_applied info -> Some info | _ -> None)
+          ~inj:(fun info -> Blueprint_applied info);
       ]
 end

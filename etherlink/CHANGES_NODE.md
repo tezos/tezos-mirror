@@ -5,6 +5,8 @@
 ### Features
 
 - Fetch WASM preimages from a remote endpoint. (!12060)
+- When the sequencer evm node diverged from rollup node it fails with
+  exit code 100. (!12214)
 
 ### Bug fixes
 

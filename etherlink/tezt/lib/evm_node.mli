@@ -136,6 +136,20 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
     is equal to [event_kind] (e.g. "sequencer_upgrade"). *)
 val wait_for_evm_event : t -> event_kind:string -> unit Lwt.t
 
+(** [wait_for_diverged evm_node] waits for the event
+    [evm_events_follower_diverged.v0] using {!wait_for} and return the
+    diverging blueprint level expected hash, and found hash. *)
+val wait_for_diverged : t -> (int * string * string) Lwt.t
+
+(** [wait_for_missing_block evm_node] waits for the event
+    [evm_events_follower_missing_block.v0] using {!wait_for} and
+    return the missing blueprint level and block hash. *)
+val wait_for_missing_block : t -> (int * string) Lwt.t
+
+(** Waits until a node terminates and return its status. If the node is
+    not running, make the test fail. *)
+val wait_for_shutdown_event : t -> int Lwt.t
+
 (** [endpoint ?private_ evm_node] returns the endpoint to communicate with the
     [evm_node]. If [private_] is true, the endpoint for the private
     RPC server is returned. *)

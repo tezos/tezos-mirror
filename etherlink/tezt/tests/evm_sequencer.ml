@@ -297,18 +297,17 @@ let test_remove_sequencer =
       ~burn_cap:Tez.one
       client
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
-  (* Produce L1 blocks to show that only the proxy is progressing *)
-  let* _ =
-    repeat 5 (fun () ->
+  let* missing_block_nb, _hash = Evm_node.wait_for_missing_block sequencer
+  and* () =
+    (* Produce L1 blocks to show that only the proxy is progressing *)
+    repeat 5 (fun _ ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~node ~client in
         unit)
   in
   (* Sequencer is at genesis, proxy is at [advance]. *)
-  let*@ sequencer_head = Rpc.block_number sequencer in
+  Check.((missing_block_nb = 1) int)
+    ~error_msg:"Sequencer should be missing block %L" ;
   let*@ proxy_head = Rpc.block_number proxy in
-  Check.((sequencer_head = 0l) int32)
-    ~error_msg:"Sequencer should still be at genesis" ;
   Check.((proxy_head > 0l) int32) ~error_msg:"Proxy should have advanced" ;
 
   unit
@@ -1796,7 +1795,7 @@ let test_sequencer_upgrade =
       ~error_msg:"The head should be the same after the upgrade"
       ()
   in
-  let nb_block = 10l in
+  let nb_block = 4l in
   let* () =
     repeat (Int32.to_int nb_block) (fun () ->
         let* _ = Rpc.produce_block sequencer in
@@ -1825,18 +1824,19 @@ let test_sequencer_upgrade =
   in
   Log.info
     "Stopping current sequencer and starting a new one with new sequencer key" ;
-  let* () = Evm_node.terminate sequencer in
   let new_sequencer =
     let mode =
       match Evm_node.mode sequencer with
       | Sequencer config ->
-          Evm_node.Sequencer {config with sequencer = new_sequencer_key}
+          Evm_node.Sequencer
+            {
+              config with
+              sequencer = new_sequencer_key;
+              private_rpc_port = Port.fresh ();
+            }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
-    Evm_node.create
-      ~name:"new-sequencer"
-      ~mode
-      (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   let* () =
@@ -1846,12 +1846,14 @@ let test_sequencer_upgrade =
       sc_rollup_node
   in
   let* () = Evm_node.run new_sequencer in
-  let* () =
-    repeat (Int32.to_int nb_block) (fun () ->
-        let* _ = Rpc.produce_block new_sequencer in
-        unit)
-  in
-  let* () =
+  let* _divergence = Evm_node.wait_for_missing_block sequencer
+  and* _exit_code = Evm_node.wait_for_shutdown_event sequencer
+  and* () =
+    let* () =
+      repeat (Int32.to_int nb_block) (fun () ->
+          let* _ = Rpc.produce_block new_sequencer in
+          unit)
+    in
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
         unit)
@@ -1870,6 +1872,66 @@ let test_sequencer_upgrade =
     (Int32.add previous_proxy_head.number nb_block = proxy_head.number) int32)
     ~error_msg:
       "The block number should have incremented (previous: %L, current: %R)" ;
+  unit
+
+(** this test the situation where a sequencer diverged from it
+    source. To obtain that we create two sequencers, one is going to
+    diverged from the other. *)
+let test_sequencer_diverge =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"]
+    ~title:"Runs two sequencers, one diverge and stop"
+    ~uses
+  @@ fun protocol ->
+  let* {sc_rollup_node; client; sequencer; node; _} =
+    setup_sequencer
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      protocol
+  in
+  let* () =
+    repeat 4 (fun () ->
+        let* _l2_level = Rpc.produce_block sequencer in
+        unit)
+  in
+  let* () =
+    repeat 3 (fun () ->
+        let* _l1_level = next_rollup_node_level ~sc_rollup_node ~node ~client in
+        unit)
+  in
+  let sequencer_bis =
+    let mode =
+      match Evm_node.mode sequencer with
+      | Sequencer config ->
+          Evm_node.Sequencer {config with private_rpc_port = Port.fresh ()}
+      | _ -> Test.fail "impossible case, it's a sequencer"
+    in
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      sequencer_bis
+      sc_rollup_node
+  in
+  let diverged_and_shutdown sequencer =
+    let* _ = Evm_node.wait_for_diverged sequencer
+    and* _ = Evm_node.wait_for_shutdown_event sequencer in
+    unit
+  in
+  let* () = Evm_node.run sequencer_bis in
+  let* () =
+    Lwt.pick
+      [diverged_and_shutdown sequencer; diverged_and_shutdown sequencer_bis]
+  and* () =
+    (* diff timestamp to differ *)
+    let* _ = Rpc.produce_block ~timestamp:"0" sequencer
+    and* _ = Rpc.produce_block ~timestamp:"1" sequencer_bis in
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~node ~client ~sc_rollup_node in
+        unit)
+  in
   unit
 
 let protocols = Protocol.all
@@ -1898,4 +1960,5 @@ let () =
   test_delayed_inbox_flushing protocols ;
   test_no_automatic_block_production protocols ;
   test_migration_from_ghostnet protocols ;
-  test_sequencer_upgrade protocols
+  test_sequencer_upgrade protocols ;
+  test_sequencer_diverge protocols
