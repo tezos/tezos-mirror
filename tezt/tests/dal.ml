@@ -811,7 +811,7 @@ let check_dal_raw_context node =
       Test.fail "Confirmed slots history mismatch." ;
     unit
 
-let test_slot_management_logic _protocol parameters cryptobox node client
+let test_slot_management_logic protocol parameters cryptobox node client
     _bootstrap_key =
   let*! () = Client.reveal ~src:"bootstrap6" client in
   let* () = bake_for client in
@@ -889,10 +889,22 @@ let test_slot_management_logic _protocol parameters cryptobox node client
     Client.RPC.call client @@ RPC.get_chain_block_operations ()
   in
   let fees_error =
-    Failed {error_id = "proto.alpha.dal_publish_commitment_duplicate"}
+    Failed
+      {
+        error_id =
+          sf
+            "proto.%s.dal_publish_commitment_duplicate"
+            (Protocol.encoding_prefix protocol);
+      }
   in
   let proof_error =
-    Failed {error_id = "proto.alpha.dal_publish_commitment_invalid_proof"}
+    Failed
+      {
+        error_id =
+          sf
+            "proto.%s.dal_publish_commitment_invalid_proof"
+            (Protocol.encoding_prefix protocol);
+      }
   in
   (* The baker sorts operations fee wise. Consequently order of
      application for the operations will be: oph3 > oph2 > oph4 > oph1
@@ -5884,7 +5896,6 @@ let scenario_tutorial_dal_baker =
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
-    ~event_sections_levels:[(Protocol.name Alpha ^ ".baker", `Debug)]
     ~additional_bootstrap_accounts:1
     "dal basic logic"
     test_slot_management_logic
