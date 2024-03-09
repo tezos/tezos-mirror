@@ -246,12 +246,6 @@ fn compute_bip<Host: KernelRuntime>(
             *current_constants = new_block
                 .constants(current_constants.chain_id, current_constants.block_fees);
 
-            Event::BlueprintApplied {
-                number: new_block.number,
-                hash: new_block.hash,
-            }
-            .store(host)?;
-
             *first_block_of_reboot = false;
         }
     }
@@ -288,6 +282,11 @@ fn promote_block<Host: Runtime>(
     }
     safe_host.promote()?;
     drop_blueprint(safe_host.host, number)?;
+
+    let number = storage::read_current_block_number(safe_host.host)?;
+    let hash = storage::read_current_block_hash(safe_host.host)?;
+
+    Event::BlueprintApplied { number, hash }.store(safe_host.host)?;
 
     let written = outbox_queue.flush_queue(safe_host.host);
     // Log to Info only if we flushed messages.
