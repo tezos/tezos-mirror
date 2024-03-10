@@ -16,3 +16,8 @@ kaitai_checks:
   - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
     and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
     and commit the resulting diff.' ; false)
+  artifacts:
+    expire_in: 1 hour
+    paths:
+    - _build/default/client-libs/bin_codec_kaitai/codec.exe
+    when: on_success

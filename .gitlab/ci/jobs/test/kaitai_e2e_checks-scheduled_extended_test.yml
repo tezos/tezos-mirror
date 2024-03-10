@@ -13,6 +13,7 @@ kaitai_e2e_checks:
   - kaitai_checks
   dependencies:
   - oc.docker:client-libs-dependencies
+  - kaitai_checks
   before_script:
   - . ./scripts/version.sh
   - . ./scripts/install_build_deps.js.sh
