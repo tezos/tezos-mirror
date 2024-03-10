@@ -158,7 +158,7 @@ check-kaitai-struct-files:
 .PHONY: validate-kaitai-struct-files
 validate-kaitai-struct-files:
 	@$(MAKE) check-kaitai-struct-files
-	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input 2>/dev/null || \
+	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files 2>/dev/null || \
 	 (echo "To see the full log run: \"./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input\""; exit 1)
 
 # Remove the old names of executables.

@@ -19,4 +19,4 @@ kaitai_e2e_checks:
   - . ./scripts/install_build_deps.js.sh
   script:
   - ./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files
-    client-libs/kaitai-struct-files/input 2>/dev/null
+    2>/dev/null

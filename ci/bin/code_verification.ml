@@ -573,8 +573,7 @@ let jobs pipeline_type =
              [])
         [
           "./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh \
-           client-libs/kaitai-struct-files/files \
-           client-libs/kaitai-struct-files/input 2>/dev/null";
+           client-libs/kaitai-struct-files/files 2>/dev/null";
         ]
       |> job_external_split
     in
