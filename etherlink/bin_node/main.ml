@@ -1243,7 +1243,7 @@ let dispatch args =
 let handle_error = function
   | Ok _ -> ()
   | Error [Tezos_clic.Version] ->
-      let devmode = Tezos_version_value.Bin_version.version_string in
+      let devmode = Tezos_version_value.Bin_version.octez_version_string in
       Format.printf "%s\n" devmode ;
       exit 0
   | Error [Tezos_clic.Help command] ->

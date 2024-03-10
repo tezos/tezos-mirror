@@ -159,7 +159,7 @@ module Info = struct
     ()
 
   let () =
-    let version = Version.to_string Current_git_info.version in
+    let version = Version.to_string Current_git_info.octez_version in
     let commit_hash = Current_git_info.commit_hash in
     let commit_date = Current_git_info.committer_date in
     let _ =

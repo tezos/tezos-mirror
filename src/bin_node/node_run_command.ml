@@ -336,7 +336,8 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
     | _ -> return_unit
   in
   let version =
-    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+    Tezos_version.Version.to_string
+      Tezos_version_value.Current_git_info.octez_version
   in
   let commit_info =
     ({
@@ -696,7 +697,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Event.(emit starting_node)
       ( config.blockchain_network.chain_name,
-        Tezos_version_value.Current_git_info.version,
+        Tezos_version_value.Current_git_info.octez_version,
         Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in

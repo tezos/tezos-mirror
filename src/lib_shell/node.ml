@@ -82,7 +82,7 @@ let get_version node =
      }
       : Tezos_version.Node_version.commit_info)
   in
-  let version = Tezos_version_value.Current_git_info.version in
+  let version = Tezos_version_value.Current_git_info.octez_version in
   let network_version = P2p.announced_version node.p2p in
   Tezos_version.Node_version.
     {version; commit_info = Some commit_info; network_version}
