@@ -262,7 +262,10 @@ FILES WITH MISSING INVALID INPUT (tested regardless):$no_invalid_input
 VALID INPUT FILES:$valid_files
 
 INVALID INPUT FILES:$invalid_files
+EOF
 
+output=$(
+  cat << EOF
 VALIDATION RESULTS:
   There are $total auto-generated '.ksy' files inside $KSY_DIR.
     - $valid/$total are semantically valid, as they parse valid input samples
@@ -271,11 +274,16 @@ VALIDATION RESULTS:
       samples or succeed parsing invalid ones.
     - $untested/$total are not tested due to missing valid input files.
 EOF
+)
 
 # This command succeeds unless semantically invalid files are found.
 # Having untested files is fine for now.
 if [ $((valid + untested)) -eq $total ]; then
+  # Print high level validation stats in green if successfull.
+  printf "\033[0;32m%s\033[0m\n" "$output"
   exit 0
 else
+  # Print high level validation stats in red if failed.
+  printf "\033[0;31m%s\033[0m\n" "$output"
   exit 1
 fi
