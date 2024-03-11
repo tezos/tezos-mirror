@@ -14,7 +14,8 @@
   octez-libs.stdlib-unix
   data-encoding
   uri
-  octez-libs.event-logging)
+  octez-libs.event-logging
+  lwt-exit)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (flags
