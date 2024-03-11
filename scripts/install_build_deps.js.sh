@@ -57,7 +57,12 @@ nvm_get_arch() {
   nvm_echo "${NVM_ARCH}"
 }
 
-nvm install "$NODE_VERSION"
+# Turn off the nvm progress bar in GitLab CI to improve logs.
+if [ -n "${CI:-}" ]; then
+  nvm install --no-progress "$NODE_VERSION"
+else
+  nvm install "$NODE_VERSION"
+fi
 nvm use --delete-prefix "$NODE_VERSION"
 
 echo "Check versions"
