@@ -2,3 +2,7 @@ include: .gitlab/ci/jobs/build/common.yml
 
 oc.docker:client-libs-dependencies:
   extends: .oc.docker:client-libs-dependencies_template
+  rules:
+    # This job runs on the schedule extended pipeline, so we want it
+    # to execute 'always'.
+    - when: always
