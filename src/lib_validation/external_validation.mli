@@ -99,6 +99,8 @@ type _ request =
       Tezos_base_unix.Internal_event_unix.Configuration.t
       -> unit request
 
+val name : string
+
 val request_pp : Format.formatter -> 'a request -> unit
 
 val magic : Bytes.t
@@ -111,6 +113,13 @@ val request_encoding : packed_request Data_encoding.t
 
 val result_encoding : 'a request -> 'a Data_encoding.t
 
+val reconfigure_event_logging_request :
+  Tezos_base.Internal_event_config.t -> unit request
+
+val internal_events : parameters -> Tezos_base.Internal_event_config.t
+
+val terminate_request : packed_request
+
 (** The prefix for the validation socket filename.
 
     Do not use it directly except for documentation purposes; use
@@ -122,3 +131,6 @@ val socket_path_prefix : string
     [socket_dir] is the directory where the file should be put.
     [pid] is the process ID of the validator process. *)
 val socket_path : socket_dir:string -> pid:int -> string
+
+val command_line_args :
+  parameters -> socket_dir:string -> string option * string list

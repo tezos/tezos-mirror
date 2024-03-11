@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let name = "validator"
+
 type parameters = {
   context_root : string;
   protocol_root : string;
@@ -502,3 +504,12 @@ let socket_path_prefix = "tezos-validation-socket-"
 let socket_path ~socket_dir ~pid =
   let filename = Format.sprintf "%s%d" socket_path_prefix pid in
   Filename.concat socket_dir filename
+
+let internal_events {internal_events; _} = internal_events
+
+let reconfigure_event_logging_request config = Reconfigure_event_logging config
+
+let terminate_request = Erequest Terminate
+
+let command_line_args _parameters ~socket_dir =
+  (Some "octez-validator", ["--socket-dir"; socket_dir])
