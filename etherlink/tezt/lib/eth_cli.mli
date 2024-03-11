@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,13 +32,20 @@ val balance : account:string -> endpoint:string -> Wei.t Lwt.t
 (** [transaction_send ~source_private_key ~to_public_key ~value
     ~endpoint] crafts and signs a transaction transferring [value] (as
     Wei) from [source_private_key] to [to_public_key], sends the raw
-    transaction to the JSON-RPI API server listening at [endpoint]. *)
+    transaction to the JSON-RPI API server listening at [endpoint].
+    It is allowed to optionally provide:
+    - [data] The raw data field of the transaction. 
+      NB: Consider using [contract_send] instead of this function.
+    - [gas_limit] The gas limit of the transaction. Will be estimated if not specified.
+    - [gas_price] The gas price of the transaction, in wei. Defaults to 1 gwei. *)
 val transaction_send :
   source_private_key:string ->
   to_public_key:string ->
   value:Wei.t ->
   endpoint:string ->
   ?data:string ->
+  ?gas_limit:Z.t ->
+  ?gas_price:Wei.t ->
   unit ->
   string Lwt.t
 

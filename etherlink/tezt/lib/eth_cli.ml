@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -53,7 +54,7 @@ let balance ~account ~endpoint =
   return @@ Wei.of_eth_string balance
 
 let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
-    () =
+    ?gas_limit ?gas_price () =
   spawn_command_and_read_json
     ([
        "transaction:send";
@@ -66,7 +67,9 @@ let transaction_send ~source_private_key ~to_public_key ~value ~endpoint ?data
        "--network";
        endpoint;
      ]
-    @ match data with Some data -> ["--data"; data] | None -> [])
+    @ Cli_arg.optional_arg "data" Fun.id data
+    @ Cli_arg.optional_arg "gas" Z.to_string gas_limit
+    @ Cli_arg.optional_arg "gasPrice" Wei.to_string gas_price)
     JSON.as_string
 
 let transaction_get ~endpoint ~tx_hash =
