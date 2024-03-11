@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::TezosContracts;
-use crate::tick_model::ticks_of_blueprint_chunk;
+use crate::tick_model::{ticks_of_blueprint_chunk, ticks_of_delayed_input};
 use crate::{
     inbox::{Deposit, Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
@@ -327,6 +327,10 @@ impl Parsable for SequencerInput {
         bytes: &[u8],
         context: &mut Self::Context,
     ) -> InputResult<Self> {
+        context.allocated_ticks = context
+            .allocated_ticks
+            .saturating_sub(ticks_of_delayed_input(bytes.len() as u64));
+
         if context.delayed_bridge.as_ref() != source.as_ref() {
             return InputResult::Unparsable;
         };
