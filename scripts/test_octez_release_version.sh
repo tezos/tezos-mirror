@@ -41,25 +41,25 @@ cleanup
 git checkout -b "$TESTBRANCH"
 
 git tag "octez-$VERSION" -m "test"
-test_version "$VERSION" "$VERSION"
+test_version "Octez $VERSION" "$VERSION"
 
 git tag "octez-v$VERSION" -m "test"
-test_version "$VERSION" "octez-v$VERSION"
+test_version "Octez $VERSION" "octez-v$VERSION"
 
 git commit --allow-empty -m "test" > /dev/null 2>&1
-test_version "$VERSION+dev" "$(git describe --tags)"
+test_version "Octez $VERSION+dev" "$(git describe --tags)"
 
 git tag "$RANDOMTAG" -m "test"
-test_version "0.0+dev" "$RANDOMTAG"
+test_version "Octez 0.0+dev" "$RANDOMTAG"
 
 git tag "octez-v$VERSION+rc1" -m "test"
-test_version "$VERSION+dev" "octez-v$VERSION+rc1"
+test_version "Octez $VERSION+dev" "octez-v$VERSION+rc1"
 
 git tag "octez-v$VERSION-rc1" -m "test"
-test_version "$VERSION~rc1" "octez-v$VERSION-rc1"
+test_version "Octez $VERSION~rc1" "octez-v$VERSION-rc1"
 
 git commit --allow-empty -m "test" > /dev/null 2>&1
-test_version "$VERSION~rc1+dev" "$(git describe --tags)"
+test_version "Octez $VERSION~rc1+dev" "$(git describe --tags)"
 
 git checkout -
 

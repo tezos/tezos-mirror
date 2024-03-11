@@ -41,18 +41,49 @@ module Assert = struct
     if not (eq x y) then fail (prn x) (prn y) msg
 end
 
-let legal_versions =
+let octez_legal_versions =
   [
-    ("octez-10.93", {Version.major = 10; minor = 93; additional_info = Release});
-    ("octez-v10.93", {Version.major = 10; minor = 93; additional_info = Release});
-    ("octez-10.93+dev", {Version.major = 10; minor = 93; additional_info = Dev});
-    ("octez-10.93-rc1", {Version.major = 10; minor = 93; additional_info = RC 1});
+    ( "octez-10.93",
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Release;
+      } );
+    ( "octez-v10.93",
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Release;
+      } );
+    ( "octez-10.93+dev",
+      {product = Octez; Version.major = 10; minor = 93; additional_info = Dev}
+    );
+    ( "octez-10.93-rc1",
+      {product = Octez; Version.major = 10; minor = 93; additional_info = RC 1}
+    );
     ( "octez-10.93-rc1+dev",
-      {Version.major = 10; minor = 93; additional_info = RC_dev 1} );
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        additional_info = RC_dev 1;
+      } );
     ( "octez-10.93-beta1",
-      {Version.major = 10; minor = 93; additional_info = Beta 1} );
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Beta 1;
+      } );
     ( "octez-10.93-beta1+dev",
-      {Version.major = 10; minor = 93; additional_info = Beta_dev 1} );
+      {
+        product = Octez;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Beta_dev 1;
+      } );
   ]
 
 let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
@@ -81,10 +112,10 @@ let prn = function
       Format.asprintf "%a" Tezos_version_parser.pp Tezos_version_parser.default
   | Some v -> Format.asprintf "%a" Tezos_version_parser.pp v
 
-let test_parser _ =
-  ListLabels.iter legal_versions ~f:(fun (x, e) ->
+let test_octez_parser _ =
+  ListLabels.iter octez_legal_versions ~f:(fun (x, e) ->
       Assert.equal
-        ~msg:(Format.asprintf "testing version string: \"%s\"" x)
+        ~msg:(Format.asprintf "testing Octez version string: \"%s\"" x)
         ~eq
         ~prn
         (Some e)
@@ -94,4 +125,4 @@ let () =
   Alcotest.run
     ~__FILE__
     "version"
-    [("parser", [("versions", `Quick, test_parser)])]
+    [("parser", [("octez versions", `Quick, test_octez_parser)])]
