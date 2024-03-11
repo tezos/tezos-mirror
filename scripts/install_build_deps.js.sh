@@ -1,6 +1,11 @@
 #!/bin/sh
 
-set -e
+# This script is intended for sourcing. This means the use of 'set -o
+# errexit' leaks to the user unless we go through a bit of
+# ritual. Store the old value of 'set -o errexit' to restore at the
+# end of the script.
+old_errexit=$(set +o | grep 'errexit$')
+set -o errexit
 
 if [ -z "$recommended_node_version" ]; then
   script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
@@ -74,4 +79,9 @@ if [ -z "${CI_PROJECT_DIR}" ]; then
   npm install
 else
   npm ci
+fi
+
+# Disable 'errexit' if it was disabled at the beginning of the script.
+if [ "$old_errexit" = "set +o errexit" ]; then
+  set +o errexit
 fi
