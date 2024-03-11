@@ -560,7 +560,7 @@ let pre_emptive_forge_time_arg =
        `block_time - t`) which may lead to lower baking rewards. Defaults to \
        15/% of block time. Set to 0 to ignore pre-emptive forging."
     (Tezos_clic.parameter (fun _ s ->
-         try return (Q.of_string s)
+         try Lwt_result_syntax.return (Q.of_string s)
          with _ -> failwith "pre-emptive-forge-time expected int or float."))
 
 let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =

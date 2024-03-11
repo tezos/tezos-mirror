@@ -749,8 +749,9 @@ let list_to_branch (list : (string * 'a) list) : (unit, 'a) scenarios =
   | (tag, h) :: t ->
       List.fold_left
         (fun scenarios (tag, elt) ->
-          scenarios |+ Tag tag --> Action (fun () -> return elt))
-        (Tag tag --> Action (fun () -> return h))
+          scenarios
+          |+ Tag tag --> Action (fun () -> Lwt_result_syntax.return elt))
+        (Tag tag --> Action (fun () -> Lwt_result_syntax.return h))
         t
 
 (** Ends the test. Dump the state, returns [unit] *)
@@ -1119,7 +1120,8 @@ let begin_test ~activate_ai ?(burn_rewards = false) ?(ns_enable_fork = false)
         Stdlib.failwith
           "You cannot provide ~constants and ~constants_list to begin_test"
     | None, Some constants_list -> list_to_branch constants_list
-    | Some constants, None -> Action (fun () -> return constants))
+    | Some constants, None ->
+        Action (fun () -> Lwt_result_syntax.return constants))
     --> exec (fun (constants : Protocol.Alpha_context.Constants.Parametric.t) ->
             let open Lwt_result_syntax in
             Log.info ~color:begin_end_color "-- Begin test --" ;
@@ -2558,7 +2560,7 @@ module Slashing = struct
                (exec_unit (fun (_block, state) ->
                     if state.State.constants.adaptive_issuance.ns_enable then
                       failwith "ns_enable = true: slash not applied yet"
-                    else return_unit)
+                    else Lwt_result_syntax.return_unit)
                --> check_snapshot_balances "before slash")
          --> exec_unit check_pending_slashings
          --> next_cycle
