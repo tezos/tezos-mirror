@@ -1,0 +1,14 @@
+include: .gitlab/ci/jobs/build/ocaml-check.yml
+
+ocaml-check:
+  extends:
+    - .ocaml-check
+    - .needs__trigger
+  rules:
+    - changes:
+        - src/**/*
+        - tezt/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+        - devtools/**/*
+      when: on_success

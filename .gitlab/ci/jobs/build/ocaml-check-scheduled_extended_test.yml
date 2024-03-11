@@ -1,0 +1,7 @@
+include: .gitlab/ci/jobs/build/ocaml-check.yml
+
+ocaml-check:
+  extends:
+    - .ocaml-check
+  rules:
+    - when: always
