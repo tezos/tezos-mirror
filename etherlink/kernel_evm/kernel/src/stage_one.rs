@@ -22,7 +22,7 @@ use tezos_smart_rollup_host::metadata::RAW_ROLLUP_ADDRESS_SIZE;
 
 use tezos_smart_rollup_host::runtime::Runtime;
 
-pub fn fetch_inbox_blueprints<Host: Runtime>(
+pub fn fetch_proxy_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
@@ -30,7 +30,7 @@ pub fn fetch_inbox_blueprints<Host: Runtime>(
     if let Some(InboxContent {
         transactions,
         sequencer_blueprints: _,
-    }) = read_proxy_inbox(host, smart_rollup_address, tezos_contracts, None, None)?
+    }) = read_proxy_inbox(host, smart_rollup_address, tezos_contracts)?
     {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -88,8 +88,8 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         host,
         smart_rollup_address,
         tezos_contracts,
-        Some(delayed_bridge),
-        Some(sequencer),
+        delayed_bridge,
+        sequencer,
     )? {
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
@@ -148,7 +148,7 @@ pub fn fetch<Host: Runtime>(
             sequencer.clone(),
         ),
         ConfigurationMode::Proxy => {
-            fetch_inbox_blueprints(host, smart_rollup_address, &config.tezos_contracts)
+            fetch_proxy_blueprints(host, smart_rollup_address, &config.tezos_contracts)
         }
     }
 }

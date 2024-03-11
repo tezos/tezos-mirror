@@ -7,7 +7,8 @@
 
 use crate::configuration::TezosContracts;
 use crate::parsing::{
-    Input, InputResult, Parsable, ProxyInput, SequencerInput, MAX_SIZE_PER_CHUNK,
+    Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
+    MAX_SIZE_PER_CHUNK,
 };
 use crate::sequencer_blueprint::SequencerBlueprint;
 use crate::storage::{
@@ -175,8 +176,7 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     inbox_is_empty: &mut bool,
-    delayed_bridge: &Option<ContractKt1Hash>,
-    sequencer: &Option<PublicKey>,
+    parsing_context: &Mode::Context,
 ) -> Result<InputResult<Mode>, Error> {
     let input = host.read_input()?;
 
@@ -188,8 +188,7 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
                 input,
                 smart_rollup_address,
                 tezos_contracts,
-                delayed_bridge,
-                sequencer,
+                parsing_context,
             ))
         }
         None => Ok(InputResult::NoInput),
@@ -383,8 +382,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
-    delayed_bridge: &Option<ContractKt1Hash>,
-    sequencer: &Option<PublicKey>,
+    parsing_context: &Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut InboxContent,
 ) -> anyhow::Result<ReadStatus> {
@@ -393,8 +391,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
         smart_rollup_address,
         tezos_contracts,
         inbox_is_empty,
-        delayed_bridge,
-        sequencer,
+        parsing_context,
     )?;
     match input {
         InputResult::NoInput => {
@@ -428,8 +425,6 @@ pub fn read_proxy_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
-    delayed_bridge: Option<ContractKt1Hash>,
-    sequencer: Option<PublicKey>,
 ) -> Result<Option<InboxContent>, anyhow::Error> {
     let mut res = InboxContent {
         transactions: vec![],
@@ -445,8 +440,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
             host,
             smart_rollup_address,
             tezos_contracts,
-            &delayed_bridge,
-            &sequencer,
+            &(),
             &mut inbox_is_empty,
             &mut res,
         ) {
@@ -474,8 +468,8 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
-    delayed_bridge: Option<ContractKt1Hash>,
-    sequencer: Option<PublicKey>,
+    delayed_bridge: ContractKt1Hash,
+    sequencer: PublicKey,
 ) -> Result<Option<InboxContent>, anyhow::Error> {
     let mut res = InboxContent {
         transactions: vec![],
@@ -486,13 +480,16 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // variable remains true, that means that the inbox was already consumed
     // during this kernel run.
     let mut inbox_is_empty = true;
+    let parsing_context = SequencerParsingContext {
+        sequencer,
+        delayed_bridge,
+    };
     loop {
         match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             smart_rollup_address,
             tezos_contracts,
-            &delayed_bridge,
-            &sequencer,
+            &parsing_context,
             &mut inbox_is_empty,
             &mut res,
         ) {
@@ -654,15 +651,10 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)));
 
-        let inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -684,15 +676,10 @@ mod tests {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
 
-        let inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -744,8 +731,6 @@ mod tests {
                 kernel_governance: None,
                 kernel_security_governance: None,
             },
-            None,
-            None,
         )
         .unwrap()
         .unwrap();
@@ -786,14 +771,9 @@ mod tests {
             new_chunk2,
         )));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap();
 
         let num_chunks = chunked_transaction_num_chunks(&mut host, &tx_hash)
             .expect("The number of chunks should exist");
@@ -835,14 +815,9 @@ mod tests {
         };
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap();
 
         // The out of bounds chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -873,14 +848,9 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk)));
 
-        let _inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap();
+        let _inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap();
 
         // The unknown chunk should not exist.
         let chunked_transaction_path = chunked_transaction_path(&tx_hash).unwrap();
@@ -927,15 +897,10 @@ mod tests {
 
         host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, chunk0)));
 
-        let inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap()
+                .unwrap();
         assert_eq!(
             inbox_content,
             InboxContent {
@@ -948,15 +913,10 @@ mod tests {
         for input in inputs {
             host.add_external(Bytes::from(input_to_bytes(SMART_ROLLUP_ADDRESS, input)))
         }
-        let inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap()
+                .unwrap();
 
         let expected_transactions = vec![Transaction {
             tx_hash,
@@ -1010,15 +970,10 @@ mod tests {
 
         host.add_external(framed);
 
-        let inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap()
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap()
+                .unwrap();
         let expected_transactions = vec![Transaction {
             tx_hash,
             content: Ethereum(tx),
@@ -1034,25 +989,15 @@ mod tests {
         // an empty inbox content. As we test in isolation there is nothing
         // in the inbox, we mock it by adding a single input.
         host.add_external(Bytes::from(vec![]));
-        let inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap();
         assert!(inbox_content.is_some());
 
         // Reading again the inbox returns no inbox content at all.
-        let inbox_content = read_proxy_inbox(
-            &mut host,
-            SMART_ROLLUP_ADDRESS,
-            &TezosContracts::default(),
-            None,
-            None,
-        )
-        .unwrap();
+        let inbox_content =
+            read_proxy_inbox(&mut host, SMART_ROLLUP_ADDRESS, &TezosContracts::default())
+                .unwrap();
         assert!(inbox_content.is_none());
     }
 }

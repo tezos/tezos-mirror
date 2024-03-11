@@ -146,18 +146,20 @@ pub type RollupType = MichelsonOr<
 /// - The internal message was addressed to the rollup, and `parse_internal`
 /// expects the bytes from `Left (Right <bytes>)`
 pub trait Parsable {
+    type Context;
+
     fn parse_external(
         tag: &u8,
         input: &[u8],
-        sequencer: &Option<PublicKey>,
+        context: &Self::Context,
     ) -> InputResult<Self>
     where
         Self: std::marker::Sized;
 
     fn parse_internal_bytes(
         source: ContractKt1Hash,
-        delayed_bridge: &Option<ContractKt1Hash>,
         bytes: &[u8],
+        context: &Self::Context,
     ) -> InputResult<Self>
     where
         Self: std::marker::Sized;
@@ -237,11 +239,9 @@ impl ProxyInput {
 }
 
 impl Parsable for ProxyInput {
-    fn parse_external(
-        tag: &u8,
-        input: &[u8],
-        _: &Option<PublicKey>,
-    ) -> InputResult<Self> {
+    type Context = ();
+
+    fn parse_external(tag: &u8, input: &[u8], _: &()) -> InputResult<Self> {
         // External transactions are only allowed in proxy mode
         match *tag {
             SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(input),
@@ -254,6 +254,11 @@ impl Parsable for ProxyInput {
     fn parse_internal_bytes(_: ContractKt1Hash, _: &[u8], _: &()) -> InputResult<Self> {
         InputResult::Unparsable
     }
+}
+
+pub struct SequencerParsingContext {
+    pub sequencer: PublicKey,
+    pub delayed_bridge: ContractKt1Hash,
 }
 
 impl SequencerInput {
@@ -286,15 +291,17 @@ impl SequencerInput {
 }
 
 impl Parsable for SequencerInput {
+    type Context = SequencerParsingContext;
+
     fn parse_external(
         tag: &u8,
         input: &[u8],
-        sequencer: &Option<PublicKey>,
+        context: &Self::Context,
     ) -> InputResult<Self> {
         // External transactions are only allowed in proxy mode
         match *tag {
             SEQUENCER_BLUEPRINT_TAG => {
-                Self::parse_sequencer_blueprint_input(sequencer.as_ref().unwrap(), input)
+                Self::parse_sequencer_blueprint_input(&context.sequencer, input)
             }
             _ => InputResult::Unparsable,
         }
@@ -303,14 +310,11 @@ impl Parsable for SequencerInput {
     /// Parses transactions that come from the delayed inbox.
     fn parse_internal_bytes(
         source: ContractKt1Hash,
-        delayed_bridge: &Option<ContractKt1Hash>,
         bytes: &[u8],
+        context: &Self::Context,
     ) -> InputResult<Self> {
-        match delayed_bridge {
-            Some(delayed_bridge) if delayed_bridge.as_ref() == source.as_ref() => (),
-            _ => {
-                return InputResult::Unparsable;
-            }
+        if context.delayed_bridge.as_ref() != source.as_ref() {
+            return InputResult::Unparsable;
         };
         let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
         let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
@@ -347,7 +351,7 @@ impl<Mode: Parsable> InputResult<Mode> {
     fn parse_external(
         input: &[u8],
         smart_rollup_address: &[u8],
-        sequencer: &Option<PublicKey>,
+        context: &Mode::Context,
     ) -> Self {
         // Compatibility with framing protocol for external messages
         let remaining = match ExternalMessageFrame::parse(input) {
@@ -363,7 +367,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         // External transactions are only allowed in proxy mode
         match *transaction_tag {
             FORCE_KERNEL_UPGRADE_TAG => Self::Input(Input::ForceKernelUpgrade),
-            _ => Mode::parse_external(transaction_tag, remaining, sequencer),
+            _ => Mode::parse_external(transaction_tag, remaining, context),
         }
     }
 
@@ -420,7 +424,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         transfer: Transfer<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
-        delayed_bridge: &Option<ContractKt1Hash>,
+        context: &Mode::Context,
     ) -> Self {
         if transfer.destination.hash().0 != smart_rollup_address {
             log!(
@@ -439,7 +443,7 @@ impl<Mode: Parsable> InputResult<Mode> {
                     Self::parse_deposit(host, ticket, receiver, &tezos_contracts.ticketer)
                 }
                 MichelsonOr::Right(MichelsonBytes(bytes)) => {
-                    Mode::parse_internal_bytes(source, delayed_bridge, &bytes)
+                    Mode::parse_internal_bytes(source, &bytes, context)
                 }
             },
             MichelsonOr::Right(MichelsonBytes(bytes)) => {
@@ -462,7 +466,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         message: InternalInboxMessage<RollupType>,
         smart_rollup_address: &[u8],
         tezos_contracts: &TezosContracts,
-        delayed_bridge: &Option<ContractKt1Hash>,
+        context: &Mode::Context,
         level: u32,
     ) -> Self {
         match message {
@@ -474,7 +478,7 @@ impl<Mode: Parsable> InputResult<Mode> {
                 transfer,
                 smart_rollup_address,
                 tezos_contracts,
-                delayed_bridge,
+                context,
             ),
             _ => InputResult::Unparsable,
         }
@@ -485,8 +489,7 @@ impl<Mode: Parsable> InputResult<Mode> {
         input: Message,
         smart_rollup_address: [u8; 20],
         tezos_contracts: &TezosContracts,
-        delayed_bridge: &Option<ContractKt1Hash>,
-        sequencer: &Option<PublicKey>,
+        context: &Mode::Context,
     ) -> Self {
         let bytes = Message::as_ref(&input);
         let (input_tag, remaining) = parsable!(bytes.split_first());
@@ -497,14 +500,14 @@ impl<Mode: Parsable> InputResult<Mode> {
         match InboxMessage::<RollupType>::parse(bytes) {
             Ok((_remaing, message)) => match message {
                 InboxMessage::External(message) => {
-                    Self::parse_external(message, &smart_rollup_address, sequencer)
+                    Self::parse_external(message, &smart_rollup_address, context)
                 }
                 InboxMessage::Internal(message) => Self::parse_internal(
                     host,
                     message,
                     &smart_rollup_address,
                     tezos_contracts,
-                    delayed_bridge,
+                    context,
                     input.level,
                 ),
             },
@@ -538,8 +541,7 @@ mod tests {
                     kernel_governance: None,
                     kernel_security_governance: None,
                 },
-                &None,
-                &None
+                &(),
             ),
             InputResult::Unparsable
         )
