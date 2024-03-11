@@ -154,55 +154,27 @@ let apply_slashing_account all_denunciations_to_apply
           state
           misbehaviour
   in
-  let get_total_supply acc_map =
-    String.Map.fold
-      (fun _name
-           {
-             State_account.pkh = _;
-             contract = _;
-             delegate = _;
-             parameters = _;
-             liquid;
-             bonds;
-             frozen_deposits;
-             unstaked_frozen;
-             unstaked_finalizable;
-             staking_delegator_numerator = _;
-             staking_delegate_denominator = _;
-             frozen_rights = _;
-             slashed_cycles = _;
-           }
-           tot ->
-        Tez.(
-          liquid +! bonds
-          +! Frozen_tez.total_current frozen_deposits
-          +! Unstaked_frozen.sum_current unstaked_frozen
-          +! Unstaked_finalizable.total unstaked_finalizable
-          +! tot))
-      acc_map
-      Tez.zero
-  in
-  let total_before_slash = get_total_supply account_map in
   let slash_culprit
       ({frozen_deposits; unstaked_frozen; frozen_rights; _} as acc) =
     let base_rights =
       CycleMap.find slashed_cycle frozen_rights
       |> Option.value ~default:Tez.zero
     in
-    let frozen_deposits, slashed_frozen =
-      Frozen_tez.slash base_rights slashed_pct frozen_deposits
+    let frozen_deposits, burnt_frozen, rewarded_frozen =
+      Frozen_tez.slash state.constants base_rights slashed_pct frozen_deposits
     in
     let slashed_pct_q = Protocol.Percentage.to_q slashed_pct in
     let slashed_pct = Q.(100 // 1 * slashed_pct_q |> to_int) in
     let unstaked_frozen, slashed_unstaked =
       Unstaked_frozen.slash
+        state.constants
         ~slashable_deposits_period:constants.consensus_rights_delay
         slashed_cycle
         slashed_pct
         unstaked_frozen
     in
     ( {acc with frozen_deposits; unstaked_frozen},
-      slashed_frozen :: slashed_unstaked )
+      (burnt_frozen, rewarded_frozen) :: slashed_unstaked )
   in
   let culprit_account =
     String.Map.find culprit_name account_map
@@ -216,25 +188,18 @@ let apply_slashing_account all_denunciations_to_apply
       culprit_name
       account_map
   in
-  let total_after_slash = get_total_supply account_map in
-  let portion_reward =
-    constants.adaptive_issuance.global_limit_of_staking_over_baking + 2
-  in
   (* For each container slashed, the snitch gets a reward transferred. It gets rounded
      down each time *)
   let reward_to_snitch =
-    List.map
-      (fun x -> Tez.mul_q x Q.(1 // portion_reward) |> Tez.of_q ~round:`Down)
-      total_slashed
-    |> List.fold_left Tez.( +! ) Tez.zero
+    List.map snd total_slashed |> List.fold_left Tez.( +! ) Tez.zero
   in
   let account_map =
     add_liquid_rewards reward_to_snitch rewarded_name account_map
   in
-  let actual_total_burnt_amount =
-    Tez.(total_before_slash -! total_after_slash -! reward_to_snitch)
+  let total_burnt_amount =
+    List.map fst total_slashed |> List.fold_left Tez.( +! ) Tez.zero
   in
-  return (account_map, actual_total_burnt_amount)
+  return (account_map, total_burnt_amount)
 
 let apply_slashing_state all_denunciations_to_apply
     ( culprit,
