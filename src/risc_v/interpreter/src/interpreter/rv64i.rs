@@ -241,7 +241,7 @@ where
         let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
         self.bus
             .read(address)
-            .map_err(|_: OutOfBounds| Exception::LoadAccessFault)
+            .map_err(|_: OutOfBounds| Exception::LoadAccessFault(address))
     }
 
     /// `LD` I-type instruction
@@ -330,7 +330,7 @@ where
         let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
         self.bus
             .write(address, value)
-            .map_err(|_: OutOfBounds| Exception::StoreAccessFault)
+            .map_err(|_: OutOfBounds| Exception::StoreAccessFault(address))
     }
 
     /// `SD` S-type instruction
@@ -837,7 +837,7 @@ mod tests {
 
             // Out of bounds loads / stores
             prop_assert!(perform_test(invalid_offset, true).is_err_and(|e|
-                e == Exception::StoreAccessFault
+                matches!(e, Exception::StoreAccessFault(_))
             ));
             // Aligned loads / stores
             prop_assert!(perform_test(aligned_offset, true).is_ok());
@@ -846,7 +846,7 @@ mod tests {
 
             // Out of bounds loads / stores
             prop_assert!(perform_test(invalid_offset, false).is_err_and(|e|
-                e == Exception::StoreAccessFault
+                matches!(e, Exception::StoreAccessFault(_))
             ));
             // Aligned loads / stores
             prop_assert!(perform_test(aligned_offset, false).is_ok());

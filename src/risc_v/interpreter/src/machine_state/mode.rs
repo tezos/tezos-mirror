@@ -78,6 +78,14 @@ impl<M: backend::Manager> ModeCell<M> {
     }
 }
 
+/// Modes the hardware state can trap into, a sub-enum of [`Mode`]
+#[derive(Debug, PartialEq, PartialOrd, Eq, Copy, Clone, strum::EnumIter)]
+#[repr(u8)]
+pub enum TrapMode {
+    Supervisor = Mode::Supervisor as u8,
+    Machine = Mode::Machine as u8,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
