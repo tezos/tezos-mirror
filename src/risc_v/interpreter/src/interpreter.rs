@@ -6,6 +6,7 @@
 pub mod rv32i;
 pub mod rv64i;
 pub mod rv64zicsr;
+pub mod rv64zifencei;
 
 #[cfg(test)]
 mod tests {
@@ -641,11 +642,7 @@ mod tests {
     test_case!(test_suite_rv64ui_p_blt, "rv64ui-p-blt");
     test_case!(test_suite_rv64ui_p_bltu, "rv64ui-p-bltu");
     test_case!(test_suite_rv64ui_p_bne, "rv64ui-p-bne");
-    test_case!(
-        #[ignore]
-        test_suite_rv64ui_p_fence_i,
-        "rv64ui-p-fence_i"
-    );
+    test_case!(test_suite_rv64ui_p_fence_i, "rv64ui-p-fence_i");
     test_case!(test_suite_rv64ui_p_jal, "rv64ui-p-jal");
     test_case!(test_suite_rv64ui_p_jalr, "rv64ui-p-jalr");
     test_case!(test_suite_rv64ui_p_lb, "rv64ui-p-lb");
