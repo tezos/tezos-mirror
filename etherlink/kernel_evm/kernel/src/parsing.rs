@@ -126,6 +126,33 @@ pub type RollupType = MichelsonOr<
     MichelsonBytes,
 >;
 
+/// Implements the trait for an input to be readable from the inbox, either
+/// being an external input or an L1 smart contract input. It assumes all
+/// verifications have already been done:
+///
+/// - The original inputs are prefixed by the frame protocol for the correct
+/// rollup, and the prefix has been removed
+///
+/// - The internal message was addressed to the rollup, and `parse_internal`
+/// expects the bytes from `Left (Right <bytes>)`
+pub trait Parsable {
+    fn parse_external(
+        tag: &u8,
+        input: &[u8],
+        sequencer: &Option<PublicKey>,
+    ) -> InputResult
+    where
+        Self: std::marker::Sized;
+
+    fn parse_internal_bytes(
+        source: ContractKt1Hash,
+        delayed_bridge: &Option<ContractKt1Hash>,
+        bytes: &[u8],
+    ) -> InputResult
+    where
+        Self: std::marker::Sized;
+}
+
 impl InputResult {
     fn parse_simple_transaction(bytes: &[u8]) -> Self {
         // Next 32 bytes is the transaction hash.
@@ -257,7 +284,7 @@ impl InputResult {
     /// Parses an external message
     ///
     // External message structure :
-    // EXTERNAL_TAG 1B / FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
+    // FRAMING_PROTOCOL_TARGETTED 21B / MESSAGE_TAG 1B / DATA
     fn parse_external(
         input: &[u8],
         smart_rollup_address: &[u8],
