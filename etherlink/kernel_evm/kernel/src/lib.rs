@@ -240,18 +240,27 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 
     let block_fees = retrieve_block_fees(host)?;
     // Start processing blueprints
-    log!(host, Debug, "Entering stage two.");
-    if let block::ComputationResult::RebootNeeded = block::produce(
-        host,
-        chain_id,
-        block_fees,
-        &mut configuration,
-        sequencer_pool_address,
-    )
-    .context("Failed during stage 2")?
+    #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
-        host.mark_for_reboot()?;
-    };
+        log!(host, Debug, "Entering stage two.");
+        if let block::ComputationResult::RebootNeeded = block::produce(
+            host,
+            chain_id,
+            block_fees,
+            &mut configuration,
+            sequencer_pool_address,
+        )
+        .context("Failed during stage 2")?
+        {
+            host.mark_for_reboot()?;
+        }
+    }
+
+    #[cfg(feature = "benchmark-bypass-stage2")]
+    {
+        log!(host, Benchmarking, "Shortcircuiting computation");
+        return Ok(());
+    }
     Ok(())
 }
 
