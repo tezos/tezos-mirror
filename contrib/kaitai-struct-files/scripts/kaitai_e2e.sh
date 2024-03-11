@@ -217,9 +217,12 @@ for ksy_file in "$KSY_DIR"/*.ksy; do
 done
 cat << EOF
 VALIDATION RESULTS:
-    - $valid/$total are semantically valid.
-    - $invalid/$total are semantically invalid.
-    - $untested/$total are not tested due to a missing input files.
+  There are $total auto-generated '.ksy' files inside $KSY_DIR.
+    - $valid/$total are semantically valid, as they parse valid input samples
+      and fail parsing invalid ones.
+    - $invalid/$total are semantically invalid, as they fail parsing valid input
+      samples or succeed parsing invalid ones.
+    - $untested/$total are not tested due to missing valid input files.
 EOF
 
 # This command succeeds unless semantically invalid files are found.
