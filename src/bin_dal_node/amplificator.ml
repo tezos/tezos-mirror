@@ -29,6 +29,11 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
         return_unit
       else
         (* We have enough shards to reconstruct the whole slot. *)
+        (* TODO: #7089
+           add a random time before starting the reconstruction;
+           this will give some slack to receive all the shards while
+           the reconstruction is not needed, and also could avoid
+           having multiple node reconstruct at once. *)
         let*! () = Event.(emit reconstruct_started commitment) in
         let shards =
           Store.Shards.read_all shard_store commitment ~number_of_shards
