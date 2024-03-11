@@ -103,8 +103,9 @@ end) : Services_backend_sig.Backend = struct
       | _ -> Error_monad.failwith "Invalid insights format"
   end
 
-  let inject_kernel_upgrade ~payload =
+  let inject_kernel_upgrade upgrade =
     let open Lwt_result_syntax in
+    let payload = Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes in
     let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
     let*! evm_state =
       Evm_state.modify
@@ -115,6 +116,12 @@ end) : Services_backend_sig.Backend = struct
     let (Qty next) = Ctxt.ctxt.next_blueprint_number in
     let* () =
       Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
+    in
+    let* () =
+      Store.Kernel_upgrades.store
+        Ctxt.ctxt.store
+        Ctxt.ctxt.next_blueprint_number
+        upgrade
     in
     return_unit
 

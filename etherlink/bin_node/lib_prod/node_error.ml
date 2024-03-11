@@ -14,7 +14,7 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"evm_node.dev.evm_event_follower.rollup_diverged"
+    ~id:"evm_node.prod.evm_event_follower.rollup_diverged"
     ~title:"Sequencer diverged from rollup node."
     ~description:"Sequencer diverged from rollup node."
     ~pp:(fun ppf (level, expected_hash, found_hash) ->

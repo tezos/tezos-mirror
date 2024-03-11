@@ -73,19 +73,42 @@ let read_from_rollup_node path level rollup_node_endpoint =
     ()
 
 let on_new_event ({backend; _} : Types.state) event =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let open Ethereum_types in
   let (module Backend) = backend in
-  let* () = Evm_events_follower_events.new_event event in
+  let*! () = Evm_events_follower_events.new_event event in
   match event with
-  | Evm_events.Upgrade_event upgrade ->
-      let payload = Upgrade.to_bytes upgrade |> String.of_bytes in
-      Backend.inject_kernel_upgrade ~payload
+  | Evm_events.Upgrade_event upgrade -> Backend.inject_kernel_upgrade upgrade
   | Evm_events.Sequencer_upgrade_event sequencer_upgrade ->
       let payload =
         Sequencer_upgrade.to_bytes sequencer_upgrade |> String.of_bytes
       in
       Backend.inject_sequencer_upgrade ~payload
+  | Evm_events.Blueprint_applied
+      {number = Qty number; hash = expected_block_hash} -> (
+      let* block_hash_opt = Backend.nth_block_hash number in
+      match block_hash_opt with
+      | Some found_block_hash ->
+          if found_block_hash = expected_block_hash then
+            let*! () =
+              Evm_events_follower_events.upstream_blueprint_applied
+                (number, expected_block_hash)
+            in
+            return_unit
+          else
+            let*! () =
+              Evm_events_follower_events.diverged
+                (number, expected_block_hash, found_block_hash)
+            in
+            tzfail
+              (Node_error.Diverged
+                 (number, expected_block_hash, Some found_block_hash))
+      | None ->
+          let*! () =
+            Evm_events_follower_events.missing_block
+              (number, expected_block_hash)
+          in
+          tzfail (Node_error.Diverged (number, expected_block_hash, None)))
 
 let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
     event_index =
@@ -153,9 +176,19 @@ module Handlers = struct
     let state = parameters in
     Lwt_result_syntax.return state
 
-  let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
+  let on_error :
+      type r request_error.
+      worker ->
+      Tezos_base.Worker_types.request_status ->
+      (r, request_error) Request.t ->
+      request_error ->
       unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
+   fun _w _ req errs ->
+    let open Lwt_result_syntax in
+    match (req, errs) with
+    | New_rollup_node_block _, [Node_error.Diverged _divergence] ->
+        Lwt_exit.exit_and_raise Node_error.exit_code_when_diverge
+    | _ -> return_unit
 
   let on_completion _ _ _ _ = Lwt.return_unit
 

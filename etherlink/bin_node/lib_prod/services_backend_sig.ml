@@ -40,6 +40,10 @@ module type S = sig
       stored block number. *)
   val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
 
+  (** [nth_block_hash n] returns the hash of the [n]th processed and
+      stored block. *)
+  val nth_block_hash : Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
+
   (** [nth_block ~full_transaction_object n] returns the [n]th
       processed and stored block.
 
@@ -80,6 +84,10 @@ module type S = sig
       commit hash where the kernel was compiled). *)
   val kernel_version : unit -> string tzresult Lwt.t
 
+  (** [kernel_root_hash ()] returns the internal kernel root hash (i.e the
+      latest root hash that was applied during an upgrade). *)
+  val kernel_root_hash : unit -> string option tzresult Lwt.t
+
   (** [simulate_call call_info] asks the rollup to simulate a call,
       and returns the result. *)
   val simulate_call :
@@ -108,9 +116,9 @@ module type S = sig
 
   (**/**)
 
-  (** [inject_kernel_upgrade ~payload] injects the kernel upgrade
-      payload [payload] in the local state. *)
-  val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+  (** [inject_kernel_upgrade upgrade] injects the kernel [upgrade]
+      in the local state. *)
+  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
 
   (** [inject_sequencer_upgrade ~payload] injects the sequencer
       upgrade payload [payload] in the local state. *)
@@ -126,7 +134,7 @@ module type Backend = sig
 
   module SimulatorBackend : Simulator.SimulationBackend
 
-  val inject_kernel_upgrade : payload:string -> unit tzresult Lwt.t
+  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
 
   val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end
