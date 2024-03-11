@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Implementation of CI job 'misc_opam_checks'.
+
 # This script expects a copy of scripts/version.sh from tezos/opam-repository
 # to be available at: /home/tezos/version.sh
 # This is the case if this script runs in one of the Docker images that are
