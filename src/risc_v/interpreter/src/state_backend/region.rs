@@ -5,6 +5,12 @@
 use super::{AllocatedOf, Atom, Elem, Manager};
 use std::mem;
 
+macro_rules! read_only_write {
+    () => {
+        panic!("cannot write to an immutable reference to a region")
+    }
+}
+
 /// Dedicated region in a [`super::Backend`]
 pub trait Region {
     /// Type of elements in the region
@@ -155,6 +161,46 @@ impl<E: Elem, T: Region<Elem = E>> Region for &mut T {
     }
 }
 
+impl<E: Elem, T: Region<Elem = E>> Region for &T {
+    type Elem = E;
+
+    const LEN: usize = T::LEN;
+
+    #[inline(always)]
+    fn read(&self, index: usize) -> E {
+        (self as &T).read(index)
+    }
+
+    #[inline(always)]
+    fn read_all(&self) -> Vec<E> {
+        (self as &T).read_all()
+    }
+
+    #[inline(always)]
+    fn read_some(&self, offset: usize, buffer: &mut [E]) {
+        (self as &T).read_some(offset, buffer)
+    }
+
+    #[inline(always)]
+    fn write(&mut self, _index: usize, _value: E) {
+        read_only_write!()
+    }
+
+    #[inline(always)]
+    fn write_all(&mut self, _value: &[E]) {
+        read_only_write!()
+    }
+
+    #[inline(always)]
+    fn write_some(&mut self, _index: usize, _buffer: &[E]) {
+        read_only_write!()
+    }
+
+    fn replace(&mut self, _index: usize, _value: E) -> E {
+        read_only_write!()
+    }
+}
+
 /// Convenience wrapper for [`Manager::Region<E, 1>`]
 #[repr(transparent)]
 pub struct Cell<E: Elem, M: Manager + ?Sized> {
@@ -248,6 +294,22 @@ impl<T: DynRegion> DynRegion for &mut T {
 
     fn write_all<E: Elem>(&mut self, address: usize, values: &[E]) {
         (self as &mut T).write_all(address, values)
+    }
+}
+
+impl<T: DynRegion> DynRegion for &T {
+    const LEN: usize = T::LEN;
+
+    fn read<E: Elem>(&self, address: usize) -> E {
+        (self as &T).read(address)
+    }
+
+    fn write<E: Elem>(&mut self, _address: usize, _value: E) {
+        read_only_write!()
+    }
+
+    fn write_all<E: Elem>(&mut self, _address: usize, _values: &[E]) {
+        read_only_write!()
     }
 }
 

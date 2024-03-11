@@ -193,6 +193,9 @@ pub trait Manager {
 pub trait BackendManagement {
     /// Backend manager
     type Manager<'backend>: Manager;
+
+    /// Backend manager for readonly operations
+    type ManagerRO<'backend>: Manager;
 }
 
 /// State backend storage
@@ -208,6 +211,12 @@ pub trait Backend: BackendManagement + Sized {
         &mut self,
         placed: PlacedOf<Self::Layout>,
     ) -> AllocatedOf<Self::Layout, Self::Manager<'_>>;
+
+    /// Allocate regions for the given layout placement.
+    fn allocate_ro(
+        &self,
+        placed: PlacedOf<Self::Layout>,
+    ) -> AllocatedOf<Self::Layout, Self::ManagerRO<'_>>;
 
     /// Read bytes from the backing storage.
     fn read(&self, index: usize, buffer: &mut [u8]);
