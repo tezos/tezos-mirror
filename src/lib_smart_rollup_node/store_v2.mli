@@ -76,20 +76,6 @@ module Dal_slots_headers :
      and type value := Dal.Slot_header.t
      and type 'a store := 'a Irmin_store.t
 
-module Dal_confirmed_slots_history :
-  Store_sigs.Append_only_map
-    with type key := Block_hash.t
-     and type value := Dal.Slot_history.t
-     and type 'a store := 'a Irmin_store.t
-
-(** Confirmed DAL slots histories cache. See documentation of
-    {!Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_histories :
-  Store_sigs.Append_only_map
-    with type key := Block_hash.t
-     and type value := Dal.Slot_history_cache.t
-     and type 'a store := 'a Irmin_store.t
-
 module Protocols : sig
   type level = First_known of int32 | Activation_level of int32
 

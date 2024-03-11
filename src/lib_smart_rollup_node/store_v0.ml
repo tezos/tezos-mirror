@@ -341,48 +341,6 @@ module Dal_slots_headers =
    the block where they have been published.
 *)
 
-(** Confirmed DAL slots history. See documentation of
-    {!Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_history =
-  Irmin_store.Make_append_only_map
-    (struct
-      let path = ["dal"; "confirmed_slots_history"]
-    end)
-    (struct
-      type key = Block_hash.t
-
-      let to_path_representation = Block_hash.to_b58check
-    end)
-    (struct
-      type value = Octez_smart_rollup.Dal.Slot_history.t
-
-      let name = "dal_slot_histories"
-
-      let encoding = Octez_smart_rollup.Dal.Slot_history.V1.encoding
-    end)
-
-(** Confirmed DAL slots histories cache. See documentation of
-    {!Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_histories =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4390
-     Store single history points in map instead of whole history. *)
-    Irmin_store.Make_append_only_map
-      (struct
-        let path = ["dal"; "confirmed_slots_histories_cache"]
-      end)
-      (struct
-        type key = Block_hash.t
-
-        let to_path_representation = Block_hash.to_b58check
-      end)
-    (struct
-      type value = Octez_smart_rollup.Dal.Slot_history_cache.t
-
-      let name = "dal_slot_histories"
-
-      let encoding = Octez_smart_rollup.Dal.Slot_history_cache.V1.encoding
-    end)
-
 type 'a store = {
   l2_blocks : 'a L2_blocks.t;
   messages : 'a Messages.t;
