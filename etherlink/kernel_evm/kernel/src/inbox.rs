@@ -515,6 +515,25 @@ pub fn read_proxy_inbox<Host: Runtime>(
     }
 }
 
+/// The StageOne can yield with three possible states:
+///
+/// - Done: the inbox has been fully read during the current `kernel_run`
+///
+/// - Reboot: the inbox cannot been read further as there are not enough ticks
+///   and needs a reboot before continuing. This is only supported in sequencer
+///   mode as the inputs are stored directly in the process.
+///
+/// - Skipped: the inbox was empty during the current `kernel_run`, implying it
+///   has been emptied during a previous `kernel_run` and the kernel is
+///   currently processing blueprints. It prevents the automatic reboot after
+///   completing the stage one to start the block production, and producing an
+///   empty blueprint in proxy mode.
+pub enum StageOneStatus {
+    Done,
+    Reboot,
+    Skipped,
+}
+
 pub fn read_sequencer_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -522,7 +541,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     sequencer: PublicKey,
     delayed_inbox: &mut DelayedInbox,
-) -> Result<bool, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
     // variable remains true, that means that the inbox was already consumed
@@ -534,10 +553,11 @@ pub fn read_sequencer_inbox<Host: Runtime>(
         allocated_ticks: MAX_ALLOWED_TICKS,
     };
     loop {
-        // TODO: Implement the reboot mechanism
+        // Checks there will be enough ticks to handle at least another chunk of
+        // full size. If it is not the case, asks for reboot.
         if parsing_context.allocated_ticks < maximum_ticks_for_sequencer_chunk() {
-            log!(host, Debug, "This is when we should reboot");
-        }
+            return Ok(StageOneStatus::Reboot);
+        };
         match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             smart_rollup_address,
@@ -560,8 +580,8 @@ pub fn read_sequencer_inbox<Host: Runtime>(
                 )
             }
             Ok(ReadStatus::Ongoing) => (),
-            Ok(ReadStatus::FinishedRead) => return Ok(true),
-            Ok(ReadStatus::FinishedIgnore) => return Ok(false),
+            Ok(ReadStatus::FinishedRead) => return Ok(StageOneStatus::Done),
+            Ok(ReadStatus::FinishedIgnore) => return Ok(StageOneStatus::Skipped),
         }
     }
 }
