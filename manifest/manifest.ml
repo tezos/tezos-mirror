@@ -230,7 +230,7 @@ module Dune = struct
       ?default_implementation ?implements ?modules
       ?modules_without_implementation ?modes
       ?(foreign_archives = Stdlib.List.[]) ?foreign_stubs ?c_library_flags
-      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
+      ?(ctypes = E) ?(private_modules = Stdlib.List.[]) ?js_of_ocaml ?wrapped
       (names : string list) =
     [
       V
@@ -302,6 +302,7 @@ module Dune = struct
           (match js_of_ocaml with
           | None -> E
           | Some flags -> S "js_of_ocaml" :: flags);
+          opt wrapped (fun x -> [S "wrapped"; S (string_of_bool x)]);
           opt library_flags (fun x -> [S "library_flags"; x]);
           opt link_flags (fun l -> [V (of_list (List.cons (S "link_flags") l))]);
           opt flags (fun l -> [V (of_list (List.cons (S "flags") l))]);
@@ -1230,6 +1231,7 @@ module Target = struct
     inline_tests_deps : Dune.s_expr list option;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
+    wrapped : bool option;
     documentation : Dune.s_expr option;
     kind : kind;
     linkall : bool;
@@ -1430,6 +1432,7 @@ module Target = struct
     ?inline_tests_deps:Dune.s_expr list ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
+    ?wrapped:bool ->
     ?documentation:Dune.s_expr ->
     ?linkall:bool ->
     ?modes:Dune.mode list ->
@@ -1522,7 +1525,7 @@ module Target = struct
       ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
       ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
       ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
-      ?inline_tests_deps ?js_compatible ?js_of_ocaml ?documentation
+      ?inline_tests_deps ?js_compatible ?js_of_ocaml ?wrapped ?documentation
       ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
       ?(npm_deps = []) ?(ocaml = default_ocaml_dependency) ?opam
       ?opam_bug_reports ?opam_doc ?opam_homepage ?(opam_with_test = Always)
@@ -1885,6 +1888,7 @@ module Target = struct
         inline_tests_deps;
         js_compatible;
         js_of_ocaml;
+        wrapped;
         documentation;
         kind;
         linkall;
@@ -2416,6 +2420,7 @@ module Sub_lib = struct
        ?inline_tests_deps
        ?js_compatible
        ?js_of_ocaml
+       ?wrapped
        ?documentation
        ?linkall
        ?modes
@@ -2502,6 +2507,7 @@ module Sub_lib = struct
       ?inline_tests_deps
       ?js_compatible
       ?js_of_ocaml
+      ?wrapped
       ?documentation
       ?linkall
       ?modes
@@ -2846,6 +2852,7 @@ let generate_dune (internal : Target.internal) =
       ?ctypes
       ~private_modules:internal.private_modules
       ?js_of_ocaml:internal.js_of_ocaml
+      ?wrapped:internal.wrapped
     :: documentation :: create_empty_files :: internal.dune)
 
 (* [Explicitly_unreleased i]: this opam package was explicitly specified not to be released

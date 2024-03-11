@@ -726,6 +726,8 @@ type bisect_ppx = No | Yes | With_sigterm
       For instance, [~js_of_ocaml:Dune.[[S "javascript_files"; S "file.js"]]]
       becomes [(js_of_ocaml (javascript_files file.js))].
 
+    - [wrapped]: specifies a [(wrapped ...)] stanza for the [dune] target.
+
     - [documentation]: specifies a [(documentation ...)] stanza for the [dune]
       target where [...] is the value of the parameter. Use this parameter if
       the library includes an [index.mld] file.
@@ -859,6 +861,7 @@ type 'a maker =
   ?inline_tests_deps:Dune.s_expr list ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
+  ?wrapped:bool ->
   ?documentation:Dune.s_expr ->
   ?linkall:bool ->
   ?modes:Dune.mode list ->
