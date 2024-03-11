@@ -5,9 +5,7 @@
 //! Adjustments of the gas price (a.k.a `base_fee_per_gas`), in response to load.
 
 use crate::block_in_progress::BlockInProgress;
-use crate::storage::{
-    read_base_fee_per_gas, read_minimum_base_fee_per_gas, store_base_fee_per_gas,
-};
+use crate::storage::read_minimum_base_fee_per_gas;
 
 use primitive_types::U256;
 use softfloat::F64;
@@ -24,24 +22,6 @@ const TOLERANCE: u64 = 10 * SPEED_LIMIT;
 // chosen so that gas price will decrease ~7/8 if there's no usage for ~10 seconds.
 // ALPHA = -ln(7/8)/(SPEED_LIMIT * 10)
 const ALPHA: F64 = softfloat::f64!(0.000_000_000_007);
-
-/// Load the current base fee per gas from storage.
-pub fn load_gas_price(host: &mut impl Runtime) -> Result<U256, crate::Error> {
-    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
-        .unwrap_or_else(|_| crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
-
-    let base_fee_per_gas = match read_base_fee_per_gas(host) {
-        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
-            base_fee_per_gas
-        }
-        _ => {
-            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
-            minimum_base_fee_per_gas
-        }
-    };
-
-    Ok(base_fee_per_gas)
-}
 
 /// Register a completed block into the tick backlog
 pub fn register_block(
@@ -214,7 +194,7 @@ mod test {
     fn gas_price_responds_to_load() {
         let mut host = MockHost::default();
         let timestamp = 0_i64;
-        let mut block_fees = BlockFees::new(U256::zero(), U256::zero());
+        let mut block_fees = BlockFees::new(U256::zero(), U256::zero(), U256::zero());
 
         let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
@@ -230,7 +210,8 @@ mod test {
         register_block(&mut host, &bip).unwrap();
 
         // At tolerance, gas price should be min.
-        let gas_price = load_gas_price(&mut host).unwrap();
+        let (min, gas_price) = load_gas_price(&mut host);
+        assert_eq!(min, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
         assert_eq!(gas_price, crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
         let gas_price_now = base_fee_per_gas(&host, timestamp.into());
         assert_eq!(gas_price, gas_price_now);
@@ -240,8 +221,8 @@ mod test {
         let gas_price_now = base_fee_per_gas(&host, timestamp.into());
         store_new_base_fee_per_gas(&mut host, gas_price_now, &mut block_fees).unwrap();
 
-        let gas_price = load_gas_price(&mut host).unwrap();
-        assert!(gas_price > crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
+        let (min, gas_price) = load_gas_price(&mut host);
+        assert!(gas_price > min);
         assert_eq!(gas_price, gas_price_now);
 
         // after 10 seconds, reduces back to tolerance
@@ -250,5 +231,11 @@ mod test {
             gas_price_after_10,
             crate::fees::MINIMUM_BASE_FEE_PER_GAS.into()
         );
+    }
+
+    fn load_gas_price(host: &mut impl Runtime) -> (U256, U256) {
+        let bf = crate::retrieve_block_fees(host).unwrap();
+
+        (bf.minimum_base_fee_per_gas(), bf.base_fee_per_gas())
     }
 }

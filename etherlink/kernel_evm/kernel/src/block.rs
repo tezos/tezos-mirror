@@ -520,7 +520,11 @@ mod tests {
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
     fn dummy_block_fees() -> BlockFees {
-        BlockFees::new(U256::from(DUMMY_BASE_FEE_PER_GAS), U256::from(DUMMY_DA_FEE))
+        BlockFees::new(
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            U256::from(DUMMY_DA_FEE),
+        )
     }
 
     fn dummy_eth_gen_transaction(

@@ -315,14 +315,14 @@ mod tests {
             da_fee in any::<u64>().prop_map(U256::from),
             data in any::<Vec<u8>>(),
             execution_gas_used in (1_u64..).prop_map(U256::from),
-            (max_fee_per_gas, base_fee_per_gas) in [1_u64.., 1_u64..]
+            (base_fee_per_gas, max_fee_per_gas) in [1_u64.., 1_u64..]
                 .prop_map(|mut prices| {prices.sort(); prices} )
                 .prop_map(|[a, b]| (a.into(), b.into())),
         ) {
             // Arrange
             let data_size = data.len();
             let tx = mock_tx(max_fee_per_gas, data);
-            let block_fees = BlockFees::new(base_fee_per_gas, da_fee);
+            let block_fees = BlockFees::new(base_fee_per_gas, base_fee_per_gas, da_fee);
 
             // Act
             let updates = FeeUpdates::for_tx(&tx, &block_fees, execution_gas_used);
@@ -553,7 +553,7 @@ mod tests {
     fn expect_extra_gas(extra: u64, tx_gas_price: u64, da_fee: u64, tx_data: &[u8]) {
         // Arrange
         let initial_gas_used = 100;
-        let block_fees = BlockFees::new(U256::one(), da_fee.into());
+        let block_fees = BlockFees::new(U256::one(), U256::one(), da_fee.into());
 
         let simulated_outcome = mock_execution_outcome(initial_gas_used);
 
