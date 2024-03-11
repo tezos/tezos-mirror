@@ -177,7 +177,7 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     inbox_is_empty: &mut bool,
-    parsing_context: &Mode::Context,
+    parsing_context: &mut Mode::Context,
 ) -> Result<InputResult<Mode>, Error> {
     let input = host.read_input()?;
 
@@ -432,7 +432,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
-    parsing_context: &Mode::Context,
+    parsing_context: &mut Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
 ) -> anyhow::Result<ReadStatus> {
@@ -489,7 +489,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
             host,
             smart_rollup_address,
             tezos_contracts,
-            &(),
+            &mut (),
             &mut inbox_is_empty,
             &mut res,
         ) {
@@ -526,7 +526,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // variable remains true, that means that the inbox was already consumed
     // during this kernel run.
     let mut inbox_is_empty = true;
-    let parsing_context = SequencerParsingContext {
+    let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
     };
@@ -535,7 +535,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             host,
             smart_rollup_address,
             tezos_contracts,
-            &parsing_context,
+            &mut parsing_context,
             &mut inbox_is_empty,
             delayed_inbox,
         ) {
