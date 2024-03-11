@@ -1121,31 +1121,32 @@ impl<M: backend::Manager> CSRegisters<M> {
     }
 
     /// Transform a read operation to account for shadow registers.
-    /// (e.g. `sstatus` register)
+    /// (e.g. `sstatus`, `sie` register)
     ///
-    /// `mstatus_value` holds the value of `mstatus` if known, `None` otherwise.
-    /// `mstatus` is read only if `sstatus` is requested and `mstatus` is not known already
+    /// `source_reg_value` holds the value of the register which is the ground truth for `reg`
+    /// if known, `None` otherwise.
+    ///
+    /// e.g.: `mstatus` is read only if `sstatus` is requested and `mstatus` is not known already
     ///
     /// Sections 3.1.6 & 4.1.1
     #[inline(always)]
-    fn transform_read(&self, reg: CSRegister, mstatus_value: Option<CSRValue>) -> CSRValue {
-        let read_mstatus = || self.registers.read(CSRegister::mstatus as usize);
+    fn transform_read(&self, reg: CSRegister, source_reg_value: Option<CSRValue>) -> CSRValue {
+        let source_reg_value = source_reg_value.unwrap_or_else(|| {
+            // If reg is a shadow, obtain the underlying ground truth for that register
+            self.registers.read(match reg {
+                CSRegister::sstatus => CSRegister::mstatus,
+                CSRegister::sip => CSRegister::mip,
+                CSRegister::sie => CSRegister::mie,
+                reg => reg,
+            } as usize)
+        });
 
+        // modify the value according to the shadowing rules of each register
         match reg {
-            CSRegister::sstatus => {
-                let mstatus = mstatus_value.unwrap_or_else(read_mstatus);
-                xstatus::sstatus_from_mstatus(mstatus)
-            }
-            CSRegister::mstatus => mstatus_value.unwrap_or_else(read_mstatus),
-            CSRegister::sip => {
-                // sip is a shadow of mip where the machine interrupt pending bits are masked
-                self.registers.read(CSRegister::mip as usize) & CSRegister::WARL_MASK_SIP_SIE
-            }
-            CSRegister::sie => {
-                // sie is a shadow of mie where the machine interrupt enable bits are masked
-                self.registers.read(CSRegister::mie as usize) & CSRegister::WARL_MASK_SIP_SIE
-            }
-            _ => self.registers.read(reg as usize),
+            CSRegister::sstatus => xstatus::sstatus_from_mstatus(source_reg_value),
+            CSRegister::sip => source_reg_value & CSRegister::WARL_MASK_SIP_SIE,
+            CSRegister::sie => source_reg_value & CSRegister::WARL_MASK_SIP_SIE,
+            _ => source_reg_value,
         }
     }
 
