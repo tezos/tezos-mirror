@@ -1855,7 +1855,9 @@ module Target = struct
     let dune =
       List.fold_right (fun x dune -> Dune.(x :: dune)) runtest_rules dune
     in
-    let prefixes = ["src/"; "tezt/"; "etherlink/"; "irmin/"; "brassaia/"] in
+    let prefixes =
+      ["src/"; "tezt/"; "etherlink/"; "irmin/"; "brassaia/"; "data-encoding/"]
+    in
     if
       match release_status with
       | Unreleased -> false
