@@ -277,13 +277,9 @@ impl Evaluation {
             false,
         ) {
             Ok(Some(outcome)) => {
-                let outcome = simulation_add_gas_for_fees(
-                    outcome,
-                    &block_fees,
-                    gas_price,
-                    &self.data,
-                )
-                .map_err(Error::Simulation)?;
+                let outcome =
+                    simulation_add_gas_for_fees(outcome, &block_fees, &self.data)
+                        .map_err(Error::Simulation)?;
 
                 let result: SimulationResult<CallResult, String> =
                     Result::Ok(Some(outcome)).into();
@@ -985,7 +981,7 @@ mod tests {
         let tx_access_list = vec![];
         let fee_gas = gas_for_fees(
             block_fees.da_fee_per_byte(),
-            gas_price,
+            block_fees.minimum_base_fee_per_gas(),
             tx_data.as_slice(),
             tx_access_list.as_slice(),
         )

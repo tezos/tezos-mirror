@@ -80,8 +80,8 @@ impl TransactionContent {
         match self {
             Self::Deposit(_) => FeeUpdates::for_deposit(execution_gas_used),
             Self::Ethereum(tx) => FeeUpdates::for_tx(tx, block_fees, execution_gas_used),
-            Self::EthereumDelayed(tx) => {
-                FeeUpdates::for_delayed_tx(tx, block_fees, execution_gas_used)
+            Self::EthereumDelayed(_) => {
+                FeeUpdates::for_delayed_tx(block_fees, execution_gas_used)
             }
         }
     }
@@ -105,21 +105,14 @@ impl FeeUpdates {
     ) -> Self {
         let da_fee = da_fee(block_fees.da_fee_per_byte(), &tx.data, &tx.access_list);
 
-        Self::of_tx(tx, block_fees, execution_gas_used, da_fee)
+        Self::of_gas_and_da_fee(block_fees, execution_gas_used, da_fee)
     }
 
-    fn for_delayed_tx(
-        tx: &EthereumTransactionCommon,
-        block_fees: &BlockFees,
-        execution_gas_used: U256,
-    ) -> Self {
-        let da_fee = U256::zero();
-
-        Self::of_tx(tx, block_fees, execution_gas_used, da_fee)
+    fn for_delayed_tx(block_fees: &BlockFees, execution_gas_used: U256) -> Self {
+        Self::of_gas_and_da_fee(block_fees, execution_gas_used, U256::zero())
     }
 
-    fn of_tx(
-        tx: &EthereumTransactionCommon,
+    fn of_gas_and_da_fee(
         block_fees: &BlockFees,
         execution_gas_used: U256,
         da_fee: U256,
@@ -129,18 +122,9 @@ impl FeeUpdates {
         let initial_added_fees = da_fee;
         let initial_total_fees = initial_added_fees + execution_gas_fees;
 
-        // first, we find the price of gas (with all fees), for the given gas used
-        let mut gas_price = cdiv(initial_added_fees, execution_gas_used)
-            .saturating_add(block_fees.base_fee_per_gas());
+        let gas_price = block_fees.base_fee_per_gas();
 
-        let gas_used = if gas_price > tx.max_fee_per_gas {
-            // We can't charge more than `max_fee_per_gas`, so bump the gas limit too.
-            // added_gas = initial_total_fee / mgp - execution_gas
-            gas_price = tx.max_fee_per_gas;
-            cdiv(initial_total_fees, gas_price)
-        } else {
-            execution_gas_used
-        };
+        let gas_used = cdiv(initial_total_fees, gas_price);
 
         let total_fees = gas_price * gas_used;
 
@@ -212,12 +196,17 @@ impl FeeUpdates {
 pub fn simulation_add_gas_for_fees(
     mut outcome: ExecutionOutcome,
     block_fees: &BlockFees,
-    tx_gas_price: U256,
     tx_data: &[u8],
 ) -> Result<ExecutionOutcome, EthereumError> {
     // Simulation does not have an access list
-    let gas_for_fees =
-        gas_for_fees(block_fees.da_fee_per_byte(), tx_gas_price, tx_data, &[])?;
+    let gas_for_fees = gas_for_fees(
+        block_fees.da_fee_per_byte(),
+        // We select minimum base fee per gas, to ensure that the user has sufficient gas
+        // even if the base_fee_per_gas falls by the time they submit their tx.
+        block_fees.minimum_base_fee_per_gas(),
+        tx_data,
+        &[],
+    )?;
 
     outcome.gas_used = outcome.gas_used.saturating_add(gas_for_fees);
     Ok(outcome)
@@ -242,7 +231,7 @@ pub fn tx_execution_gas_limit(
 
     let gas_for_fees = gas_for_fees(
         fees.da_fee_per_byte(),
-        tx.max_fee_per_gas,
+        fees.base_fee_per_gas(),
         &tx.data,
         &tx.access_list,
     )?;
@@ -315,14 +304,14 @@ mod tests {
             da_fee in any::<u64>().prop_map(U256::from),
             data in any::<Vec<u8>>(),
             execution_gas_used in (1_u64..).prop_map(U256::from),
-            (base_fee_per_gas, max_fee_per_gas) in [1_u64.., 1_u64..]
+            [min_fee_per_gas, base_fee_per_gas, max_fee_per_gas] in [1_u64.., 1_u64.., 1_u64..]
                 .prop_map(|mut prices| {prices.sort(); prices} )
-                .prop_map(|[a, b]| (a.into(), b.into())),
+                .prop_map(|[a, b, c]| [a.into(), b.into(), c.into()]),
         ) {
             // Arrange
             let data_size = data.len();
             let tx = mock_tx(max_fee_per_gas, data);
-            let block_fees = BlockFees::new(base_fee_per_gas, base_fee_per_gas, da_fee);
+            let block_fees = BlockFees::new(min_fee_per_gas, base_fee_per_gas, da_fee);
 
             // Act
             let updates = FeeUpdates::for_tx(&tx, &block_fees, execution_gas_used);
@@ -332,6 +321,7 @@ mod tests {
             let total_fee = updates.overall_gas_price * updates.overall_gas_used;
             let expected_sequencer_comp = da_fee * (data_size + ASSUMED_TX_ENCODED_SIZE);
 
+            assert_eq!(updates.overall_gas_price, base_fee_per_gas, "gas price should be 'base fee per gas'");
             assert!(updates.burn_amount >= assumed_execution_gas_cost, "inconsistent burn amount");
             assert_eq!(updates.charge_user_amount, total_fee - assumed_execution_gas_cost, "inconsistent user charge");
             assert_eq!(total_fee, updates.burn_amount + updates.compensate_sequencer_amount, "inconsistent total fees");
@@ -550,27 +540,22 @@ mod tests {
         )
     }
 
-    fn expect_extra_gas(extra: u64, tx_gas_price: u64, da_fee: u64, tx_data: &[u8]) {
+    fn expect_extra_gas(extra: u64, min_gas_price: u64, da_fee: u64, tx_data: &[u8]) {
         // Arrange
         let initial_gas_used = 100;
-        let block_fees = BlockFees::new(U256::one(), U256::one(), da_fee.into());
+        let block_fees = BlockFees::new(min_gas_price.into(), U256::one(), da_fee.into());
 
         let simulated_outcome = mock_execution_outcome(initial_gas_used);
 
         // Act
-        let res = simulation_add_gas_for_fees(
-            simulated_outcome,
-            &block_fees,
-            tx_gas_price.into(),
-            tx_data,
-        );
+        let res = simulation_add_gas_for_fees(simulated_outcome, &block_fees, tx_data);
 
         // Assert
         let expected = mock_execution_outcome(initial_gas_used + extra);
         assert_eq!(
             Ok(expected),
             res,
-            "unexpected extra gas at price {tx_gas_price} and data_len {}",
+            "unexpected extra gas at price {min_gas_price} and data_len {}",
             tx_data.len()
         );
     }
