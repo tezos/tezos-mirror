@@ -30,11 +30,11 @@ module Pool = struct
     }
 
   (** Add a transaction to the pool.*)
-  let add t pkey base_fee raw_tx =
+  let add t pkey raw_tx =
     let open Result_syntax in
     let {transactions; global_index; delayed_transactions} = t in
     let* nonce = Ethereum_types.transaction_nonce raw_tx in
-    let* gas_price = Ethereum_types.transaction_gas_price base_fee raw_tx in
+    let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
     let transaction = {index = global_index; raw_tx; gas_price} in
     (* Add the transaction to the user's transaction map *)
     let transactions =
@@ -249,7 +249,6 @@ let on_normal_transaction state tx_raw =
   let open Types in
   let {rollup_node = (module Rollup_node); pool; _} = state in
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
-  let* (Qty base_fee) = Rollup_node.base_fee_per_gas () in
   match is_valid with
   | Error err ->
       let*! () =
@@ -259,7 +258,7 @@ let on_normal_transaction state tx_raw =
       return (Error err)
   | Ok {address} ->
       (* Add the tx to the pool*)
-      let*? pool = Pool.add pool address base_fee tx_raw in
+      let*? pool = Pool.add pool address tx_raw in
       (* compute the hash *)
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
       let hash =

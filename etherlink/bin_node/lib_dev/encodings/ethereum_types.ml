@@ -1074,7 +1074,7 @@ let transaction_gas_limit bytes =
 
 (** [transaction_gas_price base_fee bytes] returns the maximum gas price the
     user can pay for the tx. *)
-let transaction_gas_price base_fee bytes =
+let transaction_gas_price bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
     (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
@@ -1087,36 +1087,18 @@ let transaction_gas_price base_fee bytes =
   else if String.starts_with ~prefix:"02" bytes then
     (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok
-        (Rlp.List
-          [
-            _;
-            _;
-            Value max_priority_fee_per_gas;
-            Value max_fee_per_gas;
-            _;
-            _;
-            _;
-            _;
-          ])
-    | Ok
-        (Rlp.List
-          [
-            _;
-            _;
-            Value max_priority_fee_per_gas;
-            Value max_fee_per_gas;
-            _;
-            _;
-            _;
-            _;
-            _;
-            _;
-            _;
-          ]) ->
-        let* max_priority_fee_per_gas = Rlp.decode_z max_priority_fee_per_gas in
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _; _; _]) ->
+        (* Normally, max_priority_fee_per_gas would also be a fee paid per gas in
+           addition to base fee per gas.
+           This would incentivise miners to include the transaction.
+           More details see here https://eips.ethereum.org/EIPS/eip-1559#abstract
+
+           We choose to ignore this, however, as we actually do not implement EIP-1559
+           mechanism exactly. The sequencer is compensated for L1 inclusion cost via
+           the data availability fee. *)
         let* max_fee_per_gas = Rlp.decode_z max_fee_per_gas in
-        return Z.(min max_fee_per_gas (add base_fee max_priority_fee_per_gas))
+        return max_fee_per_gas
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
   else
     (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
