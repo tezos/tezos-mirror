@@ -24,3 +24,20 @@
   -open Tezos_version_value
   -open Tezos_version)
  (modules octez_print_version))
+
+(executable
+ (name etherlink_print_version)
+ (public_name etherlink-version)
+ (package octez-version)
+ (libraries
+  octez-version.value
+  octez-libs.version
+  octez-libs.base.unix)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/static-link-flags.sexp))
+ (flags
+  (:standard)
+  -open Tezos_version_value
+  -open Tezos_version)
+ (modules etherlink_print_version))

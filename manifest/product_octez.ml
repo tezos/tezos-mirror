@@ -2215,6 +2215,17 @@ let _octez_print_version_exe =
     ~modules:["octez_print_version"]
     ~bisect_ppx:No
 
+let _etherlink_print_version_exe =
+  public_exe
+    "etherlink-version"
+    ~internal_name:"etherlink_print_version"
+    ~path:"src/lib_version/exe"
+    ~opam:"octez-version"
+    ~deps:
+      [octez_version_value |> open_; octez_version |> open_; octez_base_unix]
+    ~modules:["etherlink_print_version"]
+    ~bisect_ppx:No
+
 let _octez_version_tests =
   tezt
     ["test_parser"]
