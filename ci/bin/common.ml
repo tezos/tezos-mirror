@@ -306,6 +306,9 @@ let changeset_kaitai_e2e_files =
     ".gitlab-ci.yml";
   ]
 
+let changeset_ocaml_files =
+  ["src/**/*"; "tezt/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"; "devtools/**/*"]
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.

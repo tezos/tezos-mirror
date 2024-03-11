@@ -335,6 +335,23 @@ let jobs pipeline_type =
         let _job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
         ()
     | Before_merging -> ()) ;
+    let _job_ocaml_check : tezos_job =
+      job
+        ~__POS__
+        ~name:"ocaml-check"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.build
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_ocaml_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["dune build @check"]
+      |> job_external_split
+    in
     (* TODO: include the jobs defined above when full pipeline is
        generated, as well as rust tool chain and client libs docker
        builds. *)

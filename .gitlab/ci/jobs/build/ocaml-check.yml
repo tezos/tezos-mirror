@@ -1,6 +1,0 @@
-.ocaml-check:
-  extends:
-    - .tags_template__build
-    - .oc.build_template
-  script:
-    - dune build @check
