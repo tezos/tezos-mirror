@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::TezosContracts;
+use crate::tick_model::ticks_of_blueprint_chunk;
 use crate::{
     inbox::{Deposit, Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
@@ -263,13 +264,21 @@ impl Parsable for ProxyInput {
 pub struct SequencerParsingContext {
     pub sequencer: PublicKey,
     pub delayed_bridge: ContractKt1Hash,
+    pub allocated_ticks: u64,
 }
 
 impl SequencerInput {
     fn parse_sequencer_blueprint_input(
-        sequencer: &PublicKey,
         bytes: &[u8],
+        context: &mut SequencerParsingContext,
     ) -> InputResult<Self> {
+        // Inputs are 4096 bytes longs at most, and even in the future they
+        // should be limited by the size of native words of the VM which is
+        // 32bits.
+        context.allocated_ticks = context
+            .allocated_ticks
+            .saturating_sub(ticks_of_blueprint_chunk(bytes.len() as u64));
+
         // Parse the sequencer blueprint
         let seq_blueprint: SequencerBlueprint =
             parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
@@ -280,7 +289,8 @@ impl SequencerInput {
         // The sequencer signs the hash of the blueprint.
         let msg = tezos_crypto_rs::blake2b::digest_256(&bytes).unwrap();
 
-        let correctly_signed = sequencer
+        let correctly_signed = context
+            .sequencer
             .verify_signature(&seq_blueprint.signature, &msg)
             .unwrap_or(false);
 
@@ -305,7 +315,7 @@ impl Parsable for SequencerInput {
         // External transactions are only allowed in proxy mode
         match *tag {
             SEQUENCER_BLUEPRINT_TAG => {
-                Self::parse_sequencer_blueprint_input(&context.sequencer, input)
+                Self::parse_sequencer_blueprint_input(input, context)
             }
             _ => InputResult::Unparsable,
         }

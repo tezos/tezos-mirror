@@ -20,6 +20,7 @@ use crate::storage::{
     remove_chunked_transaction, remove_sequencer, store_l1_level,
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
+use crate::tick_model::constants::MAX_ALLOWED_TICKS;
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
@@ -529,6 +530,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
+        allocated_ticks: MAX_ALLOWED_TICKS,
     };
     loop {
         match read_and_dispatch_input::<Host, SequencerInput>(
