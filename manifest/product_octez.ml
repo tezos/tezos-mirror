@@ -3318,9 +3318,9 @@ let octez_requester =
         lwt_watcher;
       ]
 
-let _octez_requester_tests =
+let octez_requester_tests =
   tezt
-    ["test_requester"; "test_fuzzing_requester"; "shared"]
+    ["requester_impl"; "test_requester"; "test_fuzzing_requester"; "shared"]
     ~path:"src/lib_requester/test"
     ~opam:"octez-libs"
     ~deps:
@@ -6835,6 +6835,7 @@ let _octez_shell_tests =
         octez_test_helpers |> open_;
         alcotezt;
         octez_version_value;
+        octez_requester_tests |> open_;
       ]
 
 (* INTERNAL EXES *)
