@@ -171,6 +171,15 @@ type node_store = {
 let open_shards_stream {shards_watcher; _} =
   Lwt_watcher.create_stream shards_watcher
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
+
+   handle with_proof flag -> store proofs on disk? *)
+let save_shard_proofs node_store commitment shard_proofs =
+  Shard_proofs_cache.replace
+    node_store.in_memory_shard_proofs
+    commitment
+    shard_proofs
+
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
 let init config =
@@ -669,13 +678,4 @@ module Legacy = struct
         List.filter_map
           (fun header -> if header.Types.status = hs then Some header else None)
           accu
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
-
-     handle with_proof flag -> store proofs on disk? *)
-  let save_shard_proofs node_store commitment shard_proofs =
-    Shard_proofs_cache.replace
-      node_store.in_memory_shard_proofs
-      commitment
-      shard_proofs
 end

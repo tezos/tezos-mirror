@@ -80,6 +80,11 @@ type node_store = private {
 val open_shards_stream :
   node_store -> commitment Lwt_stream.t * Lwt_watcher.stopper
 
+(** [save_shard_proofs store commitment shard_proofs] replaces in
+      the shard proof cache all the shard proofs for the given
+      commitment with the given ones. *)
+val save_shard_proofs : node_store -> commitment -> shard_proof array -> unit
+
 val init : Configuration_file.t -> node_store tzresult Lwt.t
 
 module Legacy : sig
@@ -209,9 +214,4 @@ module Legacy : sig
       [> `Decoding_failed of Types.Store.kind * tztrace] )
     result
     Lwt.t
-
-  (** [save_shard_proofs store commitment shard_proofs] replaces in
-      the shard proof cache all the shard proofs for the given
-      commitment with the given ones. *)
-  val save_shard_proofs : node_store -> commitment -> shard_proof array -> unit
 end
