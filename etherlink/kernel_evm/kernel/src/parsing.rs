@@ -102,6 +102,12 @@ pub enum ProxyInput {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum SequencerInput {
+    DelayedInput(Box<Transaction>),
+    SequencerBlueprint(SequencerBlueprint),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Input<Mode> {
     ModeSpecific(Mode),
     Deposit(Deposit),
@@ -109,7 +115,6 @@ pub enum Input<Mode> {
     SequencerUpgrade(SequencerUpgrade),
     RemoveSequencer,
     Info(LevelWithInfo),
-    SequencerBlueprint(SequencerBlueprint),
     ForceKernelUpgrade,
 }
 
@@ -251,23 +256,11 @@ impl Parsable for ProxyInput {
     }
 }
 
-impl<Mode: Parsable> InputResult<Mode> {
-    fn parse_kernel_upgrade(bytes: &[u8]) -> Self {
-        let kernel_upgrade = parsable!(KernelUpgrade::from_rlp_bytes(bytes).ok());
-        Self::Input(Input::Upgrade(kernel_upgrade))
-    }
-
-    fn parse_sequencer_update(bytes: &[u8]) -> Self {
-        if bytes.is_empty() {
-            Self::Input(Input::RemoveSequencer)
-        } else {
-            let sequencer_upgrade =
-                parsable!(SequencerUpgrade::from_rlp_bytes(bytes).ok());
-            Self::Input(Input::SequencerUpgrade(sequencer_upgrade))
-        }
-    }
-
-    fn parse_sequencer_blueprint_input(sequencer: &PublicKey, bytes: &[u8]) -> Self {
+impl SequencerInput {
+    fn parse_sequencer_blueprint_input(
+        sequencer: &PublicKey,
+        bytes: &[u8],
+    ) -> InputResult<Self> {
         // Parse the sequencer blueprint
         let seq_blueprint: SequencerBlueprint =
             parsable!(FromRlpBytes::from_rlp_bytes(bytes).ok());
@@ -283,33 +276,68 @@ impl<Mode: Parsable> InputResult<Mode> {
             .unwrap_or(false);
 
         if correctly_signed {
-            InputResult::Input(Input::SequencerBlueprint(seq_blueprint))
+            InputResult::Input(Input::ModeSpecific(Self::SequencerBlueprint(
+                seq_blueprint,
+            )))
         } else {
             InputResult::Unparsable
         }
     }
+}
+
+impl Parsable for SequencerInput {
+    fn parse_external(
+        tag: &u8,
+        input: &[u8],
+        sequencer: &Option<PublicKey>,
+    ) -> InputResult<Self> {
+        // External transactions are only allowed in proxy mode
+        match *tag {
+            SEQUENCER_BLUEPRINT_TAG => {
+                Self::parse_sequencer_blueprint_input(sequencer.as_ref().unwrap(), input)
+            }
+            _ => InputResult::Unparsable,
+        }
+    }
 
     /// Parses transactions that come from the delayed inbox.
-    fn _parse_transaction_from_delayed_inbox(
+    fn parse_internal_bytes(
         source: ContractKt1Hash,
         delayed_bridge: &Option<ContractKt1Hash>,
         bytes: &[u8],
-    ) -> Self {
+    ) -> InputResult<Self> {
         match delayed_bridge {
             Some(delayed_bridge) if delayed_bridge.as_ref() == source.as_ref() => (),
             _ => {
                 return InputResult::Unparsable;
             }
         };
-        let _tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
-        let _tx_hash: TransactionHash = Keccak256::digest(bytes).into();
+        let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
+        let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
 
-        // THIS IS TEMPORARY
-        Self::Unparsable
-        // Self::Input(Input::SimpleTransaction(Box::new(Transaction {
-        //     tx_hash,
-        //     content: TransactionContent::Ethereum(tx),
-        // })))
+        InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
+            Transaction {
+                tx_hash,
+                content: TransactionContent::Ethereum(tx),
+            },
+        ))))
+    }
+}
+
+impl<Mode: Parsable> InputResult<Mode> {
+    fn parse_kernel_upgrade(bytes: &[u8]) -> Self {
+        let kernel_upgrade = parsable!(KernelUpgrade::from_rlp_bytes(bytes).ok());
+        Self::Input(Input::Upgrade(kernel_upgrade))
+    }
+
+    fn parse_sequencer_update(bytes: &[u8]) -> Self {
+        if bytes.is_empty() {
+            Self::Input(Input::RemoveSequencer)
+        } else {
+            let sequencer_upgrade =
+                parsable!(SequencerUpgrade::from_rlp_bytes(bytes).ok());
+            Self::Input(Input::SequencerUpgrade(sequencer_upgrade))
+        }
     }
 
     /// Parses an external message
@@ -334,12 +362,6 @@ impl<Mode: Parsable> InputResult<Mode> {
         let (transaction_tag, remaining) = parsable!(remaining.split_first());
         // External transactions are only allowed in proxy mode
         match *transaction_tag {
-            SEQUENCER_BLUEPRINT_TAG if sequencer.is_some() => {
-                Self::parse_sequencer_blueprint_input(
-                    sequencer.as_ref().unwrap(),
-                    remaining,
-                )
-            }
             FORCE_KERNEL_UPGRADE_TAG => Self::Input(Input::ForceKernelUpgrade),
             _ => Mode::parse_external(transaction_tag, remaining, sequencer),
         }

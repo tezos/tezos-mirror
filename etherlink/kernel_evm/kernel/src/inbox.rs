@@ -6,7 +6,9 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::TezosContracts;
-use crate::parsing::{Input, InputResult, Parsable, ProxyInput, MAX_SIZE_PER_CHUNK};
+use crate::parsing::{
+    Input, InputResult, Parsable, ProxyInput, SequencerInput, MAX_SIZE_PER_CHUNK,
+};
 use crate::sequencer_blueprint::SequencerBlueprint;
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
@@ -233,6 +235,22 @@ impl InputHandler for ProxyInput {
     }
 }
 
+impl InputHandler for SequencerInput {
+    fn handle_input<Host: Runtime>(
+        _host: &mut Host,
+        input: Self,
+        inbox_content: &mut InboxContent,
+    ) -> anyhow::Result<()> {
+        match input {
+            Self::DelayedInput(tx) => inbox_content.transactions.push(*tx),
+            Self::SequencerBlueprint(seq_blueprint) => {
+                inbox_content.sequencer_blueprints.push(seq_blueprint)
+            }
+        }
+        Ok(())
+    }
+}
+
 fn handle_transaction_chunk<Host: Runtime>(
     host: &mut Host,
     tx_hash: TransactionHash,
@@ -350,9 +368,6 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
         Input::Deposit(deposit) => inbox_content
             .transactions
             .push(handle_deposit(host, deposit)?),
-        Input::SequencerBlueprint(seq_blueprint) => {
-            inbox_content.sequencer_blueprints.push(seq_blueprint)
-        }
         Input::ForceKernelUpgrade => force_kernel_upgrade(host)?,
     }
     Ok(())
@@ -472,8 +487,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // during this kernel run.
     let mut inbox_is_empty = true;
     loop {
-        // THIS IS TEMPORARY, TO MAKE IN COMPILE
-        match read_and_dispatch_input::<Host, ProxyInput>(
+        match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             smart_rollup_address,
             tezos_contracts,
