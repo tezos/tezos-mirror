@@ -122,26 +122,18 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let snapshot_level_int32 =
     (Octez_smart_rollup.Inbox.Skip_list.content game.inbox_snapshot).level
   in
-  let get_snapshot_head () =
-    let+ hash = Node_context.hash_of_level node_ctxt snapshot_level_int32 in
-    Layer1.{hash; level = snapshot_level_int32}
-  in
   let* context =
     let* start_hash = Node_context.hash_of_level node_ctxt game.inbox_level in
     let+ context = Node_context.checkout_context node_ctxt start_hash in
     Context.index context
   in
   let* dal_slots_history =
-    if Node_context.dal_supported node_ctxt then
-      let* snapshot_head = get_snapshot_head () in
-      Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
-    else return Dal.Slots_history.genesis
+    (* DAL is not activated in Nairobi *)
+    return Dal.Slots_history.genesis
   in
   let* dal_slots_history_cache =
-    if Node_context.dal_supported node_ctxt then
-      let* snapshot_head = get_snapshot_head () in
-      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
-    else return (Dal.Slots_history.History_cache.empty ~capacity:0L)
+    (* DAL is not activated in Nairobi *)
+    return (Dal.Slots_history.History_cache.empty ~capacity:0L)
   in
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
