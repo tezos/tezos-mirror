@@ -6,13 +6,14 @@ pub mod devices;
 pub mod main_memory;
 
 use crate::machine_state::{backend, registers};
+use derive_more::Error;
 use std::mem;
 
 /// Bus address
 pub type Address = registers::XValue;
 
 /// An address is out of bounds.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Error, derive_more::Display)]
 pub struct OutOfBounds;
 
 /// Addressable space
