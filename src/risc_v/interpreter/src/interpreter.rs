@@ -18,7 +18,7 @@ mod tests {
             MachineState, MachineStateLayout,
         },
         program::Program,
-        state_backend::tests::TestBackendFactory,
+        state_backend::test_helpers::TestBackendFactory,
         traps::EnvironException,
     };
     use std::fs;

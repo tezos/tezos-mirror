@@ -137,6 +137,21 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
     }
 }
 
+pub mod test_helpers {
+    use super::InMemoryBackend;
+    use crate::state_backend::{test_helpers::TestBackendFactory, Layout};
+
+    pub struct InMemoryBackendFactory;
+
+    impl TestBackendFactory for InMemoryBackendFactory {
+        type Backend<L: Layout> = InMemoryBackend<L>;
+
+        fn new<L: Layout>() -> Self::Backend<L> {
+            InMemoryBackend::<L>::new().0
+        }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -175,16 +190,6 @@ pub mod tests {
             let instance = T::bind(backend.allocate(L::placed().into_location()));
             assert_eq!(instance.first.read(), FIRST);
             assert_eq!(instance.second.read_all(), SECOND);
-        }
-    }
-
-    pub struct InMemoryBackendFactory;
-
-    impl backend::tests::TestBackendFactory for InMemoryBackendFactory {
-        type Backend<L: Layout> = InMemoryBackend<L>;
-
-        fn new<L: Layout>() -> Self::Backend<L> {
-            InMemoryBackend::<L>::new().0
         }
     }
 }

@@ -216,9 +216,38 @@ pub trait Backend: BackendManagement + Sized {
     fn write(&mut self, index: usize, buffer: &[u8]);
 }
 
+pub mod test_helpers {
+    use super::{Backend, Layout};
+
+    /// Generate a test against all test backends.
+    #[macro_export]
+    macro_rules! backend_test {
+        ( $(#[$m:meta])* $name:ident, $fac_name:ident, $expr:block ) => {
+            $(#[$m])*
+            #[test]
+            fn $name() {
+                fn inner<$fac_name: $crate::state_backend::test_helpers::TestBackendFactory>() {
+                    $expr
+                }
+
+                inner::<$crate::state_backend::memory_backend::test_helpers::InMemoryBackendFactory>();
+            }
+        };
+    }
+
+    /// This lets you construct backends for any layout.
+    pub trait TestBackendFactory {
+        type Backend<L: Layout>: Backend<Layout = L>;
+
+        /// Construct a backend for the given layout `L`.
+        fn new<L: Layout>() -> Self::Backend<L>;
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
-    use super::*;
+    use super::{test_helpers::TestBackendFactory, *};
+    use crate::backend_test;
     use rand::{Fill, Rng};
     use std::{collections::VecDeque, marker::PhantomData};
 
@@ -398,14 +427,6 @@ pub mod tests {
         }
     }
 
-    /// This lets you construct backends for any layout.
-    pub trait TestBackendFactory {
-        type Backend<L: Layout>: Backend<Layout = L>;
-
-        /// Construct a backend for the given layout `L`.
-        fn new<L: Layout>() -> Self::Backend<L>;
-    }
-
     /// Given a `StateLayout` and a [`TestBackendFactory`] type,
     /// create the backend for that layout.
     #[macro_export]
@@ -452,23 +473,6 @@ pub mod tests {
 
         ($State:tt, $Factory:ty, $backend:ident) => {
             create_state!($State, paste::paste!([<$State Layout>]), $Factory, $backend)
-        };
-    }
-
-    /// Generate a test against all test backends.
-    #[macro_export]
-    macro_rules! backend_test {
-        ($(#[$m:meta])*
-         $name:ident, $fac_name:ident, $expr:block ) => {
-            $(#[$m])*
-            #[test]
-            fn $name() {
-                fn inner<$fac_name: $crate::state_backend::tests::TestBackendFactory>() {
-                    $expr
-                }
-
-                inner::<$crate::state_backend::memory_backend::tests::InMemoryBackendFactory>();
-            }
         };
     }
 
