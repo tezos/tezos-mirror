@@ -33,6 +33,27 @@
   (generated_entry_point Api)
   (deps liboctez_risc_v_pvm.a octez_risc_v_pvm.h)))
 
+(subdir
+ helpers/bin
+ (rule
+  (target armerge)
+  (enabled_if (= %{system} macosx))
+  (action
+   (chdir
+    ../..
+    (run
+     cargo
+     install
+     --locked
+     armerge
+     --version
+     2.0.0
+     --bins
+     --target-dir
+     target
+     --root
+     helpers)))))
+
 (rule
  (targets liboctez_risc_v_pvm.a octez_risc_v_pvm.h)
  (deps
@@ -46,12 +67,35 @@
   (source_tree ../machine_state/src)
   (glob_files ../kernel_loader/*)
   (source_tree ../kernel_loader/src))
+ (enabled_if (<> %{system} macosx))
  (action
   (no-infer
    (progn
     (run cargo build --release)
-    (copy target/release/liboctez_risc_v_pvm.a liboctez_risc_v_pvm.a)
-    (setenv
-     LC_ALL
-     C
-     (run sed -i'' -e s/___rdl_oom/tz_rdl_oo0/ liboctez_risc_v_pvm.a))))))
+    (copy target/release/liboctez_risc_v_pvm.a liboctez_risc_v_pvm.a)))))
+
+(rule
+ (targets liboctez_risc_v_pvm.a octez_risc_v_pvm.h)
+ (deps
+  (source_tree src)
+  (file build.rs)
+  (file Cargo.toml)
+  (file ../Cargo.lock)
+  (glob_files ../interpreter/*)
+  (source_tree ../interpreter/src)
+  (glob_files ../machine_state/*)
+  (source_tree ../machine_state/src)
+  (glob_files ../kernel_loader/*)
+  (source_tree ../kernel_loader/src)
+  (file helpers/bin/armerge))
+ (enabled_if (= %{system} macosx))
+ (action
+  (no-infer
+   (progn
+    (run cargo build --release)
+    (run
+     helpers/bin/armerge
+     --keep-symbols=^_?octez_
+     target/release/liboctez_risc_v_pvm.a
+     --output
+     liboctez_risc_v_pvm.a)))))

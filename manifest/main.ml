@@ -936,62 +936,105 @@ let octez_risc_v_pvm =
   let archive_file = Format.sprintf "lib%s.a" base_name in
   let archive_output_file = Format.sprintf "target/release/%s" archive_file in
   let header_file = Format.sprintf "%s.h" base_name in
-  let replace_symbol original replaced =
-    assert (String.length original = String.length replaced) ;
-    Dune.
-      [
-        S "setenv";
-        S "LC_ALL";
-        S "C";
-        [
-          S "run";
-          S "sed";
-          S "-i''";
-          S "-e";
-          S (Format.sprintf "s/%s/%s/" original replaced);
-          S archive_file;
-        ];
-      ]
-  in
-  let rust_foreign_library =
-    Dune.
+  let armerge =
+    let open Dune in
+    [
+      S "subdir";
+      S "helpers/bin";
       [
         S "rule";
-        [S "targets"; S archive_file; S header_file];
-        [
-          S "deps";
-          [S "source_tree"; S "src"];
-          [S "file"; S "build.rs"];
-          [S "file"; S "Cargo.toml"];
-          [S "file"; S "../Cargo.lock"];
-          (* For the local dependent crates, these patterns only include files
-           * directly contained in the crate's directory, as well as the [src]
-           * directory, excluding all other directories in order to avoid
-           * copying any build artifacts. *)
-          [S "glob_files"; S "../interpreter/*"];
-          [S "source_tree"; S "../interpreter/src"];
-          [S "glob_files"; S "../machine_state/*"];
-          [S "source_tree"; S "../machine_state/src"];
-          [S "glob_files"; S "../kernel_loader/*"];
-          [S "source_tree"; S "../kernel_loader/src"];
-        ];
+        [S "target"; S "armerge"];
+        [S "enabled_if"; of_atom_list ["="; "%{system}"; "macosx"]];
         [
           S "action";
           [
-            S "no-infer";
-            [
-              S "progn";
-              [S "run"; S "cargo"; S "build"; S "--release"];
-              [S "copy"; S archive_output_file; S archive_file];
-              (* XXX: https://gitlab.com/tezos/tezos/-/issues/6630
-                 Rename ___rdl_oom because it would conflict with other
-                 Rust staticlibs (e.g. libwasmer, librustzcash) when linking
-                 everything together into one artifact. *)
-              replace_symbol "___rdl_oom" "tz_rdl_oo0";
-            ];
+            S "chdir";
+            S "../..";
+            of_atom_list
+              [
+                "run";
+                "cargo";
+                "install";
+                "--locked";
+                "armerge";
+                "--version";
+                "2.0.0";
+                "--bins";
+                "--target-dir";
+                "target";
+                "--root";
+                "helpers";
+              ];
           ];
         ];
-      ]
+      ];
+    ]
+  in
+  let make_rust_foreign_library_rule ?(extra_dep = Dune.E) ~enable_if ~transform
+      () =
+    let open Dune in
+    [
+      S "rule";
+      [S "targets"; S archive_file; S header_file];
+      [
+        S "deps";
+        [S "source_tree"; S "src"];
+        [S "file"; S "build.rs"];
+        [S "file"; S "Cargo.toml"];
+        [S "file"; S "../Cargo.lock"];
+        (* For the local dependent crates, these patterns only include files
+         * directly contained in the crate's directory, as well as the [src]
+         * directory, excluding all other directories in order to avoid
+         * copying any build artifacts. *)
+        [S "glob_files"; S "../interpreter/*"];
+        [S "source_tree"; S "../interpreter/src"];
+        [S "glob_files"; S "../machine_state/*"];
+        [S "source_tree"; S "../machine_state/src"];
+        [S "glob_files"; S "../kernel_loader/*"];
+        [S "source_tree"; S "../kernel_loader/src"];
+        extra_dep;
+      ];
+      [S "enabled_if"; enable_if];
+      [
+        S "action";
+        [
+          S "no-infer";
+          [
+            S "progn";
+            of_atom_list ["run"; "cargo"; "build"; "--release"];
+            transform archive_output_file archive_file;
+          ];
+        ];
+      ];
+    ]
+  in
+  let rust_foreign_library_darwin =
+    let open Dune in
+    make_rust_foreign_library_rule (* Make sure armerge is built beforehand *)
+      ~extra_dep:(of_atom_list ["file"; "helpers/bin/armerge"])
+      ~enable_if:(of_atom_list ["="; "%{system}"; "macosx"])
+      ~transform:(fun input output ->
+        (* We use armerge to keep only the essential symbols. This resolves
+           issues on Mac where the linker can't resolve duplicate symbols
+           when the resulting static library is linked with other static
+           Rust libraries. *)
+        of_atom_list
+          [
+            "run";
+            "helpers/bin/armerge";
+            "--keep-symbols=^_?octez_";
+            input;
+            "--output";
+            output;
+          ])
+      ()
+  in
+  let rust_foreign_library =
+    let open Dune in
+    make_rust_foreign_library_rule
+      ~enable_if:(of_atom_list ["<>"; "%{system}"; "macosx"])
+      ~transform:(fun input output -> of_atom_list ["copy"; input; output])
+      ()
   in
   public_lib
     "octez-risc-v-pvm"
@@ -1014,7 +1057,7 @@ let octez_risc_v_pvm =
           c_library_flags = [];
           deps = [archive_file; header_file];
         }
-    ~dune:Dune.[rust_foreign_library]
+    ~dune:Dune.[armerge; rust_foreign_library; rust_foreign_library_darwin]
 
 let _octez_risc_v_pvm_test =
   tezt
