@@ -22,15 +22,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let version_string =
+let octez_version_string =
   Format.asprintf
     "%s (%s) (%s)"
     Current_git_info.abbreviated_commit_hash
     Current_git_info.committer_date
-    (Tezos_version.Version.to_string Current_git_info.version)
+    (Tezos_version.Version.to_string Current_git_info.octez_version)
 
-let simple_version_string =
+let octez_simple_version_string =
   Format.asprintf
     "%s (%s)"
-    (Tezos_version.Version.to_string Current_git_info.version)
+    (Tezos_version.Version.to_string Current_git_info.octez_version)
     Current_git_info.abbreviated_commit_hash

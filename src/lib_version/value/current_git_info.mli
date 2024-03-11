@@ -29,6 +29,6 @@ val abbreviated_commit_hash : string
 
 val committer_date : string
 
-(** current_version : is the version of the node.
+(** Current version of the node octez node.
     it uses either the git tag or a default version *)
-val version : Tezos_version.Version.t
+val octez_version : Tezos_version.Version.t

@@ -47,17 +47,18 @@ let help_string =
 
 let () =
   match Sys.argv with
-  | [|_; "--product"|] -> print_endline (string_of_product version.product)
-  | [|_; "--major"|] -> print_endline (string_of_int version.major)
-  | [|_; "--minor"|] -> print_endline (string_of_int version.minor)
+  | [|_; "--product"|] ->
+      print_endline (string_of_product octez_version.product)
+  | [|_; "--major"|] -> print_endline (string_of_int octez_version.major)
+  | [|_; "--minor"|] -> print_endline (string_of_int octez_version.minor)
   | [|_; "--additional-info"|] ->
-      print_endline (string_of_additional_info version.additional_info)
-  | [|_; "--full"|] | [|_|] -> print_endline (to_string version)
+      print_endline (string_of_additional_info octez_version.additional_info)
+  | [|_; "--full"|] | [|_|] -> print_endline (to_string octez_version)
   | [|_; "--full-with-commit"|] ->
-      print_endline Tezos_version_value.Bin_version.simple_version_string
+      print_endline Tezos_version_value.Bin_version.octez_simple_version_string
   | [|_; "--commit"|] ->
       print_endline Tezos_version_value.Current_git_info.abbreviated_commit_hash
-  | [|_; "--json"|] -> print_endline (to_json version)
+  | [|_; "--json"|] -> print_endline (to_json octez_version)
   | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;
