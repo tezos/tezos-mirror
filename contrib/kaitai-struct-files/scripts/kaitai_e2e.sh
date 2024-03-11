@@ -189,28 +189,31 @@ for ksy_file in "$KSY_DIR"/*.ksy; do
   invalid_input_dir="${HEX_INPUT_DIR}/invalid/${encoding}"
   total=$((total += 1))
   log "Running validation of $ksy_file:"
+
+  # Only validate '.ksy' file if we have at least one corresponding valid input file.
   if ! dir_has_hex_files "$valid_input_dir"; then
     log_with_ident 4 "- Aborting validation of \"$encoding\" due to missing valid input files."
     log_with_ident 4 "- To fix this add at least one valid \".hex\" file inside: \"$valid_input_dir\"."
     untested=$((untested + 1))
-    continue
-  fi
-  # Emit warning if no corresponding invalid input files.
-  if ! dir_has_hex_files "$invalid_input_dir"; then
-    log_with_ident 4 "- WARNING: \"$encoding\" has no coresponding invalid input files."
-    log_with_ident 4 "- To fix this add at least one invalid \".hex\" file inside: \"$invalid_input_dir\"."
-  fi
-  validation_output=$(validate_kaitai_spec "$encoding" "$valid_input_dir" "$invalid_input_dir" 2>&1)
-  validation_status=$?
-  if [ $validation_status -eq 0 ]; then
-    valid=$((valid + 1))
-    log_with_ident 4 "$encoding kaitai spec file is valid."
   else
-    log_with_ident 4 "$encoding kaitai spec files is not valid."
-    log_with_ident 4 "See the action log:"
-    log_with_ident 8 "$validation_output"
-    invalid=$((invalid + 1))
+    # Emit warning if no corresponding invalid input files.
+    if ! dir_has_hex_files "$invalid_input_dir"; then
+      log_with_ident 4 "- WARNING: \"$encoding\" has no coresponding invalid input files."
+      log_with_ident 4 "- To fix this add at least one invalid \".hex\" file inside: \"$invalid_input_dir\"."
+    fi
+    validation_output=$(validate_kaitai_spec "$encoding" "$valid_input_dir" "$invalid_input_dir" 2>&1)
+    validation_status=$?
+    if [ $validation_status -eq 0 ]; then
+      valid=$((valid + 1))
+      log_with_ident 4 "$encoding kaitai spec file is valid."
+    else
+      log_with_ident 4 "$encoding kaitai spec files is not valid."
+      log_with_ident 4 "See the action log:"
+      log_with_ident 8 "$validation_output"
+      invalid=$((invalid + 1))
+    fi
   fi
+
 done
 cat << EOF
 VALIDATION RESULTS:
