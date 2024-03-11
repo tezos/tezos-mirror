@@ -46,6 +46,7 @@ enum ProgramCounterUpdate {
 }
 
 /// Result type when running multiple steps at a time with [`MachineState::step_many`]
+#[derive(Debug)]
 pub struct StepManyResult {
     pub steps: usize,
     pub exception: Option<EnvironException>,
