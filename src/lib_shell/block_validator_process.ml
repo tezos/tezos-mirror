@@ -543,7 +543,8 @@ module External_validator_process = struct
         ~level:Debug
         ~name:"proc_request"
         ~msg:"request for {request}"
-        ~pp1:External_validation.request_pp
+        ~pp1:(fun fmt (External_validation.Erequest r) ->
+          External_validation.request_pp fmt r)
         ("request", External_validation.request_encoding)
 
     let request_result =
@@ -552,7 +553,8 @@ module External_validator_process = struct
         ~level:Debug
         ~name:"proc_request_result"
         ~msg:"completion of {request_result} in {timespan}"
-        ~pp1:External_validation.request_pp
+        ~pp1:(fun fmt (External_validation.Erequest r) ->
+          External_validation.request_pp fmt r)
         ("request_result", External_validation.request_encoding)
         ~pp2:Time.System.Span.pp_hum
         ("timespan", Time.System.Span.encoding)
@@ -830,8 +832,9 @@ module External_validator_process = struct
   (* Sends the given request to the external validator. If the request
      failed to be fulfilled, the status of the external validator is
      set to Uninitialized and the associated error is propagated. *)
-  let send_request vp request result_encoding =
+  let send_request vp request =
     let open Lwt_result_syntax in
+    let prequest = External_validation.Erequest request in
     let* process, process_input, process_output = validator_state vp in
     Lwt.catch
       (fun () ->
@@ -841,23 +844,23 @@ module External_validator_process = struct
           Lwt.protected
             (Lwt_mutex.with_lock vp.lock (fun () ->
                  let now = Time.System.now () in
-                 let*! () = Events.(emit request_for request) in
+                 let*! () = Events.(emit request_for prequest) in
                  let*! () =
                    External_validation.send
                      process_input
                      External_validation.request_encoding
-                     request
+                     prequest
                  in
                  let*! res =
                    External_validation.recv_result
                      process_output
-                     result_encoding
+                     (External_validation.result_encoding request)
                  in
                  let timespan =
                    let then_ = Time.System.now () in
                    Ptime.diff then_ now
                  in
-                 let*! () = Events.(emit request_result (request, timespan)) in
+                 let*! () = Events.(emit request_result (prequest, timespan)) in
                  Lwt.return res))
         in
         match process#state with
@@ -950,7 +953,7 @@ module External_validator_process = struct
           simulate;
         }
     in
-    send_request validator request Block_validation.result_encoding
+    send_request validator request
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
       ~live_operations ~predecessor_shell_header ~predecessor_hash
@@ -974,7 +977,7 @@ module External_validator_process = struct
           operations;
         }
     in
-    send_request validator request Block_validation.preapply_result_encoding
+    send_request validator request
 
   let precheck_block validator chain_store ~predecessor header hash operations =
     let open Lwt_result_syntax in
@@ -996,7 +999,7 @@ module External_validator_process = struct
           hash;
         }
     in
-    send_request validator request Data_encoding.unit
+    send_request validator request
 
   let context_garbage_collection validator _index context_hash ~gc_lockfile_path
       =
@@ -1004,15 +1007,15 @@ module External_validator_process = struct
       External_validation.Context_garbage_collection
         {context_hash; gc_lockfile_path}
     in
-    send_request validator request Data_encoding.unit
+    send_request validator request
 
   let context_split validator _index =
     let request = External_validation.Context_split in
-    send_request validator request Data_encoding.unit
+    send_request validator request
 
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
-    send_request validator request Context_hash.encoding
+    send_request validator request
 
   let init_test_chain validator chain_id forking_block =
     let forked_header = Store.Block.header forking_block in
@@ -1021,20 +1024,19 @@ module External_validator_process = struct
       External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header}
     in
-    send_request validator request Block_header.encoding
+    send_request validator request
 
   let reconfigure_event_logging validator config =
     send_request
       validator
       (External_validation.Reconfigure_event_logging config)
-      Data_encoding.unit
 
   let close vp =
     let open Lwt_syntax in
     let* () = Events.(emit close ()) in
     match vp.validator_process with
     | Running {process; input = process_input; canceler; _} ->
-        let request = External_validation.Terminate in
+        let request = External_validation.Erequest Terminate in
         let* () = Events.(emit request_for request) in
         let* () =
           Lwt.catch

@@ -36,8 +36,10 @@ type parameters = {
   internal_events : Tezos_base.Internal_event_config.t;
 }
 
-type request =
-  | Validate of {
+type never = |
+
+type _ request =
+  | Validate : {
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
@@ -50,7 +52,8 @@ type request =
       should_precheck : bool;
       simulate : bool;
     }
-  | Preapply of {
+      -> Block_validation.result request
+  | Preapply : {
       chain_id : Chain_id.t;
       timestamp : Time.Protocol.t;
       protocol_data : bytes;
@@ -65,7 +68,8 @@ type request =
       predecessor_resulting_context_hash : Context_hash.t;
       operations : Block_validation.operation list list;
     }
-  | Precheck of {
+      -> (Block_header.shell_header * error Preapply_result.t list) request
+  | Precheck : {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;
@@ -74,22 +78,27 @@ type request =
       operations : Block_validation.operation list list;
       hash : Block_hash.t;
     }
-  | Commit_genesis of {chain_id : Chain_id.t}
-  | Fork_test_chain of {
+      -> unit request
+  | Commit_genesis : {chain_id : Chain_id.t} -> Context_hash.t request
+  | Fork_test_chain : {
       chain_id : Chain_id.t;
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
-  | Context_garbage_collection of {
+      -> Block_header.t request
+  | Context_garbage_collection : {
       context_hash : Context_hash.t;
       gc_lockfile_path : string;
     }
-  | Context_split
-  | Terminate
-  | Reconfigure_event_logging of
+      -> unit request
+  | Context_split : unit request
+  | Terminate : never request
+  | Reconfigure_event_logging :
       Tezos_base_unix.Internal_event_unix.Configuration.t
+      -> unit request
 
-let request_pp ppf = function
+let request_pp : type a. Format.formatter -> a request -> unit =
+ fun ppf -> function
   | Validate {block_header; chain_id; _} ->
       Format.fprintf
         ppf
@@ -191,6 +200,8 @@ let parameters_encoding =
        (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
        (req "internal_events" Tezos_base.Internal_event_config.encoding))
 
+type packed_request = Erequest : _ request -> packed_request
+
 let case_validate tag =
   let open Data_encoding in
   case
@@ -210,19 +221,20 @@ let case_validate tag =
        (req "should_precheck" bool)
        (req "simulate" bool))
     (function
-      | Validate
-          {
-            chain_id;
-            block_header;
-            predecessor_block_header;
-            predecessor_block_metadata_hash;
-            predecessor_ops_metadata_hash;
-            predecessor_resulting_context_hash;
-            max_operations_ttl;
-            operations;
-            should_precheck;
-            simulate;
-          } ->
+      | Erequest
+          (Validate
+            {
+              chain_id;
+              block_header;
+              predecessor_block_header;
+              predecessor_block_metadata_hash;
+              predecessor_ops_metadata_hash;
+              predecessor_resulting_context_hash;
+              max_operations_ttl;
+              operations;
+              should_precheck;
+              simulate;
+            }) ->
           Some
             ( chain_id,
               block_header,
@@ -245,19 +257,20 @@ let case_validate tag =
            operations,
            should_precheck,
            simulate ) ->
-      Validate
-        {
-          chain_id;
-          block_header;
-          predecessor_block_header;
-          predecessor_block_metadata_hash;
-          predecessor_ops_metadata_hash;
-          predecessor_resulting_context_hash;
-          max_operations_ttl;
-          operations;
-          should_precheck;
-          simulate;
-        })
+      Erequest
+        (Validate
+           {
+             chain_id;
+             block_header;
+             predecessor_block_header;
+             predecessor_block_metadata_hash;
+             predecessor_ops_metadata_hash;
+             predecessor_resulting_context_hash;
+             max_operations_ttl;
+             operations;
+             should_precheck;
+             simulate;
+           }))
 
 let case_preapply tag =
   let open Data_encoding in
@@ -284,21 +297,22 @@ let case_preapply tag =
              "operations"
              (list (list (dynamic_size Block_validation.operation_encoding))))))
     (function
-      | Preapply
-          {
-            chain_id;
-            timestamp;
-            protocol_data;
-            live_blocks;
-            live_operations;
-            predecessor_shell_header;
-            predecessor_hash;
-            predecessor_max_operations_ttl;
-            predecessor_block_metadata_hash;
-            predecessor_ops_metadata_hash;
-            predecessor_resulting_context_hash;
-            operations;
-          } ->
+      | Erequest
+          (Preapply
+            {
+              chain_id;
+              timestamp;
+              protocol_data;
+              live_blocks;
+              live_operations;
+              predecessor_shell_header;
+              predecessor_hash;
+              predecessor_max_operations_ttl;
+              predecessor_block_metadata_hash;
+              predecessor_ops_metadata_hash;
+              predecessor_resulting_context_hash;
+              operations;
+            }) ->
           Some
             ( ( chain_id,
                 timestamp,
@@ -323,21 +337,22 @@ let case_preapply tag =
              predecessor_block_metadata_hash,
              predecessor_ops_metadata_hash ),
            (predecessor_resulting_context_hash, operations) ) ->
-      Preapply
-        {
-          chain_id;
-          timestamp;
-          protocol_data;
-          live_blocks;
-          live_operations;
-          predecessor_shell_header;
-          predecessor_hash;
-          predecessor_max_operations_ttl;
-          predecessor_block_metadata_hash;
-          predecessor_ops_metadata_hash;
-          predecessor_resulting_context_hash;
-          operations;
-        })
+      Erequest
+        (Preapply
+           {
+             chain_id;
+             timestamp;
+             protocol_data;
+             live_blocks;
+             live_operations;
+             predecessor_shell_header;
+             predecessor_hash;
+             predecessor_max_operations_ttl;
+             predecessor_block_metadata_hash;
+             predecessor_ops_metadata_hash;
+             predecessor_resulting_context_hash;
+             operations;
+           }))
 
 let case_precheck tag =
   let open Data_encoding in
@@ -355,16 +370,17 @@ let case_precheck tag =
           "operations"
           (list (list (dynamic_size Block_validation.operation_encoding)))))
     (function
-      | Precheck
-          {
-            chain_id;
-            predecessor_block_header;
-            predecessor_block_hash;
-            predecessor_resulting_context_hash;
-            header;
-            operations;
-            hash;
-          } ->
+      | Erequest
+          (Precheck
+            {
+              chain_id;
+              predecessor_block_header;
+              predecessor_block_hash;
+              predecessor_resulting_context_hash;
+              header;
+              operations;
+              hash;
+            }) ->
           Some
             ( chain_id,
               predecessor_block_header,
@@ -381,16 +397,17 @@ let case_precheck tag =
            header,
            hash,
            operations ) ->
-      Precheck
-        {
-          chain_id;
-          predecessor_block_header;
-          predecessor_block_hash;
-          predecessor_resulting_context_hash;
-          header;
-          operations;
-          hash;
-        })
+      Erequest
+        (Precheck
+           {
+             chain_id;
+             predecessor_block_header;
+             predecessor_block_hash;
+             predecessor_resulting_context_hash;
+             header;
+             operations;
+             hash;
+           }))
 
 let case_context_gc tag =
   let open Data_encoding in
@@ -401,11 +418,12 @@ let case_context_gc tag =
        (req "context_hash" Context_hash.encoding)
        (req "gc_lockfile_path" string))
     (function
-      | Context_garbage_collection {context_hash; gc_lockfile_path} ->
+      | Erequest (Context_garbage_collection {context_hash; gc_lockfile_path})
+        ->
           Some (context_hash, gc_lockfile_path)
       | _ -> None)
     (fun (context_hash, gc_lockfile_path) ->
-      Context_garbage_collection {context_hash; gc_lockfile_path})
+      Erequest (Context_garbage_collection {context_hash; gc_lockfile_path}))
 
 let case_context_split tag =
   let open Data_encoding in
@@ -413,8 +431,8 @@ let case_context_split tag =
     tag
     ~title:"context_split"
     unit
-    (function Context_split -> Some () | _ -> None)
-    (fun () -> Context_split)
+    (function Erequest Context_split -> Some () | _ -> None)
+    (fun () -> Erequest Context_split)
 
 let request_encoding =
   let open Data_encoding in
@@ -425,8 +443,9 @@ let request_encoding =
         (Tag 1)
         ~title:"commit_genesis"
         (obj1 (req "chain_id" Chain_id.encoding))
-        (function Commit_genesis {chain_id} -> Some chain_id | _ -> None)
-        (fun chain_id -> Commit_genesis {chain_id});
+        (function
+          | Erequest (Commit_genesis {chain_id}) -> Some chain_id | _ -> None)
+        (fun chain_id -> Erequest (Commit_genesis {chain_id}));
       case
         (Tag 2)
         ~title:"fork_test_chain"
@@ -435,28 +454,41 @@ let request_encoding =
            (req "context_hash" Context_hash.encoding)
            (req "forked_header" Block_header.encoding))
         (function
-          | Fork_test_chain {chain_id; context_hash; forked_header} ->
+          | Erequest (Fork_test_chain {chain_id; context_hash; forked_header})
+            ->
               Some (chain_id, context_hash, forked_header)
           | _ -> None)
         (fun (chain_id, context_hash, forked_header) ->
-          Fork_test_chain {chain_id; context_hash; forked_header});
+          Erequest (Fork_test_chain {chain_id; context_hash; forked_header}));
       case
         (Tag 3)
         ~title:"terminate"
         unit
-        (function Terminate -> Some () | _ -> None)
-        (fun () -> Terminate);
+        (function Erequest Terminate -> Some () | _ -> None)
+        (fun () -> Erequest Terminate);
       case
         (Tag 4)
         ~title:"reconfigure_event_logging"
         Tezos_base_unix.Internal_event_unix.Configuration.encoding
-        (function Reconfigure_event_logging c -> Some c | _ -> None)
-        (fun c -> Reconfigure_event_logging c);
+        (function
+          | Erequest (Reconfigure_event_logging c) -> Some c | _ -> None)
+        (fun c -> Erequest (Reconfigure_event_logging c));
       case_preapply (Tag 5);
       case_precheck (Tag 6);
       case_context_gc (Tag 7);
       case_context_split (Tag 8);
     ]
+
+let result_encoding : type a. a request -> a Data_encoding.t = function
+  | Validate _ -> Block_validation.result_encoding
+  | Preapply _ -> Block_validation.preapply_result_encoding
+  | Precheck _ -> Data_encoding.unit
+  | Commit_genesis _ -> Context_hash.encoding
+  | Fork_test_chain _ -> Block_header.encoding
+  | Context_garbage_collection _ -> Data_encoding.unit
+  | Context_split -> Data_encoding.unit
+  | Reconfigure_event_logging _ -> Data_encoding.unit
+  | Terminate -> assert false
 
 let send pin encoding data =
   let open Lwt_syntax in

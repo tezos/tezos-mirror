@@ -260,11 +260,11 @@ let run ~readonly ~using_std_channel input output =
   *)
   let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)
       cached_result =
-    let*! recved =
+    let*! (External_validation.Erequest recved) =
       External_validation.recv input External_validation.request_encoding
     in
     match recved with
-    | External_validation.Commit_genesis {chain_id} ->
+    | Commit_genesis {chain_id} ->
         let*! () = Events.(emit commit_genesis_request genesis.block) in
         let*! commit =
           Error_monad.catch_es (fun () ->
@@ -281,7 +281,7 @@ let run ~readonly ~using_std_channel input output =
             commit
         in
         loop cache None
-    | External_validation.Validate
+    | Validate
         {
           chain_id;
           block_header;
