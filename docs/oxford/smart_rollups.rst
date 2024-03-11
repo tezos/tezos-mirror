@@ -68,7 +68,7 @@ messages.
 Address
 ^^^^^^^
 
-When a smart rollup is originated on the Layer 1, a unique address is
+When a Smart Rollup is originated on the Layer 1, a unique address is
 generated to uniquely identify it. A smart rollup address starts with
 the prefix ``sr1``
 (see also :doc:`./accounts`).

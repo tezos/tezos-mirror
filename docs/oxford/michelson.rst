@@ -38,14 +38,14 @@ Semantics of smart contracts and transactions
 The Tezos ledger currently has two types of accounts that can hold
 tokens (and be the destinations of transactions).
 
-  - Implicit account: non programmable account whose address is
+  - Implicit account: non-programmable account whose address is
     the public key hash, prefixed by ``tz`` and one digit.
   - Smart contract: programmable account associated to some Michelson code,
     whose address is a unique hash, prefixed by ``KT1``.
     A transaction to such
     an address can provide data, and can fail for reasons detailed below.
 
-See :doc:`./accounts` for more details on accounts and addresses.
+See :doc:`./accounts` for more details.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

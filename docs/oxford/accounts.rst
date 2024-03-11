@@ -1,6 +1,3 @@
-.. _address_prefixes:
-.. _address_prefixes_oxford:
-
 Accounts and addresses
 ======================
 
@@ -8,25 +5,22 @@ The Tezos ledger currently supports two types of accounts that can hold
 tokens (and be the destinations of transactions), identified by distinct
 addresses:
 
-  - An implicit account is a non programmable account, whose tokens
-    are spendable and delegatable by a public key. Its address is
-    directly the public key hash, and starts with ``tz1``, ``tz2``,
+  - An implicit account is a non-programmable account, whose tokens
+    are spendable and delegatable by the owner of a private key. Its address is
+    the hash of the public key, prefixed by ``tz1``, ``tz2``,
     ``tz3`` or ``tz4``.
   - A smart contract is a programmable account, associated with some Michelson code.
     A transaction to such
     an address can provide data, and can fail, according to the :ref:`transaction semantics <transaction_semantics_oxford>`. Its address is a unique hash that depends on
-    the operation that led to its creation, and starts with ``KT1``.
+    the operation that led to its creation, prefixed by ``KT1``.
 
-Finally, addresses prefixed with ``sr1`` identify :doc:`smart rollups
+Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`.
-
-.. _implicit_accounts:
-.. _implicit_accounts_oxford:
 
 Implicit accounts
 ~~~~~~~~~~~~~~~~~
 
-From Michelson, implicit accounts are considered as a particular case
+From the economic protocol's point of view, implicit accounts are considered as a particular case
 of smart contracts that always succeed in receiving tokens or tickets,
 and do nothing else.
 

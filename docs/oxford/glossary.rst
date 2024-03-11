@@ -114,8 +114,7 @@ _`Account`
     In the context_, each account is associated with a balance (an amount of
     tez available).
 
-    An account can be either an `originated account`_ or an `implicit account`_
-    (see :doc:`./accounts`).
+    An account can be either an `originated account`_ or an `implicit account`_.
 
 _`Baker`
     When a delegate_ creates a new block_, it is called the baker of this block.
@@ -249,7 +248,6 @@ _`Implicit account`
     The address of an implicit account always starts with the
     letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
     signature scheme) and finally the hash of the public key.
-
     See :doc:`./accounts` for a more detailed explanation on addresses.
 
 _`Layer 1`
