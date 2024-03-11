@@ -2605,12 +2605,12 @@ let _octez_version_get_git_info =
 let _octez_print_version_exe =
   public_exe
     "octez-version"
-    ~internal_name:"tezos_print_version"
+    ~internal_name:"octez_print_version"
     ~path:"src/lib_version/exe"
     ~opam:"octez-version"
     ~deps:
       [octez_version_value |> open_; octez_version |> open_; octez_base_unix]
-    ~modules:["tezos_print_version"]
+    ~modules:["octez_print_version"]
     ~bisect_ppx:No
 
 let _octez_version_tests =
