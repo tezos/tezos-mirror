@@ -595,14 +595,24 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
         Seq.return {Cryptobox.share; index = shard_index}
         |> save_and_notify commitment |> Errors.to_tzresult
       in
-      Amplificator.amplify
-        shard_store
-        node_store
-        commitment
-        ~published_level:level
-        ~slot_index
-        gs_worker
-        node_ctxt
+      match
+        Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
+      with
+      | Operator profile_list
+        when List.exists
+               (function
+                 | Types.Observer {slot_index = index} -> index = slot_index
+                 | _ -> false)
+               profile_list ->
+          Amplificator.amplify
+            shard_store
+            node_store
+            commitment
+            ~published_level:level
+            ~slot_index
+            gs_worker
+            node_ctxt
+      | _ -> return_unit
   in
   Lwt.dont_wait
     (fun () ->
