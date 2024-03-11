@@ -29,14 +29,14 @@ let start ~(constants : starter_constants) : (unit, constants) scenarios =
     (fun () ->
       Log.info ~color:begin_end_color "-- Begin test --" ;
       Log.info "Loading constants_%s." name ;
-      return constants)
+      Lwt_result_syntax.return constants)
 
 let start_with ~(constants : constants) : (unit, constants) scenarios =
   Action
     (fun () ->
       Log.info ~color:begin_end_color "-- Begin test --" ;
       Log.info "Loading custom constants." ;
-      return constants)
+      Lwt_result_syntax.return constants)
 
 let start_with_list ~(constants : (string * constants) list) :
     (unit, constants) scenarios =

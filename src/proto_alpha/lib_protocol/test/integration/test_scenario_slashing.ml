@@ -75,7 +75,7 @@ let test_simple_slash =
              (exec_unit (fun (_block, state) ->
                   if State_ai_flags.Delayed_slashing.enabled state then
                     failwith "ns_enable = true: slash not applied yet"
-                  else return_unit)
+                  else Lwt_result_syntax.return_unit)
              --> check_snapshot_balances "before slash")
        --> exec_unit (check_pending_slashings ~loc:__LOC__)
        --> next_cycle

@@ -26,7 +26,7 @@ let log ?(level = Cli.Logs.Info) ?color format =
     (fun s ->
       exec_unit (fun _ ->
           Log.log ~level ?color "%s" s ;
-          return_unit))
+          Lwt_result_syntax.return_unit))
     format
 
 (* ======== State updates ======== *)

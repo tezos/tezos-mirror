@@ -936,7 +936,8 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
     dal_node_rpc_ctxt
 
 let run cctxt ?canceler ?(stop_on_event = fun _ -> false)
-    ?(on_error = fun _ -> return_unit) ?constants ~chain config delegates =
+    ?(on_error = fun _ -> Lwt_result_syntax.return_unit) ?constants ~chain
+    config delegates =
   let open Lwt_result_syntax in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
   let* () = perform_sanity_check cctxt ~chain_id in
