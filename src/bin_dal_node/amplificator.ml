@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
-    commitment published_level slot_index gs_worker node_ctxt =
+    commitment ~published_level ~slot_index gs_worker node_ctxt =
   let open Lwt_result_syntax in
   match Node_context.get_status node_ctxt with
   | Starting ->

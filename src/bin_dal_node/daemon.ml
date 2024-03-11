@@ -599,8 +599,8 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
         shard_store
         node_store
         commitment
-        level
-        slot_index
+        ~published_level:level
+        ~slot_index
         gs_worker
         node_ctxt
   in
