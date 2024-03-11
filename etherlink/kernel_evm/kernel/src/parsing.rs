@@ -86,12 +86,8 @@ pub struct LevelWithInfo {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Input {
+pub enum ProxyInput {
     SimpleTransaction(Box<Transaction>),
-    Deposit(Deposit),
-    Upgrade(KernelUpgrade),
-    SequencerUpgrade(SequencerUpgrade),
-    RemoveSequencer,
     NewChunkedTransaction {
         tx_hash: TransactionHash,
         num_chunks: u16,
@@ -103,17 +99,26 @@ pub enum Input {
         chunk_hash: TransactionHash,
         data: Vec<u8>,
     },
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Input<Mode> {
+    ModeSpecific(Mode),
+    Deposit(Deposit),
+    Upgrade(KernelUpgrade),
+    SequencerUpgrade(SequencerUpgrade),
+    RemoveSequencer,
     Info(LevelWithInfo),
     SequencerBlueprint(SequencerBlueprint),
     ForceKernelUpgrade,
 }
 
 #[derive(Debug, PartialEq, Default)]
-pub enum InputResult {
+pub enum InputResult<Mode> {
     /// No further inputs
     NoInput,
     /// Some decoded input
-    Input(Input),
+    Input(Input<Mode>),
     /// Simulation mode starts after this input
     Simulation,
     #[default]
@@ -140,7 +145,7 @@ pub trait Parsable {
         tag: &u8,
         input: &[u8],
         sequencer: &Option<PublicKey>,
-    ) -> InputResult
+    ) -> InputResult<Self>
     where
         Self: std::marker::Sized;
 
@@ -148,13 +153,13 @@ pub trait Parsable {
         source: ContractKt1Hash,
         delayed_bridge: &Option<ContractKt1Hash>,
         bytes: &[u8],
-    ) -> InputResult
+    ) -> InputResult<Self>
     where
         Self: std::marker::Sized;
 }
 
-impl InputResult {
-    fn parse_simple_transaction(bytes: &[u8]) -> Self {
+impl ProxyInput {
+    fn parse_simple_transaction(bytes: &[u8]) -> InputResult<Self> {
         // Next 32 bytes is the transaction hash.
         // Remaining bytes is the rlp encoded transaction.
         let (tx_hash, remaining) = parsable!(split_at(bytes, TRANSACTION_HASH_SIZE));
@@ -167,13 +172,15 @@ impl InputResult {
             return InputResult::Unparsable;
         }
         let tx: EthereumTransactionCommon = parsable!(remaining.try_into().ok());
-        InputResult::Input(Input::SimpleTransaction(Box::new(Transaction {
-            tx_hash,
-            content: TransactionContent::Ethereum(tx),
-        })))
+        InputResult::Input(Input::ModeSpecific(Self::SimpleTransaction(Box::new(
+            Transaction {
+                tx_hash,
+                content: TransactionContent::Ethereum(tx),
+            },
+        ))))
     }
 
-    fn parse_new_chunked_transaction(bytes: &[u8]) -> Self {
+    fn parse_new_chunked_transaction(bytes: &[u8]) -> InputResult<Self> {
         // Next 32 bytes is the transaction hash.
         let (tx_hash, remaining) = parsable!(split_at(bytes, TRANSACTION_HASH_SIZE));
         let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
@@ -181,7 +188,7 @@ impl InputResult {
         let (num_chunks, remaining) = parsable!(split_at(remaining, 2));
         let num_chunks = u16::from_le_bytes(num_chunks.try_into().unwrap());
         if remaining.len() != (TRANSACTION_HASH_SIZE * usize::from(num_chunks)) {
-            return Self::Unparsable;
+            return InputResult::Unparsable;
         }
         let mut chunk_hashes = vec![];
         let mut remaining = remaining;
@@ -192,14 +199,14 @@ impl InputResult {
             remaining = remaining_hashes;
             chunk_hashes.push(chunk_hash)
         }
-        Self::Input(Input::NewChunkedTransaction {
+        InputResult::Input(Input::ModeSpecific(Self::NewChunkedTransaction {
             tx_hash,
             num_chunks,
             chunk_hashes,
-        })
+        }))
     }
 
-    fn parse_transaction_chunk(bytes: &[u8]) -> Self {
+    fn parse_transaction_chunk(bytes: &[u8]) -> InputResult<Self> {
         // Next 32 bytes is the transaction hash.
         let (tx_hash, remaining) = parsable!(split_at(bytes, TRANSACTION_HASH_SIZE));
         let tx_hash: TransactionHash = parsable!(tx_hash.try_into().ok());
@@ -213,16 +220,38 @@ impl InputResult {
         let data_hash: [u8; TRANSACTION_HASH_SIZE] = Keccak256::digest(remaining).into();
         // Check if the produced hash from the data is the same as the chunk hash.
         if chunk_hash != data_hash {
-            return Self::Unparsable;
+            return InputResult::Unparsable;
         }
-        Self::Input(Input::TransactionChunk {
+        InputResult::Input(Input::ModeSpecific(Self::TransactionChunk {
             tx_hash,
             i,
             chunk_hash,
             data: remaining.to_vec(),
-        })
+        }))
+    }
+}
+
+impl Parsable for ProxyInput {
+    fn parse_external(
+        tag: &u8,
+        input: &[u8],
+        _: &Option<PublicKey>,
+    ) -> InputResult<Self> {
+        // External transactions are only allowed in proxy mode
+        match *tag {
+            SIMPLE_TRANSACTION_TAG => Self::parse_simple_transaction(input),
+            NEW_CHUNKED_TRANSACTION_TAG => Self::parse_new_chunked_transaction(input),
+            TRANSACTION_CHUNK_TAG => Self::parse_transaction_chunk(input),
+            _ => InputResult::Unparsable,
+        }
     }
 
+    fn parse_internal_bytes(_: ContractKt1Hash, _: &[u8], _: &()) -> InputResult<Self> {
+        InputResult::Unparsable
+    }
+}
+
+impl<Mode: Parsable> InputResult<Mode> {
     fn parse_kernel_upgrade(bytes: &[u8]) -> Self {
         let kernel_upgrade = parsable!(KernelUpgrade::from_rlp_bytes(bytes).ok());
         Self::Input(Input::Upgrade(kernel_upgrade))
@@ -261,7 +290,7 @@ impl InputResult {
     }
 
     /// Parses transactions that come from the delayed inbox.
-    fn parse_transaction_from_delayed_inbox(
+    fn _parse_transaction_from_delayed_inbox(
         source: ContractKt1Hash,
         delayed_bridge: &Option<ContractKt1Hash>,
         bytes: &[u8],
@@ -272,13 +301,15 @@ impl InputResult {
                 return InputResult::Unparsable;
             }
         };
-        let tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
-        let tx_hash: TransactionHash = Keccak256::digest(bytes).into();
+        let _tx = parsable!(EthereumTransactionCommon::from_bytes(bytes).ok());
+        let _tx_hash: TransactionHash = Keccak256::digest(bytes).into();
 
-        Self::Input(Input::SimpleTransaction(Box::new(Transaction {
-            tx_hash,
-            content: TransactionContent::Ethereum(tx),
-        })))
+        // THIS IS TEMPORARY
+        Self::Unparsable
+        // Self::Input(Input::SimpleTransaction(Box::new(Transaction {
+        //     tx_hash,
+        //     content: TransactionContent::Ethereum(tx),
+        // })))
     }
 
     /// Parses an external message
@@ -303,15 +334,6 @@ impl InputResult {
         let (transaction_tag, remaining) = parsable!(remaining.split_first());
         // External transactions are only allowed in proxy mode
         match *transaction_tag {
-            SIMPLE_TRANSACTION_TAG if sequencer.is_none() => {
-                Self::parse_simple_transaction(remaining)
-            }
-            NEW_CHUNKED_TRANSACTION_TAG if sequencer.is_none() => {
-                Self::parse_new_chunked_transaction(remaining)
-            }
-            TRANSACTION_CHUNK_TAG if sequencer.is_none() => {
-                Self::parse_transaction_chunk(remaining)
-            }
             SEQUENCER_BLUEPRINT_TAG if sequencer.is_some() => {
                 Self::parse_sequencer_blueprint_input(
                     sequencer.as_ref().unwrap(),
@@ -319,7 +341,7 @@ impl InputResult {
                 )
             }
             FORCE_KERNEL_UPGRADE_TAG => Self::Input(Input::ForceKernelUpgrade),
-            _ => InputResult::Unparsable,
+            _ => Mode::parse_external(transaction_tag, remaining, sequencer),
         }
     }
 
@@ -395,11 +417,7 @@ impl InputResult {
                     Self::parse_deposit(host, ticket, receiver, &tezos_contracts.ticketer)
                 }
                 MichelsonOr::Right(MichelsonBytes(bytes)) => {
-                    Self::parse_transaction_from_delayed_inbox(
-                        source,
-                        delayed_bridge,
-                        &bytes,
-                    )
+                    Mode::parse_internal_bytes(source, delayed_bridge, &bytes)
                 }
             },
             MichelsonOr::Right(MichelsonBytes(bytes)) => {
@@ -487,7 +505,7 @@ mod tests {
 
         let message = Message::new(0, 0, vec![1, 9, 32, 58, 59, 30]);
         assert_eq!(
-            InputResult::parse(
+            InputResult::<ProxyInput>::parse(
                 &mut host,
                 message,
                 ZERO_SMART_ROLLUP_ADDRESS,
