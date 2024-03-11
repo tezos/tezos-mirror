@@ -66,75 +66,65 @@ Installing binaries
 -------------------
 
 Depending on your operating system, you may install Octez (dynamically-linked)
-binaries and their dependencies using a package manager, as follows.
+binaries and their dependencies by first downloading the packages for your
+distribution from the `Octez release page
+<https://gitlab.com/tezos/tezos/-/releases>`__, browsing to your distribution
+and then installing them with your package tool manager. Most of the
+configuration options are accessible by the user in ``/etc/default/<package>``.
 
-Ubuntu Launchpad PPA with Octez packages
+If you are upgrading from a different package distributor such as `Serokell's tezos-packaging<https://github.com/serokell/tezos-packaging>`__,
+please pay attention to the possible differences between the two packages, in
+particular regarding the home directory for the ``tezos`` user.
+
+There are several packages:
+
+- ``octez-client``: the client for manipulating wallets and signing items
+- ``octez-node``: the Octez node
+- ``octez-baker``: the Octez baking and VDF daemons
+- ``octez-smartrollup``: the Octez Smart Rollup daemons
+- ``octez-signer``: the remote signer, to hold keys on (and sign from) a different machine from the baker or client
+
+Also there are some experimental packages:
+
+- ``octez-experimental`` - binaries that are considered experimental including
+  the Alpha baker
+- ``octez-evm-node`` - the EVM endpoint node for Etherlink
+
+The packages are set up to run under a dedicated user. The ``octez-node``,
+``octez-baker`` and ``octez-smartrollup`` packages use a user and group called
+tezos. The ``octez-signer`` package uses a user and group called tzsigner. It’s
+possible to configure the software to use a different user (even root).
+
+The documentation for these packages, originally developed by Chris Pinnock,
+can be found here: https://chrispinnock.com/tezos/packages/
+
+Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu, you can install packages with Octez binaries from a Launchpad PPA.
-Currently it supports Jammy and Focal versions.
+If you're using Ubuntu or Debian, you can install packages with Octez binaries
+using ``dpkg`` or ``apt``. Currently it supports the two latest LTS releases
+for Ubuntu and for Debian, the stable and testing release.
 
-In order to add the stable release PPA repository to your machine, do:
+Upgrading to a newer release requires downloading again all the ``deb``
+packages and repeat the installation.
 
-.. literalinclude:: install-bin-ubuntu.sh
-   :language: shell
-   :start-after: [setup stable repository]
-   :end-before: [end]
+For example using dpkg::
 
-Alternatively, to add the release candidates PPA instead, do:
+     dpkg -i octez-client_19.1-1_arm64.deb
 
-.. literalinclude:: install-bin-ubuntu.sh
-   :language: shell
-   :start-after: [setup rc repository]
-   :end-before: [end]
-
-Then, to install the binaries, run the following commands:
-
-.. literalinclude:: install-bin-ubuntu.sh
-   :language: shell
-   :start-after: [install tezos]
-   :end-before: [test executables]
-
-Upgrading to a newer release is made easy by the APT package manager, using
-commands such as ``apt-get update``, ``apt-get upgrade <package>``, and
-``apt-get install <new-package>``. Indeed, as the names of some packages (e.g.
-the baker) depend on their version, you may have to also install new packages.
-You may take a look at the available packages in the Octez PPA repository listed
-by ``apt-get update``.
-
-Fedora Copr repository with Octez packages
+Fedora Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Fedora, you can install packages with Octez binaries from a Copr repository.
-Currently it supports Fedora 37 and 38.
+If you're using Fedora, you can install packages with Octez binaries
+using ``rpm`` or ``dnf``. Currently it supports the latest LTS release for
+Fedora and for RockyLinux.
 
-In order to add the stable Copr repository to your machine, do:
+Upgrading to a new or more recent release requires downloading again all the ``rpm``
+packages and repeat the installation.
 
-.. literalinclude:: install-bin-fedora.sh
-   :language: shell
-   :start-after: [setup stable repository]
-   :end-before: [end]
+For example using ``yum``::
 
-Alternatively, to add the release candidates Copr repository instead, do:
-
-.. literalinclude:: install-bin-fedora.sh
-   :language: shell
-   :start-after: [setup rc repository]
-   :end-before: [end]
-
-Then, to install the binaries, run the following commands:
-
-.. literalinclude:: install-bin-fedora.sh
-   :language: shell
-   :start-after: [install tezos]
-   :end-before: [test executables]
-
-Upgrading to a newer release is made easy by the DNF package manager, using
-commands such as ``dnf upgrade <package>``, and
-``dnf install <new-package>``. Indeed, as the names of some packages (e.g.
-the baker) depend on their version, you may have to also install new packages.
-You may take a look at the available packages in the Octez Copr repository
-listed by ``dnf repoinfo``.
+    yum install ./octez-client-19.1-1.x86_64.rpm
 
 .. _using_docker_images:
 
