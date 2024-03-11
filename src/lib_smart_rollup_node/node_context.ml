@@ -910,18 +910,6 @@ let save_slot_status {store; _} current_block_hash slot_index status =
     ~secondary_key:slot_index
     status
 
-let find_confirmed_slots_history {store; _} block =
-  Store.Dal_confirmed_slots_history.find store.irmin_store block
-
-let save_confirmed_slots_history {store; _} block hist =
-  Store.Dal_confirmed_slots_history.add store.irmin_store block hist
-
-let find_confirmed_slots_histories {store; _} block =
-  Store.Dal_confirmed_slots_histories.find store.irmin_store block
-
-let save_confirmed_slots_histories {store; _} block hist =
-  Store.Dal_confirmed_slots_histories.add store.irmin_store block hist
-
 let get_gc_levels node_ctxt =
   let open Lwt_result_syntax in
   let+ gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in

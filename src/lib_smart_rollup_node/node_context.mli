@@ -528,18 +528,6 @@ val save_slot_status :
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4636
    Missing docstrings. *)
 
-val find_confirmed_slots_history :
-  _ t -> Block_hash.t -> Dal.Slot_history.t option tzresult Lwt.t
-
-val save_confirmed_slots_history :
-  rw -> Block_hash.t -> Dal.Slot_history.t -> unit tzresult Lwt.t
-
-val find_confirmed_slots_histories :
-  _ t -> Block_hash.t -> Dal.Slot_history_cache.t option tzresult Lwt.t
-
-val save_confirmed_slots_histories :
-  rw -> Block_hash.t -> Dal.Slot_history_cache.t -> unit tzresult Lwt.t
-
 (** [gc node_ctxt level] triggers garbage collection for the node in accordance
     with [node_ctxt.config.gc_parameters]. Upon completion, all data for L2
     levels lower than [level] will be removed. *)
