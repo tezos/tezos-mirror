@@ -236,7 +236,7 @@ struct
       | Option t -> (
           function None -> Repr.repr `Null | Some v -> construct t v)
       | Constant str -> fun () -> Repr.repr (`String str)
-      | Int {int_name; to_float; lower_bound; upper_bound} ->
+      | Int {int_name; to_float; lower_bound; upper_bound; _} ->
           fun (i : t) ->
             if i < lower_bound || i > upper_bound then
               invalid_arg
@@ -252,25 +252,26 @@ struct
             if float < minimum || float > maximum then invalid_arg err ;
             Repr.repr (`Float float)
       | Float None -> fun float -> Repr.repr (`Float float)
-      | Describe {encoding = t} -> construct t
-      | Custom ({write}, _) -> fun (j : t) -> write (module Repr) j
+      | Describe {encoding = t; _} -> construct t
+      | Custom ({write; _}, _) -> fun (j : t) -> write (module Repr) j
       | Conv (ffrom, _, t, _) -> (
           fun v ->
             try construct t (ffrom v)
             with Decoding_exception_whilst_conversion_of_lazy_encoding b ->
               construct invalid_lazy_bytes b)
-      | Mu {self} as enc -> construct (self enc)
+      | Mu {self; _} as enc -> construct (self enc)
       | Array t ->
           let w v = construct t v in
           fun arr -> Repr.repr (`A (Array.to_list (Array.map w arr)))
       | Seq t ->
           let w v = construct t v in
           fun s -> Repr.repr (`A (List.of_seq (Seq.map w s)))
-      | Obj (Req {name = n; encoding = t}) ->
+      | Obj (Req {name = n; encoding = t; _}) ->
           let w v = construct t v in
           fun v -> Repr.repr (`O [(n, w v)])
       | Obj
-          (Dft {name = n; equal; encoding = t; default = d; construct_default})
+          (Dft
+            {name = n; equal; encoding = t; default = d; construct_default; _})
         ->
           let w v = construct t v in
           let inc_default =
@@ -279,7 +280,7 @@ struct
           fun v ->
             Repr.repr
               (`O (if inc_default || not (equal v d) then [(n, w v)] else []))
-      | Obj (Opt {name = n; encoding = t}) -> (
+      | Obj (Opt {name = n; encoding = t; _}) -> (
           let w v = construct t v in
           function
           | None -> Repr.repr (`O []) | Some v -> Repr.repr (`O [(n, w v)]))
@@ -312,7 +313,7 @@ struct
               | [] ->
                   invalid_arg
                     "Json_encoding.construct: consequence of bad union"
-              | Case {encoding; proj} :: rest -> (
+              | Case {encoding; proj; _} :: rest -> (
                   match proj v with
                   | Some v -> construct encoding v
                   | None -> do_cases rest)
@@ -409,12 +410,12 @@ struct
                 raise (Cannot_destruct ([], exn))
               else f
           | k -> raise (unexpected k "float"))
-    | Describe {encoding = t} ->
+    | Describe {encoding = t; _} ->
         destruct ~ignore_extra_fields ~bson_relaxation t
-    | Custom ({read}, _) -> read (module Repr)
+    | Custom ({read; _}, _) -> read (module Repr)
     | Conv (_, fto, t, _) ->
         fun v -> fto (destruct ~ignore_extra_fields ~bson_relaxation t v)
-    | Mu {self} as enc ->
+    | Mu {self; _} as enc ->
         destruct ~ignore_extra_fields ~bson_relaxation (self enc)
     | Array t -> (
         let array_of_cells cells =
@@ -528,7 +529,7 @@ struct
           let rec do_cases errs = function
             | [] ->
                 raise (Cannot_destruct ([], No_case_matched (List.rev errs)))
-            | Case {encoding; inj} :: rest -> (
+            | Case {encoding; inj; _} :: rest -> (
                 try
                   inj
                     (destruct ~ignore_extra_fields ~bson_relaxation encoding v)
@@ -557,8 +558,8 @@ struct
     | Conv (_, fto, t, _) ->
         let r, i = destruct_tup ~ignore_extra_fields i t in
         ((fun arr -> fto (r arr)), i)
-    | Mu {self} as enc -> destruct_tup ~ignore_extra_fields i (self enc)
-    | Describe {encoding} -> destruct_tup ~ignore_extra_fields i encoding
+    | Mu {self; _} as enc -> destruct_tup ~ignore_extra_fields i (self enc)
+    | Describe {encoding; _} -> destruct_tup ~ignore_extra_fields i encoding
     | _ -> invalid_arg "Json_encoding.destruct: consequence of bad merge_tups"
 
   and destruct_obj :
@@ -576,7 +577,7 @@ struct
     match t with
     | Empty -> fun fields -> ((), fields, ignore_extra_fields)
     | Ignore -> fun fields -> ((), fields, true)
-    | Obj (Req {name = n; encoding = t}) -> (
+    | Obj (Req {name = n; encoding = t; _}) -> (
         fun fields ->
           try
             let v, rest = assoc [] n fields in
@@ -587,7 +588,7 @@ struct
           | Not_found -> raise (Cannot_destruct ([], Missing_field n))
           | Cannot_destruct (path, err) ->
               raise (Cannot_destruct (`Field n :: path, err)))
-    | Obj (Opt {name = n; encoding = t}) -> (
+    | Obj (Opt {name = n; encoding = t; _}) -> (
         fun fields ->
           try
             let v, rest = assoc [] n fields in
@@ -598,7 +599,7 @@ struct
           | Not_found -> (None, fields, ignore_extra_fields)
           | Cannot_destruct (path, err) ->
               raise (Cannot_destruct (`Field n :: path, err)))
-    | Obj (Dft {name = n; encoding = t; default = d}) -> (
+    | Obj (Dft {name = n; encoding = t; default = d; _}) -> (
         fun fields ->
           try
             let v, rest = assoc [] n fields in
@@ -621,14 +622,14 @@ struct
         fun fields ->
           let r, rest, ign = d fields in
           (fto r, rest, ign)
-    | Mu {self} as enc -> destruct_obj ~ignore_extra_fields (self enc)
-    | Describe {encoding} -> destruct_obj ~ignore_extra_fields encoding
+    | Mu {self; _} as enc -> destruct_obj ~ignore_extra_fields (self enc)
+    | Describe {encoding; _} -> destruct_obj ~ignore_extra_fields encoding
     | Union cases ->
         fun fields ->
           let rec do_cases errs = function
             | [] ->
                 raise (Cannot_destruct ([], No_case_matched (List.rev errs)))
-            | Case {encoding; inj} :: rest -> (
+            | Case {encoding; inj; _} :: rest -> (
                 try
                   let r, rest, ign =
                     destruct_obj ~ignore_extra_fields encoding fields
@@ -701,7 +702,7 @@ let schema ?definitions_path encoding =
             false,
             None );
         ]
-    | Obj (Dft {name = n; encoding = t; title; description; default = d}) ->
+    | Obj (Dft {name = n; encoding = t; title; description; default = d; _}) ->
         let d =
           Json_repr.repr_to_any
             (module Json_repr.Ezjsonm)
@@ -721,14 +722,14 @@ let schema ?definitions_path encoding =
     | Union [] -> invalid_arg "Json_encoding.schema: empty union in object"
     | Union cases ->
         List.concat_map
-          (fun (Case {encoding = o; title; description}) ->
+          (fun (Case {encoding = o; title; description; _}) ->
             let elt = patch_description ?title ?description (schema o) in
             match object_schema o with
             | [(l, b, _)] -> [(l, b, Some elt)]
             | l -> l)
           cases
-    | Mu {self} as enc -> object_schema (self enc)
-    | Describe {title; description; encoding} -> (
+    | Mu {self; _} as enc -> object_schema (self enc)
+    | Describe {title; description; encoding; _} -> (
         let elt = patch_description ?title ?description (schema encoding) in
         match object_schema encoding with
         | [(l, b, _)] -> [(l, b, Some elt)]
@@ -743,8 +744,8 @@ let schema ?definitions_path encoding =
     | Tups (t1, t2) ->
         let acc = array_schema_acc acc t1 in
         array_schema_acc acc t2
-    | Mu {self} as enc -> array_schema_acc acc (self enc)
-    | Describe {encoding = t} -> array_schema_acc acc t
+    | Mu {self; _} as enc -> array_schema_acc acc (self enc)
+    | Describe {encoding = t; _} -> array_schema_acc acc t
     | Conv (_, _, _, Some _) (* FIXME: We could do better *) | _ ->
         invalid_arg "Json_encoding.schema: consequence of bad merge_tups"
   and array_schema : type t. t encoding -> element list =
@@ -754,7 +755,7 @@ let schema ?definitions_path encoding =
     | Empty -> element (Object {object_specs with additional_properties = None})
     | Ignore -> element Any
     | Option t -> element (Combine (One_of, [schema t; element Null]))
-    | Int {to_float; lower_bound; upper_bound} ->
+    | Int {to_float; lower_bound; upper_bound; _} ->
         let minimum = Some (to_float lower_bound, `Inclusive) in
         let maximum = Some (to_float upper_bound, `Inclusive) in
         element (Integer {multiple_of = None; minimum; maximum})
@@ -765,7 +766,7 @@ let schema ?definitions_path encoding =
           enum = Some [Json_repr.to_any (`String str)];
         }
     | String -> element (String string_specs)
-    | Float (Some {minimum; maximum}) ->
+    | Float (Some {minimum; maximum; _}) ->
         element
           (Number
              {
@@ -913,7 +914,7 @@ let schema ?definitions_path encoding =
         (* FIXME: smarter merge *)
         let elements =
           List.map
-            (fun (Case {encoding; title; description}) ->
+            (fun (Case {encoding; title; description; _}) ->
               patch_description ?title ?description (schema encoding))
             cases
         in
@@ -1302,9 +1303,9 @@ let rec is_nullable : type t. t encoding -> bool = function
   | Option _ -> true
   | Conv (_, _, t, _) -> is_nullable t
   | Union cases ->
-      List.exists (fun (Case {encoding = t}) -> is_nullable t) cases
-  | Describe {encoding = t} -> is_nullable t
-  | Mu {self} as enc -> is_nullable (self enc)
+      List.exists (fun (Case {encoding = t; _}) -> is_nullable t) cases
+  | Describe {encoding = t; _} -> is_nullable t
+  | Mu {self; _} as enc -> is_nullable (self enc)
   | Custom (_, sch) -> Json_schema.is_nullable sch
 
 let option : type t. t encoding -> t option encoding =
@@ -1383,8 +1384,8 @@ let merge_tups t1 t2 =
     | Tup _ -> true
     | Tups _ (* by construction *) -> true
     | Conv (_, _, t, None) -> is_tup t
-    | Mu {self} as enc -> is_tup (self enc)
-    | Describe {encoding = t} -> is_tup t
+    | Mu {self; _} as enc -> is_tup (self enc)
+    | Describe {encoding = t; _} -> is_tup t
     | _ -> false
   in
   if is_tup t1 && is_tup t2 then Tups (t1, t2)
@@ -1400,10 +1401,11 @@ let merge_objs o1 o2 =
     | Conv (_, _, t, None) -> is_obj t
     | Empty -> true
     | Ignore -> true
-    | Union cases -> List.for_all (fun (Case {encoding = o}) -> is_obj o) cases
-    | Mu {self} as enc -> is_obj (self enc)
-    | Describe {encoding = t} -> is_obj t
-    | Custom ({is_object}, _) -> is_object
+    | Union cases ->
+        List.for_all (fun (Case {encoding = o; _}) -> is_obj o) cases
+    | Mu {self; _} as enc -> is_obj (self enc)
+    | Describe {encoding = t; _} -> is_obj t
+    | Custom ({is_object; _}, _) -> is_object
     | _ -> false
   in
   if is_obj o1 && is_obj o2 then Objs (o1, o2)
@@ -1613,7 +1615,7 @@ module JsonmLexemeSeq = struct
       | Option t -> (
           function None -> null | Some v -> (construct [@ocaml.tailcall]) t v)
       | Constant str -> fun () -> Seq.return (`String str)
-      | Int {int_name; to_float; lower_bound; upper_bound} ->
+      | Int {int_name; to_float; lower_bound; upper_bound; _} ->
           fun (i : t) ->
             if i < lower_bound || i > upper_bound then
               invalid_arg
@@ -1628,21 +1630,23 @@ module JsonmLexemeSeq = struct
                 ("Json_encoding.construct_seq: " ^ float_name ^ " out of range") ;
             Seq.return (`Float float)
       | Float None -> fun float -> Seq.return (`Float float)
-      | Describe {encoding = t} -> fun v -> (construct [@ocaml.tailcall]) t v
-      | Custom ({write}, _) ->
+      | Describe {encoding = t; _} -> fun v -> (construct [@ocaml.tailcall]) t v
+      | Custom ({write; _}, _) ->
           fun v ->
             let ezjson = write (module Json_repr.Ezjsonm) v in
             jsonm_lexeme_seq_of_ezjson ezjson
       | Conv (ffrom, _, t, _) ->
           fun v -> (construct [@ocaml.tailcall]) t (ffrom v)
-      | Mu {self} as enc -> fun v -> (construct [@ocaml.tailcall]) (self enc) v
+      | Mu {self; _} as enc ->
+          fun v -> (construct [@ocaml.tailcall]) (self enc) v
       | Array t -> (
           function [||] -> empty_arr | vs -> `As +< construct_arr t vs +> `Ae)
       | Seq t -> fun s -> `As +< construct_seq_ t s +> `Ae
-      | Obj (Req {name = n; encoding = t}) ->
+      | Obj (Req {name = n; encoding = t; _}) ->
           fun v -> `Os +< construct_named n t v +> `Oe
       | Obj
-          (Dft {name = n; equal; encoding = t; default = d; construct_default})
+          (Dft
+            {name = n; equal; encoding = t; default = d; construct_default; _})
         ->
           fun v ->
             let inc_default =
@@ -1651,7 +1655,7 @@ module JsonmLexemeSeq = struct
             if inc_default || not (equal v d) then
               `Os +< construct_named n t v +> `Oe
             else empty_obj
-      | Obj (Opt {name = n; encoding = t}) -> (
+      | Obj (Opt {name = n; encoding = t; _}) -> (
           function
           | None -> empty_obj | Some v -> `Os +< construct_named n t v +> `Oe)
       | Objs (o1, o2) ->
@@ -1677,7 +1681,7 @@ module JsonmLexemeSeq = struct
               | [] ->
                   invalid_arg
                     "Json_encoding.construct_seq: consequence of bad union"
-              | Case {encoding; proj} :: rest -> (
+              | Case {encoding; proj; _} :: rest -> (
                   match proj v with
                   | Some v -> (construct [@ocaml.tailcall]) encoding v
                   | None -> do_cases rest)
@@ -1696,9 +1700,10 @@ module JsonmLexemeSeq = struct
         (* NOTE: we recurse on [construct_obj] (i.e., we stay in the same state
            of the same machine) for all the constructors present in [is_obj]. *) :
         type t. t encoding -> t -> jsonm_lexeme Seq.t = function
-      | Obj (Req {name = n; encoding = t}) -> fun v -> construct_named n t v
+      | Obj (Req {name = n; encoding = t; _}) -> fun v -> construct_named n t v
       | Obj
-          (Dft {name = n; equal; encoding = t; default = d; construct_default})
+          (Dft
+            {name = n; equal; encoding = t; default = d; construct_default; _})
         ->
           fun v ->
             let inc_default =
@@ -1706,7 +1711,7 @@ module JsonmLexemeSeq = struct
             in
             if inc_default || not (equal v d) then construct_named n t v
             else Seq.empty
-      | Obj (Opt {name = n; encoding = t}) -> (
+      | Obj (Opt {name = n; encoding = t; _}) -> (
           function None -> Seq.empty | Some v -> construct_named n t v)
       | Obj _ ->
           .
@@ -1717,21 +1722,21 @@ module JsonmLexemeSeq = struct
       | Conv (ffrom, _, t, _) -> fun v -> construct_obj t (ffrom v)
       | Empty -> fun () -> Seq.empty
       | Ignore -> fun () -> Seq.empty
-      | Mu {self} as enc -> fun v -> construct_obj (self enc) v
-      | Describe {encoding = t} -> fun v -> construct_obj t v
+      | Mu {self; _} as enc -> fun v -> construct_obj (self enc) v
+      | Describe {encoding = t; _} -> fun v -> construct_obj t v
       | Union cases ->
           fun v ->
             let rec do_cases = function
               | [] ->
                   invalid_arg
                     "Json_encoding.construct_seq: consequence of bad union"
-              | Case {encoding; proj} :: rest -> (
+              | Case {encoding; proj; _} :: rest -> (
                   match proj v with
                   | Some v -> construct_obj encoding v
                   | None -> do_cases rest)
             in
             do_cases cases
-      | Custom ({write}, _) -> (
+      | Custom ({write; _}, _) -> (
           fun v ->
             (* NOTE: This constructor is not in [is_obj] (because it is not
                possible to statically determine whether it always produces
@@ -1753,9 +1758,9 @@ module JsonmLexemeSeq = struct
       | Tups (o1, o2) ->
           fun (v1, v2) -> construct_tup o1 v1 @ construct_tup o2 v2
       | Conv (ffrom, _, t, _) -> fun v -> construct_tup t (ffrom v)
-      | Mu {self} as enc -> fun v -> construct_tup (self enc) v
-      | Describe {encoding = t} -> fun v -> construct_tup t v
-      | Custom ({write}, _) -> (
+      | Mu {self; _} as enc -> fun v -> construct_tup (self enc) v
+      | Describe {encoding = t; _} -> fun v -> construct_tup t v
+      | Custom ({write; _}, _) -> (
           fun v ->
             match write (module Json_repr.Ezjsonm) v with
             | `A vs -> jsonm_lexeme_seq_of_ezjson_vs vs

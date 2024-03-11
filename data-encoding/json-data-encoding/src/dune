@@ -1,8 +1,6 @@
 (library
  (name json_data_encoding_stdlib)
  (public_name json-data-encoding.stdlib)
- (flags
-  (:standard -w -9))
  (modules json_data_encoding_stdlib list_override)
  (synopsis "Type-safe encoding to and decoding from JSON")
  (libraries uri)
@@ -13,7 +11,7 @@
  (name json_data_encoding)
  (public_name json-data-encoding)
  (flags
-  (:standard -w -9 -open Json_data_encoding_stdlib))
+  (:standard -open Json_data_encoding_stdlib))
  (modules json_encoding json_query json_repr json_schema)
  (synopsis "Type-safe encoding to and decoding from JSON")
  (libraries uri hex json_data_encoding_stdlib)
@@ -24,7 +22,7 @@
  (name json_data_encoding_bson)
  (public_name json-data-encoding-bson)
  (flags
-  (:standard -w -9 -open Json_data_encoding_stdlib))
+  (:standard -open Json_data_encoding_stdlib))
  (modules json_repr_bson)
  (synopsis "BSON representation of JSON documents")
  (libraries json-data-encoding ocplib-endian json_data_encoding_stdlib)
@@ -35,7 +33,7 @@
  (name json_data_encoding_browser)
  (public_name json-data-encoding-browser)
  (flags
-  (:standard -w -9 -open Js_of_ocaml -open Json_data_encoding_stdlib))
+  (:standard -open Js_of_ocaml -open Json_data_encoding_stdlib))
  (modules json_repr_browser)
  (synopsis "Native browser representation of JSON documents")
  (libraries json-data-encoding js_of_ocaml json_data_encoding_stdlib)

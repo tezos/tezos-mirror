@@ -268,13 +268,13 @@ let pp_path ppf = function
 
 let pp_desc element =
   match element with
-  | {title = None; description = None} -> None
-  | {title = Some text; description = None}
-  | {title = None; description = Some text} ->
+  | {title = None; description = None; _} -> None
+  | {title = Some text; description = None; _}
+  | {title = None; description = Some text; _} ->
       Some
         (fun ppf () ->
           Format.fprintf ppf "/* @[<hov 0>%a@] */" Format.pp_print_text text)
-  | {title = Some title; description = Some description} ->
+  | {title = Some title; description = Some description; _} ->
       Some
         (fun ppf () ->
           Format.fprintf
@@ -411,10 +411,10 @@ let rec pp_element ppf element =
                         "@[<v 2>{ %a }@]"
                         pp_object_contents
                         specs
-                  | Array (_, {max_items = Some 0})
-                  | Monomorphic_array (_, {max_items = Some 0}) ->
+                  | Array (_, {max_items = Some 0; _})
+                  | Monomorphic_array (_, {max_items = Some 0; _}) ->
                       Format.fprintf ppf "[]"
-                  | Array (elements, {additional_items}) ->
+                  | Array (elements, {additional_items; _}) ->
                       let pp_sep =
                         let first = ref true in
                         fun ppf () ->
@@ -428,7 +428,7 @@ let rec pp_element ppf element =
                         elements ;
                       (match additional_items with
                       | None -> ()
-                      | Some {kind = Any} ->
+                      | Some {kind = Any; _} ->
                           Format.fprintf ppf "%a,@ ..." pp_sep ()
                       | Some elt ->
                           Format.fprintf
@@ -439,16 +439,16 @@ let rec pp_element ppf element =
                             pp_element
                             elt) ;
                       Format.fprintf ppf " ]@]"
-                  | Monomorphic_array (elt, {additional_items = None}) ->
+                  | Monomorphic_array (elt, {additional_items = None; _}) ->
                       Format.fprintf ppf "[ %a ... ]" pp_element elt
                   | Monomorphic_array
-                      (elt, {additional_items = Some {kind = Any}}) ->
+                      (elt, {additional_items = Some {kind = Any; _}; _}) ->
                       Format.fprintf
                         ppf
                         "@[<hv 2>[ %a ...,@ ... ]@]"
                         pp_element
                         elt
-                  | Monomorphic_array (elt, {additional_items = Some add_elt})
+                  | Monomorphic_array (elt, {additional_items = Some add_elt; _})
                     ->
                       (* TODO: find a good way to print length *)
                       Format.fprintf
@@ -460,7 +460,7 @@ let rec pp_element ppf element =
                         add_elt))))
 
 and pp_object_contents ppf
-    {properties; pattern_properties; additional_properties} =
+    {properties; pattern_properties; additional_properties; _} =
   (* TODO: find a good way to print length / dependencies *)
   let pp_sep =
     let first = ref true in
@@ -485,7 +485,7 @@ and pp_object_contents ppf
     pattern_properties ;
   match additional_properties with
   | None -> ()
-  | Some {kind = Any} -> Format.fprintf ppf "%a..." pp_sep ()
+  | Some {kind = Any; _} -> Format.fprintf ppf "%a..." pp_sep ()
   | Some elt -> Format.fprintf ppf "%a@[<hv 2>*:@ %a@]" pp_sep () pp_element elt
 
 let pp ppf schema =
@@ -586,7 +586,7 @@ let insert_definition name elt (defs : element Def_map.t) : element Def_map.t =
     name
     (function
       | None -> Some elt
-      | Some {kind = Dummy} -> Some elt
+      | Some {kind = Dummy; _} -> Some elt
       | Some defelt ->
           if not (eq_element elt defelt) then
             raise (Duplicate_definition (name, elt, defelt)) ;
@@ -614,7 +614,8 @@ module Make (Repr : Json_repr.Repr) = struct
     in
     let set_multiple xs rest = List.rev_append xs rest in
     (* recursive encoder *)
-    let rec format_element {title; description; default; enum; kind; format} =
+    let rec format_element {title; description; default; enum; kind; format; _}
+        =
       set_if_some "title" title (fun s -> `String s)
       @@ set_if_some "description" description (fun s -> `String s)
       @@ (fun rest ->
@@ -695,7 +696,7 @@ module Make (Repr : Json_repr.Repr) = struct
                       | None -> `Bool false
                       | Some elt -> `O (format_element elt))
                @@ rest
-           | Monomorphic_array (elt, {min_items; max_items; unique_items}) ->
+           | Monomorphic_array (elt, {min_items; max_items; unique_items; _}) ->
                set_always "type" (`String "array")
                @@ set_always "items" (`O (format_element elt))
                @@ set_if_neq "minItems" min_items 0 (fun i -> `Float (float i))
@@ -1050,7 +1051,7 @@ module Make (Repr : Json_repr.Repr) = struct
         let kind =
           match as_nary "allOf" All_of cases with
           | None -> Any (* no type, ref or logical combination found *)
-          | Some {kind} -> kind
+          | Some {kind; _} -> kind
         in
         (* add optional fields *)
         {title; description; default; format; kind; enum; id}
@@ -1321,7 +1322,7 @@ module Make (Repr : Json_repr.Repr) = struct
   let check_definitions root definitions =
     let collected_id_defs = ref Id_map.empty in
     let collected_id_refs = ref Id_set.empty in
-    let rec check ({kind; id} as elt) =
+    let rec check ({kind; id; _} as elt) =
       (match id with
       | None -> ()
       | Some id -> collected_id_defs := Id_map.add id elt !collected_id_defs) ;
@@ -1332,15 +1333,16 @@ module Make (Repr : Json_repr.Repr) = struct
             pattern_properties;
             additional_properties;
             schema_dependencies;
+            _;
           } -> (
           List.iter (fun (_, e, _, _) -> check e) properties ;
           List.iter (fun (_, e) -> check e) pattern_properties ;
           List.iter (fun (_, e) -> check e) schema_dependencies ;
           match additional_properties with Some e -> check e | None -> ())
-      | Array (es, {additional_items}) -> (
+      | Array (es, {additional_items; _}) -> (
           List.iter check es ;
           match additional_items with Some e -> check e | None -> ())
-      | Monomorphic_array (e, {additional_items}) -> (
+      | Monomorphic_array (e, {additional_items; _}) -> (
           check e ;
           match additional_items with Some e -> check e | None -> ())
       | Combine (_, es) -> List.iter check es
@@ -1368,7 +1370,7 @@ module Make (Repr : Json_repr.Repr) = struct
     let ids = check_definitions root Def_map.empty in
     {root; definitions = Def_map.empty; world = []; ids; source = Uri.empty}
 
-  let root {root} = root
+  let root {root; _} = root
 
   let update root sch =
     let ids = check_definitions root sch.definitions in
@@ -1388,7 +1390,7 @@ module Make (Repr : Json_repr.Repr) = struct
   (* remove unused definitions from the schema *)
   let simplify schema =
     let res = ref Def_map.empty (* collected definitions *) in
-    let rec collect {kind} =
+    let rec collect {kind; _} =
       match kind with
       | Object
           {
@@ -1396,15 +1398,16 @@ module Make (Repr : Json_repr.Repr) = struct
             pattern_properties;
             additional_properties;
             schema_dependencies;
+            _;
           } -> (
           List.iter (fun (_, e, _, _) -> collect e) properties ;
           List.iter (fun (_, e) -> collect e) pattern_properties ;
           List.iter (fun (_, e) -> collect e) schema_dependencies ;
           match additional_properties with Some e -> collect e | None -> ())
-      | Array (es, {additional_items}) -> (
+      | Array (es, {additional_items; _}) -> (
           List.iter collect es ;
           match additional_items with Some e -> collect e | None -> ())
-      | Monomorphic_array (e, {additional_items}) -> (
+      | Monomorphic_array (e, {additional_items; _}) -> (
           collect e ;
           match additional_items with Some e -> collect e | None -> ())
       | Combine (_, es) -> List.iter collect es
@@ -1469,8 +1472,8 @@ module Make (Repr : Json_repr.Repr) = struct
     in
     combine any [] schemas
 
-  let is_nullable {ids; definitions; root} =
-    let rec nullable {kind} =
+  let is_nullable {ids; definitions; root; _} =
+    let rec nullable {kind; _} =
       match kind with
       | Null | Any -> true
       | Object _ | Array _ | Monomorphic_array _ | Ext_ref _ | String _

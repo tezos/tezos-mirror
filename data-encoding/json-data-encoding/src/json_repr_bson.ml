@@ -229,7 +229,7 @@ module Repr = struct
     | Deserialized _ ->
         let rec compute_size bson =
           match bson.node with
-          | Serialized {length} | Both (_, {length}) -> length
+          | Serialized {length; _} | Both (_, {length; _}) -> length
           | Deserialized deserialized -> (
               match deserialized with
               | `Float _ -> 4 + 1 + 8 + 1
@@ -369,8 +369,8 @@ module Repr = struct
             fields
         and serialize conforming bson =
           match bson.node with
-          | Serialized {buffer; offset; length}
-          | Both (_, {buffer; offset; length}) ->
+          | Serialized {buffer; offset; length; _}
+          | Both (_, {buffer; offset; length; _}) ->
               Bytes.blit buffer offset result !pos length ;
               pos := !pos + length
           | Deserialized deserialized ->
