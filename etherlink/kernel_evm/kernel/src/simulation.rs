@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -47,6 +48,7 @@ pub const ERR_TAG: u8 = 0x2;
 const INCORRECT_SIGNATURE: &str = "Incorrect signature.";
 const INVALID_CHAIN_ID: &str = "Invalid chain id.";
 const NONCE_TOO_LOW: &str = "Nonce too low.";
+const CANNOT_PREPAY: &str = "Cannot prepay transaction.";
 const MAX_GAS_FEE_TOO_LOW: &str = "Max gas fee too low.";
 const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
     is allocated. Try reducing its gas consumption or splitting the call in
@@ -386,7 +388,7 @@ impl TxValidation {
             Some(gas_limit), // gas could be omitted
             block_fees.base_fee_per_gas(),
             Some(transaction.value),
-            false,
+            true,
             allocated_ticks,
             false,
             false,
@@ -395,8 +397,7 @@ impl TxValidation {
                 reason: ExtendedExitReason::OutOfTicks,
                 ..
             })) => Self::to_error(OUT_OF_TICKS_MSG),
-            // TODO: #6498, 6813
-            // Check for PREPAY
+            Ok(None) => Self::to_error(CANNOT_PREPAY),
             _ => Ok(SimulationResult::Ok(ValidationResult { address: *caller })),
         }
     }
