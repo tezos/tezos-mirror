@@ -4,15 +4,28 @@
 
 ### Features
 
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version 79509a69d01c38eeba38d6cc7a323b4d69c58b94
+
+### Features
+
 - Add detailed tick model for the `modexp` precompiled contract (!12278)
+- Reduce the verbosity of logs (!12372)
+- Store the root hash used for an upgrade in the durable storage (!12352)
+- Update the governance contracts to a more up-to-date deployment (!12379)
+- Support upgrade from a kernel security governance contract (!12359)
+- Rename the sequencer admin contract into sequencer governance (!12380)
 
 ### Bug fixes
 
 - Ticks for gas price adjustments are counted per block, rather than per run. (!12279)
 
 ### Breaking changes
-
-### Internal
 
 ## Version 5cc8ce8253e0fc4fb31b0d975d20351c25d22bab (Security Upgrade)
 
