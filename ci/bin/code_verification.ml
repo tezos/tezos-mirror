@@ -284,6 +284,26 @@ let jobs pipeline_type =
       ()
     |> job_external_split
   in
+  let _job_docker_client_libs_dependencies =
+    job_docker_authenticated
+      ~__POS__
+      ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
+      ~stage:Stages.build
+      ~name:"oc.docker:client-libs-dependencies"
+        (* These image are not built for external use. *)
+      ~ci_docker_hub:false
+        (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
+      ~skip_docker_initialization:true
+      ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
+      ~artifacts:
+        (artifacts
+           ~reports:
+             (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
+           [])
+    |> job_external_split
+         ~before_merging_suffix:"before_merging"
+         ~scheduled_suffix:"other"
+  in
   let build =
     let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
     let _job_build_arm64_release : Tezos_ci.tezos_job =
@@ -317,7 +337,9 @@ let jobs pipeline_type =
         let _job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
         ()
     | Before_merging -> ()) ;
-    (* TODO: include the jobs defined above when full pipeline is generated *)
+    (* TODO: include the jobs defined above when full pipeline is
+       generated, as well as rust tool chain and client libs docker
+       builds. *)
     []
   in
   let packaging =

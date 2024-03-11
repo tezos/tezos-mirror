@@ -178,8 +178,6 @@ let () =
     | ".gitlab/ci/jobs/build/oc.build_kernels.yml"
     | ".gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml"
     | ".gitlab/ci/jobs/build/oc.build_x86_64-released.yml"
-    | ".gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-before_merging.yml"
-    | ".gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-other.yml"
     | ".gitlab/ci/jobs/build/oc.tezt:fetch-records.yml"
     | ".gitlab/ci/jobs/build/ocaml-check.yml"
     | ".gitlab/ci/jobs/build/select_tezts.yml"

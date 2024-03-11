@@ -297,6 +297,15 @@ let changeset_opam_jobs =
     "scripts/version.sh";
   ]
 
+let changeset_kaitai_e2e_files =
+  [
+    "images/**/*";
+    "src/**/*";
+    "contrib/*kaitai*/**/*";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.
