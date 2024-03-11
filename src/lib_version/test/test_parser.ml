@@ -86,6 +86,59 @@ let octez_legal_versions =
       } );
   ]
 
+let etherlink_legal_versions =
+  [
+    ( "etherlink-10.93",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Release;
+      } );
+    ( "etherlink-v10.93",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Release;
+      } );
+    ( "etherlink-10.93+dev",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Dev;
+      } );
+    ( "etherlink-10.93-rc1",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = RC 1;
+      } );
+    ( "etherlink-10.93-rc1+dev",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = RC_dev 1;
+      } );
+    ( "etherlink-10.93-beta1",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Beta 1;
+      } );
+    ( "etherlink-10.93-beta1+dev",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Beta_dev 1;
+      } );
+  ]
+
 let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
 
 let eq v1 v2 =
@@ -121,8 +174,23 @@ let test_octez_parser _ =
         (Some e)
         (parse_version x))
 
+let test_etherlink_parser _ =
+  ListLabels.iter etherlink_legal_versions ~f:(fun (x, e) ->
+      Assert.equal
+        ~msg:(Format.asprintf "testing Etherlink version string: \"%s\"" x)
+        ~eq
+        ~prn
+        (Some e)
+        (parse_version x))
+
 let () =
   Alcotest.run
     ~__FILE__
     "version"
-    [("parser", [("octez versions", `Quick, test_octez_parser)])]
+    [
+      ( "parser",
+        [
+          ("octez versions", `Quick, test_octez_parser);
+          ("etherlink versions", `Quick, test_etherlink_parser);
+        ] );
+    ]
