@@ -43,7 +43,7 @@ let init_scenario ?(force_ai = true) ?reward_per_block () =
     let name = if self_stake then "staker" else "delegate" in
     init_constants ?reward_per_block ()
     --> set S.Adaptive_issuance.autostaking_enable false
-    --> Scenario_begin.activate_ai activate_ai
+    --> Scenario_begin.activate_ai (if activate_ai then `Force else `No)
     --> begin_test [name]
     --> set_delegate_params name init_params
     --> set_baker "__bootstrap__"
@@ -58,7 +58,7 @@ let init_scenario ?(force_ai = true) ?reward_per_block () =
                  "delegate"
                  (Amount (Tez.of_mutez 2_000_000_000_000L))
            --> set_delegate "staker" (Some "delegate"))
-    --> wait_ai_activation
+    --> wait_delegate_parameters_activation --> next_cycle
   in
 
   let ai_deactivated =

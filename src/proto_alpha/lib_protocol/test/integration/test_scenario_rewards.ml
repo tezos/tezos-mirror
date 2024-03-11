@@ -30,7 +30,7 @@ let test_wait_with_rewards =
   in
   init_constants ~reward_per_block:1_000_000_000L ()
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai true
+  --> activate_ai `Zero_threshold
   --> begin_test ["delegate"; "faucet"]
   --> set_baker "faucet"
   --> (Tag "edge = 0" --> set_edge 0.
@@ -79,7 +79,7 @@ let test_ai_curve_activation_time =
   in
   init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai true
+  --> activate_ai `Zero_threshold
   --> begin_test ~burn_rewards:true [""]
   --> next_block --> save_current_rate (* before AI rate *)
   --> wait_ai_activation
@@ -111,7 +111,7 @@ let test_static =
   in
   init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai true
+  --> activate_ai `Zero_threshold
   --> begin_test ~burn_rewards:true ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> save_current_rate --> wait_ai_activation

@@ -10,7 +10,6 @@ open State
 open Scenario_dsl
 open Log_helpers
 open Scenario_base
-open Adaptive_issuance_helpers
 
 (** Applies when baking the last block of a cycle *)
 let apply_end_cycle current_cycle previous_block block state :
@@ -164,7 +163,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
     baker_name ;
   let current_cycle = Block.current_cycle block in
   let adaptive_issuance_vote =
-    if state.activate_ai then
+    if state.force_ai_vote_yes then
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
   in
@@ -313,6 +312,8 @@ let wait_cycle_until condition =
     let rec get_names condition =
       match condition with
       | `AI_activation -> ("AI activation", "AI activated")
+      | `AI_activation_with_votes ->
+          ("AI activation (with votes)", "AI activated")
       | `delegate_parameters_activation ->
           ("delegate parameters activation", "delegate parameters activated")
       | `And (cond1, cond2) ->
@@ -323,36 +324,54 @@ let wait_cycle_until condition =
     get_names condition
   in
   let condition (init_block, init_state) =
-    let open Lwt_result_syntax in
     let rec stopper condition =
       match condition with
-      | `AI_activation ->
+      | `AI_activation -> (
           fun (block, _state) ->
-            if init_state.State.activate_ai then
-              let* launch_cycle = get_launch_cycle ~loc:__LOC__ init_block in
-              let current_cycle = Block.current_cycle block in
-              return Cycle.(current_cycle >= launch_cycle)
-            else assert false
+            (* Expects the launch cycle to be already set *)
+            match init_state.State.ai_activation_cycle with
+            | Some launch_cycle ->
+                let current_cycle = Block.current_cycle block in
+                Cycle.(current_cycle >= launch_cycle)
+            | _ ->
+                Log.error
+                  "wait_cycle_until `AI_activation: launch cycle not found, \
+                   aborting." ;
+                assert false)
+      | `AI_activation_with_votes ->
+          fun (block, state) ->
+            if State_ai_flags.AI_Activation.enabled init_state then
+              match state.State.ai_activation_cycle with
+              (* Since AI_activation is enabled, we expect the activation
+                 cycle to be set eventually *)
+              | Some launch_cycle ->
+                  let current_cycle = Block.current_cycle block in
+                  Cycle.(current_cycle >= launch_cycle)
+              | _ -> false
+            else (
+              Log.error
+                "wait_cycle_until `AI_activation_with_votes: AI cannot \
+                 activate with the current protocol parameters, aborting." ;
+              assert false)
       | `delegate_parameters_activation ->
           fun (block, _state) ->
             let init_cycle = Block.current_cycle init_block in
             let cycles_to_wait =
               init_state.constants.delegate_parameters_activation_delay
             in
-            return
-              Cycle.(Block.current_cycle block >= add init_cycle cycles_to_wait)
+            Cycle.(Block.current_cycle block >= add init_cycle cycles_to_wait)
       | `And (cond1, cond2) ->
           let stop1 = stopper cond1 in
           let stop2 = stopper cond2 in
           fun (block, state) ->
-            let* b1 = stop1 (block, state) in
-            let* b2 = stop2 (block, state) in
-            return (b1 && b2)
+            let b1 = stop1 (block, state) in
+            let b2 = stop2 (block, state) in
+            b1 && b2
     in
     stopper condition
   in
   log ~color:time_color "Fast forward to %s" to_
-  --> wait_cycle_f_es condition
+  --> wait_cycle_f condition
   --> log ~color:event_color "%s" done_
 
 (** Wait until AI activates.

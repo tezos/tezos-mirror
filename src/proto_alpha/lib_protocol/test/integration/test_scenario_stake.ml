@@ -71,8 +71,7 @@ let shorter_roundtrip_for_baker =
   in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai true --> begin_test ["delegate"] --> next_block
-  --> wait_ai_activation
+  --> activate_ai `Force --> begin_test ["delegate"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle
   --> snapshot_balances "init" ["delegate"]
@@ -170,7 +169,7 @@ let change_delegate =
   in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai true
+  --> activate_ai `Force
   --> begin_test ["delegate1"; "delegate2"]
   --> set_delegate_params "delegate1" init_params
   --> set_delegate_params "delegate2" init_params
@@ -179,7 +178,8 @@ let change_delegate =
         "delegate1"
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> set_delegate "staker" (Some "delegate1")
-  --> wait_ai_activation --> next_cycle --> stake "staker" Half --> next_cycle
+  --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
+  --> next_cycle
   --> set_delegate "staker" (Some "delegate2")
   --> next_cycle
   --> assert_failure (stake "staker" Half)
@@ -192,7 +192,7 @@ let unset_delegate =
   in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai true --> begin_test ["delegate"]
+  --> activate_ai `Force --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
@@ -203,7 +203,7 @@ let unset_delegate =
         "delegate"
         (Amount (Tez.of_mutez 2_000_000L))
   --> set_delegate "staker" (Some "delegate")
-  --> wait_ai_activation --> next_cycle --> stake "staker" Half
+  --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
   --> unstake "staker" All --> next_cycle --> set_delegate "staker" None
   --> next_cycle
   --> transfer "staker" "dummy" All
@@ -228,7 +228,7 @@ let forbid_costaking =
      --> init_constants ~delegate_parameters_activation_delay:10 ())
   (* Set flags *)
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai true
+  --> activate_ai `Zero_threshold
   (* Start scenario *)
   --> begin_test ["delegate"]
   --> set_delegate_params "delegate" init_params

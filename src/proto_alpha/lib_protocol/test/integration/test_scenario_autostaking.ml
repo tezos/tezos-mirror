@@ -56,7 +56,7 @@ and delegator2 = "delegator2"
 let setup ~activate_ai =
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable true
-  --> Scenario_begin.activate_ai activate_ai
+  --> Scenario_begin.activate_ai (if activate_ai then `Force else `No)
   --> begin_test [delegate]
   --> add_account_with_funds
         delegator1
@@ -67,7 +67,6 @@ let setup ~activate_ai =
         "__bootstrap__"
         (Amount (Tez.of_mutez 2_000_000_000L))
   --> next_cycle
-  --> (if activate_ai then wait_ai_activation else next_cycle)
   --> snapshot_balances "before delegation" [delegate]
   --> set_delegate delegator1 (Some delegate)
   --> check_snapshot_balances "before delegation"
@@ -147,7 +146,7 @@ let test_overdelegation =
      begin with 4M tz, with 5% staked *)
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable true
-  --> activate_ai false
+  --> activate_ai `No
   --> begin_test ["delegate"; "faucet1"; "faucet2"; "faucet3"]
   --> add_account_with_funds
         "delegator_to_fund"

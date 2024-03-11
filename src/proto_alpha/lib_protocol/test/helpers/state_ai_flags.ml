@@ -16,10 +16,15 @@ module AI_Activation = struct
       [adaptive_issuance.force_activation], [adaptive_issuance.activation_vote_enable], and
       [adaptive_issuance.launch_ema_threshold]. *)
 
-  (** AI can be activated with both flags set to false if the threshold is set to 0 *)
+  (** AI can be activated with both flags set to false if the threshold is set to 0.
+      If the vote is enabled, but the threshold is above the maximum EMA, then the vote
+      cannot trigger the activation. *)
   let enabled state =
     state.constants.adaptive_issuance.force_activation
-    || state.constants.adaptive_issuance.activation_vote_enable
+    || (state.constants.adaptive_issuance.activation_vote_enable
+       && Compare.Int32.(
+            state.constants.adaptive_issuance.launch_ema_threshold
+            <= Protocol.Per_block_votes_repr.Internal_for_tests.ema_max))
     || Compare.Int32.(
          state.constants.adaptive_issuance.launch_ema_threshold = 0l)
 
