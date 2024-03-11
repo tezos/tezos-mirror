@@ -110,7 +110,8 @@ module Plugin = struct
       Plugin.RPC.Dal.dal_shards cpctxt (`Main, `Head 0) ~level ()
     in
     List.fold_left
-      (fun acc (pkh, s) -> Signature.Public_key_hash.Map.add pkh s acc)
+      (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
+        Signature.Public_key_hash.Map.add delegate indexes acc)
       Signature.Public_key_hash.Map.empty
       pkh_to_shards
 

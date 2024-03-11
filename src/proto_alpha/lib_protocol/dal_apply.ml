@@ -53,7 +53,7 @@ let slot_of_int_e ~number_of_slots n =
 let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
   consensus_key.delegate
 
-let validate_block_attestation ctxt level consensus_key attestation =
+let validate_attestation ctxt level slot consensus_key attestation =
   let open Lwt_result_syntax in
   let*? () = assert_dal_feature_enabled ctxt in
   let number_of_slots = Dal.number_of_slots ctxt in
@@ -65,36 +65,17 @@ let validate_block_attestation ctxt level consensus_key attestation =
       Compare.Int.(size <= maximum_size)
       (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
   in
-  let attester = pkh_of_consensus_key consensus_key in
+  let number_of_shards = Dal.number_of_shards ctxt in
   fail_when
-    (Option.is_none @@ Dal.Attestation.power_of_attester ctxt ~attester)
-    (Dal_data_availibility_attester_not_in_committee {attester; level})
+    Compare.Int.(Slot.to_int slot >= number_of_shards)
+    (let attester = pkh_of_consensus_key consensus_key in
+     Dal_data_availibility_attester_not_in_committee {attester; level; slot})
 
-let validate_mempool_attestation ctxt attestation =
-  let open Lwt_result_syntax in
-  let*? () = assert_dal_feature_enabled ctxt in
-  let number_of_slots = Dal.number_of_slots ctxt in
-  let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
-  let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
-  let size = Dal.Attestation.occupied_size_in_bits attestation in
-  fail_unless
-    Compare.Int.(size <= maximum_size)
-    (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
-
-let apply_attestation ctxt consensus_key level attestation =
+let apply_attestation ctxt attestation ~power =
   let open Result_syntax in
   let* () = assert_dal_feature_enabled ctxt in
-  let attester = pkh_of_consensus_key consensus_key in
-  match Dal.Attestation.power_of_attester ctxt ~attester with
-  | None ->
-      (* This should not happen: operation validation should have failed. *)
-      error (Dal_data_availibility_attester_not_in_committee {attester; level})
-  | Some power ->
-      return
-        (Dal.Attestation.record_number_of_attested_shards
-           ctxt
-           attestation
-           power)
+  return
+    (Dal.Attestation.record_number_of_attested_shards ctxt attestation power)
 
 (* This function should fail if we don't want the operation to be
    propagated over the L1 gossip network. Because this is a manager
@@ -149,23 +130,3 @@ let finalisation ctxt =
         Dal.Slot.finalize_pending_slot_headers ctxt ~number_of_slots
       in
       (ctxt, attestation))
-
-let compute_committee ctxt level =
-  let open Lwt_result_syntax in
-  let*? () = assert_dal_feature_enabled ctxt in
-  let pkh_from_tenderbake_slot slot =
-    let+ ctxt, consensus_key = Stake_distribution.slot_owner ctxt level slot in
-    (ctxt, pkh_of_consensus_key consensus_key)
-  in
-  Alpha_context.Dal.Attestation.compute_committee ctxt pkh_from_tenderbake_slot
-
-let initialisation ctxt ~level =
-  let open Lwt_result_syntax in
-  only_if_dal_feature_enabled
-    ctxt
-    ~default:(fun ctxt -> return ctxt)
-    (fun ctxt ->
-      let+ committee = compute_committee ctxt level in
-      (* This committee is cached because it is the one we will use
-         for the validation of the DAL attestations. *)
-      Alpha_context.Dal.Attestation.init_committee ctxt committee)

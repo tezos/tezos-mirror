@@ -725,7 +725,10 @@ let test_attester_not_in_dal_committee () =
         committee
     in
     let in_dal_committee =
-      List.mem_assoc ~equal:Signature.Public_key_hash.equal pkh dal_committee
+      List.exists
+        (fun ({delegate; _} : Plugin.RPC.Dal.S.shards_assignment) ->
+          Signature.Public_key_hash.equal pkh delegate)
+        dal_committee
     in
     if in_committee && not in_dal_committee then
       let dal_content = {attestation = Dal.Attestation.empty} in
@@ -736,7 +739,7 @@ let test_attester_not_in_dal_committee () =
             Environment.Ecoproto_error
               (Alpha_context.Dal_errors
                .Dal_data_availibility_attester_not_in_committee
-                {attester; level});
+                {attester; level; slot = _});
           ]
           when Signature.Public_key_hash.equal attester pkh
                && Raw_level.to_int32 level = b.header.shell.level ->
@@ -797,10 +800,11 @@ let test_dal_attestation_threshold () =
   Log.info "Number of minimum required attested shards: %d" min_power ;
   let* _ =
     List.fold_left_es
-      (fun (acc_ops, acc_power) (pkh, (_first_index, power)) ->
-        let* op = Op.attestation ~delegate:pkh ~dal_content b in
+      (fun (acc_ops, acc_power)
+           ({delegate; indexes} : RPC.Dal.S.shards_assignment) ->
+        let* op = Op.attestation ~delegate ~dal_content b in
         let ops = op :: acc_ops in
-        let power = acc_power + power in
+        let power = acc_power + List.length indexes in
         let* _b, (metadata, _ops) =
           Block.bake_with_metadata ~operations:ops b
         in

@@ -1664,11 +1664,10 @@ let get_chain_block_votes_total_voting_power ?(chain = "main") ?(block = "head")
     Fun.id
 
 let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
-    ?level () =
+    ?level ?delegates () =
   let query_string =
-    match level with
-    | None -> []
-    | Some level -> [("level", string_of_int level)]
+    Query_arg.opt_list "delegates" (fun x y -> (x, y)) delegates
+    @ Query_arg.opt "level" Int.to_string level
   in
   make
     GET

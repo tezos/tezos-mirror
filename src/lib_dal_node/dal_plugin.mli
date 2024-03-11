@@ -79,12 +79,11 @@ module type T = sig
 
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
       map that associates to the public key hash [pkh] of the member of
-      the committee an interval [(s,n)], meaning that the slots [s;s+1;...;s+n-1]
-      belong to [pkh] *)
+      the committee its assigned shard indexes. *)
   val get_committee :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    (int * int) Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
+    int list Tezos_crypto.Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   (** [attested_slot_headers block_info number_of_slots] reads the metadata
       of the given [block_info] and constructs the list of attested slots

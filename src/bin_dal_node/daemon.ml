@@ -380,6 +380,20 @@ module Handler = struct
               Plugin.block_info cctxt ~block ~metadata:`Always
             in
             let shell_header = Plugin.block_shell_header block_info in
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
+               Note that the first processed block is special: in contrast to
+               the general case, as implemented by this function, the plugin was
+               set before processing the block, by
+               [resolve_plugin_and_set_ready], not after processing the
+               block. *)
+            let* () =
+              may_update_plugin
+                cctxt
+                ctxt
+                ~block
+                ~current_proto:plugin_proto
+                ~block_proto:shell_header.proto_level
+            in
             let*? block_round = Plugin.get_round shell_header.fitness in
             let* slot_headers = Plugin.get_published_slot_headers block_info in
             let* () =
@@ -448,18 +462,7 @@ module Handler = struct
             let*! () =
               Event.(emit layer1_node_final_block (block_level, block_round))
             in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
-               Note that the first processed block is special: in contrast to
-               the general case, as implemented by this function, the plugin was
-               set before processing the block, by
-               [resolve_plugin_and_set_ready], not after processing the
-               block. *)
-            may_update_plugin
-              cctxt
-              ctxt
-              ~block
-              ~current_proto:plugin_proto
-              ~block_proto:shell_header.proto_level
+            return_unit
           in
           match last_processed_level with
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6849

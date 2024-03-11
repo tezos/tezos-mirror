@@ -107,8 +107,16 @@ module Plugin = struct
     let+ pkh_to_shards =
       Plugin.RPC.Dal.dal_shards cpctxt (`Main, `Head 0) ~level ()
     in
+    let indexes (initial_slot, power) =
+      let last_slot = initial_slot + power - 1 in
+      let rec iter acc i =
+        if i < initial_slot then acc else iter (i :: acc) (i - 1)
+      in
+      iter [] last_slot
+    in
     List.fold_left
-      (fun acc (pkh, s) -> Signature.Public_key_hash.Map.add pkh s acc)
+      (fun acc (pkh, s) ->
+        Signature.Public_key_hash.Map.add pkh (indexes s) acc)
       Signature.Public_key_hash.Map.empty
       pkh_to_shards
 

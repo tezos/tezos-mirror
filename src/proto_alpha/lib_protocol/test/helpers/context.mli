@@ -201,8 +201,9 @@ module Dal : sig
   val shards :
     t ->
     ?level:Raw_level.t ->
+    ?delegates:Signature.public_key_hash list ->
     unit ->
-    (Signature.Public_key_hash.t * (int * int)) list tzresult Lwt.t
+    Plugin.RPC.Dal.S.shards_output tzresult Lwt.t
 end
 
 module Contract : sig

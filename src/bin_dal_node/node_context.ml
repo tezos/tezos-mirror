@@ -175,11 +175,6 @@ let fetch_committee ctxt ~level =
   | None ->
       let*? {plugin = (module Plugin); _} = get_ready ctxt in
       let+ committee = Plugin.get_committee cctxt ~level in
-      let committee =
-        Tezos_crypto.Signature.Public_key_hash.Map.map
-          (fun (start_index, offset) -> Committee_cache.{start_index; offset})
-          committee
-      in
       Committee_cache.add cache ~level ~committee ;
       committee
 
@@ -188,11 +183,7 @@ let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let+ committee = fetch_committee ctxt ~level in
   match Tezos_crypto.Signature.Public_key_hash.Map.find pkh committee with
   | None -> []
-  | Some {start_index; offset} ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4540
-         Consider returning some abstract representation of [(s, n)]
-         instead of [int list] *)
-      Stdlib.List.init offset (fun i -> start_index + i)
+  | Some indexes -> indexes
 
 let version {config; _} =
   let network_name = config.Configuration_file.network_name in
