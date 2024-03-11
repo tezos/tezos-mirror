@@ -29,16 +29,6 @@
 open Version
 open Current_git_info
 
-let to_json {product; major; minor; additional_info} =
-  Format.sprintf
-    "{ \"product\": \"%s\", \"major\": \"%i\", \"minor\": \"%i\", \"info\": \
-     \"%s\", \"hash\": \"%s\" }"
-    (string_of_product product)
-    major
-    minor
-    (string_of_additional_info additional_info)
-    Tezos_version_value.Current_git_info.abbreviated_commit_hash
-
 let help_string =
   "This script prints out the current version of the\n\
    octez node as it is deduced from the git tag of the current branch.\n\
@@ -58,7 +48,11 @@ let () =
       print_endline Tezos_version_value.Bin_version.octez_simple_version_string
   | [|_; "--commit"|] ->
       print_endline Tezos_version_value.Current_git_info.abbreviated_commit_hash
-  | [|_; "--json"|] -> print_endline (to_json octez_version)
+  | [|_; "--json"|] ->
+      print_endline
+        (to_json
+           octez_version
+           Tezos_version_value.Current_git_info.abbreviated_commit_hash)
   | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;

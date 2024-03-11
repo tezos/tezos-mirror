@@ -62,3 +62,13 @@ let pp f {product; major; minor; additional_info} =
     (string_of_additional_info additional_info)
 
 let to_string x = Format.asprintf "%a" pp x
+
+let to_json {product; major; minor; additional_info} commit_hash =
+  Format.sprintf
+    "{ \"product\": \"%s\", \"major\": \"%i\", \"minor\": \"%i\", \"info\": \
+     \"%s\", \"hash\": \"%s\" }"
+    (string_of_product product)
+    major
+    minor
+    (string_of_additional_info additional_info)
+    commit_hash
