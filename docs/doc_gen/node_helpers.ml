@@ -62,7 +62,7 @@ let with_node f =
     in
     let version =
       Tezos_version.Version.to_string
-        Tezos_version_value.Current_git_info.version
+        Tezos_version_value.Current_git_info.octez_version
     in
     let commit_info =
       ({
