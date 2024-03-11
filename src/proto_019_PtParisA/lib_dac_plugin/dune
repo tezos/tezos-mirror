@@ -20,7 +20,6 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_registerer
   -open Tezos_stdlib_unix
   -open Tezos_dac_lib
