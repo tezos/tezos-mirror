@@ -410,24 +410,32 @@ let replay ~internal_events ~singleprocess ~strict
       in
       let main_chain_store = Store.main_chain_store store in
       let* validator_process =
-        Block_validator_process.init validator_env (Internal main_chain_store)
+        Block_validator_process.init
+          (Internal (validator_env, main_chain_store))
       in
       return (validator_process, store)
     else
       let* validator_process =
         Block_validator_process.init
-          validator_env
           (External
              {
-               data_dir = config.data_dir;
-               readonly;
-               genesis;
-               context_root;
-               protocol_root;
+               parameters =
+                 {
+                   data_dir = config.data_dir;
+                   readonly;
+                   genesis;
+                   context_root;
+                   protocol_root;
+                   sandbox_parameters = None;
+                   dal_config = config.blockchain_network.dal_config;
+                   user_activated_upgrades =
+                     config.blockchain_network.user_activated_upgrades;
+                   user_activated_protocol_overrides =
+                     config.blockchain_network.user_activated_protocol_overrides;
+                   operation_metadata_size_limit;
+                   internal_events;
+                 };
                process_path = Sys.executable_name;
-               sandbox_parameters = None;
-               dal_config = config.blockchain_network.dal_config;
-               internal_events;
              })
       in
       let commit_genesis =

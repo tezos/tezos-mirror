@@ -185,20 +185,11 @@ let handshake input output =
    sent by the node. This is expected to be run after the
    [handshake]. See [Block_validator_process.process_init] for
    the init scenario. *)
-let init ~readonly input output =
+let init input output =
   let open Lwt_result_syntax in
   let*! () = Events.(emit initialization_request ()) in
-  let*! {
-          context_root;
-          protocol_root;
-          genesis;
-          sandbox_parameters;
-          user_activated_upgrades;
-          user_activated_protocol_overrides;
-          operation_metadata_size_limit;
-          dal_config;
-          internal_events;
-        } =
+  let*! ({context_root; genesis; readonly; sandbox_parameters; dal_config; _} as
+        parameters) =
     External_validation.recv input External_validation.parameters_encoding
   in
   let*? () = Tezos_crypto_dal.Cryptobox.Config.init_verifier_dal dal_config in
@@ -227,18 +218,12 @@ let init ~readonly input output =
       (Error_monad.result_encoding Data_encoding.empty)
       (Ok ())
   in
-  return
-    ( ( context_index,
-        protocol_root,
-        genesis,
-        user_activated_upgrades,
-        user_activated_protocol_overrides,
-        operation_metadata_size_limit ),
-      internal_events )
+  return (parameters, context_index)
 
 let handle_request :
     type a.
-    _ ->
+    External_validation.parameters ->
+    Context.index ->
     Context_ops.Environment_context.block_cache option ->
     (Block_validation.apply_result * Context_ops.Environment_context.t) option ->
     a External_validation.request ->
@@ -249,12 +234,15 @@ let handle_request :
         option
     | `Stop ]
     Lwt.t =
- fun ( context_index,
-       protocol_root,
-       genesis,
-       user_activated_upgrades,
-       user_activated_protocol_overrides,
-       operation_metadata_size_limit )
+ fun {
+       protocol_root;
+       genesis;
+       user_activated_upgrades;
+       user_activated_protocol_overrides;
+       operation_metadata_size_limit;
+       _;
+     }
+     context_index
      cache
      cached_result ->
   let open Lwt_result_syntax in
@@ -263,7 +251,6 @@ let handle_request :
   in
   function
   | Commit_genesis {chain_id} ->
-      let*! () = Events.(emit commit_genesis_request genesis.Genesis.block) in
       let*! commit =
         Error_monad.catch_es (fun () ->
             Context.commit_genesis
@@ -286,7 +273,6 @@ let handle_request :
         should_precheck;
         simulate;
       } ->
-      let*! () = Events.(emit validation_request block_header) in
       let*! block_application_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->
@@ -417,9 +403,8 @@ let handle_request :
         predecessor_resulting_context_hash;
         header;
         operations;
-        hash;
+        _;
       } ->
-      let*! () = Events.(emit precheck_request hash) in
       let*! block_precheck_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->
@@ -456,7 +441,6 @@ let handle_request :
       continue block_precheck_result cache cached_result
   | External_validation.Fork_test_chain {chain_id; context_hash; forked_header}
     ->
-      let*! () = Events.(emit fork_test_chain_request forked_header) in
       let*! context_opt = Context.checkout context_index context_hash in
       let*! res =
         match context_opt with
@@ -471,7 +455,6 @@ let handle_request :
       continue res cache cached_result
   | External_validation.Context_garbage_collection
       {context_hash; gc_lockfile_path} ->
-      let*! () = Events.(emit context_gc_request context_hash) in
       let*! () = Context.gc context_index context_hash in
       let*! lockfile =
         Lwt_unix.openfile
@@ -497,12 +480,10 @@ let handle_request :
       let () = Lwt.dont_wait gc_waiter (fun _exn -> ()) in
       continue (Ok ()) cache cached_result
   | External_validation.Context_split ->
-      let*! () = Events.(emit context_split_request) () in
       let*! () = Context.split context_index in
       continue (Ok ()) cache cached_result
   | External_validation.Terminate ->
       let*! () = Lwt_io.flush_all () in
-      let*! () = Events.(emit termination_request ()) in
       Lwt.return `Stop
   | External_validation.Reconfigure_event_logging config ->
       let*! res =
@@ -510,15 +491,18 @@ let handle_request :
       in
       continue res cache cached_result
 
-let run ~readonly ~using_std_channel input output =
+let run ~using_std_channel input output =
   let open Lwt_result_syntax in
   let* () = handshake input output in
-  let* external_env, internal_events = init ~readonly input output in
+  let* parameters, context_index = init input output in
   let*! () =
     (* if the external validator is spawned in a standalone way and communicates
        with the node through stdin/stdoud, we do no start the logging system. *)
     if using_std_channel then Lwt.return_unit
-    else Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
+    else
+      Tezos_base_unix.Internal_event_unix.init
+        ~config:parameters.internal_events
+        ()
   in
   (* Main loop waiting for request to be processed, forever, until the
      [Terminate] request is received.
@@ -528,7 +512,9 @@ let run ~readonly ~using_std_channel input output =
     let*! (External_validation.Erequest recved) =
       External_validation.recv input External_validation.request_encoding
     in
-    let*! action = handle_request external_env cache cached_result recved in
+    let*! action =
+      handle_request parameters context_index cache cached_result recved
+    in
     match action with
     | `Continue (res, cache, cached_result) ->
         let*! () =
@@ -543,7 +529,7 @@ let run ~readonly ~using_std_channel input output =
   in
   loop None None
 
-let main ?socket_dir ~readonly () =
+let main ?socket_dir () =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
   let* in_channel, out_channel, using_std_channel =
@@ -562,7 +548,7 @@ let main ?socket_dir ~readonly () =
   let*! () = Events.(emit initialized ()) in
   let*! r =
     Error_monad.catch_es (fun () ->
-        let* () = run ~readonly ~using_std_channel in_channel out_channel in
+        let* () = run ~using_std_channel in_channel out_channel in
         let*! r = Lwt_canceler.cancel canceler in
         match r with
         | Ok () | Error [] -> return_unit

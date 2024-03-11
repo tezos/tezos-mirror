@@ -28,6 +28,8 @@ type parameters = {
   context_root : string;
   protocol_root : string;
   genesis : Genesis.t;
+  readonly : bool;
+  data_dir : string;
   sandbox_parameters : Data_encoding.json option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;

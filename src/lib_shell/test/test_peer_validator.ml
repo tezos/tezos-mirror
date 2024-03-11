@@ -65,11 +65,6 @@ let wrap
       in
       let genesis = WithExceptions.Option.get ~loc:__LOC__ genesis in
       let genesis_header = Store.Block.header genesis in
-      let internal_validator =
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2833
-           External validator should be used *)
-        Block_validator_process.Internal chain_store
-      in
       let validator_environment =
         {
           Block_validator_process.user_activated_upgrades = [];
@@ -77,8 +72,13 @@ let wrap
           operation_metadata_size_limit = Unlimited;
         }
       in
+      let internal_validator =
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2833
+           External validator should be used *)
+        Block_validator_process.Internal (validator_environment, chain_store)
+      in
       let* block_validator_processs =
-        Block_validator_process.init validator_environment internal_validator
+        Block_validator_process.init internal_validator
       in
       let*! block_validator =
         Block_validator.create

@@ -28,6 +28,8 @@ type parameters = {
   context_root : string;
   protocol_root : string;
   genesis : Genesis.t;
+  readonly : bool;
+  data_dir : string;
   sandbox_parameters : Data_encoding.json option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
@@ -149,6 +151,8 @@ let parameters_encoding =
            context_root;
            protocol_root;
            genesis;
+           readonly;
+           data_dir;
            user_activated_upgrades;
            user_activated_protocol_overrides;
            operation_metadata_size_limit;
@@ -156,28 +160,26 @@ let parameters_encoding =
            dal_config;
            internal_events;
          } ->
-      ( context_root,
-        protocol_root,
-        genesis,
-        user_activated_upgrades,
-        user_activated_protocol_overrides,
-        operation_metadata_size_limit,
-        sandbox_parameters,
-        dal_config,
-        internal_events ))
-    (fun ( context_root,
-           protocol_root,
-           genesis,
-           user_activated_upgrades,
-           user_activated_protocol_overrides,
-           operation_metadata_size_limit,
-           sandbox_parameters,
-           dal_config,
-           internal_events ) ->
+      ( (context_root, protocol_root, genesis, readonly, data_dir),
+        ( user_activated_upgrades,
+          user_activated_protocol_overrides,
+          operation_metadata_size_limit,
+          sandbox_parameters,
+          dal_config,
+          internal_events ) ))
+    (fun ( (context_root, protocol_root, genesis, readonly, data_dir),
+           ( user_activated_upgrades,
+             user_activated_protocol_overrides,
+             operation_metadata_size_limit,
+             sandbox_parameters,
+             dal_config,
+             internal_events ) ) ->
       {
         context_root;
         protocol_root;
         genesis;
+        readonly;
+        data_dir;
         user_activated_upgrades;
         user_activated_protocol_overrides;
         operation_metadata_size_limit;
@@ -185,20 +187,24 @@ let parameters_encoding =
         dal_config;
         internal_events;
       })
-    (obj9
-       (req "context_root" string)
-       (req "protocol_root" string)
-       (req "genesis" Genesis.encoding)
-       (req "user_activated_upgrades" User_activated.upgrades_encoding)
-       (req
-          "user_activated_protocol_overrides"
-          User_activated.protocol_overrides_encoding)
-       (req
-          "operation_metadata_size_limit"
-          Shell_limits.operation_metadata_size_limit_encoding)
-       (opt "sandbox_parameters" json)
-       (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
-       (req "internal_events" Tezos_base.Internal_event_config.encoding))
+  @@ merge_objs
+       (obj5
+          (req "context_root" string)
+          (req "protocol_root" string)
+          (req "genesis" Genesis.encoding)
+          (req "readonly" bool)
+          (req "data_dir" string))
+       (obj6
+          (req "user_activated_upgrades" User_activated.upgrades_encoding)
+          (req
+             "user_activated_protocol_overrides"
+             User_activated.protocol_overrides_encoding)
+          (req
+             "operation_metadata_size_limit"
+             Shell_limits.operation_metadata_size_limit_encoding)
+          (opt "sandbox_parameters" json)
+          (req "dal_config" Tezos_crypto_dal.Cryptobox.Config.encoding)
+          (req "internal_events" Tezos_base.Internal_event_config.encoding))
 
 type packed_request = Erequest : _ request -> packed_request
 

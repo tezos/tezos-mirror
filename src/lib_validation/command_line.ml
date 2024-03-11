@@ -25,7 +25,6 @@
 
 let parse_args () =
   let socket_dir = ref None in
-  let readonly_flag = ref false in
   let args =
     Arg.
       [
@@ -43,12 +42,6 @@ let parse_args () =
       tezos-validator's process identifier. By default, the validator will
       communicate through its standard input and output.|}
         );
-        ( "--readonly",
-          Unit (fun () -> readonly_flag := true),
-          {|<flag>
-      When provided, the validator will start in readonly mode. It will not be
-      able to update the context.|}
-        );
         ( "--version",
           Unit
             (fun () ->
@@ -60,18 +53,17 @@ let parse_args () =
       ]
   in
   let usage_msg =
-    Format.sprintf
-      "tezos-validator [--version] [--socket-dir <dir>] [--readonly]"
+    Format.sprintf "tezos-validator [--version] [--socket-dir <dir>]"
   in
   Arg.parse
     args
     (fun s -> raise (Arg.Bad (Format.sprintf "Unexpected argument: %s" s)))
     usage_msg ;
-  (!socket_dir, !readonly_flag)
+  !socket_dir
 
 let run () =
-  let socket_dir, readonly = parse_args () in
-  let main_promise = External_validator.main ?socket_dir ~readonly () in
+  let socket_dir = parse_args () in
+  let main_promise = External_validator.main ?socket_dir () in
   Stdlib.exit
     (let open Lwt_syntax in
     Lwt.Exception_filter.(set handle_all_except_runtime) ;

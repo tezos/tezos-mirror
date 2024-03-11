@@ -44,17 +44,10 @@ type validator_environment = {
     one processus has a write access to the context. Currently informations
     are exchanged via the file system. *)
 type validator_kind =
-  | Internal : Store.Chain.chain_store -> validator_kind
+  | Internal : validator_environment * Store.Chain.chain_store -> validator_kind
   | External : {
-      genesis : Genesis.t;
-      readonly : bool;
-      data_dir : string;
-      context_root : string;
-      protocol_root : string;
+      parameters : External_validation.parameters;
       process_path : string;
-      sandbox_parameters : Data_encoding.json option;
-      dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-      internal_events : Tezos_base.Internal_event_config.t;
     }
       -> validator_kind
 
@@ -63,7 +56,7 @@ type simple_kind = External_process | Single_process
 (** Internal representation of the block validator process *)
 type t
 
-val init : validator_environment -> validator_kind -> t tzresult Lwt.t
+val init : validator_kind -> t tzresult Lwt.t
 
 val kind : t -> simple_kind
 

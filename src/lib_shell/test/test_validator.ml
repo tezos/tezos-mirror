@@ -59,8 +59,7 @@ let init_validator
     in
     let* block_validator =
       Block_validator_process.init
-        validator_environment
-        (Block_validator_process.Internal chain_store)
+        (Block_validator_process.Internal (validator_environment, chain_store))
     in
     let* validator =
       Validator.create
