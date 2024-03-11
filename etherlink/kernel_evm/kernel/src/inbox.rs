@@ -21,6 +21,7 @@ use crate::storage::{
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
 use crate::tick_model::constants::MAX_ALLOWED_TICKS;
+use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
@@ -533,6 +534,10 @@ pub fn read_sequencer_inbox<Host: Runtime>(
         allocated_ticks: MAX_ALLOWED_TICKS,
     };
     loop {
+        // TODO: Implement the reboot mechanism
+        if parsing_context.allocated_ticks < maximum_ticks_for_sequencer_chunk() {
+            log!(host, Debug, "This is when we should reboot");
+        }
         match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             smart_rollup_address,

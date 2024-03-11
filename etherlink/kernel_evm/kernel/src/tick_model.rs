@@ -206,3 +206,7 @@ pub fn ticks_of_delayed_input(input_size: u64) -> u64 {
         constants::TICKS_PER_BYTE_FOR_CHUNK_STORE.saturating_mul(input_size);
     reading_ticks.saturating_add(storing_ticks)
 }
+
+pub fn maximum_ticks_for_sequencer_chunk() -> u64 {
+    ticks_of_blueprint_chunk(4096)
+}
