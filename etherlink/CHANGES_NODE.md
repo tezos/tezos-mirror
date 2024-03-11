@@ -1,12 +1,24 @@
 # Changelog
 
-## Version NEXT
+## Version for NEXT
+
+### Features
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version for 79509a69d01c38eeba38d6cc7a323b4d69c58b94
 
 ### Features
 
 - Fetch WASM preimages from a remote endpoint. (!12060)
 - When the sequencer evm node diverged from rollup node it fails with
   exit code 100. (!12214)
+- Add a new RPC (tez_kernelRootHash) to retrieve the root hash used during the
+  last upgrade (!12352)
 
 ### Bug fixes
 

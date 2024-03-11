@@ -45,6 +45,40 @@ module Event = struct
       ~msg:"Stopping the evm events follower"
       ~level:Notice
       ()
+
+  let diverged =
+    declare_3
+      ~section
+      ~name:"evm_events_follower_diverged"
+      ~msg:
+        "The rollup diverged, blueprint {level} leaded to block hash \
+         {expected_hash}, but locally has {found_hash}."
+      ~level:Error
+      ("level", Data_encoding.n)
+      ("expected_hash", Ethereum_types.block_hash_encoding)
+      ("found_hash", Ethereum_types.block_hash_encoding)
+
+  let upstream_blueprint_applied =
+    declare_2
+      ~section
+      ~name:"evm_events_follower_upstream_blueprint_applied"
+      ~msg:
+        "The rollup node kernel applied blueprint {level} leading to creating \
+         block {hash}."
+      ~level:Notice
+      ("level", Data_encoding.n)
+      ("hash", Ethereum_types.block_hash_encoding)
+
+  let missing_block =
+    declare_2
+      ~section
+      ~name:"evm_events_follower_missing_block"
+      ~msg:
+        "The rollup diverged, blueprint {level} not found in local state \
+         (block hash: {expected_hash})."
+      ~level:Error
+      ("level", Data_encoding.n)
+      ("expected_hash", Ethereum_types.block_hash_encoding)
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -55,3 +89,11 @@ let unreadable_event (index, level) =
   Internal_event.Simple.emit Event.unreadable_event (index, level)
 
 let new_event event = Internal_event.Simple.emit Event.new_event event
+
+let diverged divergence = Internal_event.Simple.emit Event.diverged divergence
+
+let upstream_blueprint_applied level_hash =
+  Internal_event.Simple.emit Event.upstream_blueprint_applied level_hash
+
+let missing_block divergence =
+  Internal_event.Simple.emit Event.missing_block divergence

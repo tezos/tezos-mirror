@@ -167,6 +167,8 @@ let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
 let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
 
+let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
+
 let empty_hash = Hash (Hex "")
 
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
@@ -174,6 +176,8 @@ let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
 let encode_hex (Hex hex) = Hex.to_bytes_exn (`Hex hex)
 
 let decode_block_hash bytes = Block_hash (decode_hex bytes)
+
+let encode_block_hash (Block_hash hash) = encode_hex hash
 
 let decode_address bytes = Address (decode_hex bytes)
 
@@ -1283,23 +1287,29 @@ module Upgrade = struct
 end
 
 module Sequencer_upgrade = struct
-  type t = {sequencer : Signature.public_key; timestamp : Time.Protocol.t}
+  type t = {
+    sequencer : Signature.public_key;
+    pool_address : address;
+    timestamp : Time.Protocol.t;
+  }
 
   let of_rlp = function
-    | Rlp.List [Value sequencer; Value timestamp] ->
+    | Rlp.List [Value sequencer; Value pool_address; Value timestamp] ->
         let sequencer =
           Signature.Public_key.of_b58check_exn (String.of_bytes sequencer)
         in
         let timestamp = timestamp_of_bytes timestamp in
-        Some {sequencer; timestamp}
+        let pool_address = decode_address pool_address in
+        Some {sequencer; pool_address; timestamp}
     | _ -> None
 
-  let to_rlp {sequencer; timestamp} =
+  let to_rlp {sequencer; pool_address; timestamp} =
     let sequencer =
       Signature.Public_key.to_b58check sequencer |> String.to_bytes
     in
     let timestamp = timestamp_to_bytes timestamp in
-    Rlp.List [Value sequencer; Value timestamp]
+    let pool_address = encode_address pool_address in
+    Rlp.List [Value sequencer; Value pool_address; Value timestamp]
 
   let of_bytes bytes =
     match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
@@ -1309,15 +1319,46 @@ module Sequencer_upgrade = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {sequencer; timestamp} -> (sequencer, timestamp))
-      (fun (sequencer, timestamp) -> {sequencer; timestamp})
-      (tup2 Signature.Public_key.encoding Time.Protocol.encoding)
+      (fun {sequencer; pool_address = Address (Hex pool_address); timestamp} ->
+        (sequencer, pool_address, timestamp))
+      (fun (sequencer, pool_address, timestamp) ->
+        {sequencer; pool_address = Address (Hex pool_address); timestamp})
+      (tup3 Signature.Public_key.encoding string Time.Protocol.encoding)
+end
+
+module Blueprint_applied = struct
+  type t = {number : quantity; hash : block_hash}
+
+  let of_rlp = function
+    | Rlp.List [Value number; Value hash] ->
+        let number = decode_number number in
+        let hash = decode_block_hash hash in
+        Some {number; hash}
+    | _ -> None
+
+  let of_bytes bytes =
+    match bytes |> Rlp.decode with Ok rlp -> of_rlp rlp | _ -> None
+
+  let to_bytes {number; hash} =
+    let number = encode_number number in
+    let hash = encode_block_hash hash in
+    Rlp.(encode (List [Value number; Value hash]))
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {number = Qty number; hash = Block_hash (Hex hash)} ->
+        (number, hash))
+      (fun (number, hash) ->
+        {number = Qty number; hash = Block_hash (Hex hash)})
+      (tup2 z string)
 end
 
 module Evm_events = struct
   type t =
     | Upgrade_event of Upgrade.t
     | Sequencer_upgrade_event of Sequencer_upgrade.t
+    | Blueprint_applied of Blueprint_applied.t
 
   let of_bytes bytes =
     match bytes |> Rlp.decode with
@@ -1329,6 +1370,9 @@ module Evm_events = struct
         | "\x02" ->
             let sequencer_upgrade = Sequencer_upgrade.of_rlp rlp_content in
             Option.map (fun u -> Sequencer_upgrade_event u) sequencer_upgrade
+        | "\x03" ->
+            let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
+            Option.map (fun u -> Blueprint_applied u) blueprint_applied
         | _ -> None)
     | _ -> None
 
@@ -1336,43 +1380,59 @@ module Evm_events = struct
     | Upgrade_event {hash; timestamp} ->
         Format.fprintf
           fmt
-          "upgrade:@ hash %a,@ timestamp: %a"
+          "Upgrade:@ hash %a,@ timestamp: %a"
           pp_hash
           hash
           Time.Protocol.pp_hum
           timestamp
-    | Sequencer_upgrade_event {sequencer; timestamp} ->
+    | Sequencer_upgrade_event
+        {sequencer; pool_address = Address (Hex address); timestamp} ->
         Format.fprintf
           fmt
-          "Sequencer_upgrade:@ sequencer:@ %a,@ timestamp %a"
+          "Sequencer upgrade:@ sequencer:@ %a,pool_address %s,@ timestamp: %a"
           Signature.Public_key.pp
           sequencer
+          address
           Time.Protocol.pp_hum
           timestamp
+    | Blueprint_applied {number = Qty number; hash = Block_hash (Hex hash)} ->
+        Format.fprintf
+          fmt
+          "Blueprint applied:@,number:%a@ hash: %s"
+          Z.pp_print
+          number
+          hash
 
   let encoding =
     let open Data_encoding in
+    let case ~kind ~tag ~event_encoding ~proj ~inj =
+      case
+        ~title:kind
+        (Tag tag)
+        (obj2 (req "kind" string) (req "event" event_encoding))
+        (fun x -> match proj x with None -> None | Some x -> Some (kind, x))
+        (fun (_, x) -> inj x)
+    in
     union
       [
-        (let tag = "kernel_upgrade" in
-         case
-           ~title:tag
-           (Tag 0)
-           (obj2 (req "kind" string) (req "event" Upgrade.encoding))
-           (function
-             | Upgrade_event upgrade -> Some ("kernel_upgrade", upgrade)
-             | _ -> None)
-           (fun (_, upgrade) -> Upgrade_event upgrade));
-        (let tag = "sequencer_upgrade" in
-         case
-           ~title:tag
-           (Tag 1)
-           (obj2 (req "kind" string) (req "event" Sequencer_upgrade.encoding))
-           (function
-             | Sequencer_upgrade_event sequencer_upgrade ->
-                 Some ("sequencer_upgrade", sequencer_upgrade)
-             | _ -> None)
-           (fun (_, sequencer_upgrade) ->
-             Sequencer_upgrade_event sequencer_upgrade));
+        case
+          ~kind:"kernel_upgrade"
+          ~tag:0
+          ~event_encoding:Upgrade.encoding
+          ~proj:(function Upgrade_event upgrade -> Some upgrade | _ -> None)
+          ~inj:(fun upgrade -> Upgrade_event upgrade);
+        case
+          ~kind:"sequencer_upgrade"
+          ~tag:1
+          ~event_encoding:Sequencer_upgrade.encoding
+          ~proj:(function
+            | Sequencer_upgrade_event upgrade -> Some upgrade | _ -> None)
+          ~inj:(fun upgrade -> Sequencer_upgrade_event upgrade);
+        case
+          ~kind:"blueprint_applied"
+          ~tag:2
+          ~event_encoding:Blueprint_applied.encoding
+          ~proj:(function Blueprint_applied info -> Some info | _ -> None)
+          ~inj:(fun info -> Blueprint_applied info);
       ]
 end
