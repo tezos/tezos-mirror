@@ -1183,6 +1183,7 @@ dependencies = [
  "strum 0.26.1",
  "thiserror",
  "twiddle",
+ "vm-fdt",
 ]
 
 [[package]]
@@ -1194,6 +1195,7 @@ dependencies = [
  "ed25519-dalek",
  "goblin",
  "kernel-loader",
+ "risc-v-interpreter",
  "rvemu",
  "tezos-smart-rollup-constants",
  "tezos-smart-rollup-encoding",

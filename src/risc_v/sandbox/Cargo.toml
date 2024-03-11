@@ -15,8 +15,10 @@ version = "4.4.6"
 features = ["derive"]
 
 [dependencies.kernel-loader]
-version = "0.1.0"
 path = "../kernel_loader"
+
+[dependencies.risc-v-interpreter]
+path = "../interpreter"
 
 [dependencies.rvemu]
 git = "https://github.com/vapourismo/rvemu.git"

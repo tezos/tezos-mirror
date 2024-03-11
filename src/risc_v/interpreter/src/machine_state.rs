@@ -14,6 +14,7 @@ pub mod registers;
 extern crate proptest;
 
 use crate::{
+    devicetree,
     machine_state::{
         bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
         csregisters::CSRegister,
@@ -437,6 +438,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     pub fn setup_boot(
         &mut self,
         program: &Program<ML>,
+        initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<(), MachineError> {
         // Write program to main memory and point the PC at its start
@@ -448,14 +450,31 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         // Set booting Hart ID (a0) to 0
         self.hart.xregisters.write(registers::a0, 0);
 
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/6941
-        // Write device tree
-        let dtb_addr = program
+        // Load the initial program into memory
+        let initrd_addr = program
             .segments
             .iter()
             .map(|(base, data)| base + data.len() as Address)
             .max()
             .unwrap_or(bus::start_of_main_memory::<ML>());
+
+        // Write initial ramdisk, if any
+        let (dtb_addr, initrd) = if let Some(initrd) = initrd {
+            self.bus.write_all(initrd_addr, initrd)?;
+            let length = initrd.len() as u64;
+            let dtb_options = devicetree::InitialRamDisk {
+                start: initrd_addr,
+                length,
+            };
+            let dtb_addr = initrd_addr + length;
+            (dtb_addr, Some(dtb_options))
+        } else {
+            (initrd_addr, None)
+        };
+
+        // Write device tree to memory
+        let fdt = devicetree::generate::<ML>(initrd)?;
+        self.bus.write_all(dtb_addr, fdt.as_slice())?;
 
         // Point DTB boot argument (a1) at the written device tree
         self.hart.xregisters.write(registers::a1, dtb_addr);
@@ -476,9 +495,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 }
 
 /// Errors that occur from interacting with the [MachineState]
-#[derive(Debug, Clone, derive_more::From)]
+#[derive(Debug, derive_more::Display, derive_more::From, thiserror::Error)]
 pub enum MachineError {
+    #[display(fmt = "Address out of bounds")]
     AddressError(OutOfBounds),
+    DeviceTreeError(vm_fdt::Error),
 }
 
 #[cfg(test)]

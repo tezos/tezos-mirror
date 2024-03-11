@@ -1,3 +1,4 @@
+pub mod devicetree;
 mod interpreter;
 pub mod machine_state;
 pub mod parser;
