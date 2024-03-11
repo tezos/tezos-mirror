@@ -10,8 +10,8 @@ verbose: # Regenerate GitLab CI configuration with verbose output.
 inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
 	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info)
 
-.PHONY: docker-%
-docker-%:
+.PHONY: docker-do-%
+docker-do-%:
 	@( cd .. \
 	    && . ./scripts/version.sh \
 	    && docker run -it -w$$(pwd) -v$$(pwd):$$(pwd) --entrypoint opam \
@@ -19,13 +19,13 @@ docker-%:
 	         make -C ci $* )
 
 .PHONY: docker-all
-docker-all: # Build the target 'all' using the 'runtime-build-dependencies' Docker image.
+docker-all: docker-do-all # Build the target 'all' using the 'runtime-build-dependencies' Docker image.
 
 .PHONY: docker-verbose
-docker-verbose: # Build the target 'verbose' using the 'runtime-build-dependencies' Docker image.
+docker-verbose: docker-do-verbose # Build the target 'verbose' using the 'runtime-build-dependencies' Docker image.
 
 .PHONY: docker-inline-source-info
-docker-inline-source-info: # Build the target 'inline-source-info' using the 'runtime-build-dependencies' Docker image.
+docker-inline-source-info: docker-do-inline-source-info # Build the target 'inline-source-info' using the 'runtime-build-dependencies' Docker image.
 
 .PHONY: check
 check: # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
@@ -42,4 +42,4 @@ check: # Used in the CI to verify that [.gitlab-ci.yml] is up to date.
 help: # Display this help.
 	@echo "GitLab CI configuration generator. Available targets:"
 	@echo
-	@grep '^[^[:space:]]\+: #' makefile | sed 's/^\([^[:space:]]\+\): # \(.*\)/ - \1: \2/'
+	@grep '^[^[:space:]]\+:.*#' makefile | sed 's/^\([^[:space:]]\+\):.*# \(.*\)/ - \1: \2/'
