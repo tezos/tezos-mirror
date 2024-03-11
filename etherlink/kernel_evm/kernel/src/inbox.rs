@@ -194,6 +194,15 @@ pub fn read_input<Host: Runtime>(
     }
 }
 
+/// The InputHandler abstracts how the input is handled once it has been parsed.
+pub trait InputHandler {
+    fn handle_input<Host: Runtime>(
+        host: &mut Host,
+        input: Self,
+        inbox_content: &mut InboxContent,
+    ) -> anyhow::Result<()>;
+}
+
 fn handle_transaction_chunk<Host: Runtime>(
     host: &mut Host,
     tx_hash: TransactionHash,
