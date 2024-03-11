@@ -185,7 +185,7 @@ type batch_content = {
   block_payload_hash : Block_payload_hash.t;
 }
 
-type unsigned_consensus_vote_batch = {
+type unsigned_consensus_vote_batch = private {
   batch_kind : consensus_vote_kind;
   batch_content : batch_content;
   batch_branch : Block_hash.t;
@@ -215,6 +215,9 @@ val make_signed_consensus_vote_batch :
   signed_consensus_vote list ->
   signed_consensus_vote_batch tzresult
 
+val make_singleton_consensus_vote_batch :
+  signed_consensus_vote -> signed_consensus_vote_batch
+
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
@@ -239,6 +242,8 @@ type round_state = {
   current_round : Round.t;
   current_phase : phase;
   delayed_quorum : Kind.attestation operation list option;
+  early_attestations : signed_consensus_vote list;
+  awaiting_unlocking_pqc : bool;
 }
 
 (** [forge_event] type used to return the result of a task completion

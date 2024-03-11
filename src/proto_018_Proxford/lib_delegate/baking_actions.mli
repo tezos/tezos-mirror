@@ -32,16 +32,21 @@ type action =
   | Prepare_block of {block_to_bake : block_to_bake}
   | Prepare_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Prepare_attestations of {attestations : unsigned_consensus_vote_batch}
+  | Prepare_consensus_votes of {
+      preattestations : unsigned_consensus_vote_batch;
+      attestations : unsigned_consensus_vote_batch;
+    }
   | Inject_block of {
       prepared_block : prepared_block;
       force_injection : bool;
       asynchronous : bool;
     }
   | Inject_preattestation of {signed_preattestation : signed_consensus_vote}
-  | Inject_attestation of {signed_attestation : signed_consensus_vote}
+  | Inject_attestations of {signed_attestations : signed_consensus_vote_batch}
   | Update_to_level of level_update
   | Synchronize_round of round_update
-  | Watch_proposal
+  | Watch_prequorum
+  | Watch_quorum
 
 and level_update = {
   new_level_proposal : proposal;

@@ -121,6 +121,14 @@ Baker
   If not given, defaults to ``0.15 * block_time``. Set to ``0`` to
   ignore. (MR :gl:`!10712`)
 
+- Made the baker sign attestations as soon as preattestations were
+  forged without waiting for the consensus pre-quorum. However, the
+  baker will still wait for the pre-quorum to inject them as specified
+  by the Tenderbake consensus algorithm. (MR :gl:`!12353`)
+
+- Fixed situations where the baker would stall when a signing request
+  hanged. (MR :gl:`!12353`)
+
 Accuser
 -------
 

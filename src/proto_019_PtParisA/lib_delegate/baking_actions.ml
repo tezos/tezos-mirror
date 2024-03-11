@@ -123,16 +123,21 @@ type action =
   | Prepare_block of {block_to_bake : block_to_bake}
   | Prepare_preattestations of {preattestations : unsigned_consensus_vote_batch}
   | Prepare_attestations of {attestations : unsigned_consensus_vote_batch}
+  | Prepare_consensus_votes of {
+      preattestations : unsigned_consensus_vote_batch;
+      attestations : unsigned_consensus_vote_batch;
+    }
   | Inject_block of {
       prepared_block : prepared_block;
       force_injection : bool;
       asynchronous : bool;
     }
   | Inject_preattestation of {signed_preattestation : signed_consensus_vote}
-  | Inject_attestation of {signed_attestation : signed_consensus_vote}
+  | Inject_attestations of {signed_attestations : signed_consensus_vote_batch}
   | Update_to_level of level_update
   | Synchronize_round of round_update
-  | Watch_proposal
+  | Watch_prequorum
+  | Watch_quorum
 
 and level_update = {
   new_level_proposal : proposal;
@@ -155,12 +160,14 @@ let pp_action fmt = function
   | Prepare_block _ -> Format.fprintf fmt "prepare block"
   | Prepare_preattestations _ -> Format.fprintf fmt "prepare preattestations"
   | Prepare_attestations _ -> Format.fprintf fmt "prepare attestations"
+  | Prepare_consensus_votes _ -> Format.fprintf fmt "prepare consensus votes"
   | Inject_block _ -> Format.fprintf fmt "inject block"
   | Inject_preattestation _ -> Format.fprintf fmt "inject preattestation"
-  | Inject_attestation _ -> Format.fprintf fmt "inject attestation"
+  | Inject_attestations _ -> Format.fprintf fmt "inject multiple attestations"
   | Update_to_level _ -> Format.fprintf fmt "update to level"
   | Synchronize_round _ -> Format.fprintf fmt "synchronize round"
-  | Watch_proposal -> Format.fprintf fmt "watch proposal"
+  | Watch_prequorum -> Format.fprintf fmt "watch prequorum"
+  | Watch_quorum -> Format.fprintf fmt "watch quorum"
 
 let generate_seed_nonce_hash config delegate level =
   let open Lwt_result_syntax in
@@ -894,7 +901,13 @@ let synchronize_round state {new_round_proposal; handle_proposal} =
       new_round_proposal.block.round
   else
     let new_round_state =
-      {current_round; current_phase = Idle; delayed_quorum = None}
+      {
+        current_round;
+        current_phase = Idle;
+        delayed_quorum = None;
+        early_attestations = [];
+        awaiting_unlocking_pqc = false;
+      }
     in
     let new_state = {state with round_state = new_round_state} in
     let*! new_state = handle_proposal new_state in
@@ -938,10 +951,20 @@ let rec perform_action state (action : action) =
   | Prepare_block {block_to_bake} -> prepare_block_request state block_to_bake
   | Prepare_preattestations {preattestations} ->
       let* new_state = prepare_preattestations_request state preattestations in
-      return new_state
+      (* We wait for preattestations to trigger the [Prequorum_reached]
+         event *)
+      perform_action new_state Watch_prequorum
   | Prepare_attestations {attestations} ->
       let* new_state = prepare_attestations_request state attestations in
-      return new_state
+      (* We wait for attestations to trigger the [Quorum_reached]
+         event *)
+      perform_action new_state Watch_quorum
+  | Prepare_consensus_votes {preattestations; attestations} ->
+      let* state = prepare_preattestations_request state preattestations in
+      let* state = prepare_attestations_request state attestations in
+      (* We wait for preattestations to trigger the [Prequorum_reached]
+         event *)
+      perform_action state Watch_prequorum
   | Inject_block {prepared_block; force_injection; asynchronous} ->
       let* new_state =
         inject_block ~force_injection ~asynchronous state prepared_block
@@ -949,21 +972,24 @@ let rec perform_action state (action : action) =
       return new_state
   | Inject_preattestation {signed_preattestation} ->
       let* () = inject_consensus_vote state signed_preattestation in
-      perform_action state Watch_proposal
-  | Inject_attestation {signed_attestation} ->
-      let* () = inject_consensus_vote state signed_attestation in
+      (* Here, we do not need to wait for the prequorum, it has
+         already been triggered by the
+         [Prepare_(preattestation|consensus_votes)] action *)
+      return state
+  | Inject_attestations {signed_attestations} ->
+      let* () = inject_consensus_votes state signed_attestations in
       (* We wait for attestations to trigger the [Quorum_reached]
          event *)
-      let*! () = start_waiting_for_attestation_quorum state in
-      return state
+      perform_action state Watch_quorum
   | Update_to_level level_update ->
       let* new_state, new_action = update_to_level state level_update in
       perform_action new_state new_action
   | Synchronize_round round_update ->
       let* new_state, new_action = synchronize_round state round_update in
       perform_action new_state new_action
-  | Watch_proposal ->
-      (* We wait for preattestations to trigger the
-           [Prequorum_reached] event *)
+  | Watch_prequorum ->
       let*! () = start_waiting_for_preattestation_quorum state in
+      return state
+  | Watch_quorum ->
+      let*! () = start_waiting_for_attestation_quorum state in
       return state
