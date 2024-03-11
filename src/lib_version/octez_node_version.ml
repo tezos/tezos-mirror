@@ -1,6 +1,7 @@
 (*****************************************************************************)
+(*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -76,9 +77,10 @@ let additional_info_encoding =
 let version_encoding =
   let open Data_encoding in
   conv
-    (fun ({major; minor; additional_info} : Version.t) ->
+    (fun ({product = _; major; minor; additional_info} : Version.t) ->
       (major, minor, additional_info))
-    (fun (major, minor, additional_info) -> {major; minor; additional_info})
+    (fun (major, minor, additional_info) ->
+      {product = Octez; major; minor; additional_info})
     (obj3
        (req "major" int31)
        (req "minor" int31)

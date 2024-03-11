@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let namespace = Tezos_version.Node_version.namespace
+let namespace = Tezos_version.Octez_node_version.namespace
 
 let subsystem = "p2p"
 

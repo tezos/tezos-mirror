@@ -69,7 +69,7 @@ let with_node f =
          commit_hash = Tezos_version_value.Current_git_info.commit_hash;
          commit_date = Tezos_version_value.Current_git_info.committer_date;
        }
-        : Tezos_version.Node_version.commit_info)
+        : Tezos_version.Octez_node_version.commit_info)
     in
     let* node =
       Node.create

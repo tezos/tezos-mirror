@@ -80,11 +80,11 @@ let get_version node =
        commit_hash = Tezos_version_value.Current_git_info.commit_hash;
        commit_date = Tezos_version_value.Current_git_info.committer_date;
      }
-      : Tezos_version.Node_version.commit_info)
+      : Tezos_version.Octez_node_version.commit_info)
   in
   let version = Tezos_version_value.Current_git_info.octez_version in
   let network_version = P2p.announced_version node.p2p in
-  Tezos_version.Node_version.
+  Tezos_version.Octez_node_version.
     {version; commit_info = Some commit_info; network_version}
 
 let peer_metadata_cfg : _ P2p_params.peer_meta_config =
