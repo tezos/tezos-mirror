@@ -64,7 +64,8 @@
       "etherlink"
     ],
     "path_patterns": [
-      "^tezt/tests/evm_rollup.ml$"
+      "^etherlink/tezt/tests/evm_rollup.ml$",
+      "^etherlink/tezt/tests/evm_sequencer.ml$"
     ]
   }
 }
