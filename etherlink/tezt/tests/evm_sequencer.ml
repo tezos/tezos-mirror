@@ -48,6 +48,10 @@ open Helpers
 
 let base_fee_for_hardcoded_tx = Wei.to_wei_z @@ Z.of_int 21000
 
+let arb_da_fee_for_delayed_inbox = Wei.of_eth_int 10_000
+(* da fee doesn't apply to delayed inbox, set it arbitrarily high
+   to prove this *)
+
 type l1_contracts = {
   delayed_transaction_bridge : string;
   exchanger : string;
@@ -134,7 +138,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) ?(kernel = Constant.WASM.evm_kernel)
-    ?minimum_base_fee_per_gas ?preimages_dir protocol =
+    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -158,6 +162,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       ~administrator:l1_contracts.admin
       ~sequencer_governance:l1_contracts.sequencer_governance
       ?minimum_base_fee_per_gas
+      ?da_fee_per_byte:da_fee
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
       ()
@@ -562,7 +567,7 @@ let test_send_transaction_to_delayed_inbox =
   @@ fun protocol ->
   (* Start the evm node *)
   let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} =
-    setup_sequencer protocol
+    setup_sequencer ~da_fee:arb_da_fee_for_delayed_inbox protocol
   in
   let raw_transfer =
     "f86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
@@ -609,7 +614,7 @@ let test_send_deposit_to_delayed_inbox =
     ~uses
   @@ fun protocol ->
   let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} =
-    setup_sequencer protocol
+    setup_sequencer ~da_fee:arb_da_fee_for_delayed_inbox protocol
   in
   let amount = Tez.of_int 16 in
   let depositor = Constant.bootstrap5 in
@@ -751,7 +756,7 @@ let test_delayed_transfer_is_included =
   @@ fun protocol ->
   (* Start the evm node *)
   let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
-    setup_sequencer protocol
+    setup_sequencer ~da_fee:arb_da_fee_for_delayed_inbox protocol
   in
   let endpoint = Evm_node.endpoint sequencer in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
@@ -801,7 +806,7 @@ let test_delayed_deposit_is_included =
   @@ fun protocol ->
   (* Start the evm node *)
   let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
-    setup_sequencer protocol
+    setup_sequencer ~da_fee:arb_da_fee_for_delayed_inbox protocol
   in
   let endpoint = Evm_node.endpoint sequencer in
 
@@ -1108,6 +1113,7 @@ let test_delayed_transfer_timeout =
     setup_sequencer
       ~delayed_inbox_timeout:3
       ~delayed_inbox_min_levels:1
+      ~da_fee:arb_da_fee_for_delayed_inbox
       protocol
   in
   (* Kill the sequencer *)
@@ -1170,6 +1176,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
     setup_sequencer
       ~delayed_inbox_timeout:3
       ~delayed_inbox_min_levels:20
+      ~da_fee:arb_da_fee_for_delayed_inbox
       protocol
   in
   (* Kill the sequencer *)
@@ -1384,6 +1391,12 @@ let test_external_transaction_to_delayed_inbox_fails =
   @@ fun protocol ->
   (* Start the evm node *)
   let* {client; sequencer; proxy; sc_rollup_node; _} =
+    (* We have a da_fee set to zero here. This is because the proxy will perform
+       validation on the tx before adding it the transaction pool. This will fail
+       due to 'gas limit too low' if the da fee is set.
+
+       Since we want to test what happens when the tx is actually submitted, we
+       bypass the da fee check here. *)
     setup_sequencer
       protocol
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -1437,6 +1450,7 @@ let test_delayed_inbox_flushing =
     setup_sequencer
       ~delayed_inbox_timeout:1
       ~delayed_inbox_min_levels:20
+      ~da_fee:arb_da_fee_for_delayed_inbox
       protocol
   in
   (* Kill the sequencer *)

@@ -4,11 +4,15 @@
 
 ### Features
 
+- Delayed EVM transactions no longer pay data-availability fee. (!12401)
+
 ### Bug fixes
 
 - Fix `eth_getTransactionBy*`: report the gas & gasPrice as set by the sender. (!12419)
 
 ### Breaking changes
+
+- Delayed EVM transactions use a dedicated encoding tag in blueprints. (!12401)
 
 ### Internal
 

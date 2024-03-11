@@ -372,7 +372,7 @@ impl TxValidation {
                 tx_data_size,
             );
 
-        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees) else {
+        let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false) else {
             return Self::to_error(MAX_GAS_FEE_TOO_LOW);
         };
 

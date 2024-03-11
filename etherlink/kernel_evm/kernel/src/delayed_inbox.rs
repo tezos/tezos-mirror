@@ -96,6 +96,7 @@ impl Decodable for DelayedTransaction {
             DELAYED_TRANSACTION_TAG => {
                 let payload: Vec<u8> = payload.as_val()?;
                 let delayed_tx = EthereumTransactionCommon::from_bytes(&payload)?;
+
                 Ok(Self::Ethereum(delayed_tx))
             }
             DELAYED_DEPOSIT_TAG => {
@@ -167,7 +168,8 @@ impl DelayedInbox {
     ) -> Result<()> {
         let Transaction { tx_hash, content } = tx;
         let transaction = match content {
-            TransactionContent::Ethereum(tx) => DelayedTransaction::Ethereum(tx),
+            TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
+            TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
             TransactionContent::Deposit(deposit) => DelayedTransaction::Deposit(deposit),
         };
         let item = DelayedInboxItem {
@@ -192,7 +194,7 @@ impl DelayedInbox {
         match delayed {
             DelayedTransaction::Ethereum(tx) => Transaction {
                 tx_hash: tx_hash.0,
-                content: TransactionContent::Ethereum(tx),
+                content: TransactionContent::EthereumDelayed(tx),
             },
             DelayedTransaction::Deposit(deposit) => Transaction {
                 tx_hash: tx_hash.0,
@@ -340,7 +342,7 @@ mod tests {
     use primitive_types::{H160, U256};
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-    use crate::inbox::TransactionContent::Ethereum;
+    use crate::inbox::TransactionContent::{Ethereum, EthereumDelayed};
     use tezos_ethereum::{
         transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
@@ -371,7 +373,7 @@ mod tests {
     fn dummy_transaction(i: u8) -> Transaction {
         Transaction {
             tx_hash: [i; TRANSACTION_HASH_SIZE],
-            content: Ethereum(tx_(i.into())),
+            content: EthereumDelayed(tx_(i.into())),
         }
     }
 
@@ -382,6 +384,7 @@ mod tests {
             DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
 
         let tx: Transaction = dummy_transaction(0);
+
         let timestamp: Timestamp = current_timestamp(&mut host);
         delayed_inbox
             .save_transaction(&mut host, tx.clone(), timestamp, 0)
@@ -395,5 +398,22 @@ mod tests {
             .expect("Reading from the delayed inbox should work")
             .expect("Transaction should be in the delayed inbox");
         assert_eq!((tx, timestamp), read)
+    }
+
+    #[test]
+    fn test_delayed_inbox_roundtrip_error_non_delayed() {
+        let mut host = MockHost::default();
+        let mut delayed_inbox =
+            DelayedInbox::new(&mut host).expect("Delayed inbox should be created");
+
+        let tx: Transaction = Transaction {
+            tx_hash: [12; TRANSACTION_HASH_SIZE],
+            content: Ethereum(tx_(12)),
+        };
+
+        let timestamp: Timestamp = current_timestamp(&mut host);
+        let res = delayed_inbox.save_transaction(&mut host, tx, timestamp, 0);
+
+        assert!(res.is_err());
     }
 }

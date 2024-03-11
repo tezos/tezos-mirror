@@ -73,10 +73,12 @@ impl Decodable for Deposit {
 pub enum TransactionContent {
     Ethereum(EthereumTransactionCommon),
     Deposit(Deposit),
+    EthereumDelayed(EthereumTransactionCommon),
 }
 
 const ETHEREUM_TX_TAG: u8 = 1;
 const DEPOSIT_TX_TAG: u8 = 2;
+const ETHEREUM_DELAYED_TX_TAG: u8 = 3;
 
 impl Encodable for TransactionContent {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
@@ -90,6 +92,11 @@ impl Encodable for TransactionContent {
             TransactionContent::Deposit(dep) => {
                 stream.append(&DEPOSIT_TX_TAG);
                 dep.rlp_append(stream)
+            }
+            TransactionContent::EthereumDelayed(eth) => {
+                stream.append(&ETHEREUM_DELAYED_TX_TAG);
+                let eth_bytes = eth.to_bytes();
+                stream.append(&eth_bytes);
             }
         }
     }
@@ -115,6 +122,11 @@ impl Decodable for TransactionContent {
                 let eth = EthereumTransactionCommon::from_bytes(&bytes)?;
                 Ok(Self::Ethereum(eth))
             }
+            ETHEREUM_DELAYED_TX_TAG => {
+                let bytes: Vec<u8> = tx.as_val()?;
+                let eth = EthereumTransactionCommon::from_bytes(&bytes)?;
+                Ok(Self::EthereumDelayed(eth))
+            }
             _ => Err(DecoderError::Custom("Unknown transaction tag.")),
         }
     }
@@ -130,7 +142,9 @@ impl Transaction {
     pub fn data_size(&self) -> u64 {
         match &self.content {
             TransactionContent::Deposit(_) => 0,
-            TransactionContent::Ethereum(e) => e.data.len() as u64,
+            TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
+                e.data.len() as u64
+            }
         }
     }
 }
@@ -164,7 +178,8 @@ impl Transaction {
         match &self.content {
             // The deposit is considered arbitrarily as a legacy transaction
             TransactionContent::Deposit(_) => TransactionType::Legacy,
-            TransactionContent::Ethereum(tx) => tx.type_,
+            TransactionContent::Ethereum(tx)
+            | TransactionContent::EthereumDelayed(tx) => tx.type_,
         }
     }
 }

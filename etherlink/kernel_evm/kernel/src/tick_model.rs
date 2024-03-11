@@ -145,13 +145,15 @@ pub fn ticks_of_valid_transaction(
     transaction: &Transaction,
     resulting_ticks: u64,
 ) -> u64 {
+    use crate::inbox::TransactionContent::*;
+
     match &transaction.content {
-        crate::inbox::TransactionContent::Ethereum(_) => {
+        Ethereum(_) | EthereumDelayed(_) => {
             ticks_of_valid_transaction_ethereum(resulting_ticks, transaction.data_size())
         }
         // Ticks are already spent during the validation of the transaction (see
         // apply.rs).
-        crate::inbox::TransactionContent::Deposit(_) => resulting_ticks,
+        Deposit(_) => resulting_ticks,
     }
 }
 

@@ -6,13 +6,16 @@
 
 - The private RPC server is no longer launched by default. You need to provide
   the parameter `--private-rpc-port` to launch it. (!12449)
+- Delayed EVM transactions no longer pay data-availability fee. (!12401)
 
 ### Bug fixes
 
 - The transaction pool checks if a transaction can be prepayed before
-  inclusion and injection. (!12342) 
+  inclusion and injection. (!12342)
 
 ### Breaking changes
+
+- Delayed Transactions use a dedicated encoding tag in the block in progress. (!12401)
 
 ### Internal
 
