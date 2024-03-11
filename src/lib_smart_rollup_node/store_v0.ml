@@ -229,40 +229,6 @@ module Levels_to_hashes =
     end))
     (Tezos_store_shared.Block_key)
 
-(* Published slot headers per block hash,
-   stored as a list of bindings from `Dal_slot_index.t`
-   to `Dal.Slot.t`. The encoding function converts this
-   list into a `Dal.Slot_index.t`-indexed map. *)
-module Dal_slot_pages =
-  Irmin_store.Make_nested_map
-    (struct
-      let path = ["dal"; "slot_pages"]
-    end)
-    (struct
-      type key = Block_hash.t
-
-      let to_path_representation = Block_hash.to_b58check
-    end)
-    (struct
-      type key =
-        Octez_smart_rollup.Dal.Slot_index.t
-        * Octez_smart_rollup.Dal.Page_index.t
-
-      let encoding =
-        Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page_index.encoding)
-
-      let compare = Stdlib.compare
-
-      let name = "slot_index"
-    end)
-    (struct
-      type value = bytes
-
-      let encoding = Data_encoding.(bytes' Hex)
-
-      let name = "slot_pages"
-    end)
-
 (** stores slots whose data have been considered and pages stored to disk (if
     they are confirmed). *)
 module Dal_processed_slots =
