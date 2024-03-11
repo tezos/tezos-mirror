@@ -203,3 +203,5 @@ Miscellaneous
 - **Breaking change** Switch encoding of ``nread_total`` field of
   ``P2p_events.read_fd`` in Octez-p2p library to ``Data_encoding.int64`` to fix an
   overflow.
+
+- Versions now include information about the product. (MR :gl:`!12366`)
