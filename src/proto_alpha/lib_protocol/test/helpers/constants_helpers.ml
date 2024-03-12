@@ -157,6 +157,38 @@ module Set = struct
         adaptive_rewards_params
           {c.adaptive_issuance.adaptive_rewards_params with max_bonus}
           c
+
+      let issuance_ratio_final_min issuance_ratio_final_min (c : t) =
+        adaptive_rewards_params
+          {
+            c.adaptive_issuance.adaptive_rewards_params with
+            issuance_ratio_final_min;
+          }
+          c
+
+      let issuance_ratio_final_max issuance_ratio_final_max (c : t) =
+        adaptive_rewards_params
+          {
+            c.adaptive_issuance.adaptive_rewards_params with
+            issuance_ratio_final_max;
+          }
+          c
+
+      let issuance_ratio_initial_min issuance_ratio_initial_min (c : t) =
+        adaptive_rewards_params
+          {
+            c.adaptive_issuance.adaptive_rewards_params with
+            issuance_ratio_initial_min;
+          }
+          c
+
+      let issuance_ratio_initial_max issuance_ratio_initial_max (c : t) =
+        adaptive_rewards_params
+          {
+            c.adaptive_issuance.adaptive_rewards_params with
+            issuance_ratio_initial_max;
+          }
+          c
     end
   end
 end

@@ -108,13 +108,17 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
               src_name ;
             Some delegate.pkh
       in
+      let is_not_changing_delegate =
+        Option.equal String.equal delegate_name_opt src.delegate
+      in
       let cycle = Block.current_cycle block in
       let* operation =
         Op.delegation ~fee:Tez.zero (B block) src.contract delegate_pkh_opt
       in
       let balance = balance_of_account src_name state.account_map in
       let state =
-        if Q.(equal balance.staked_b zero) then state
+        if Q.(equal balance.staked_b zero) || is_not_changing_delegate then
+          state
         else
           let state = State.apply_unstake cycle Tez.max_tez src_name state in
           (* Changing delegate applies finalize if unstake happened *)

@@ -199,7 +199,7 @@ let check_balance_field src_name field amount : (t, t) scenarios =
   let open Lwt_result_syntax in
   let check = Assert.equal_tez ~loc:__LOC__ amount in
   let check' a = check (Partial_tez.to_tez ~round:`Down a) in
-  exec_state (fun (block, state) ->
+  exec_unit (fun (block, state) ->
       let src = State.find_account src_name state in
       let src_balance, src_total =
         balance_and_total_balance_of_account src_name state.account_map
@@ -228,4 +228,4 @@ let check_balance_field src_name field amount : (t, t) scenarios =
             let* () = check rpc_total in
             check src_total
       in
-      return state)
+      return_unit)
