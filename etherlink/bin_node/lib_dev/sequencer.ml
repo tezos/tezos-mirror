@@ -266,7 +266,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ctxt.store
   in
 
-  let* ctxt =
+  let* () =
     if not loaded then
       (* Create the first empty block. *)
       let* genesis =
@@ -281,7 +281,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
           ~parent_hash:Ethereum_types.genesis_parent_hash
       in
       Evm_context.apply_and_publish_blueprint ctxt genesis
-    else return ctxt
+    else return_unit
   in
 
   let module Sequencer = Make (struct

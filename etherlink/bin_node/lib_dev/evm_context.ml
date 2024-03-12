@@ -65,7 +65,7 @@ let execute ?wasm_entrypoint ctxt inbox =
   let config = execution_config ctxt in
   let*! evm_state = evm_state ctxt in
   let* evm_state = Evm_state.execute ?wasm_entrypoint ~config evm_state inbox in
-  return (ctxt, evm_state)
+  return evm_state
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
@@ -114,7 +114,7 @@ let apply_blueprint ctxt payload =
       Lwt_watcher.notify
         ctxt.blueprint_watcher
         {number = Qty blueprint_number; payload} ;
-      return ctxt
+      return_unit
   | Apply_success _ (* Produced a block, but not of the expected height *)
   | Apply_failure (* Did not produce a block *) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
@@ -124,7 +124,7 @@ let apply_blueprint ctxt payload =
 let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
   let open Lwt_result_syntax in
   let (Qty level) = ctxt.next_blueprint_number in
-  let* ctxt = apply_blueprint ctxt blueprint.to_execute in
+  let* () = apply_blueprint ctxt blueprint.to_execute in
   let* () =
     Store.Publishable_blueprints.store
       ctxt.store
@@ -132,7 +132,7 @@ let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
       blueprint.to_publish
   in
   let* () = Blueprints_publisher.publish level blueprint.to_publish in
-  return ctxt
+  return_unit
 
 let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ~smart_rollup_address () =
