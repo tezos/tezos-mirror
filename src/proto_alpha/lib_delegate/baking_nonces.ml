@@ -52,6 +52,7 @@ type nonce_data = {
   nonce : Nonce.t;
   cycle : Cycle.t option;
   level : Raw_level.t option;
+  round : Round.t option;
 }
 
 type nonces = nonce_data Block_hash.Map.t
@@ -62,18 +63,13 @@ let nonce_data_encoding =
   let open Data_encoding in
   def "nonce_data"
   @@ conv
-       (fun {nonce; cycle; level} -> (nonce, cycle, level))
-       (fun (nonce, cycle, level) -> {nonce; cycle; level})
-       (obj3
+       (fun {nonce; cycle; level; round} -> (nonce, cycle, level, round))
+       (fun (nonce, cycle, level, round) -> {nonce; cycle; level; round})
+       (obj4
           (req "nonce" Nonce.encoding)
-<<<<<<< Updated upstream
-          (req "cycle" (option Cycle.encoding))
-          (req "level" (option Raw_level.encoding)))
-=======
           (opt "cycle" Cycle.encoding)
           (opt "level" Raw_level.encoding)
-          (req "round" (option Round.encoding)))
->>>>>>> Stashed changes
+          (opt "round" Round.encoding))
 
 let legacy_encoding =
   let open Data_encoding in
@@ -151,7 +147,7 @@ let load (wallet : #Client_context.wallet) location =
     in
     return
     @@ Block_hash.Map.map
-         (fun nonce -> {nonce; cycle = None; level = None})
+         (fun nonce -> {nonce; cycle = None; level = None; round = None})
          legacy_nonces
 
 let save (wallet : #Client_context.wallet) location nonces =
@@ -191,7 +187,7 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
     in
     let detailed_nonces =
       Block_hash.Map.map
-        (fun nonce -> {nonce; cycle = None; level = None})
+        (fun nonce -> {nonce; cycle = None; level = None; round = None})
         legacy_nonces
     in
     wallet#write
@@ -293,7 +289,7 @@ let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
   | Some previous_cycle ->
       let* nonces = fill_missing_fields cctxt chain nonces_location nonces in
       Block_hash.Map.fold_es
-        (fun hash {nonce; cycle; level} acc ->
+        (fun hash {nonce; cycle; level; _} acc ->
           match cycle with
           | Some cycle when Cycle.(cycle = previous_cycle) -> (
               match level with
@@ -346,7 +342,7 @@ let generate_seed_nonce (nonce_config : Baking_configuration.nonce_config)
   return (Nonce.hash nonce, nonce)
 
 let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
-    nonce ~cycle ~level =
+    nonce ~cycle ~level ~round =
   let open Lwt_result_syntax in
   let*! () = Events.(emit registering_nonce block_hash) in
   (* Register the nonce *)
@@ -354,7 +350,10 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
   cctxt#with_lock @@ fun () ->
   let* nonces = load cctxt nonces_location in
   let nonces =
-    add nonces block_hash {nonce; cycle = Some cycle; level = Some level}
+    add
+      nonces
+      block_hash
+      {nonce; cycle = Some cycle; level = Some level; round = Some round}
   in
   let* () = save cctxt nonces_location nonces in
   return_unit

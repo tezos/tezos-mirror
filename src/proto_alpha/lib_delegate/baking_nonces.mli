@@ -60,10 +60,10 @@ val generate_seed_nonce :
   Raw_level.t ->
   (Nonce_hash.t * Nonce.t) tzresult Lwt.t
 
-(** [register_nonce cctxt ~chain_id block_hash nonce ~cycle ~level] updates the 
-    contents from the nonces file located using [cctxt] and [~chain_id] by adding 
-    a new entry or replacing an existing one of the form 
-    [block_hash] : [nonce] * [~cycle] * [~level]. *)
+(** [register_nonce cctxt ~chain_id block_hash nonce ~cycle ~level ~round] updates 
+    the contents from the nonces file located using [cctxt] and [~chain_id] by 
+    adding a new entry or replacing an existing one of the form 
+    [block_hash] : [nonce] * [~cycle] * [~level] * [~round]. *)
 val register_nonce :
   #Protocol_client_context.full ->
   chain_id:Chain_id.t ->
@@ -71,6 +71,7 @@ val register_nonce :
   Nonce.t ->
   cycle:Cycle.t ->
   level:Raw_level.t ->
+  round:Round.t ->
   unit tzresult Lwt.t
 
 (** [start_revelation_worker cctxt config chain_id constants block_stream] 
