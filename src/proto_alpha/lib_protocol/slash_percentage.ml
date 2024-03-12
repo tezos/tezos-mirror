@@ -44,3 +44,7 @@ let get ctxt ~(kind : Misbehaviour_repr.kind) ~(level : Level_repr.t)
   | Double_attesting | Double_preattesting ->
       let* ctxt, rights = Delegate_sampler.attesting_rights_count ctxt level in
       return (ctxt, for_double_attestation ctxt rights denounced)
+
+module Internal_for_tests = struct
+  let for_double_attestation = for_double_attestation
+end

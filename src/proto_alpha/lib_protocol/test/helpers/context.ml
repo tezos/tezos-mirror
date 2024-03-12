@@ -744,7 +744,7 @@ let init_with_parameters1 = init_with_parameters_gen T1
 
 let init_with_parameters2 = init_with_parameters_gen T2
 
-let default_raw_context () =
+let raw_context_from_constants constants =
   let open Lwt_result_wrap_syntax in
   let open Tezos_protocol_alpha_parameters in
   let initial_account = Account.new_account () in
@@ -753,7 +753,6 @@ let default_raw_context () =
       ~balance:(Tez.of_mutez_exn 100_000_000_000L)
       initial_account
   in
-  let* constants, _, _ = Block.prepare_initial_context_params () in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts:[bootstrap_accounts]
@@ -786,3 +785,8 @@ let default_raw_context () =
       ~typecheck_smart_rollup
   in
   return e
+
+let default_raw_context () =
+  let open Lwt_result_wrap_syntax in
+  let* constants, _, _ = Block.prepare_initial_context_params () in
+  raw_context_from_constants constants
