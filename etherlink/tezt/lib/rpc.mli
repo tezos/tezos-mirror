@@ -49,6 +49,10 @@ val get_code : address:string -> Evm_node.t -> (string, error) result Lwt.t
 (** [block_number evm_node] calls [eth_blockNumber]. *)
 val block_number : Evm_node.t -> (int32, error) result Lwt.t
 
+(** [block_number_opt evm_node] calls [eth_blockNumber]. allows None
+    when no block have been produced yet.  *)
+val block_number_opt : Evm_node.t -> (int32 option, error) result Lwt.t
+
 (** [get_block_by_number ?full_tx_objets ~block evm_node] calls
     [eth_getBlockByNumber]. [full_tx_objects] is false by default, so
     the block contains the transaction hashes. [block] can be

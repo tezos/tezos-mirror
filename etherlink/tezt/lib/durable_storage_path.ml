@@ -27,6 +27,12 @@
 
 type path = string
 
+let no_0x s =
+  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
+  else s
+
+let normalize s = String.lowercase_ascii @@ no_0x s
+
 let evm rst = sf "/evm%s" rst
 
 let world_state rst = evm (sf "/world_state%s" rst)
@@ -37,7 +43,7 @@ let kernel_root_hash = evm "/kernel_root_hash"
 
 let eth_accounts = world_state "/eth_accounts"
 
-let eth_account addr = sf "%s/%s" eth_accounts (Helpers.normalize addr)
+let eth_account addr = sf "%s/%s" eth_accounts (normalize addr)
 
 let balance addr = sf "%s/balance" (eth_account addr)
 
@@ -78,7 +84,7 @@ let reveal_config = "/__tmp/reveal_config"
 module Ghostnet = struct
   let eth_accounts = evm "/eth_accounts"
 
-  let eth_account addr = sf "%s/%s" eth_accounts (Helpers.normalize addr)
+  let eth_account addr = sf "%s/%s" eth_accounts (normalize addr)
 
   let balance addr = sf "%s/balance" (eth_account addr)
 

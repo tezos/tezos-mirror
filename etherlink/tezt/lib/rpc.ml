@@ -120,6 +120,16 @@ let block_number evm_node =
        (fun json -> JSON.(json |-> "result" |> as_string |> Int32.of_string))
        json)
 
+let block_number_opt evm_node =
+  let* json = Evm_node.call_evm_rpc evm_node Request.eth_blockNumber in
+  return
+    (decode_or_error
+       (fun json ->
+         JSON.(
+           json |-> "result" |> as_opt |> Option.map as_string
+           |> Option.map Int32.of_string))
+       json)
+
 let get_block_by_number ?(full_tx_objects = false) ~block evm_node =
   let* json =
     Evm_node.call_evm_rpc

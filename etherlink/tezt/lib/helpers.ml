@@ -27,19 +27,13 @@
 let evm_type =
   "or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes"
 
-let no_0x s =
-  if String.starts_with ~prefix:"0x" s then String.sub s 2 (String.length s - 2)
-  else s
-
-let normalize s = String.lowercase_ascii @@ no_0x s
-
 let u16_to_bytes n =
   let bytes = Bytes.make 2 'a' in
   Bytes.set_uint16_le bytes 0 n ;
   Bytes.to_string bytes
 
 let leftPad32 s =
-  let s = no_0x s in
+  let s = Durable_storage_path.no_0x s in
   let len = String.length s in
   String.make (64 - len) '0' ^ s
 
@@ -53,19 +47,18 @@ let mapping_position index map_position =
 
 let hex_string_to_int x = `Hex x |> Hex.to_string |> Z.of_bits |> Z.to_int
 
-let next_rollup_node_level ~sc_rollup_node ~node ~client =
+let next_rollup_node_level ~sc_rollup_node ~client =
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  let* level = Node.get_level node in
-  Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node level
+  Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node
 
-let next_evm_level ~evm_node ~sc_rollup_node ~node ~client =
+let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
-  | Proxy _ -> next_rollup_node_level ~sc_rollup_node ~node ~client
+  | Proxy _ ->
+      let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
+      unit
   | Sequencer _ ->
-      let open Rpc.Syntax in
-      let* _ = Rpc.produce_block evm_node in
-      let*@ level = Rpc.block_number evm_node in
-      return (Int32.to_int level)
+      let* _l2_level = Rpc.produce_block evm_node in
+      unit
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
 
 let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
@@ -78,7 +71,7 @@ let read_tx_from_file () =
          | [tx_raw; tx_hash] -> (tx_raw, tx_hash)
          | _ -> failwith "Unexpected tx_raw and tx_hash.")
 
-let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client ~node =
+let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client =
   let force_kernel_upgrade_payload =
     (* Framed protocol tag. *)
     "\000"
@@ -95,7 +88,7 @@ let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client ~node =
       client
       (sf "hex:[%S]" force_kernel_upgrade_payload)
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client ~node in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
 let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
@@ -165,3 +158,25 @@ let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
       client
   in
   Client.bake_for_and_wait ~keys:[] client
+
+let bake_until_sync ?(timeout = 30.) ~sc_rollup_node ~proxy ~sequencer ~client
+    () =
+  let open Rpc.Syntax in
+  let*@ sequencer_level = Rpc.block_number sequencer in
+  let rec go () =
+    let*@ proxy_level_opt = Rpc.block_number_opt proxy in
+    match proxy_level_opt with
+    | None ->
+        let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        go ()
+    | Some proxy_level ->
+        if sequencer_level < proxy_level then
+          Test.fail
+            ~loc:__LOC__
+            "rollup node has more recent block. Not supposed to happened "
+        else if sequencer_level = proxy_level then unit
+        else
+          let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+          go ()
+  in
+  Lwt.pick [go (); Lwt_unix.sleep timeout]
