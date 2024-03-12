@@ -1197,5 +1197,70 @@ let config () =
 let () =
   (* If argument --verbose is set, then log generation info.
      If argument --inline-source, then print generation info in yml files. *)
-  let filename = Base.(project_root // ".gitlab-ci.yml") in
-  To_yaml.to_file ~header:Tezos_ci.header ~filename (config ())
+  let filename = ".gitlab-ci.yml" in
+  Tezos_ci.to_file ~filename (config ()) ;
+  (* Paths to exclude from generation check. As files are translated
+     to CI-in-OCaml, they should be removed from this function *)
+  let exclude = function
+    | ".gitlab/ci/jobs/build/bin_packages_common.yml"
+    | ".gitlab/ci/jobs/build/common.yml"
+    | ".gitlab/ci/jobs/build/oc.build_kernels.yml"
+    | ".gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml"
+    | ".gitlab/ci/jobs/build/oc.build_x86_64-released.yml"
+    | ".gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-before_merging.yml"
+    | ".gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-other.yml"
+    | ".gitlab/ci/jobs/build/oc.tezt:fetch-records.yml"
+    | ".gitlab/ci/jobs/build/ocaml-check.yml"
+    | ".gitlab/ci/jobs/build/select_tezts.yml"
+    | ".gitlab/ci/jobs/coverage/common.yml"
+    | ".gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml"
+    | ".gitlab/ci/jobs/doc/documentation.yml"
+    | ".gitlab/ci/jobs/doc/documentation:linkcheck.yml"
+    | ".gitlab/ci/jobs/doc/oc.install_python.yml"
+    | ".gitlab/ci/jobs/packaging/debian_repository.yml"
+    | ".gitlab/ci/jobs/packaging/opam:prepare.yml"
+    | ".gitlab/ci/jobs/packaging/opam_package.yml"
+    | ".gitlab/ci/jobs/sanity/docker:hadolint-before_merging.yml"
+    | ".gitlab/ci/jobs/sanity/docker:hadolint-schedule_extended_test.yml"
+    | ".gitlab/ci/jobs/sanity/docker:hadolint.yml"
+    | ".gitlab/ci/jobs/sanity/sanity_ci.yml"
+    | ".gitlab/ci/jobs/shared/images.yml"
+    | ".gitlab/ci/jobs/shared/templates.yml"
+    | ".gitlab/ci/jobs/test/commit_titles.yml"
+    | ".gitlab/ci/jobs/test/common.yml"
+    | ".gitlab/ci/jobs/test/install_octez.yml"
+    | ".gitlab/ci/jobs/test/kaitai_checks.yml"
+    | ".gitlab/ci/jobs/test/kaitai_e2e_checks.yml"
+    | ".gitlab/ci/jobs/test/misc_opam_checks.yml"
+    | ".gitlab/ci/jobs/test/oc.check_lift_limits_patch.yml"
+    | ".gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml"
+    | ".gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml"
+    | ".gitlab/ci/jobs/test/oc.misc_checks-schedule_extended_test.yml"
+    | ".gitlab/ci/jobs/test/oc.script:b58_prefix.yml"
+    | ".gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml"
+    | ".gitlab/ci/jobs/test/oc.script:test-gen-genesis.yml"
+    | ".gitlab/ci/jobs/test/oc.script:test_octez_release_versions.yml"
+    | ".gitlab/ci/jobs/test/oc.semgrep.yml"
+    | ".gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml"
+    | ".gitlab/ci/jobs/test/oc.unit.yml"
+    | ".gitlab/ci/jobs/test/test_etherlink_kernel-before_merging.yml"
+    | ".gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml"
+    | ".gitlab/ci/jobs/test/test_evm_compatibility.yml"
+    | ".gitlab/ci/jobs/test/test_kernels.yml"
+    | ".gitlab/ci/jobs/test/test_risc_v_kernels-before_merging.yml"
+    | ".gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml"
+    | ".gitlab/ci/jobs/test/tezt-flaky-before_merging.yml"
+    | ".gitlab/ci/jobs/test/tezt-flaky-schedule_extended_test.yml"
+    | ".gitlab/ci/jobs/test/tezt-flaky.yml"
+    | ".gitlab/ci/jobs/test/tezt-slow-before_merging.yml"
+    | ".gitlab/ci/jobs/test/tezt-slow-schedule_extended_test.yml"
+    | ".gitlab/ci/jobs/test/tezt-slow.yml" | ".gitlab/ci/jobs/test/tezt.yml"
+    | ".gitlab/ci/pipelines/before_merging.yml"
+    | ".gitlab/ci/pipelines/schedule_extended_test.yml" ->
+        true
+    | _ -> false
+  in
+  Tezos_ci.check_files
+    ~remove_extra_files:Cli.config.remove_extra_files
+    ~exclude
+    ()
