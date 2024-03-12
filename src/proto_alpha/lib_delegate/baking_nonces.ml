@@ -48,7 +48,11 @@ let override_legacy_nonces_flag = false
 
 type t = state
 
-type nonce_data = {nonce : Nonce.t; cycle : Cycle.t option}
+type nonce_data = {
+  nonce : Nonce.t;
+  cycle : Cycle.t option;
+  level : Raw_level.t option;
+}
 
 type nonces = nonce_data Block_hash.Map.t
 
@@ -58,9 +62,18 @@ let nonce_data_encoding =
   let open Data_encoding in
   def "nonce_data"
   @@ conv
-       (fun {nonce; cycle} -> (nonce, cycle))
-       (fun (nonce, cycle) -> {nonce; cycle})
-       (obj2 (req "nonce" Nonce.encoding) (req "cycle" (option Cycle.encoding)))
+       (fun {nonce; cycle; level} -> (nonce, cycle, level))
+       (fun (nonce, cycle, level) -> {nonce; cycle; level})
+       (obj3
+          (req "nonce" Nonce.encoding)
+<<<<<<< Updated upstream
+          (req "cycle" (option Cycle.encoding))
+          (req "level" (option Raw_level.encoding)))
+=======
+          (opt "cycle" Cycle.encoding)
+          (opt "level" Raw_level.encoding)
+          (req "round" (option Round.encoding)))
+>>>>>>> Stashed changes
 
 let legacy_encoding =
   let open Data_encoding in
@@ -137,7 +150,9 @@ let load (wallet : #Client_context.wallet) location =
       wallet#load nonces_location ~default:empty legacy_encoding
     in
     return
-    @@ Block_hash.Map.map (fun nonce -> {nonce; cycle = None}) legacy_nonces
+    @@ Block_hash.Map.map
+         (fun nonce -> {nonce; cycle = None; level = None})
+         legacy_nonces
 
 let save (wallet : #Client_context.wallet) location nonces =
   let open Lwt_result_syntax in
@@ -175,7 +190,9 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
       wallet#load nonces_location ~default:empty legacy_encoding
     in
     let detailed_nonces =
-      Block_hash.Map.map (fun nonce -> {nonce; cycle = None}) legacy_nonces
+      Block_hash.Map.map
+        (fun nonce -> {nonce; cycle = None; level = None})
+        legacy_nonces
     in
     wallet#write
       (get_detailed_nonces_location nonces_location)
@@ -261,18 +278,20 @@ let filter_outdated_nonces state nonces =
   in
   return (remove_all nonces outdated_nonces)
 
-(** [find_missing_cycle cctxt chain hash cycle] makes an RPC call to retrieve the cycle of the 
-     current block [hash] only when this information is missing. *)
-let find_missing_cycle (cctxt : #Protocol_client_context.full) chain hash cycle
-    =
+(** [fill_any_missing_fields cctxt chain hash nonce_data] fills the [None] fields of a particular
+    [nonce_data] entry and only makes an RPC call when there is a missing field. *)
+let fill_any_missing_fields (cctxt : #Protocol_client_context.full) chain hash
+    nonce_data =
   let open Lwt_result_syntax in
-  match cycle with
-  | Some _ -> return cycle
-  | None ->
-      let* {cycle; _} =
-        Plugin.RPC.current_level cctxt (chain, `Hash (hash, 0))
-      in
-      return (Some cycle)
+  if Option.is_none nonce_data.cycle || Option.is_none nonce_data.level then
+    let* rpc_level = Plugin.RPC.current_level cctxt (chain, `Hash (hash, 0)) in
+    return
+      {
+        nonce_data with
+        cycle = Some (Option.value nonce_data.cycle ~default:rpc_level.cycle);
+        level = Some (Option.value nonce_data.level ~default:rpc_level.level);
+      }
+  else return nonce_data
 
 (** [fill_missing_fields cctxt chain nonces_location nonces] iterates through the nonces map and
     fills the [None] fields with the necessary information, then it synchronises the information
@@ -282,9 +301,9 @@ let fill_missing_fields (cctxt : #Protocol_client_context.full) chain
   let open Lwt_result_syntax in
   let* filled_nonces =
     Block_hash.Map.fold_es
-      (fun hash {nonce; cycle} acc ->
-        let+ cycle = find_missing_cycle cctxt chain hash cycle in
-        Block_hash.Map.add hash {nonce; cycle} acc)
+      (fun hash nonce_data acc ->
+        let* nonce_data = fill_any_missing_fields cctxt chain hash nonce_data in
+        return @@ Block_hash.Map.add hash nonce_data acc)
       nonces
       empty
   in
@@ -306,7 +325,7 @@ let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces =
   | Some previous_cycle ->
       let* nonces = fill_missing_fields cctxt chain nonces_location nonces in
       Block_hash.Map.fold_es
-        (fun hash {nonce; cycle} acc ->
+        (fun hash {nonce; cycle; _} acc ->
           match cycle with
           | Some cycle when Cycle.(cycle = previous_cycle) -> (
               let*! level_opt =
@@ -359,14 +378,16 @@ let generate_seed_nonce (nonce_config : Baking_configuration.nonce_config)
   return (Nonce.hash nonce, nonce)
 
 let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
-    nonce ~cycle =
+    nonce ~cycle ~level =
   let open Lwt_result_syntax in
   let*! () = Events.(emit registering_nonce block_hash) in
   (* Register the nonce *)
   let nonces_location = Baking_files.resolve_location ~chain_id `Nonce in
   cctxt#with_lock @@ fun () ->
   let* nonces = load cctxt nonces_location in
-  let nonces = add nonces block_hash {nonce; cycle = Some cycle} in
+  let nonces =
+    add nonces block_hash {nonce; cycle = Some cycle; level = Some level}
+  in
   let* () = save cctxt nonces_location nonces in
   return_unit
 
