@@ -173,6 +173,7 @@ type instruction_name =
   | N_IContract
   | N_ITransfer_tokens
   | N_IImplicit_account
+  | N_IIs_implicit_account
   | N_ICreate_contract
   | N_ISet_delegate
   (* time *)
@@ -382,6 +383,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IContract -> "N_IContract"
   | N_ITransfer_tokens -> "N_ITransfer_tokens"
   | N_IImplicit_account -> "N_IImplicit_account"
+  | N_IIs_implicit_account -> "N_IIs_implicit_account"
   | N_ICreate_contract -> "N_ICreate_contract"
   | N_ISet_delegate -> "N_ISet_delegate"
   | N_INow -> "N_INow"
@@ -614,6 +616,7 @@ let all_instructions =
     N_IContract;
     N_ITransfer_tokens;
     N_IImplicit_account;
+    N_IIs_implicit_account;
     N_ICreate_contract;
     N_ISet_delegate;
     N_INow;
@@ -1033,6 +1036,8 @@ module Instructions = struct
 
   let implicit_account = ir_sized_step N_IImplicit_account nullary
 
+  let is_implicit_account = ir_sized_step N_IIs_implicit_account nullary
+
   let create_contract = ir_sized_step N_ICreate_contract nullary
 
   let set_delegate = ir_sized_step N_ISet_delegate nullary
@@ -1437,6 +1442,7 @@ let extract_ir_sized_step :
   | ITransfer_tokens (_, _), _ -> Instructions.transfer_tokens
   | IView (_, _, _, _), _ -> Instructions.view
   | IImplicit_account (_, _), _ -> Instructions.implicit_account
+  | IIs_implicit_account (_, _), _ -> Instructions.is_implicit_account
   | ICreate_contract _, _ -> Instructions.create_contract
   | ISet_delegate (_, _), _ -> Instructions.set_delegate
   | INow (_, _), _ -> Instructions.now

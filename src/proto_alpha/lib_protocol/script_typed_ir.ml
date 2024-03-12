@@ -899,6 +899,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IImplicit_account :
       Script.location * (unit typed_contract, 'S, 'r, 'F) kinstr
       -> (public_key_hash, 'S, 'r, 'F) kinstr
+  | IIs_implicit_account :
+      Script.location * (public_key_hash option, 'S, 'r, 'F) kinstr
+      -> (address, 'S, 'r, 'F) kinstr
   | ICreate_contract : {
       loc : Script.location;
       storage_type : ('a, _) ty;
@@ -1651,6 +1654,7 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | ITransfer_tokens (loc, _) -> loc
   | IView (loc, _, _, _) -> loc
   | IImplicit_account (loc, _) -> loc
+  | IIs_implicit_account (loc, _) -> loc
   | ICreate_contract {loc; _} -> loc
   | ISet_delegate (loc, _) -> loc
   | INow (loc, _) -> loc
@@ -2063,6 +2067,9 @@ let contract_t loc t =
 let contract_unit_t =
   Contract_t (unit_t, assert_ok1 contract_metadata unit_metadata)
 
+let key_hash_option_t =
+  Option_t (key_hash_t, assert_ok1 option_metadata key_hash_metadata, Yes)
+
 let sapling_transaction_t ~memo_size = Sapling_transaction_t memo_size
 
 let sapling_transaction_deprecated_t ~memo_size =
@@ -2230,6 +2237,7 @@ let kinstr_traverse i init f =
     | IView (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | ITransfer_tokens (_, k) -> (next [@ocaml.tailcall]) k
     | IImplicit_account (_, k) -> (next [@ocaml.tailcall]) k
+    | IIs_implicit_account (_, k) -> (next [@ocaml.tailcall]) k
     | ICreate_contract {k; _} -> (next [@ocaml.tailcall]) k
     | ISet_delegate (_, k) -> (next [@ocaml.tailcall]) k
     | INow (_, k) -> (next [@ocaml.tailcall]) k

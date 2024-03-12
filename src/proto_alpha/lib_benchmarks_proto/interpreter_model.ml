@@ -705,7 +705,8 @@ let ir_model instr_or_cont =
       | N_ICheck_signature_ed25519 | N_ICheck_signature_secp256k1
       | N_ICheck_signature_p256 | N_ICheck_signature_bls ->
           (affine_model, const1_skip1_model) |> m2 name
-      | N_IContract | N_ITransfer_tokens | N_IImplicit_account ->
+      | N_IContract | N_ITransfer_tokens | N_IImplicit_account
+      | N_IIs_implicit_account ->
           (const1_model, const1_model) |> m2 name
       (* The following two instructions are expected to have an affine model. However,
          we observe 3 affine parts, on [0;300], [300;400] and [400;\inf[. *)

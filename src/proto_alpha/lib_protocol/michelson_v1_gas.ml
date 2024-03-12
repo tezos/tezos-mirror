@@ -433,6 +433,8 @@ module Cost_of = struct
 
     let implicit_account = atomic_step_cost cost_N_IImplicit_account
 
+    let is_implicit_account = atomic_step_cost cost_N_IIs_implicit_account
+
     let create_contract = atomic_step_cost cost_N_ICreate_contract
 
     let set_delegate = atomic_step_cost cost_N_ISet_delegate

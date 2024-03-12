@@ -878,6 +878,7 @@ module Scripts = struct
       | IView _ -> pp_print_string fmt "VIEW"
       | ITransfer_tokens _ -> pp_print_string fmt "TRANSFER_TOKENS"
       | IImplicit_account _ -> pp_print_string fmt "IMPLICIT_ACCOUNT"
+      | IIs_implicit_account _ -> pp_print_string fmt "IS_IMPLICIT_ACCOUNT"
       | ICreate_contract _ -> pp_print_string fmt "CREATE_CONTRACT"
       | ISet_delegate _ -> pp_print_string fmt "SET_DELEGATE"
       | INow _ -> pp_print_string fmt "NOW"

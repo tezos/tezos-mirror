@@ -369,6 +369,8 @@
     "interpreter/N_IInt_bytes_const": 20,
     "interpreter/N_IInt_nat_alloc_const": 0,
     "interpreter/N_IInt_nat_const": 10,
+    "interpreter/N_IIs_implicit_account_alloc_const": 8,
+    "interpreter/N_IIs_implicit_account_const": 10,
     "interpreter/N_IIs_nat_alloc_const": 8,
     "interpreter/N_IIs_nat_const": 10,
     "interpreter/N_IJoin_tickets_add_coeff": 0.07889348241253691,

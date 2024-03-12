@@ -578,6 +578,7 @@ and kinstr_size :
           (base1 loc k +! stack_ty_for_logging_size sty +! (word_size *? 2))
     | ITransfer_tokens (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IImplicit_account (loc, k) -> ret_succ_adding accu (base1 loc k)
+    | IIs_implicit_account (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICreate_contract {loc; storage_type; code; k} ->
         ret_succ_adding
           (accu ++ ty_size storage_type ++ expr_size code)

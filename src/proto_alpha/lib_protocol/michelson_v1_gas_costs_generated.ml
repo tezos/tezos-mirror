@@ -1728,6 +1728,18 @@ let cost_N_IInt_nat_alloc = S.safe_int 10
 (* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IInt_nat_synthesized = S.safe_int 10
 
+(* model interpreter/N_IIs_implicit_account *)
+(* max 10 10. *)
+let cost_N_IIs_implicit_account = S.safe_int 10
+
+(* model interpreter/N_IIs_implicit_account_alloc *)
+(* max 10 8. *)
+let cost_N_IIs_implicit_account_alloc = S.safe_int 10
+
+(* model interpreter/N_IIs_implicit_account_synthesized *)
+(* let time = 10. in let alloc = 8. in max 10 (max time alloc) *)
+let cost_N_IIs_implicit_account_synthesized = S.safe_int 10
+
 (* model interpreter/N_IIs_nat *)
 (* max 10 10. *)
 let cost_N_IIs_nat = S.safe_int 10
