@@ -94,9 +94,6 @@ contrib/kaitai-struct-files/doc
 **/.venv
 **/.mypy_cache/
 
-# Output of the update_opam_repo script
-opam_repo.patch
-
 # Rust
 target
 
