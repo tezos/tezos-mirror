@@ -66,6 +66,8 @@ module Shard_proofs_cache : sig
 
   type 'a t
 
+  (** Returns the element associated to the commitment in the shard proofs cache, or [None] if
+      there is none. *)
   val find_opt : 'a t -> commitment -> 'a option
 end
 
