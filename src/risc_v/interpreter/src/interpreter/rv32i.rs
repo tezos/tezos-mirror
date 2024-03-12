@@ -180,7 +180,6 @@ where
             Mode::User => Exception::EnvCallFromUMode,
             Mode::Supervisor => Exception::EnvCallFromSMode,
             Mode::Machine => Exception::EnvCallFromMMode,
-            Mode::Debug => Exception::IllegalInstruction,
         }
     }
 
@@ -719,7 +718,6 @@ mod tests {
             (Mode::User, Exception::EnvCallFromUMode),
             (Mode::Supervisor, Exception::EnvCallFromSMode),
             (Mode::Machine, Exception::EnvCallFromMMode),
-            (Mode::Debug, Exception::IllegalInstruction),
         ];
 
         for (mode, expected_e) in mode_exc {

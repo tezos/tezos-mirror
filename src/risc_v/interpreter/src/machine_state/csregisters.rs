@@ -9,13 +9,15 @@ mod satp;
 pub mod xstatus;
 
 use self::satp::{SvLength, TranslationAlgorithm};
+use super::{bus::Address, mode::TrapMode};
 use crate::{
     machine_state::mode::Mode,
     state_backend::{self as backend, Region},
-    traps::{Exception, Interrupt},
+    traps::{Exception, Interrupt, TrapContext, TrapKind},
 };
 use num_enum::TryFromPrimitive;
 use strum::IntoEnumIterator;
+use twiddle::Twiddle;
 
 /// Privilege required to access a CSR
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -1231,8 +1233,74 @@ impl<M: backend::Manager> CSRegisters<M> {
             Mode::User => Interrupt::SUPERVISOR_BIT_MASK | Interrupt::MACHINE_BIT_MASK,
             Mode::Supervisor => ie_supervisor | Interrupt::MACHINE_BIT_MASK,
             Mode::Machine => ie_machine,
-            Mode::Debug => 0,
         }
+    }
+
+    /// Determine the mode where this trap would go to.
+    pub fn get_trap_mode<TC: TrapContext>(&self, trap_source: &TC, current_mode: Mode) -> TrapMode {
+        // Section 3.1.8: Machine Trap Delegation Registers (medeleg and mideleg)
+        //
+        // "By default, all traps at any privilege level are handled in machine mode"
+        // "To increase performance, implementations can provide individual read/write bits within
+        // medeleg and mideleg to indicate that certain exceptions and interrupts should be
+        // processed directly by a lower privilege level."
+        //
+        // "medeleg has a bit position allocated for every synchronous exception
+        // shown in Table 3.6, with the index of the bit position equal to the value
+        // returned in the mcause register (i.e., setting bit 8 allows user-mode environment calls
+        // to be delegated to a lower-privilege trap handler)."
+        //
+        // Traps never transition from a more-privileged mode to a
+        // less-privileged mode. For example, if M-mode has delegated illegal instruction
+        // exceptions to S-mode, and M-mode software later executes
+        // an illegal instruction, the trap is taken in M-mode,
+        // rather than being delegated to S-mode.
+
+        // Section 3.1.9: An interrupt i will trap to M-mode
+        // (causing the privilege mode to change to M-mode)
+        // if all of the following are true:
+        // (a) either the current privilege mode is M and the MIE bit in the mstatus
+        //     register is set, or the current privilege mode has less privilege than M-mode;
+        // (b) bit i is set in both mip and mie; and
+        // (c) if register mideleg exists, bit i is not set in mideleg.
+
+        // An interrupt i will trap to S-mode if both of the following are true:
+        // (a) either the current privilege mode is S and
+        //     the SIE bit in the sstatus register is set,
+        //     or the current privilege mode has less privilege than S-mode; and
+        // (b) bit i is set in both sip and sie.
+
+        // The (b) check that the trap can be taken by looking at mip&mie / sip&sie
+        // is already done by get_pending_interrupt()
+        // only checking if delegation takes place is left.
+
+        if current_mode <= Mode::Supervisor {
+            let deleg = match TC::kind() {
+                TrapKind::Interrupt => CSRegister::mideleg,
+                TrapKind::Exception => CSRegister::medeleg,
+            };
+            let deleg_val = self.read(deleg);
+
+            match deleg_val.bit(trap_source.exception_code() as usize) {
+                true => TrapMode::Supervisor,
+                false => TrapMode::Machine,
+            }
+        } else {
+            TrapMode::Machine
+        }
+    }
+
+    /// Retrieve the address of the trap handler.
+    pub fn get_trap_handler<TC: TrapContext>(
+        &self,
+        trap_source: &TC,
+        trap_mode: TrapMode,
+    ) -> Address {
+        let xtvec = self.read(match trap_mode {
+            TrapMode::Supervisor => CSRegister::stvec,
+            TrapMode::Machine => CSRegister::mtvec,
+        });
+        trap_source.trap_handler_address(xtvec)
     }
 }
 
@@ -1282,19 +1350,16 @@ mod tests {
         let is_illegal_instr = |e| -> bool { e == Exception::IllegalInstruction };
 
         // Access Machine registers
-        assert!(check(csreg::mie, Mode::Debug).is_ok());
         assert!(check(csreg::mstatus, Mode::Machine).is_ok());
         assert!(check(csreg::medeleg, Mode::Supervisor).is_err_and(is_illegal_instr));
         assert!(check(csreg::mcause, Mode::User).is_err_and(is_illegal_instr));
 
         // Access Supervisor registers
-        assert!(check(csreg::sstatus, Mode::Debug).is_ok());
         assert!(check(csreg::sip, Mode::Machine).is_ok());
         assert!(check(csreg::scontext, Mode::Supervisor).is_ok());
         assert!(check(csreg::stval, Mode::User).is_err_and(is_illegal_instr));
 
         // Access User registers
-        assert!(check(csreg::fflags, Mode::Debug).is_ok());
         assert!(check(csreg::cycle, Mode::Machine).is_ok());
         assert!(check(csreg::frm, Mode::Supervisor).is_ok());
         assert!(check(csreg::fcsr, Mode::User).is_ok());

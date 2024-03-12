@@ -25,7 +25,7 @@ where
         // Only M-mode (and Debug) can run mret
         match self.mode.read() {
             Mode::User | Mode::Supervisor => return Err(Exception::IllegalInstruction),
-            Mode::Machine | Mode::Debug => (),
+            Mode::Machine => (),
         }
 
         let mstatus = self.csregisters.read(CSRegister::mstatus);
@@ -66,7 +66,7 @@ where
         // Only M and S mode (and Debug) can run SRET
         match self.mode.read() {
             Mode::User => return Err(Exception::IllegalInstruction),
-            Mode::Supervisor | Mode::Machine | Mode::Debug => (),
+            Mode::Supervisor | Mode::Machine => (),
         }
         // Section 3.1.6.5
         // SRET raises IllegalInstruction exception when TSR (Trap SRET) bit is on.

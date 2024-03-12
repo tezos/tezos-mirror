@@ -14,7 +14,6 @@ pub enum Mode {
     User = 0b000,
     Supervisor = 0b001,
     Machine = 0b011,
-    Debug = 0b100,
 }
 
 impl Mode {
@@ -24,7 +23,6 @@ impl Mode {
             Mode::User => Privilege::Unprivileged,
             Mode::Supervisor => Privilege::Supervisor,
             Mode::Machine => Privilege::Machine,
-            Mode::Debug => Privilege::Machine,
         }
     }
 }
@@ -37,7 +35,6 @@ impl TryFrom<u8> for Mode {
             0 => Mode::User,
             1 => Mode::Supervisor,
             3 => Mode::Machine,
-            4 => Mode::Debug,
             _ => return Err(format!("Invalid value for Mode: {}", value)),
         };
 
@@ -84,6 +81,16 @@ impl<M: backend::Manager> ModeCell<M> {
 pub enum TrapMode {
     Supervisor = Mode::Supervisor as u8,
     Machine = Mode::Machine as u8,
+}
+
+impl TrapMode {
+    /// Construct the mode corresponding to the trap mode.
+    pub fn as_mode(&self) -> Mode {
+        match self {
+            Self::Supervisor => Mode::Supervisor,
+            Self::Machine => Mode::Machine,
+        }
+    }
 }
 
 #[cfg(test)]
