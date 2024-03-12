@@ -224,26 +224,21 @@ let get_block_level_opt cctxt ~chain ~block =
     for which we could not retrieve the block level, which can happen in case
     of a snapshot import or of a block reorganisation; "outdated" nonces
     appear in cycles which are [consensus_rights_delay] older than the 
-    [current_cycle].  *)
-let get_outdated_nonces {cctxt; constants; chain; _} nonces current_cycle =
+    [current_cycle]. *)
+let get_outdated_nonces state nonces current_cycle =
   let open Lwt_result_syntax in
-  let {Constants.parametric = {blocks_per_cycle; consensus_rights_delay; _}; _}
-      =
-    constants
-  in
-  let is_older_than_consensus_rights_delay block_level =
-    let block_cycle = Int32.(div block_level blocks_per_cycle) in
-    Int32.sub (Cycle.to_int32 current_cycle) block_cycle
-    > Int32.of_int consensus_rights_delay
+  let {Constants.parametric = {consensus_rights_delay; _}; _} =
+    state.constants
   in
   Block_hash.Map.fold
     (fun hash nonce acc ->
       let* orphans, outdated = acc in
-      let*! level = get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) in
-      match level with
-      | Some level ->
-          if is_older_than_consensus_rights_delay level then
-            return (orphans, add outdated hash nonce)
+      match nonce.cycle with
+      | Some cycle ->
+          if
+            Int32.sub current_cycle (Cycle.to_int32 cycle)
+            > Int32.of_int consensus_rights_delay
+          then return (orphans, add outdated hash nonce)
           else acc
       | None -> return (add orphans hash nonce, outdated))
     nonces
@@ -471,7 +466,10 @@ let reveal_potential_nonces state new_proposal =
                    - A revelation was not included yet in the cycle beginning.
                      So, it is safe to only filter outdated_nonces there *)
                 let* live_nonces =
-                  filter_outdated_nonces state nonces current_cycle
+                  filter_outdated_nonces
+                    state
+                    nonces
+                    (Cycle.to_int32 current_cycle)
                 in
                 let* () = save cctxt nonces_location live_nonces in
                 return_unit)))
