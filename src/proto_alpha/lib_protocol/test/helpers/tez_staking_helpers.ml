@@ -141,7 +141,7 @@ module Frozen_tez = struct
   (* For slashing, slash equally *)
   let sub_tez_from_all_current tez a =
     let self_portion = Tez.ratio a.self_current (total_current a) in
-    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Down in
+    let self_quantity = Tez.mul_q tez self_portion |> Tez.of_q ~round:`Up in
     let self_current =
       if Tez.(self_quantity >= a.self_current) then Tez.zero
       else Tez.(a.self_current -! self_quantity)
@@ -227,12 +227,24 @@ module Frozen_tez = struct
     let a, amount = sub_current amount account a in
     ({a with initial = Tez.(a.initial -! amount)}, amount)
 
-  let slash base_amount (pct : Protocol.Percentage.t) a =
+  let slash cst base_amount (pct : Protocol.Percentage.t) a =
     let pct_q = Protocol.Percentage.to_q pct in
-    let slashed_amount = Tez.mul_q base_amount pct_q |> Tez.of_q ~round:`Down in
     let total_current = total_current a in
-    let slashed_amount_final = Tez.min slashed_amount total_current in
-    (sub_tez_from_all_current slashed_amount a, slashed_amount_final)
+    let slashed_amount =
+      Tez.mul_q base_amount pct_q
+      |> Tez.of_q ~round:`Down |> Tez.min total_current
+    in
+    let rat =
+      cst.Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
+        .global_limit_of_staking_over_baking + 2
+    in
+    let rewarded_amount =
+      Tez.mul_q slashed_amount Q.(1 // rat) |> Tez.of_q ~round:`Down
+    in
+    let burnt_amount = Tez.(slashed_amount -! rewarded_amount) in
+    let a = sub_tez_from_all_current burnt_amount a in
+    let a = sub_tez_from_all_current rewarded_amount a in
+    (a, burnt_amount, rewarded_amount)
 end
 
 (** Representation of Unstaked frozen deposits *)
@@ -277,11 +289,25 @@ module Unstaked_frozen = struct
     in
     Tez.(amount -! slashed_amount)
 
-  let apply_slash_to_current slash_pct initial current =
+  let apply_slash_to_current cst slash_pct initial current =
     let slashed_amount =
-      Tez.mul_q initial Q.(slash_pct // 100) |> Tez.of_q ~round:`Down
+      Tez.mul_q initial Q.(slash_pct // 100)
+      |> Tez.of_q ~round:`Down |> Tez.min current
     in
-    Tez.sub_opt current slashed_amount |> Option.value ~default:Tez.zero
+    let rat =
+      cst.Protocol.Alpha_context.Constants.Parametric.adaptive_issuance
+        .global_limit_of_staking_over_baking + 2
+    in
+    let rewarded_amount =
+      Tez.mul_q slashed_amount Q.(1 // rat) |> Tez.of_q ~round:`Down
+    in
+    let burnt_amount = Tez.(slashed_amount -! rewarded_amount) in
+    let actual_slashed_amount = Tez.(rewarded_amount +! burnt_amount) in
+    let remaining =
+      Tez.sub_opt current actual_slashed_amount
+      |> Option.value ~default:Tez.zero
+    in
+    (remaining, burnt_amount, rewarded_amount)
 
   let remove_zeros (a : t) : t =
     List.filter (fun ({current; _} : r) -> Tez.(current > zero)) a
@@ -372,7 +398,7 @@ module Unstaked_frozen = struct
           let info, rest = pop_cycle cycle t in
           (info, h :: rest)
 
-  let slash ~slashable_deposits_period slashed_cycle pct_times_100 a =
+  let slash cst ~slashable_deposits_period slashed_cycle pct_times_100 a =
     remove_zeros a
     |> List.map
          (fun
@@ -383,14 +409,13 @@ module Unstaked_frozen = struct
              Cycle.(
                cycle > slashed_cycle
                || add cycle slashable_deposits_period < slashed_cycle)
-           then (r, Tez.zero)
+           then (r, (Tez.zero, Tez.zero))
            else
-             let new_current =
-               apply_slash_to_current pct_times_100 initial current
+             let new_current, burnt, rewarded =
+               apply_slash_to_current cst pct_times_100 initial current
              in
-             let slashed = Tez.(current -! new_current) in
              let slash_pct = min 100 (pct_times_100 + old_slash_pct) in
-             ({r with slash_pct; current = new_current}, slashed))
+             ({r with slash_pct; current = new_current}, (burnt, rewarded)))
     |> List.split
 end
 
