@@ -115,7 +115,7 @@ warnings() {
 
 getOctezVersion() {
 
-  if ! version=$(dune exec src/lib_version/exe/tezos_print_version.exe -- --json 2> /dev/null); then
+  if ! version=$(dune exec src/lib_version/exe/octez_print_version.exe -- --json 2> /dev/null); then
     echo "Cannot get version. Try eval \`opam env\`?" >&2
     exit 1
   fi
