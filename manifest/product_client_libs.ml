@@ -19,7 +19,7 @@ end)
 let kaitai =
   public_lib
     "kaitai"
-    ~path:"contrib/kaitai-ocaml/src"
+    ~path:"client-libs/kaitai-ocaml/src"
     ~release_status:Unreleased
     ~preprocess:[pps ppx_sexp_conv]
     ~deps:[yaml; sexplib]
@@ -33,7 +33,7 @@ let _kaitai_test =
   private_lib
     "kaitai_test"
     ~opam:"kaitai"
-    ~path:"contrib/kaitai-ocaml/test"
+    ~path:"client-libs/kaitai-ocaml/test"
     ~release_status:Unreleased
     ~inline_tests:ppx_expect
     ~deps:[kaitai]
@@ -41,7 +41,7 @@ let _kaitai_test =
 let kaitai_of_data_encoding =
   public_lib
     "kaitai-of-data-encoding"
-    ~path:"contrib/lib_kaitai_of_data_encoding"
+    ~path:"client-libs/lib_kaitai_of_data_encoding"
     ~release_status:Unreleased
     ~synopsis:"Kaitai spec generator for data-encoding library"
     ~deps:[yaml; data_encoding; kaitai]
@@ -51,7 +51,7 @@ let _kaitai_of_data_encoding_test =
   private_lib
     "kaitai_of_data_encoding_test"
     ~opam:"kaitai-of-data-encoding"
-    ~path:"contrib/lib_kaitai_of_data_encoding/test"
+    ~path:"client-libs/lib_kaitai_of_data_encoding/test"
     ~release_status:Unreleased
     ~deps:[yaml; data_encoding; kaitai; kaitai_of_data_encoding]
     ~bisect_ppx:No
@@ -60,7 +60,7 @@ let _kaitai_of_data_encoding_test =
 let _octez_codec_kaitai =
   public_exe
     "octez-codec-kaitai"
-    ~path:"contrib/bin_codec_kaitai"
+    ~path:"client-libs/bin_codec_kaitai"
     ~release_status:Unreleased
     ~internal_name:"codec"
     ~synopsis:

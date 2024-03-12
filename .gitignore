@@ -72,7 +72,7 @@ __pycache__
 /_coverage_output/*.coverage
 /_coverage_report
 
-contrib/kaitai-struct-files/doc
+client-libs/kaitai-struct-files/doc
 
 .merlin
 

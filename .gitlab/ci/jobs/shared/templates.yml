@@ -156,7 +156,7 @@
     - changes:
         - images/**/*
         - src/**/*
-        - contrib/*kaitai*/**/*
+        - client-libs/*kaitai*/**/*
         - .gitlab/**/*
         - .gitlab-ci.yml
       when: on_success
