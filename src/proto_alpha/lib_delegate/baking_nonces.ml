@@ -200,25 +200,6 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
       encoding
   else return_unit
 
-(** [get_block_level_opt cctxt ~chain ~block] makes an RPC call to 
-    retrieve the block level associated to the [~block], given the 
-    client context [cctxt] and chain [~chain]. *)
-let get_block_level_opt cctxt ~chain ~block =
-  let open Lwt_syntax in
-  let* result =
-    Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  in
-  match result with
-  | Ok {level; _} -> return_some level
-  | Error errs ->
-      let* () =
-        Events.(
-          emit
-            cant_retrieve_block_header_for_nonce
-            (Block_services.to_string block, errs))
-      in
-      return_none
-
 (** [get_outdated_nonces state nonces currnet_cycle] returns an (orphans, outdated) 
     pair of lists of nonces (paired with their block hashes); "orphans" are nonces
     for which we could not retrieve the block level, which can happen in case
@@ -312,28 +293,28 @@ let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
   | Some previous_cycle ->
       let* nonces = fill_missing_fields cctxt chain nonces_location nonces in
       Block_hash.Map.fold_es
-        (fun hash {nonce; cycle; _} acc ->
+        (fun hash {nonce; cycle; level} acc ->
           match cycle with
           | Some cycle when Cycle.(cycle = previous_cycle) -> (
-              let*! level_opt =
-                get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
-              in
-              match level_opt with
-              | Some int_level -> (
-                  let*? level =
-                    Environment.wrap_tzresult (Raw_level.of_int32 int_level)
-                  in
+              match level with
+              | Some level -> (
                   let* nonce_info =
                     Alpha_services.Nonce.get cctxt (chain, `Head 0) level
                   in
                   match nonce_info with
                   | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
                       let*! () =
-                        Events.(emit found_nonce_to_reveal (hash, int_level))
+                        Events.(
+                          emit
+                            found_nonce_to_reveal
+                            (hash, Raw_level.to_int32 level))
                       in
                       return ((level, nonce) :: acc)
                   | Missing _nonce_hash ->
-                      let*! () = Events.(emit incoherent_nonce int_level) in
+                      let*! () =
+                        Events.(
+                          emit incoherent_nonce (Raw_level.to_int32 level))
+                      in
                       return acc
                   | Forgotten | Revealed _ -> return acc)
               | None -> raise Not_found)
