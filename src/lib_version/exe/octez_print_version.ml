@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,10 +29,11 @@
 open Version
 open Current_git_info
 
-let to_json {major; minor; additional_info} =
+let to_json {product; major; minor; additional_info} =
   Format.sprintf
-    "{ \"major\": \"%i\", \"minor\": \"%i\", \"info\": \"%s\", \"hash\": \
-     \"%s\" }"
+    "{ \"product\": \"%s\", \"major\": \"%i\", \"minor\": \"%i\", \"info\": \
+     \"%s\", \"hash\": \"%s\" }"
+    (string_of_product product)
     major
     minor
     (string_of_additional_info additional_info)
@@ -40,22 +41,24 @@ let to_json {major; minor; additional_info} =
 
 let help_string =
   "This script prints out the current version of the\n\
-   node as it is deduced from the git tag of the current branch.\n\
+   octez node as it is deduced from the git tag of the current branch.\n\
    print_version \
-   [--major|--minor|--additional-info|--full|--full-with-commit|--commit]"
+   [--product|--major|--minor|--additional-info|--full|--full-with-commit|--commit]"
 
 let () =
   match Sys.argv with
-  | [|_; "--major"|] -> print_endline (string_of_int version.major)
-  | [|_; "--minor"|] -> print_endline (string_of_int version.minor)
+  | [|_; "--product"|] ->
+      print_endline (string_of_product octez_version.product)
+  | [|_; "--major"|] -> print_endline (string_of_int octez_version.major)
+  | [|_; "--minor"|] -> print_endline (string_of_int octez_version.minor)
   | [|_; "--additional-info"|] ->
-      print_endline (string_of_additional_info version.additional_info)
-  | [|_; "--full"|] | [|_|] -> print_endline (to_string version)
+      print_endline (string_of_additional_info octez_version.additional_info)
+  | [|_; "--full"|] | [|_|] -> print_endline (to_string octez_version)
   | [|_; "--full-with-commit"|] ->
-      print_endline Tezos_version_value.Bin_version.simple_version_string
+      print_endline Tezos_version_value.Bin_version.octez_simple_version_string
   | [|_; "--commit"|] ->
       print_endline Tezos_version_value.Current_git_info.abbreviated_commit_hash
-  | [|_; "--json"|] -> print_endline (to_json version)
+  | [|_; "--json"|] -> print_endline (to_json octez_version)
   | [|_; "--help"|] -> print_endline help_string
   | _ ->
       print_endline help_string ;

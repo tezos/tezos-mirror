@@ -54,7 +54,7 @@ let parse_args () =
             (fun () ->
               Format.printf
                 "%s\n"
-                Tezos_version_value.Bin_version.version_string ;
+                Tezos_version_value.Bin_version.octez_version_string ;
               Stdlib.exit 0),
           " Display version information" );
       ]

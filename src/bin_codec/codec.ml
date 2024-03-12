@@ -169,7 +169,9 @@ let main commands =
           match r with
           | Ok () -> Lwt.return 0
           | Error [Tezos_clic.Version] ->
-              let version = Tezos_version_value.Bin_version.version_string in
+              let version =
+                Tezos_version_value.Bin_version.octez_version_string
+              in
               Format.printf "%s\n" version ;
               Lwt.return 0
           | Error [Tezos_clic.Help command] ->

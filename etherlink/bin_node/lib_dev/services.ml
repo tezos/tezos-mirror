@@ -40,7 +40,7 @@ let client_version =
     "%s/%s-%s/%s/ocamlc.%s"
     "octez-evm-node"
     (Tezos_version.Version.to_string
-       Tezos_version_value.Current_git_info.version)
+       Tezos_version_value.Current_git_info.octez_version)
     Tezos_version_value.Current_git_info.abbreviated_commit_hash
     Stdlib.Sys.os_type
     Stdlib.Sys.ocaml_version

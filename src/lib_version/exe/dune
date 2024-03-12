@@ -9,7 +9,7 @@
  (modules get_git_info))
 
 (executable
- (name tezos_print_version)
+ (name octez_print_version)
  (public_name octez-version)
  (package octez-version)
  (libraries
@@ -23,4 +23,4 @@
   (:standard)
   -open Tezos_version_value
   -open Tezos_version)
- (modules tezos_print_version))
+ (modules octez_print_version))

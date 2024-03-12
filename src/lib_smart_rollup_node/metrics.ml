@@ -27,7 +27,7 @@ open Prometheus
 
 let sc_rollup_node_registry = CollectorRegistry.create ()
 
-let namespace = Tezos_version.Node_version.namespace
+let namespace = Tezos_version.Octez_node_version.namespace
 
 let subsystem = "sc_rollup_node"
 
@@ -159,7 +159,7 @@ module Info = struct
     ()
 
   let () =
-    let version = Version.to_string Current_git_info.version in
+    let version = Version.to_string Current_git_info.octez_version in
     let commit_hash = Current_git_info.commit_hash in
     let commit_date = Current_git_info.committer_date in
     let _ =

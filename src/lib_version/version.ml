@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,7 +31,10 @@ type additional_info = Tezos_version_parser.additional_info =
   | RC_dev of int
   | Release
 
+type product = Tezos_version_parser.product = Octez
+
 type t = Tezos_version_parser.t = {
+  product : product;
   major : int;
   minor : int;
   additional_info : additional_info;
@@ -47,10 +50,13 @@ let string_of_additional_info = function
   | RC_dev n -> Format.asprintf "~rc%d+dev" n
   | Release -> ""
 
-let pp f {major; minor; additional_info} =
+let string_of_product = function Octez -> "Octez"
+
+let pp f {product; major; minor; additional_info} =
   Format.fprintf
     f
-    "%i.%i%s"
+    "%s %i.%i%s"
+    (string_of_product product)
     major
     minor
     (string_of_additional_info additional_info)

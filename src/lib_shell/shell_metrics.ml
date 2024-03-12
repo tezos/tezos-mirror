@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let namespace = Tezos_version.Node_version.namespace
+let namespace = Tezos_version.Octez_node_version.namespace
 
 module Worker = struct
   open Prometheus
@@ -707,7 +707,8 @@ module Version = struct
     ]
 
   let init ~version
-      ~commit_info:({commit_hash; commit_date} : Node_version.commit_info) net =
+      ~commit_info:({commit_hash; commit_date} : Octez_node_version.commit_info)
+      net =
     let _ =
       Prometheus.Gauge.labels metric
       @@ [version] @ network_version net @ [commit_hash; commit_date]

@@ -138,7 +138,7 @@ module Event = struct
       ~level:Notice
       ("chain", Distributed_db_version.Name.encoding)
       ~pp2:Tezos_version.Version.pp
-      ("version", Tezos_version.Node_version.version_encoding)
+      ("version", Tezos_version.Octez_node_version.version_encoding)
       ("git_info", Data_encoding.string)
 
   let node_is_ready =
@@ -336,14 +336,15 @@ let init_node ?sandbox ?target ~identity ~singleprocess ~internal_events
     | _ -> return_unit
   in
   let version =
-    Tezos_version.Version.to_string Tezos_version_value.Current_git_info.version
+    Tezos_version.Version.to_string
+      Tezos_version_value.Current_git_info.octez_version
   in
   let commit_info =
     ({
        commit_hash = Tezos_version_value.Current_git_info.commit_hash;
        commit_date = Tezos_version_value.Current_git_info.committer_date;
      }
-      : Tezos_version.Node_version.commit_info)
+      : Tezos_version.Octez_node_version.commit_info)
   in
   Node.create
     ~sandboxed:(sandbox <> None)
@@ -362,7 +363,7 @@ let rpc_metrics =
   Prometheus.Summary.v_labels
     ~label_names:["endpoint"; "method"]
     ~help:"RPC endpoint call counts and sum of execution times."
-    ~namespace:Tezos_version.Node_version.namespace
+    ~namespace:Tezos_version.Octez_node_version.namespace
     ~subsystem:"rpc"
     "calls"
 
@@ -632,7 +633,7 @@ let init_rpc (config : Config_file.t) (node : Node.t) internal_events =
        commit_hash = Tezos_version_value.Current_git_info.commit_hash;
        commit_date = Tezos_version_value.Current_git_info.committer_date;
      }
-      : Tezos_version.Node_version.commit_info)
+      : Tezos_version.Octez_node_version.commit_info)
   in
   let node_version = Node.get_version node in
 
@@ -696,7 +697,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Event.(emit starting_node)
       ( config.blockchain_network.chain_name,
-        Tezos_version_value.Current_git_info.version,
+        Tezos_version_value.Current_git_info.octez_version,
         Tezos_version_value.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in

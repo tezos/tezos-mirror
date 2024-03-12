@@ -245,7 +245,7 @@ module Run = struct
   let man = description
 
   let info =
-    let version = Tezos_version_value.Bin_version.version_string in
+    let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"Run the Octez DAL node" ~man ~version "run"
 
   let cmd run = Cmdliner.Cmd.v info (Term.term run)
@@ -276,7 +276,7 @@ module Config = struct
       ]
 
     let info =
-      let version = Tezos_version_value.Bin_version.version_string in
+      let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Configuration initialisation" ~man ~version "init"
 
     let cmd run = Cmdliner.Cmd.v info (Term.term run)
@@ -285,7 +285,7 @@ module Config = struct
   let cmd run =
     let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
     let info =
-      let version = Tezos_version_value.Bin_version.version_string in
+      let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info
         ~doc:"Manage the Octez DAL node configuration"
         ~man
@@ -338,7 +338,7 @@ let make ~run =
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
-    let version = Tezos_version_value.Bin_version.version_string in
+    let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
   Cmdliner.Cmd.group

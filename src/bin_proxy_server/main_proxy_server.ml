@@ -289,7 +289,7 @@ let info =
       `P "Report issues to https://gitlab.com/tezos/tezos/-/issues";
     ]
   in
-  let version = Tezos_version_value.Bin_version.version_string in
+  let version = Tezos_version_value.Bin_version.octez_version_string in
   Cmd.info name ~version ~doc ~exits:Cmd.Exit.defaults ~man
 
 let () = exit (Cmd.eval (Cmd.v info term))
