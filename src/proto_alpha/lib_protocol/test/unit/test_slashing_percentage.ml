@@ -36,22 +36,13 @@ let assert_not_equal_int ~loc n (pct : Percentage.t tzresult Lwt.t) =
   Assert.not_equal ~loc Q.equal "Values are equal" Q.pp_print Q.(n // 100) pct_q
 
 let raw_context ~max_slashing_threshold ~max_slashing_per_block ~ns_enable () =
-  let constants = Default_parameters.constants_test in
+  let open Constants_helpers in
   let constants =
-    Constants_helpers.Set.Adaptive_issuance.force_activation constants true
-  in
-  let constants =
-    Constants_helpers.Set.Adaptive_issuance.ns_enable constants ns_enable
-  in
-  let constants =
-    Constants_helpers.Set.max_slashing_threshold
-      constants
-      max_slashing_threshold
-  in
-  let constants =
-    Constants_helpers.Set.max_slashing_per_block
-      constants
-      max_slashing_per_block
+    Default_parameters.constants_test
+    |> Set.Adaptive_issuance.force_activation true
+    |> Set.Adaptive_issuance.ns_enable ns_enable
+    |> Set.max_slashing_threshold max_slashing_threshold
+    |> Set.max_slashing_per_block max_slashing_per_block
   in
   Context.raw_context_from_constants constants
 
