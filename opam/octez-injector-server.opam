@@ -10,15 +10,20 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-injector"
-  "octez-shell-libs"
+  "octez-libs" { = version }
+  "octez-injector" { = version }
+  "octez-shell-libs" { = version }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
 ]
 depopts: [
   "tezos-injector-018-Proxford"
   "tezos-injector-019-PtParisA"
   "tezos-injector-alpha"
+]
+conflicts: [
+  "tezos-injector-018-Proxford" { != version }
+  "tezos-injector-019-PtParisA" { != version }
+  "tezos-injector-alpha" { != version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

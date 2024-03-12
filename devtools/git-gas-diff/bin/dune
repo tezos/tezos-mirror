@@ -4,7 +4,7 @@
 (executable
  (name main)
  (public_name git-gas-diff)
- (package internal-devtools)
+ (package tezos-tooling)
  (libraries
   num
   re))

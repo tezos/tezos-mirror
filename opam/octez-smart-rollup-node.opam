@@ -10,16 +10,20 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-libs"
-  "octez-shell-libs"
-  "octez-l2-libs"
-  "octez-smart-rollup-node-lib"
-  "octez-smart-rollup-node-Proxford"
-  "octez-smart-rollup-node-PtParisA"
+  "octez-libs" { = version }
+  "octez-shell-libs" { = version }
+  "octez-l2-libs" { = version }
+  "octez-smart-rollup-node-lib" { = version }
+  "octez-smart-rollup-node-Proxford" { = version }
+  "octez-smart-rollup-node-PtParisA" { = version }
 ]
 depopts: [
   "octez-smart-rollup-node-PtNairob"
   "octez-smart-rollup-node-alpha"
+]
+conflicts: [
+  "octez-smart-rollup-node-PtNairob" { != version }
+  "octez-smart-rollup-node-alpha" { != version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

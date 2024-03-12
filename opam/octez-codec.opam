@@ -11,9 +11,9 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "data-encoding" { >= "0.7.1" & < "1.0.0" }
-  "octez-libs"
-  "octez-shell-libs"
-  "octez-version"
+  "octez-libs" { = version }
+  "octez-shell-libs" { = version }
+  "octez-version" { = version }
 ]
 depopts: [
   "octez-protocol-005-PsBabyM1-libs"
@@ -32,6 +32,24 @@ depopts: [
   "octez-protocol-018-Proxford-libs"
   "octez-protocol-019-PtParisA-libs"
   "octez-protocol-alpha-libs"
+]
+conflicts: [
+  "octez-protocol-005-PsBabyM1-libs" { != version }
+  "octez-protocol-006-PsCARTHA-libs" { != version }
+  "octez-protocol-007-PsDELPH1-libs" { != version }
+  "octez-protocol-008-PtEdo2Zk-libs" { != version }
+  "octez-protocol-009-PsFLoren-libs" { != version }
+  "octez-protocol-010-PtGRANAD-libs" { != version }
+  "octez-protocol-011-PtHangz2-libs" { != version }
+  "octez-protocol-012-Psithaca-libs" { != version }
+  "octez-protocol-013-PtJakart-libs" { != version }
+  "octez-protocol-014-PtKathma-libs" { != version }
+  "octez-protocol-015-PtLimaPt-libs" { != version }
+  "octez-protocol-016-PtMumbai-libs" { != version }
+  "octez-protocol-017-PtNairob-libs" { != version }
+  "octez-protocol-018-Proxford-libs" { != version }
+  "octez-protocol-019-PtParisA-libs" { != version }
+  "octez-protocol-alpha-libs" { != version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

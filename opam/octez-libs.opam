@@ -31,7 +31,7 @@ depends: [
   "ezjsonm" { >= "1.3.0" }
   "resto" { >= "1.2" }
   "resto-directory" { >= "1.2" }
-  "bls12-381"
+  "bls12-381" { = version }
   "re" { >= "1.10.0" }
   "secp256k1-internal" { >= "0.4.0" }
   "alcotest" { >= "1.5.0" }
@@ -45,8 +45,8 @@ depends: [
   "repr"
   "stdint"
   "logs"
-  "octez-distributed-lwt-internal"
-  "octez-alcotezt"
+  "octez-distributed-lwt-internal" { = version }
+  "octez-alcotezt" { = version }
   "aches-lwt" { >= "1.0.0" }
   "ipaddr" { >= "5.3.0" & < "6.0.0" }
   "ptime" { >= "1.1.0" }
@@ -55,7 +55,7 @@ depends: [
   "uutf"
   "ringo" { >= "1.0.0" }
   "qcheck-core" {with-test}
-  "octez-internal-libs"
+  "octez-internal-libs" { = version }
   "conf-rust"
   "integers"
   "integers_stubs_js"

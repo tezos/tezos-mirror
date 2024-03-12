@@ -726,6 +726,8 @@ type bisect_ppx = No | Yes | With_sigterm
       For instance, [~js_of_ocaml:Dune.[[S "javascript_files"; S "file.js"]]]
       becomes [(js_of_ocaml (javascript_files file.js))].
 
+    - [wrapped]: specifies a [(wrapped ...)] stanza for the [dune] target.
+
     - [documentation]: specifies a [(documentation ...)] stanza for the [dune]
       target where [...] is the value of the parameter. Use this parameter if
       the library includes an [index.mld] file.
@@ -766,6 +768,9 @@ type bisect_ppx = No | Yes | With_sigterm
 
     - [opam_with_test]: whether to add the [dune runtest] command.
       Note that for a given package all targets must have the same value of [opam_with_test].
+
+    - [opam_version]: the version of the opam package.
+      This is only useful for releasing different products that depend on each-other.
 
     - [path]: path of the directory in which to generate the [dune] file for this target.
 
@@ -856,6 +861,7 @@ type 'a maker =
   ?inline_tests_deps:Dune.s_expr list ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
+  ?wrapped:bool ->
   ?documentation:Dune.s_expr ->
   ?linkall:bool ->
   ?modes:Dune.mode list ->
@@ -868,6 +874,7 @@ type 'a maker =
   ?opam_doc:string ->
   ?opam_homepage:string ->
   ?opam_with_test:with_test ->
+  ?opam_version:Version.t ->
   ?optional:bool ->
   ?ppx_kind:Dune.ppx_kind ->
   ?ppx_runtime_libraries:target list ->
@@ -932,95 +939,6 @@ module Env : sig
   val add : profile -> key:string -> Dune.s_expr -> t -> t
 end
 
-(** Register and return an internal public library.
-
-    The ['a] argument of [maker] is [string]: it is the public name.
-    If [internal_name] is not specified, a default is chosen by converting
-    the public name, by replacing characters ['-'] and ['.'] to ['_'].
-
-    Internal names correspond to the [(name ...)] stanza in [dune] files,
-    while public names correspond to the [(public_name ...)] stanza
-    (and usually to the name of the [.opam] file). *)
-val public_lib : ?internal_name:string -> string maker
-
-(** Same as {!public_lib} but for a public executable. *)
-val public_exe : ?internal_name:string -> string maker
-
-(** Same as {!public_exe} but with several names, to define multiple executables at once.
-
-    If given, the list of internal names must be in the same order as the list of
-    public names. If not given, the list of internal names is derived from the
-    list of names as for [public_lib].
-
-    @raise Invalid_arg if the list of names is empty or if the length of
-    [internal_names] differs from the length of the list of public names. *)
-val public_exes : ?internal_names:string list -> string list maker
-
-(** Register and return an internal private (non-public) library.
-
-    Since it is private, it has no public name: the ['a] argument of [maker]
-    is its internal name. *)
-val private_lib : string maker
-
-(** Register and return an internal private (non-public) executable.
-
-    Since it is private, it has no public name: the ['a] argument of [maker]
-    is its internal name. *)
-val private_exe : string maker
-
-(** Same as {!private_exe} but with several names, to define multiple executables at once. *)
-val private_exes : string list maker
-
-(** Register and return an internal test.
-
-    - [alias]: if non-empty, an alias is set up for the given test, named [alias].
-      Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
-      Also note that if [alias] is non-empty, the target must belong to an opam package
-      (i.e. [~opam] must also be non-empty). If given, the [enabled_if] and/or [locks]
-      clauses are added to this alias.
-
-    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
-      in the [runtest] alias.
-
-    - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
-      in the [dune] file.
-
-    - [dep_globs_rec]: a list of files to add as dependencies using [(deps (glob_files_rec ...))]
-      in the [dune] file.
-
-    - [dune_with_test]: Specifies a condition for the test to be run on the dune file.
-      If set to [Only_on_64_arch], [%{arch_sixtyfour}] is added to the [enabled_if] clause.
-      If set to [Always], nothing is added to the [enabled_if] clause.
-      If set to [Never], [false] is added to the [enabled_if] clause.
-
-    - [enabled_if]: add a custom [enabled_if] clause. If both [dune_with_test] and
-      [enabled_if] are set, then logically, the resulting clause is the conjunction
-      of the two (i.e. [(and <enabled_if> <dune_with_test>)])
-
-    Since tests are private, they have no public name: the ['a]
-    argument of [maker] is the internal name. *)
-val test :
-  ?alias:string ->
-  ?dep_files:string list ->
-  ?dep_globs:string list ->
-  ?dep_globs_rec:string list ->
-  ?locks:string ->
-  ?enabled_if:Dune.s_expr ->
-  ?dune_with_test:with_test ->
-  ?lib_deps:target list ->
-  string maker
-
-(** Same as {!test} but with several names, to define multiple tests at once. *)
-val tests :
-  ?alias:string ->
-  ?dep_files:string list ->
-  ?dep_globs:string list ->
-  ?dep_globs_rec:string list ->
-  ?locks:string ->
-  ?enabled_if:Dune.s_expr ->
-  ?lib_deps:target list ->
-  string list maker
-
 (** Register a Tezt test.
 
     Usage: [tezt module_names]
@@ -1067,6 +985,7 @@ val tezt :
   ?dune:Dune.s_expr ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
+  product:string ->
   string list ->
   target
 
@@ -1251,10 +1170,7 @@ val re_export : target -> target
     actual package. *)
 val add_dep_to_profile : string -> target -> unit
 
-(** This module is used to register multiple libraries (sub-libraries)
-    for a single container package. See
-    [https://dune.readthedocs.io/en/stable/concepts/package-spec.html#libraries]
-    for the corresponding dune feature. *)
+(** Common types for sub-libs (makers are in the [Product] functor) *)
 module Sub_lib : sig
   type documentation_entrypoint = Module | Page | Sub_lib
 
@@ -1267,9 +1183,6 @@ module Sub_lib : sig
   (** The type of a container for a set of sub-libraries *)
   type container
 
-  (** Create a container *)
-  val make_container : unit -> container
-
   (** A sub-lib [maker] is similar to a generic [maker] except that:
 
       - Passing a value for the [opam] parameter raises [Invalid_argument],
@@ -1280,13 +1193,120 @@ module Sub_lib : sig
       library. *)
   type nonrec maker = ?internal_name:string -> string maker
 
-  (** Define a maker for sub-libraries of a given [container]. *)
-  val sub_lib :
-    package_synopsis:string -> container:container -> package:string -> maker
-
   (** Prints all the registered sub-libraries of a package. *)
   val pp_documentation_of_container :
     header:string -> Format.formatter -> container -> unit
+end
+
+(** [Product] is a functor which instantiates [maker]s for [target]s. The
+    product name passed as a functor parameter is used for all the made targets. *)
+module Product (M : sig
+  val name : string
+end) : sig
+  (** Register and return an internal public library.
+
+    The ['a] argument of [maker] is [string]: it is the public name.
+    If [internal_name] is not specified, a default is chosen by converting
+    the public name, by replacing characters ['-'] and ['.'] to ['_'].
+
+    Internal names correspond to the [(name ...)] stanza in [dune] files,
+    while public names correspond to the [(public_name ...)] stanza
+    (and usually to the name of the [.opam] file). *)
+  val public_lib : ?internal_name:string -> string maker
+
+  (** Same as {!public_lib} but for a public executable. *)
+  val public_exe : ?internal_name:string -> string maker
+
+  (** Same as {!public_exe} but with several names, to define multiple executables at once.
+
+    If given, the list of internal names must be in the same order as the list of
+    public names. If not given, the list of internal names is derived from the
+    list of names as for [public_lib].
+
+    @raise Invalid_arg if the list of names is empty or if the length of
+    [internal_names] differs from the length of the list of public names. *)
+  val public_exes : ?internal_names:string list -> string list maker
+
+  (** Register and return an internal private (non-public) library.
+
+    Since it is private, it has no public name: the ['a] argument of [maker]
+    is its internal name. *)
+  val private_lib : string maker
+
+  (** Register and return an internal private (non-public) executable.
+
+    Since it is private, it has no public name: the ['a] argument of [maker]
+    is its internal name. *)
+  val private_exe : string maker
+
+  (** Same as {!private_exe} but with several names, to define multiple executables at once. *)
+  val private_exes : string list maker
+
+  (** Register and return an internal test.
+
+    - [alias]: if non-empty, an alias is set up for the given test, named [alias].
+      Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
+      Also note that if [alias] is non-empty, the target must belong to an opam package
+      (i.e. [~opam] must also be non-empty). If given, the [enabled_if] and/or [locks]
+      clauses are added to this alias.
+
+    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
+      in the [runtest] alias.
+
+    - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
+      in the [dune] file.
+
+    - [dep_globs_rec]: a list of files to add as dependencies using [(deps (glob_files_rec ...))]
+      in the [dune] file.
+
+    - [dune_with_test]: Specifies a condition for the test to be run on the dune file.
+      If set to [Only_on_64_arch], [%{arch_sixtyfour}] is added to the [enabled_if] clause.
+      If set to [Always], nothing is added to the [enabled_if] clause.
+      If set to [Never], [false] is added to the [enabled_if] clause.
+
+    - [enabled_if]: add a custom [enabled_if] clause. If both [dune_with_test] and
+      [enabled_if] are set, then logically, the resulting clause is the conjunction
+      of the two (i.e. [(and <enabled_if> <dune_with_test>)])
+
+    Since tests are private, they have no public name: the ['a]
+    argument of [maker] is the internal name. *)
+  val test :
+    ?alias:string ->
+    ?dep_files:string list ->
+    ?dep_globs:string list ->
+    ?dep_globs_rec:string list ->
+    ?locks:string ->
+    ?enabled_if:Dune.s_expr ->
+    ?dune_with_test:with_test ->
+    ?lib_deps:target list ->
+    string maker
+
+  (** Same as {!test} but with several names, to define multiple tests at once. *)
+  val tests :
+    ?alias:string ->
+    ?dep_files:string list ->
+    ?dep_globs:string list ->
+    ?dep_globs_rec:string list ->
+    ?locks:string ->
+    ?enabled_if:Dune.s_expr ->
+    ?lib_deps:target list ->
+    string list maker
+
+  (** This module is used to register multiple libraries (sub-libraries)
+    for a single container package. See
+    [https://dune.readthedocs.io/en/stable/concepts/package-spec.html#libraries]
+    for the corresponding dune feature. *)
+  module Sub_lib : sig
+    (** Create a container *)
+    val make_container : unit -> Sub_lib.container
+
+    (** Define a maker for sub-libraries of a given [container]. *)
+    val sub_lib :
+      package_synopsis:string ->
+      container:Sub_lib.container ->
+      package:string ->
+      Sub_lib.maker
+  end
 end
 
 (** Get a name for a given target, to display in errors.
