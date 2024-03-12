@@ -2233,7 +2233,7 @@ let _octez_version_tests =
     ~opam:"octez-libs"
     ~js_compatible:true
     ~modes:[Native; JS]
-    ~deps:[octez_version |> open_; octez_version_parser; alcotezt]
+    ~deps:[octez_version |> open_; octez_version_parser]
 
 let octez_p2p_services =
   octez_lib
