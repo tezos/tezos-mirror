@@ -24,6 +24,7 @@ In the Json format, a balance update consists of three parts:
     * ``"block"`` means that the balance update originates from the application of a block
     * ``"migration"`` means that the balance update originates from migration
     * ``"subsidy"`` means that the balance update originates from subsidies for liquidity baking
+    * ``"delayed_operation"`` means that the balance update originates from the delayed application of the operation whose hash is given in the additional field ``"delayed_operation_hash"``.
 
 
 A transfer of tokens is represented by a continuous and ordered sequence of (balance) updates.
