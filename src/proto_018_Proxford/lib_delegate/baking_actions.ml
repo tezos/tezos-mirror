@@ -374,7 +374,12 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
         return_unit
     | Some (_, nonce) ->
         let block_hash = Block_header.hash signed_block_header in
-        Baking_nonces.register_nonce cctxt ~chain_id block_hash nonce
+        Baking_nonces.register_nonce
+          cctxt
+          ~chain_id
+          block_hash
+          nonce
+          ~cycle:injection_level.cycle
   in
   let baking_votes =
     {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
