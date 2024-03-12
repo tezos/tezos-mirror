@@ -78,6 +78,17 @@ let finalize staker =
   --> finalize_unstake staker
   --> check_balance_field staker `Unstaked_finalizable Tez.zero
 
+(* Simple stake - unstake - finalize roundtrip.
+
+   - Note that the test framework automatically checks, whenever a
+   block is baked, that the staker's fully detailed balance (liquid,
+   bonds, staked, unstaked frozen, unstaked finalizable, and costaking
+   values) is the same as predicted in the simulated state.
+
+   - Moreover, we explicitly check that after the unstake operation,
+   the staker's balance doesn't change until the last cycle of the
+   unfreeze delay (which is [consensus_rights_delay +
+   max_slashing_period = 2 + 2]). *)
 let simple_roundtrip =
   init_staker_delegate_or_external --> stake_init
   --> (Tag "full unstake" --> unstake "staker" All
@@ -85,6 +96,7 @@ let simple_roundtrip =
   --> wait_for_unfreeze_and_check unstake_wait
   --> finalize "staker" --> next_cycle
 
+(* Same as above, except with two separate unstake operations. *)
 let double_roundtrip =
   init_staker_delegate_or_external --> stake_init --> unstake "staker" Half
   --> (Tag "half then full unstake" --> wait_n_cycles 2 --> unstake "staker" All
@@ -94,6 +106,7 @@ let double_roundtrip =
   --> wait_for_unfreeze_and_check (Fun.const 2)
   --> finalize "staker" --> next_cycle
 
+(* Test that a baker can stake from unstaked frozen funds. *)
 let shorter_roundtrip_for_baker =
   let amount = Amount (Tez.of_mutez 333_000_000_000L) in
   let consensus_rights_delay =
@@ -106,13 +119,19 @@ let shorter_roundtrip_for_baker =
   --> next_cycle
   --> snapshot_balances "init" ["delegate"]
   --> unstake "delegate" amount
-  --> List.fold_left
-        (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
-        (Tag "wait 0 cycles" --> Empty)
-        (Stdlib.List.init (consensus_rights_delay + 1) (fun i -> i + 1))
+  --> (* Wait [n] cycles where [0 <= n <= consensus_rights_delay + 1]. *)
+  List.fold_left
+    (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
+    (Tag "wait 0 cycles" --> Empty)
+    (Stdlib.List.init (consensus_rights_delay + 1) (fun i -> i + 1))
   --> stake "delegate" amount
   --> check_snapshot_balances "init"
 
+(* Roundtrip where the unstaked amount matches the initially staked
+   amount (either from one unstake operation of this amount, or two
+   unstake operations summing up to it). This lets us explicitly check
+   that the detailed balance of the staker at the end is identical to
+   its balance before the stake operation. *)
 let status_quo_rountrip =
   let full_amount = Tez.of_mutez 10_000_000L in
   let amount_1 = Tez.of_mutez 2_999_999L in
@@ -130,6 +149,13 @@ let status_quo_rountrip =
   --> finalize "staker"
   --> check_snapshot_balances "init"
 
+(* Test three different ways to finalize unstake requests:
+   - finalize_unstake operation
+   - stake operation (of 1 mutez)
+   - unstake operation (of 1 mutez)
+
+   Check that the finalizable unstaked balance is non-zero before, and
+   becomes zero after the finalization. *)
 let scenario_finalize =
   init_staker_delegate_or_external --> stake "staker" Half --> next_cycle
   --> unstake "staker" Half
@@ -142,7 +168,9 @@ let scenario_finalize =
       )
   --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
 
-(* Finalize does not go through when unstake does nothing *)
+(* Test that an unstake operation doesn't cause finalization when
+   there are zero staked funds (so the unstake operation doesn't do
+   anything). *)
 (* Todo: there might be other cases... like changing delegates *)
 let scenario_not_finalize =
   init_staker_delegate_or_external --> stake "staker" Half --> next_cycle
@@ -251,6 +279,10 @@ let unset_delegate =
   --> wait_n_cycles_f (unstake_wait ++ 1)
   --> finalize_unstake "staker"
 
+(* Test that external stakers cannot stake when a delegate sets the
+   limit of staking over baking to zero, then can stake again when the
+   limit is set back to one. Changes take effect only after
+   [delegate_parameters_activation_delay + 1] cycles. *)
 let forbid_costaking =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
