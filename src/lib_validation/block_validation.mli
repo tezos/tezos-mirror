@@ -198,6 +198,7 @@ val preapply :
   predecessor_max_operations_ttl:int ->
   predecessor_block_metadata_hash:Block_metadata_hash.t option ->
   predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+  cache:Tezos_protocol_environment.Context.source_of_cache ->
   operation list list ->
   ((Block_header.shell_header * error Preapply_result.t list)
   * (apply_result * Tezos_protocol_environment.Context.t))

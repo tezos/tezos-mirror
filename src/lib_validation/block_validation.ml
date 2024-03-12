@@ -31,14 +31,25 @@ open Validation_errors
 module Event = struct
   include Internal_event.Simple
 
-  let inherited_inconsistent_cache =
+  let inherited_inconsistent_cache_apply =
     declare_1
       ~section:["block"; "validation"]
-      ~name:"block_validation_inconsistent_cache"
+      ~name:"block_validation_inconsistent_cache_apply"
       ~msg:"applied block {hash} with an inconsistent cache: reloading cache"
       ~level:Warning
       ~pp1:Block_hash.pp
       ("hash", Block_hash.encoding)
+
+  let inherited_inconsistent_cache_preapply =
+    declare_1
+      ~section:["block"; "validation"]
+      ~name:"block_validation_inconsistent_cache_preapply"
+      ~msg:
+        "preapplied block on top of {pred_hash} with an inconsistent cache: \
+         reloading cache"
+      ~level:Warning
+      ~pp1:Block_hash.pp
+      ("pred_hash", Block_hash.encoding)
 end
 
 type operation = {
@@ -1518,7 +1529,7 @@ let apply ?simulate ?cached_result ?should_precheck apply_environment ~cache
            fails with an [Inconsistency_hash] error. To make the node
            resilient to such problem, when such an error occurs, we retry
            the application using a fresh cache. *)
-        let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
+        let*! () = Event.(emit inherited_inconsistent_cache_apply) block_hash in
         apply
           ?cached_result
           ?should_precheck
@@ -1539,7 +1550,8 @@ let preapply ~chain_id ~user_activated_upgrades
     ~protocol_data ~live_blocks ~live_operations ~predecessor_context
     ~predecessor_resulting_context_hash ~predecessor_shell_header
     ~predecessor_hash ~predecessor_max_operations_ttl
-    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
+    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash ~cache
+    operations =
   let open Lwt_result_syntax in
   let*! protocol = Context_ops.get_protocol predecessor_context in
   let* (module Proto) =
@@ -1561,7 +1573,7 @@ let preapply ~chain_id ~user_activated_upgrades
   in
   Block_validation.preapply
     ~chain_id
-    ~cache:`Force_load
+    ~cache
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
     ~operation_metadata_size_limit
@@ -1583,26 +1595,61 @@ let preapply ~chain_id ~user_activated_upgrades
     ~protocol_data ~live_blocks ~live_operations ~predecessor_context
     ~predecessor_resulting_context_hash ~predecessor_shell_header
     ~predecessor_hash ~predecessor_max_operations_ttl
-    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
+    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash ~cache
+    operations =
   let open Lwt_result_syntax in
   let*! r =
-    preapply
-      ~chain_id
-      ~user_activated_upgrades
-      ~user_activated_protocol_overrides
-      ~operation_metadata_size_limit
-      ~timestamp
-      ~protocol_data
-      ~live_blocks
-      ~live_operations
-      ~predecessor_context
-      ~predecessor_resulting_context_hash
-      ~predecessor_shell_header
-      ~predecessor_hash
-      ~predecessor_max_operations_ttl
-      ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash
-      operations
+    (* The cache might be inconsistent with the context. By forcing
+       the reloading of the cache, we restore the consistency. *)
+    let*! r =
+      preapply
+        ~chain_id
+        ~user_activated_upgrades
+        ~user_activated_protocol_overrides
+        ~operation_metadata_size_limit
+        ~timestamp
+        ~protocol_data
+        ~live_blocks
+        ~live_operations
+        ~predecessor_context
+        ~predecessor_resulting_context_hash
+        ~predecessor_shell_header
+        ~predecessor_hash
+        ~predecessor_max_operations_ttl
+        ~predecessor_block_metadata_hash
+        ~predecessor_ops_metadata_hash
+        ~cache
+        operations
+    in
+    match r with
+    | Error (Validation_errors.Inconsistent_hash _ :: _) ->
+        (* The shell makes an assumption over the protocol concerning
+           the cache which may be broken. In that case, the application
+           fails with an [Inconsistency_hash] error. To make the node
+           resilient to such problem, when such an error occurs, we retry
+           the application using a fresh cache. *)
+        let*! () =
+          Event.(emit inherited_inconsistent_cache_preapply) predecessor_hash
+        in
+        preapply
+          ~chain_id
+          ~user_activated_upgrades
+          ~user_activated_protocol_overrides
+          ~operation_metadata_size_limit
+          ~timestamp
+          ~protocol_data
+          ~live_blocks
+          ~live_operations
+          ~predecessor_context
+          ~predecessor_resulting_context_hash
+          ~predecessor_shell_header
+          ~predecessor_hash
+          ~predecessor_max_operations_ttl
+          ~predecessor_block_metadata_hash
+          ~predecessor_ops_metadata_hash
+          ~cache:`Force_load
+          operations
+    | (Ok _ | Error _) as res -> Lwt.return res
   in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
