@@ -88,12 +88,12 @@ module M = struct
           issuance_weights.baking_reward_bonus_weight
       | Attesting_reward_per_slot -> issuance_weights.attesting_reward_weight
       | Seed_nonce_revelation_tip ->
-          (* Seed nonce revelation rewards are given every [blocks_per_commitment](=192)th block *)
+          (* Seed nonce revelation rewards are given every [blocks_per_commitment](=240)th block *)
           let blocks_per_commitment = Int32.to_int csts.blocks_per_commitment in
           issuance_weights.seed_nonce_revelation_tip_weight
           * blocks_per_commitment
       | Vdf_revelation_tip ->
-          (* Vdf revelation rewards are given every [blocks_per_commitment](=192)th block *)
+          (* Vdf revelation rewards are given every [blocks_per_commitment](=240)th block *)
           let blocks_per_commitment = Int32.to_int csts.blocks_per_commitment in
           issuance_weights.vdf_revelation_tip_weight * blocks_per_commitment
     in
