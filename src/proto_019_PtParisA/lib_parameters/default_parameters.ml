@@ -380,7 +380,7 @@ let constants_test =
             };
         };
     issuance_weights;
-    consensus_rights_delay = 3;
+    consensus_rights_delay = 2;
     delegate_parameters_activation_delay = 3;
     blocks_preservation_cycles = 1;
     blocks_per_cycle = 12l;
