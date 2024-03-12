@@ -5,9 +5,14 @@
   pkg-config,
 }: {
   pick-latest-packages = final: prev:
-    builtins.mapAttrs
-    (name: versions: versions.latest)
-    prev.repository.packages;
+    prev.repository.select {
+      opams = [
+        {
+          name = "octez-deps";
+          opam = ../opam/virtual/octez-deps.opam.locked;
+        }
+      ];
+    };
 
   common-overlay = final: prev:
     lib.optionalAttrs (lib.hasAttr "ocaml-base-compiler" prev) {
