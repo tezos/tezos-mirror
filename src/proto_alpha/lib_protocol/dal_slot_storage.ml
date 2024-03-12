@@ -64,7 +64,7 @@ let get_slot_headers_history ctxt =
   | None -> Dal_slot_repr.History.genesis
   | Some slots_history -> slots_history
 
-let update_skip_list ctxt ~slot_headers_statuses ~level_attested
+let update_skip_list ctxt ~slot_headers_statuses ~published_level
     ~number_of_slots ~attestation_lag =
   let open Lwt_result_syntax in
   let open Dal_slot_repr.History in
@@ -85,7 +85,7 @@ let update_skip_list ctxt ~slot_headers_statuses ~level_attested
       ~number_of_slots
       slots_history
       cache
-      ~published_level:level_attested
+      ~published_level
       slot_headers_statuses
   in
   let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
@@ -101,14 +101,9 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
   match Raw_level_repr.(sub raw_level dal.attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
-  | Some level_attested ->
-      (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/7563
-
-         rename a level_attested into a published_level. The name level_attested
-         is misteading as it's equal to (current_)level - attestation_lag, which
-         rather corresponds to the publication level of slot headers. *)
-      let* seen_slots = find_slot_headers ctxt level_attested in
-      let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt level_attested in
+  | Some published_level ->
+      let* seen_slots = find_slot_headers ctxt published_level in
+      let*! ctxt = Storage.Dal.Slot.Headers.remove ctxt published_level in
       let* ctxt, attestation, slot_headers_statuses =
         match seen_slots with
         | None -> return (ctxt, Dal_attestation_repr.empty, [])
@@ -127,7 +122,7 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
         update_skip_list
           ctxt
           ~slot_headers_statuses
-          ~level_attested
+          ~published_level
           ~number_of_slots
           ~attestation_lag:dal.attestation_lag
       in
