@@ -150,15 +150,15 @@ let on_new_blueprint (ctxt : Evm_context.t) (blueprint : Blueprint_types.t) =
 
 let main (ctxt : Evm_context.t) ~evm_node_endpoint =
   let open Lwt_result_syntax in
-  let rec loop ctxt stream =
+  let rec loop stream =
     let*! candidate = Lwt_stream.get stream in
     match candidate with
     | Some blueprint ->
-        let* ctxt = on_new_blueprint ctxt blueprint in
+        let* () = on_new_blueprint ctxt blueprint in
         let* _ =
           Tx_pool.produce_block ~force:false ~timestamp:(Helpers.now ())
         in
-        loop ctxt stream
+        loop stream
     | None -> return_unit
   in
 
@@ -170,7 +170,7 @@ let main (ctxt : Evm_context.t) ~evm_node_endpoint =
       ctxt.next_blueprint_number
   in
 
-  loop ctxt blueprints_stream
+  loop blueprints_stream
 
 module Make (Ctxt : sig
   val ctxt : Evm_context.t
