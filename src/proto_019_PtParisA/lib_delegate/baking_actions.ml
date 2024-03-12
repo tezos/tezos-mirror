@@ -437,57 +437,61 @@ let may_get_dal_content state consensus_vote =
     state
     ~default_value:None
     (fun dal_node_rpc_ctxt ->
-      let timeout = compute_dal_rpc_timeout state in
-      let*! result =
-        Lwt.pick
-          [
-            (let*! () = Lwt_unix.sleep timeout in
-             Lwt.return `RPC_timeout);
-            (let*! tz_res =
-               Node_rpc.get_attestable_slots
-                 dal_node_rpc_ctxt
-                 consensus_key.public_key_hash
-                 ~attested_level:(Int32.succ level)
-             in
-             Lwt.return (`RPC_result tz_res));
-          ]
-      in
-      match result with
-      | `RPC_timeout ->
-          let*! () =
-            Events.(
-              emit failed_to_get_dal_attestations_in_time (delegate, timeout))
-          in
-          return_none
-      | `RPC_result (Error errs) ->
-          let*! () =
-            Events.(emit failed_to_get_dal_attestations (delegate, errs))
-          in
-          return_none
-      | `RPC_result (Ok res) -> (
-          match res with
-          | Tezos_dal_node_services.Types.Not_in_committee -> return_none
-          | Attestable_slots {slots = attestation_flags; published_level} ->
-              let number_of_slots =
-                state.global_state.constants.parametric.dal.number_of_slots
-              in
-              let dal_attestation =
-                List.fold_left_i
-                  (fun i acc flag ->
-                    match Dal.Slot_index.of_int_opt ~number_of_slots i with
-                    | Some index when flag -> Dal.Attestation.commit acc index
-                    | None | Some _ -> acc)
-                  Dal.Attestation.empty
-                  attestation_flags
-              in
-              let*! () =
-                let bitset_int = Bitset.to_z (dal_attestation :> Bitset.t) in
-                Events.(
-                  emit
-                    attach_dal_attestation
-                    (delegate, bitset_int, published_level, level, round))
-              in
-              return_some {attestation = dal_attestation}))
+      let attested_level = Int32.succ level in
+      let lag = state.global_state.constants.parametric.dal.attestation_lag in
+      if Int32.sub attested_level (Int32.of_int lag) < 1l then return_none
+      else
+        let timeout = compute_dal_rpc_timeout state in
+        let*! result =
+          Lwt.pick
+            [
+              (let*! () = Lwt_unix.sleep timeout in
+               Lwt.return `RPC_timeout);
+              (let*! tz_res =
+                 Node_rpc.get_attestable_slots
+                   dal_node_rpc_ctxt
+                   consensus_key.public_key_hash
+                   ~attested_level
+               in
+               Lwt.return (`RPC_result tz_res));
+            ]
+        in
+        match result with
+        | `RPC_timeout ->
+            let*! () =
+              Events.(
+                emit failed_to_get_dal_attestations_in_time (delegate, timeout))
+            in
+            return_none
+        | `RPC_result (Error errs) ->
+            let*! () =
+              Events.(emit failed_to_get_dal_attestations (delegate, errs))
+            in
+            return_none
+        | `RPC_result (Ok res) -> (
+            match res with
+            | Tezos_dal_node_services.Types.Not_in_committee -> return_none
+            | Attestable_slots {slots = attestation_flags; published_level} ->
+                let number_of_slots =
+                  state.global_state.constants.parametric.dal.number_of_slots
+                in
+                let dal_attestation =
+                  List.fold_left_i
+                    (fun i acc flag ->
+                      match Dal.Slot_index.of_int_opt ~number_of_slots i with
+                      | Some index when flag -> Dal.Attestation.commit acc index
+                      | None | Some _ -> acc)
+                    Dal.Attestation.empty
+                    attestation_flags
+                in
+                let*! () =
+                  let bitset_int = Bitset.to_z (dal_attestation :> Bitset.t) in
+                  Events.(
+                    emit
+                      attach_dal_attestation
+                      (delegate, bitset_int, published_level, level, round))
+                in
+                return_some {attestation = dal_attestation}))
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate = consensus_key, _; vote_consensus_content; _} =
