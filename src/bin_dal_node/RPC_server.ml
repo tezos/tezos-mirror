@@ -465,12 +465,30 @@ let register_legacy ctxt =
 
 let register ctxt = register_new ctxt (register_legacy ctxt)
 
-let merge dir plugin_dir = Tezos_rpc.Directory.merge dir plugin_dir
+let register_plugin node_ctxt =
+  Tezos_rpc.Directory.register_dynamic_directory
+    Tezos_rpc.Directory.empty
+    Tezos_rpc.Path.(open_root / "plugin")
+    (fun () ->
+      match Node_context.get_ready node_ctxt with
+      | Ok {plugin = (module Plugin); skip_list_cells_store; _} ->
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7069
+
+             DAL: handle protocol plugins change in dynamic proto-related RPCs.
+
+             In case of protocol change where the type of cells and/or hashes
+             change(s), we could register the wrong directory (the one with the
+             current plugin while we want to request data encoded with the
+             previous protocol). A fix would be try answering the RPCs with the
+             current protocol plugin, then with the previous one in case of
+             failure. *)
+          Lwt.return (Plugin.RPC.directory skip_list_cells_store)
+      | Error _ -> Lwt.return Tezos_rpc.Directory.empty)
 
 let start configuration ctxt =
   let open Lwt_syntax in
   let Configuration_file.{rpc_addr; _} = configuration in
-  let dir = register ctxt in
+  let dir = Tezos_rpc.Directory.merge (register ctxt) (register_plugin ctxt) in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
       dir
