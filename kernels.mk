@@ -59,7 +59,7 @@ build-deps:
 
 	# Iterate through all the toolchains. 'rustup show' will install the
 	# toolchain in addition to showing toolchain information.
-	@find src -iname 'rust-toolchain*' -execdir rustup show active-toolchain \; 2>/dev/null
+	@find ${SDK_DIR} ${DEMO_DIR} -iname 'rust-toolchain*' -execdir rustup show active-toolchain \; 2>/dev/null
 
 .PHONY: test
 test:
