@@ -310,13 +310,12 @@ let fill_missing_fields (cctxt : #Protocol_client_context.full) chain
   let* () = save cctxt nonces_location filled_nonces in
   return filled_nonces
 
-(** [get_unrevealed_nonces state nonces] retrieves all the nonces which have been
-    computed for blocks from the previous cycle, which have not been yet revealed. *)
-let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces =
+(** [get_unrevealed_nonces state nonces current_cycle] retrieves all the nonces which 
+    have been computed for blocks from the previous cycle (w.r.t. [current_cycle]), 
+    which have not been yet revealed. *)
+let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
+    current_cycle =
   let open Lwt_result_syntax in
-  let* {cycle = current_cycle; _} =
-    Plugin.RPC.current_level cctxt (chain, `Head 0)
-  in
   match Cycle.pred current_cycle with
   | None ->
       (* This will be [None] iff [current_cycle = 0] which only
@@ -449,7 +448,12 @@ let reveal_potential_nonces state new_proposal =
         let*! () = Events.(emit cannot_read_nonces err) in
         return_unit
     | Ok nonces -> (
-        let*! nonces_to_reveal = get_unrevealed_nonces state nonces in
+        let* {cycle = current_cycle; _} =
+          Plugin.RPC.current_level cctxt (chain, `Head 0)
+        in
+        let*! nonces_to_reveal =
+          get_unrevealed_nonces state nonces current_cycle
+        in
         match nonces_to_reveal with
         | Error err ->
             let*! () = Events.(emit cannot_retrieve_unrevealed_nonces err) in
