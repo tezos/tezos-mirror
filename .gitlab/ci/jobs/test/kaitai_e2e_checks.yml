@@ -20,3 +20,4 @@ kaitai_e2e_checks:
     - ./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh
       contrib/kaitai-struct-files/files
       contrib/kaitai-struct-files/input
+      2>/dev/null
