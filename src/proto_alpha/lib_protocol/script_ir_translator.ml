@@ -2074,7 +2074,7 @@ let normalized_lam_rec ~unparse_code_rec ~stack_depth ctxt kdescr code_field =
              - internal calls parameters
              - storage after origination.
              For
-             - user-provided script parameters 
+             - user-provided script parameters
              [allow_forged_lazy_storage_id] should be [false] but [allow_forged_tickets] should be [true] as users are allowed to transfer tickets. Checking ticket ownership is handled by the ticket table.
            *)
 
@@ -5593,15 +5593,15 @@ let diff_of_sapling_state ctxt ~temporary ~ids_to_copy
            lazy storage.
            [False_f] must be used only when a value of the type cannot contain a lazy
            storage.
-       
+
            This flag is built in [has_lazy_storage] and used only in
            [extract_lazy_storage_updates] and [collect_lazy_storage].
-       
+
            This flag is necessary to avoid these two functions to have a quadratic
            complexity in the size of the type.
-       
+
            Add new lazy storage kinds here.
-       
+
            Please keep the usage of this GADT local.
        *)
 
@@ -5673,10 +5673,10 @@ let rec has_lazy_storage : type t tc. (t, tc) ty -> t has_lazy_storage =
 (**
          Transforms a value potentially containing lazy storage in an intermediary
          state to a value containing lazy storage only represented by identifiers.
-       
+
          Returns the updated value, the updated set of ids to copy, and the lazy
          storage diff to show on the receipt and apply on the storage.
-       
+
        *)
 let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
   let rec aux :
@@ -6055,17 +6055,17 @@ let get_single_sapling_state ctxt ty x =
   | Fold_lazy_storage.Ok None | Fold_lazy_storage.Error -> return (None, ctxt)
 
 (*
-       
+
           {!Script_cache} needs a measure of the script size in memory.
           Determining this size is not easy in OCaml because of sharing.
-       
+
           Indeed, many values present in the script share the same memory
           area. This is especially true for types and stack types: they are
           heavily shared in every typed IR internal representation. As a
           consequence, computing the size of the typed IR without taking
           sharing into account leads to a size which is sometimes two order
           of magnitude bigger than the actual size.
-       
+
           We could track down this sharing. Unfortunately, sharing is not
           part of OCaml semantics: for this reason, a compiler can optimize
           memory representation by adding more sharing.  If two nodes use
@@ -6073,13 +6073,13 @@ let get_single_sapling_state ctxt ty x =
           computation of the memory footprint of scripts would lead to two
           distinct sizes. As these sizes occur in the blockchain context,
           this situation would lead to a fork.
-       
+
           For this reason, we introduce a *size model* for the script size.
           This model provides an overapproximation of the actual size in
           memory. The risk is to be too far from the actual size: the cache
           would then be wrongly marked as full. This situation would make the
           cache less useful but should present no security risk .
-       
+
        *)
 let script_size
     (Ex_script
