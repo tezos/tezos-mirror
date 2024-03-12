@@ -13,6 +13,12 @@ type t
     existing ([false]). *)
 val init : data_dir:string -> t tzresult Lwt.t
 
+(** [with_transaction store k] wraps the accesses to [store] made in the
+    continuation [k] within {{:https://www.sqlite.org/lang_transaction.html}a
+    SQL transaction}. If [k] fails, the transaction is rollbacked. Otherwise,
+    the transaction is committed. *)
+val with_transaction : t -> (t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+
 module Executable_blueprints : sig
   val store :
     t ->
