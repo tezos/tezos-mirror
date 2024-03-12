@@ -121,6 +121,10 @@ The field ``kind`` allows to identify the type of container account, it can have
   Other categories may be added in the future.
 * ``"commitment"`` represents the accounts of commitments awaiting activation.
   This type of account is further identified by the additional field ``committer`` whose value is the encrypted public key hash of the user who has committed to provide funds.
+* ``"staking"`` represents abstractions used for accounting staking by delegators, and comes with the additional field ``category`` that can have one of the following values:
+
+  - ``"delegator numerator"`` abstracts the delegator's stake, and comes with the additional field ``"delegator"`` whose value is the public key hash of the delegator.
+  - ``"delegate denominator"`` abstracts the total stake of delegate's delegators, and comes with the additional field ``"delegate"`` whose value is the public key hash of the delegate.
 
 Sink accounts
 -------------
