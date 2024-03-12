@@ -6,6 +6,8 @@
 
 ### Bug fixes
 
+- Fix `eth_getTransactionBy*`: report the gas & gasPrice as set by the sender. (!12419)
+
 ### Breaking changes
 
 ### Internal

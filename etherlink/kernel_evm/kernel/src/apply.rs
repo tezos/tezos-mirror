@@ -91,10 +91,16 @@ pub struct TransactionReceiptInfo {
     pub type_: TransactionType,
 }
 
+/// Details about the original transaction.
+///
+/// See <https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash>
+/// for more details.
 #[derive(Debug)]
 pub struct TransactionObjectInfo {
     pub from: H160,
-    pub gas_used: U256,
+    /// Gas provided by the sender
+    pub gas: U256,
+    /// Gas price provided by the sender
     pub gas_price: U256,
     pub hash: TransactionHash,
     pub input: Vec<u8>,
@@ -133,10 +139,19 @@ fn make_object_info(
     index: u32,
     fee_updates: &FeeUpdates,
 ) -> Result<TransactionObjectInfo, anyhow::Error> {
+    let (gas, gas_price) = match &transaction.content {
+        TransactionContent::Ethereum(e) => {
+            (e.gas_limit_with_fees().into(), e.max_fee_per_gas)
+        }
+        TransactionContent::Deposit(_) => {
+            (fee_updates.overall_gas_used, fee_updates.overall_gas_price)
+        }
+    };
+
     Ok(TransactionObjectInfo {
         from,
-        gas_used: fee_updates.overall_gas_used,
-        gas_price: fee_updates.overall_gas_price,
+        gas,
+        gas_price,
         hash: transaction.tx_hash,
         input: transaction.data(),
         nonce: transaction.nonce(),
@@ -558,7 +573,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         execution_outcome,
         caller,
         to,
-        object_info.gas_price,
+        fee_updates.overall_gas_price,
         transaction.type_(),
     );
 
