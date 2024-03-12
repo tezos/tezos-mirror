@@ -591,11 +591,11 @@ module Simple = struct
      | Bool -> Format.pp_print_bool fmt value
      | Int8 -> Format.pp_print_int fmt value
      | Uint8 -> Format.pp_print_int fmt value
-     | Int16 -> Format.pp_print_int fmt value
-     | Uint16 -> Format.pp_print_int fmt value
-     | Int31 -> Format.pp_print_int fmt value
-     | Int32 -> Format.fprintf fmt "%ld" value
-     | Int64 -> Format.fprintf fmt "%Ld" value
+     | Int16 _ -> Format.pp_print_int fmt value
+     | Uint16 _ -> Format.pp_print_int fmt value
+     | Int31 _ -> Format.pp_print_int fmt value
+     | Int32 _ -> Format.fprintf fmt "%ld" value
+     | Int64 _ -> Format.fprintf fmt "%Ld" value
      | N -> Format.pp_print_string fmt (Z.to_string value)
      | Z -> Format.pp_print_string fmt (Z.to_string value)
      | RangedInt _ -> Format.pp_print_int fmt value
@@ -603,6 +603,7 @@ module Simple = struct
      | Float -> pp_print_compact_float fmt value
      | Bytes _ -> pp_print_shortened_string fmt (Bytes.to_string value)
      | String _ -> pp_print_shortened_string fmt value
+     | Bigstring _ -> Format.pp_print_string fmt "<bigstring>"
      | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
      | String_enum (table, _) -> (
          match Stdlib.Hashtbl.find_opt table value with

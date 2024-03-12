@@ -8,7 +8,7 @@
 type genesis_info = {level : int32; commitment_hash : Commitment.Hash.t}
 
 let genesis_info_encoding =
-  let open Data_encoding in
+  let open Data_encoding.V1 in
   conv
     (fun {level; commitment_hash} -> (level, commitment_hash))
     (fun (level, commitment_hash) -> {level; commitment_hash})
@@ -38,7 +38,7 @@ module V0 = struct
   type t = {rollup_address : Address.t; context_version : Context.Version.t}
 
   let encoding =
-    let open Data_encoding in
+    let open Data_encoding.V1 in
     conv
       (fun {rollup_address; context_version} ->
         (rollup_address, context_version))
@@ -62,7 +62,7 @@ module V1 = struct
   }
 
   let encoding =
-    let open Data_encoding in
+    let open Data_encoding.V1 in
     conv
       (fun {rollup_address; context_version; kind; genesis_info} ->
         (rollup_address, context_version, kind, genesis_info))
@@ -83,7 +83,7 @@ module Versioned = struct
   type t = V0 of V0.t | V1 of V1.t
 
   let encoding =
-    let open Data_encoding in
+    let open Data_encoding.V1 in
     union
       [
         case
