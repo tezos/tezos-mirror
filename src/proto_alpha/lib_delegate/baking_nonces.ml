@@ -219,51 +219,44 @@ let get_block_level_opt cctxt ~chain ~block =
       in
       return_none
 
-(** [get_outdated_nonces state nonces] returns an (orphans, outdated) pair 
-    of lists of nonces (paired with their block hashes); "orphans" are nonces
+(** [get_outdated_nonces state nonces currnet_cycle] returns an (orphans, outdated) 
+    pair of lists of nonces (paired with their block hashes); "orphans" are nonces
     for which we could not retrieve the block level, which can happen in case
     of a snapshot import or of a block reorganisation; "outdated" nonces
     appear in cycles which are [consensus_rights_delay] older than the 
-    current cycle.  *)
-let get_outdated_nonces {cctxt; constants; chain; _} nonces =
+    [current_cycle].  *)
+let get_outdated_nonces {cctxt; constants; chain; _} nonces current_cycle =
   let open Lwt_result_syntax in
   let {Constants.parametric = {blocks_per_cycle; consensus_rights_delay; _}; _}
       =
     constants
   in
-  let*! current_level = get_block_level_opt cctxt ~chain ~block:(`Head 0) in
-  match current_level with
-  | None ->
-      let*! () = Events.(emit cannot_fetch_chain_head_level ()) in
-      return (empty, empty)
-  | Some current_level ->
-      let current_cycle = Int32.(div current_level blocks_per_cycle) in
-      let is_older_than_consensus_rights_delay block_level =
-        let block_cycle = Int32.(div block_level blocks_per_cycle) in
-        Int32.sub current_cycle block_cycle
-        > Int32.of_int consensus_rights_delay
-      in
-      Block_hash.Map.fold
-        (fun hash nonce acc ->
-          let* orphans, outdated = acc in
-          let*! level =
-            get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0))
-          in
-          match level with
-          | Some level ->
-              if is_older_than_consensus_rights_delay level then
-                return (orphans, add outdated hash nonce)
-              else acc
-          | None -> return (add orphans hash nonce, outdated))
-        nonces
-        (return (empty, empty))
+  let is_older_than_consensus_rights_delay block_level =
+    let block_cycle = Int32.(div block_level blocks_per_cycle) in
+    Int32.sub (Cycle.to_int32 current_cycle) block_cycle
+    > Int32.of_int consensus_rights_delay
+  in
+  Block_hash.Map.fold
+    (fun hash nonce acc ->
+      let* orphans, outdated = acc in
+      let*! level = get_block_level_opt cctxt ~chain ~block:(`Hash (hash, 0)) in
+      match level with
+      | Some level ->
+          if is_older_than_consensus_rights_delay level then
+            return (orphans, add outdated hash nonce)
+          else acc
+      | None -> return (add orphans hash nonce, outdated))
+    nonces
+    (return (empty, empty))
 
-(** [filter_outdated_nonces state nonces] computes the pair of "orphaned" and
-    "outdated" nonces; emits a warning in case our map contains too many "orphaned"
+(** [filter_outdated_nonces state nonces current_cyce] computes the pair of "orphaned" 
+    and "outdated" nonces; emits a warning in case our map contains too many "orphaned"
     nonces, and removes all the oudated nonces. *)
-let filter_outdated_nonces state nonces =
+let filter_outdated_nonces state nonces current_cycle =
   let open Lwt_result_syntax in
-  let* orphans, outdated_nonces = get_outdated_nonces state nonces in
+  let* orphans, outdated_nonces =
+    get_outdated_nonces state nonces current_cycle
+  in
   let* () =
     when_
       (Block_hash.Map.cardinal orphans >= 50)
@@ -425,8 +418,8 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
           return_unit)
         nonces
 
-(** [reveal_potential_nonces state new_proposal] updates the internal [state] of 
-    the worker each time a proposal with a new predecessor is received; this means
+(** [reveal_potential_nonces state new_proposal] updates the internal [state] 
+    of the worker each time a proposal with a new predecessor is received; this means
     revealing the necessary nonces. *)
 let reveal_potential_nonces state new_proposal =
   let open Lwt_result_syntax in
@@ -477,7 +470,9 @@ let reveal_potential_nonces state new_proposal =
                    - We entered a new cycle and we can clear old nonces ;
                    - A revelation was not included yet in the cycle beginning.
                      So, it is safe to only filter outdated_nonces there *)
-                let* live_nonces = filter_outdated_nonces state nonces in
+                let* live_nonces =
+                  filter_outdated_nonces state nonces current_cycle
+                in
                 let* () = save cctxt nonces_location live_nonces in
                 return_unit)))
   else return_unit
