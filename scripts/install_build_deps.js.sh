@@ -1,6 +1,11 @@
 #!/bin/sh
 
-set -e
+# This script is intended for sourcing. This means the use of 'set -o
+# errexit' leaks to the user unless we go through a bit of
+# ritual. Store the old value of 'set -o errexit' to restore at the
+# end of the script.
+old_errexit=$(set +o | grep 'errexit$')
+set -o errexit
 
 if [ -z "$recommended_node_version" ]; then
   script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
@@ -57,7 +62,12 @@ nvm_get_arch() {
   nvm_echo "${NVM_ARCH}"
 }
 
-nvm install "$NODE_VERSION"
+# Turn off the nvm progress bar in GitLab CI to improve logs.
+if [ -n "${CI:-}" ]; then
+  nvm install --no-progress "$NODE_VERSION"
+else
+  nvm install "$NODE_VERSION"
+fi
 nvm use --delete-prefix "$NODE_VERSION"
 
 echo "Check versions"
@@ -69,4 +79,9 @@ if [ -z "${CI_PROJECT_DIR}" ]; then
   npm install
 else
   npm ci
+fi
+
+# Disable 'errexit' if it was disabled at the beginning of the script.
+if [ "$old_errexit" = "set +o errexit" ]; then
+  set +o errexit
 fi
