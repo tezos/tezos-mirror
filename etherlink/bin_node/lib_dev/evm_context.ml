@@ -5,17 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type session_state = {
+  mutable context : Irmin_context.rw;
+  mutable next_blueprint_number : Ethereum_types.quantity;
+  mutable current_block_hash : Ethereum_types.block_hash;
+}
+
 type t = {
   data_dir : string;
-  mutable context : Irmin_context.rw;
   index : Irmin_context.rw_index;
   preimages : string;
   preimages_endpoint : Uri.t option;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
-  mutable next_blueprint_number : Ethereum_types.quantity;
-  mutable current_block_hash : Ethereum_types.block_hash;
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
   store : Store.t;
+  session : session_state;
 }
 
 let store_path ~data_dir = Filename.Infix.(data_dir // "store")
@@ -45,12 +49,12 @@ let load ~data_dir index =
 
 let commit ~number (ctxt : t) evm_state =
   let open Lwt_result_syntax in
-  let*! context = Irmin_context.PVMState.set ctxt.context evm_state in
+  let*! context = Irmin_context.PVMState.set ctxt.session.context evm_state in
   let*! checkpoint = Irmin_context.commit context in
-  ctxt.context <- context ;
+  ctxt.session.context <- context ;
   Store.Context_hashes.store ctxt.store number checkpoint
 
-let evm_state {context; _} = Irmin_context.PVMState.get context
+let evm_state ctxt = Irmin_context.PVMState.get ctxt.session.context
 
 let execution_config ctxt =
   Config.config
@@ -93,7 +97,7 @@ let apply_blueprint ctxt payload =
   let open Lwt_result_syntax in
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
-  let (Qty next) = ctxt.next_blueprint_number in
+  let (Qty next) = ctxt.session.next_blueprint_number in
   let* try_apply = Evm_state.apply_blueprint ~config evm_state payload in
 
   match try_apply with
@@ -105,8 +109,8 @@ let apply_blueprint ctxt payload =
           (Qty blueprint_number)
           payload
       in
-      ctxt.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
-      ctxt.current_block_hash <- current_block_hash ;
+      ctxt.session.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
+      ctxt.session.current_block_hash <- current_block_hash ;
       let*! () =
         Blueprint_events.blueprint_applied (blueprint_number, current_block_hash)
       in
@@ -123,7 +127,7 @@ let apply_blueprint ctxt payload =
 
 let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
   let open Lwt_result_syntax in
-  let (Qty level) = ctxt.next_blueprint_number in
+  let (Qty level) = ctxt.session.next_blueprint_number in
   let* () = apply_blueprint ctxt blueprint.to_execute in
   let* () =
     Store.Publishable_blueprints.store
@@ -149,13 +153,11 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   let ctxt =
     {
       index;
-      context;
       data_dir;
       preimages;
       preimages_endpoint;
       smart_rollup_address = destination;
-      next_blueprint_number;
-      current_block_hash;
+      session = {context; next_blueprint_number; current_block_hash};
       blueprint_watcher = Lwt_watcher.create_input ();
       store;
     }
@@ -250,7 +252,7 @@ let execute_and_inspect ?wasm_entrypoint ~input ctxt =
 
 let last_produced_blueprint (ctxt : t) =
   let open Lwt_result_syntax in
-  let (Qty next) = ctxt.next_blueprint_number in
+  let (Qty next) = ctxt.session.next_blueprint_number in
   let current = Ethereum_types.Qty Z.(pred next) in
   let* blueprint = Store.Executable_blueprints.find ctxt.store current in
   match blueprint with

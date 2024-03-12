@@ -5,19 +5,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  data_dir : string;  (** Data dir of the EVM node. *)
+type session_state = {
   mutable context : Irmin_context.rw;  (** Irmin read and write context. *)
-  index : Irmin_context.rw_index;
-  preimages : string;  (** Path to the preimages directory. *)
-  preimages_endpoint : Uri.t option;  (** URI to fetch missing pre-images. *)
-  smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   mutable next_blueprint_number : Ethereum_types.quantity;
       (** Number for the next bluerpint to be produced. *)
   mutable current_block_hash : Ethereum_types.block_hash;
       (** Hash of the latest processed block *)
+}
+
+type t = {
+  data_dir : string;  (** Data dir of the EVM node. *)
+  index : Irmin_context.rw_index;
+  preimages : string;  (** Path to the preimages directory. *)
+  preimages_endpoint : Uri.t option;  (** URI to fetch missing pre-images. *)
+  smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
   store : Store.t;
+  session : session_state;
 }
 
 (** [init ~data_dir ~preimages ~preimages_endpoint ~smart_rollup_address ()]
