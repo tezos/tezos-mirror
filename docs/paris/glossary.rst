@@ -237,6 +237,7 @@ _`Implicit account`
     The address of an implicit account always starts with the
     letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
     signature scheme) and finally the hash of the public key.
+    See :doc:`./accounts` for a more detailed explanation on addresses.
 
 _`Layer 1`
     The primary blockchain i.e. the Tezos chain. Within any blockchain ecosystem, Layer 1 (L1) refers to the main chain to

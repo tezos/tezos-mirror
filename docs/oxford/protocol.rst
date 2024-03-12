@@ -35,6 +35,11 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   accounts
+
+.. toctree::
+   :maxdepth: 2
+
    michelson
 
 .. toctree::

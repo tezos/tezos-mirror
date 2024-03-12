@@ -29,7 +29,7 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
-.. _address_prefixes_alpha:
+.. _transaction_semantics_alpha:
 
 Semantics of smart contracts and transactions
 ---------------------------------------------
@@ -37,20 +37,14 @@ Semantics of smart contracts and transactions
 The Tezos ledger currently has two types of accounts that can hold
 tokens (and be the destinations of transactions).
 
-  - An implicit account is a non programmable account, whose tokens
-    are spendable and delegatable by a public key. Its address is
-    directly the public key hash, and starts with ``tz1``, ``tz2``,
-    ``tz3`` or ``tz4``.
-  - A smart contract is a programmable account. A transaction to such
-    an address can provide data, and can fail for reasons decided by
-    its Michelson code. Its address is a unique hash that depends on
-    the operation that led to its creation, and starts with ``KT1``.
+- Implicit account: non-programmable account whose address is
+  the public key hash, prefixed by ``tz`` and one digit.
+- Smart contract: programmable account associated to some Michelson code,
+  whose address is a unique hash, prefixed by ``KT1``.
+  A transaction to such
+  an address can provide data, and can fail for reasons detailed below.
 
-From Michelson, they are indistinguishable. A safe way to think about
-this is to consider that implicit accounts are smart contracts that
-always succeed in receiving tokens, and do nothing else.
-
-Finally, addresses prefixed with ``sr1`` identify :doc:`smart rollups <./smart_rollups>`.
+See :doc:`./accounts` for more details.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
