@@ -462,7 +462,7 @@ let handle_request :
             tzfail
               (Block_validator_errors.Failed_to_checkout_context context_hash)
       in
-      continue res cache None
+      continue res cache cached_result
   | External_validation.Context_garbage_collection
       {context_hash; gc_lockfile_path} ->
       let*! () = Events.(emit context_gc_request context_hash) in
@@ -489,11 +489,11 @@ let handle_request :
           (fun () -> Lwt_unix.close lockfile)
       in
       let () = Lwt.dont_wait gc_waiter (fun _exn -> ()) in
-      continue (Ok ()) cache None
+      continue (Ok ()) cache cached_result
   | External_validation.Context_split ->
       let*! () = Events.(emit context_split_request) () in
       let*! () = Context.split context_index in
-      continue (Ok ()) cache None
+      continue (Ok ()) cache cached_result
   | External_validation.Terminate ->
       let*! () = Lwt_io.flush_all () in
       let*! () = Events.(emit termination_request ()) in
@@ -502,7 +502,7 @@ let handle_request :
       let*! res =
         Tezos_base_unix.Internal_event_unix.Configuration.reapply config
       in
-      continue res cache None
+      continue res cache cached_result
 
 let run ~readonly ~using_std_channel input output =
   let open Lwt_result_syntax in
