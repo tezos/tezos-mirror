@@ -301,8 +301,6 @@ let jobs pipeline_type =
              (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
            [])
     |> job_external_split
-         ~before_merging_suffix:"before_merging"
-         ~scheduled_suffix:"other"
   in
   let build =
     let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
