@@ -388,9 +388,6 @@ let constants_test =
       (* Not 9 so that multiplication by a percentage and
          divisions by a limit do not easily get intermingled. *);
     max_operations_time_to_live = 8;
-    (* This has the same slashing behaviour as before P *)
-    max_slashing_per_block = Protocol.Percentage.p50;
-    max_slashing_threshold = 1;
   }
 
 let test_commitments =
