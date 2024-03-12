@@ -139,6 +139,9 @@ pub enum Instr {
     Csrrsi(CsriArgs),
     Csrrci(CsriArgs),
 
+    // Zifencei instructions
+    FenceI,
+
     // Privileged instructions
     Mret,
     Sret,
@@ -214,6 +217,7 @@ impl Instr {
             | Csrrwi(_)
             | Csrrsi(_)
             | Csrrci(_)
+            | FenceI
             | Mret
             | Sret
             | Mnret
@@ -431,6 +435,9 @@ impl fmt::Display for Instr {
             Csrrwi(args) => csri_instr!(f, "csrrwi", args),
             Csrrsi(args) => csri_instr!(f, "csrrsi", args),
             Csrrci(args) => csri_instr!(f, "csrrci", args),
+
+            // Zifencei instructions
+            FenceI => write!(f, "fence.i"),
 
             // Privileged instructions
             Mret => write!(f, "mret"),

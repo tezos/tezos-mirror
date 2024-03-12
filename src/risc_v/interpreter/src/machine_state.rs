@@ -253,6 +253,12 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Csrrsi(args) => run_csr_imm_instr!(self, instr, args, run_csrrsi),
             Instr::Csrrci(args) => run_csr_imm_instr!(self, instr, args, run_csrrci),
 
+            // Zifencei instructions
+            Instr::FenceI => {
+                self.run_fencei();
+                Ok(Add(instr.width()))
+            }
+
             // Privileged instructions
             Instr::Mret => run_xret_instr!(self, run_mret),
             Instr::Sret => run_xret_instr!(self, run_sret),
