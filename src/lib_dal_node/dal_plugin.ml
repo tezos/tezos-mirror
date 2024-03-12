@@ -98,6 +98,10 @@ module type T = sig
       Tezos_rpc.Context.generic ->
       (hash * cell) list tzresult Lwt.t
   end
+
+  module RPC : sig
+    val directory : Skip_list_cells_store.t -> unit Tezos_rpc.Directory.t
+  end
 end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5

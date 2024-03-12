@@ -263,6 +263,11 @@ module Plugin = struct
           in
           return last_cells
   end
+
+  module RPC = struct
+    let directory skip_list_cells_store =
+      RPC_directory.directory skip_list_cells_store
+  end
 end
 
 let () = Dal_plugin.register (module Plugin)

@@ -139,6 +139,11 @@ module type T = sig
       Tezos_rpc.Context.generic ->
       (hash * cell) list tzresult Lwt.t
   end
+
+  module RPC : sig
+    (** RPCs directory of the protocol-related part of the DAL node. *)
+    val directory : Skip_list_cells_store.t -> unit Tezos_rpc.Directory.t
+  end
 end
 
 val register : (module T) -> unit
