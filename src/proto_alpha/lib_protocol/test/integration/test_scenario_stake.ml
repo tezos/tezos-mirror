@@ -106,27 +106,6 @@ let double_roundtrip =
   --> wait_for_unfreeze_and_check (Fun.const 2)
   --> finalize "staker" --> next_cycle
 
-(* Test that a baker can stake from unstaked frozen funds. *)
-let shorter_roundtrip_for_baker =
-  let amount = Amount (Tez.of_mutez 333_000_000_000L) in
-  let consensus_rights_delay =
-    Default_parameters.constants_test.consensus_rights_delay
-  in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force --> begin_test ["delegate"]
-  --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
-  --> next_cycle
-  --> snapshot_balances "init" ["delegate"]
-  --> unstake "delegate" amount
-  --> (* Wait [n] cycles where [0 <= n <= consensus_rights_delay + 1]. *)
-  List.fold_left
-    (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
-    (Tag "wait 0 cycles" --> Empty)
-    (Stdlib.List.init (consensus_rights_delay + 1) (fun i -> i + 1))
-  --> stake "delegate" amount
-  --> check_snapshot_balances "init"
-
 (* Roundtrip where the unstaked amount matches the initially staked
    amount (either from one unstake operation of this amount, or two
    unstake operations summing up to it). This lets us explicitly check
@@ -147,6 +126,27 @@ let status_quo_rountrip =
          --> unstake "staker" (Amount amount_2))
   --> wait_n_cycles_f unstake_wait
   --> finalize "staker"
+  --> check_snapshot_balances "init"
+
+(* Test that a baker can stake from unstaked frozen funds. *)
+let shorter_roundtrip_for_baker =
+  let amount = Amount (Tez.of_mutez 333_000_000_000L) in
+  let consensus_rights_delay =
+    Default_parameters.constants_test.consensus_rights_delay
+  in
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai `Force --> begin_test ["delegate"]
+  --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+  --> next_cycle
+  --> snapshot_balances "init" ["delegate"]
+  --> unstake "delegate" amount
+  --> (* Wait [n] cycles where [0 <= n <= consensus_rights_delay + 1]. *)
+  List.fold_left
+    (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
+    (Tag "wait 0 cycles" --> Empty)
+    (Stdlib.List.init (consensus_rights_delay + 1) (fun i -> i + 1))
+  --> stake "delegate" amount
   --> check_snapshot_balances "init"
 
 (* Test three different ways to finalize unstake requests:
