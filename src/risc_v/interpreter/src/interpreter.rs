@@ -25,48 +25,57 @@ mod tests {
     use std::fs;
 
     const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
-    const MAX_STEPS: usize = 1000000;
+    const MAX_STEPS: usize = 1_000_000;
 
-    fn interpret_test<F: TestBackendFactory>(contents: &[u8]) {
+    fn interpret_test<F: TestBackendFactory>(contents: &[u8], mode: Mode) {
         let program = Program::<M1G>::from_elf(contents).unwrap();
         let mut backend = create_backend!(MachineStateLayout<M1G>, F);
         let mut state = create_state!(MachineState, MachineStateLayout<M1G>, F, backend, M1G);
         state
             .setup_boot(&program, None, Mode::Machine)
             .expect("Boot failed");
-        for _ in 1..MAX_STEPS {
-            let result = state.step();
-            if let Err(EnvironException::EnvCallFromUMode) = result {
-                match (
-                    state.hart.xregisters.read(a7),
-                    state.hart.xregisters.read(a0),
-                ) {
-                    (93, 0) => return,
-                    (93, tcase) => {
-                        panic!("Failed at test case {}", tcase >> 1)
-                    }
-                    _ => panic!("Failed unexpectedly at {:x}", state.hart.pc.read()),
+
+        let expected_exception = match mode {
+            Mode::User => EnvironException::EnvCallFromUMode,
+            Mode::Supervisor => EnvironException::EnvCallFromSMode,
+            Mode::Machine => EnvironException::EnvCallFromMMode,
+            Mode::Debug => EnvironException::TrapFromDMode,
+        };
+
+        let result = state.step_many(MAX_STEPS, |_| true);
+        if result.exception == Some(expected_exception) {
+            match (
+                state.hart.xregisters.read(a7),
+                state.hart.xregisters.read(a0),
+            ) {
+                (93, 0) => return,
+                (93, tcase) => {
+                    panic!("Failed at test case {}", tcase >> 1)
                 }
+                _ => panic!("Failed unexpectedly at {:x}", state.hart.pc.read()),
             }
         }
-        panic!("Timeout")
+
+        panic!("Test ended with {:?}", result);
     }
 
     macro_rules! test_case {
-        ($(#[$m:meta])*
-         $name: ident, $path: expr) => {
+        ($(#[$m:meta])* $name: ident, $path: expr) => {
             backend_test!($(#[$m])* $name, F, {
                 let contents = fs::read(format!("{}/{}", TESTS_DIR, $path)).expect("Failed to read binary");
-                interpret_test::<F>(&contents)
+                interpret_test::<F>(&contents, Mode::Machine)
+            });
+        };
+
+        ($(#[$m:meta])* $name: ident, $path: expr, $mode:expr) => {
+            backend_test!($(#[$m])* $name, F, {
+                let contents = fs::read(format!("{}/{}", TESTS_DIR, $path)).expect("Failed to read binary");
+                interpret_test::<F>(&contents, $mode)
             });
         };
     }
 
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_access,
-        "rv64mi-p-access"
-    );
+    test_case!(test_suite_rv64mi_p_access, "rv64mi-p-access");
     test_case!(
         #[ignore]
         test_suite_rv64mi_p_breakpoint,
@@ -82,26 +91,10 @@ mod tests {
         test_suite_rv64mi_p_illegal,
         "rv64mi-p-illegal"
     );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_ld_misaligned,
-        "rv64mi-p-ld-misaligned"
-    );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_lh_misaligned,
-        "rv64mi-p-lh-misaligned"
-    );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_lw_misaligned,
-        "rv64mi-p-lw-misaligned"
-    );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_ma_addr,
-        "rv64mi-p-ma_addr"
-    );
+    test_case!(test_suite_rv64mi_p_ld_misaligned, "rv64mi-p-ld-misaligned");
+    test_case!(test_suite_rv64mi_p_lh_misaligned, "rv64mi-p-lh-misaligned");
+    test_case!(test_suite_rv64mi_p_lw_misaligned, "rv64mi-p-lw-misaligned");
+    test_case!(test_suite_rv64mi_p_ma_addr, "rv64mi-p-ma_addr");
     test_case!(
         #[ignore]
         test_suite_rv64mi_p_ma_fetch,
@@ -112,36 +105,16 @@ mod tests {
         test_suite_rv64mi_p_mcsr,
         "rv64mi-p-mcsr"
     );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_sbreak,
-        "rv64mi-p-sbreak"
-    );
+    test_case!(test_suite_rv64mi_p_sbreak, "rv64mi-p-sbreak");
     test_case!(
         #[ignore]
         test_suite_rv64mi_p_scall,
         "rv64mi-p-scall"
     );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_sd_misaligned,
-        "rv64mi-p-sd-misaligned"
-    );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_sh_misaligned,
-        "rv64mi-p-sh-misaligned"
-    );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_sw_misaligned,
-        "rv64mi-p-sw-misaligned"
-    );
-    test_case!(
-        #[ignore]
-        test_suite_rv64mi_p_zicntr,
-        "rv64mi-p-zicntr"
-    );
+    test_case!(test_suite_rv64mi_p_sd_misaligned, "rv64mi-p-sd-misaligned");
+    test_case!(test_suite_rv64mi_p_sh_misaligned, "rv64mi-p-sh-misaligned");
+    test_case!(test_suite_rv64mi_p_sw_misaligned, "rv64mi-p-sw-misaligned");
+    test_case!(test_suite_rv64mi_p_zicntr, "rv64mi-p-zicntr");
 
     test_case!(
         #[ignore]
@@ -152,37 +125,43 @@ mod tests {
     test_case!(
         #[ignore]
         test_suite_rv64si_p_csr,
-        "rv64si-p-csr"
+        "rv64si-p-csr",
+        Mode::Supervisor
     );
     test_case!(
         #[ignore]
         test_suite_rv64si_p_dirty,
-        "rv64si-p-dirty"
+        "rv64si-p-dirty",
+        Mode::Supervisor
     );
     test_case!(
         #[ignore]
         test_suite_rv64si_p_icache_alias,
-        "rv64si-p-icache-alias"
+        "rv64si-p-icache-alias",
+        Mode::Supervisor
     );
     test_case!(
         #[ignore]
         test_suite_rv64si_p_ma_fetch,
-        "rv64si-p-ma_fetch"
+        "rv64si-p-ma_fetch",
+        Mode::Supervisor
     );
     test_case!(
-        #[ignore]
         test_suite_rv64si_p_sbreak,
-        "rv64si-p-sbreak"
+        "rv64si-p-sbreak",
+        Mode::Supervisor
     );
     test_case!(
         #[ignore]
         test_suite_rv64si_p_scall,
-        "rv64si-p-scall"
+        "rv64si-p-scall",
+        Mode::Supervisor
     );
     test_case!(
         #[ignore]
         test_suite_rv64si_p_wfi,
-        "rv64si-p-wfi"
+        "rv64si-p-wfi",
+        Mode::Supervisor
     );
 
     test_case!(
@@ -629,58 +608,58 @@ mod tests {
         "rv64uf-v-recoding"
     );
 
-    test_case!(test_suite_rv64ui_p_add, "rv64ui-p-add");
-    test_case!(test_suite_rv64ui_p_addi, "rv64ui-p-addi");
-    test_case!(test_suite_rv64ui_p_addiw, "rv64ui-p-addiw");
-    test_case!(test_suite_rv64ui_p_addw, "rv64ui-p-addw");
-    test_case!(test_suite_rv64ui_p_and, "rv64ui-p-and");
-    test_case!(test_suite_rv64ui_p_andi, "rv64ui-p-andi");
-    test_case!(test_suite_rv64ui_p_auipc, "rv64ui-p-auipc");
-    test_case!(test_suite_rv64ui_p_beq, "rv64ui-p-beq");
-    test_case!(test_suite_rv64ui_p_bge, "rv64ui-p-bge");
-    test_case!(test_suite_rv64ui_p_bgeu, "rv64ui-p-bgeu");
-    test_case!(test_suite_rv64ui_p_blt, "rv64ui-p-blt");
-    test_case!(test_suite_rv64ui_p_bltu, "rv64ui-p-bltu");
-    test_case!(test_suite_rv64ui_p_bne, "rv64ui-p-bne");
-    test_case!(test_suite_rv64ui_p_fence_i, "rv64ui-p-fence_i");
-    test_case!(test_suite_rv64ui_p_jal, "rv64ui-p-jal");
-    test_case!(test_suite_rv64ui_p_jalr, "rv64ui-p-jalr");
-    test_case!(test_suite_rv64ui_p_lb, "rv64ui-p-lb");
-    test_case!(test_suite_rv64ui_p_lbu, "rv64ui-p-lbu");
-    test_case!(test_suite_rv64ui_p_ld, "rv64ui-p-ld");
-    test_case!(test_suite_rv64ui_p_lh, "rv64ui-p-lh");
-    test_case!(test_suite_rv64ui_p_lhu, "rv64ui-p-lhu");
-    test_case!(test_suite_rv64ui_p_lui, "rv64ui-p-lui");
-    test_case!(test_suite_rv64ui_p_lw, "rv64ui-p-lw");
-    test_case!(test_suite_rv64ui_p_lwu, "rv64ui-p-lwu");
-    test_case!(test_suite_rv64ui_p_ma_data, "rv64ui-p-ma_data");
-    test_case!(test_suite_rv64ui_p_or, "rv64ui-p-or");
-    test_case!(test_suite_rv64ui_p_ori, "rv64ui-p-ori");
-    test_case!(test_suite_rv64ui_p_sb, "rv64ui-p-sb");
-    test_case!(test_suite_rv64ui_p_sd, "rv64ui-p-sd");
-    test_case!(test_suite_rv64ui_p_sh, "rv64ui-p-sh");
-    test_case!(test_suite_rv64ui_p_simple, "rv64ui-p-simple");
-    test_case!(test_suite_rv64ui_p_sll, "rv64ui-p-sll");
-    test_case!(test_suite_rv64ui_p_slli, "rv64ui-p-slli");
-    test_case!(test_suite_rv64ui_p_slliw, "rv64ui-p-slliw");
-    test_case!(test_suite_rv64ui_p_sllw, "rv64ui-p-sllw");
-    test_case!(test_suite_rv64ui_p_slt, "rv64ui-p-slt");
-    test_case!(test_suite_rv64ui_p_slti, "rv64ui-p-slti");
-    test_case!(test_suite_rv64ui_p_sltiu, "rv64ui-p-sltiu");
-    test_case!(test_suite_rv64ui_p_sltu, "rv64ui-p-sltu");
-    test_case!(test_suite_rv64ui_p_sra, "rv64ui-p-sra");
-    test_case!(test_suite_rv64ui_p_srai, "rv64ui-p-srai");
-    test_case!(test_suite_rv64ui_p_sraiw, "rv64ui-p-sraiw");
-    test_case!(test_suite_rv64ui_p_sraw, "rv64ui-p-sraw");
-    test_case!(test_suite_rv64ui_p_srl, "rv64ui-p-srl");
-    test_case!(test_suite_rv64ui_p_srli, "rv64ui-p-srli");
-    test_case!(test_suite_rv64ui_p_srliw, "rv64ui-p-srliw");
-    test_case!(test_suite_rv64ui_p_srlw, "rv64ui-p-srlw");
-    test_case!(test_suite_rv64ui_p_sub, "rv64ui-p-sub");
-    test_case!(test_suite_rv64ui_p_subw, "rv64ui-p-subw");
-    test_case!(test_suite_rv64ui_p_sw, "rv64ui-p-sw");
-    test_case!(test_suite_rv64ui_p_xor, "rv64ui-p-xor");
-    test_case!(test_suite_rv64ui_p_xori, "rv64ui-p-xori");
+    test_case!(test_suite_rv64ui_p_add, "rv64ui-p-add", Mode::User);
+    test_case!(test_suite_rv64ui_p_addi, "rv64ui-p-addi", Mode::User);
+    test_case!(test_suite_rv64ui_p_addiw, "rv64ui-p-addiw", Mode::User);
+    test_case!(test_suite_rv64ui_p_addw, "rv64ui-p-addw", Mode::User);
+    test_case!(test_suite_rv64ui_p_and, "rv64ui-p-and", Mode::User);
+    test_case!(test_suite_rv64ui_p_andi, "rv64ui-p-andi", Mode::User);
+    test_case!(test_suite_rv64ui_p_auipc, "rv64ui-p-auipc", Mode::User);
+    test_case!(test_suite_rv64ui_p_beq, "rv64ui-p-beq", Mode::User);
+    test_case!(test_suite_rv64ui_p_bge, "rv64ui-p-bge", Mode::User);
+    test_case!(test_suite_rv64ui_p_bgeu, "rv64ui-p-bgeu", Mode::User);
+    test_case!(test_suite_rv64ui_p_blt, "rv64ui-p-blt", Mode::User);
+    test_case!(test_suite_rv64ui_p_bltu, "rv64ui-p-bltu", Mode::User);
+    test_case!(test_suite_rv64ui_p_bne, "rv64ui-p-bne", Mode::User);
+    test_case!(test_suite_rv64ui_p_fence_i, "rv64ui-p-fence_i", Mode::User);
+    test_case!(test_suite_rv64ui_p_jal, "rv64ui-p-jal", Mode::User);
+    test_case!(test_suite_rv64ui_p_jalr, "rv64ui-p-jalr", Mode::User);
+    test_case!(test_suite_rv64ui_p_lb, "rv64ui-p-lb", Mode::User);
+    test_case!(test_suite_rv64ui_p_lbu, "rv64ui-p-lbu", Mode::User);
+    test_case!(test_suite_rv64ui_p_ld, "rv64ui-p-ld", Mode::User);
+    test_case!(test_suite_rv64ui_p_lh, "rv64ui-p-lh", Mode::User);
+    test_case!(test_suite_rv64ui_p_lhu, "rv64ui-p-lhu", Mode::User);
+    test_case!(test_suite_rv64ui_p_lui, "rv64ui-p-lui", Mode::User);
+    test_case!(test_suite_rv64ui_p_lw, "rv64ui-p-lw", Mode::User);
+    test_case!(test_suite_rv64ui_p_lwu, "rv64ui-p-lwu", Mode::User);
+    test_case!(test_suite_rv64ui_p_ma_data, "rv64ui-p-ma_data", Mode::User);
+    test_case!(test_suite_rv64ui_p_or, "rv64ui-p-or", Mode::User);
+    test_case!(test_suite_rv64ui_p_ori, "rv64ui-p-ori", Mode::User);
+    test_case!(test_suite_rv64ui_p_sb, "rv64ui-p-sb", Mode::User);
+    test_case!(test_suite_rv64ui_p_sd, "rv64ui-p-sd", Mode::User);
+    test_case!(test_suite_rv64ui_p_sh, "rv64ui-p-sh", Mode::User);
+    test_case!(test_suite_rv64ui_p_simple, "rv64ui-p-simple", Mode::User);
+    test_case!(test_suite_rv64ui_p_sll, "rv64ui-p-sll", Mode::User);
+    test_case!(test_suite_rv64ui_p_slli, "rv64ui-p-slli", Mode::User);
+    test_case!(test_suite_rv64ui_p_slliw, "rv64ui-p-slliw", Mode::User);
+    test_case!(test_suite_rv64ui_p_sllw, "rv64ui-p-sllw", Mode::User);
+    test_case!(test_suite_rv64ui_p_slt, "rv64ui-p-slt", Mode::User);
+    test_case!(test_suite_rv64ui_p_slti, "rv64ui-p-slti", Mode::User);
+    test_case!(test_suite_rv64ui_p_sltiu, "rv64ui-p-sltiu", Mode::User);
+    test_case!(test_suite_rv64ui_p_sltu, "rv64ui-p-sltu", Mode::User);
+    test_case!(test_suite_rv64ui_p_sra, "rv64ui-p-sra", Mode::User);
+    test_case!(test_suite_rv64ui_p_srai, "rv64ui-p-srai", Mode::User);
+    test_case!(test_suite_rv64ui_p_sraiw, "rv64ui-p-sraiw", Mode::User);
+    test_case!(test_suite_rv64ui_p_sraw, "rv64ui-p-sraw", Mode::User);
+    test_case!(test_suite_rv64ui_p_srl, "rv64ui-p-srl", Mode::User);
+    test_case!(test_suite_rv64ui_p_srli, "rv64ui-p-srli", Mode::User);
+    test_case!(test_suite_rv64ui_p_srliw, "rv64ui-p-srliw", Mode::User);
+    test_case!(test_suite_rv64ui_p_srlw, "rv64ui-p-srlw", Mode::User);
+    test_case!(test_suite_rv64ui_p_sub, "rv64ui-p-sub", Mode::User);
+    test_case!(test_suite_rv64ui_p_subw, "rv64ui-p-subw", Mode::User);
+    test_case!(test_suite_rv64ui_p_sw, "rv64ui-p-sw", Mode::User);
+    test_case!(test_suite_rv64ui_p_xor, "rv64ui-p-xor", Mode::User);
+    test_case!(test_suite_rv64ui_p_xori, "rv64ui-p-xori", Mode::User);
 
     test_case!(
         #[ignore]
