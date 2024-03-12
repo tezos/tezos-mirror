@@ -256,7 +256,7 @@ let init_scenario_with_delegators delegate_name faucet_name delegators_list =
     | (delegator, amount) :: t ->
         add_account_with_funds
           delegator
-          faucet_name
+          ~funder:faucet_name
           (Amount (Tez.of_mutez amount))
         --> set_delegate delegator (Some delegate_name)
         --> init_delegators t
