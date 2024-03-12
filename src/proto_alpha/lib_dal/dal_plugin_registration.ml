@@ -151,10 +151,6 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
-    let empty_cache =
-      (* A capacity of [number_of_slots] is actually sufficient. *)
-      Dal.Slots_history.History_cache.empty ~capacity:Int64.max_int
-
     (*
       This function mimics what the protocol does in
       {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info and
@@ -242,9 +238,15 @@ module Plugin = struct
              history cache, so the returned [cache] contains exactly the cells
              produced for this [level]. *)
           let*? _last_cell, cache =
+            let capacity =
+              Int64.of_int
+              @@ max
+                   publication_level_dal_constants.number_of_slots
+                   dal_constants.number_of_slots
+            in
             Dal.Slots_history.add_confirmed_slot_headers
               previous_cell
-              empty_cache
+              (Dal.Slots_history.History_cache.empty ~capacity)
               published_level
               (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
 
