@@ -307,7 +307,7 @@ let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
                       let*! () = Events.(emit incoherent_nonce level) in
                       return acc
                   | Forgotten | Revealed _ -> return acc)
-              | None -> raise Not_found)
+              | None -> return acc)
           | Some _cycle -> return acc
           | None -> assert false)
         nonces
