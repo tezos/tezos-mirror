@@ -42,7 +42,7 @@ type mode =
           (** Path to the initial kernel used by the sequencer. *)
       preimage_dir : string;
           (** Path to the directory with the associated preimages. *)
-      private_rpc_port : int;  (** Port for private RPC server*)
+      private_rpc_port : int option;  (** Port for private RPC server*)
       time_between_blocks : time_between_blocks option;
           (** See {!time_between_blocks}, if the value is not
               provided, the sequencer uses it default value. *)

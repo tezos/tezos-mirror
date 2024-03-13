@@ -4,6 +4,9 @@
 
 ### Features
 
+- The private RPC server is no longer launched by default. You need to provide
+  the parameter `--private-rpc-port` to launch it. (!12449)
+
 ### Bug fixes
 
 - The transaction pool checks if a transaction can be prepayed before

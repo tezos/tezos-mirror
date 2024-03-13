@@ -32,7 +32,7 @@ type mode =
   | Sequencer of {
       initial_kernel : string;
       preimage_dir : string;
-      private_rpc_port : int;
+      private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;
       sequencer : string;
       genesis_timestamp : Client.timestamp option;
@@ -332,9 +332,8 @@ let run_args evm_node =
           initial_kernel;
           "--preimages-dir";
           preimage_dir;
-          "--private-rpc-port";
-          string_of_int private_rpc_port;
         ]
+        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
         @ Cli_arg.optional_arg
             "maximum-blueprints-lag"
             string_of_int
@@ -399,8 +398,10 @@ let endpoint ?(private_ = false) (evm_node : t) =
   let addr, port, path =
     if private_ then
       match evm_node.persistent_state.mode with
-      | Sequencer {private_rpc_port; _} ->
+      | Sequencer {private_rpc_port = Some private_rpc_port; _} ->
           (Constant.default_host, private_rpc_port, "/private")
+      | Sequencer {private_rpc_port = None; _} ->
+          Test.fail "Sequencer doesn't have a private RPC server"
       | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
     else
