@@ -59,8 +59,8 @@ end) : Services_backend_sig.Backend = struct
           ~smart_rollup_address
           ~transactions:messages.TxEncoder.raw
           ~delayed_transactions:messages.TxEncoder.delayed
-          ~parent_hash:Ctxt.ctxt.current_block_hash
-          ~number:Ctxt.ctxt.next_blueprint_number
+          ~parent_hash:Ctxt.ctxt.session.current_block_hash
+          ~number:Ctxt.ctxt.session.next_blueprint_number
       in
       (* Apply the blueprint *)
       let* _ctxt =
@@ -88,14 +88,14 @@ end) : Services_backend_sig.Backend = struct
         ~value:payload
         evm_state
     in
-    let (Qty next) = Ctxt.ctxt.next_blueprint_number in
+    let (Qty next) = Ctxt.ctxt.session.next_blueprint_number in
     let* () =
       Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
     in
     let* () =
       Store.Kernel_upgrades.store
         Ctxt.ctxt.store
-        Ctxt.ctxt.next_blueprint_number
+        Ctxt.ctxt.session.next_blueprint_number
         upgrade
     in
     return_unit
@@ -109,7 +109,7 @@ end) : Services_backend_sig.Backend = struct
         ~value:payload
         evm_state
     in
-    let (Qty next) = Ctxt.ctxt.next_blueprint_number in
+    let (Qty next) = Ctxt.ctxt.session.next_blueprint_number in
     let* () =
       Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
     in

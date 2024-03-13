@@ -113,14 +113,14 @@ end) : Services_backend_sig.Backend = struct
         ~value:payload
         evm_state
     in
-    let (Qty next) = Ctxt.ctxt.next_blueprint_number in
+    let (Qty next) = Ctxt.ctxt.session.next_blueprint_number in
     let* () =
       Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
     in
     let* () =
       Store.Kernel_upgrades.store
         Ctxt.ctxt.store
-        Ctxt.ctxt.next_blueprint_number
+        Ctxt.ctxt.session.next_blueprint_number
         upgrade
     in
     return_unit
@@ -134,7 +134,7 @@ end) : Services_backend_sig.Backend = struct
         ~value:payload
         evm_state
     in
-    let (Qty next) = Ctxt.ctxt.next_blueprint_number in
+    let (Qty next) = Ctxt.ctxt.session.next_blueprint_number in
     let* () =
       Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
     in
@@ -143,7 +143,7 @@ end
 
 let on_new_blueprint (ctxt : Evm_context.t) (blueprint : Blueprint_types.t) =
   let (Qty level) = blueprint.number in
-  let (Qty number) = ctxt.next_blueprint_number in
+  let (Qty number) = ctxt.session.next_blueprint_number in
   if Z.(equal level number) then
     Evm_context.apply_blueprint ctxt blueprint.payload
   else failwith "Received a blueprint with an unexpected number."
@@ -167,7 +167,7 @@ let main (ctxt : Evm_context.t) ~evm_node_endpoint =
   let*! blueprints_stream =
     Evm_services.monitor_blueprints
       ~evm_node_endpoint
-      ctxt.next_blueprint_number
+      ctxt.session.next_blueprint_number
   in
 
   loop blueprints_stream
