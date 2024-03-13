@@ -136,12 +136,33 @@ let shorter_roundtrip_for_baker =
     Default_parameters.constants_mainnet.consensus_rights_delay
     (* mainnet value, = 2 *)
   in
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
+  in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
   --> set S.consensus_rights_delay consensus_rights_delay
-  --> activate_ai `Force --> begin_test ["delegate"]
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
-  --> next_cycle
+  --> set_delegate_params "delegate" init_params
+  --> add_account_with_funds
+        "staker1"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> add_account_with_funds
+        "staker2"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> wait_delegate_parameters_activation --> next_cycle
+  --> set_delegate "staker1" (Some "delegate")
+  --> set_delegate "staker2" (Some "delegate")
+  --> stake "staker1" Half --> stake "staker2" Half
+  -->
+  (* From now on, staker1 unstakes every cycle to fill all the containers, but
+     this shouldn't change anything for the baker *)
+  let next_cycle = unstake "staker1" Half --> next_cycle in
+  next_cycle
   (* We unstake to have an amount in the last container for ufd *)
   --> unstake "delegate" unstake_amount
   --> next_cycle
@@ -158,7 +179,11 @@ let shorter_roundtrip_for_baker =
      first unstake request will become finalizable. *)
   --> check_balance_field "delegate" `Unstaked_finalizable Tez.zero
   --> (Tag "stake from unstake one container"
-       --> stake "delegate" (Amount (Tez.of_mutez 111_000_000_000L))
+       --> (Tag "one stake"
+            --> stake "delegate" (Amount (Tez.of_mutez 111_000_000_000L))
+           |+ Tag "two stakes"
+              --> stake "delegate" (Amount (Tez.of_mutez 100_000_000_000L))
+              --> stake "delegate" (Amount (Tez.of_mutez 11_000_000_000L)))
        --> check_balance_field
              "delegate"
              `Unstaked_frozen_total
