@@ -53,6 +53,7 @@ const MAX_GAS_FEE_TOO_LOW: &str = "Max gas fee too low.";
 const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
     is allocated. Try reducing its gas consumption or splitting the call in
     multiple steps, if possible.";
+const GAS_LIMIT_TOO_LOW: &str = "Gas limit too low.";
 
 // Redefined Result as we cannot implement Decodable and Encodable traits on Result
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -373,7 +374,7 @@ impl TxValidation {
             );
 
         let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false) else {
-            return Self::to_error(MAX_GAS_FEE_TOO_LOW);
+            return Self::to_error(GAS_LIMIT_TOO_LOW);
         };
 
         match run_transaction(
@@ -1078,7 +1079,7 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(
-            SimulationResult::Err(String::from(super::MAX_GAS_FEE_TOO_LOW)),
+            SimulationResult::Err(String::from(super::GAS_LIMIT_TOO_LOW)),
             result.unwrap()
         );
     }
