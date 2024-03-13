@@ -6,6 +6,9 @@
 
 ### Bug fixes
 
+- The transaction pool checks if a transaction can be prepayed before
+  inclusion and injection. (!12342) 
+
 ### Breaking changes
 
 ### Internal
@@ -24,9 +27,6 @@
   last upgrade (!12352)
 
 ### Bug fixes
-
-- The transaction pool checks if a transaction can be prepayed before
-  inclusion and injection. (!12342) 
 
 ### Breaking changes
 
