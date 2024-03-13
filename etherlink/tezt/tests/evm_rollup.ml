@@ -2518,7 +2518,7 @@ let test_kernel_upgrade_failing_migration =
     ~sc_rollup_node
     ~client
     ~endpoint
-    ~expected_block_level:2
+    ~expected_block_level:3
 
 let test_kernel_upgrade_via_governance =
   Protocol.register_test
