@@ -409,6 +409,92 @@ let forbid_costaking =
   (* Now possible *)
   --> stake "staker" amount
 
+(* Check that a delegate can be deactivated under AI by unstaking everything, even with stakers.
+   Check that such a delegate can reactivate later, and still have their stakers *)
+let test_deactivation =
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
+  in
+  let fail_if_deactivated delegate =
+    let open Lwt_result_syntax in
+    exec_unit (fun (block, state) ->
+        let dlgt = State.find_account delegate state in
+        let* deactivated = Context.Delegate.deactivated (B block) dlgt.pkh in
+        Assert.is_true ~loc:__LOC__ (not deactivated))
+  in
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
+  --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+  --> set_delegate_params "delegate" init_params
+  --> add_account_with_funds
+        "staker1"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> add_account_with_funds
+        "staker2"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> wait_delegate_parameters_activation --> next_cycle
+  --> set_delegate "staker1" (Some "delegate")
+  --> set_delegate "staker2" (Some "delegate")
+  --> stake "staker1" Half --> stake "staker2" Half --> next_cycle
+  (* The delegate unstakes all, starting the deactivation process *)
+  --> unstake "delegate" All
+  (* "delegate" can still bake, but not for long... *)
+  --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay)
+  (* After consensus_rights_delay, the delegate still has rights... *)
+  --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> next_cycle
+  (* ...But not in the following cycle *)
+  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  (* The stakers still have stake, and can still stake/unstake *)
+  --> check_balance_field "staker1" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> check_balance_field "staker2" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> assert_success ~loc:__LOC__ (stake "staker1" Half)
+  --> assert_success
+        ~loc:__LOC__
+        (unstake "staker2" Half --> wait_n_cycles 5
+       --> finalize_unstake "staker2")
+  (* We wait until the delegate is completely deactivated *)
+  --> assert_success ~loc:__LOC__ (fail_if_deactivated "delegate")
+  (* We already waited for [consensus_rights_delay] + 1 cycles since 0 stake,
+     we must wait for [consensus_rights_delay] more. *)
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay)
+  --> assert_success ~loc:__LOC__ (fail_if_deactivated "delegate")
+  --> next_cycle
+  --> assert_failure ~loc:__LOC__ (fail_if_deactivated "delegate")
+  --> next_cycle
+  (* The stakers still have stake, and can still stake/unstake *)
+  --> check_balance_field "staker1" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> check_balance_field "staker2" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> assert_success ~loc:__LOC__ (stake "staker1" Half)
+  --> assert_success
+        ~loc:__LOC__
+        (unstake "staker2" Half --> wait_n_cycles 5
+       --> finalize_unstake "staker2")
+  --> next_cycle
+  (* We now reactivate the delegate *)
+  --> set_delegate "delegate" (Some "delegate")
+  --> stake "delegate" (Amount (Tez.of_mutez 2_000_000_000_000L))
+  (* It cannot bake right away *)
+  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay)
+  (* After consensus_rights_delay, the delegate still has no rights... *)
+  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> next_cycle
+  (* ...But has enough to bake in the following cycle *)
+  --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> exec_unit (fun (_, state) ->
+          let dlgt = State.find_account "delegate" state in
+          let total = Frozen_tez.total_current dlgt.frozen_deposits in
+          Assert.equal_tez ~loc:__LOC__ total (Tez.of_mutez 2_200_000_000_000L))
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -424,6 +510,7 @@ let tests =
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
+       ("Test deactivation under AI", test_deactivation);
      ]
 
 let () = register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "stake"] tests
