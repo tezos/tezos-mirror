@@ -11,6 +11,7 @@
   octez-libs.stdlib
   octez-libs.crypto
   data-encoding
+  octez-libs.error-monad-legacy
   octez-libs.error-monad
   octez-libs.rpc
   octez-libs.micheline
@@ -27,6 +28,7 @@
   (:standard)
   -open Tezos_stdlib
   -open Data_encoding
+  -open Tezos_error_monad_legacy
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_micheline

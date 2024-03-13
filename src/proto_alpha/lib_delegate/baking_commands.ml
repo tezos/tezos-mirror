@@ -546,6 +546,7 @@ let per_block_vote_file_arg =
          else tzfail (Block_vote_file_not_found file)))
 
 let pre_emptive_forge_time_arg =
+  let open Lwt_result_syntax in
   Tezos_clic.arg
     ~long:"pre-emptive-forge-time"
     ~placeholder:"seconds"

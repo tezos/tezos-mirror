@@ -365,6 +365,16 @@ let octez_error_monad =
     ~conflicts:[external_lib "result" V.(less_than "1.5")]
     ~js_compatible:true
 
+let octez_error_monad_legacy =
+  octez_lib
+    "error-monad-legacy"
+    ~internal_name:"tezos_error_monad_legacy"
+    ~path:"src/lib_error_monad_legacy"
+    ~synopsis:"Error monad (legacy)"
+    ~deps:[lwt; octez_error_monad]
+    ~conflicts:[external_lib "result" V.(less_than "1.5")]
+    ~js_compatible:true
+
 let octez_hacl =
   let js_stubs = ["random.js"; "evercrypt.js"] in
   let js_generated = "runtime-generated.js" in
@@ -1917,6 +1927,7 @@ let octez_base =
         octez_stdlib |> open_;
         octez_crypto;
         data_encoding |> open_;
+        octez_error_monad_legacy |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_rpc;
         octez_micheline |> open_;
@@ -4783,6 +4794,10 @@ end = struct
   let conditional_list =
     List.filter_map (fun (x, b) -> if b then Some x else None)
 
+  let error_monad_module should_use_infix =
+    if should_use_infix then open_ ~m:"TzPervasives.Error_monad_legacy"
+    else fun target -> target
+
   module Lib_protocol = struct
     type t = {main : target; lifted : target; embedded : target}
 
@@ -4821,7 +4836,7 @@ end = struct
             [
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               main |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
@@ -4839,7 +4854,7 @@ end = struct
             [
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               main |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
@@ -4894,7 +4909,7 @@ end = struct
             [
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               main |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
@@ -4936,7 +4951,7 @@ end = struct
             [
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               main |> open_;
               client |> if_some |> if_ N.(number >= 012) |> open_;
               test_helpers |> if_some |> open_;
@@ -4967,7 +4982,7 @@ end = struct
             [
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               main |> open_;
               qcheck_alcotest;
               client |> if_some |> open_;
@@ -5009,7 +5024,7 @@ end = struct
               octez_context;
               alcotezt;
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               client |> if_some |> open_;
               octez_client_base |> if_ N.(number <= 012);
               main |> open_;
@@ -5057,7 +5072,7 @@ end = struct
               octez_base
               |> if_ N.(number <= 14)
               |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
               octez_micheline |> open_;
               client |> if_some |> open_;
@@ -5125,7 +5140,7 @@ end = struct
           ~deps:
             [
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               octez_base_test_helpers |> open_;
               octez_micheline |> open_;
               client |> if_some |> open_;
@@ -5524,7 +5539,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> open_ ~m:"TzPervasives.Error_monad";
             octez_shell_services |> open_;
             octez_client_base |> open_;
             octez_protocol_environment;
@@ -5558,7 +5573,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> open_ ~m:"TzPervasives.Error_monad";
             octez_shell_services |> open_;
             octez_client_base |> open_;
             octez_client_commands |> open_;
@@ -5698,7 +5713,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             main |> open_;
             octez_sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
           ]
@@ -5716,7 +5731,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             embedded |> open_;
             plugin |> open_;
             octez_validation |> open_;
@@ -5738,7 +5753,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_clic;
             octez_shell_services |> open_;
             octez_client_base |> open_;
@@ -5777,7 +5792,7 @@ let hash = Protocol.hash
             qcheck_alcotest;
             octez_test_helpers;
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_micheline |> open_;
             octez_stdlib_unix |> open_;
             main |> open_;
@@ -5808,7 +5823,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_base_test_helpers |> open_;
             octez_base_unix |> if_ N.(number >= 013);
             alcotezt;
@@ -5837,7 +5852,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_micheline |> open_;
             client |> if_some |> open_;
             main |> open_;
@@ -5858,7 +5873,7 @@ let hash = Protocol.hash
             octez_base
             |> if_ N.(number <= 14)
             |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
             octez_clic;
             main |> open_;
@@ -5891,7 +5906,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_clic;
             octez_crypto;
             octez_stdlib_unix |> open_;
@@ -5915,7 +5930,7 @@ let hash = Protocol.hash
             octez_base
             |> if_ N.(number <= 14)
             |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
             octez_clic;
             main |> open_;
@@ -5947,7 +5962,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_clic;
             octez_version_value;
             main |> open_;
@@ -5989,7 +6004,7 @@ let hash = Protocol.hash
           [
             data_encoding |> open_;
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
+            |> error_monad_module N.(number <= 018)
             |> open_;
             octez_base_unix;
             main |> open_;
@@ -6009,7 +6024,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
+            |> error_monad_module N.(number <= 018)
             |> open_;
             octez_client_base |> open_;
             client |> if_some |> open_;
@@ -6030,7 +6045,7 @@ let hash = Protocol.hash
           ~deps:
             [
               octez_base |> open_ ~m:"TzPervasives"
-              |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              |> error_monad_module N.(number <= 018);
               main |> open_ |> open_ ~m:"Protocol";
               client |> if_some |> open_;
               octez_client_commands |> open_;
@@ -6054,7 +6069,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_protocol_environment |> if_ N.(number <= 011);
             octez_test_helpers |> open_;
             octez_micheline |> open_;
@@ -6081,7 +6096,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             main |> open_;
             parameters |> if_some |> if_ N.(number >= 18) |> open_;
             octez_stdlib_unix |> open_;
@@ -6139,7 +6154,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_clic;
             main |> open_;
             client |> if_some |> open_;
@@ -6178,7 +6193,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_protocol_compiler_registerer |> open_;
             octez_stdlib_unix |> open_;
             octez_dal_node_lib |> open_;
@@ -6208,7 +6223,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             dal |> if_some |> open_;
             main |> open_;
             octez_base_test_helpers |> open_;
@@ -6231,7 +6246,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_protocol_compiler_registerer |> open_;
             octez_stdlib_unix |> open_;
             octez_dac_lib |> open_;
@@ -6257,7 +6272,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             dac |> if_some |> open_;
             main |> open_;
             octez_base_test_helpers |> open_;
@@ -6319,7 +6334,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_stdlib_unix |> open_;
             octez_client_base |> open_;
             octez_client_base_unix |> open_;
@@ -6374,7 +6389,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             main |> open_;
             octez_test_helpers |> open_;
             octez_sc_rollup_layer2 |> if_some |> open_;
@@ -6428,8 +6443,7 @@ let hash = Protocol.hash
         ~deps:
           [
             octez_stdlib |> open_;
-            octez_base |> open_
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_base |> open_ |> error_monad_module N.(number <= 018);
             octez_error_monad |> open_;
             octez_micheline |> open_;
             octez_micheline_rewriting |> open_;
@@ -6464,8 +6478,7 @@ let hash = Protocol.hash
         ~opam:(sf "tezos-benchmark-%s" name_dash)
         ~deps:
           [
-            octez_base
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_base |> error_monad_module N.(number <= 018);
             octez_micheline |> open_;
             octez_micheline_rewriting;
             main |> open_;
@@ -6501,7 +6514,7 @@ let hash = Protocol.hash
             str;
             octez_stdlib |> open_;
             octez_base |> open_ |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            |> error_monad_module N.(number <= 018);
             octez_error_monad |> open_;
             parameters |> if_some |> open_;
             lazy_containers |> open_;
@@ -7768,7 +7781,7 @@ let _octez_smart_rollup_node =
     ~deps:
       ([
          octez_base |> open_ |> open_ ~m:"TzPervasives"
-         |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+         |> open_ ~m:"TzPervasives.Error_monad";
          octez_clic;
          octez_shell_services |> open_;
          octez_client_base |> open_;
@@ -7803,7 +7816,7 @@ let _octez_smart_rollup_node_lib_tests =
       ~deps:
         ([
            octez_base |> open_ ~m:"TzPervasives"
-           |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+           |> open_ ~m:"TzPervasives.Error_monad";
            octez_test_helpers |> open_;
            qcheck_alcotest;
            qcheck_core;
@@ -7826,7 +7839,7 @@ let _octez_smart_rollup_node_lib_tests =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives"
-        |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+        |> open_ ~m:"TzPervasives.Error_monad";
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         octez_layer2_store |> open_;

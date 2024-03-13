@@ -1840,7 +1840,7 @@ let test_scenario_m9 () =
     let check_chain_on_success ~chain:_ =
       match !raise_error with
       | Some err -> Stdlib.failwith err
-      | _ -> return_unit
+      | _ -> Lwt_result_syntax.return_unit
   end in
   let module Node_b_hooks : Hooks = struct
     include Default_hooks
@@ -1848,7 +1848,8 @@ let test_scenario_m9 () =
     let on_inject_block ~level:_ ~round:_ ~block_hash ~block_header ~operations
         ~protocol_data:_ =
       bh := Some block_hash ;
-      return (block_hash, block_header, operations, [Pass; Pass])
+      Lwt_result_syntax.return
+        (block_hash, block_header, operations, [Pass; Pass])
 
     let latest_proposal : Baking_state.block_info option ref = ref None
 

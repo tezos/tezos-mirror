@@ -14,7 +14,7 @@ module S = Constants_helpers.Set
 
 let set :
     ('a -> constants -> constants) -> 'a -> (constants, constants) scenarios =
- fun f x -> Action (fun csts -> return @@ f x csts)
+ fun f x -> Action (fun csts -> Lwt_result_syntax.return @@ f x csts)
 
 let set_opt :
     ('a -> constants -> constants) ->

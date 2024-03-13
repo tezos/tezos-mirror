@@ -380,7 +380,7 @@ let wait_ai_activation =
   wait_cycle_until `AI_activation
   --> exec_unit (fun (block, state) ->
           assert (State_ai_flags.AI.enabled block state) ;
-          return_unit)
+          Lwt_result_syntax.return_unit)
 
 (** wait delegate_parameters_activation_delay cycles  *)
 let wait_delegate_parameters_activation =
