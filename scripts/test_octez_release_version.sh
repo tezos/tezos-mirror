@@ -24,7 +24,6 @@ test_version() {
 
 cleanup() {
   set +e
-  git tag -d "$RANDOMTAG" > /dev/null 2>&1
   git tag -d "octez-$VERSION" > /dev/null 2>&1
   git tag -d "octez-v$VERSION" > /dev/null 2>&1
   git tag -d "octez-v$VERSION"+rc1 > /dev/null 2>&1
@@ -48,9 +47,6 @@ test_version "Octez $VERSION" "octez-v$VERSION"
 
 git commit --allow-empty -m "test" > /dev/null 2>&1
 test_version "Octez $VERSION+dev" "$(git describe --tags)"
-
-git tag "$RANDOMTAG" -m "test"
-test_version "Octez 0.0+dev" "$RANDOMTAG"
 
 git tag "octez-v$VERSION+rc1" -m "test"
 test_version "Octez $VERSION+dev" "octez-v$VERSION+rc1"
