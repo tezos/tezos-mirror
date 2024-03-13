@@ -227,6 +227,26 @@ let wait_for_blueprint_applied ~timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
+let wait_for_pending_upgrade evm_node =
+  wait_for
+    evm_node
+    "pending_upgrade.v0"
+    JSON.(
+      fun json ->
+        let root_hash = json |-> "root_hash" |> as_string in
+        let timestamp = json |-> "timestamp" |> as_string in
+        Some (root_hash, timestamp))
+
+let wait_for_successful_upgrade evm_node =
+  wait_for
+    evm_node
+    "applied_upgrade.v0"
+    JSON.(
+      fun json ->
+        let root_hash = json |-> "root_hash" |> as_string in
+        let level = json |-> "level" |> as_int in
+        Some (root_hash, level))
+
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
   | Sequencer_upgrade : (string * Hex.t * Client.Time.t) evm_event_kind
