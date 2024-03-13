@@ -74,8 +74,7 @@ pub struct EthereumTransactionCommon {
     /// More details see here https://eips.ethereum.org/EIPS/eip-1559#abstract
     ///
     /// We choose to ignore this, however, as we actually do not implement eip-1559
-    /// mechanism exactly. The sequencer is compensated via the data availability fee
-    /// and gas fee.
+    /// mechanism exactly. The sequencer is compensated via the data availability fee.
     ///
     /// We keep this field purely for compatibility with existing ethereum tooling.
     max_priority_fee_per_gas: U256,
