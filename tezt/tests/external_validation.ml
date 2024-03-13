@@ -34,7 +34,7 @@
 
 let wait_for_external_validator_pid node =
   let filter json = JSON.(json |> as_int_opt) in
-  Node.wait_for node "proc_validator_started.v0" filter
+  Node.wait_for node "validator_proc_started.v0" filter
 
 (* Typical signals that could be sent. This could be enriched but the
    effects are expected to be similar.
@@ -68,7 +68,7 @@ let pp_signal ppf signal =
 
 let wait_for_external_validator_failure node =
   let filter json = JSON.(json |> as_int_opt) in
-  Node.wait_for node "proc_status.v0" filter
+  Node.wait_for node "validator_proc_status.v0" filter
 
 let kill_process ~pid ~signal =
   Log.info
