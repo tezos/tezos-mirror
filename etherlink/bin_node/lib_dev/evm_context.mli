@@ -22,6 +22,8 @@ type t = {
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
   store : Store.t;
   session : session_state;
+  head_lock : Lwt_mutex.t;
+      (** Lock to acquire to modify the head of the chain *)
 }
 
 (** [init ~data_dir ~preimages ~preimages_endpoint ~smart_rollup_address ()]
@@ -47,26 +49,15 @@ val init :
 val init_from_rollup_node :
   data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
 
-(** [commit ~number ctxt evm_state] updates the [evm_state] resulting from the
-    application of the [number]th blueprint in [ctxt], commits to disk the
-    changes, and update the checkpoint. *)
-val commit :
-  number:Ethereum_types.quantity -> t -> Evm_state.t -> unit tzresult Lwt.t
+(** [replace_current_head ctxt f] modifies the local state of the chain using
+    [f], and commits results to disk. As a consequence, the next blueprint will
+    be applied on top of the resulting state. *)
+val replace_current_head :
+  t -> (Evm_state.t -> Evm_state.t tzresult Lwt.t) -> unit tzresult Lwt.t
 
-(** [evm_state ctxt] returns the freshest EVM state stored under [ctxt]. *)
-val evm_state : t -> Evm_state.t Lwt.t
-
-(** [execute ?wasm_entrypoint ?commit ctxt messages] executes the
-    [wasm_entrypoint] function with [messages] in the inbox of the freshest EVM
-    state stored in [ctxt].
-
-    If [wasm_entrypoint] is omitted, the [kernel_run] function of the kernel is
-    executed. *)
-val execute :
-  ?wasm_entrypoint:string ->
-  t ->
-  [< `Input of string] list ->
-  Evm_state.t tzresult Lwt.t
+(** [inspect ctxt path] returns the value stored in [path] of the freshest EVM
+    state, if it exists. *)
+val inspect : t -> string -> bytes option Lwt.t
 
 (** [execute_and_inspect ~input ctxt] executes [input] using the freshest EVM
     state, and returns [input.insights_requests].
@@ -79,6 +70,8 @@ val execute_and_inspect :
   t ->
   bytes option list tzresult Lwt.t
 
+(** [last_produced_blueprint ctxt] returns the pair of publishable and
+    executable blueprints used to create the current head of the chain. *)
 val last_produced_blueprint : t -> Blueprint_types.t tzresult Lwt.t
 
 (** [apply_blueprint ctxt blueprint] applies [blueprint] in the freshest EVM

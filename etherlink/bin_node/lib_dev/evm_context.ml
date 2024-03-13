@@ -20,7 +20,15 @@ type t = {
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
   store : Store.t;
   session : session_state;
+  head_lock : Lwt_mutex.t;
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7073
+         [head_lock] is only necessary because several workers can modify the
+         current HEAD of the chain *)
 }
+
+let with_store_transaction ctxt k =
+  Store.with_transaction ctxt.store (fun txn_store ->
+      k {ctxt with store = txn_store})
 
 let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
@@ -47,14 +55,43 @@ let load ~data_dir index =
           Ethereum_types.genesis_parent_hash,
           false )
 
-let commit ~number (ctxt : t) evm_state =
+let commit_next_head (ctxt : t) evm_state =
   let open Lwt_result_syntax in
   let*! context = Irmin_context.PVMState.set ctxt.session.context evm_state in
   let*! checkpoint = Irmin_context.commit context in
-  ctxt.session.context <- context ;
-  Store.Context_hashes.store ctxt.store number checkpoint
+  let* () =
+    Store.Context_hashes.store
+      ctxt.store
+      ctxt.session.next_blueprint_number
+      checkpoint
+  in
+  return context
+
+let replace_current_commit (ctxt : t) evm_state =
+  let open Lwt_result_syntax in
+  let (Qty next) = ctxt.session.next_blueprint_number in
+  let*! context = Irmin_context.PVMState.set ctxt.session.context evm_state in
+  let*! checkpoint = Irmin_context.commit context in
+  let* () =
+    Store.Context_hashes.store ctxt.store (Qty Z.(pred next)) checkpoint
+  in
+  return context
 
 let evm_state ctxt = Irmin_context.PVMState.get ctxt.session.context
+
+let on_modified_head ctxt context = ctxt.session.context <- context
+
+let replace_current_head (ctxt : t) k =
+  let open Lwt_result_syntax in
+  Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
+  let* context =
+    with_store_transaction ctxt @@ fun ctxt ->
+    let*! evm_state = evm_state ctxt in
+    let* evm_state = k evm_state in
+    replace_current_commit ctxt evm_state
+  in
+  on_modified_head ctxt context ;
+  return_unit
 
 let execution_config ctxt =
   Config.config
@@ -63,13 +100,6 @@ let execution_config ctxt =
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
     ()
-
-let execute ?wasm_entrypoint ctxt inbox =
-  let open Lwt_result_syntax in
-  let config = execution_config ctxt in
-  let*! evm_state = evm_state ctxt in
-  let* evm_state = Evm_state.execute ?wasm_entrypoint ~config evm_state inbox in
-  return evm_state
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 
@@ -93,8 +123,17 @@ let () =
       | _ -> None)
     (fun local_state_level -> Cannot_apply_blueprint {local_state_level})
 
-let apply_blueprint ctxt payload =
+(** [apply_blueprint_store_unsafe ctxt payload] applies the blueprint [payload]
+    on the head of [ctxt], and commit the resulting state to Irmin and the
+    node’s store.
+
+    However, it does not modifies [ctxt] to make it aware of the new state.
+    This is because [apply_blueprint_store_unsafe] is expected to be called
+    within a SQL transaction to make sure the node’s store is not left in an
+    inconsistent state in case of error. *)
+let apply_blueprint_store_unsafe ctxt payload =
   let open Lwt_result_syntax in
+  Store.assert_in_transaction ctxt.store ;
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
   let (Qty next) = ctxt.session.next_blueprint_number in
@@ -109,33 +148,51 @@ let apply_blueprint ctxt payload =
           (Qty blueprint_number)
           payload
       in
-      ctxt.session.next_blueprint_number <- Qty (Z.succ blueprint_number) ;
-      ctxt.session.current_block_hash <- current_block_hash ;
-      let*! () =
-        Blueprint_events.blueprint_applied (blueprint_number, current_block_hash)
-      in
-      let* () = commit ~number:(Qty blueprint_number) ctxt evm_state in
-      Lwt_watcher.notify
-        ctxt.blueprint_watcher
-        {number = Qty blueprint_number; payload} ;
-      return_unit
+      let* context = commit_next_head ctxt evm_state in
+      return (context, current_block_hash)
   | Apply_success _ (* Produced a block, but not of the expected height *)
   | Apply_failure (* Did not produce a block *) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
       let*! () = Blueprint_events.invalid_blueprint_produced next in
       tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
+let on_new_head ctxt context block_hash payload =
+  let (Qty level) = ctxt.session.next_blueprint_number in
+  ctxt.session.context <- context ;
+  ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
+  ctxt.session.current_block_hash <- block_hash ;
+  Lwt_watcher.notify ctxt.blueprint_watcher {number = Qty level; payload} ;
+  Blueprint_events.blueprint_applied (level, block_hash)
+
 let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
   let open Lwt_result_syntax in
+  Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
   let (Qty level) = ctxt.session.next_blueprint_number in
-  let* () = apply_blueprint ctxt blueprint.to_execute in
-  let* () =
-    Store.Publishable_blueprints.store
-      ctxt.store
-      (Qty level)
-      blueprint.to_publish
+  let* context, current_block_hash =
+    with_store_transaction ctxt @@ fun ctxt ->
+    let* current_block_hash =
+      apply_blueprint_store_unsafe ctxt blueprint.to_execute
+    in
+    let* () =
+      Store.Publishable_blueprints.store
+        ctxt.store
+        (Qty level)
+        blueprint.to_publish
+    in
+    return current_block_hash
   in
-  let* () = Blueprints_publisher.publish level blueprint.to_publish in
+
+  let*! () = on_new_head ctxt context current_block_hash blueprint.to_execute in
+  Blueprints_publisher.publish level blueprint.to_publish
+
+let apply_blueprint ctxt payload =
+  let open Lwt_result_syntax in
+  Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
+  let* context, current_block_hash =
+    with_store_transaction ctxt @@ fun ctxt ->
+    apply_blueprint_store_unsafe ctxt payload
+  in
+  let*! () = on_new_head ctxt context current_block_hash payload in
   return_unit
 
 let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
@@ -160,6 +217,7 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       session = {context; next_blueprint_number; current_block_hash};
       blueprint_watcher = Lwt_watcher.create_input ();
       store;
+      head_lock = Lwt_mutex.create ();
     }
   in
 
@@ -171,8 +229,9 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
           return_unit
         else
           let* evm_state = Evm_state.init ~kernel in
-          (* The state prior to the genesis blueprint is indexed by [-1] *)
-          commit ~number:(Qty Z.(pred zero)) ctxt evm_state
+          let* context = replace_current_commit ctxt evm_state in
+          on_modified_head ctxt context ;
+          return_unit
     | None ->
         if loaded then return_unit
         else
@@ -273,6 +332,11 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
     Store.Context_hashes.store store (Qty current_blueprint_number) checkpoint
   in
   return_unit
+
+let inspect ctxt path =
+  let open Lwt_syntax in
+  let* evm_state = evm_state ctxt in
+  Evm_state.inspect evm_state path
 
 let execute_and_inspect ?wasm_entrypoint ~input ctxt =
   let open Lwt_result_syntax in

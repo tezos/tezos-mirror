@@ -36,6 +36,8 @@ type t = {
   with_transaction : (module Caqti_lwt.CONNECTION) option;
 }
 
+let assert_in_transaction store = assert (store.with_transaction <> None)
+
 module Q = struct
   open Caqti_request.Infix
   open Caqti_type.Std
