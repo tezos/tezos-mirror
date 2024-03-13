@@ -557,14 +557,14 @@ let tests =
       `Quick
       (test_launch
          1000000l (* This means that the threshold is set at 0.05% *)
-         88l);
+         110l);
     Tztest.tztest
       "the EMA reaches the vote threshold at the expected level and adaptive \
        issuance does not launch (very low threshold, vote disabled)"
       `Quick
       (test_does_not_launch_without_feature_flag
          1000000l (* This means that the threshold is set at 0.05% *)
-         88l);
+         110l);
   ]
 
 let () =
