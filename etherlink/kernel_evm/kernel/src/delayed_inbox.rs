@@ -265,6 +265,12 @@ impl DelayedInbox {
         Ok(to_pop)
     }
 
+    #[cfg(test)]
+    pub fn is_empty<Host: Runtime>(&self, host: &mut Host) -> Result<bool> {
+        let first = self.0.first_with_id(host)?;
+        Ok(first.is_none())
+    }
+
     fn pop_first<Host: Runtime>(
         &mut self,
         host: &mut Host,
