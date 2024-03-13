@@ -13,9 +13,9 @@ $ make -f etherlink.mk evm_kernel.wasm
 $ cp evm_kernel.wasm etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm
 ```
 
-Reset the non regression test:
+Update the constant `ghostnet_evm_commit` in `tezt/lib_tezos/constant.ml`:
 ```
-$ tezt -f evm_rollup.ml --title 'Alpha: Regression test for Ghostnet kernel' --reset-regressions
+let ghostnet_evm_commit = "RELEASE_COMMIT"
 ```
 
 ## Freeze the node

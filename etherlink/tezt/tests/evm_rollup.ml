@@ -4795,9 +4795,9 @@ let test_migrate_proxy_to_sequencer_past =
   unit
 
 let test_ghostnet_kernel =
-  Protocol.register_regression_test
+  Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "block"; "hash"; "regression"]
+    ~tags:["evm"; "ghostnet"; "version"]
     ~uses:(fun _protocol ->
       [
         Constant.octez_evm_node;
@@ -4814,7 +4814,8 @@ let test_ghostnet_kernel =
       protocol
   in
   let*@ version = Rpc.tez_kernelVersion evm_node in
-  Regression.capture version ;
+  Check.((version = Constant.WASM.ghostnet_evm_commit) string)
+    ~error_msg:"The ghostnet kernel has version %L but constant says %R" ;
   unit
 
 let test_estimate_gas_out_of_ticks =
