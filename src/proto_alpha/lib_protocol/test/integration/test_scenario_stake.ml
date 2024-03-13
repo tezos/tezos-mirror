@@ -128,26 +128,71 @@ let status_quo_rountrip =
   --> finalize "staker"
   --> check_snapshot_balances "init"
 
-(* Test that a baker can stake from unstaked frozen funds. *)
+(* Test that a baker can stake from unstaked frozen funds.
+   The most recent unstakes are prioritized when staking. *)
 let shorter_roundtrip_for_baker =
-  let amount = Amount (Tez.of_mutez 333_000_000_000L) in
+  let unstake_amount = Amount (Tez.of_mutez 222_000_000_000L) in
   let consensus_rights_delay =
-    Default_parameters.constants_test.consensus_rights_delay
+    Default_parameters.constants_mainnet.consensus_rights_delay
+    (* mainnet value, = 2 *)
   in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
+  --> set S.consensus_rights_delay consensus_rights_delay
   --> activate_ai `Force --> begin_test ["delegate"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> next_cycle
-  --> snapshot_balances "init" ["delegate"]
-  --> unstake "delegate" amount
-  --> (* Wait [n] cycles where [0 <= n <= consensus_rights_delay + 1]. *)
-  List.fold_left
-    (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
-    (Tag "wait 0 cycles" --> Empty)
-    (Stdlib.List.init (consensus_rights_delay + 1) (fun i -> i + 1))
-  --> stake "delegate" amount
-  --> check_snapshot_balances "init"
+  (* We unstake to have an amount in the last container for ufd *)
+  --> unstake "delegate" unstake_amount
+  --> next_cycle
+  (* We unstake either one, two or three cycles later *)
+  --> (Tag "unstake cycle (current-2)"
+       --> unstake "delegate" unstake_amount
+       --> next_cycle --> next_cycle
+      |+ Tag "unstake cycle (current-1)" --> next_cycle
+         --> unstake "delegate" unstake_amount
+         --> next_cycle
+      |+ Tag "unstake cycle (current)" --> next_cycle --> next_cycle
+         --> unstake "delegate" unstake_amount)
+  (* Nothing is finalizable yet. If nothing else happens, next cycle the
+     first unstake request will become finalizable. *)
+  --> check_balance_field "delegate" `Unstaked_finalizable Tez.zero
+  --> (Tag "stake from unstake one container"
+       --> stake "delegate" (Amount (Tez.of_mutez 111_000_000_000L))
+       --> check_balance_field
+             "delegate"
+             `Unstaked_frozen_total
+             (Tez.of_mutez 333_000_000_000L)
+       (* We only removed unstake from the most recent unstake: we should
+          expect the first unstake request to finalize with its full amount on the next cycle *)
+       --> next_cycle
+       --> check_balance_field
+             "delegate"
+             `Unstaked_finalizable
+             (Tez.of_mutez 222_000_000_000L)
+       --> check_balance_field
+             "delegate"
+             `Unstaked_frozen_total
+             (Tez.of_mutez 111_000_000_000L)
+      |+ Tag "stake from unstake two containers"
+         --> stake "delegate" (Amount (Tez.of_mutez 333_000_000_000L))
+         --> check_balance_field
+               "delegate"
+               `Unstaked_frozen_total
+               (Tez.of_mutez 111_000_000_000L)
+         (* We should have removed all the unstake from the most recent container.
+            The rest will be finalizable next cycle. *)
+         --> next_cycle
+         --> check_balance_field
+               "delegate"
+               `Unstaked_finalizable
+               (Tez.of_mutez 111_000_000_000L)
+         --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
+      |+ Tag "stake from all unstaked + liquid"
+         --> stake "delegate" (Amount (Tez.of_mutez 555_000_000_000L))
+         (* Nothing remains unstaked *)
+         --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
+         --> check_balance_field "delegate" `Unstaked_finalizable Tez.zero)
 
 (* Test three different ways to finalize unstake requests:
    - finalize_unstake operation
