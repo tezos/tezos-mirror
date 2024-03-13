@@ -10,6 +10,13 @@
 
 ### Internal
 
+## Version d689a9dcfa16169aa0dbce1944e920093223c671t (Security Upgrade)
+
+### Bug fixes
+
+- The delayed inbox was blocked as deposit were stored in the wrong
+  storage location. The delayed inbox is flushed to unblock it.
+
 ## Version 79509a69d01c38eeba38d6cc7a323b4d69c58b94
 
 ### Features

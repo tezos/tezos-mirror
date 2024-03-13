@@ -103,7 +103,7 @@ module WASM = struct
       ~path:
         "etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm"
 
-  let ghostnet_evm_commit = "79509a69d01c38eeba38d6cc7a323b4d69c58b94"
+  let ghostnet_evm_commit = "d689a9dcfa16169aa0dbce1944e920093223c671"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm"
 
