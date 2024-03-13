@@ -1,61 +1,57 @@
-use kernel_loader::Memory;
-use rvemu::{emulator::Emulator, exception::Exception};
-use std::{error::Error, fs};
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
+
+use cli::Options;
+use risc_v_interpreter::{
+    machine_state::mode::Mode, traps::EnvironException, Interpreter, InterpreterResult::*,
+};
+use rvemu::emulator::Emulator;
+use std::error::Error;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_encoding::{
     michelson::MichelsonUnit, public_key_hash::PublicKeyHash, smart_rollup::SmartRollupAddress,
 };
 
-mod boot;
 mod cli;
 mod devicetree;
 mod inbox;
-mod input;
-mod rv;
-mod syscall;
+mod rvemu_boot;
+mod rvemu_syscall;
 
 /// Convert a RISC-V exception into an error.
-pub fn exception_to_error(exc: Exception) -> Box<dyn Error> {
+pub fn exception_to_error(exc: EnvironException) -> Box<dyn Error> {
     format!("{:?}", exc).into()
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let cli = cli::parse();
+fn run(opts: Options) -> Result<(), Box<dyn Error>> {
+    let contents = std::fs::read(opts.input)?;
+    let mut backend = Interpreter::create_backend();
+    let mut interpreter = Interpreter::new(&mut backend, &contents, None, Mode::Machine)?;
 
+    const MAX_STEPS: usize = 1000000;
+
+    match interpreter.run(MAX_STEPS) {
+        Exit { code: 0, .. } => Ok(()),
+        Exit { code, .. } => Err(format!("Failed with exit code {}", code).into()),
+        Running(_) => Err("Timeout".into()),
+        Exception(exc, _) => Err(exception_to_error(exc)),
+    }
+}
+
+fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
     let mut emu = Emulator::new();
 
     // Load the ELF binary into the emulator.
-    let contents = std::fs::read(&cli.input)?;
-    let initrd_addr = input::configure_emulator(&contents, &mut emu)?;
+    let contents = std::fs::read(&opts.input)?;
 
-    // Load the initial ramdisk to memory.
-    let initrd_info = cli
-        .initrd
-        .map(|initrd_path| -> Result<_, Box<dyn Error>> {
-            let initrd = fs::read(initrd_path)?;
-            emu.cpu.bus.write_bytes(initrd_addr, initrd.as_slice())?;
-            Ok(devicetree::InitialRamDisk {
-                start: initrd_addr,
-                length: initrd.len() as u64,
-            })
-        })
-        .transpose()?;
-
-    // Generate and load the flattened device tree.
-    let dtb_addr = initrd_info
-        .as_ref()
-        .map(|info| info.start + info.length)
-        .unwrap_or(initrd_addr);
-    let dtb = devicetree::generate(initrd_info)?;
-    emu.cpu.bus.write_bytes(dtb_addr, dtb.as_slice())?;
-
-    // Prepare the boot procedure
-    boot::configure(&mut emu, dtb_addr);
+    rvemu_boot::setup_boot(&mut emu, &contents, opts.initrd)?;
 
     // Rollup metadata
-    let meta = syscall::RollupMetadata {
-        origination_level: cli.origination_level,
-        address: SmartRollupAddress::from_b58check(cli.address.as_str()).unwrap(),
+    let meta = rvemu_syscall::RollupMetadata {
+        origination_level: opts.origination_level,
+        address: SmartRollupAddress::from_b58check(opts.address.as_str()).unwrap(),
     };
 
     // Prepare inbox
@@ -76,22 +72,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     let mut inbox = inbox.build();
 
-    let handle_syscall = if cli.posix {
+    let handle_syscall = if opts.posix {
         fn dummy(
             emu: &mut Emulator,
-            _: &syscall::RollupMetadata,
+            _: &rvemu_syscall::RollupMetadata,
             _: &mut inbox::Inbox,
         ) -> Result<(), Box<dyn Error>> {
-            syscall::handle_posix(emu)
+            rvemu_syscall::handle_posix(emu)
         }
         dummy
     } else {
-        syscall::handle_sbi
+        rvemu_syscall::handle_sbi
     };
 
     let mut prev_pc = emu.cpu.pc;
 
-    while inbox.none_count() < 2 || cli.keep_going {
+    while inbox.none_count() < 2 || opts.keep_going {
         emu.cpu.devices_increment();
 
         if let Some(interrupt) = emu.cpu.check_pending_interrupt() {
@@ -107,7 +103,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|_| ())
             .or_else(|exception| -> Result<(), Box<dyn Error>> {
                 match exception {
-                    Exception::EnvironmentCallFromSMode | Exception::EnvironmentCallFromUMode => {
+                    rvemu::exception::Exception::EnvironmentCallFromSMode
+                    | rvemu::exception::Exception::EnvironmentCallFromUMode => {
                         handle_syscall(&mut emu, &meta, &mut inbox).map_err(
                             |err| -> Box<dyn Error> {
                                 format!("Failed to handle environment call at {prev_pc:x}: {}", err)
@@ -142,4 +139,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let cli = cli::parse();
+    match cli.command {
+        cli::Mode::Rvemu(opts) => rvemu(opts),
+        cli::Mode::Run(opts) => run(opts),
+    }
 }

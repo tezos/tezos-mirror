@@ -6,11 +6,12 @@
 //!   - https://www.scs.stanford.edu/~zyedidia/docs/riscv/riscv-sbi.pdf
 
 use crate::inbox::Inbox;
-use crate::rv::{A0, A1, A2, A3, A6, A7};
+use crate::rvemu_boot::{A0, A1, A2, A3, A6, A7};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use kernel_loader::Memory;
 use rvemu::cpu::{AccessType, BYTE};
 use rvemu::emulator::Emulator;
+use rvemu::exception::Exception;
 use std::{
     error::Error,
     io::{self, Write},
@@ -25,12 +26,17 @@ use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 
 type SBIResult = Result<(), Box<dyn Error>>;
 
+/// Convert a RISC-V exception into an error.
+pub fn exception_to_error(exc: Exception) -> Box<dyn Error> {
+    format!("{:?}", exc).into()
+}
+
 /// Read a virtual address from a register and translate it into a physical address.
 fn read_physical_address(emu: &mut Emulator, register: u64) -> Result<u64, Box<dyn Error>> {
     let addr = emu.cpu.xregs.read(register);
     emu.cpu
         .translate(addr, AccessType::Load)
-        .map_err(super::exception_to_error)
+        .map_err(exception_to_error)
 }
 
 /// Read a series of bytes from memory.
@@ -42,7 +48,7 @@ fn read_memory(emu: &mut Emulator, address: u64, len: u64) -> Result<Vec<u8>, Bo
             .cpu
             .bus
             .read(address + i, BYTE)
-            .map_err(super::exception_to_error)? as u8;
+            .map_err(exception_to_error)? as u8;
     }
 
     Ok(buffer)
