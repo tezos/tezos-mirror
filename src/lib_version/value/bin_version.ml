@@ -22,28 +22,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let octez_version_string =
+let version_string version =
   Format.asprintf
     "%s (%s) (%s)"
     Current_git_info.abbreviated_commit_hash
     Current_git_info.committer_date
-    (Tezos_version.Version.to_string Current_git_info.octez_version)
+    (Tezos_version.Version.to_string version)
+
+let simple_version_string version =
+  Format.asprintf
+    "%s (%s)"
+    (Tezos_version.Version.to_string version)
+    Current_git_info.abbreviated_commit_hash
+
+let octez_version_string = version_string Current_git_info.octez_version
 
 let octez_simple_version_string =
-  Format.asprintf
-    "%s (%s)"
-    (Tezos_version.Version.to_string Current_git_info.octez_version)
-    Current_git_info.abbreviated_commit_hash
+  simple_version_string Current_git_info.octez_version
 
-let etherlink_version_string =
-  Format.asprintf
-    "%s (%s) (%s)"
-    Current_git_info.abbreviated_commit_hash
-    Current_git_info.committer_date
-    (Tezos_version.Version.to_string Current_git_info.etherlink_version)
+let etherlink_version_string = version_string Current_git_info.etherlink_version
 
 let etherlink_simple_version_string =
-  Format.asprintf
-    "%s (%s)"
-    (Tezos_version.Version.to_string Current_git_info.etherlink_version)
-    Current_git_info.abbreviated_commit_hash
+  simple_version_string Current_git_info.etherlink_version
