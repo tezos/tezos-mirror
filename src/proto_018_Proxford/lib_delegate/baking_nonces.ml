@@ -203,28 +203,27 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
     appear in cycles which are [preserved_cycles] older than the 
     [current_cycle]. *)
 let get_outdated_nonces state nonces current_cycle =
-  let open Lwt_result_syntax in
   let {Constants.parametric = {preserved_cycles; _}; _} = state.constants in
   Block_hash.Map.fold
     (fun hash nonce acc ->
-      let* orphans, outdated = acc in
+      let orphans, outdated = acc in
       match nonce.cycle with
       | Some cycle ->
           if
             Int32.sub current_cycle (Cycle.to_int32 cycle)
             > Int32.of_int preserved_cycles
-          then return (orphans, add outdated hash nonce)
+          then (orphans, add outdated hash nonce)
           else acc
-      | None -> return (add orphans hash nonce, outdated))
+      | None -> (add orphans hash nonce, outdated))
     nonces
-    (return (empty, empty))
+    (empty, empty)
 
 (** [filter_outdated_nonces state nonces current_cyce] computes the pair of "orphaned" 
     and "outdated" nonces; emits a warning in case our map contains too many "orphaned"
     nonces, and removes all the oudated nonces. *)
 let filter_outdated_nonces state nonces current_cycle =
   let open Lwt_result_syntax in
-  let* orphans, outdated_nonces =
+  let orphans, outdated_nonces =
     get_outdated_nonces state nonces current_cycle
   in
   let* () =
