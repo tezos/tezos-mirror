@@ -876,6 +876,14 @@ let test_init_from_rollup_node_data_dir =
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () =
+    (* bake 2 blocks so rollup context is for the finalized l1 level
+       and can't be reorged. *)
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~devmode:true
       evm_node'
@@ -1820,7 +1828,8 @@ let test_sequencer_diverge =
         unit)
   in
   let* () =
-    repeat 3 (fun () ->
+    (* 3 to make sure it is seen by the rollup node, 2 to finalize it *)
+    repeat 5 (fun () ->
         let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in

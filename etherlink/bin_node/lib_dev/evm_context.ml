@@ -185,18 +185,48 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
 
 let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let open Lwt_result_syntax in
-  let* checkpoint =
-    let l2_head_path =
-      Filename.Infix.(rollup_node_data_dir // "storage" // "l2_head")
+  let* Sc_rollup_block.(_, {context; _}) =
+    let open Rollup_node_storage in
+    let* last_finalized_level, levels_to_hashes, l2_blocks =
+      Rollup_node_storage.load ~rollup_node_data_dir ()
     in
-    Lwt_io.with_file ~flags:[Unix.O_RDONLY; O_CLOEXEC] ~mode:Input l2_head_path
-    @@ fun channel ->
-    let*! raw_data = Lwt_io.read channel in
-    let Sc_rollup_block.{header = {context; _}; _} =
-      Data_encoding.Binary.of_string_exn Sc_rollup_block.encoding raw_data
+    let* final_level = Last_finalized_level.read last_finalized_level in
+    let*? final_level =
+      Option.to_result
+        ~none:
+          [
+            error_of_fmt
+              "Rollup node storage is missing the last finalized level";
+          ]
+        final_level
     in
-    Smart_rollup_context_hash.to_bytes context
-    |> Context_hash.of_bytes_exn |> return
+    let* final_level_hash =
+      Levels_to_hashes.find levels_to_hashes final_level
+    in
+    let*? final_level_hash =
+      Option.to_result
+        ~none:
+          [
+            error_of_fmt
+              "Rollup node has no block hash for the l1 level %ld"
+              final_level;
+          ]
+        final_level_hash
+    in
+    let* final_l2_block = L2_blocks.read l2_blocks final_level_hash in
+    Lwt.return
+    @@ Option.to_result
+         ~none:
+           [
+             error_of_fmt
+               "Rollup node has no l2 blocks for the l1 block hash %a"
+               Block_hash.pp
+               final_level_hash;
+           ]
+         final_l2_block
+  in
+  let checkpoint =
+    Smart_rollup_context_hash.to_bytes context |> Context_hash.of_bytes_exn
   in
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
