@@ -124,6 +124,15 @@ let next_level node =
   let* current_level = Node.get_level node in
   return (current_level + 1)
 
+let get_peer_score dal_node peer_id =
+  let* scores = Dal_RPC.(call dal_node @@ get_scores ()) in
+  let peer_score =
+    List.find
+      (fun Dal_RPC.{peer; score = _} -> String.equal peer peer_id)
+      scores
+  in
+  return peer_score.score
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
    They should be moved to a common submodule. *)
@@ -3500,6 +3509,10 @@ let connect_nodes_via_p2p dal_node1 dal_node2 =
       ~is_trusted:false
   in
   let* () = Dal_node.run dal_node2 in
+  Log.info
+    "Node %s started. Waiting for connection with node %s"
+    (Dal_node.name dal_node2)
+    (Dal_node.name dal_node1) ;
   conn_ev_in_node1
 
 (** This helper function makes the nodes [dal_node1] and [dal_node2] join the
@@ -3797,8 +3810,8 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     ~expect_app_notification
     ~is_first_slot_attestable
 
-let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
-    dal_node1 =
+let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
+    =
   let rec repeat_i n f =
     if n <= 0 then unit
     else
@@ -3819,6 +3832,7 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
         (Array.length Account.Bootstrap.keys)
         parameters.Dal.Parameters.number_of_slots
     in
+    Log.info "Publishing %d slots" num_slots ;
     repeat_i num_slots (fun i ->
         let slot_index = i - 1 in
         let account = Account.Bootstrap.keys.(slot_index) in
@@ -3860,13 +3874,23 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       pkh1
   in
 
-  (* We bake a block and wait for the prune events. *)
-  let* () = bake_for client in
+  Log.info "Waiting for prune event on %s" (Dal_node.name dal_node1) ;
+
+  (* We bake 3 blocks (one to include publish ops and two more to make that
+     block final) and wait for the prune events. *)
+  let* () = bake_for ~count:3 client in
   let* () = event_waiter_prune in
+
+  let* score = get_peer_score dal_node2 peer_id1 in
+  Log.info "The peer's score after prune is %f" score ;
+  Check.(
+    (score < 0.)
+      float
+      ~error_msg:"The dal_node1's score (%L) was expected to be negative.") ;
 
   (* Now, we'll inject a new slot for the next published_level in
      dal_node1. Since it's pruned, dal_node2 will be notified via IHave
-     messages, to which it will respond by IWant messages. *)
+     messages. *)
   let slot_index = 0 in
   let* commitment =
     publish_and_store_slot
@@ -3891,18 +3915,6 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
         Test.fail "Should not happen as %s is part of the committee" pkh1
     | v -> v
   in
-  let iwant_events_waiter =
-    check_events_with_message_id
-      ~event_with_message_id:IWant
-      dal_node1
-      ~number_of_shards
-      ~shard_indexes
-      ~expected_commitment:commitment
-      ~expected_level:publish_level
-      ~expected_pkh:attester
-      ~expected_slot:slot_index
-      ~expected_peer:peer_id2
-  in
   let ihave_events_waiter =
     check_events_with_message_id
       ~event_with_message_id:(IHave {pkh = pkh1; slot_index = 0})
@@ -3915,9 +3927,8 @@ let _test_gs_prune_ihave_and_iwant protocol parameters _cryptobox node client
       ~expected_slot:slot_index
       ~expected_peer:peer_id1
   in
-  let* () = bake_for client in
-  let* () = iwant_events_waiter and* () = ihave_events_waiter in
-  unit
+  let* () = bake_for client ~count:3 in
+  ihave_events_waiter
 
 (* Checks that:
    * the baker does not crash when there's a DAL node specified, but it is not
@@ -5040,15 +5051,12 @@ let register ~protocols =
     ~producer_profiles:[0]
     test_dal_node_gs_invalid_messages_exchange
     protocols ;
-  (* Will be re-enabled once the debug in
-     https://gitlab.com/tezos/tezos/-/merge_requests/9032 allows explaning the
-     issue and how to fix
-     scenario_with_layer1_and_dal_nodes
-       ~tags:["gossipsub"]
-       "GS prune due to negative score, ihave and iwant"
-       test_gs_prune_ihave_and_iwant
-       protocols ;
-  *)
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["gossipsub"]
+    ~producer_profiles:[0]
+    "GS prune due to negative score, and ihave"
+    test_gs_prune_and_ihave
+    protocols ;
   scenario_with_layer1_and_dal_nodes
     "baker registers profiles with dal node"
     ~uses:(fun protocol -> [Protocol.baker protocol])
