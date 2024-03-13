@@ -46,12 +46,12 @@ module Event = struct
       ~pp1:Ethereum_types.pp_hash
 
   let transaction_injection_failed =
-    declare_0
+    declare_1
       ~section
       ~name:"tx_pool_transaction_injection_failed"
       ~msg:"Injection of transactions failed"
       ~level:Error
-      ()
+      ("trace", trace_encoding)
 
   let connection_lost =
     declare_0
@@ -86,8 +86,8 @@ let add_transaction ~transaction =
 let invalid_transaction ~transaction =
   Internal_event.Simple.emit Event.invalid_transaction transaction
 
-let transaction_injection_failed =
-  Internal_event.Simple.emit Event.transaction_injection_failed
+let transaction_injection_failed trace =
+  Internal_event.Simple.emit Event.transaction_injection_failed trace
 
 let transaction_injected ~hash =
   Internal_event.Simple.emit Event.transaction_injected hash
