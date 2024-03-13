@@ -705,3 +705,17 @@ val dal_data_availibility_attester_not_in_committee : rex
     {!rejected_by_full_mempool_with_needed_fee} as [rex]. *)
 val inject_error_check_recommended_fee :
   loc:string -> rex:rex -> expected_fee:int -> t -> Client.t -> unit Lwt.t
+
+(** Matches the message produced by
+    [Already_denounced {kind; delegate; level}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [delegate], [level], [kind]. *)
+val already_denounced : rex
+
+(** Matches the message produced by
+    [Outdated_denunciation {kind; level; last_cycle}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [kind], [last_cycle], [level]. *)
+val outdated_denunciation : rex

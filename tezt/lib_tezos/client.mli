@@ -640,6 +640,17 @@ val spawn_bake_for :
   t ->
   Process.t
 
+(** Bake until the node is at [target_level], using
+    {!bake_for_and_wait}.
+
+    Fail if the node is already at [target_level] or higher.
+
+    @param keys See {!bake_for}.
+
+    @param node See {!bake_for_and_wait}. *)
+val bake_until_level :
+  target_level:int -> ?keys:string list -> ?node:Node.t -> t -> unit Lwt.t
+
 (** Run [octez-client attest for]. Run [octez-client endorse for] for protocol
     older than 018.
 

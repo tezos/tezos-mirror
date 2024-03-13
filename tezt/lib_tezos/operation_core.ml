@@ -884,3 +884,11 @@ let inject_error_check_recommended_fee ~loc ~rex ~expected_fee op client =
 let dal_data_availibility_attester_not_in_committee =
   rex
     {|The attester (tz[\w\d]+), with slot ([\d]+), is not part of the DAL committee for the level ([\d]+)\.|}
+
+let already_denounced =
+  rex
+    {|Delegate ([\w\d]+) at level ([\d]+) has already been denounced for a double ([\w]+).|}
+
+let outdated_denunciation =
+  rex
+    {|A double-([\w]+) denunciation is outdated \(last acceptable cycle: ([\d]+), given level: ([\d]+)\).|}

@@ -881,6 +881,28 @@ let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
   in
   unit
 
+let bake_until_level ~target_level ?keys ?node client =
+  Log.info "Bake until level %d." target_level ;
+  let node =
+    match node with
+    | Some n -> n
+    | None -> (
+        match node_of_client_mode client.mode with
+        | Some n -> n
+        | None -> Test.fail "No node found for bake_until_level")
+  in
+  let* current = Node.get_level node in
+  if current >= target_level then
+    Test.fail "bake_until_level(%d): already at level %d" target_level current ;
+  let* () =
+    repeat (target_level - current) (fun () ->
+        bake_for_and_wait ?keys ~node client)
+  in
+  let* final_level = Node.get_level node in
+  Check.((final_level = target_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
+  unit
+
 (* Handle attesting and preattesting similarly *)
 type tenderbake_action = Preattest | Attest | Propose
 
