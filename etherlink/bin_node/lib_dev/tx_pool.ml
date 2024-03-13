@@ -379,8 +379,8 @@ let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
     in
     let* nb_transactions =
       match hashes with
-      | Error _ ->
-          let*! () = Tx_pool_events.transaction_injection_failed () in
+      | Error trace ->
+          let*! () = Tx_pool_events.transaction_injection_failed trace in
           return 0
       | Ok hashes ->
           let*! () =

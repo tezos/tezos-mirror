@@ -10,6 +10,9 @@
 
 ### Internal
 
+- If an error occurs during transaction injection, the trace of errors is
+  logged. (!12451)
+
 ## Version for 79509a69d01c38eeba38d6cc7a323b4d69c58b94
 
 ### Features
