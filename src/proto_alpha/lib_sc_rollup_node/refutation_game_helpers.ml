@@ -158,9 +158,9 @@ let generate_proof (node_ctxt : _ Node_context.t)
     let+ context = Node_context.checkout_context node_ctxt start_hash in
     Context.index context
   in
-  let* dal_slots_history =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3805 *)
-    return Dal.Slots_history.genesis
+  let dal_slots_history =
+    (* Similarly to what's done for inbox snapshot above. *)
+    Sc_rollup_proto_types.Dal.Slot_history.of_octez game.dal_snapshot
   in
   let* dal_slots_history_cache_view =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3805 *)
