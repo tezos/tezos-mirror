@@ -24,6 +24,7 @@ In the Json format, a balance update consists of three parts:
     * ``"block"`` means that the balance update originates from the application of a block
     * ``"migration"`` means that the balance update originates from migration
     * ``"subsidy"`` means that the balance update originates from subsidies for liquidity baking
+    * ``"delayed_operation"`` means that the balance update originates from the delayed application of the operation whose hash is given in the additional field ``"delayed_operation_hash"``.
 
 
 A transfer of tokens is represented by a continuous and ordered sequence of (balance) updates.
@@ -92,7 +93,8 @@ The field ``kind`` allows to identify the type of container account, it can have
 
     - just a ``"delegate"`` to designate collectively the deposits of all
       stakers delegating to the provided implicit account.
-    - a ``baker`` field to designate the delegate's own deposits
+    - a ``"baker_own_stake"`` field to designate the delegate's own deposits received from its own stake rewards.
+    - a ``"baker_edge"`` field to designate the delegate's own deposits received from the edge on its staker's rewards.
   - ``"unstaked_deposits"`` represents the accounts of unstaked frozen tokens.
     Accounts in this category are further identified by the following additional fields:
 
@@ -119,6 +121,10 @@ The field ``kind`` allows to identify the type of container account, it can have
   Other categories may be added in the future.
 * ``"commitment"`` represents the accounts of commitments awaiting activation.
   This type of account is further identified by the additional field ``committer`` whose value is the encrypted public key hash of the user who has committed to provide funds.
+* ``"staking"`` represents abstractions used for accounting staking by delegators, and comes with the additional field ``category`` that can have one of the following values:
+
+  - ``"delegator numerator"`` abstracts the delegator's stake, and comes with the additional field ``"delegator"`` whose value is the public key hash of the delegator.
+  - ``"delegate denominator"`` abstracts the total stake of delegate's delegators, and comes with the additional field ``"delegate"`` whose value is the public key hash of the delegate.
 
 Sink accounts
 -------------
@@ -187,9 +193,9 @@ the following balance updates are generated:
   [ {"kind": "accumulator", "category": "block fees", "change": "-1000", ...},
     {"kind": "contract", "contract": "tz1a...", "change": "1000", ...}
     {"kind": "minted", "category": "baking rewards", "change": "-5", ...},
-    {"kind": "freezer", "category": "deposits", "staker": { "baker": "tz1a..."}, "change": "5", ...},
+    {"kind": "freezer", "category": "deposits", "staker": { "baker_edge": "tz1a..."}, "change": "5", ...},
     {"kind": "minted", "category": "baking rewards", "change": "-10", ...},
-    {"kind": "freezer", "category": "deposits", "staker": { "baker": "tz1a..."}, "change": "10", ...},
+    {"kind": "freezer", "category": "deposits", "staker": { "baker_own_stake": "tz1a..."}, "change": "10", ...},
     {"kind": "minted", "category": "baking rewards", "change": "-35", ...},
     {"kind": "freezer", "category": "deposits", "staker": { "delegate": "tz1a..."}, "change": "35", ...},
     {"kind": "minted", "category": "baking rewards", "change": "-450", ...},
@@ -207,7 +213,7 @@ baking bonus with 90% sent to spendable balance and 10% to bakers frozen deposit
   [ {"kind": "minted", "category": "baking bonus", "change": "-90", ...},
     {"kind": "contract", "contract": "tz1b...", "change": "90", ...},
     {"kind": "minted", "category": "baking bonus", "change": "-10", ...},
-    {"kind": "freezer", "category": "deposits", "staker": { "baker": "tz1b..."}, "change": "10", ...}]
+    {"kind": "freezer", "category": "deposits", "staker": { "baker_own_stake": "tz1b..."}, "change": "10", ...}]
 
 Attesting, double signing evidence, and nonce revelation rewards
 ----------------------------------------------------------------
