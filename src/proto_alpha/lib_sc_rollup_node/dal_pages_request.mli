@@ -26,6 +26,10 @@
 open Protocol
 open Alpha_context
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7070
+
+   Rework the interface of dal_pages_request.mli (see the issue for details). *)
+
 (** Access DAL slots and pages content.
 
     This module is a wrapper on top of {!Store.Dal_slot_pages} module to
