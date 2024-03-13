@@ -165,13 +165,16 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
              - child->parent: length of serialized proved shards,
              - child->parent: serialized proved shards,
              - parent stores shards and shard proofs,
-             - child waits a bit and exits *)
+             - parent->child: termination signal (any byte),
+             - child exits *)
           let*! () = Lwt_io.flush_all () in
           let ic_parent, oc_child = Lwt_io.pipe ~cloexec:true () in
+          let ic_child, oc_parent = Lwt_io.pipe ~cloexec:true () in
           match Lwt_unix.fork () with
           | 0 ->
               (* Child *)
               let*! () = Lwt_io.close ic_parent in
+              let*! () = Lwt_io.close oc_parent in
               let* polynomial =
                 Slot_manager_legacy.polynomial_from_shards_lwt
                   cryptobox
@@ -198,10 +201,15 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
                 Lwt_io.write_from oc_child proved_shards_encoded 0 len
               in
               let*! () = Lwt_io.close oc_child in
-              let*! () = Lwt_unix.sleep 60. in
+              let*! _ =
+                let termination_signal = Bytes.create 1 in
+                Lwt_io.read_into_exactly ic_child termination_signal 0 1
+              in
+              let*! () = Lwt_io.close ic_child in
               exit 0
           | _n ->
               (* Parent *)
+              let*! () = Lwt_io.close ic_child in
               let*! () = Lwt_io.close oc_child in
               let* shards, shard_proofs =
                 let buffer = Bytes.create 4 in
@@ -217,6 +225,13 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
                 in
                 return (List.to_seq shards, shard_proofs)
               in
+              let*! _exit_child =
+                (* Any byte sent to the child is interpreted as a termination
+                   signal. *)
+                let termination_signal = Bytes.create 1 in
+                Lwt_io.write_from oc_parent termination_signal 0 1
+              in
+              let*! () = Lwt_io.close oc_parent in
               let* () =
                 Store.(
                   Shards.save_and_notify
