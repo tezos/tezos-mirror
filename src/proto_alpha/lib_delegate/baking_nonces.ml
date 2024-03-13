@@ -300,17 +300,11 @@ let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
                   match nonce_info with
                   | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
                       let*! () =
-                        Events.(
-                          emit
-                            found_nonce_to_reveal
-                            (hash, Raw_level.to_int32 level))
+                        Events.(emit found_nonce_to_reveal (hash, level))
                       in
                       return ((level, nonce) :: acc)
                   | Missing _nonce_hash ->
-                      let*! () =
-                        Events.(
-                          emit incoherent_nonce (Raw_level.to_int32 level))
-                      in
+                      let*! () = Events.(emit incoherent_nonce level) in
                       return acc
                   | Forgotten | Revealed _ -> return acc)
               | None -> raise Not_found)
