@@ -30,5 +30,7 @@
 module Make : functor
   (Base : sig
      val base : Uri.t
+
+     val smart_rollup_address : string
    end)
   -> Services_backend_sig.S

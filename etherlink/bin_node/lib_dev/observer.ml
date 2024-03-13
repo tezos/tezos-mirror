@@ -102,6 +102,10 @@ end) : Services_backend_sig.Backend = struct
       | _ -> Error_monad.failwith "Invalid insights format"
   end
 
+  let smart_rollup_address =
+    Tezos_crypto.Hashed.Smart_rollup_address.to_string
+      Ctxt.ctxt.smart_rollup_address
+
   let inject_kernel_upgrade upgrade =
     let open Lwt_result_syntax in
     let payload = Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes in
