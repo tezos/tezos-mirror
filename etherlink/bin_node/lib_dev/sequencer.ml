@@ -232,8 +232,10 @@ let start_server
     (fun _ -> return (server, private_server))
 
 let loop_sequencer :
-    Configuration.sequencer Configuration.t -> unit tzresult Lwt.t =
- fun config ->
+    (module Services_backend_sig.S) ->
+    Configuration.sequencer Configuration.t ->
+    unit tzresult Lwt.t =
+ fun backend config ->
   let open Lwt_result_syntax in
   let time_between_blocks = config.mode.time_between_blocks in
   let rec loop last_produced_block =
@@ -251,7 +253,9 @@ let loop_sequencer :
           let diff = Time.Protocol.(diff now last_produced_block) in
           diff >= Int64.of_float time_between_blocks
         in
-        let* nb_transactions = Tx_pool.produce_block ~force ~timestamp:now in
+        let* nb_transactions =
+          Block_producer.produce_block backend ~force ~timestamp:now
+        in
         let*! () = Lwt_unix.sleep 0.5 in
         if nb_transactions > 0 || force then loop now
         else loop last_produced_block
@@ -344,5 +348,5 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_seq server private_server
   in
-  let* () = loop_sequencer configuration in
+  let* () = loop_sequencer (module Sequencer) configuration in
   return_unit

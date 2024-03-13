@@ -33,9 +33,12 @@ val add_delayed :
     if no transactions are in the pool. *)
 val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
 
-(** [produce_block ~force ~timestamp] takes the transactions in the tx pool
-    and produces a block from it, returns the number of transaction in
-    the block. The block is not produced if the list of
-    transactions is empty and [force] is set to [false]. *)
-val produce_block :
-  force:bool -> timestamp:Time.Protocol.t -> int tzresult Lwt.t
+(** [pop_transactions ()] pops the valid transactions from the pool. *)
+val pop_transactions :
+  unit ->
+  (string list * Ethereum_types.Delayed_transaction.t list) tzresult Lwt.t
+
+(** [pop_and_inject_transactions ()] pops the valid transactions from
+    the pool using {!pop_transactions }and injects them using
+    [inject_raw_transactions] provided by {!parameters.rollup_node}. *)
+val pop_and_inject_transactions : unit -> unit tzresult Lwt.t

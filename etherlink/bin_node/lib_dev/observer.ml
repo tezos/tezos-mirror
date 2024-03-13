@@ -156,9 +156,7 @@ let main (ctxt : Evm_context.t) ~evm_node_endpoint =
     match candidate with
     | Some blueprint ->
         let* () = on_new_blueprint ctxt blueprint in
-        let* _ =
-          Tx_pool.produce_block ~force:false ~timestamp:(Helpers.now ())
-        in
+        let* _ = Tx_pool.pop_and_inject_transactions () in
         loop stream
     | None -> return_unit
   in
