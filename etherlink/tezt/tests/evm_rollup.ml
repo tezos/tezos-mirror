@@ -2578,21 +2578,29 @@ let test_kernel_upgrade_via_kernel_security_governance =
 
 let test_rpc_sendRawTransaction =
   register_both
-    ~tags:["evm"; "rpc"; "tx_hash"]
+    ~tags:["evm"; "rpc"; "tx_hash"; "raw_tx"]
     ~title:
       "Ensure EVM node returns appropriate hash for any given transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
+  let txs =
+    [
+      "f86480825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a0964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004a03eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a";
+      "f86480825208831e848094b53dc01974176e5dff2298c5a94343c2585e3c548080820a96a0542124cb9fe80b1c8bd18a07b6ea8292770055c06c2a1b7b0aa82e121c30d0a1a07e9092eb6d303b58c89475f147684a1ae44d0a0248a7409dfc15675555a467e6";
+    ]
+  in
   let* hashes =
     Lwt_list.map_p
-      (fun (raw_tx, _) ->
+      (fun raw_tx ->
         let*@ hash = Rpc.send_raw_transaction ~raw_tx evm_node in
         return hash)
       txs
   in
   let expected_hashes =
-    List.map (fun (_, expected_hash) -> expected_hash) txs
+    [
+      "0xb941cbf32821471381b6f003f9013b95c788ad24260d2af54848a5b504c09bb0";
+      "0x6ddd857feb6c81405ea50fb12489ea00cd91193ae36cb41fc119999521422e3a";
+    ]
   in
   Check.((hashes = expected_hashes) (list string))
     ~error_msg:"Unexpected returned hash, should be %R, but got %L" ;
@@ -2934,6 +2942,70 @@ let test_deposit_dailynet =
 
   (* Check the balance in the EVM rollup. *)
   check_balance ~receiver ~endpoint amount_mutez
+
+let test_cannot_prepayed_leads_to_no_inclusion =
+  register_both
+    ~tags:["evm"; "prepay"; "inclusion"]
+    ~title:
+      "Not being able to prepay a transaction leads to it not being included."
+    ~bootstrap_accounts:[||]
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  (* No bootstrap accounts, so no one has funds. *)
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
+     Eth_account.bootstrap_accounts.(1).  We do not use eth-cli in
+     this test because we want the results of the simulation. *)
+  let raw_transfer =
+    "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
+  in
+  let*@? error = Rpc.send_raw_transaction ~raw_tx:raw_transfer evm_node in
+  Check.(
+    ((error.message = "Cannot prepay transaction.") string)
+      ~error_msg:"The transaction should fail") ;
+  unit
+
+let test_cannot_prepayed_with_delay_leads_to_no_injection =
+  register_both
+    ~tags:["evm"; "prepay"; "injection"]
+    ~title:
+      "Not being able to prepay a transaction that was included leads to it \
+       not being injected."
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; endpoint; _}
+    ->
+  let sender, to_public_key =
+    ( Eth_account.bootstrap_accounts.(0),
+      "0xE7f682c226d7269C7247b878B3F94c7a8d31FEf5" )
+  in
+  let transaction_included =
+    Eth_cli.transaction_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~to_public_key
+      ~value:Wei.one
+      ~endpoint
+  in
+  (* Transaction from previous sender to the same address but with nonce 1 and
+     a gas computation that will lead it to not being able to be prepayed hence
+     rejected at injection. *)
+  let raw_tx =
+    "f86501830186a0830186a094e7f682c226d7269c7247b878b3f94c7a8d31fef58080820a95a0a9afcb6020f31b62e45778a051c62e71ce5c52789ba6ab487812f21271a98291a03673d60e267b6d32ecd22403cb54c088ee897e0c1862aa3f48039671503957d1"
+  in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
+  let* _will_succeed =
+    wait_for_application ~evm_node ~sc_rollup_node ~client transaction_included
+  in
+  let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
+  let wait_for_failure () =
+    let* _ =
+      wait_for_application
+        ~evm_node
+        ~sc_rollup_node
+        ~client
+        (wait_for_transaction_receipt ~evm_node ~transaction_hash)
+    in
+    Test.fail "Unreachable state, transaction will never be injected."
+  in
+  Lwt.catch wait_for_failure (function _ -> unit)
 
 let test_rpc_sendRawTransaction_nonce_too_low =
   register_both
@@ -3455,41 +3527,6 @@ let test_simulation_eip2200 =
   let* _tx = wait_for_application ~evm_node ~sc_rollup_node ~client call in
   unit
 
-let test_cover_fees =
-  register_both
-    ~tags:["evm"; "validity"]
-    ~title:"Transaction is invalid if sender cannot cover the fees"
-    ~bootstrap_accounts:[||]
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  (* No bootstrap accounts, so no one has funds. *)
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; endpoint; sc_rollup_node; client; _}
-    ->
-  (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
-     Eth_account.bootstrap_accounts.(1).  We do not use eth-cli in
-     this test because we want the results of the simulation. *)
-  let raw_transfer =
-    "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
-  in
-  (* This should fail when the tx-pool check this. *)
-  let* hash_result = Rpc.send_raw_transaction ~raw_tx:raw_transfer evm_node in
-  let hash =
-    match hash_result with
-    | Ok hash -> hash
-    | Error _ -> Test.fail "The proxy did not accept the transaction."
-  in
-  (* No receipt should be produced for an invalid transaction. *)
-  let rec check_for_receipt blocks_left =
-    if blocks_left = 0 then unit
-    else
-      let* receipt = Eth_cli.get_receipt ~endpoint ~tx:hash in
-      match receipt with
-      | Some _ -> Test.fail "An invalid transaction should not have a receipt."
-      | None ->
-          let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
-          check_for_receipt (blocks_left - 1)
-  in
-  check_for_receipt 6
-
 let test_rpc_sendRawTransaction_with_consecutive_nonce =
   register_both
     ~tags:["evm"; "rpc"; "tx_nonce"]
@@ -3526,7 +3563,7 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
 
 let test_rpc_sendRawTransaction_not_included =
   register_both
-    ~tags:["evm"; "rpc"; "tx_nonce"]
+    ~tags:["evm"; "rpc"; "tx_nonce"; "no_inclusion"]
     ~title:
       "Tx with nonce too high are not included without previous transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -3535,7 +3572,7 @@ let test_rpc_sendRawTransaction_not_included =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6520 *)
   (* Nonce: 1 *)
   let tx =
-    "0xf86401825208831e84809400000000000000000000000000000000000000008080820a96a05709a6fbce9cf391d0530f4b4d4c9fd57fa160dd20fead5bd5c49c3ec78efcc9a06e4fcb1d5596e00bc34fa5d97ccafce8fa1f44534b36920d7db0a3ad29ca03f8"
+    "f86401825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a07298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776a07042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e"
   in
   let*@ tx_hash =
     wait_for_application ~evm_node ~sc_rollup_node ~client (fun () ->
@@ -4308,20 +4345,27 @@ let test_reboot_out_of_ticks =
     |> String.trim |> String.split_on_char '\n'
   in
   (* The first three transactions are sent in a separate block, to handle any nonce issue. *)
-  let first_block, second_block =
+  let first_block, second_block, third_block, fourth_block =
     match txs with
-    | faucet1 :: faucet2 :: create :: rem -> ([faucet1; faucet2; create], rem)
+    | faucet1 :: faucet2 :: create :: rem ->
+        ([faucet1], [faucet2], [create], rem)
     | _ ->
         failwith
           "The prepared transactions should contain at least 3 transactions"
   in
-  let* _requests, _receipt, _hashes =
-    send_n_transactions
-      ~sc_rollup_node
-      ~client
-      ~evm_node
-      ~wait_for_blocks:5
-      first_block
+  let* () =
+    Lwt_list.iter_s
+      (fun block ->
+        let* _requests, _receipt, _hashes =
+          send_n_transactions
+            ~sc_rollup_node
+            ~client
+            ~evm_node
+            ~wait_for_blocks:5
+            block
+        in
+        unit)
+      [first_block; second_block; third_block]
   in
   let* total_tick_number_before_expected_reboots =
     Sc_rollup_node.RPC.call sc_rollup_node
@@ -4334,11 +4378,11 @@ let test_reboot_out_of_ticks =
       ~client
       ~evm_node
       ~wait_for_blocks:5
-        (* By default, it waits for 3 blocks. We need to take into account the
-           blocks before the inclusion which is generally 2. The loops can be a
-           bit long to execute, as such the inclusion test might fail before the
-           execution is over, making it flaky. *)
-      second_block
+      (* By default, it waits for 3 blocks. We need to take into account the
+         blocks before the inclusion which is generally 2. The loops can be a
+         bit long to execute, as such the inclusion test might fail before the
+         execution is over, making it flaky. *)
+      fourth_block
   in
   let* total_tick_number_with_expected_reboots =
     Sc_rollup_node.RPC.call sc_rollup_node
@@ -4866,22 +4910,27 @@ let test_transaction_exhausting_ticks_is_rejected =
     |> String.trim |> String.split_on_char '\n'
   in
   (* The first three transactions are sent in a separate block, to handle any nonce issue. *)
-  let first_block, loop_out_of_ticks =
+  let first_block, second_block, third_block, loop_out_of_ticks =
     match txs with
     | [faucet1; faucet2; create; loop_out_of_ticks] ->
-        ([faucet1; faucet2; create], loop_out_of_ticks)
+        ([faucet1], [faucet2], [create], loop_out_of_ticks)
     | _ -> failwith "The prepared transactions should contain 4 transactions"
   in
-  let* _requests, _receipt, _hashes =
-    send_n_transactions
-      ~sc_rollup_node
-      ~client
-      ~evm_node
-      ~wait_for_blocks:5
-      first_block
+  let* () =
+    Lwt_list.iter_s
+      (fun block ->
+        let* _requests, _receipt, _hashes =
+          send_n_transactions
+            ~sc_rollup_node
+            ~client
+            ~evm_node
+            ~wait_for_blocks:5
+            block
+        in
+        unit)
+      [first_block; second_block; third_block]
   in
   let* result = Rpc.send_raw_transaction ~raw_tx:loop_out_of_ticks evm_node in
-
   (match result with
   | Ok _ -> Test.fail "The transaction should have been rejected by the node"
   | Error _ -> ()) ;
@@ -5226,6 +5275,8 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_via_kernel_security_governance protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_deposit_dailynet protocols ;
+  test_cannot_prepayed_leads_to_no_inclusion protocols ;
+  test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
   test_rpc_sendRawTransaction_nonce_too_low protocols ;
   test_rpc_sendRawTransaction_nonce_too_high protocols ;
   test_rpc_sendRawTransaction_invalid_chain_id protocols ;
@@ -5236,7 +5287,6 @@ let register_evm_node ~protocols =
   test_rpc_getUncleCountByBlock protocols ;
   test_rpc_getUncleByBlockArgAndIndex protocols ;
   test_simulation_eip2200 protocols ;
-  test_cover_fees protocols ;
   test_rpc_gasPrice protocols ;
   test_rpc_getStorageAt protocols ;
   test_accounts_double_indexing protocols ;

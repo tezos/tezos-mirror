@@ -5,9 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6672
-   It should be created by the configuration, or at least using values of
-   the configuration. *)
 type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer | Observer
 
 type parameters = {

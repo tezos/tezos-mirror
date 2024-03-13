@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -14,6 +15,7 @@ module Pool = struct
     index : int64; (* Global index of the transaction. *)
     raw_tx : string; (* Current transaction. *)
     gas_price : Z.t; (* The maximum price the user can pay for fees. *)
+    gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
   }
 
   type t = {
@@ -29,15 +31,16 @@ module Pool = struct
       delayed_transactions = [];
     }
 
-  (** Add a transaction to the pool.*)
-  let add t pkey base_fee raw_tx =
+  (** Add a transaction to the pool. *)
+  let add t pkey raw_tx =
     let open Result_syntax in
     let {transactions; global_index; delayed_transactions} = t in
-    let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
-    let* gas_price = Ethereum_types.transaction_gas_price base_fee raw_tx in
-    let transaction = {index = global_index; raw_tx; gas_price} in
+    let* nonce = Ethereum_types.transaction_nonce raw_tx in
+    let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
+    let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
     (* Add the transaction to the user's transaction map *)
     let transactions =
+      let transaction = {index = global_index; raw_tx; gas_price; gas_limit} in
       Pkey_map.update
         pkey
         (function
@@ -64,7 +67,7 @@ module Pool = struct
         delayed_transactions;
       }
 
-  (** Add a delayed transacion to the pool.*)
+  (** Add a delayed transaction to the pool.*)
   let add_delayed t tx =
     let open Result_syntax in
     let delayed_transactions = tx :: t.delayed_transactions in
@@ -249,7 +252,6 @@ let on_normal_transaction state tx_raw =
   let open Types in
   let {rollup_node = (module Rollup_node); pool; _} = state in
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
-  let* (Qty base_fee) = Rollup_node.base_fee_per_gas () in
   match is_valid with
   | Error err ->
       let*! () =
@@ -259,7 +261,7 @@ let on_normal_transaction state tx_raw =
       return (Error err)
   | Ok {address} ->
       (* Add the tx to the pool*)
-      let*? pool = Pool.add pool address base_fee tx_raw in
+      let*? pool = Pool.add pool address tx_raw in
       (* compute the hash *)
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
       let hash =
@@ -290,6 +292,16 @@ let on_transaction state transaction =
       let* () = on_delayed_transaction state delayed_transaction in
       return (Ok hash)
 
+(** Checks that [balance] is enough to pay up to the maximum [gas_limit]
+    the sender defined parametrized by the [gas_price]. *)
+let can_prepay ~balance ~gas_price ~gas_limit =
+  balance >= Z.(gas_limit * gas_price)
+
+(** Checks that the transaction can be payed given the [gas_price] that was set
+    and the current [base_fee_per_gas]. *)
+let can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas =
+  gas_price >= base_fee_per_gas
+
 let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
     =
   let open Lwt_result_syntax in
@@ -301,36 +313,40 @@ let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
     Lwt_list.map_p
       (fun address ->
         let* nonce = Rollup_node.nonce address in
-        let nonce = Option.value ~default:(Qty Z.zero) nonce in
-        Lwt.return_ok (address, nonce))
+        let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
+        let* (Qty balance) = Rollup_node.balance address in
+        Lwt.return_ok (address, balance, nonce))
       addresses
   in
   let addr_with_nonces = List.filter_ok addr_with_nonces in
-  (* Remove transactions with too low nonce. *)
+  (* Remove transactions with too low nonce and the ones that
+     can not be prepayed anymore. *)
+  let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
   let pool =
     addr_with_nonces
     |> List.fold_left
-         (fun pool (pkey, current_nonce) ->
+         (fun pool (pkey, balance, current_nonce) ->
            Pool.remove
              pkey
-             (fun nonce _tx ->
-               let (Ethereum_types.Qty current_nonce) = current_nonce in
-               Z.lt nonce current_nonce)
+             (fun nonce {gas_limit; gas_price; _} ->
+               nonce < current_nonce
+               || not (can_prepay ~balance ~gas_price ~gas_limit))
              pool)
          pool
   in
-  (* Select transaction with nonce equal to user's nonce.
+  (* Select transaction with nonce equal to user's nonce and that
+     can be prepaid.
      Also removes the transactions from the pool. *)
   let txs, pool =
     addr_with_nonces
     |> List.fold_left
-         (fun (txs, pool) (pkey, current_nonce) ->
+         (fun (txs, pool) (pkey, _, current_nonce) ->
            let selected, pool =
              Pool.partition
                pkey
-               (fun nonce _tx ->
-                 let (Ethereum_types.Qty current_nonce) = current_nonce in
-                 Z.equal nonce current_nonce)
+               (fun nonce {gas_price; _} ->
+                 nonce = current_nonce
+                 && can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas)
                pool
            in
            let txs = List.append txs selected in
