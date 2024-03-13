@@ -74,21 +74,25 @@ impl<'a> Interpreter<'a> {
         })
     }
 
+    // TODO: use execution environment for exception handling once merged
     fn handle_step_result(&mut self, result: StepManyResult) -> InterpreterResult {
         self.steps += result.steps;
 
-        // The only exception currently handled is exit
-        if let Some(EnvironException::EnvCallFromUMode) = result.exception {
-            if self.machine_state.hart.xregisters.read(a7) == 93 {
-                return Exit {
-                    code: self.machine_state.hart.xregisters.read(a0) as usize,
-                    steps: result.steps,
-                };
-            }
-        }
-
         match result.exception {
-            Some(exception) => Exception(exception, result.steps),
+            Some(exc) => {
+                // The only exception currently handled is exit
+                if (exc == EnvironException::EnvCallFromUMode
+                    || exc == EnvironException::EnvCallFromSMode
+                    || exc == EnvironException::EnvCallFromMMode)
+                    && self.machine_state.hart.xregisters.read(a7) == 93
+                {
+                    return Exit {
+                        code: self.machine_state.hart.xregisters.read(a0) as usize,
+                        steps: result.steps,
+                    };
+                };
+                Exception(exc, result.steps)
+            }
             None => Running(result.steps),
         }
     }
