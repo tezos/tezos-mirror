@@ -1724,7 +1724,7 @@ let test_full_blocks =
     ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
     ~tags:["evm"; "full_blocks"]
     ~title:
-      "Check `evm_getBlockByNumber` with full blocks returns the correct \
+      "Check `eth_getBlockByNumber` with full blocks returns the correct \
        informations"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
@@ -1772,7 +1772,7 @@ let test_latest_block =
   register_proxy
     ~tags:["evm"; "blocks"; "latest"]
     ~title:
-      "Check `evm_getBlockByNumber` works correctly when asking for the \
+      "Check `eth_getBlockByNumber` works correctly when asking for the \
        `latest`"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
   let* _ = next_evm_level ~evm_node ~sc_rollup_node ~client in
