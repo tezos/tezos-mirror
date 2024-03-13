@@ -183,7 +183,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
-  let private_rpc_port = Port.fresh () in
+  let private_rpc_port = Some (Port.fresh ()) in
   let mode =
     Evm_node.Sequencer
       {
@@ -1764,7 +1764,7 @@ let test_sequencer_upgrade =
             {
               config with
               sequencer = new_sequencer_key;
-              private_rpc_port = Port.fresh ();
+              private_rpc_port = Some (Port.fresh ());
             }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
@@ -1837,7 +1837,8 @@ let test_sequencer_diverge =
     let mode =
       match Evm_node.mode sequencer with
       | Sequencer config ->
-          Evm_node.Sequencer {config with private_rpc_port = Port.fresh ()}
+          Evm_node.Sequencer
+            {config with private_rpc_port = Some (Port.fresh ())}
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)

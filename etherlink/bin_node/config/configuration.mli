@@ -32,7 +32,7 @@ type sequencer = {
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
   time_between_blocks : time_between_blocks;  (** See {!time_between_blocks}. *)
-  private_rpc_port : int;  (** Port for internal RPC services *)
+  private_rpc_port : int option;  (** Port for internal RPC services *)
   sequencer : Signature.public_key_hash;
       (** The key used to sign the blueprints. *)
 }

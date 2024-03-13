@@ -22,7 +22,7 @@ type sequencer = {
   preimages : string;
   preimages_endpoint : Uri.t option;
   time_between_blocks : time_between_blocks;
-  private_rpc_port : int;
+  private_rpc_port : int option;
   sequencer : Signature.public_key_hash;
 }
 
@@ -71,8 +71,6 @@ let default_rollup_node_endpoint = Uri.empty
 let default_evm_node_endpoint = Uri.empty
 
 let default_time_between_blocks = Time_between_blocks 5.
-
-let default_private_rpc_port = 8546
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -148,11 +146,10 @@ let encoding_sequencer =
           "time_between_blocks"
           encoding_time_between_blocks
           default_time_between_blocks)
-       (dft
+       (opt
           "private-rpc-port"
           ~description:"RPC port for private server"
-          uint16
-          default_private_rpc_port)
+          uint16)
        (req "sequencer" Signature.Public_key_hash.encoding))
 
 let encoding_observer =
@@ -305,8 +302,7 @@ module Cli = struct
         preimages_endpoint;
         time_between_blocks =
           Option.value ~default:default_time_between_blocks time_between_blocks;
-        private_rpc_port =
-          Option.value ~default:default_private_rpc_port private_rpc_port;
+        private_rpc_port;
         sequencer;
       }
     in
@@ -388,8 +384,7 @@ module Cli = struct
           Option.value
             ~default:configuration.mode.time_between_blocks
             time_between_blocks;
-        private_rpc_port =
-          Option.value ~default:default_private_rpc_port private_rpc_port;
+        private_rpc_port;
         sequencer;
       }
     in

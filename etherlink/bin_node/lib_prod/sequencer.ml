@@ -131,8 +131,13 @@ let install_finalizer_seq server private_server =
   let* () = Events.shutdown_node ~exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = Events.shutdown_rpc_server ~private_:false in
-  let* () = Tezos_rpc_http_server.RPC_server.shutdown private_server in
-  let* () = Events.shutdown_rpc_server ~private_:true in
+  let* () =
+    Option.iter_s
+      (fun private_server ->
+        let* () = Tezos_rpc_http_server.RPC_server.shutdown private_server in
+        Events.shutdown_rpc_server ~private_:true)
+      private_server
+  in
   let* () = Tx_pool.shutdown () in
   let* () = Rollup_node_follower.shutdown () in
   let* () = Evm_events_follower.shutdown () in
@@ -160,10 +165,9 @@ let start_server
         rpc_port;
         cors_origins;
         cors_headers;
-        mode = {private_rpc_port; _};
         max_active_connections;
         _;
-      } ~directory ~private_directory =
+      } ~directory ~private_info =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -181,14 +185,21 @@ let start_server
       ~media_types:Media_type.all_media_types
       directory
   in
-  let private_node = `TCP (`Port private_rpc_port) in
-  let private_server =
-    RPC_server.init_server
-      ~acl
-      ~cors
-      ~media_types:Media_type.all_media_types
-      private_directory
+  let private_info =
+    Option.map
+      (fun (private_directory, private_rpc_port) ->
+        let private_server =
+          RPC_server.init_server
+            ~acl
+            ~cors
+            ~media_types:Media_type.all_media_types
+            private_directory
+        in
+        let private_node = `TCP (`Port private_rpc_port) in
+        (private_server, private_node))
+      private_info
   in
+  let private_server = Option.map fst private_info in
   Lwt.catch
     (fun () ->
       let*! () =
@@ -200,12 +211,15 @@ let start_server
           node
       in
       let*! () =
-        RPC_server.launch
-          ~max_active_connections
-          ~host:Ipaddr.V4.(to_string localhost)
-          private_server
-          ~callback:(callback_log private_server)
-          private_node
+        Option.iter_s
+          (fun (private_server, private_node) ->
+            RPC_server.launch
+              ~max_active_connections
+              ~host:Ipaddr.V4.(to_string localhost)
+              private_server
+              ~callback:(callback_log private_server)
+              private_node)
+          private_info
       in
       let*! () = Events.is_ready ~rpc_addr ~rpc_port in
       return (server, private_server))
@@ -307,13 +321,19 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in
   let directory = directory |> Evm_services.register ctxt in
-  let private_directory =
-    Services.private_directory
-      configuration
-      ((module Sequencer), smart_rollup_address)
+  let private_info =
+    Option.map
+      (fun private_rpc_port ->
+        let private_directory =
+          Services.private_directory
+            configuration
+            ((module Sequencer), smart_rollup_address)
+        in
+        (private_directory, private_rpc_port))
+      configuration.mode.private_rpc_port
   in
   let* server, private_server =
-    start_server configuration ~directory ~private_directory
+    start_server configuration ~directory ~private_info
   in
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_seq server private_server
