@@ -929,8 +929,8 @@ module Nonces = struct
       ~msg:"found nonce to reveal for block {block}, level {level}"
       ~pp1:Block_hash.pp
       ("block", Block_hash.encoding)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
+      ~pp2:Raw_level.pp
+      ("level", Raw_level.encoding)
 
   let revealing_nonce =
     declare_3
@@ -961,8 +961,8 @@ module Nonces = struct
       ~name:"incoherent_nonce"
       ~level:Error
       ~msg:"incoherent nonce for level {level}"
-      ~pp1:pp_int32
-      ("level", Data_encoding.int32)
+      ~pp1:(fun fmt -> Format.fprintf fmt "%a" Raw_level.pp)
+      ("level", Raw_level.encoding)
 
   let cannot_read_nonces =
     declare_1
