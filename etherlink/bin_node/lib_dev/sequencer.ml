@@ -195,8 +195,7 @@ let start_server
             ~media_types:Media_type.all_media_types
             private_directory
         in
-        let private_node = `TCP (`Port private_rpc_port) in
-        (private_server, private_node))
+        (private_server, private_rpc_port))
       private_info
   in
   let private_server = Option.map fst private_info in
@@ -212,13 +211,19 @@ let start_server
       in
       let*! () =
         Option.iter_s
-          (fun (private_server, private_node) ->
-            RPC_server.launch
-              ~max_active_connections
-              ~host:Ipaddr.V4.(to_string localhost)
-              private_server
-              ~callback:(callback_log private_server)
-              private_node)
+          (fun (private_server, private_rpc_port) ->
+            let host = Ipaddr.V4.(to_string localhost) in
+            let*! () =
+              RPC_server.launch
+                ~max_active_connections
+                ~host
+                private_server
+                ~callback:(callback_log private_server)
+                (`TCP (`Port private_rpc_port))
+            in
+            Events.private_server_is_ready
+              ~rpc_addr:host
+              ~rpc_port:private_rpc_port)
           private_info
       in
       let*! () = Events.is_ready ~rpc_addr ~rpc_port in

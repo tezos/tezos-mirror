@@ -36,6 +36,15 @@ let event_is_ready =
     ("addr", Data_encoding.string)
     ("port", Data_encoding.uint16)
 
+let event_private_server_is_ready =
+  declare_2
+    ~section
+    ~name:"private_server_is_ready"
+    ~msg:"the EVM node private RPC server is listening to {addr}:{port}"
+    ~level:Notice
+    ("addr", Data_encoding.string)
+    ("port", Data_encoding.uint16)
+
 let event_shutdown_node =
   Internal_event.Simple.declare_1
     ~section
@@ -68,6 +77,9 @@ let received_upgrade payload = emit received_upgrade payload
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
 let is_ready ~rpc_addr ~rpc_port = emit event_is_ready (rpc_addr, rpc_port)
+
+let private_server_is_ready ~rpc_addr ~rpc_port =
+  emit event_private_server_is_ready (rpc_addr, rpc_port)
 
 let shutdown_rpc_server ~private_ =
   emit (event_shutdown_rpc_server ~private_) ()

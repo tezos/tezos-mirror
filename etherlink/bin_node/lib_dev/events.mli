@@ -23,6 +23,10 @@ val ignored_kernel_arg : unit -> unit Lwt.t
     ready and listens to [rpc_addr]:[rpc_port]. *)
 val is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
 
+(** [private_server_is_ready ~rpc_addr ~rpc_port] advertises that the
+    private rpc server is ready and listens to [rpc_addr]:[rpc_port]. *)
+val private_server_is_ready : rpc_addr:string -> rpc_port:int -> unit Lwt.t
+
 (** [shutdown_rpc_server ~private_ ()] advertises that the RPC server
     was shut down, [private_] tells whether it is the private server
     or not. *)
