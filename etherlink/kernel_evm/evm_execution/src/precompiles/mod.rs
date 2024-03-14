@@ -11,9 +11,10 @@
 //! provided by SputnikVM, as we require the Host type and object
 //! for writing to the log.
 
-use std::{cmp::min, str::FromStr, vec};
+use std::{str::FromStr, vec};
 
 mod blake2;
+mod ecdsa;
 mod hash;
 mod modexp;
 mod zero_knowledge;
@@ -23,14 +24,12 @@ use crate::handler::EvmHandler;
 use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use blake2::blake2f_precompile;
+use ecdsa::ecrecover_precompile;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
 use hash::{ripemd160_precompile, sha256_precompile};
 use host::runtime::Runtime;
-use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use modexp::modexp_precompile;
 use primitive_types::{H160, U256};
-use sha2::Digest;
-use sha3::Keccak256;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
@@ -157,108 +156,6 @@ macro_rules! fail_if_too_much {
             $estimated_ticks
         }
     };
-}
-
-fn erec_output_for_wrong_input() -> PrecompileOutcome {
-    PrecompileOutcome {
-        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output: vec![],
-        withdrawals: vec![],
-        estimated_ticks: 0,
-    }
-}
-
-macro_rules! unwrap_ecrecover {
-    ($expr : expr) => {
-        match $expr {
-            Ok(x) => x,
-            Err(_) => return Ok(erec_output_for_wrong_input()),
-        }
-    };
-}
-
-fn erec_parse_inputs(input: &[u8]) -> ([u8; 32], [u8; 32], [u8; 64]) {
-    // input is padded with 0 on the right
-    let mut clean_input: [u8; 128] = [0; 128];
-    // and truncated if too large
-    let input_size = min(128, input.len());
-    clean_input[..input_size].copy_from_slice(&input[..input_size]);
-
-    // extract values
-    let mut hash = [0; 32];
-    let mut v_array = [0; 32];
-    let mut rs_array = [0; 64];
-    hash.copy_from_slice(&clean_input[0..32]);
-    v_array.copy_from_slice(&clean_input[32..64]);
-    rs_array.copy_from_slice(&clean_input[64..128]);
-    (hash, v_array, rs_array)
-}
-
-// implementation of 0x01 ECDSA recover
-fn ecrecover_precompile<Host: Runtime>(
-    handler: &mut EvmHandler<Host>,
-    input: &[u8],
-    _context: &Context,
-    _is_static: bool,
-    _transfer: Option<Transfer>,
-) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Debug, "Calling ecrecover precompile");
-
-    // check that enough resources to execute (gas / ticks) are available
-    let estimated_ticks = fail_if_too_much!(tick_model::ticks_of_ecrecover(), handler);
-    let cost = 3000;
-    if let Err(err) = handler.record_cost(cost) {
-        log!(
-            handler.borrow_host(),
-            Info,
-            "Couldn't record the cost of ecrecover {:?}",
-            err
-        );
-        return Ok(PrecompileOutcome {
-            exit_status: ExitReason::Error(err),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks,
-        });
-    }
-
-    log!(
-        handler.borrow_host(),
-        Debug,
-        "Input is {:?}",
-        hex::encode(input)
-    );
-
-    // parse inputs
-    let (hash, v_array, rs_array) = erec_parse_inputs(input);
-    let v_raw = v_array[31];
-
-    if !(v_array[0..31] == [0u8; 31] && matches!(v_raw, 27 | 28)) {
-        return Ok(erec_output_for_wrong_input());
-    }
-
-    // `parse_standard` will check for potential overflows
-    let sig = unwrap_ecrecover!(Signature::parse_standard(&rs_array));
-    let ri = unwrap_ecrecover!(RecoveryId::parse(v_raw - 27));
-
-    // check signature
-    let pubk = unwrap_ecrecover!(recover(&Message::parse(&hash), &sig, &ri));
-    let mut hash = Keccak256::digest(&pubk.serialize()[1..]);
-    hash[..12].fill(0);
-
-    log!(
-        handler.borrow_host(),
-        Debug,
-        "Output is {:?}",
-        hex::encode(hash)
-    );
-
-    Ok(PrecompileOutcome {
-        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output: hash.to_vec(),
-        withdrawals: vec![],
-        estimated_ticks,
-    })
 }
 
 // implementation of 0x02 precompiled (identity)
@@ -479,6 +376,7 @@ mod tests {
     use crate::EthereumAccountStorage;
     use evm::Config;
     use primitive_types::{H160, U256};
+    use tests::ecdsa::erec_parse_inputs;
     use tezos_ethereum::block::BlockConstants;
     use tezos_ethereum::block::BlockFees;
     use tezos_smart_rollup_encoding::contract::Contract;
