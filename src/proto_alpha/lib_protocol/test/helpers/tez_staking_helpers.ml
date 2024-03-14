@@ -272,9 +272,11 @@ module Frozen_tez = struct
       rewarded_amount
       Tez.pp
       burnt_amount ;
-    let a = sub_tez_from_all_current burnt_amount a in
-    let a = sub_tez_from_all_current rewarded_amount a in
-    (a, burnt_amount, rewarded_amount)
+    if total_current > Tez.zero then
+      let a = sub_tez_from_all_current burnt_amount a in
+      let a = sub_tez_from_all_current rewarded_amount a in
+      (a, burnt_amount, rewarded_amount)
+    else (a, Tez.zero, Tez.zero)
 end
 
 (** Representation of Unstaked frozen deposits *)
