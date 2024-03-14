@@ -365,4 +365,12 @@ export class Simulator {
       bonus_committee_size,
     );
   }
+
+  attestation_reward_per_slot(cycle) {
+    return this.#reward_from_constants(
+      cycle,
+      this.config.proto.attestation_rewards,
+      this.config.proto.consensus_committee_size,
+    );
+  }
 }
