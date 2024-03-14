@@ -419,6 +419,43 @@ let jobs pipeline_type =
           ]
       |> enable_kernels |> enable_sccache |> job_external_split
     in
+    (* Fetch records for Tezt generated on the last merge request pipeline
+       on the most recently merged MR and makes them available in artifacts
+       for future merge request pipelines. *)
+    let _job_tezt_fetch_records : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.tezt:fetch-records"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.build
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ~rules:(make_rules ~changes:changeset_octez ())
+        [
+          "dune exec scripts/ci/update_records/update.exe -- --log-file \
+           tezt-fetch-records.log --from \
+           last-successful-schedule-extended-test --info";
+        ]
+        ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
+          (* Allow failure of this job, since Tezt can use the records
+             stored in the repo as backup for balancing. *)
+        ~allow_failure:Yes
+        ~artifacts:
+          (artifacts
+             ~expire_in:(Hours 4)
+             ~when_:Always
+             [
+               "tezt-fetch-records.log";
+               "tezt/records/*.json";
+               (* Keep broken records for debugging *)
+               "tezt/records/*.json.broken";
+             ])
+      |> job_external_split
+    in
     (* TODO: include the jobs defined above when full pipeline is
        generated, as well as rust tool chain and client libs docker
        builds. *)

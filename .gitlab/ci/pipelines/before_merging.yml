@@ -26,7 +26,7 @@ include:
   - .gitlab/ci/jobs/build/oc.docker:arm64-test_manual.yml
   - .gitlab/ci/jobs/build/oc.build:rpm:amd64-manual.yml
   - .gitlab/ci/jobs/build/oc.build:dpkg:amd64-manual.yml
-  - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
+  - .gitlab/ci/jobs/build/oc.tezt:fetch-records-before_merging.yml
   - .gitlab/ci/jobs/build/select_tezts.yml
 
   # Stage: test
