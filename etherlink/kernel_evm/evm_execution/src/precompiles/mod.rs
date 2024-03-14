@@ -15,7 +15,7 @@ use std::{cmp::min, str::FromStr, vec};
 
 mod eip152;
 mod modexp;
-mod zk_precompiled;
+mod zero_knowledge;
 
 use crate::abi;
 use crate::handler::EvmHandler;
@@ -35,7 +35,7 @@ use sha2::{Digest, Sha256};
 use sha3::Keccak256;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
-use zk_precompiled::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
+use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 
 /// Cost of doing a withdrawal. A valid call to this precompiled contract
 /// takes almost 880000 ticks, and one gas unit takes 1000 ticks.
