@@ -402,3 +402,6 @@ export class Simulator {
       .times(100);
   }
 }
+
+export { total_frozen_stake_storage } from "./total_frozen_stake_storage";
+export { total_supply_storage } from "./total_supply_storage";
