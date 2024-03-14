@@ -388,4 +388,17 @@ export class Simulator {
       this.config.proto.vdf_tip * this.config.proto.blocks_per_commitment,
     );
   };
+
+  #current_rewards_per_minute(cycle) {
+    return this.reward_coeff(cycle).times(
+      this.config.proto.base_total_issued_per_minute,
+    );
+  }
+
+  current_yearly_rate_value(cycle) {
+    return this.#current_rewards_per_minute(cycle)
+      .divide(safe_get(this.config.chain.total_supply, cycle))
+      .times(min_per_year)
+      .times(100);
+  }
 }
