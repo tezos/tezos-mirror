@@ -144,17 +144,6 @@ pub fn call_precompile_with_gas_draining<Host: Runtime>(
     }
 }
 
-#[macro_export]
-macro_rules! fail_if_too_much {
-    ($estimated_ticks : expr, $handler: expr) => {
-        if $estimated_ticks + $handler.estimated_ticks_used > $handler.ticks_allocated {
-            return Err(EthereumError::OutOfTicks);
-        } else {
-            $estimated_ticks
-        }
-    };
-}
-
 /// Factory function for generating the precompileset that the EVM kernel uses.
 pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
     BTreeMap::from([
@@ -203,8 +192,21 @@ pub fn precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
         ),
     ])
 }
+
+#[macro_export]
+macro_rules! fail_if_too_much {
+    ($estimated_ticks : expr, $handler: expr) => {
+        if $estimated_ticks + $handler.estimated_ticks_used > $handler.ticks_allocated {
+            return Err(EthereumError::OutOfTicks);
+        } else {
+            $estimated_ticks
+        }
+    };
+}
+
 mod tick_model {
-    use super::*;
+    use crate::EthereumError;
+
     pub fn ticks_of_sha256(data_size: usize) -> Result<u64, EthereumError> {
         let size = data_size as u64;
         Ok(75_000 + 30_000 * (size.div_euclid(64)))
