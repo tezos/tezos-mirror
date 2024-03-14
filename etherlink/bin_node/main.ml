@@ -387,6 +387,14 @@ let maximum_blueprints_lag_arg =
        before trying to send its backlog again."
     Params.int
 
+let maximum_blueprints_ahead_arg =
+  Tezos_clic.default_arg
+    ~long:"maximum-blueprints-ahead"
+    ~placeholder:"AHEAD"
+    ~default:"100"
+    ~doc:"The maximum advance (in blueprints) the Sequencer accepts"
+    Params.int
+
 let maximum_blueprints_catchup_arg =
   Tezos_clic.default_arg
     ~long:"maximum-blueprints-catch-up"
@@ -676,7 +684,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args17
+    (args18
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -690,6 +698,7 @@ let sequencer_command =
        time_between_blocks_arg
        genesis_timestamp_arg
        maximum_blueprints_lag_arg
+       maximum_blueprints_ahead_arg
        maximum_blueprints_catchup_arg
        catchup_cooldown_arg
        devmode_arg
@@ -716,6 +725,7 @@ let sequencer_command =
            time_between_blocks,
            genesis_timestamp,
            max_blueprints_lag,
+           max_blueprints_ahead,
            max_blueprints_catchup,
            catchup_cooldown,
            devmode,
@@ -777,6 +787,7 @@ let sequencer_command =
           ~data_dir
           ~rollup_node_endpoint
           ~max_blueprints_lag
+          ~max_blueprints_ahead
           ~max_blueprints_catchup
           ~catchup_cooldown
           ?genesis_timestamp
