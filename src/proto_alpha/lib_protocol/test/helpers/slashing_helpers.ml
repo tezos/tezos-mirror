@@ -247,6 +247,14 @@ let apply_all_slashes_at_cycle_end current_cycle (block_before_slash : Block.t)
   let to_slash_later, to_slash_now =
     State_ai_flags.Delayed_slashing.partition_slashes state current_cycle
   in
+  (* Sort to_slash_now by level+round *)
+  let to_slash_now =
+    List.sort
+      (fun (_, item1) (_, item2) ->
+        Denunciations_repr.compare_item_except_hash item1 item2)
+      to_slash_now
+  in
+
   let* state, total_burnt =
     List.fold_left_es
       (fun (acc_state, acc_total) x ->
