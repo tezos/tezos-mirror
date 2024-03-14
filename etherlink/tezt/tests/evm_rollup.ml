@@ -2678,19 +2678,36 @@ let test_rpc_getTransactionByHash =
   register_both
     ~tags:["evm"; "rpc"; "get_transaction_by"; "transaction_by_hash"]
     ~title:"RPC method eth_getTransactionByHash"
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~da_fee_per_byte:(Wei.of_eth_string "0.000004")
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; client; _} = evm_setup in
-  let raw_tx =
-    "0xf86c80825208831e8480940000000000000000000000000000000000000000888ac7230489e8000080820a96a038294f867266c767aee6c3b54a0c444368fb8d5e90353219bce1da78de16aea4a018a7d3c58ddb1f6b33bad5dde106843acfbd6467e5df181d22270229dcfdf601"
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  let value = Wei.one_eth in
+  let estimateGas =
+    [
+      ("from", `String sender.address);
+      ("to", `String receiver.address);
+      ("value", `String (Wei.to_string value));
+    ]
   in
-  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx evm_node in
-  let* _ =
-    wait_for_application
-      ~evm_node
-      ~sc_rollup_node
-      ~client
-      (wait_for_transaction_receipt ~evm_node ~transaction_hash)
+  let*@ expected_gas = Rpc.estimate_gas estimateGas evm_node in
+  let submitted_gas = Int64.mul expected_gas 2L in
+  let* expected_gas_price =
+    Rpc.get_gas_price evm_node |> Lwt.map Int64.of_int32
+  in
+  let submitted_gas_price = Int64.mul expected_gas_price 2L in
+  let send =
+    Eth_cli.transaction_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~to_public_key:receiver.Eth_account.address
+      ~value
+      ~endpoint:(Evm_node.endpoint evm_node)
+      ~gas_price:(Wei.to_wei_z (Z.of_int64 submitted_gas_price))
+      ~gas_limit:(Z.of_int64 submitted_gas)
+  in
+  let* transaction_hash =
+    wait_for_application ~evm_node ~sc_rollup_node ~client send
   in
   let*@ transaction_object =
     Rpc.get_transaction_by_hash ~transaction_hash evm_node
@@ -2698,6 +2715,12 @@ let test_rpc_getTransactionByHash =
   Check.(
     ((transaction_object.hash = transaction_hash) string)
       ~error_msg:"Incorrect transaction hash, should be %R, but got %L.") ;
+  Check.(
+    ((transaction_object.gas = submitted_gas) int64)
+      ~error_msg:"Incorrect gas on transaction, should be %R, but got %L.") ;
+  Check.(
+    ((transaction_object.gasPrice = submitted_gas_price) int64)
+      ~error_msg:"Incorrect gasPrice on transaction, should be %R, but got %L.") ;
   unit
 
 let test_rpc_getTransactionByBlockHashAndIndex =

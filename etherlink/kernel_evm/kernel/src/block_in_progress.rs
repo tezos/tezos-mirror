@@ -248,7 +248,10 @@ impl BlockInProgress {
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
         // account for gas
-        self.add_gas(object_info.gas_used)?;
+        let Some(gas_used) = receipt_info.execution_outcome.as_ref().map(|eo| eo.gas_used) else {
+            anyhow::bail!("No execution outcome on valid transaction 0x{}", hex::encode(transaction.tx_hash));
+        };
+        self.add_gas(gas_used.into())?;
 
         // account for transaction ticks
         self.add_ticks(tick_model::ticks_of_valid_transaction(
@@ -410,7 +413,7 @@ impl BlockInProgress {
         TransactionObject {
             block_number: self.number,
             from: object_info.from,
-            gas_used: object_info.gas_used,
+            gas_used: object_info.gas,
             gas_price: object_info.gas_price,
             hash: object_info.hash,
             input: object_info.input,
