@@ -10,7 +10,7 @@ verbose: # Regenerate GitLab CI configuration with verbose output.
 inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
 	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info
 
-.PHONY: verbose
+.PHONY: remove-extra-files
 remove-extra-files: # Regenerate GitLab CI configuration and remove any non-generated files.
 	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
 
