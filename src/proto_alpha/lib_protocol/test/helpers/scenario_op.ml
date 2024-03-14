@@ -377,20 +377,15 @@ let update_state_denunciation (block, state)
       Cycle.(
         add ds_cycle Protocol.Constants_repr.max_slashing_period
         <= inclusion_cycle)
-    then
+    then (
       (* The denunciation is too late and gets refused. *)
-      return (state, denounced)
-    else if get_pending_slashed_pct_for_delegate (block, state) culprit >= 100
-    then
-      (* Culprit has been slashed too much, a denunciation is not added to the list.
-         TODO: is the double signing treated as included, or can it be included in the
-         following cycle? *)
-      return (state, denounced)
+      Log.info ~color:event_color "Denunciation too late" ;
+      return (state, denounced))
     else
       (* for simplicity's sake (lol), the block producer and the payload producer are the same
          We also assume that the current state baking policy will be used for the next block *)
       let* rewarded, _, _, _ =
-        Block.get_next_baker ?policy:state.baking_policy block
+        Block.get_next_baker ?policy:state.State.baking_policy block
       in
       let culprit_name, culprit_account =
         State.find_account_from_pkh culprit state
