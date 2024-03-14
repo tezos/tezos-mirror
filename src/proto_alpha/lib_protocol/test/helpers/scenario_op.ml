@@ -222,51 +222,99 @@ let op_double_baking ?(correct_order = true) bh1 bh2 ctxt =
   let bh1, bh2 = order_block_hashes ~correct_order bh1 bh2 in
   Op.double_baking ctxt bh1 bh2
 
-let double_bake_ delegate_name (block, state) =
+(** [double_bake_op delegate_names (block, state)] performs a double baking with
+    the given delegate names. The first delegate in the list bakes the new main
+    branch. All delegates (including the first) will bake two other blocks at
+    the same level/different round.  *)
+let double_bake_op delegate_names (block, state) =
   let open Lwt_result_syntax in
-  Log.info ~color:event_color "Double baking with %s" delegate_name ;
-  let delegate = State.find_account delegate_name state in
-  let* operation =
-    Adaptive_issuance_helpers.unstake (B block) delegate.contract Tez.one_mutez
+  Log.info
+    ~color:event_color
+    "Double baking with (%s)"
+    (String.concat ", " delegate_names) ;
+  let delegates =
+    List.map
+      (fun delegate_name -> State.find_account delegate_name state)
+      delegate_names
   in
-  let* forked_block =
-    Block.bake ~policy:(By_account delegate.pkh) ~operation block
+  let* main_branch, state =
+    bake
+      ~baker:(WithExceptions.Option.get ~loc:__LOC__ @@ List.hd delegate_names)
+      (block, state)
   in
-  (* includes pending operations *)
-  let* main_branch, state = bake ~baker:delegate_name (block, state) in
-  let evidence = op_double_baking main_branch.header forked_block.header in
-  let*? misbehaviour =
-    Slashing_helpers.Misbehaviour_repr.from_duplicate_block main_branch
-  in
-  let dss =
-    {State.culprit = delegate.pkh; denounced = false; evidence; misbehaviour}
-  in
-  let state =
-    {state with double_signings = dss :: state.State.double_signings}
+  let* state =
+    List.fold_left_es
+      (fun state delegate ->
+        let* operation =
+          Adaptive_issuance_helpers.unstake
+            (B block)
+            delegate.contract
+            Tez.one_mutez
+        in
+        let* forked_block1 =
+          Block.bake ~policy:(By_account delegate.pkh) block
+        in
+        let* forked_block2 =
+          Block.bake ~policy:(By_account delegate.pkh) ~operation block
+        in
+        (* includes pending operations *)
+        let evidence =
+          op_double_baking forked_block1.header forked_block2.header
+        in
+        let*? misbehaviour =
+          Slashing_helpers.Misbehaviour_repr.from_duplicate_block forked_block1
+        in
+        let dss =
+          {
+            State.culprit = delegate.pkh;
+            denounced = false;
+            evidence;
+            misbehaviour;
+          }
+        in
+        return
+          {
+            state with
+            State.double_signings = dss :: state.State.double_signings;
+          })
+      state
+      delegates
   in
   return (main_branch, state)
 
 (* Note: advances one block *)
 let double_bake delegate_name : (t, t) scenarios =
-  exec (double_bake_ delegate_name)
+  exec (double_bake_op [delegate_name])
 
-(* [other_bakers] can be used to force using specific bakers to avoid
-   reusing forbidden ones *)
-let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_name
+let double_bake_many delegate_names : (t, t) scenarios =
+  exec (double_bake_op delegate_names)
+
+(** [double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_names
+  (block, state)] performs a double (pre)attestation with the given delegate
+  names. Starting at block level `n`, it creates two 2-block branches and all
+  delegates will (pre)attest the two blocks at level `n+2`. [other_bakers] can
+  be used to force using specific bakers to avoid reusing forbidden ones *)
+let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_names
     (block, state) =
   let open Lwt_result_syntax in
   Log.info
     ~color:event_color
-    "Double %s with %s"
+    "Double %s with %a"
     (match kind with
     | Protocol.Misbehaviour_repr.Double_preattesting -> "preattesting"
     | Double_attesting -> "attesting"
     | Double_baking -> assert false)
-    delegate_name ;
-  let delegate = State.find_account delegate_name state in
+    (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string)
+    delegate_names ;
+  let delegates =
+    List.map
+      (fun delegate_name -> State.find_account delegate_name state)
+      delegate_names
+  in
   let* baker, _, _, _ =
     Block.get_next_baker ?policy:state.baking_policy block
   in
+  Log.info "Baker: %a" Signature.Public_key_hash.pp baker ;
   let* other_baker1, other_baker2 =
     match other_bakers with
     | Some (ob1, ob2) ->
@@ -280,28 +328,36 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_name
       other_baker2
     else other_baker1
   in
+  Log.info "Other baker: %a" Signature.Public_key_hash.pp other_baker ;
+  Log.info "Bake 1 block with %a" Signature.Public_key_hash.pp baker ;
   let* forked_block = Block.bake ~policy:(By_account other_baker) block in
+  Log.info "Bake 1 block " ;
   let* forked_block = Block.bake ?policy:state.baking_policy forked_block in
+  Log.info "Baked two blocks" ;
   (* includes pending operations *)
   let* block, state = bake (block, state) in
   let* main_branch, state = bake (block, state) in
-  let* attestation_a = op ~delegate:delegate.pkh forked_block in
-  let* attestation_b = op ~delegate:delegate.pkh main_branch in
-  let evidence = op_evidence attestation_a attestation_b in
-  let dss =
-    {
-      State.culprit = delegate.pkh;
-      denounced = false;
-      evidence;
-      misbehaviour =
-        Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
-          attestation_a;
-    }
-  in
-  let state =
-    {state with double_signings = dss :: state.State.double_signings}
-  in
-  return (main_branch, state)
+  List.fold_left_es
+    (fun (main_branch, state) delegate ->
+      let* attestation_a = op ~delegate:delegate.pkh forked_block in
+      let* attestation_b = op ~delegate:delegate.pkh main_branch in
+      let evidence = op_evidence attestation_a attestation_b in
+      let dss =
+        {
+          State.culprit = delegate.pkh;
+          denounced = false;
+          evidence;
+          misbehaviour =
+            Slashing_helpers.Misbehaviour_repr.from_duplicate_operation
+              attestation_a;
+        }
+      in
+      let state : State.t =
+        {state with double_signings = dss :: state.State.double_signings}
+      in
+      return (main_branch, state))
+    (main_branch, state)
+    delegates
 
 let double_attest_ =
   double_attest_op
@@ -310,8 +366,11 @@ let double_attest_ =
     ~kind:Double_attesting
 
 (* Note: advances two blocks *)
+let double_attest_many ?other_bakers delegate_names : (t, t) scenarios =
+  exec (double_attest_ ?other_bakers delegate_names)
+
 let double_attest ?other_bakers delegate_name : (t, t) scenarios =
-  exec (double_attest_ ?other_bakers delegate_name)
+  double_attest_many ?other_bakers [delegate_name]
 
 let double_preattest_ =
   double_attest_op
@@ -320,8 +379,11 @@ let double_preattest_ =
     ~kind:Double_preattesting
 
 (* Note: advances two blocks *)
+let double_preattest_many ?other_bakers delegate_names : (t, t) scenarios =
+  exec (double_preattest_ ?other_bakers delegate_names)
+
 let double_preattest ?other_bakers delegate_name : (t, t) scenarios =
-  exec (double_preattest_ ?other_bakers delegate_name)
+  double_preattest_many ?other_bakers [delegate_name]
 
 let cycle_from_level blocks_per_cycle level =
   let current_cycle = Int32.div level blocks_per_cycle in
@@ -423,8 +485,12 @@ let update_state_denunciation (block, state)
       in
       return (state, true)
 
-let make_denunciations_ ?(filter = fun {State.denounced; _} -> not denounced)
-    (block, state) =
+(** [make_denunciations_op ?single ?rev ?filter ()] denounces all double signers
+  in the state. If [single] is set, only one denunciation is made. If [rev] is
+  set, the denunciations are made in reverse order. If [filter] is set, only the
+  double signers for which the filter returns true are denounced. *)
+let make_denunciations_op ?(single = false) ?(rev = false)
+    ?(filter = fun {State.denounced; _} -> not denounced) (block, state) =
   let open Lwt_result_syntax in
   let* () = check_pending_slashings ~loc:__LOC__ (block, state) in
   let make_op state ({State.evidence; _} as dss) =
@@ -436,22 +502,43 @@ let make_denunciations_ ?(filter = fun {State.denounced; _} -> not denounced)
   let rec make_op_list dss_list state r_op r_dss =
     match dss_list with
     | d :: t -> (
+        let open State in
         let* new_op = make_op state d in
         match new_op with
         | None -> make_op_list t state r_op (d :: r_dss)
         | Some (op, p_dss, new_state) ->
-            make_op_list t new_state (op :: r_op) (p_dss :: r_dss))
-    | [] -> return @@ (state, List.rev r_op, List.rev r_dss)
+            Log.info
+              ~color:event_color
+              "Denouncing %a for %s at level %a round %a"
+              Signature.Public_key_hash.pp
+              d.culprit
+              (match d.misbehaviour.kind with
+              | Double_baking -> "double baking"
+              | Double_attesting -> "double attesting"
+              | Double_preattesting -> "double preattesting")
+              Protocol.Raw_level_repr.pp
+              d.misbehaviour.level
+              Protocol.Round_repr.pp
+              d.misbehaviour.round ;
+            if single then
+              return @@ (new_state, op :: r_op, List.rev @@ (p_dss :: t))
+            else make_op_list t new_state (op :: r_op) (p_dss :: r_dss))
+    | [] -> return @@ (state, r_op, r_dss)
   in
   let* state, operations, double_signings =
-    make_op_list state.double_signings state [] []
+    make_op_list
+      (if rev then state.double_signings else List.rev state.double_signings)
+      state
+      []
+      []
   in
   let state = {state with double_signings} in
   return (state, operations)
 
 (* Important note: do not change the baking policy behaviour once denunciations are made,
    until the operations are included in a block (by default the next block) *)
-let make_denunciations ?filter () = exec_op (make_denunciations_ ?filter)
+let make_denunciations ?single ?rev ?filter () =
+  exec_op (make_denunciations_op ?single ?rev ?filter)
 
 (** Create an account and give an initial balance funded by [funder] *)
 let add_account_with_funds name ~funder amount =

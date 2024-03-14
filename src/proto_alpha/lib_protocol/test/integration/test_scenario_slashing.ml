@@ -39,6 +39,85 @@ open Scenario_constants
 
 let fs = Format.asprintf
 
+(** Test multiple misbehaviors
+    - Test a single delegate misbehaving multiple times
+    - Test multiple delegates misbehaving
+    - Test multiple delegates misbehaving multiple times
+    - Test denunciation at once or in a staggered way
+    - Test denunciation in chronological order or reverse order
+    - Spread misbehaviors/denunciations over multiple cycles
+    *)
+let test_multiple_misbehaviors =
+  (* Denounce all misbehaviours or 14 one by one in chronological or reverse
+     order *)
+  let make_denunciations () =
+    Tag "denounce chronologically"
+    --> log "denounce chronologically"
+    --> (Tag "all at once" --> make_denunciations ~rev:false ()
+        |+ Tag "one by one"
+           --> loop
+                 12
+                 (make_denunciations
+                    ~filter:(fun {denounced; _} -> not denounced)
+                    ~single:true
+                    ~rev:false
+                    ()))
+    |+ Tag "denounce reverse" --> log "denounce reverse"
+       --> (Tag "all at once" --> make_denunciations ~rev:true ()
+           |+ Tag "one by one"
+              --> loop
+                    12
+                    (make_denunciations
+                       ~filter:(fun {denounced; _} -> not denounced)
+                       ~single:true
+                       ~rev:true
+                       ()))
+  in
+  (* Misbehaviors scenarios *)
+  let misbehave i delegate1 delegate2 =
+    (Tag "single delegate"
+     (* A single delegate misbehaves several times before being denunced *)
+     --> loop
+           i
+           (double_attest delegate1 --> double_preattest delegate1
+          --> double_bake delegate1 --> double_attest delegate1
+          --> double_preattest delegate1)
+     --> exclude_bakers [delegate1]
+    |+ Tag "multiple delegates"
+       (* Two delegates double bake sequentially *)
+       --> loop
+             i
+             (loop
+                3
+                (double_bake delegate1 --> double_bake delegate2 --> next_block))
+       --> exclude_bakers [delegate1; delegate2]
+    |+ Tag "double misbehaviors"
+       (* Two delegates misbehave in parallel for multiple levels *)
+       --> loop
+             i
+             (double_attest_many [delegate1; delegate2]
+             --> double_attest_many [delegate1; delegate2]
+             --> double_preattest_many [delegate1; delegate2]
+             --> double_bake_many [delegate1; delegate2])
+       --> exclude_bakers [delegate1; delegate2])
+    --> make_denunciations ()
+  in
+  init_constants ~blocks_per_cycle:24l ~reward_per_block:0L ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> (Tag "No AI" --> activate_ai `No |+ Tag "Yes AI" --> activate_ai `Force)
+  --> branch_flag S.Adaptive_issuance.ns_enable
+  --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"; "bootstrap3"]
+  --> next_cycle
+  --> (* various make misbehaviors spread over 1 or two cycles *)
+  List.fold_left
+    (fun acc i ->
+      acc
+      |+ Tag (string_of_int i ^ " misbehavior loops")
+         --> misbehave i "delegate" "bootstrap1"
+         --> next_cycle)
+    Empty
+    [1; 3]
+
 let check_is_forbidden baker = assert_failure (next_block_with_baker baker)
 
 let check_is_not_forbidden baker =
