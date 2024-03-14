@@ -595,12 +595,15 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
     not
       ((remove_extra_files || String_set.is_empty error_not_generated)
       && String_set.is_empty error_generated_and_excluded)
-  then
+  then (
     Cli.error
       "Please modify ci/bin/main.ml to either generate the above file(s)\n\
-       or declare them in the 'exclude' function (but not both).\n\
-       If this file is a leftover from some previous work on the CI\n\
-       system then simply remove with 'make -C ci remove-extra-files' or with:\n\n\
-      \  rm %s"
-      (error_not_generated |> String_set.elements |> String.concat " ") ;
+       or declare them in the 'exclude' function (but not both)." ;
+    if not (remove_extra_files || String_set.is_empty error_not_generated) then
+      Cli.error
+        "If this file is a leftover from some previous work on the CI\n\
+         system then simply remove with 'make -C ci remove-extra-files' or \
+         with:\n\n\
+        \  rm %s"
+        (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
