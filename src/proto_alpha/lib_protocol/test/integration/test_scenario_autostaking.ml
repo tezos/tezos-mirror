@@ -155,32 +155,78 @@ let test_overdelegation =
         "delegator_to_fund"
         ~funder:"delegate"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
-  (* Delegate has 200k staked and 200k liquid *)
+  (* Delegate has 200k = 5% * 4M staked and 200k liquid *)
+  --> check_balance_fields
+        "delegate"
+        ~liquid:(Tez.of_mutez 200_000_000_000L)
+        ~staked:(Tez.of_mutez 200_000_000_000L)
+        ()
   --> set_delegate "delegator_to_fund" (Some "delegate")
       (* Delegate stake will not change at the end of cycle: same stake *)
   --> next_cycle
-  --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
+  --> check_balance_fields
+        "delegate"
+        ~liquid:(Tez.of_mutez 200_000_000_000L)
+        ~staked:(Tez.of_mutez 200_000_000_000L)
+        ()
   --> transfer
         "faucet1"
         "delegator_to_fund"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
-      (* Delegate is not overdelegated, but will need to freeze 180k *)
+      (* Delegate is not overdelegated, but will need to freeze 180k = 5% * 3.6M *)
   --> next_cycle
-  --> check_balance_field "delegate" `Staked (Tez.of_mutez 380_000_000_000L)
+  --> check_balance_fields
+        "delegate"
+        ~liquid:(Tez.of_mutez 20_000_000_000L)
+        ~staked:(Tez.of_mutez 380_000_000_000L)
+        ()
   --> transfer
         "faucet2"
         "delegator_to_fund"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
       (* Delegate is now overdelegated, it will freeze 100% *)
   --> next_cycle
-  --> check_balance_field "delegate" `Staked (Tez.of_mutez 400_000_000_000L)
+  --> check_balance_fields
+        "delegate"
+        ~liquid:Tez.zero
+        ~staked:(Tez.of_mutez 400_000_000_000L)
+        ()
   --> transfer
         "faucet3"
         "delegator_to_fund"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
   (* Delegate is overmegadelegated *)
   --> next_cycle
-  --> check_balance_field "delegate" `Staked (Tez.of_mutez 400_000_000_000L)
+  --> check_balance_field
+        "delegator_to_fund"
+        `Liquid
+        (Tez.of_mutez 14_400_000_000_000L)
+  --> check_balance_fields
+        "delegate"
+        ~liquid:Tez.zero
+        ~staked:(Tez.of_mutez 400_000_000_000L)
+        ()
+  --> transfer
+        "delegator_to_fund"
+        "faucet1"
+        (Amount (Tez.of_mutez 7_200_000_000_000L))
+  (* Delegate is not overdelegated anymore, it will freeze 380k = 5% * 7.2M
+     and unstake 20k *)
+  --> next_cycle
+  --> check_balance_fields
+        "delegate"
+        ~liquid:Tez.zero
+        ~staked:(Tez.of_mutez 380_000_000_000L)
+        ~unstaked_frozen_total:(Tez.of_mutez 20_000_000_000L)
+        ()
+  (* Unfreezing will be done automatically in
+     (consensus_rights_delay + max_slashing_period) cycles *)
+  --> wait_n_cycles_f Test_scenario_stake.unstake_wait
+  --> check_balance_fields
+        "delegate"
+        ~liquid:(Tez.of_mutez 20_000_000_000L)
+        ~staked:(Tez.of_mutez 380_000_000_000L)
+        ()
 
 let tests =
   tests_of_scenarios
