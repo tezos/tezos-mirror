@@ -36,6 +36,7 @@
   test_scenario_rewards
   test_scenario_autostaking
   test_scenario_slashing
+  test_scenario_slashing_stakers
   test_liquidity_baking
   test_storage_functions
   test_storage
