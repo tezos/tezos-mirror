@@ -16,6 +16,7 @@ use std::{str::FromStr, vec};
 mod blake2;
 mod ecdsa;
 mod hash;
+mod identity;
 mod modexp;
 mod zero_knowledge;
 
@@ -28,6 +29,7 @@ use ecdsa::ecrecover_precompile;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
 use hash::{ripemd160_precompile, sha256_precompile};
 use host::runtime::Runtime;
+use identity::identity_precompile;
 use modexp::modexp_precompile;
 use primitive_types::{H160, U256};
 use tezos_ethereum::withdrawal::Withdrawal;
@@ -156,41 +158,6 @@ macro_rules! fail_if_too_much {
             $estimated_ticks
         }
     };
-}
-
-// implementation of 0x02 precompiled (identity)
-fn identity_precompile<Host: Runtime>(
-    handler: &mut EvmHandler<Host>,
-    input: &[u8],
-    _context: &Context,
-    _is_static: bool,
-    _transfer: Option<Transfer>,
-) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Debug, "Calling identity precompile");
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_identity(input.len())?, handler);
-
-    let size = input.len() as u64;
-    let data_word_size = (size + 31) / 32;
-    let static_gas = 15;
-    let dynamic_gas = 3 * data_word_size;
-    let cost = static_gas + dynamic_gas;
-
-    if let Err(err) = handler.record_cost(cost) {
-        return Ok(PrecompileOutcome {
-            exit_status: ExitReason::Error(err),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks,
-        });
-    }
-
-    Ok(PrecompileOutcome {
-        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output: input.to_vec(),
-        withdrawals: vec![],
-        estimated_ticks,
-    })
 }
 
 /// Implementation of Etherelink specific withdrawals precompiled contract.
