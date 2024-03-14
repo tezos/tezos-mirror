@@ -242,7 +242,7 @@ async function get_ticks(path, function_call_keyword) {
     const fileStream = fs.createReadStream(path);
     var ticks_count_for_transactions = [];
     var previous_row_is_given_function_call = false;
-
+    const regexp = new RegExp(function_call_keyword);
     const rl = readline.createInterface({
         input: fileStream,
         crlfDelay: Infinity
@@ -253,7 +253,7 @@ async function get_ticks(path, function_call_keyword) {
             tokens = l.split(" ");
             calls = tokens[0];
             ticks = tokens[1];
-            if (calls.includes(function_call_keyword)) {
+            if (regexp.test(calls)) {
                 if (previous_row_is_given_function_call) {
                     ticks_count_for_transactions[ticks_count_for_transactions.length - 1] += parseInt(ticks);
                 } else {
@@ -274,13 +274,13 @@ async function analyze_profiler_output(path) {
     let results = Object();
     results.kernel_run_ticks = await get_ticks(path, "kernel_run");
     results.run_transaction_ticks = await get_ticks(path, "run_transaction");
-    results.signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
-    results.sputnik_runtime_ticks = await get_ticks(path, "EvmHandler$LT$Host$GT$7execute");
-    results.store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
+    results.signature_verification_ticks = await get_ticks(path, "EthereumTransactionCommon.*caller");
+    results.sputnik_runtime_ticks = await get_ticks(path, "EvmHandler.*Host.*execute");
+    results.store_transaction_object_ticks = await get_ticks(path, "storage.*store_transaction_object");
     results.store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
     results.interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     results.interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
-    results.stage_one_ticks = await get_ticks(path, "stage_one");
+    results.stage_one_ticks = await get_ticks(path, "stage_one.*fetch");
     results.block_finalize = await get_ticks(path, "store_current_block");
     results.logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     results.block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
