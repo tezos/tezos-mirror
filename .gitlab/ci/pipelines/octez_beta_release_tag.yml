@@ -2,7 +2,7 @@
 # Edit file ci/bin/main.ml instead.
 
 oc.docker:rust-toolchain:
-  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
   stage: build
   tags:
   - gcp
@@ -61,7 +61,7 @@ oc.build:static-arm64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.docker:amd64:
-  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
   stage: build
   tags:
   - gcp
@@ -83,7 +83,7 @@ oc.docker:amd64:
     EXECUTABLE_FILES: script-inputs/released-executables
 
 oc.docker:arm64:
-  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
   stage: build
   tags:
   - gcp_arm64
@@ -179,7 +179,7 @@ oc.build:rpm:amd64:
     when: on_success
 
 docker:merge_manifests:
-  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
   stage: prepare_release
   tags:
   - gcp
@@ -198,7 +198,7 @@ docker:merge_manifests:
     CI_DOCKER_HUB: "true"
 
 gitlab:release:
-  image: ${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.4.0
   stage: publish_release_gitlab
   tags:
   - gcp

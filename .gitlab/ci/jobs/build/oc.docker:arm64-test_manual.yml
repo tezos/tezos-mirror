@@ -2,7 +2,7 @@
 # Edit file ci/bin/main.ml instead.
 
 oc.docker:arm64:
-  image: ${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
   stage: manual
   tags:
   - gcp_arm64
