@@ -80,7 +80,7 @@ let variables : variables =
        in GitLab namespaces `nomadic-labs` and `tezos`
        /!\ This value MUST be the same as `opam_repository_tag` in `scripts/version.sh` *)
     ("build_deps_image_version", build_deps_image_version);
-    ("build_deps_image_name", "${CI_REGISTRY}/tezos/opam-repository");
+    ("build_deps_image_name", "${GCP_REGISTRY}/tezos/opam-repository");
     ( "rust_toolchain_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "client_libs_dependencies_image_name",
@@ -171,7 +171,7 @@ module Images = struct
   let docker =
     Image.register
       ~name:"docker"
-      ~image_path:"${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.9.0"
+      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0"
 
   (* The Alpine version should be kept up to date with the version
      used for the [build_deps_image_name] images and specified in the
@@ -188,7 +188,7 @@ module Images = struct
   let ci_release =
     Image.register
       ~name:"ci_release"
-      ~image_path:"${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
+      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.4.0"
 end
 
 let before_script ?(take_ownership = false) ?(source_version = false)
