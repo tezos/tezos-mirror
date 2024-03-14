@@ -540,7 +540,40 @@ let jobs pipeline_type =
         ]
       |> job_external_split
     in
-    [job_kaitai_checks]
+    let job_kaitai_e2e_checks =
+      job
+        ~__POS__
+        ~name:"kaitai_e2e_checks"
+        ~image:Images.client_libs_dependencies
+        ~stage:Stages.test
+        ~dependencies:
+          (Dependent
+             [
+               Artifacts job_docker_client_libs_dependencies;
+               Job job_kaitai_checks;
+             ])
+        ~rules:
+          (make_rules ~changes:changeset_kaitai_e2e_files ~dependent:true ())
+        ~before_script:
+          (before_script
+             ~source_version:true
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/5026
+                  As observed for the `unit:js_components` running `npm i`
+                  everytime we run a job is inefficient.
+
+                  The benefit of this approach is that we specify node version
+                  and npm dependencies (package.json) in one place, and that the local
+                  environment is then the same as CI environment. *)
+             ~install_js_deps:true
+             [])
+        [
+          "./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh \
+           client-libs/kaitai-struct-files/files \
+           client-libs/kaitai-struct-files/input 2>/dev/null";
+        ]
+      |> job_external_split
+    in
+    [job_kaitai_checks; job_kaitai_e2e_checks]
   in
   let doc = [] in
   let manual =

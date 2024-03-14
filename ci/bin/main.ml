@@ -185,7 +185,6 @@ let () =
     | ".gitlab/ci/jobs/test/commit_titles.yml"
     | ".gitlab/ci/jobs/test/common.yml"
     | ".gitlab/ci/jobs/test/install_octez.yml"
-    | ".gitlab/ci/jobs/test/kaitai_e2e_checks.yml"
     | ".gitlab/ci/jobs/test/misc_opam_checks.yml"
     | ".gitlab/ci/jobs/test/oc.check_lift_limits_patch.yml"
     | ".gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml"
