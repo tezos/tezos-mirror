@@ -2204,6 +2204,12 @@ let _octez_version_get_git_info =
     ~modules:["get_git_info"]
     ~bisect_ppx:No
 
+let octez_print_version =
+  public_lib
+    "octez-version.print"
+    ~path:"src/lib_version/print"
+    ~deps:[octez_version |> open_; octez_version_value |> open_]
+
 let _octez_print_version_exe =
   public_exe
     "octez-version"
@@ -2211,8 +2217,29 @@ let _octez_print_version_exe =
     ~path:"src/lib_version/exe"
     ~opam:"octez-version"
     ~deps:
-      [octez_version_value |> open_; octez_version |> open_; octez_base_unix]
+      [
+        octez_version_value |> open_;
+        octez_version |> open_;
+        octez_base_unix;
+        octez_print_version |> open_;
+      ]
     ~modules:["octez_print_version"]
+    ~bisect_ppx:No
+
+let _etherlink_print_version_exe =
+  public_exe
+    "etherlink-version"
+    ~internal_name:"etherlink_print_version"
+    ~path:"src/lib_version/exe"
+    ~opam:"octez-version"
+    ~deps:
+      [
+        octez_version_value |> open_;
+        octez_version |> open_;
+        octez_base_unix;
+        octez_print_version |> open_;
+      ]
+    ~modules:["etherlink_print_version"]
     ~bisect_ppx:No
 
 let _octez_version_tests =
@@ -2222,7 +2249,7 @@ let _octez_version_tests =
     ~opam:"octez-libs"
     ~js_compatible:true
     ~modes:[Native; JS]
-    ~deps:[octez_version |> open_; octez_version_parser; alcotezt]
+    ~deps:[octez_version |> open_; octez_version_parser]
 
 let octez_p2p_services =
   octez_lib

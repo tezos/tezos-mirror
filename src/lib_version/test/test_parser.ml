@@ -1,25 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -30,16 +13,6 @@
                   -- --file test_parser.ml
     Subject: Test versions parser
  *)
-
-module Assert = struct
-  let fail expected given msg =
-    Format.kasprintf failwith "@[%s@ expected: %s@ got: %s@]" msg expected given
-
-  let default_printer _ = ""
-
-  let equal ?(eq = ( = )) ?(prn = default_printer) ?(msg = "") x y =
-    if not (eq x y) then fail (prn x) (prn y) msg
-end
 
 let octez_legal_versions =
   [
@@ -86,6 +59,59 @@ let octez_legal_versions =
       } );
   ]
 
+let etherlink_legal_versions =
+  [
+    ( "etherlink-10.93",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Release;
+      } );
+    ( "etherlink-v10.93",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Release;
+      } );
+    ( "etherlink-10.93+dev",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Dev;
+      } );
+    ( "etherlink-10.93-rc1",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = RC 1;
+      } );
+    ( "etherlink-10.93-rc1+dev",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = RC_dev 1;
+      } );
+    ( "etherlink-10.93-beta1",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Beta 1;
+      } );
+    ( "etherlink-10.93-beta1+dev",
+      {
+        product = Etherlink;
+        Version.major = 10;
+        minor = 93;
+        additional_info = Beta_dev 1;
+      } );
+  ]
+
 let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
 
 let eq v1 v2 =
@@ -107,22 +133,37 @@ let eq v1 v2 =
       && additional_info_eq v1.additional_info v2.additional_info
   | _, _ -> false
 
-let prn = function
-  | None ->
-      Format.asprintf "%a" Tezos_version_parser.pp Tezos_version_parser.default
-  | Some v -> Format.asprintf "%a" Tezos_version_parser.pp v
-
-let test_octez_parser _ =
-  ListLabels.iter octez_legal_versions ~f:(fun (x, e) ->
-      Assert.equal
-        ~msg:(Format.asprintf "testing Octez version string: \"%s\"" x)
-        ~eq
-        ~prn
-        (Some e)
-        (parse_version x))
+let version_typ : Tezos_version_parser.t option Check.typ =
+  Check.equalable
+    (fun ppf -> function
+      | Some v -> Tezos_version_parser.pp ppf v
+      | None -> Tezos_version_parser.(pp ppf default))
+    eq
 
 let () =
-  Alcotest.run
+  Test.register
     ~__FILE__
-    "version"
-    [("parser", [("octez versions", `Quick, test_octez_parser)])]
+    ~title:"Version: Test Octez versions parser"
+    ~tags:["version"; "octez"]
+  @@ fun () ->
+  ( Fun.flip List.iter octez_legal_versions @@ fun (x, e) ->
+    Check.(
+      (Some e = parse_version x)
+        version_typ
+        ~error_msg:"Expected %L, got %R"
+        ~__LOC__) ) ;
+  unit
+
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"Version: Test Etherlink versions parser"
+    ~tags:["version"; "etherlink"]
+  @@ fun () ->
+  ( Fun.flip List.iter etherlink_legal_versions @@ fun (x, e) ->
+    Check.(
+      (Some e = parse_version x)
+        version_typ
+        ~error_msg:"Expected %L, got %R"
+        ~__LOC__) ) ;
+  unit

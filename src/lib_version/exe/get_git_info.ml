@@ -71,7 +71,7 @@ let raw_current_version = "$Format:%(describe:tags)$"
    If one commit is associated with two or more tags,
    output always the most recently added tag that match the regexp `v*`
 *)
-let git_describe =
+let git_describe product =
   let parse s =
     match parse_version s with
     | Some v -> v
@@ -84,7 +84,10 @@ let git_describe =
     (* here we use the same trick as in src/lib_version/current_git_info.ml
      * so we concatenate the two strings to avoid the subsitution *)
     if String.equal raw_current_version ("$Format" ^ ":%(describe:tags)$") then
-      query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags"
+      query
+        ~env:"GIT_VERSION"
+        ~default:"dev"
+        ("git describe --tags --match " ^ product)
     else raw_current_version
   in
   parse s
@@ -93,7 +96,14 @@ let lines =
   [
     Format.asprintf "let commit_hash = \"%s\"" hash;
     Format.asprintf "let committer_date = \"%s\"" date;
-    Format.asprintf "let git_describe = %a" Tezos_version_parser.pp git_describe;
+    Format.asprintf
+      "let git_describe_octez = %a"
+      Tezos_version_parser.pp
+      (git_describe "octez-*");
+    Format.asprintf
+      "let git_describe_etherlink = %a"
+      Tezos_version_parser.pp
+      (git_describe "etherlink-*");
   ]
 
 let () =

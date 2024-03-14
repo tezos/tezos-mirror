@@ -65,7 +65,7 @@ type additional_info = Tezos_version_parser.additional_info =
 val string_of_additional_info : additional_info -> string
 
 (** Product information. *)
-type product = Tezos_version_parser.product = Octez
+type product = Tezos_version_parser.product = Octez | Etherlink
 
 (** Convert the product information to a string. *)
 val string_of_product : product -> string
@@ -93,6 +93,13 @@ type t = Tezos_version_parser.t = {
     - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"]
     - [to_string { major = 7; minor = 0; additional_info = RC_dev 1 } = "7.0~rc1+dev"] *)
 val to_string : t -> string
+
+(** [to_json version commit_hash] json representation of a [version] and [commit_hash] as string.
+
+    Returns, as a string, a json object with the fields:
+    - [product], [major], [minor], [info] corresponding to the given fields of [version.]
+    - [hash], containing [commit_hash]. *)
+val to_json : t -> string -> string
 
 (** Version printer.
 

@@ -27,10 +27,11 @@
     | RC_dev of int
     | Release [@@deriving show]
 
-  type product = Octez
+  type product = Octez | Etherlink
 
   let pp_product ppf = function
   | Octez -> Format.fprintf ppf "Octez"
+  | Etherlink -> Format.fprintf ppf "Etherlink"
 
   type t = {
     product: product;
@@ -46,9 +47,16 @@
 let num = ['0'-'9']+
 
 rule version_tag = parse
-  | "octez-" 'v'? (num as major) '.' (num as minor) ".0"?
-      { Some {
-        product = Octez;
+  | ("octez" | "etherlink" as product) "-" 'v'? (num as major) '.' (num as minor) ".0"?
+      {
+        let product = match product with 
+          | "etherlink" -> Etherlink
+          | "octez" -> Octez
+          | _ -> (* this case cannot happen, see pattern above *)  
+                 assert false
+        in
+        Some {
+        product;
         major = int major;
         minor = int minor;
         additional_info = extra lexbuf }
