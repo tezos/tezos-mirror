@@ -390,8 +390,9 @@ end = struct
 
   (* The 'n'th byte of the bitset indicates whether a value is stored or not. *)
   let key_exists handle index =
-    if handle.bitset.{index} = '\000' then `Not_found
-    else if handle.bitset.{index} = '\001' then `Found
+    let bit = handle.bitset.{index} in
+    if bit = '\000' then `Not_found
+    else if bit = '\001' then `Found
     else `Corrupted
 
   (* This computation relies on the fact that the size of all the
