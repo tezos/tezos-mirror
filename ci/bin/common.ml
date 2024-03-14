@@ -151,6 +151,9 @@ module Images = struct
     Image.register
       ~name:"ci_release"
       ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.4.0"
+
+  let hadolint =
+    Image.register ~name:"hadolint" ~image_path:"hadolint/hadolint:2.9.3-debian"
 end
 
 (** {2 Helpers} *)
@@ -260,6 +263,8 @@ let changeset_octez_docker_changes_or_master =
     ".gitlab/**/*";
     ".gitlab-ci.yml";
   ]
+
+let changeset_hadolint_docker_files = ["build.Dockerfile"; "Dockerfile"]
 
 (** {2 Job makers} *)
 

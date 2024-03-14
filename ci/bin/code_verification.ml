@@ -148,6 +148,22 @@ let jobs pipeline_type =
         ]
       |> job_external_once
     in
+    let _job_docker_hadolint =
+      job
+        ~rules:(make_rules ~changes:changeset_hadolint_docker_files ())
+        ~__POS__
+        ~name:
+          (* TODO: I'm not sure it makes sense to have different names for the same job *)
+          ("docker:hadolint-"
+          ^
+          match pipeline_type with
+          | Before_merging -> "before_merging"
+          | Schedule_extended_test -> "schedule_extended_test")
+        ~image:Images.hadolint
+        ~stage:Stages.sanity
+        ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
+      |> job_external
+    in
     []
   in
   let job_docker_rust_toolchain =

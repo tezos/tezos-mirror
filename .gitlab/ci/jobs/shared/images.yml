@@ -13,6 +13,8 @@
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
 .image_template__fedora_39:
   image: fedora:39
+.image_template__hadolint:
+  image: hadolint/hadolint:2.9.3-debian
 .image_template__runtime_build_dependencies:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
 .image_template__runtime_build_test_dependencies:
