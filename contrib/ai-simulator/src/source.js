@@ -186,4 +186,45 @@ export class Simulator {
       issuance_ratio_global_max,
     );
   }
+
+  is_ai_activated(cycle) {
+    return this.config.chain.ai_activation_cycle <= cycle;
+  }
+
+  get initial_period_start_cycle() {
+    return this.config.chain.ai_activation_cycle;
+  }
+
+  get transition_period_start_cycle() {
+    return this.config.chain.ai_activation_cycle + initial_period;
+  }
+
+  get final_period_start_cycle() {
+    return (
+      this.config.chain.ai_activation_cycle + initial_period + transition_period
+    );
+  }
+
+  is_in_initial_period(cycle) {
+    const l = this.config.chain.ai_activation_cycle <= cycle;
+    const r = cycle <= initial_period + this.config.chain.ai_activation_cycle;
+    return l && r;
+  }
+
+  is_in_transition_period(cycle) {
+    const l = initial_period + this.config.chain.ai_activation_cycle < cycle;
+    const r =
+      cycle <=
+      initial_period +
+        transition_period +
+        this.config.chain.ai_activation_cycle;
+    return l && r;
+  }
+
+  is_in_final_period(cycle) {
+    return (
+      cycle >
+      initial_period + transition_period + this.config.chain.ai_activation_cycle
+    );
+  }
 }
