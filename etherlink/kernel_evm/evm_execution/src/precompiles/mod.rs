@@ -14,6 +14,7 @@
 use std::{cmp::min, str::FromStr, vec};
 
 mod blake2;
+mod hash;
 mod modexp;
 mod zero_knowledge;
 
@@ -23,12 +24,12 @@ use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
 use blake2::blake2f_precompile;
 use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
+use hash::{ripemd160_precompile, sha256_precompile};
 use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use modexp::modexp_precompile;
 use primitive_types::{H160, U256};
-use ripemd::Ripemd160;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 use sha3::Keccak256;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
@@ -290,83 +291,6 @@ fn identity_precompile<Host: Runtime>(
     Ok(PrecompileOutcome {
         exit_status: ExitReason::Succeed(ExitSucceed::Returned),
         output: input.to_vec(),
-        withdrawals: vec![],
-        estimated_ticks,
-    })
-}
-
-// implmenetation of 0x03 precompiled (sha256)
-fn sha256_precompile<Host: Runtime>(
-    handler: &mut EvmHandler<Host>,
-    input: &[u8],
-    _context: &Context,
-    _is_static: bool,
-    _transfer: Option<Transfer>,
-) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Debug, "Calling sha2-256 precompile");
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_sha256(input.len())?, handler);
-
-    let size = input.len() as u64;
-    let data_word_size = (31 + size) / 32;
-    let cost = 60 + 12 * data_word_size;
-
-    if let Err(err) = handler.record_cost(cost) {
-        return Ok(PrecompileOutcome {
-            exit_status: ExitReason::Error(err),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks,
-        });
-    }
-
-    let output = Sha256::digest(input);
-
-    Ok(PrecompileOutcome {
-        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output: output.to_vec(),
-        withdrawals: vec![],
-        estimated_ticks,
-    })
-}
-
-// implmenetation of 0x04 precompiled (ripemd160)
-fn ripemd160_precompile<Host: Runtime>(
-    handler: &mut EvmHandler<Host>,
-    input: &[u8],
-    _context: &Context,
-    _is_static: bool,
-    _transfer: Option<Transfer>,
-) -> Result<PrecompileOutcome, EthereumError> {
-    log!(
-        handler.borrow_host(),
-        Debug,
-        "Calling ripemd-160 precompile"
-    );
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_ripemd160(input.len())?, handler);
-
-    let size = input.len() as u64;
-    let data_word_size = (31 + size) / 32;
-    let cost = 600 + 120 * data_word_size;
-
-    if let Err(err) = handler.record_cost(cost) {
-        return Ok(PrecompileOutcome {
-            exit_status: ExitReason::Error(err),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks,
-        });
-    }
-
-    let hash = Ripemd160::digest(input);
-    // The 20-byte hash is returned right aligned to 32 bytes
-    let mut output = [0u8; 32];
-    output[12..].clone_from_slice(&hash);
-
-    Ok(PrecompileOutcome {
-        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output: output.to_vec(),
         withdrawals: vec![],
         estimated_ticks,
     })
