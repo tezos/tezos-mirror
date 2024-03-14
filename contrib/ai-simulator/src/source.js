@@ -283,4 +283,13 @@ export class Simulator {
     this.#storage_issuance_bonus[cycle] = new_bonus;
     return new_bonus;
   }
+
+  issuance_rate_for_next_cycle(cycle) {
+    const next_cycle = cycle + 1;
+    const ratio_min = this.minimum_ratio(next_cycle);
+    const ratio_max = this.maximum_ratio(next_cycle);
+    const static_rate = this.static_rate_for_next_cycle(cycle);
+    const bonus = this.dynamic_rate_for_next_cycle(cycle);
+    return bigRat.clip(static_rate.add(bonus), ratio_min, ratio_max);
+  }
 }
