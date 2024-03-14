@@ -156,10 +156,13 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let baker_name, {contract = baker_contract; _} =
     State.find_account_from_pkh baker state
   in
+  let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
+  assert (Protocol.Alpha_context.Cycle.(level.cycle = Block.current_cycle block)) ;
   Log.info
     ~color:time_color
-    "Baking level %d with %s"
+    "Baking level %d (cycle %ld) with %s"
     (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
+    (Protocol.Alpha_context.Cycle.to_int32 level.cycle)
     baker_name ;
   let current_cycle = Block.current_cycle block in
   let adaptive_issuance_vote =

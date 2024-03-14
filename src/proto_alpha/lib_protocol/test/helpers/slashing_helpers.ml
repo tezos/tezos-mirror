@@ -140,6 +140,12 @@ let apply_slashing_account all_denunciations_to_apply
   in
   let culprit_name = find_account_name_from_pkh_exn culprit account_map in
   let rewarded_name = find_account_name_from_pkh_exn rewarded account_map in
+  Log.info
+    "Slashing %a for %a"
+    Signature.Public_key_hash.pp
+    culprit
+    Misbehaviour_repr.pp
+    misbehaviour ;
   let* slashed_pct =
     match misbehaviour.kind with
     | Double_baking ->
@@ -156,15 +162,25 @@ let apply_slashing_account all_denunciations_to_apply
   in
   let slash_culprit
       ({frozen_deposits; unstaked_frozen; frozen_rights; _} as acc) =
+    Log.info
+      "Slashing %a for %a with frozen deposits: { %a }"
+      Signature.Public_key_hash.pp
+      acc.pkh
+      Misbehaviour_repr.pp
+      misbehaviour
+      Frozen_tez.pp
+      frozen_deposits ;
     let base_rights =
       CycleMap.find slashed_cycle frozen_rights
       |> Option.value ~default:Tez.zero
     in
+    Log.info "Base rights: %a" Tez.pp base_rights ;
     let frozen_deposits, burnt_frozen, rewarded_frozen =
       Frozen_tez.slash state.constants base_rights slashed_pct frozen_deposits
     in
     let slashed_pct_q = Protocol.Percentage.to_q slashed_pct in
     let slashed_pct = Q.(100 // 1 * slashed_pct_q |> to_int) in
+    Log.info "Slashed %d%% of frozen deposits@." slashed_pct ;
     let unstaked_frozen, slashed_unstaked =
       Unstaked_frozen.slash
         state.constants
@@ -182,6 +198,7 @@ let apply_slashing_account all_denunciations_to_apply
            fail_account_not_found "apply_slashing" culprit_name)
   in
   let slashed_culprit_account, total_slashed = slash_culprit culprit_account in
+  Log.info "Slashed %a@." Signature.Public_key_hash.pp culprit_account.pkh ;
   let account_map =
     update_account
       ~f:(fun _ -> slashed_culprit_account)
@@ -199,6 +216,7 @@ let apply_slashing_account all_denunciations_to_apply
   let total_burnt_amount =
     List.map fst total_slashed |> List.fold_left Tez.( +! ) Tez.zero
   in
+  Log.info "Total burnt amount: %a" Tez.pp total_burnt_amount ;
   return (account_map, total_burnt_amount)
 
 let apply_slashing_state all_denunciations_to_apply

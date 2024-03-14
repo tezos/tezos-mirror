@@ -56,6 +56,20 @@ module Frozen_tez = struct
     co_current : Partial_tez.t String.Map.t;
   }
 
+  let pp fmt {delegate; initial; self_current; co_current} =
+    Format.fprintf
+      fmt
+      "Delegate: %s, Initial: %a, Self_current: %a, Co_current: %a"
+      delegate
+      Tez.pp
+      initial
+      Tez.pp
+      self_current
+      (fun fmt ->
+        String.Map.iter (fun k v ->
+            Format.fprintf fmt "%s: %a, " k Partial_tez.pp v))
+      co_current
+
   let zero =
     {
       delegate = "";
@@ -228,6 +242,11 @@ module Frozen_tez = struct
     ({a with initial = Tez.(a.initial -! amount)}, amount)
 
   let slash cst base_amount (pct : Protocol.Percentage.t) a =
+    Log.info
+      "Slashing frozen tez for delegate %s with percentage %a"
+      a.delegate
+      Q.pp_print
+    @@ Protocol.Percentage.to_q pct ;
     let pct_q = Protocol.Percentage.to_q pct in
     let total_current = total_current a in
     let slashed_amount =
@@ -242,6 +261,17 @@ module Frozen_tez = struct
       Tez.mul_q slashed_amount Q.(1 // rat) |> Tez.of_q ~round:`Down
     in
     let burnt_amount = Tez.(slashed_amount -! rewarded_amount) in
+    Log.info
+      "Total current: %a, slashed amount: %a, rewarded amount: %a, burnt \
+       amount: %a"
+      Tez.pp
+      total_current
+      Tez.pp
+      slashed_amount
+      Tez.pp
+      rewarded_amount
+      Tez.pp
+      burnt_amount ;
     let a = sub_tez_from_all_current burnt_amount a in
     let a = sub_tez_from_all_current rewarded_amount a in
     (a, burnt_amount, rewarded_amount)

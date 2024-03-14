@@ -355,9 +355,10 @@ let get_pending_slashed_pct_for_delegate (block, state) delegate =
 let update_state_denunciation (block, state)
     {State.culprit; denounced; evidence = _; misbehaviour} =
   let open Lwt_result_syntax in
-  if denounced then
+  if denounced then (
     (* If the double signing has already been denounced, a second denunciation should fail *)
-    return (state, denounced)
+    Log.info ~color:event_color "Denunciation already included" ;
+    return (state, denounced))
   else
     let*? block_level = Context.get_level (B block) in
     let next_level =
@@ -368,9 +369,10 @@ let update_state_denunciation (block, state)
     in
     let ds_level = Protocol.Raw_level_repr.to_int32 misbehaviour.level in
     let ds_cycle = cycle_from_level block.constants.blocks_per_cycle ds_level in
-    if Cycle.(ds_cycle > inclusion_cycle) then
+    if Cycle.(ds_cycle > inclusion_cycle) then (
       (* The denunciation is trying to be included too early *)
-      return (state, denounced)
+      Log.info ~color:event_color "Denunciation too early" ;
+      return (state, denounced))
     else if
       Cycle.(
         add ds_cycle Protocol.Constants_repr.max_slashing_period
