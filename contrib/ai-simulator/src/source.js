@@ -373,4 +373,19 @@ export class Simulator {
       this.config.proto.consensus_committee_size,
     );
   }
+
+  seed_nonce_revelation_tip(cycle) {
+    return this.#reward_from_constants(
+      cycle,
+      this.config.proto.nonce_revelation_tip *
+        this.config.proto.blocks_per_commitment,
+    );
+  }
+
+  vdf_revelation_tip = (cycle) => {
+    return this.#reward_from_constants(
+      cycle,
+      this.config.proto.vdf_tip * this.config.proto.blocks_per_commitment,
+    );
+  };
 }
