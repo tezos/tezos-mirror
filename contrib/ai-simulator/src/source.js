@@ -227,4 +227,13 @@ export class Simulator {
       initial_period + transition_period + this.config.chain.ai_activation_cycle
     );
   }
+
+  staked_ratio_for_next_cycle(cycle) {
+    const total_supply = safe_get(this.config.chain.total_supply, cycle);
+    const total_frozen_stake = safe_get(
+      this.config.chain.total_frozen_stake,
+      cycle + this.config.proto.consensus_rights_delay + 1,
+    );
+    return bigRat(total_frozen_stake).divide(total_supply);
+  }
 }
