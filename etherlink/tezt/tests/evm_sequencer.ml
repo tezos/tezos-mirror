@@ -694,7 +694,7 @@ let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
       Some hash
     in
     let injected =
-      Evm_node.wait_for sequencer "tx_pool_transaction_injected.v0"
+      Evm_node.wait_for sequencer "block_producer_transaction_injected.v0"
       @@ fun json ->
       let hash = JSON.(json |> as_string) in
       Some hash
@@ -1014,7 +1014,7 @@ let test_upgrade_kernel_auto_sync =
     ~__FILE__
     ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
     ~title:"Rollup-node kernel upgrade is applied to the sequencer state."
-    ~uses:(fun protocol -> Constant.WASM.debug_kernel :: uses protocol)
+    ~uses
   @@ fun protocol ->
   (* Add a delay between first block and activation timestamp. *)
   let genesis_timestamp =
@@ -1041,7 +1041,7 @@ let test_upgrade_kernel_auto_sync =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.debug_kernel
+      ~upgrade_to:Constant.WASM.evm_kernel
       ~activation_timestamp
   in
 
@@ -1728,11 +1728,7 @@ let test_sequencer_upgrade =
       ()
   in
   let nb_block = 4l in
-  let* () =
-    repeat (Int32.to_int nb_block) (fun () ->
-        let*@ _ = Rpc.produce_block sequencer in
-        unit)
-  in
+  let*@? _ = Rpc.produce_block sequencer in
   let* () =
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
