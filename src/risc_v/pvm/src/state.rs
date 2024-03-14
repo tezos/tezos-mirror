@@ -5,39 +5,48 @@
 // Allow dead code while this module contains stubs.
 #![allow(dead_code)]
 
+use crate::exec_env::{self, ExecutionEnvironment, ExecutionEnvironmentState};
 use risc_v_interpreter::{
-    machine_state::{self, StepManyResult},
+    machine_state::{self, bus::main_memory, StepManyResult},
     state_backend,
     traps::EnvironException,
 };
 
-/// Memory configuration
-type MemorySize = machine_state::bus::main_memory::M1G;
-
 /// PVM state layout
-type PvmLayout = (
+pub type PvmLayout<EE, ML> = (
     state_backend::Atom<u64>,
-    machine_state::MachineStateLayout<MemorySize>,
+    machine_state::MachineStateLayout<ML>,
+    <EE as ExecutionEnvironment>::Layout,
 );
 
 /// Value for the initial version
 const INITIAL_VERSION: u64 = 0;
 
 /// Proof-generating virtual machine
-pub struct Pvm<M: state_backend::Manager> {
+pub struct Pvm<
+    EE: ExecutionEnvironment,
+    ML: main_memory::MainMemoryLayout,
+    M: state_backend::Manager,
+> {
     version: state_backend::Cell<u64, M>,
-    machine_state: machine_state::MachineState<MemorySize, M>,
+    pub(crate) machine_state: machine_state::MachineState<ML, M>,
+
+    /// Execution environment state
+    pub syscall_state: EE::State<M>,
 }
 
-impl<M: state_backend::Manager> Pvm<M> {
+impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backend::Manager>
+    Pvm<EE, ML, M>
+{
     /// Bind the PVM to the given allocated region.
-    pub fn bind(space: state_backend::AllocatedOf<PvmLayout, M>) -> Self {
+    pub fn bind(space: state_backend::AllocatedOf<PvmLayout<EE, ML>, M>) -> Self {
         // Ensure we're binding a version we can deal with
         assert_eq!(space.0.read(), INITIAL_VERSION);
 
         Self {
             version: space.0,
             machine_state: machine_state::MachineState::bind(space.1),
+            syscall_state: EE::State::<M>::bind(space.2),
         }
     }
 
@@ -45,6 +54,7 @@ impl<M: state_backend::Manager> Pvm<M> {
     pub fn reset(&mut self) {
         self.version.write(INITIAL_VERSION);
         self.machine_state.reset();
+        self.syscall_state.reset();
     }
 
     /// Provide input. Returns `false` if the machine state is not in
@@ -62,9 +72,25 @@ impl<M: state_backend::Manager> Pvm<M> {
 
     /// Defines how to handle exceptions in the PVM execution environment.
     /// Returns `true` in case the PVM may continue evaluation afterwards.
-    fn handle_exception(&mut self, _exception: EnvironException) -> bool {
-        // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
-        todo!("PVM Trap handler for execution environment traps not implemented")
+    fn handle_exception(&mut self, exception: EnvironException) -> bool {
+        match exception {
+            EnvironException::EnvCallFromUMode
+            | EnvironException::EnvCallFromSMode
+            | EnvironException::EnvCallFromMMode => {
+                match self.syscall_state.handle_call(&mut self.machine_state) {
+                    exec_env::EcallOutcome::Fatal => {
+                        // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
+                        unimplemented!("Fatal exceptions aren't implemented yet")
+                    }
+                    exec_env::EcallOutcome::Handled { continue_eval } => continue_eval,
+                }
+            }
+
+            EnvironException::TrapFromDMode => {
+                // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
+                unimplemented!("Fatal exceptions aren't implemented yet")
+            }
+        }
     }
 
     /// Perform one step. Returns `false` if the PVM is not in [`Status::Eval`] status.
