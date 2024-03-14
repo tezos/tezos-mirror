@@ -125,8 +125,14 @@
       when: on_success
 
 # Only if documentation has changed
+# NB: maintain in sync with .rules__octez_docs_changes_manual!
 .rules__octez_docs_changes:
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    # Run when there is label on the merge request
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/'
+      when: on_success
     - changes:
         - scripts/**/*/
         - script-inputs/**/*/
@@ -140,6 +146,29 @@
         - .gitlab/**/*
         - .gitlab-ci.yml
       when: on_success
+
+# Manual if documentation has changed
+# NB: maintain in sync with .rules__octez_docs_changes!
+.rules__octez_docs_changes_manual:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+      when: always
+    # Run when there is label on the merge request
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/'
+      when: on_success
+    - changes:
+        - scripts/**/*/
+        - script-inputs/**/*/
+        - src/**/*
+        - tezt/**/*
+        - vendors/**/*
+        - dune
+        - dune-project
+        - dune-workspace
+        - docs/**/*
+        - .gitlab/**/*
+        - .gitlab-ci.yml
+      when: manual
 
 # Only if the dependencies of the Octez Docker changed or if we're on
 # master.
