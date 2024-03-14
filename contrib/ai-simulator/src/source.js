@@ -60,3 +60,19 @@ const ratio_target = bigRat(50, 100);
  * The radius of the interval centered on the target ratio (2%).
  */
 const ratio_radius = bigRat(2, 100);
+
+/* Helpers */
+
+const safe_get = (array, cycle) => {
+  if (cycle < 0) {
+    throw new Error(
+      `Querying data for a negative cycle (${cycle}) is not allowed.`,
+    );
+  }
+  if (cycle >= array.length) {
+    throw new Error(
+      `Querying data for a cycle (${cycle}) that is beyond the maximum cycle, defined as ${array.length}.`,
+    );
+  }
+  return array[cycle];
+};
