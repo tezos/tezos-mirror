@@ -17,6 +17,7 @@ use crate::storage::blocks::get_block_hash;
 use crate::tick_model_opcodes;
 use crate::transaction::TransactionContext;
 use crate::transaction_layer_data::TransactionLayerData;
+use crate::utilities::create_address_legacy;
 use crate::EthereumError;
 use crate::PrecompileSet;
 use alloc::borrow::Cow;
@@ -236,13 +237,6 @@ mod benchmarks {
             host.write_debug(core::str::from_utf8_unchecked(&END_PRECOMPILE_SECTION_MSG));
         }
     }
-}
-
-pub fn create_address_legacy(caller: &H160, nonce: &u64) -> H160 {
-    let mut stream = rlp::RlpStream::new_list(2);
-    stream.append(caller);
-    stream.append(nonce);
-    H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
 }
 
 /// The implementation of the SputnikVM [Handler] trait

@@ -6,6 +6,9 @@
 use core::cmp::min;
 
 use alloc::vec::Vec;
+use primitive_types::{H160, H256};
+use sha2::Digest;
+use sha3::Keccak256;
 
 /// Get an array from the data, if data does not contain `start` to `len` bytes, add right padding with
 /// zeroes
@@ -45,4 +48,11 @@ pub fn left_padding_vec(data: &[u8], len: usize) -> Vec<u8> {
     let end = min(len, data.len());
     padded[len - end..].copy_from_slice(&data[..end]);
     padded
+}
+
+pub fn create_address_legacy(caller: &H160, nonce: &u64) -> H160 {
+    let mut stream = rlp::RlpStream::new_list(2);
+    stream.append(caller);
+    stream.append(nonce);
+    H256::from_slice(Keccak256::digest(&stream.out()).as_slice()).into()
 }
