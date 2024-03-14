@@ -76,3 +76,81 @@ const safe_get = (array, cycle) => {
   }
   return array[cycle];
 };
+
+/**
+ * The Adaptive Issuance simulator.
+ * @typedef {Object} Simulator
+ * @property {function(number):boolean} is_ai_activated - Takes a cycle as argument
+ * and returns true if adaptive issuance is activated, false otherwise.
+ * @property {number} initial_period_start_cycle - Returns the cycle at which the launch of
+ * the initial period  is set to happen.
+ * @property {number} transition_period_start_cycle - Returns the cycle at which the launch of
+ * the transition period  is set to happen.
+ * @property {number} final_period_start_cycle - Returns the cycle at which the launch of
+ * the final period  is set to happen.
+ * @property {function(number):boolean} is_in_initial_period - Takes a cycle as argument
+ * and returns true if belongs to the initial period, false otherwise.
+ * @property {function(number):boolean} is_in_transition_period - Takes a cycle as argument
+ * and returns true if belongs to the transition period, false otherwise.
+ * @property {function(number):boolean} is_in_final_period - Takes a cycle as argument
+ * and returns true if it is after the transition period, false otherwise.
+ * @property {function(number):bigRat} staked_ratio_for_next_cycle - Returns the
+ * staked ratio for the cycle following the specified cycle.
+ * @property {function(number):bigRat} static_rate_for_next_cycle - Returns the
+ * static rate for the cycle following the specified cycle.
+ * @property {function(number):bigRat} dynamic_rate_for_next_cycle - Returns the
+ * dynamic rate for the cycle following the specified cycle.
+ * @property {function(number):bigRat} minimum_ratio - Returns the
+ * minimum ratio corresponding to the given cycle.
+ * @property {function(number):bigRat} maximum_ratio - Returns the
+ * maximum ratio corresponding to the given cycle.
+ * @property {function(number):bigRat} reward_coeff - Returns the
+ * reward coefficient corresponding to the given cycle.
+ * @property {function(number):bigRat} baking_reward_fixed_portion - Returns the
+ * baking reward fixed portion corresponding to the given cycle, in mutez.
+ * @property {function(number):bigRat} baking_reward_bonus_per_slot - Returns the
+ * baking reward bonus per slot corresponding to the given cycle, in mutez.
+ * @property {function(number):bigRat} attestation_reward_per_slot - Returns the
+ * attestation reward per slot corresponding to the given cycle, in mutez.
+ * @property {function(number):bigRat} seed_nonce_revelation_tip - Returns the
+ * seed nonce revelation tip corresponding to the given cycle, in mutez.
+ * @property {function(number):bigRat} vdf_revelation_tip - Returns the
+ * vdf revelation tip corresponding to the given cycle, in mutez.
+ * @property {function(number):bigRat} current_yearly_rate_value - Returns the
+ * current yearly rate corresponding to the given cycle.
+ */
+
+/**
+ * Simulator building.
+ *
+ * @constructor
+ * @param {Object} config. - Configuration.
+ * @param {Object} config.proto - Protocol constants.
+ * @param {number} config.proto.minimal_block_delay.
+ * @param {number} config.proto.blocks_per_cycle.
+ * @param {number} config.proto.base_total_issued_per_minute.
+ * @param {number} config.proto.attestation_rewards.
+ * @param {number} config.proto.blocks_per_commitment.
+ * @param {number} config.proto.fixed_baking_rewards.
+ * @param {number} config.proto.bonus_baking_rewards.
+ * @param {number} config.proto.nonce_revelation.
+ * @param {number} config.proto.vdf_tip.
+ * @param {number} config.proto.consensus_committee_size.
+ * @param {number} config.proto.consensus_rights_delay.
+ * @param {number} config.proto.consensus_threshold.
+ * @param {number} config.proto.max_bonus.
+ * @param {Object} config.chain - Data concerning the chain state.
+ * @param {number} config.chain.ai_activation_cycle - Adaptive Issuance activation cycle.
+ * @param {array(number)} config.chain.total_supply.
+ * @param {array(number)} config.chain.total_frozen_stake.
+ *
+ * @return {Simulator}. The Adaptive Issuance simulator.
+ */
+
+export class Simulator {
+
+  constructor(config) {
+    this.config = config;
+  }
+
+}
