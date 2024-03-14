@@ -177,11 +177,13 @@ let jobs pipeline_type =
      enable the job [On_success] in the [before_merging]
      pipeline. This is safe, but prefer specifying a [changes] clause
      if possible. *)
-  let make_rules ?label ?changes ?(manual = false) () =
+  let make_rules ?label ?changes ?(manual = false) ?(dependent = false) () =
     match pipeline_type with
     | Schedule_extended_test ->
-        (* The scheduled pipeline always runs all tests unconditionally. *)
-        [job_rule ~when_:Always ()]
+        (* The scheduled pipeline always runs all jobs unconditionally
+           -- unless they are dependent on a previous, non-trigger job, in the
+           pipeline. *)
+        [job_rule ~when_:(if dependent then On_success else Always) ()]
     | Before_merging ->
         (* MR labels can be used to force tests to run. *)
         (match label with
@@ -378,6 +380,44 @@ let jobs pipeline_type =
              [])
         ["dune build @check"]
       |> job_external_split
+    in
+    let _job_build_kernels : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.build_kernels"
+        ~image:Images.rust_toolchain
+        ~stage:Stages.build
+        ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+        ~rules:
+          (make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+        [
+          "make -f kernels.mk build";
+          "make -f etherlink.mk evm_kernel.wasm";
+          "make -C src/risc_v risc-v-sandbox risc-v-dummy.elf";
+          "make -C src/risc_v/tests/ build";
+        ]
+        ~artifacts:
+          (artifacts
+             ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
+             ~expire_in:(Days 1)
+             ~when_:On_success
+             [
+               "evm_kernel.wasm";
+               "smart-rollup-installer";
+               "sequenced_kernel.wasm";
+               "tx_kernel.wasm";
+               "tx_kernel_dal.wasm";
+               "dal_echo_kernel.wasm";
+               "src/risc_v/risc-v-sandbox";
+               "src/risc_v/risc-v-dummy.elf";
+               "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
+             ])
+        ~cache:
+          [
+            {key = "kernels"; paths = ["cargo/"]};
+            {key = "kernels-sccache"; paths = ["_sccache"]};
+          ]
+      |> enable_kernels |> enable_sccache |> job_external_split
     in
     (* TODO: include the jobs defined above when full pipeline is
        generated, as well as rust tool chain and client libs docker

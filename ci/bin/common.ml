@@ -227,6 +227,15 @@ let enable_sccache ?error_log ?idle_timeout ?log
     @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
     @ opt_var "SCCACHE_LOG" Fun.id log)
 
+(** Add common variables used by jobs compiling kernels *)
+let enable_kernels =
+  Tezos_ci.append_variables
+    [
+      ("CC", "clang");
+      ("CARGO_HOME", "$CI_PROJECT_DIR/cargo");
+      ("NATIVE_TARGET", "x86_64-unknown-linux-musl");
+    ]
+
 (** {2 Changesets} *)
 
 let changeset_octez =
