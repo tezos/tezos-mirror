@@ -201,16 +201,6 @@
 .oc.template__retry_flaky:
   retry: 2
 
-.oc.build_template:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_dependencies
-  stage: build
-  before_script:
-    - ./scripts/ci/take_ownership.sh
-    - . ./scripts/version.sh
-    - eval $(opam env)
-
 .oc.kernels_template:
   extends:
     - .default_settings_template

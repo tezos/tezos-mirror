@@ -237,6 +237,7 @@ let jobs pipeline_type =
           |> job_external
         in
         (* TODO: put job_trigger here when full pipeline is generated *)
+        (* TODO: the dependency on job_trigger does not have to be optional *)
         ([], Dependent [Optional job_trigger])
   in
   let sanity =
@@ -335,6 +336,32 @@ let jobs pipeline_type =
         let _job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
         ()
     | Before_merging -> ()) ;
+    (* The build_x86_64 jobs are split in two to keep the artifact size
+       under the 1GB hard limit set by GitLab. *)
+    (* [_job_build_x86_64_release] builds the released executables. *)
+    let _job_build_x86_64_release =
+      job_build_dynamic_binaries
+        ~__POS__
+        ~arch:Amd64
+        ~dependencies:dependencies_needs_trigger
+        ~release:true
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ()
+      |> job_external_split
+    in
+    (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
+       executables, as well as the tezt test suite used by the subsequent
+       'tezt' jobs and TPS evaluation tool. *)
+    let _job_build_x86_64_exp_dev_extra =
+      job_build_dynamic_binaries
+        ~__POS__
+        ~arch:Amd64
+        ~dependencies:dependencies_needs_trigger
+        ~release:false
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ()
+      |> job_external_split
+    in
     let _job_ocaml_check : tezos_job =
       job
         ~__POS__
