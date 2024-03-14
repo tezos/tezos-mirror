@@ -15,8 +15,7 @@ end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
       let open Lwt_result_syntax in
-      let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
-      let*! res = Evm_state.inspect evm_state path in
+      let*! res = Evm_context.inspect Ctxt.ctxt path in
       return res
   end
 
@@ -81,37 +80,35 @@ end) : Services_backend_sig.Backend = struct
   let inject_kernel_upgrade upgrade =
     let open Lwt_result_syntax in
     let payload = Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes in
-    let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
-    let*! evm_state =
-      Evm_state.modify
-        ~key:Durable_storage_path.kernel_upgrade
-        ~value:payload
-        evm_state
-    in
-    let (Qty next) = Ctxt.ctxt.session.next_blueprint_number in
     let* () =
-      Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
-    in
-    let* () =
-      Store.Kernel_upgrades.store
-        Ctxt.ctxt.store
-        Ctxt.ctxt.session.next_blueprint_number
-        upgrade
+      Evm_context.replace_current_head Ctxt.ctxt (fun evm_state ->
+          let*! evm_state =
+            Evm_state.modify
+              ~key:Durable_storage_path.kernel_upgrade
+              ~value:payload
+              evm_state
+          in
+          let* () =
+            Store.Kernel_upgrades.store
+              Ctxt.ctxt.store
+              Ctxt.ctxt.session.next_blueprint_number
+              upgrade
+          in
+          return evm_state)
     in
     return_unit
 
   let inject_sequencer_upgrade ~payload =
     let open Lwt_result_syntax in
-    let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
-    let*! evm_state =
-      Evm_state.modify
-        ~key:Durable_storage_path.sequencer_upgrade
-        ~value:payload
-        evm_state
-    in
-    let (Qty next) = Ctxt.ctxt.session.next_blueprint_number in
     let* () =
-      Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
+      Evm_context.replace_current_head Ctxt.ctxt (fun evm_state ->
+          let*! evm_state =
+            Evm_state.modify
+              ~key:Durable_storage_path.sequencer_upgrade
+              ~value:payload
+              evm_state
+          in
+          return evm_state)
     in
     return_unit
 end

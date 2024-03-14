@@ -19,6 +19,12 @@ val init : data_dir:string -> t tzresult Lwt.t
     the transaction is committed. *)
 val with_transaction : t -> (t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
+(** [assert_in_transaction store] raises an exception if a transaction has not
+    been started with [store].
+
+    @raise Assert_failure *)
+val assert_in_transaction : t -> unit
+
 module Executable_blueprints : sig
   val store :
     t ->
