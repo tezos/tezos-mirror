@@ -13,11 +13,13 @@
 
 use std::{cmp::min, str::FromStr, vec};
 
-use crate::eip152;
+mod eip152;
+mod modexp;
+mod zk_precompiled;
+
+use crate::abi;
 use crate::handler::EvmHandler;
-use crate::zk_precompiled::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 use crate::EthereumError;
-use crate::{abi, modexp::modexp_precompile};
 use alloc::borrow::Cow;
 use alloc::collections::btree_map::BTreeMap;
 use evm::{
@@ -26,12 +28,14 @@ use evm::{
 };
 use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
+use modexp::modexp_precompile;
 use primitive_types::{H160, U256};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use sha3::Keccak256;
 use tezos_ethereum::withdrawal::Withdrawal;
 use tezos_evm_logging::{log, Level::*};
+use zk_precompiled::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 
 /// Cost of doing a withdrawal. A valid call to this precompiled contract
 /// takes almost 880000 ticks, and one gas unit takes 1000 ticks.

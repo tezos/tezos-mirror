@@ -19,19 +19,16 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_storage::StorageError;
 use thiserror::Error;
 
-mod eip152;
+mod access_record;
 
 pub mod abi;
-mod access_record;
 pub mod account_storage;
 pub mod handler;
-pub mod modexp;
 pub mod precompiles;
 pub mod storage;
 pub mod tick_model_opcodes;
 pub mod transaction;
 pub mod utilities;
-pub mod zk_precompiled;
 
 pub use evm::Config;
 
