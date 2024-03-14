@@ -176,7 +176,7 @@ let may_migrate (wallet : Protocol_client_context.full) location =
           return_unit
       | true -> Lwt_utils_unix.copy_file ~src:legacy_file ~dst:current_file)
 
-let get_detailed_nonces_location nonces_location = "detailed_" ^ nonces_location
+let get_detailed_nonces_location nonces_location = "stateful_" ^ nonces_location
 
 let load (wallet : #Client_context.wallet) location =
   let open Lwt_result_syntax in
