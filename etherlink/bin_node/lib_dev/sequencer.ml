@@ -267,6 +267,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~smart_rollup_address
       ()
   in
+  let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
@@ -274,6 +275,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~max_blueprints_ahead
       ~max_blueprints_catchup
       ~catchup_cooldown
+      ~latest_level_seen:(Z.pred next_blueprint_number)
       ctxt.store
   in
   let* () =

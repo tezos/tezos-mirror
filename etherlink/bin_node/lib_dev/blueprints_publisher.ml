@@ -12,6 +12,7 @@ type parameters = {
   max_blueprints_ahead : int;
   max_blueprints_catchup : int;
   catchup_cooldown : int;
+  latest_level_seen : Z.t;
 }
 
 type state = {
@@ -175,6 +176,7 @@ module Handlers = struct
          max_blueprints_ahead;
          max_blueprints_catchup;
          catchup_cooldown;
+         latest_level_seen;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -185,10 +187,7 @@ module Handlers = struct
           (* Will be set at the correct value once the next L2 block is
              received from the rollup node *)
           Z.zero;
-        latest_level_seen =
-          (* Will be set at the correct value once the sequencer produces
-             the next blueprint *)
-          Z.zero;
+        latest_level_seen;
         cooldown = 0;
         rollup_node_endpoint;
         max_blueprints_lag = Z.of_int max_blueprints_lag;
@@ -240,7 +239,7 @@ let table = Worker.create_table Queue
 let worker_promise, worker_waker = Lwt.task ()
 
 let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
-    ~max_blueprints_catchup ~catchup_cooldown store =
+    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen store =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -253,6 +252,7 @@ let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
         max_blueprints_ahead;
         max_blueprints_catchup;
         catchup_cooldown;
+        latest_level_seen;
       }
       (module Handlers)
   in
