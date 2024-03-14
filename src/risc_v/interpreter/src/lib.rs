@@ -11,18 +11,20 @@ pub mod program;
 pub mod state_backend;
 pub mod traps;
 
-use crate::machine_state::{
-    bus::main_memory::M1G,
-    mode,
-    registers::{a0, a7},
-    MachineError, MachineState, MachineStateLayout, StepManyResult,
+use crate::{
+    machine_state::{
+        bus::main_memory::M1G,
+        mode,
+        registers::{a0, a7},
+        MachineError, MachineState, MachineStateLayout, StepManyResult,
+    },
+    program::Program,
+    state_backend::{
+        memory_backend::{InMemoryBackend, SliceManager},
+        Backend, Layout,
+    },
+    traps::EnvironException,
 };
-use crate::program::Program;
-use crate::state_backend::{
-    memory_backend::{InMemoryBackend, SliceManager},
-    Backend, Layout,
-};
-use crate::traps::EnvironException;
 use derive_more::{Error, From};
 use InterpreterResult::*;
 
