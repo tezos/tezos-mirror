@@ -18,7 +18,27 @@ module Event = struct
       ~level:Info
       ("transaction", Ethereum_types.hash_encoding)
       ~pp1:Ethereum_types.pp_hash
+
+  let started =
+    declare_0
+      ~section
+      ~name:"block_producer_started"
+      ~msg:"Block producer has been started"
+      ~level:Notice
+      ()
+
+  let shutdown =
+    declare_0
+      ~section
+      ~name:"shutting_down_block_producer"
+      ~msg:"Stopping the block producer follower"
+      ~level:Notice
+      ()
 end
 
 let transaction_selected ~hash =
   Internal_event.Simple.emit Event.transaction_selected hash
+
+let started () = Internal_event.Simple.emit Event.started ()
+
+let shutdown () = Internal_event.Simple.emit Event.shutdown ()

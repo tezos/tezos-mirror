@@ -441,10 +441,7 @@ let dispatch_private_request (_config : 'a Configuration.t)
           let open Lwt_result_syntax in
           let timestamp = Option.value timestamp ~default:(Helpers.now ()) in
           let* nb_transactions =
-            Block_producer.produce_block
-              (module Backend_rpc)
-              ~force:true
-              ~timestamp
+            Block_producer.produce_block ~force:true ~timestamp
           in
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in
