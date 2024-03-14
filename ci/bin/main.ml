@@ -195,7 +195,6 @@ let () =
     | ".gitlab/ci/jobs/sanity/docker:hadolint-before_merging.yml"
     | ".gitlab/ci/jobs/sanity/docker:hadolint-schedule_extended_test.yml"
     | ".gitlab/ci/jobs/sanity/docker:hadolint.yml"
-    | ".gitlab/ci/jobs/sanity/sanity_ci.yml"
     | ".gitlab/ci/jobs/shared/images.yml"
     | ".gitlab/ci/jobs/shared/templates.yml"
     | ".gitlab/ci/jobs/test/commit_titles.yml"

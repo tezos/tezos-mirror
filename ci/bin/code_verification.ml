@@ -52,6 +52,13 @@ let jobs pipeline_type =
         | Schedule_extended_test -> scheduled_suffix)
       job
   in
+  (* Used to externalize jobs that are the same on both pipelines. They're only written once.
+     Beware: there is no check that the two jobs are actually identical. *)
+  let job_external_once job =
+    match pipeline_type with
+    | Before_merging -> job_external job
+    | Schedule_extended_test -> job
+  in
   (* [make_rules] makes rules for jobs that are:
      - automatic in scheduled pipelines;
      - conditional in [before_merging] pipelines.
@@ -122,7 +129,27 @@ let jobs pipeline_type =
         (* TODO: put job_trigger here when full pipeline is generated *)
         ([], Dependent [Optional job_trigger])
   in
-  let sanity = [] in
+  let sanity =
+    let _job_sanity_ci : tezos_job =
+      job
+        ~__POS__
+        ~name:"sanity_ci"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.sanity
+        ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
+        [
+          "make -C manifest check";
+          "./scripts/lint.sh --check-gitlab-ci-yml";
+          (* Check that the opam-repo images' Alpine version corresponds to
+             the value in scripts/version.sh. *)
+          "./scripts/ci/check_alpine_version.sh";
+          (* Check that .gitlab-ci.yml is up to date. *)
+          "make -C ci check";
+        ]
+      |> job_external_once
+    in
+    []
+  in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
       ~__POS__
