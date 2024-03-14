@@ -344,4 +344,11 @@ export class Simulator {
     const base_rewards = rewards.divide(d);
     return base_rewards.multiply(num).divide(den);
   }
+
+  baking_reward_fixed_portion(cycle) {
+    return this.#reward_from_constants(
+      cycle,
+      this.config.proto.fixed_baking_rewards,
+    );
+  }
 }
