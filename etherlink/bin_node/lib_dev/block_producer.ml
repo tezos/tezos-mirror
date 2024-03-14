@@ -5,12 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = (module Services_backend_sig.S)
+type parameters = {
+  ctxt : Evm_context.t;
+  cctxt : Client_context.wallet;
+  smart_rollup_address : string;
+  sequencer_key : Client_keys.sk_uri;
+}
 
 module Types = struct
-  type state = (module Services_backend_sig.S)
-
   type nonrec parameters = parameters
+
+  type state = parameters
 end
 
 module Name = struct
@@ -58,18 +63,40 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let produce_block ~force ~timestamp (module Backend : Services_backend_sig.S) =
+let get_hashes ~transactions ~delayed_transactions =
+  let open Result_syntax in
+  let delayed_hashes =
+    List.map Ethereum_types.Delayed_transaction.hash delayed_transactions
+  in
+  let hashes =
+    List.map
+      (fun transaction ->
+        let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
+        Ethereum_types.(
+          Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
+      transactions
+  in
+  return (delayed_hashes @ hashes)
+
+let produce_block ~ctxt ~cctxt ~smart_rollup_address ~sequencer_key ~force
+    ~timestamp =
   let open Lwt_result_syntax in
-  let* transactions, delayed = Tx_pool.pop_transactions () in
-  let n = List.length transactions + List.length delayed in
+  let* transactions, delayed_transactions = Tx_pool.pop_transactions () in
+  let n = List.length transactions + List.length delayed_transactions in
   if force || n > 0 then
-    let* hashes =
-      Backend.inject_raw_transactions
+    let*? hashes = get_hashes ~transactions ~delayed_transactions in
+    let* blueprint =
+      Sequencer_blueprint.create
+        ~sequencer_key
+        ~cctxt
         ~timestamp
-        ~smart_rollup_address:Backend.smart_rollup_address
+        ~smart_rollup_address
         ~transactions
-        ~delayed
+        ~delayed_transactions
+        ~parent_hash:ctxt.Evm_context.session.current_block_hash
+        ~number:ctxt.Evm_context.session.next_blueprint_number
     in
+    let* _ctxt = Evm_context.apply_and_publish_blueprint ctxt blueprint in
     let*! () =
       List.iter_p
         (fun hash -> Block_producer_events.transaction_selected ~hash)
@@ -89,13 +116,20 @@ module Handlers = struct
     let state = Worker.state w in
     match request with
     | Request.Produce_block (timestamp, force) ->
-        protect @@ fun () -> produce_block ~force ~timestamp state
+        protect @@ fun () ->
+        let {ctxt; cctxt; smart_rollup_address; sequencer_key} = state in
+        produce_block
+          ~ctxt
+          ~cctxt
+          ~smart_rollup_address
+          ~sequencer_key
+          ~force
+          ~timestamp
 
   type launch_error = error trace
 
-  let on_launch _w () (backend : Types.parameters) =
-    let state = backend in
-    Lwt_result_syntax.return state
+  let on_launch _w () (parameters : Types.parameters) =
+    Lwt_result_syntax.return parameters
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
       unit tzresult Lwt.t =

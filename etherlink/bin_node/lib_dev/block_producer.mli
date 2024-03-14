@@ -5,7 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = (module Services_backend_sig.S)
+type parameters = {
+  ctxt : Evm_context.t;
+  cctxt : Client_context.wallet;
+  smart_rollup_address : string;
+  sequencer_key : Client_keys.sk_uri;
+}
 
 (** [start parameters] starts the events follower. *)
 val start : parameters -> unit tzresult Lwt.t
