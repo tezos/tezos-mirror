@@ -153,4 +153,37 @@ export class Simulator {
     this.config = config;
   }
 
+  #compute_extremum(cycle, initial_value, final_value) {
+    const trans = transition_period + 1;
+    const t1 = this.config.chain.ai_activation_cycle + initial_period;
+    const t2 = t1 + trans;
+    if (cycle <= t1) {
+      return initial_value;
+    } else if (cycle >= t2) {
+      return final_value;
+    } else {
+      const t = cycle - t1;
+      const res = bigRat(t)
+        .multiply(final_value - initial_value)
+        .divide(trans)
+        .add(initial_value);
+      return res;
+    }
+  }
+
+  minimum_ratio(cycle) {
+    return this.#compute_extremum(
+      cycle,
+      issuance_ratio_initial_min,
+      issuance_ratio_global_min,
+    );
+  }
+
+  maximum_ratio(cycle) {
+    return this.#compute_extremum(
+      cycle,
+      issuance_ratio_initial_max,
+      issuance_ratio_global_max,
+    );
+  }
 }
