@@ -223,20 +223,8 @@ let get_outdated_nonces state nonces current_cycle =
     nonces, and removes all the oudated nonces. *)
 let filter_outdated_nonces state nonces current_cycle =
   let open Lwt_result_syntax in
-  let orphans, outdated_nonces =
+  let _orphans, outdated_nonces =
     get_outdated_nonces state nonces current_cycle
-  in
-  let* () =
-    when_
-      (Block_hash.Map.cardinal orphans >= 50)
-      (fun () ->
-        let*! () =
-          Events.(
-            emit
-              too_many_nonces
-              (Baking_files.filename state.nonces_location ^ "s"))
-        in
-        return_unit)
   in
   return (remove_all nonces outdated_nonces)
 
