@@ -273,41 +273,6 @@ let job_dummy : job =
     ~script:[{|echo "This job will never execute"|}]
     ()
 
-(* Define the [trigger] job
-
-   §1: The purpose of this job is to launch the CI manually in certain cases.
-   The objective is not to run computing when it is not
-   necessary and the decision to do so belongs to the developer
-
-   §2: We also perform some fast sanity checks. *)
-let job_trigger =
-  job
-    ~__POS__
-    ~image:Images.alpine
-    ~stage:Stages.trigger
-    ~allow_failure:No
-    ~rules:
-      [
-        job_rule
-          ~if_:(If.not Rules.assigned_to_marge_bot)
-          ~allow_failure:No
-          ~when_:Manual
-          ();
-        job_rule ~when_:Always ();
-      ]
-    ~timeout:(Minutes 10)
-    ~name:"trigger"
-    [
-      "echo 'Trigger pipeline!'";
-      (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
-         [scripts/version.sh]'s [opam_repository_tag] are the same. *)
-      "./scripts/ci/check_opam_repository_tag.sh";
-      (* Check that the Alpine version of the trigger job's image
-         corresponds to the value in scripts/version.sh. *)
-      "./scripts/ci/check_alpine_version.sh";
-    ]
-  |> job_external
-
 (** Helper to create jobs that uses the docker deamon.
 
     It:
@@ -356,8 +321,8 @@ let job_docker_promote_to_latest ~ci_docker_hub : tezos_job =
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(release = false)
-    ?(needs_trigger = false) ?rules () : Tezos_ci.tezos_job =
+let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
+    ?dependencies () : Tezos_ci.tezos_job =
   let arch_string =
     match arch with Tezos_ci.Amd64 -> "x86_64" | Arm64 -> "arm64"
   in
@@ -371,16 +336,9 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false)
     "script-inputs/released-executables"
     ^ if not release then " script-inputs/experimental-executables" else ""
   in
-  let dependencies =
-    (* Even though not many tests depend on static executables, some
-       of those that do are limiting factors in the total duration of
-       pipelines. So when requested through [needs_trigger] we start
-       this job as early as possible, without waiting for
-       sanity_ci. *)
-    if needs_trigger then Dependent [Optional job_trigger] else Staged []
-  in
   job
     ?rules
+    ?dependencies
     ~__POS__
     ~stage:Stages.build
     ~arch
@@ -388,28 +346,8 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false)
     ~image:Images.runtime_build_dependencies
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
     ~variables:[("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
-    ~dependencies
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
-
-let rules_static_build_other = [job_rule ~changes:changeset_octez ()]
-
-let _job_static_arm64_experimental =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Arm64
-    ~rules:rules_static_build_other
-    ()
-  |> job_external ~filename_suffix:"experimental"
-
-let _job_static_x86_64_experimental =
-  job_build_static_binaries
-    ~__POS__
-    ~arch:Amd64
-    ~needs_trigger:true
-    ~rules:rules_static_build_other
-    ()
-  |> job_external ~filename_suffix:"experimental"
 
 let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
   job_docker_authenticated
@@ -425,21 +363,6 @@ let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
          ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
          [])
     ["./scripts/ci/docker_rust_toolchain_build.sh"]
-
-let _job_docker_rust_toolchain_before_merging =
-  job_docker_rust_toolchain
-    ~__POS__
-    ~dependencies:(Dependent [Optional job_trigger])
-    ~rules:
-      [
-        job_rule ~changes:changeset_octez_or_kernels ~when_:On_success ();
-        job_rule ~when_:Manual ();
-      ]
-    ()
-  |> job_external ~filename_suffix:"before_merging"
-
-let _job_docker_rust_toolchain_other =
-  job_docker_rust_toolchain ~__POS__ () |> job_external ~filename_suffix:"other"
 
 (** Type of Docker build jobs.
 
@@ -546,24 +469,6 @@ let rules_octez_docker_changes_or_master =
     job_rule ~changes:changeset_octez_docker_changes_or_master ();
   ]
 
-let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
-  job_docker_build
-    ~__POS__
-    ~external_:true (* TODO: see above *)
-    ~dependencies:
-      (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
-    ~arch:Amd64
-    Test_manual
-
-let _job_docker_arm64_test_manual : Tezos_ci.tezos_job =
-  job_docker_build
-    ~__POS__
-    ~external_:true (* TODO: see above *)
-    ~dependencies:
-      (Dependent [Artifacts _job_docker_rust_toolchain_before_merging])
-    ~arch:Arm64
-    Test_manual
-
 (* Note: here we rely on [$IMAGE_ARCH_PREFIX] to be empty.
    Otherwise, [$DOCKER_IMAGE_TAG] would contain [$IMAGE_ARCH_PREFIX] too.
    [$IMAGE_ARCH_PREFIX] is only used when building Docker images,
@@ -655,45 +560,19 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
       "make $TARGET";
     ]
 
-let job_build_dpkg_amd64 =
+let job_build_dpkg_amd64 : unit -> tezos_job =
   job_build_bin_package
     ~__POS__
     ~name:"oc.build:dpkg:amd64"
     ~target:Dpkg
     ~arch:Tezos_ci.Amd64
-    ()
-  |> job_external
 
-let job_build_rpm_amd64 =
+let job_build_rpm_amd64 : unit -> tezos_job =
   job_build_bin_package
     ~__POS__
     ~name:"oc.build:rpm:amd64"
     ~target:Rpm
     ~arch:Tezos_ci.Amd64
-    ()
-  |> job_external
-
-let _job_build_dpkg_amd64_manual =
-  job_build_bin_package
-    ~__POS__
-    ~name:"oc.build:dpkg:amd64"
-    ~target:Dpkg
-    ~arch:Tezos_ci.Amd64
-    ~rules:[job_rule ~when_:Manual ()]
-    ~stage:Stages.manual
-    ()
-  |> job_external ~directory:"build" ~filename_suffix:"manual"
-
-let _job_build_rpm_amd64_manual =
-  job_build_bin_package
-    ~__POS__
-    ~rules:[job_rule ~when_:Manual ()]
-    ~name:"oc.build:rpm:amd64"
-    ~target:Rpm
-    ~arch:Tezos_ci.Amd64
-    ~stage:Stages.manual
-    ()
-  |> job_external ~directory:"build" ~filename_suffix:"manual"
 
 (** Type of release tag pipelines.
 
@@ -749,12 +628,7 @@ let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
     job_build_static_binaries ~__POS__ ~arch:Arm64 ~release:true ()
   in
   let job_static_x86_64_release =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~release:true
-      ~needs_trigger:true
-      ()
+    job_build_static_binaries ~__POS__ ~arch:Amd64 ~release:true ()
   in
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
@@ -779,6 +653,8 @@ let release_tag_pipeline ?(test = false) release_tag_pipeline_type =
       ~name:"gitlab:publish"
       ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
   in
+  let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
+  let job_build_rpm_amd64 = job_build_rpm_amd64 () in
   let job_gitlab_release_or_publish =
     let dependencies =
       Dependent
@@ -833,7 +709,7 @@ let amd64_build_extra =
   ]
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
-    ?(needs_trigger = false) () =
+    ?dependencies () =
   let arch_string = match arch with Amd64 -> "x86_64" | Arm64 -> "arm64" in
   let name =
     sf
@@ -872,17 +748,10 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
         "_build/default/contrib/octez_injector_server/octez_injector_server.exe";
       ]
   in
-  let dependencies =
-    (* Even though not many tests depend on static executables, some
-       of those that do are limiting factors in the total duration of
-       pipelines. So when requested through [needs_trigger] we start
-       this job as early as possible, without waiting for
-       sanity_ci. *)
-    if needs_trigger then Dependent [Optional job_trigger] else Staged []
-  in
   let job =
     job
       ?rules
+      ?dependencies
       ~__POS__
       ~stage:Stages.build
       ~arch
@@ -895,46 +764,20 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
            ~eval_opam:true
            [])
       ~variables
-      ~dependencies
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
 
-let build_arm_rules =
-  [
-    job_rule ~if_:Rules.schedule_extended_tests ~when_:Always ();
-    job_rule ~if_:Rules.(has_mr_label "ci--arm64") ~when_:On_success ();
-    job_rule
-      ~changes:["src/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"]
-      ~when_:Manual
-      ~allow_failure:Yes
-      ();
-  ]
-
 (* Write external files for build_arm64_jobs.
 
    Used in external pipelines [before_merging] and [schedule_extended_test]. *)
-let job_build_arm64_release : tezos_job =
-  job_build_dynamic_binaries
-    ~__POS__
-    ~arch:Arm64
-    ~needs_trigger:false
-    ~release:true
-    ~rules:build_arm_rules
-    ()
-  |> job_external
+let job_build_arm64_release ?rules () : tezos_job =
+  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:true ()
 
-let job_build_arm64_exp_dev_extra : tezos_job =
-  job_build_dynamic_binaries
-    ~__POS__
-    ~arch:Arm64
-    ~needs_trigger:false
-    ~release:false
-    ~rules:build_arm_rules
-    ()
-  |> job_external
+let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
+  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:false ()
 
 let enable_coverage_report job : tezos_job =
   job
@@ -952,6 +795,195 @@ let enable_coverage_report job : tezos_job =
        ~when_:Always
        ["_coverage_report/"; "$BISECT_FILE"]
   |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
+
+type code_verification_pipeline = Before_merging | Schedule_extended_test
+
+(* Encodes the conditional [before_merging] pipeline and its unconditional variant
+   [schedule_extended_test]. *)
+let code_verification_pipeline pipeline_type =
+  (* Externalization *)
+  let job_external_split ?(before_merging_suffix = "before_merging")
+      ?(scheduled_suffix = "scheduled_extended_test") job =
+    job_external
+      ~filename_suffix:
+        (match pipeline_type with
+        | Before_merging -> before_merging_suffix
+        | Schedule_extended_test -> scheduled_suffix)
+      job
+  in
+  (* [make_rules] makes rules for jobs that are:
+     - automatic in scheduled pipelines;
+     - conditional in [before_merging] pipelines.
+
+     If [label], [changes] and [manual] are omitted, then rules will
+     enable the job [On_success] in the [before_merging]
+     pipeline. This is safe, but prefer specifying a [changes] clause
+     if possible. *)
+  let make_rules ?label ?changes ?(manual = false) () =
+    match pipeline_type with
+    | Schedule_extended_test ->
+        (* The scheduled pipeline always runs all tests unconditionally. *)
+        [job_rule ~when_:Always ()]
+    | Before_merging ->
+        (* MR labels can be used to force tests to run. *)
+        (match label with
+        | Some label ->
+            [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
+        | None -> [])
+        (* Modifying some files can force tests to run. *)
+        @ (match changes with
+          | None -> []
+          | Some changes -> [job_rule ~changes ~when_:On_success ()])
+        (* For some tests, it can be relevant to have a manual trigger. *)
+        @ if manual then [job_rule ~when_:Manual ()] else []
+  in
+  (* Stages *)
+  (* All stages should be empty, as explained below, until the full pipeline is generated. *)
+  let trigger, dependencies_needs_trigger =
+    match pipeline_type with
+    | Schedule_extended_test -> ([], Staged [])
+    | Before_merging ->
+        (* Define the [trigger] job
+
+           §1: The purpose of this job is to launch the CI manually in certain cases.
+           The objective is not to run computing when it is not
+           necessary and the decision to do so belongs to the developer
+
+           §2: We also perform some fast sanity checks. *)
+        let job_trigger =
+          job
+            ~__POS__
+            ~image:Images.alpine
+            ~stage:Stages.trigger
+            ~allow_failure:No
+            ~rules:
+              [
+                job_rule
+                  ~if_:(If.not Rules.assigned_to_marge_bot)
+                  ~allow_failure:No
+                  ~when_:Manual
+                  ();
+                job_rule ~when_:Always ();
+              ]
+            ~timeout:(Minutes 10)
+            ~name:"trigger"
+            [
+              "echo 'Trigger pipeline!'";
+              (* Check that [.gitlab-ci.yml]'s [build_deps_image_version] and
+                 [scripts/version.sh]'s [opam_repository_tag] are the same. *)
+              "./scripts/ci/check_opam_repository_tag.sh";
+              (* Check that the Alpine version of the trigger job's image
+                 corresponds to the value in scripts/version.sh. *)
+              "./scripts/ci/check_alpine_version.sh";
+            ]
+          |> job_external
+        in
+        (* TODO: put job_trigger here when full pipeline is generated *)
+        ([], Dependent [Optional job_trigger])
+  in
+  let sanity = [] in
+  let job_docker_rust_toolchain =
+    job_docker_rust_toolchain
+      ~__POS__
+      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:true ())
+      ~dependencies:dependencies_needs_trigger
+      ()
+    |> job_external_split
+  in
+  let build =
+    let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
+    let _job_build_arm64_release : Tezos_ci.tezos_job =
+      job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
+    in
+    let _job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
+      job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
+      |> job_external_split
+    in
+    let _job_static_x86_64_experimental =
+      job_build_static_binaries
+        ~__POS__
+        ~arch:Amd64
+          (* Even though not many tests depend on static executables, some
+             of those that do are limiting factors in the total duration
+             of pipelines. So we start this job as early as possible,
+             without waiting for sanity_ci. *)
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ()
+      |> job_external_split
+    in
+    (* TODO: The code is a bit convulted here because these jobs are
+       either in the build or in the manual stage depeneding on the
+       pipeline type. However, we can put them in the build stage on
+       [before_merging] pipelines as long as we're careful to put
+       [allow_failure: true]. *)
+    (match pipeline_type with
+    | Schedule_extended_test ->
+        let _job_build_dpkg_amd64 = job_build_dpkg_amd64 () |> job_external in
+        let _job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
+        ()
+    | Before_merging -> ()) ;
+    (* TODO: include the jobs defined above when full pipeline is generated *)
+    []
+  in
+  let packaging = [] in
+  let test = [] in
+  let doc = [] in
+  let manual =
+    match pipeline_type with
+    | Before_merging ->
+        let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
+          job_docker_build
+            ~__POS__
+            ~external_:true
+            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+            ~arch:Amd64
+            Test_manual
+        in
+        let _job_docker_arm64_test_manual : Tezos_ci.tezos_job =
+          job_docker_build
+            ~__POS__
+            ~external_:true
+            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+            ~arch:Arm64
+            Test_manual
+        in
+        let _job_build_dpkg_amd64_manual =
+          job_build_bin_package
+            ~__POS__
+            ~name:"oc.build:dpkg:amd64"
+            ~target:Dpkg
+            ~arch:Tezos_ci.Amd64
+            ~rules:[job_rule ~when_:Manual ()]
+            ~stage:Stages.manual
+            ()
+          |> job_external ~directory:"build" ~filename_suffix:"manual"
+        in
+        let _job_build_rpm_amd64_manual =
+          job_build_bin_package
+            ~__POS__
+            ~rules:[job_rule ~when_:Manual ()]
+            ~name:"oc.build:rpm:amd64"
+            ~target:Rpm
+            ~arch:Tezos_ci.Amd64
+            ~stage:Stages.manual
+            ()
+          |> job_external ~directory:"build" ~filename_suffix:"manual"
+        in
+        (* TODO: include the jobs defined above when full pipeline is generated *)
+        []
+    (* No manual jobs on the scheduled pipeline *)
+    | Schedule_extended_test -> []
+  in
+  (* Empty place-holder: this has the effect of not overwriting the pipeline file in question.
+     Once all the jobs in these pipelines are defined, we will return them here which
+     will cause the pipeline files to contain the definition of all those jobs.
+
+     Until that time, all the jobs are written ot external files
+     (using {!job_external} or {!jobs_external}) and included by hand
+     in the files [.gitlab/ci/pipelines/before_merging.yml] and
+     [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
+  trigger @ sanity @ build @ packaging @ test @ doc @ manual
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
@@ -974,7 +1006,10 @@ let () =
   let has_non_release_tag =
     If.(Predefined_vars.ci_commit_tag != null && not has_any_octez_release_tag)
   in
-  register "before_merging" If.(on_tezos_namespace && merge_request) ;
+  register
+    "before_merging"
+    If.(on_tezos_namespace && merge_request)
+    ~jobs:(code_verification_pipeline Before_merging) ;
   register
     "octez_latest_release"
     ~jobs:[job_docker_promote_to_latest ~ci_docker_hub:true]
@@ -1034,9 +1069,6 @@ let () =
          job_build_static_binaries
            ~__POS__
            ~arch:Amd64
-             (* TODO: this job doesn't actually need trigger and there is no
-                need to set it optional since we know this job is only on the master branch. *)
-           ~needs_trigger:true
            ~rules:[job_rule ~when_:Always ()]
            ()
        in
@@ -1120,6 +1152,14 @@ let () =
               publish-sdk";
            ]
        in
+       (* arm builds are manual on the master branch pipeline *)
+       let build_arm_rules = [job_rule ~when_:Manual ~allow_failure:Yes ()] in
+       let job_build_arm64_release =
+         job_build_arm64_release ~rules:build_arm_rules ()
+       in
+       let job_build_arm64_exp_dev_extra =
+         job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
+       in
        [
          (* Stage: build *)
          job_docker_rust_toolchain;
@@ -1158,7 +1198,10 @@ let () =
     "non_release_tag_test"
     If.(not_on_tezos_namespace && push && has_non_release_tag)
     ~jobs:(release_tag_pipeline ~test:true Non_release_tag) ;
-  register "schedule_extended_test" schedule_extended_tests
+  register
+    "schedule_extended_test"
+    schedule_extended_tests
+    ~jobs:(code_verification_pipeline Schedule_extended_test)
 
 (* Split pipelines and writes image templates *)
 let config () =

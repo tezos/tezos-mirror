@@ -7,16 +7,7 @@ oc.build_arm64-exp-dev-extra:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: always
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - changes:
-    - src/**/*
-    - .gitlab/**/*
-    - .gitlab-ci.yml
-    when: manual
-    allow_failure: true
+  - when: always
   dependencies: []
   before_script:
   - ./scripts/ci/take_ownership.sh

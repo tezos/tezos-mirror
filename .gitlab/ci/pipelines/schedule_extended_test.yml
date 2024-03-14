@@ -4,15 +4,15 @@ include:
   - .gitlab/ci/jobs/sanity/docker:hadolint-schedule_extended_test.yml
 
   # Stage: build
-  - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra.yml
-  - .gitlab/ci/jobs/build/oc.build_arm64-released.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-exp-dev-extra-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_arm64-released-scheduled_extended_test.yml
   # Check that binary packages build
   - .gitlab/ci/jobs/build/oc.build:rpm:amd64.yml
   - .gitlab/ci/jobs/build/oc.build:dpkg:amd64.yml
   - .gitlab/ci/jobs/build/select_tezts.yml
 
   # These jobs are necessary to run flaky tezts
-  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-other.yml
+  - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-scheduled_extended_test.yml
   - .gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-other.yml
   - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml
   - .gitlab/ci/jobs/build/oc.build_x86_64-released.yml
@@ -22,7 +22,7 @@ include:
   # These jobs may not have been run in before_merging pipeline
   # because of absence of certain changes
   - .gitlab/ci/jobs/build/ocaml-check.yml
-  - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-experimental.yml
+  - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-scheduled_extended_test.yml
   - .gitlab/ci/jobs/doc/documentation.yml
 
   # Stage: packaging
