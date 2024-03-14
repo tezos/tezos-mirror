@@ -48,28 +48,81 @@ let override_legacy_nonces_flag = false
 
 type t = state
 
+(** [nonce_state] tracks the current state of committed nonces. It is used to
+    optimise nonce processing by further reducing queries for nonce metadata. *)
+type nonce_state =
+  | Committed
+      (** [Committed] is initial state and signals that the nonce was committed at
+          some cycle:
+       - If baker in current cycle: do nothing
+       - If baker in cycle + 1:
+           - If block with commitment is part of the
+             cannonical chain: then transition to injected
+           - else: safe to delete
+       - If current cycle > cycle + 1: too stale, so safe to delete *)
+  | Revealed of Raw_level.t
+      (** [Revealed] signals that the nonce revelation operation was injected at
+      [injected_level]
+      - At each level, get the last finalized block (level - 2)
+      - If the revelation operation found in that block: nonce is safe to
+        delete
+      - If not found:
+          - If pass `re_injection_threshold`:
+              - consider revelation operation lost, so re-inject
+              - transition to injected with updated level
+          - If pass `nonce_revelation_threshold`:
+              - missed out revelation operation, so delete
+          - else: do nothing *)
+
 type nonce_data = {
   nonce : Nonce.t;
+  nonce_hash : Nonce_hash.t;
+  block_hash : Block_hash.t; (* Keep around for legacy purposes *)
   cycle : Cycle.t option;
   level : Raw_level.t option;
   round : Round.t option;
+  nonce_state : nonce_state option;
 }
 
 type nonces = nonce_data Block_hash.Map.t
 
 let empty = Block_hash.Map.empty
 
+let nonce_state_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Committed"
+        (constant "committed")
+        (function Committed -> Some () | _ -> None)
+        (fun () -> Committed);
+      case
+        (Tag 1)
+        ~title:"Revealed"
+        (obj1 (req "injection_level" Raw_level.encoding))
+        (function
+          | Revealed injection_level -> Some injection_level | _ -> None)
+        (fun injection_level -> Revealed injection_level);
+    ]
+
 let nonce_data_encoding =
   let open Data_encoding in
   def "nonce_data"
   @@ conv
-       (fun {nonce; cycle; level; round} -> (nonce, cycle, level, round))
-       (fun (nonce, cycle, level, round) -> {nonce; cycle; level; round})
-       (obj4
+       (fun {nonce; nonce_hash; block_hash; cycle; level; round; nonce_state} ->
+         (nonce, nonce_hash, block_hash, cycle, level, round, nonce_state))
+       (fun (nonce, nonce_hash, block_hash, cycle, level, round, nonce_state) ->
+         {nonce; nonce_hash; block_hash; cycle; level; round; nonce_state})
+       (obj7
           (req "nonce" Nonce.encoding)
+          (req "hash" Nonce_hash.encoding)
+          (req "block" Block_hash.encoding)
           (opt "cycle" Cycle.encoding)
           (opt "level" Raw_level.encoding)
-          (opt "round" Round.encoding))
+          (opt "round" Round.encoding)
+          (opt "state" nonce_state_encoding))
 
 let legacy_encoding =
   let open Data_encoding in
@@ -146,9 +199,22 @@ let load (wallet : #Client_context.wallet) location =
       wallet#load nonces_location ~default:empty legacy_encoding
     in
     return
-    @@ Block_hash.Map.map
-         (fun nonce -> {nonce; cycle = None; level = None; round = None})
+    @@ Block_hash.Map.fold
+         (fun block_hash nonce acc ->
+           let data =
+             {
+               nonce;
+               nonce_hash = Nonce.hash nonce;
+               block_hash;
+               cycle = None;
+               level = None;
+               round = None;
+               nonce_state = None;
+             }
+           in
+           Block_hash.Map.add block_hash data acc)
          legacy_nonces
+         empty
 
 let save (wallet : #Client_context.wallet) location nonces =
   let open Lwt_result_syntax in
@@ -186,9 +252,22 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
       wallet#load nonces_location ~default:empty legacy_encoding
     in
     let detailed_nonces =
-      Block_hash.Map.map
-        (fun nonce -> {nonce; cycle = None; level = None; round = None})
+      Block_hash.Map.fold
+        (fun block_hash nonce acc ->
+          let data =
+            {
+              nonce;
+              nonce_hash = Nonce.hash nonce;
+              block_hash;
+              cycle = None;
+              level = None;
+              round = None;
+              nonce_state = None;
+            }
+          in
+          Block_hash.Map.add block_hash data acc)
         legacy_nonces
+        empty
     in
     wallet#write
       (get_detailed_nonces_location nonces_location)
@@ -337,7 +416,15 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
     add
       nonces
       block_hash
-      {nonce; cycle = Some cycle; level = Some level; round = Some round}
+      {
+        nonce;
+        nonce_hash = Nonce.hash nonce;
+        block_hash;
+        cycle = Some cycle;
+        level = Some level;
+        round = Some round;
+        nonce_state = None;
+      }
   in
   let* () = save cctxt nonces_location nonces in
   return_unit
