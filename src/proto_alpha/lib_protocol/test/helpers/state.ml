@@ -95,6 +95,19 @@ let update_map ?(log_updates = []) ~(f : account_map -> account_map) (state : t)
     log_updates ;
   new_state
 
+let update_map_es ?(log_updates = [])
+    ~(f : account_map -> account_map tzresult Lwt.t) (state : t) :
+    t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let log_updates = List.sort_uniq String.compare log_updates in
+  let* account_map = f state.account_map in
+  let new_state = {state with account_map} in
+  List.iter
+    (fun x ->
+      log_debug_balance_update x state.account_map new_state.account_map)
+    log_updates ;
+  return new_state
+
 let apply_burn amount src_name (state : t) : t =
   let f = apply_burn amount src_name in
   let state = update_map ~log_updates:[src_name] ~f state in

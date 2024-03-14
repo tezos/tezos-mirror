@@ -16,21 +16,13 @@ let apply_end_cycle current_cycle previous_block block state :
     State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
+  (* Sets initial frozen for future cycle *)
+  let* state = update_map_es ~f:(update_frozen_rights_cycle block) state in
   (* Apply all slashes *)
   let* state =
     Slashing_helpers.apply_all_slashes_at_cycle_end
       current_cycle
       previous_block
-      state
-  in
-  (* Sets initial frozen for future cycle *)
-  let state =
-    update_map
-      ~f:
-        (update_frozen_rights_cycle
-           (Cycle.add
-              current_cycle
-              (state.constants.consensus_rights_delay + 1)))
       state
   in
   (* Apply autostaking *)
