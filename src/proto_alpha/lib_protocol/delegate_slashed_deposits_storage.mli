@@ -25,10 +25,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module maintains the storage related to slashing of delegates for
-   double signing. In particular, it is responsible for maintaining the
-   {!Storage.Already_denounced}, {!Storage.Contract.Slashed_deposits}, and
-   {!Storage.Pending_denunciations} tables.
+(** This module handles the slashing of delegates for double signing.
+
+    It is behind the {!Alpha_context} abstraction: some functions are
+    re-exported in {!Alpha_context.Delegate}.
+
+    This module is responsible for maintaining the
+    {!Storage.Contract.Slashed_deposits} table. It also interacts
+    heavily with {!Pending_denunciations_storage}.
 *)
 
 (** The [reward_and_burn] type embeds amounts involved when slashing a
