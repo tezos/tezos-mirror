@@ -94,7 +94,6 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
         // Store the transactions in the delayed inbox.
-        log!(host, Info, "Number of txs: {}", transactions.len());
         for transaction in transactions {
             delayed_inbox.save_transaction(
                 host,
