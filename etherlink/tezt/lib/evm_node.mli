@@ -225,3 +225,18 @@ val init_from_rollup_node_data_dir :
     instructions stored in [dump_json] to an RLP list, which is
     stored in [dump_rlp].  *)
 val transform_dump : dump_json:string -> dump_rlp:string -> unit Lwt.t
+
+(** [chunk data ?devmode ~rollup_address ?sequencer_key ?timestamp ?parent_hash
+    ?number ?client data] generates the valid inputs for the rollup at
+    [rollup_address] from the given [data]. If [sequencer_key] is given, the
+    data produced is for the sequencer mode. *)
+val chunk_data :
+  ?devmode:bool ->
+  rollup_address:string ->
+  ?sequencer_key:string ->
+  ?timestamp:string ->
+  ?parent_hash:string ->
+  ?number:int ->
+  ?client:Client.t ->
+  string list ->
+  string list Lwt.t
