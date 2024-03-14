@@ -768,6 +768,8 @@ let args1 a = a
 
 let args2 a b = Pair (a, b)
 
+let merge_options = args2
+
 let args3 a b c =
   map_arg
     ~f:(fun _ ((a, b), c) -> Lwt_result_syntax.return (a, b, c))

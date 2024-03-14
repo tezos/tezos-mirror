@@ -27,9 +27,23 @@
 
 type t
 
-(** [start node_ctxt config] starts an RPC server listening for requests on the
-    port [config.rpc_port] and address [config.rpc_addr]. *)
-val start : Configuration.t -> unit Tezos_rpc.Directory.t -> t tzresult Lwt.t
+module Acl : sig
+  val allow_all : Resto_acl.Acl.t
+
+  val secure : Resto_acl.Acl.t
+
+  val default : P2p_addr.t -> Resto_acl.Acl.t
+end
+
+(** [start ~rpc_addr ~rpc_port ~acl ~cors node_ctxt config] starts an RPC server
+    listening for requests on the port [rpc_port] and address [rpc_addr]. *)
+val start :
+  rpc_addr:string ->
+  rpc_port:int ->
+  acl:Tezos_rpc_http_server.RPC_server.Acl.policy ->
+  cors:Resto_cohttp.Cors.t ->
+  unit Tezos_rpc.Directory.t ->
+  t tzresult Lwt.t
 
 (** Shutdown a running RPC server. When this function is called, the rollup node
     will stop listening to incoming requests. *)
