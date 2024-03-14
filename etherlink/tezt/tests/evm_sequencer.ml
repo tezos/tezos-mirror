@@ -134,8 +134,9 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
     {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_governance}
 
 let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
-    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) ?(kernel = Constant.WASM.evm_kernel)
     ?da_fee ?minimum_base_fee_per_gas ?preimages_dir protocol =
@@ -199,6 +200,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
         sequencer = sequencer.alias;
         genesis_timestamp;
         max_blueprints_lag;
+        max_blueprints_ahead;
         max_blueprints_catchup;
         catchup_cooldown;
         devmode;
@@ -375,6 +377,53 @@ let test_publish_blueprints =
      we put a small sleep to make the least flaky possible. *)
   let* () = Lwt_unix.sleep 2. in
   check_head_consistency ~left:sequencer ~right:proxy ()
+
+let test_sequencer_too_ahead =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "max_blueprint_ahead"]
+    ~title:"Sequencer locks production if it's too ahead"
+    ~uses
+  @@ fun protocol ->
+  let max_blueprints_ahead = 5 in
+  let* {sequencer; sc_rollup_node; proxy; client; sc_rollup_address; _} =
+    setup_sequencer ~max_blueprints_ahead ~time_between_blocks:Nothing protocol
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  let* () = Evm_node.terminate proxy in
+  let* () =
+    repeat (max_blueprints_ahead * 2) (fun () ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  and* () =
+    Evm_node.wait_for sequencer "block_producer_locked.v0" (fun _json ->
+        Some ())
+  in
+  let*@ block_number = Rpc.block_number sequencer in
+  Check.((block_number = 6l) int32)
+    ~error_msg:"The sequencer should have been locked" ;
+  let* () = Evm_node.terminate sequencer in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+  let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run proxy in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let new_blocks = 3l in
+  let* () =
+    repeat (Int32.to_int new_blocks) (fun () ->
+        let*@ _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let previous_block_number = block_number in
+  let*@ block_number = Rpc.block_number sequencer in
+  Check.((block_number = Int32.add previous_block_number new_blocks) int32)
+    ~error_msg:"The sequencer should have been unlocked" ;
+  unit
 
 let test_resilient_to_rollup_node_disconnect =
   Protocol.register_test
@@ -2183,6 +2232,7 @@ let () =
   test_remove_sequencer protocols ;
   test_persistent_state protocols ;
   test_publish_blueprints protocols ;
+  test_sequencer_too_ahead protocols ;
   test_resilient_to_rollup_node_disconnect protocols ;
   test_can_fetch_smart_rollup_address protocols ;
   test_can_fetch_blueprint protocols ;

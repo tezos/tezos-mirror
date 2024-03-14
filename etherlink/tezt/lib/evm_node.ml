@@ -37,6 +37,7 @@ type mode =
       sequencer : string;
       genesis_timestamp : Client.timestamp option;
       max_blueprints_lag : int option;
+      max_blueprints_ahead : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
       devmode : bool;
@@ -381,6 +382,7 @@ let run_args evm_node =
           sequencer;
           genesis_timestamp;
           max_blueprints_lag;
+          max_blueprints_ahead;
           max_blueprints_catchup;
           catchup_cooldown;
           devmode;
@@ -405,6 +407,10 @@ let run_args evm_node =
             "maximum-blueprints-lag"
             string_of_int
             max_blueprints_lag
+        @ Cli_arg.optional_arg
+            "maximum-blueprints-ahead"
+            string_of_int
+            max_blueprints_ahead
         @ Cli_arg.optional_arg
             "maximum-blueprints-catch-up"
             string_of_int
