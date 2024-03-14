@@ -81,37 +81,44 @@ let get_hashes ~transactions ~delayed_transactions =
 let produce_block ~(ctxt : Evm_context.t) ~cctxt ~smart_rollup_address
     ~sequencer_key ~force ~timestamp =
   let open Lwt_result_syntax in
-  let* transactions, delayed_transactions = Tx_pool.pop_transactions () in
-  let n = List.length transactions + List.length delayed_transactions in
-  if force || n > 0 then
-    Helpers.with_timing
-      (Blueprint_events.blueprint_production ctxt.session.next_blueprint_number)
-    @@ fun () ->
-    let*? hashes = get_hashes ~transactions ~delayed_transactions in
-    let* blueprint =
-      Helpers.with_timing
-        (Blueprint_events.blueprint_proposal ctxt.session.next_blueprint_number)
-      @@ fun () ->
-      Sequencer_blueprint.create
-        ~sequencer_key
-        ~cctxt
-        ~timestamp
-        ~smart_rollup_address
-        ~transactions
-        ~delayed_transactions
-        ~parent_hash:ctxt.Evm_context.session.current_block_hash
-        ~number:ctxt.Evm_context.session.next_blueprint_number
-    in
-    let* () =
-      Evm_context.apply_and_publish_blueprint ctxt timestamp blueprint
-    in
-    let*! () =
-      List.iter_p
-        (fun hash -> Block_producer_events.transaction_selected ~hash)
-        hashes
-    in
-    return n
-  else return 0
+  let* tx_pool_response = Tx_pool.pop_transactions () in
+  match tx_pool_response with
+  | Transactions (transactions, delayed_transactions) ->
+      let n = List.length transactions + List.length delayed_transactions in
+      if force || n > 0 then
+        Helpers.with_timing
+          (Blueprint_events.blueprint_production
+             ctxt.session.next_blueprint_number)
+        @@ fun () ->
+        let*? hashes = get_hashes ~transactions ~delayed_transactions in
+        let* blueprint =
+          Helpers.with_timing
+            (Blueprint_events.blueprint_proposal
+               ctxt.session.next_blueprint_number)
+          @@ fun () ->
+          Sequencer_blueprint.create
+            ~sequencer_key
+            ~cctxt
+            ~timestamp
+            ~smart_rollup_address
+            ~transactions
+            ~delayed_transactions
+            ~parent_hash:ctxt.Evm_context.session.current_block_hash
+            ~number:ctxt.Evm_context.session.next_blueprint_number
+        in
+        let* _ctxt =
+          Evm_context.apply_and_publish_blueprint ctxt timestamp blueprint
+        in
+        let*! () =
+          List.iter_p
+            (fun hash -> Block_producer_events.transaction_selected ~hash)
+            hashes
+        in
+        return n
+      else return 0
+  | Locked ->
+      let*! () = Block_producer_events.production_locked () in
+      return 0
 
 module Handlers = struct
   type self = worker

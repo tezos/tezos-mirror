@@ -34,6 +34,16 @@ module Event = struct
       ~msg:"Stopping the block producer follower"
       ~level:Notice
       ()
+
+  let production_locked =
+    declare_0
+      ~section
+      ~name:"block_producer_locked"
+      ~msg:
+        "Transaction pool is locked, block production as well. The sequencer \
+         is progressing too far in advance in comparison to the rollup node."
+      ~level:Error
+      ()
 end
 
 let transaction_selected ~hash =
@@ -42,3 +52,5 @@ let transaction_selected ~hash =
 let started () = Internal_event.Simple.emit Event.started ()
 
 let shutdown () = Internal_event.Simple.emit Event.shutdown ()
+
+let production_locked () = Internal_event.Simple.emit Event.production_locked ()

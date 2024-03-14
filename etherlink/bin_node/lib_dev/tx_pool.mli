@@ -13,6 +13,10 @@ type parameters = {
   mode : mode;
 }
 
+type popped_transactions =
+  | Locked
+  | Transactions of string list * Ethereum_types.Delayed_transaction.t list
+
 (** [start parameters] starts the tx-pool *)
 val start : parameters -> unit tzresult Lwt.t
 
@@ -34,11 +38,17 @@ val add_delayed :
 val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
 
 (** [pop_transactions ()] pops the valid transactions from the pool. *)
-val pop_transactions :
-  unit ->
-  (string list * Ethereum_types.Delayed_transaction.t list) tzresult Lwt.t
+val pop_transactions : unit -> popped_transactions tzresult Lwt.t
 
 (** [pop_and_inject_transactions ()] pops the valid transactions from
     the pool using {!pop_transactions }and injects them using
     [inject_raw_transactions] provided by {!parameters.rollup_node}. *)
 val pop_and_inject_transactions : unit -> unit tzresult Lwt.t
+
+(** [lock_transactions] locks the transactions in the pool, new transactions
+    can be added but nothing can be retrieved with {!pop_transactions}. *)
+val lock_transactions : unit -> unit tzresult Lwt.t
+
+(** [unlock_transactions] unlocks the transactions if it was locked by
+    {!lock_transactions}. *)
+val unlock_transactions : unit -> unit tzresult Lwt.t
