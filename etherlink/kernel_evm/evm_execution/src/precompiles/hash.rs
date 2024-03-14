@@ -89,3 +89,75 @@ pub fn ripemd160_precompile<Host: Runtime>(
         estimated_ticks,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use evm::{ExitReason, ExitSucceed};
+    use primitive_types::H160;
+
+    use crate::{
+        handler::ExecutionOutcome, precompiles::test_helpers::execute_precompiled,
+    };
+
+    #[test]
+    fn call_sha256() {
+        // act
+        let input: &[u8] = &[0xFF];
+        let address = H160::from_low_u64_be(2u64);
+        let result = execute_precompiled(address, input, None, Some(22000));
+
+        // assert
+        let expected_hash = hex::decode(
+            "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+        )
+        .expect("Result should be hex string");
+
+        let expected_gas = 21000 // base cost
+            + 72 // sha256 cost
+            + 16; // transaction data cost
+
+        let expected = ExecutionOutcome {
+            gas_used: expected_gas,
+            is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
+            new_address: None,
+            logs: vec![],
+            result: Some(expected_hash),
+            withdrawals: vec![],
+            estimated_ticks_used: 75_000,
+        };
+
+        assert_eq!(Ok(expected), result);
+    }
+
+    #[test]
+    fn call_ripemd() {
+        // act
+        let input: &[u8] = &[0xFF];
+        let address = H160::from_low_u64_be(3u64);
+        let result = execute_precompiled(address, input, None, Some(22000));
+
+        // assert
+        let expected_hash = hex::decode(
+            "0000000000000000000000002c0c45d3ecab80fe060e5f1d7057cd2f8de5e557",
+        )
+        .expect("Result should be hex string");
+
+        let expected_gas = 21000 // base cost
+        + 600 + 120// ripeMD cost
+        + 16; // transaction data cost
+
+        let expected = ExecutionOutcome {
+            gas_used: expected_gas,
+            is_success: true,
+            reason: ExitReason::Succeed(ExitSucceed::Returned).into(),
+            new_address: None,
+            logs: vec![],
+            result: Some(expected_hash),
+            withdrawals: vec![],
+            estimated_ticks_used: 70_000,
+        };
+
+        assert_eq!(Ok(expected), result);
+    }
+}
