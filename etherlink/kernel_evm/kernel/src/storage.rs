@@ -1072,6 +1072,18 @@ mod internal_for_tests {
         let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
         Ok(receipt)
     }
+
+    pub fn store_current_block_number<Host: Runtime>(
+        host: &mut Host,
+        block_number: U256,
+    ) -> Result<(), Error> {
+        let current_block_path = OwnedPath::from(EVM_CURRENT_BLOCK);
+        let number_path = concat(&current_block_path, &BLOCK_NUMBER)?;
+        let mut le_block_number: [u8; 32] = [0; 32];
+        block_number.to_little_endian(&mut le_block_number);
+        host.store_write(&number_path, &le_block_number, 0)
+            .map_err(Error::from)
+    }
 }
 
 #[cfg(test)]

@@ -5,16 +5,18 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::configuration::TezosContracts;
+use crate::delayed_inbox::DelayedInbox;
 use crate::parsing::{
     Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
     MAX_SIZE_PER_CHUNK,
 };
-use crate::sequencer_blueprint::SequencerBlueprint;
+
 use crate::storage::{
     chunked_hash_transaction_path, chunked_transaction_num_chunks,
     chunked_transaction_path, clear_events, create_chunked_transaction,
-    get_and_increment_deposit_nonce, read_last_info_per_level_timestamp,
+    get_and_increment_deposit_nonce, read_l1_level, read_last_info_per_level_timestamp,
     remove_chunked_transaction, remove_sequencer, store_l1_level,
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
@@ -166,9 +168,8 @@ impl Transaction {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct InboxContent {
+pub struct ProxyInboxContent {
     pub transactions: Vec<Transaction>,
-    pub sequencer_blueprints: Vec<SequencerBlueprint>,
 }
 
 pub fn read_input<Host: Runtime, Mode: Parsable>(
@@ -197,18 +198,31 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
 
 /// The InputHandler abstracts how the input is handled once it has been parsed.
 pub trait InputHandler {
+    /// Abstracts the type used to store the inputs once handled
+    type Inbox;
+
     fn handle_input<Host: Runtime>(
         host: &mut Host,
         input: Self,
-        inbox_content: &mut InboxContent,
+        inbox_content: &mut Self::Inbox,
+    ) -> anyhow::Result<()>;
+
+    fn handle_deposit<Host: Runtime>(
+        host: &mut Host,
+        deposit: Deposit,
+        inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()>;
 }
 
 impl InputHandler for ProxyInput {
+    // In case of the proxy, the Inbox is unchanged: we keep the InboxContent as
+    // everything is doable in a single kernel_run.
+    type Inbox = ProxyInboxContent;
+
     fn handle_input<Host: Runtime>(
         host: &mut Host,
         input: Self,
-        inbox_content: &mut InboxContent,
+        inbox_content: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
         match input {
             Self::SimpleTransaction(tx) => inbox_content.transactions.push(*tx),
@@ -232,21 +246,59 @@ impl InputHandler for ProxyInput {
         }
         Ok(())
     }
+
+    fn handle_deposit<Host: Runtime>(
+        host: &mut Host,
+        deposit: Deposit,
+        inbox_content: &mut Self::Inbox,
+    ) -> anyhow::Result<()> {
+        inbox_content
+            .transactions
+            .push(handle_deposit(host, deposit)?);
+        Ok(())
+    }
 }
 
 impl InputHandler for SequencerInput {
+    // For the sequencer, inputs are stored directly in the storage. The delayed
+    // inbox represents part of the storage, but `Unit` would also be enough as
+    // there is nothing to return in the end.
+    type Inbox = DelayedInbox;
+
     fn handle_input<Host: Runtime>(
-        _host: &mut Host,
+        host: &mut Host,
         input: Self,
-        inbox_content: &mut InboxContent,
+        delayed_inbox: &mut Self::Inbox,
     ) -> anyhow::Result<()> {
         match input {
-            Self::DelayedInput(tx) => inbox_content.transactions.push(*tx),
+            Self::DelayedInput(tx) => {
+                let previous_timestamp = read_last_info_per_level_timestamp(host)?;
+                let level = read_l1_level(host)?;
+                delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)?
+            }
             Self::SequencerBlueprint(seq_blueprint) => {
-                inbox_content.sequencer_blueprints.push(seq_blueprint)
+                log!(
+                    host,
+                    Debug,
+                    "Storing chunk {} of sequencer blueprint number {}",
+                    seq_blueprint.blueprint.chunk_index,
+                    seq_blueprint.blueprint.number
+                );
+                store_sequencer_blueprint(host, seq_blueprint)?
             }
         }
         Ok(())
+    }
+
+    fn handle_deposit<Host: Runtime>(
+        host: &mut Host,
+        deposit: Deposit,
+        delayed_inbox: &mut Self::Inbox,
+    ) -> anyhow::Result<()> {
+        let previous_timestamp = read_last_info_per_level_timestamp(host)?;
+        let level = read_l1_level(host)?;
+        let tx = handle_deposit(host, deposit)?;
+        delayed_inbox.save_transaction(host, tx, previous_timestamp, level)
     }
 }
 
@@ -349,7 +401,7 @@ fn force_kernel_upgrade(host: &mut impl Runtime) -> anyhow::Result<()> {
 pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
-    inbox_content: &mut InboxContent,
+    inbox_content: &mut Mode::Inbox,
 ) -> anyhow::Result<()> {
     match input {
         Input::ModeSpecific(input) => Mode::handle_input(host, input, inbox_content)?,
@@ -364,9 +416,7 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
             store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
             store_l1_level(host, info.level)?
         }
-        Input::Deposit(deposit) => inbox_content
-            .transactions
-            .push(handle_deposit(host, deposit)?),
+        Input::Deposit(deposit) => Mode::handle_deposit(host, deposit, inbox_content)?,
         Input::ForceKernelUpgrade => force_kernel_upgrade(host)?,
     }
     Ok(())
@@ -384,7 +434,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     tezos_contracts: &TezosContracts,
     parsing_context: &Mode::Context,
     inbox_is_empty: &mut bool,
-    res: &mut InboxContent,
+    res: &mut Mode::Inbox,
 ) -> anyhow::Result<ReadStatus> {
     let input: InputResult<Mode> = read_input(
         host,
@@ -425,10 +475,9 @@ pub fn read_proxy_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
-) -> Result<Option<InboxContent>, anyhow::Error> {
-    let mut res = InboxContent {
+) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
+    let mut res = ProxyInboxContent {
         transactions: vec![],
-        sequencer_blueprints: vec![],
     };
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
@@ -470,11 +519,8 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     tezos_contracts: &TezosContracts,
     delayed_bridge: ContractKt1Hash,
     sequencer: PublicKey,
-) -> Result<Option<InboxContent>, anyhow::Error> {
-    let mut res = InboxContent {
-        transactions: vec![],
-        sequencer_blueprints: vec![],
-    };
+    delayed_inbox: &mut DelayedInbox,
+) -> Result<bool, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
     // variable remains true, that means that the inbox was already consumed
@@ -491,7 +537,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
             tezos_contracts,
             &parsing_context,
             &mut inbox_is_empty,
-            &mut res,
+            delayed_inbox,
         ) {
             Err(err) =>
             // If we failed to read or dispatch the input.
@@ -507,8 +553,8 @@ pub fn read_sequencer_inbox<Host: Runtime>(
                 )
             }
             Ok(ReadStatus::Ongoing) => (),
-            Ok(ReadStatus::FinishedRead) => return Ok(Some(res)),
-            Ok(ReadStatus::FinishedIgnore) => return Ok(None),
+            Ok(ReadStatus::FinishedRead) => return Ok(true),
+            Ok(ReadStatus::FinishedIgnore) => return Ok(false),
         }
     }
 }
@@ -903,9 +949,8 @@ mod tests {
                 .unwrap();
         assert_eq!(
             inbox_content,
-            InboxContent {
+            ProxyInboxContent {
                 transactions: vec![],
-                sequencer_blueprints: vec![]
             }
         );
 
