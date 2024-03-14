@@ -157,6 +157,7 @@ function run_profiler(path, logs) {
             precompiles: [],
             blueprint_chunks: [],
             tx_type: [],
+            reason: []
         }
         let nb_reboots = 0;
 
@@ -208,6 +209,7 @@ function run_profiler(path, logs) {
             push_match(output, results.bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
             push_match(output, results.blueprint_chunks, /\[Benchmarking\] number of blueprint chunks read:\s*(\d+)/g)
             push_match(output, results.tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
+            push_match(output, results.reason, /\[Benchmarking\] reason: ([A-Za-z()_]+)\b/g)
             push_profiler_sections(output, results.opcodes, results.precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
@@ -224,6 +226,7 @@ function run_profiler(path, logs) {
             check(results.block_in_progress_store.length, nb_reboots, "Missing stored block size value $?")
             check(results.block_in_progress_read.length, nb_reboots, "Missing read bip size value $?")
             check(results.tx_status.length, results.tx_type.length, "Missing transaction type $?")
+            check(results.tx_status.length, results.reason.length, "Missing transaction exit reason $?")
             resolve(results);
         });
     })
@@ -344,6 +347,7 @@ function log_benchmark_result(benchmark_name, data) {
             Object.assign(row,
                 {
                     gas_cost: data.gas_costs[gas_cost_index],
+                    reason: data.reason?.[j],
                     run_transaction_ticks: data.run_transaction_ticks?.[j],
                     sputnik_runtime_ticks: data.sputnik_runtime_ticks?.[j],
                     store_transaction_object_ticks: data.store_transaction_object_ticks?.[j],
@@ -450,7 +454,7 @@ function get_headers(array, seed) {
 }
 
 function initialize_headers(output, benchmark_log) {
-    let headers = get_headers(benchmark_log, ["benchmark_name", "status"]);
+    let headers = get_headers(benchmark_log, ["benchmark_name", "status", "tx_type", "reason"]);
     let benchmark_csv_config = { columns: headers }
     fs.writeFileSync(output, csv.stringify([], { header: true, ...benchmark_csv_config }));
     return benchmark_csv_config;
@@ -498,5 +502,9 @@ async function run_all_benchmarks(benchmark_scripts) {
     execSync("rm transactions.json");
 }
 
-benchmark_scripts = require("./benchmarks_list.json")
+// we exclude bench_loop_calldataload because with the current tick model it
+// puts the kernel in a stuck mode
+const excluded_benchmark = ["benchmarks/bench_loop_calldataload.js"]
+benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(name))
+
 run_all_benchmarks(benchmark_scripts.filter(filter_name));

@@ -541,6 +541,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     if let Some(outcome) = &mut execution_outcome {
         log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
         log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
+        log!(host, Benchmarking, "reason: {:?}", outcome.reason);
         fee_updates.modify_outcome(outcome);
         post_withdrawals(host, outbox_queue, &outcome.withdrawals, ticketer)?
     }
