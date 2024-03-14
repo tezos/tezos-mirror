@@ -351,4 +351,18 @@ export class Simulator {
       this.config.proto.fixed_baking_rewards,
     );
   }
+
+  baking_reward_bonus_per_slot(cycle) {
+    const bonus_committee_size =
+      this.config.proto.consensus_committee_size -
+      this.config.proto.consensus_threshold;
+    if (bonus_committee_size == 0) {
+      return 0;
+    }
+    return this.#reward_from_constants(
+      cycle,
+      this.config.proto.bonus_baking_rewards,
+      bonus_committee_size,
+    );
+  }
 }
