@@ -236,4 +236,15 @@ export class Simulator {
     );
     return bigRat(total_frozen_stake).divide(total_supply);
   }
+
+  static_rate_for_next_cycle(cycle) {
+    const next_cycle = cycle + 1;
+    const staked_ratio = this.staked_ratio_for_next_cycle(cycle);
+    const ratio_min = this.minimum_ratio(next_cycle);
+    const ratio_max = this.maximum_ratio(next_cycle);
+    const static_rate = staked_ratio.eq(0)
+      ? ratio_max
+      : bigRat(1, 1600).multiply(bigRat.one.divide(staked_ratio.pow(2)));
+    return bigRat.clip(static_rate, ratio_min, ratio_max);
+  }
 }
