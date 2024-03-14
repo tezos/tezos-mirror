@@ -28,6 +28,7 @@ pub mod precompiles;
 pub mod storage;
 pub mod tick_model_opcodes;
 pub mod transaction;
+pub mod transaction_layer_data;
 pub mod utilities;
 
 pub use evm::Config;

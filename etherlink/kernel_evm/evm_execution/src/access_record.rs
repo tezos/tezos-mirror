@@ -13,7 +13,7 @@ pub struct AccessRecord {
 }
 
 impl AccessRecord {
-    pub fn new() -> Self {
+    pub fn default() -> Self {
         AccessRecord {
             accessed_storage_keys: BTreeSet::new(),
             accessed_addresses: BTreeSet::new(),
