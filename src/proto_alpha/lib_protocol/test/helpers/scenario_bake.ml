@@ -218,8 +218,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let* () = check_all_balances block state in
   return (block, state)
 
-(** Bake until a cycle is reached, using [bake] instead of [Block.bake]
-    Should be slower because checks balances at the end of every block (avoidable in some cases) *)
+(** Bake until a cycle is reached, using [bake] instead of [Block.bake] *)
 let bake_until_next_cycle : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
   let open Lwt_result_syntax in
@@ -231,6 +230,20 @@ let bake_until_next_cycle : t -> t tzresult Lwt.t =
     else
       let* new_block, new_state = bake (old_block, old_state) in
       step (new_block, new_state)
+  in
+  step (init_block, init_state)
+
+(** Bake all the remaining blocks of the current cycle *)
+let bake_until_dawn_of_next_cycle : t -> t tzresult Lwt.t =
+ fun (init_block, init_state) ->
+  let open Lwt_result_syntax in
+  let current_cycle = Block.current_cycle init_block in
+  let rec step (old_block, old_state) =
+    let* new_block, new_state = bake (old_block, old_state) in
+    let step_cycle = Block.current_cycle new_block in
+    if Protocol.Alpha_context.Cycle.(step_cycle > current_cycle) then
+      return (old_block, old_state)
+    else step (new_block, new_state)
   in
   step (init_block, init_state)
 

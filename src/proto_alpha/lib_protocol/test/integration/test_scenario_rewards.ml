@@ -18,7 +18,56 @@ open State_account
 open Tez_helpers.Ez_tez
 open Scenario
 
-let test_wait_with_rewards =
+(** Test reward distribution without AI and without autostaking.
+    [State_account.add_*_rewards] ensures the rewards are distributed
+    correctly, and it is checked at the end of every block.
+*)
+let test_wait_rewards_no_ai_no_auto =
+  (* Prime number to always trigger roundings *)
+  init_constants ~reward_per_block:1_000_000_007L ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai `No
+  --> begin_test ["delegate1"; "delegate2"; "delegate3"]
+  --> wait_n_cycles 20
+
+(** Test reward distribution without AI and with autostaking.
+    We expect autostaking to keep the ratio total/frozen equal to
+    [limit_of_delegation_over_baking + 1], rounding towards frozen.
+*)
+let test_wait_rewards_no_ai_yes_auto =
+  let open Lwt_result_syntax in
+  let check_balanced_balance src_name =
+    exec_unit (fun (_block, state) ->
+        let src_balance, src_total =
+          balance_and_total_balance_of_account src_name state.State.account_map
+        in
+        let rat = state.constants.limit_of_delegation_over_baking + 1 in
+        let expected_frozen =
+          Tez_helpers.(mul_q src_total Q.(1 // rat) |> of_q ~round:`Up)
+        in
+        let* () =
+          Assert.equal_tez
+            ~loc:__LOC__
+            expected_frozen
+            (Tez_helpers.of_q ~round:`Down src_balance.staked_b)
+        in
+        return_unit)
+  in
+  let check_all_balanced_balances = unfold check_balanced_balance in
+  let all_delegates = ["delegate1"; "delegate2"; "delegate3"] in
+  init_constants ~reward_per_block:1_000_000_007L ()
+  --> set S.Adaptive_issuance.autostaking_enable true
+  --> activate_ai `No --> begin_test all_delegates
+  --> loop
+        20
+        (exec bake_until_dawn_of_next_cycle
+        --> check_all_balanced_balances all_delegates
+        --> next_block)
+
+(** Tests reward distribution under AI:
+    - with and without stakers;
+    - with different values of edge. *)
+let test_wait_rewards_with_ai =
   let set_edge pct =
     let params =
       {
@@ -28,51 +77,89 @@ let test_wait_with_rewards =
     in
     set_delegate_params "delegate" params
   in
-  init_constants ~reward_per_block:1_000_000_000L ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Zero_threshold
+  init_constants ~reward_per_block:1_000_000_007L ()
+  --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
-  --> set_baker "faucet"
   --> (Tag "edge = 0" --> set_edge 0.
       |+ Tag "edge = 0.24" --> set_edge 0.24
-      |+ Tag "edge = 0.11..." --> set_edge 0.1111111111
+      |+ Tag "edge = 0.11... repeating" --> set_edge 0.1111111111
       |+ Tag "edge = 1" --> set_edge 1.)
-  --> add_account_with_funds
-        "staker1"
-        ~funder:"faucet"
-        (Amount (Tez.of_mutez 2_000_000_000L))
-  --> add_account_with_funds
-        "staker2"
-        ~funder:"faucet"
-        (Amount (Tez.of_mutez 2_000_000_000L))
-  --> add_account_with_funds
-        "staker3"
-        ~funder:"faucet"
-        (Amount (Tez.of_mutez 2_000_000_000L))
-  --> set_delegate "staker1" (Some "delegate")
-  --> set_delegate "staker2" (Some "delegate")
-  --> set_delegate "staker3" (Some "delegate")
-  --> set_baker "delegate"
-  --> (Tag "block step" --> wait_n_blocks 200
-      |+ Tag "cycle step" --> wait_n_cycles 20
-      |+ Tag "wait AI activation" --> next_block --> wait_ai_activation
-         --> (Tag "no staker" --> Empty
-             |+ Tag "one staker"
-                --> stake "staker1" (Amount (Tez.of_mutez 450_000_111L))
+  --> wait_delegate_parameters_activation --> next_cycle
+  --> (Tag "no staker" --> Empty
+      |+ Tag "one staker"
+         --> add_account_with_funds
+               "staker1"
+               ~funder:"faucet"
+               (Amount (Tez.of_mutez 2_000_000_000L))
+         --> set_delegate "staker1" (Some "delegate")
+         --> stake "staker1" (Amount (Tez.of_mutez 444_000_111L))
+         --> (Empty
              |+ Tag "two stakers"
-                --> stake "staker1" (Amount (Tez.of_mutez 444_000_111L))
+                --> add_account_with_funds
+                      "staker2"
+                      ~funder:"faucet"
+                      (Amount (Tez.of_mutez 2_000_000_000L))
+                --> set_delegate "staker2" (Some "delegate")
                 --> stake "staker2" (Amount (Tez.of_mutez 333_001_987L))
-                --> set_baker "delegate"
-             |+ Tag "three stakers"
-                --> stake "staker1" (Amount (Tez.of_mutez 444_000_111L))
-                --> stake "staker2" (Amount (Tez.of_mutez 333_001_987L))
-                --> stake "staker3" (Amount (Tez.of_mutez 123_456_788L)))
-         --> (Tag "block step" --> wait_n_blocks 100
-             |+ Tag "cycle step" --> wait_n_cycles 10))
-  --> Tag "staker 1 unstakes half..." --> unstake "staker1" Half
-  --> (Tag "block step" --> wait_n_blocks 100
-      |+ Tag "cycle step" --> wait_n_cycles 10)
+                --> (Empty
+                    |+ Tag "three stakers! ha ha ha"
+                       --> add_account_with_funds
+                             "staker3"
+                             ~funder:"faucet"
+                             (Amount (Tez.of_mutez 2_000_000_000L))
+                       --> set_delegate "staker3" (Some "delegate")
+                       --> stake "staker3" (Amount (Tez.of_mutez 123_456_788L))
+                    )))
+  --> set_baker "delegate" --> wait_n_cycles 20
 
+(** Tests reward distribution under AI for one baker and one staker,
+    and different arbitrary events:
+    staking, unstaking, finalizing, slashing *)
+let test_wait_rewards_with_ai_staker_variation =
+  let set_edge pct =
+    let params =
+      {
+        limit_of_staking_over_baking = Q.one;
+        edge_of_baking_over_staking = Q.of_float pct;
+      }
+    in
+    set_delegate_params "delegate" params
+  in
+  init_constants ~reward_per_block:1_000_000_007L ()
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
+  --> set_edge 0.24 --> wait_delegate_parameters_activation --> next_cycle
+  --> add_account_with_funds
+        "staker"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 20_000_000_000L))
+  --> set_delegate "staker" (Some "delegate")
+  --> stake "staker" (Amount (Tez.of_mutez 12_444_000_111L))
+  --> set_baker "delegate"
+  (* Regular rewards *)
+  --> wait_n_cycles 7
+  (* Staker unstakes some *)
+  --> unstake "staker" Half
+  --> wait_n_cycles 4
+  (* Staker restakes some *)
+  --> stake "staker" Half
+  (* Reactivate another baker for allowing it to bake later *)
+  --> set_delegate "faucet" (Some "faucet")
+  --> wait_n_cycles 4
+  (* Add unstake requests in the mix *)
+  --> unstake "staker" Half
+  --> next_cycle
+  (* Double bake for the delegate *)
+  --> set_baker "faucet"
+  --> double_bake "delegate" --> make_denunciations ()
+  (* Wait for the delegate to not be forbidden anymore *)
+  --> wait_n_cycles 10
+  (* Reactivate it, make it bake, and see everything is as before *)
+  --> set_delegate "delegate" (Some "delegate")
+  --> wait_n_cycles 4 --> set_baker "delegate" --> wait_n_cycles 10
+
+(** Tests that the activation time for AI is as expected:
+    The expected delay is [consensus_rights_delay] + 1 cycles after activation. *)
 let test_ai_curve_activation_time =
   let consensus_rights_delay (_, state) =
     state.State.constants.consensus_rights_delay
@@ -92,12 +179,17 @@ let test_ai_curve_activation_time =
      We go from 1000tz per day to (at most) 5% of 4_000_000tz per year *)
   --> check_rate_evolution Q.gt
 
-let test_static =
+(** Integration test for Adaptive Issuance.
+    Tests that the curve is decreasing wrt stake ratio. *)
+let test_static_decreasing =
   let rate_var_lag = Default_parameters.constants_test.consensus_rights_delay in
-  let init_params =
-    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
-  in
   let delta = Amount (Tez.of_mutez 20_000_000_000L) in
+  let q_almost_equal x y =
+    let rat = Q.div x y in
+    (* ~ inverse square root of total supply *)
+    let epsilon = Q.(1 // 100_000) in
+    Q.(rat >= one - epsilon && rat <= one + epsilon)
+  in
   let cycle_stake =
     save_current_rate --> stake "delegate" delta --> next_cycle
     --> check_rate_evolution Q.gt
@@ -107,14 +199,26 @@ let test_static =
     --> check_rate_evolution Q.lt
   in
   let cycle_stable =
-    save_current_rate --> next_cycle --> check_rate_evolution Q.equal
+    save_current_rate --> next_cycle --> check_rate_evolution q_almost_equal
   in
-  init_constants ~reward_per_block:1_000_000_000L ~deactivate_dynamic:true ()
+  init_constants ~reward_per_block:1L ~deactivate_dynamic:true ()
+  (* Set rate bounds that should not be reached *)
   --> set S.Adaptive_issuance.autostaking_enable false
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_min
+        Q.(1 // 100_000)
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_initial_min
+        Q.(1 // 100_000)
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_max
+        Q.one
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_initial_max
+        Q.one
   --> activate_ai `Zero_threshold
   --> begin_test ~burn_rewards:true ["delegate"]
-  --> set_delegate_params "delegate" init_params
-  --> save_current_rate --> wait_ai_activation
+  --> next_block --> wait_ai_activation
   (* We stake about 50% of the total supply *)
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
@@ -125,25 +229,67 @@ let test_static =
          --> loop rate_var_lag (unstake "delegate" delta --> next_cycle)
          --> loop 10 cycle_unstake
       |+ Tag "stable stake, stable rate" --> next_cycle
-         --> wait_n_cycles rate_var_lag --> loop 10 cycle_stable
-      |+ Tag "test timing" --> wait_n_cycles rate_var_lag
-         --> check_rate_evolution Q.equal
-         --> next_cycle --> check_rate_evolution Q.gt --> save_current_rate
-         --> (Tag "increase stake" --> stake "delegate" delta
-              --> wait_n_cycles rate_var_lag
-              --> check_rate_evolution Q.equal
-              --> next_cycle --> check_rate_evolution Q.gt
-             |+ Tag "decrease stake" --> unstake "delegate" delta
-                --> wait_n_cycles rate_var_lag
-                --> check_rate_evolution Q.equal
-                --> next_cycle --> check_rate_evolution Q.lt))
+         --> wait_n_cycles rate_var_lag --> loop 10 cycle_stable)
+
+(** Integration test for Adaptive Issuance.
+    Tests that the curve is updated for stake movement only after
+    [consensus_rights_delay] cycles. *)
+let test_static_timing =
+  let consensus_rights_delay (_block, state) =
+    state.State.constants.consensus_rights_delay
+  in
+  let delta = Amount (Tez.of_mutez 20_000_000_000L) in
+  let q_almost_equal x y =
+    let rat = Q.div x y in
+    (* ~ inverse square root of total supply *)
+    let epsilon = Q.(1 // 100_000) in
+    Q.(rat >= one - epsilon && rat <= one + epsilon)
+  in
+  init_constants ~reward_per_block:1L ~deactivate_dynamic:true ()
+  (* Set rate bounds that should not be reached *)
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_min
+        Q.(1 // 100_000)
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_initial_min
+        Q.(1 // 100_000)
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_final_max
+        Q.one
+  --> set
+        S.Adaptive_issuance.Adaptive_rewards_params.issuance_ratio_initial_max
+        Q.one
+  --> activate_ai `Force
+  --> begin_test ~burn_rewards:true ["delegate"]
+  (* We stake about 50% of the total supply *)
+  --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+  --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
+  --> wait_n_cycles_f (fun x -> consensus_rights_delay x + 1)
+  --> save_current_rate
+  --> (Tag "increase stake" --> stake "delegate" delta
+       --> wait_n_cycles_f consensus_rights_delay
+       --> check_rate_evolution q_almost_equal
+       --> next_cycle --> check_rate_evolution Q.gt
+      |+ Tag "decrease stake" --> unstake "delegate" delta
+         --> wait_n_cycles_f consensus_rights_delay
+         --> check_rate_evolution q_almost_equal
+         --> next_cycle --> check_rate_evolution Q.lt)
 
 let tests =
   tests_of_scenarios
   @@ [
-       ("Test wait with rewards", test_wait_with_rewards);
+       ("Test wait rewards no AI no autostake", test_wait_rewards_no_ai_no_auto);
+       ( "Test wait rewards no AI yes autostake",
+         test_wait_rewards_no_ai_yes_auto );
+       ("Test wait rewards with AI, stakers and edge", test_wait_rewards_with_ai);
+       ( "Test wait rewards with AI and stake variation events",
+         test_wait_rewards_with_ai_staker_variation );
        ("Test ai curve activation time", test_ai_curve_activation_time);
-       (* ("Test static rate", test_static); *)
+       ( "Test static rate decreasing with stake ratio increasing",
+         test_static_decreasing );
+       ( "Test static rate updated after consensus_rights_delay",
+         test_static_timing );
      ]
 
 let () =
