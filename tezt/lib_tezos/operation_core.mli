@@ -382,6 +382,22 @@ module Anonymous : sig
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
+
+  (** Crafts two (pre)attestations that only differ in their block
+      payload hash, then a well-formed double (pre)attestation
+      evidence operation on them.
+
+      The denounced (pre)attestations have the specified
+      [misbehaviour_level] and [misbehaviour_round], the first slot of
+      [culprit], and two constant and distinct block payload
+      hashes. They are signed by [culprit]. *)
+  val make_double_consensus_evidence_with_distinct_bph :
+    kind:double_consensus_evidence_kind ->
+    misbehaviour_level:int ->
+    misbehaviour_round:int ->
+    culprit:Account.key ->
+    Client.t ->
+    t Lwt.t
 end
 
 (** Voting operations (validation pass [1]): [proposals] and [ballot].

@@ -452,6 +452,56 @@ module Anonymous = struct
   let inject ?request ?force ?branch ?error consensus client =
     let* op = operation ?branch consensus client in
     inject ?request ?force ?error op client
+
+  let as_consensus_kind = function
+    | Double_attestation_evidence -> Attestation {with_dal = false}
+    | Double_preattestation_evidence -> Preattestation
+
+  let arbitrary_block_payload_hash1 =
+    "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG"
+
+  let arbitrary_block_payload_hash2 =
+    "vh3cjL2UL3p73CHhSLpAcLvB9obU9jSrRsu1Y9tg85os3i3akAig"
+
+  let make_double_consensus_evidence_with_distinct_bph ~kind ~misbehaviour_level
+      ~misbehaviour_round ~culprit client =
+    let* slots =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_helper_validators
+           ~delegate:culprit.Account.public_key_hash
+           ~level:misbehaviour_level
+           ()
+    in
+    let slot =
+      JSON.(
+        slots |> as_list |> List.hd |-> "slots" |> as_list |> List.hd |> as_int)
+    in
+    let mk_consensus_op block_payload_hash =
+      let consensus =
+        Consensus.consensus
+          ~kind:(as_consensus_kind kind)
+          ~use_legacy_name:false
+          ~slot
+          ~level:misbehaviour_level
+          ~round:misbehaviour_round
+          ~block_payload_hash
+      in
+      Consensus.operation ~signer:culprit consensus client
+    in
+    let* op1 = mk_consensus_op arbitrary_block_payload_hash1
+    and* op2 = mk_consensus_op arbitrary_block_payload_hash2 in
+    let* (`OpHash oph1) = hash op1 client
+    and* (`OpHash oph2) = hash op2 client in
+    let op1, op2 =
+      if String.compare oph1 oph2 < 1 then (op1, op2) else (op2, op1)
+    in
+    let* op1_sign = sign op1 client and* op2_sign = sign op2 client in
+    return
+      (double_consensus_evidence
+         ~kind
+         ~use_legacy_name:false
+         (op1, op1_sign)
+         (op2, op2_sign))
 end
 
 module Voting = struct
