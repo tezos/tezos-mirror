@@ -499,7 +499,16 @@ module Helpers = struct
     Cryptobox.Internal_for_tests.init_prover_dal () ;
     match Cryptobox.make parameters with
     | Ok cryptobox -> cryptobox
-    | Error (`Fail msg) -> on_error msg
+    | Error (`Fail msg) ->
+        let parameters_json =
+          Data_encoding.Json.construct Cryptobox.parameters_encoding parameters
+        in
+        on_error
+        @@ Format.asprintf
+             "%s,@ parameters: %a"
+             msg
+             Data_encoding.Json.pp
+             parameters_json
 
   let publish_commitment ?counter ?force ?source ?fee ?error ~index ~commitment
       ~proof client =
