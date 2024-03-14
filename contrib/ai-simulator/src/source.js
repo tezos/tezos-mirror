@@ -292,4 +292,56 @@ export class Simulator {
     const bonus = this.dynamic_rate_for_next_cycle(cycle);
     return bigRat.clip(static_rate.add(bonus), ratio_min, ratio_max);
   }
+
+  reward_coeff(cycle) {
+    if (
+      cycle <=
+      this.config.chain.ai_activation_cycle +
+        this.config.proto.consensus_rights_delay
+    ) {
+      return bigRat.one;
+    }
+    const adjusted_cycle = cycle - this.config.proto.consensus_rights_delay - 1;
+    const issuance_rate = this.issuance_rate_for_next_cycle(adjusted_cycle);
+    const total_supply = safe_get(
+      this.config.chain.total_supply,
+      adjusted_cycle,
+    );
+    return issuance_rate.multiply(
+      bigRat(total_supply).divide(
+        bigRat(this.config.proto.base_total_issued_per_minute).multiply(
+          min_per_year,
+        ),
+      ),
+    );
+  }
+
+  #sum_rewards_weight() {
+    return (
+      this.config.proto.attestation_rewards +
+      this.config.proto.fixed_baking_rewards +
+      this.config.proto.bonus_baking_rewards +
+      this.config.proto.nonce_revelation_tip +
+      this.config.proto.vdf_tip
+    );
+  }
+
+  #tez_from_weights(weight) {
+    const num = bigInt(weight).multiply(this.config.proto.minimal_block_delay);
+    const den = bigInt(this.#sum_rewards_weight()).multiply(60);
+    const res = bigInt(this.config.proto.base_total_issued_per_minute)
+      .multiply(num)
+      .divide(den);
+    return res;
+  }
+
+  #reward_from_constants(cycle, weight, d = 1) {
+    const coeff = this.reward_coeff(cycle);
+    const rewards = this.#tez_from_weights(weight);
+    const coeff_rat = bigRat(coeff);
+    const num = coeff_rat.numerator;
+    const den = coeff_rat.denominator;
+    const base_rewards = rewards.divide(d);
+    return base_rewards.multiply(num).divide(den);
+  }
 }
