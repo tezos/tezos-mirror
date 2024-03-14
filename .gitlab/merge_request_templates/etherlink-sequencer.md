@@ -13,9 +13,9 @@
 - [X] Select suitable reviewers using the `Reviewers` field below.
 - [X] Select as `Assignee` the next person who should [take action on that MR](https://tezos.gitlab.io/developer/contributing.html#merge-request-assignees-field)
 
-/assign @lthms @sribaroud @vch9
+/assign @lthms @sribaroud @vch9 @picdc
 
-/assign_reviewer @lthms @sribaroud @vch9
+/assign_reviewer @lthms @sribaroud @vch9 @picdc
 
 /labels ~evm::sequencer
 
