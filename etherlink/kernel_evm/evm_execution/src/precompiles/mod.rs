@@ -13,19 +13,16 @@
 
 use std::{cmp::min, str::FromStr, vec};
 
-mod eip152;
+mod blake2;
 mod modexp;
 mod zero_knowledge;
 
 use crate::abi;
 use crate::handler::EvmHandler;
 use crate::EthereumError;
-use alloc::borrow::Cow;
 use alloc::collections::btree_map::BTreeMap;
-use evm::{
-    executor::stack::PrecompileFailure, Context, ExitError, ExitReason, ExitRevert,
-    ExitSucceed, Handler, Transfer,
-};
+use blake2::blake2f_precompile;
+use evm::{Context, ExitReason, ExitRevert, ExitSucceed, Handler, Transfer};
 use host::runtime::Runtime;
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use modexp::modexp_precompile;
@@ -373,121 +370,6 @@ fn ripemd160_precompile<Host: Runtime>(
         withdrawals: vec![],
         estimated_ticks,
     })
-}
-
-fn blake2f_output_for_wrong_input() -> EthereumError {
-    EthereumError::PrecompileFailed(PrecompileFailure::Error {
-        exit_status: ExitError::Other(Cow::from("Wrong input for blake2f precompile")),
-    })
-}
-
-trait Decodable {
-    fn decode_from_le_slice(&mut self, source: &[u8]);
-}
-
-impl<const N: usize> Decodable for [u64; N] {
-    fn decode_from_le_slice(&mut self, src: &[u8]) {
-        let mut word_buf = [0_u8; 8];
-        for (i, word) in self.iter_mut().enumerate() {
-            word_buf.copy_from_slice(&src[i * 8..(i + 1) * 8]);
-            *word = u64::from_le_bytes(word_buf);
-        }
-    }
-}
-
-fn blake2f_precompile_without_gas_draining<Host: Runtime>(
-    handler: &mut EvmHandler<Host>,
-    input: &[u8],
-) -> Result<PrecompileOutcome, EthereumError> {
-    log!(handler.borrow_host(), Debug, "Calling blake2f precompile");
-
-    // The precompile requires 6 inputs tightly encoded, taking exactly 213 bytes
-    if input.len() != 213 {
-        return Err(blake2f_output_for_wrong_input());
-    }
-
-    // the number of rounds - 32-bit unsigned big-endian word
-    let mut rounds_buf = [0_u8; 4];
-    rounds_buf.copy_from_slice(&input[0..4]);
-    let rounds: u32 = u32::from_be_bytes(rounds_buf);
-
-    // check that enough resources to execute (gas / ticks) are available
-    let estimated_ticks =
-        fail_if_too_much!(tick_model::ticks_of_blake2f(rounds), handler);
-    let cost = rounds as u64; // static_gas + dynamic_gas
-    if let Err(err) = handler.record_cost(cost) {
-        log!(
-            handler.borrow_host(),
-            Info,
-            "Couldn't record the cost of blake2f {:?}",
-            err
-        );
-        return Ok(PrecompileOutcome {
-            exit_status: ExitReason::Error(err),
-            output: vec![],
-            withdrawals: vec![],
-            estimated_ticks,
-        });
-    }
-    log!(
-        handler.borrow_host(),
-        Debug,
-        "Input is {:?}",
-        hex::encode(input)
-    );
-
-    // parse inputs
-    // the state vector - 8 unsigned 64-bit little-endian words
-    let mut h = [0_u64; 8];
-    h.decode_from_le_slice(&input[4..68]);
-
-    // the message block vector - 16 unsigned 64-bit little-endian words
-    let mut m = [0_u64; 16];
-    m.decode_from_le_slice(&input[68..196]);
-
-    // offset counters - 2 unsigned 64-bit little-endian words
-    let mut t = [0_u64; 2];
-    t.decode_from_le_slice(&input[196..212]);
-
-    // the final block indicator flag - 8-bit word (true if 1 or false if 0)
-    let f = match input[212] {
-        1 => true,
-        0 => false,
-        _ => return Err(blake2f_output_for_wrong_input()),
-    };
-
-    eip152::compress(&mut h, m, t, f, rounds as usize);
-
-    let mut output = [0_u8; 64];
-    for (i, state_word) in h.iter().enumerate() {
-        output[i * 8..(i + 1) * 8].copy_from_slice(&state_word.to_le_bytes());
-    }
-    log!(
-        handler.borrow_host(),
-        Debug,
-        "Output is {:?}",
-        hex::encode(output)
-    );
-    Ok(PrecompileOutcome {
-        exit_status: ExitReason::Succeed(ExitSucceed::Returned),
-        output: output.to_vec(),
-        withdrawals: vec![],
-        estimated_ticks,
-    })
-}
-
-fn blake2f_precompile<Host: Runtime>(
-    handler: &mut EvmHandler<Host>,
-    input: &[u8],
-    _context: &Context,
-    _is_static: bool,
-    _transfer: Option<Transfer>,
-) -> Result<PrecompileOutcome, EthereumError> {
-    call_precompile_with_gas_draining(
-        handler,
-        input,
-        blake2f_precompile_without_gas_draining,
-    )
 }
 
 /// Implementation of Etherelink specific withdrawals precompiled contract.
