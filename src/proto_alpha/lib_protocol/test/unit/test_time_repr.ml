@@ -1,9 +1,16 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
 (** Testing
     -------
     Component:  Protocol (time repr)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
                   -- --file test_time_repr.ml
-    Subject:    Error handling of time operations 
+    Subject:    Error handling of time operations
 *)
 
 open Protocol
