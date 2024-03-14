@@ -179,15 +179,17 @@ let rollup_node_config_prod ~rollup_node_endpoint ~keep_alive =
 let rollup_node_config_dev ~rollup_node_endpoint ~keep_alive =
   let open Lwt_result_syntax in
   let open Evm_node_lib_dev in
-  let module Rollup_node_rpc = Rollup_node.Make (struct
-    let base = rollup_node_endpoint
-  end) in
   let* smart_rollup_address =
     fetch_smart_rollup_address
       ~keep_alive
       Rollup_services.smart_rollup_address
       rollup_node_endpoint
   in
+  let module Rollup_node_rpc = Rollup_node.Make (struct
+    let base = rollup_node_endpoint
+
+    let smart_rollup_address = smart_rollup_address
+  end) in
   return
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 

@@ -76,7 +76,7 @@ end
 
 (** [produce_block ?timestamp evm_node] calls the private RPC [produceBlock]. If
     provided the block will have timestamp [timestamp] (in RFC3339) format. *)
-val produce_block : ?timestamp:string -> Evm_node.t -> int32 Lwt.t
+val produce_block : ?timestamp:string -> Evm_node.t -> (int, error) result Lwt.t
 
 (** [send_raw_transaction ~raw_tx evm_node] calls [eth_sendRawTransaction]
     with [raw_tx] as argument. *)

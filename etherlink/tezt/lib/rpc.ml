@@ -179,7 +179,10 @@ let produce_block ?timestamp evm_node =
       evm_node
       (Request.produceBlock ?timestamp ())
   in
-  return JSON.(json |-> "result" |> as_string |> Int32.of_string)
+  return
+  @@ decode_or_error
+       (fun json -> Evm_node.extract_result json |> JSON.as_int)
+       json
 
 let send_raw_transaction ~raw_tx evm_node =
   let* response =

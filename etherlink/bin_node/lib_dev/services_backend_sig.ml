@@ -114,6 +114,8 @@ module type S = sig
     Ethereum_types.quantity ->
     Ethereum_types.hex tzresult Lwt.t
 
+  val smart_rollup_address : string
+
   (**/**)
 
   (** [inject_kernel_upgrade upgrade] injects the kernel [upgrade]
@@ -134,6 +136,8 @@ module type Backend = sig
 
   module SimulatorBackend : Simulator.SimulationBackend
 
+  val smart_rollup_address : string
+
   val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
 
   val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
@@ -143,6 +147,8 @@ module Make (Backend : Backend) : S = struct
   include Durable_storage.Make (Backend.READER)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
+
+  let smart_rollup_address = Backend.smart_rollup_address
 
   let inject_kernel_upgrade = Backend.inject_kernel_upgrade
 

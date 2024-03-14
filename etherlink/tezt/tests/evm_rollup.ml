@@ -4616,7 +4616,7 @@ let test_migrate_proxy_to_sequencer_future =
       ()
   in
   (* Produce a block in sequencer. *)
-  let* _ = Rpc.produce_block sequencer_node in
+  let*@ _ = Rpc.produce_block sequencer_node in
   let* () =
     bake_until_sync
       ~sc_rollup_node
@@ -4772,7 +4772,7 @@ let test_migrate_proxy_to_sequencer_past =
   in
 
   (* Produce a block in sequencer. *)
-  let* _ = Rpc.produce_block sequencer_node in
+  let*@ _ = Rpc.produce_block sequencer_node in
   let* () =
     bake_until_sync
       ~sc_rollup_node

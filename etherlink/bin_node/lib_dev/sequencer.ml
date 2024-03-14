@@ -7,10 +7,6 @@
 
 module MakeBackend (Ctxt : sig
   val ctxt : Evm_context.t
-
-  val cctxt : Client_context.wallet
-
-  val sequencer_key : Client_keys.sk_uri
 end) : Services_backend_sig.Backend = struct
   module READER = struct
     let read path =
@@ -27,45 +23,15 @@ end) : Services_backend_sig.Backend = struct
 
     type messages = transactions
 
-    let encode_transactions ~smart_rollup_address:_
-        ~(transactions : transactions) =
-      let open Result_syntax in
-      let delayed_hashes =
-        List.map Ethereum_types.Delayed_transaction.hash transactions.delayed
-      in
-      let hashes =
-        List.map
-          (fun transaction ->
-            let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-            Ethereum_types.(
-              Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
-          transactions.raw
-      in
-      return (delayed_hashes @ hashes, transactions)
+    let encode_transactions ~smart_rollup_address:_ ~transactions:_ =
+      assert false
   end
 
   module Publisher = struct
     type messages = TxEncoder.messages
 
-    let publish_messages ~timestamp ~smart_rollup_address ~messages =
-      let open Lwt_result_syntax in
-      (* Create the blueprint with the messages. *)
-      let* blueprint =
-        Sequencer_blueprint.create
-          ~sequencer_key:Ctxt.sequencer_key
-          ~cctxt:Ctxt.cctxt
-          ~timestamp
-          ~smart_rollup_address
-          ~transactions:messages.TxEncoder.raw
-          ~delayed_transactions:messages.TxEncoder.delayed
-          ~parent_hash:Ctxt.ctxt.session.current_block_hash
-          ~number:Ctxt.ctxt.session.next_blueprint_number
-      in
-      (* Apply the blueprint *)
-      let* _ctxt =
-        Evm_context.apply_and_publish_blueprint Ctxt.ctxt blueprint
-      in
-      return_unit
+    let publish_messages ~timestamp:_ ~smart_rollup_address:_ ~messages:_ =
+      assert false
   end
 
   module SimulatorBackend = struct
@@ -76,6 +42,10 @@ end) : Services_backend_sig.Backend = struct
       | [Some bytes] -> return bytes
       | _ -> Error_monad.failwith "Invalid insights format"
   end
+
+  let smart_rollup_address =
+    Tezos_crypto.Hashed.Smart_rollup_address.to_string
+      Ctxt.ctxt.smart_rollup_address
 
   let inject_kernel_upgrade upgrade =
     let open Lwt_result_syntax in
@@ -115,10 +85,6 @@ end
 
 module Make (Ctxt : sig
   val ctxt : Evm_context.t
-
-  val cctxt : Client_context.wallet
-
-  val sequencer_key : Client_keys.sk_uri
 end) =
   Services_backend_sig.Make (MakeBackend (Ctxt))
 
@@ -247,7 +213,9 @@ let loop_sequencer :
           let diff = Time.Protocol.(diff now last_produced_block) in
           diff >= Int64.of_float time_between_blocks
         in
-        let* nb_transactions = Tx_pool.produce_block ~force ~timestamp:now in
+        let* nb_transactions =
+          Block_producer.produce_block ~force ~timestamp:now
+        in
         let*! () = Lwt_unix.sleep 0.5 in
         if nb_transactions > 0 || force then loop now
         else loop last_produced_block
@@ -302,14 +270,14 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
 
   let module Sequencer = Make (struct
     let ctxt = ctxt
-
-    let cctxt = cctxt
-
-    let sequencer_key = sequencer
   end) in
   let* () =
     Tx_pool.start
       {rollup_node = (module Sequencer); smart_rollup_address; mode = Sequencer}
+  in
+  let* () =
+    Block_producer.start
+      {ctxt; cctxt; smart_rollup_address; sequencer_key = sequencer}
   in
   let* () =
     Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}

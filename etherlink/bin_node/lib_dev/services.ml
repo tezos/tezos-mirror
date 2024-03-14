@@ -440,7 +440,9 @@ let dispatch_private_request (_config : 'a Configuration.t)
         let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in
           let timestamp = Option.value timestamp ~default:(Helpers.now ()) in
-          let* nb_transactions = Tx_pool.produce_block ~force:true ~timestamp in
+          let* nb_transactions =
+            Block_producer.produce_block ~force:true ~timestamp
+          in
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in
         build ~f module_ parameters
