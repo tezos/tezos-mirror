@@ -213,6 +213,19 @@ let enable_coverage_report job : tezos_job =
        ["_coverage_report/"; "$BISECT_FILE"]
   |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
 
+(** Add variable enabling sccache.
+
+    This function should be applied to jobs that build rust files and
+    which has a configured sccache Gitlab CI cache. *)
+let enable_sccache ?error_log ?idle_timeout ?log
+    ?(dir = "$CI_PROJECT_DIR/_sccache") : tezos_job -> tezos_job =
+  let opt_var name = function Some value -> [(name, value)] | None -> [] in
+  Tezos_ci.append_variables
+    ([("SCCACHE_DIR", dir); ("RUSTC_WRAPPER", "sccache")]
+    @ opt_var "SCCACHE_ERROR_LOG" error_log
+    @ opt_var "SCCACHE_IDLE_TIMEOUT" idle_timeout
+    @ opt_var "SCCACHE_LOG" log)
+
 (** {2 Changesets} *)
 
 let changeset_octez =
@@ -265,6 +278,23 @@ let changeset_octez_docker_changes_or_master =
   ]
 
 let changeset_hadolint_docker_files = ["build.Dockerfile"; "Dockerfile"]
+
+(* The set of [changes:] that trigger opam jobs *)
+let changeset_opam_jobs =
+  [
+    "**/dune";
+    "**/dune.inc";
+    "**/*.dune.inc";
+    "**/dune-project";
+    "**/dune-workspace";
+    "**/*.opam";
+    ".gitlab/ci/jobs/packaging/opam:prepare.yml";
+    ".gitlab/ci/jobs/packaging/opam_package.yml";
+    "manifest/manifest.ml";
+    "manifest/main.ml";
+    "scripts/opam-prepare-repo.sh";
+    "scripts/version.sh";
+  ]
 
 (** {2 Job makers} *)
 

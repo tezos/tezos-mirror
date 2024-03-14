@@ -1,1159 +1,5954 @@
 # This file was automatically generated, do not edit.
-# Edit file manifest/main.ml instead.
-
-.rules_template__trigger_exec_opam_batch_1:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 1 minute
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 1 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 1 minutes
-    - when: never # default
-
-.rules_template__trigger_all_opam_batch_1:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 1 minute
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 1 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 1 minutes
-    - when: never # default
-
-.rules_template__trigger_exec_opam_batch_2:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 2 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 2 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 2 minutes
-    - when: never # default
-
-.rules_template__trigger_all_opam_batch_2:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 2 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 2 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 2 minutes
-    - when: never # default
-
-.rules_template__trigger_exec_opam_batch_3:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 3 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 3 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 3 minutes
-    - when: never # default
-
-.rules_template__trigger_all_opam_batch_3:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 3 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 3 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 3 minutes
-    - when: never # default
-
-.rules_template__trigger_exec_opam_batch_4:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 4 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 4 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 4 minutes
-    - when: never # default
-
-.rules_template__trigger_all_opam_batch_4:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 4 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 4 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 4 minutes
-    - when: never # default
-
-.rules_template__trigger_exec_opam_batch_5:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 5 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 5 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 5 minutes
-    - when: never # default
-
-.rules_template__trigger_all_opam_batch_5:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 5 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 5 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 5 minutes
-    - when: never # default
-
-.rules_template__trigger_exec_opam_batch_6:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 6 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 6 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 6 minutes
-    - when: never # default
-
-.rules_template__trigger_all_opam_batch_6:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 6 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 6 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 6 minutes
-    - when: never # default
-
-.rules_template__trigger_exec_opam_batch_7:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 7 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 7 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 7 minutes
-    - when: never # default
-
-.rules_template__trigger_all_opam_batch_7:
-  rules:
-    # Run on scheduled builds.
-    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: delayed
-      start_in: 7 minutes
-    # Run when there is label on the merge request
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/'
-      when: delayed
-      start_in: 7 minutes
-    # Run on merge requests when opam changes are detected.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"'
-      changes:
-        - "**/dune"
-        - "**/dune.inc"
-        - "**/*.dune.inc"
-        - "**/dune-project"
-        - "**/dune-workspace"
-        - "**/*.opam"
-        - .gitlab/ci/jobs/packaging/opam:prepare.yml
-        - .gitlab/ci/jobs/packaging/opam_package.yml
-        - manifest/manifest.ml
-        - manifest/main.ml
-        - scripts/opam-prepare-repo.sh
-        - scripts/version.sh
-      when: delayed
-      start_in: 7 minutes
-    - when: never # default
+# Edit file ci/bin/main.ml instead.
 
 opam:bls12-381:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: bls12-381
-
-# Ignoring unreleased package gitlab_ci.
-
-# Ignoring unreleased package internal-devtools.
-
-# Ignoring unreleased package internal-devtools_proto-context-du.
-
-# Ignoring unreleased package kaitai.
-
-# Ignoring unreleased package kaitai-of-data-encoding.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-accuser-Proxford:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-accuser-Proxford
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-accuser-PtParisA:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-accuser-PtParisA
-
-# Ignoring unreleased package octez-accuser-alpha.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-alcotezt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-alcotezt
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-baker-Proxford:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-baker-Proxford
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-baker-PtParisA:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-baker-PtParisA
-
-# Ignoring unreleased package octez-baker-alpha.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-client:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-client
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-codec:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-codec
-
-# Ignoring unreleased package octez-codec-kaitai.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-crawler:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-crawler
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-dac-client:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-dac-client
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-dac-node:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-dac-node
-
-# Ignoring unreleased package octez-dal-node.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-distributed-internal:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-distributed-internal
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-distributed-lwt-internal:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-distributed-lwt-internal
-
-# Ignoring unreleased package octez-evm-node.
-
-# Ignoring unreleased package octez-evm-node-libs.
-
-# Ignoring unreleased package octez-evm-node-tests.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-injector:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-injector
-
-# Ignoring unreleased package octez-injector-server.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-internal-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-internal-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-l2-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-l2-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-node:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-node
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-node-config:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-node-config
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-proto-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-proto-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-000-Ps9mPmXa-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-000-Ps9mPmXa-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-001-PtCJ7pwo-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-001-PtCJ7pwo-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-002-PsYLVpVv-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-002-PsYLVpVv-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-003-PsddFKi3-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-003-PsddFKi3-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-004-Pt24m4xi-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-004-Pt24m4xi-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-005-PsBabyM1-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-005-PsBabyM1-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-006-PsCARTHA-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-006-PsCARTHA-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-007-PsDELPH1-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-007-PsDELPH1-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-008-PtEdo2Zk-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-008-PtEdo2Zk-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-009-PsFLoren-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-009-PsFLoren-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-010-PtGRANAD-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-010-PtGRANAD-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-011-PtHangz2-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-011-PtHangz2-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-012-Psithaca-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-012-Psithaca-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-013-PtJakart-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-013-PtJakart-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-014-PtKathma-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-014-PtKathma-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-015-PtLimaPt-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-015-PtLimaPt-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-016-PtMumbai-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-016-PtMumbai-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-017-PtNairob-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-017-PtNairob-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-018-Proxford-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-018-Proxford-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-019-PtParisA-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-019-PtParisA-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-alpha-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-alpha-libs
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-protocol-compiler:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-protocol-compiler
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-proxy-server:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-proxy-server
-
-# Ignoring unreleased package octez-risc-v-pvm.
-
-# Ignoring unreleased package octez-risc-v-pvm-test.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-rpc-process:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_3
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 3 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 3 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 3 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-rpc-process
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-shell-libs:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-shell-libs
-
-# Ignoring unreleased package octez-shell-tests.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-signer:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-signer
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-node:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-node-Proxford:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-Proxford
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-node-PtNairob:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtNairob
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-node-PtParisA:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-PtParisA
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-node-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-alpha
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-node-lib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-node-lib
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-wasm-debugger:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-wasm-debugger-lib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-lib
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-smart-rollup-wasm-debugger-plugin:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-smart-rollup-wasm-debugger-plugin
-
-# Ignoring unreleased package octez-snoop.
-
-# Ignoring unreleased package octez-store-tests.
-
-# Ignoring unreleased package octez-testnet-scenarios.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:octez-version:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_exec_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: octez-version
-
-# Ignoring unreleased package octogram.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-benchmark:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-benchmark
-
-# Ignoring unreleased package tezos-benchmark-018-Proxford.
-
-# Ignoring unreleased package tezos-benchmark-019-PtParisA.
-
-# Ignoring unreleased package tezos-benchmark-alpha.
-
-# Ignoring unreleased package tezos-benchmark-examples.
-
-# Ignoring unreleased package tezos-benchmark-tests.
-
-# Ignoring unreleased package tezos-benchmark-type-inference-018-Proxford.
-
-# Ignoring unreleased package tezos-benchmark-type-inference-019-PtParisA.
-
-# Ignoring unreleased package tezos-benchmark-type-inference-alpha.
-
-# Ignoring unreleased package tezos-benchmarks-proto-018-Proxford.
-
-# Ignoring unreleased package tezos-benchmarks-proto-019-PtParisA.
-
-# Ignoring unreleased package tezos-benchmarks-proto-alpha.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-client-demo-counter:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-client-demo-counter
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-client-genesis:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-client-genesis
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-dac-client-lib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-dac-client-lib
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-dac-lib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-dac-lib
-
-# Ignoring unreleased package tezos-dac-lib-test.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-dac-node-lib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_2
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 2 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 2 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 2 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-dac-node-lib
-
-# Ignoring unreleased package tezos-dac-node-lib-test.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-dal-node-lib:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-dal-node-lib
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-dal-node-services:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-dal-node-services
-
-# Ignoring unreleased package tezos-injector-018-Proxford.
-
-# Ignoring unreleased package tezos-injector-019-PtParisA.
-
-# Ignoring unreleased package tezos-injector-alpha.
-
-# Ignoring unreleased package tezos-lazy-containers-tests.
-
-# Ignoring unreleased package tezos-micheline-rewriting.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-openapi:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-openapi
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-000-Ps9mPmXa:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-000-Ps9mPmXa
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-001-PtCJ7pwo:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-001-PtCJ7pwo
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-002-PsYLVpVv:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-002-PsYLVpVv
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-003-PsddFKi3:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-003-PsddFKi3
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-004-Pt24m4xi:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-004-Pt24m4xi
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-005-PsBABY5H:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_4
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 4 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 4 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 4 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBABY5H
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-005-PsBabyM1:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-005-PsBabyM1
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-006-PsCARTHA:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-006-PsCARTHA
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-007-PsDELPH1:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-007-PsDELPH1
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-008-PtEdo2Zk:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdo2Zk
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-008-PtEdoTez:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-008-PtEdoTez
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-009-PsFLoren:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-009-PsFLoren
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-010-PtGRANAD:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-010-PtGRANAD
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-011-PtHangz2:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-011-PtHangz2
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-012-Psithaca:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-012-Psithaca
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-013-PtJakart:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-013-PtJakart
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-014-PtKathma:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-014-PtKathma
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-015-PtLimaPt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-015-PtLimaPt
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-016-PtMumbai:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-016-PtMumbai
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-017-PtNairob:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_5
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 5 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 5 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 5 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-017-PtNairob
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-018-Proxford:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-018-Proxford
-
-# Ignoring unreleased package tezos-protocol-018-Proxford-tests.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-019-PtParisA:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-019-PtParisA
-
-# Ignoring unreleased package tezos-protocol-019-PtParisA-tests.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-alpha
-
-# Ignoring unreleased package tezos-protocol-alpha-tests.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-demo-counter:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-counter
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-demo-noops:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-demo-noops
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-protocol-genesis:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-protocol-genesis
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezos-proxy-server-config:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_6
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 6 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 6 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 6 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezos-proxy-server-config
-
-# Ignoring unreleased package tezos-sc-rollup-node-test.
-
-# Ignoring unreleased package tezos-scoru-wasm-regressions.
-
-# Ignoring unreleased package tezos-smart-rollup-node-lib-test.
-
-# Ignoring unreleased package tezos-tooling.
-
-# Ignoring unreleased package tezos-tps-evaluation.
-
-# Ignoring unreleased package tezos-tree-encoding-test.
-
-# Ignoring unreleased package tezt-etherlink.
-
-# Ignoring unreleased package tezt-risc-v-sandbox.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2
 
 opam:tezt-tezos:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_all_opam_batch_7
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 7 minutes
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 7 minutes
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
+    when: delayed
+    start_in: 7 minutes
+  - when: never
+  needs:
+  - opam:prepare
+  dependencies:
+  - opam:prepare
+  cache:
+    key: opam-sccache
+    paths:
+    - _build/_sccache
+  before_script:
+  - eval $(opam env)
+  - mkdir -p $CI_PROJECT_DIR/opam_logs
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - opam remote add dev-repo ./_opam-repo-for-release
+  - opam install --yes ${package}.dev
+  - opam reinstall --yes --with-test ${package}.dev
+  after_script:
+  - sccache --stop-server || true
+  - eval $(opam env)
+  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
+    RUNTEZTALIAS: "true"
     package: tezt-tezos
-
-# Ignoring unreleased package tezt-tx-kernel.
+    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
+    RUSTC_WRAPPER: sccache
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_LOG: debug
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - opam_logs/
+    when: always
+  retry: 2

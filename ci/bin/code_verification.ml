@@ -35,6 +35,110 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Common
 
+type opam_package_group = Executable | All
+
+type opam_package = {
+  name : string;
+  group : opam_package_group;
+  batch_index : int;
+}
+
+let opam_rules ~only_marge_bot ?batch_index () =
+  let when_ =
+    match batch_index with
+    | Some batch_index -> Delayed (Minutes batch_index)
+    | None -> On_success
+  in
+  [
+    job_rule ~if_:Rules.schedule_extended_tests ~when_ ();
+    job_rule ~if_:(Rules.has_mr_label "ci--opam") ~when_ ();
+    job_rule
+      ~if_:
+        (if only_marge_bot then
+         If.(Rules.merge_request && Rules.triggered_by_marge_bot)
+        else Rules.merge_request)
+      ~changes:changeset_opam_jobs
+      ~when_
+      ();
+    job_rule ~when_:Never ();
+  ]
+
+let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
+  job
+    ?dependencies
+    ~__POS__
+    ~name:("opam:" ^ name)
+    ~image:Images.runtime_prebuild_dependencies
+    ~stage:Stages.packaging
+      (* FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
+         FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
+         At the time of writing, the opam tests were quite flaky.
+         Therefore, a retry was added. This should be removed once the
+         underlying tests have been fixed. *)
+    ~retry:2
+    ~rules:(opam_rules ~only_marge_bot:(group = All) ~batch_index ())
+    ~variables:
+      [
+        (* See [.gitlab-ci.yml] for details on [RUNTEZTALIAS] *)
+        ("RUNTEZTALIAS", "true");
+        ("package", name);
+      ]
+    ~before_script:
+      (before_script
+         ~eval_opam:true
+         [
+           "mkdir -p $CI_PROJECT_DIR/opam_logs";
+           ". ./scripts/ci/sccache-start.sh";
+         ])
+    [
+      "opam remote add dev-repo ./_opam-repo-for-release";
+      "opam install --yes ${package}.dev";
+      "opam reinstall --yes --with-test ${package}.dev";
+    ]
+    (* Stores logs in opam_logs for artifacts and outputs an excerpt on
+       failure. [after_script] runs in a separate shell and so requires
+       a second opam environment initialization. *)
+    ~after_script:
+      [
+        "sccache --stop-server || true";
+        "eval $(opam env)";
+        "OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh";
+      ]
+    ~artifacts:(artifacts ~expire_in:(Weeks 1) ~when_:Always ["opam_logs/"])
+    ~cache:[{key = "opam-sccache"; paths = ["_build/_sccache"]}]
+  |> (* We store caches in [_build] for two reasons: (1) the [_build]
+        folder is excluded from opam's rsync. (2) gitlab ci cache
+        requires that cached files are in a sub-folder of the checkout. *)
+  enable_sccache
+    ~error_log:"$CI_PROJECT_DIR/opam_logs/sccache.log"
+    ~idle_timeout:"0"
+    ~log:"debug"
+    ~dir:"$CI_PROJECT_DIR/_build/_sccache"
+
+let ci_opam_package_tests = "script-inputs/ci-opam-package-tests"
+
+let read_opam_packages =
+  Fun.flip List.filter_map (read_lines_from_file ci_opam_package_tests)
+  @@ fun line ->
+  let fail () =
+    failwith
+      (sf "failed to parse %S: invalid line: %S" ci_opam_package_tests line)
+  in
+  if line = "" then None
+  else
+    match String.split_on_char '\t' line with
+    | [name; group; batch_index] ->
+        let batch_index =
+          match int_of_string_opt batch_index with
+          | Some i -> i
+          | None -> fail ()
+        in
+        let group =
+          match group with "exec" -> Executable | "all" -> All | _ -> fail ()
+        in
+        Some {name; group; batch_index}
+    | _ -> fail ()
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 type code_verification_pipeline = Before_merging | Schedule_extended_test
@@ -58,6 +162,12 @@ let jobs pipeline_type =
     match pipeline_type with
     | Before_merging -> job_external job
     | Schedule_extended_test -> job
+  in
+  (* as [job_external_once] but for sets of jobs *)
+  let jobs_external_once ~path jobs =
+    match pipeline_type with
+    | Before_merging -> jobs_external ~path jobs
+    | Schedule_extended_test -> jobs
   in
   (* [make_rules] makes rules for jobs that are:
      - automatic in scheduled pipelines;
@@ -210,7 +320,34 @@ let jobs pipeline_type =
     (* TODO: include the jobs defined above when full pipeline is generated *)
     []
   in
-  let packaging = [] in
+  let packaging =
+    let job_opam_prepare : tezos_job =
+      job
+        ~__POS__
+        ~name:"opam:prepare"
+        ~image:Images.runtime_prebuild_dependencies
+        ~stage:Stages.packaging
+        ~dependencies:dependencies_needs_trigger
+        ~before_script:(before_script ~eval_opam:true [])
+        ~artifacts:(artifacts ["_opam-repo-for-release/"])
+        ~rules:(opam_rules ~only_marge_bot:false ~batch_index:1 ())
+        [
+          "git init _opam-repo-for-release";
+          "./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release";
+          "git -C _opam-repo-for-release add packages";
+          "git -C _opam-repo-for-release commit -m \"tezos packages\"";
+        ]
+      |> job_external_once
+    in
+    let (_jobs_opam_packages : tezos_job list) =
+      read_opam_packages
+      |> List.map
+           (job_opam_package
+              ~dependencies:(Dependent [Artifacts job_opam_prepare]))
+      |> jobs_external_once ~path:"packaging/opam_package.yml"
+    in
+    []
+  in
   let test = [] in
   let doc = [] in
   let manual =

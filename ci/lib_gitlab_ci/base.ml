@@ -33,6 +33,15 @@ let with_open_in file read_f =
     close_in chan ;
     raise x
 
+let read_lines_from_file path =
+  with_open_in path @@ fun ch ->
+  let rec loop acc =
+    match input_line ch with
+    | exception End_of_file -> List.rev acc
+    | line -> loop (line :: acc)
+  in
+  loop []
+
 let write_file filename ~contents =
   with_open_out filename @@ fun ch -> output_string ch contents
 
