@@ -9,8 +9,8 @@ use crate::blueprint_storage::{
 use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
-use crate::inbox::InboxContent;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
+use crate::inbox::{ProxyInboxContent, SequencerInboxContent};
 use crate::read_last_info_per_level_timestamp;
 use crate::storage::read_l1_level;
 use anyhow::Ok;
@@ -27,10 +27,8 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
 ) -> Result<(), anyhow::Error> {
-    if let Some(InboxContent {
-        transactions,
-        sequencer_blueprints: _,
-    }) = read_proxy_inbox(host, smart_rollup_address, tezos_contracts)?
+    if let Some(ProxyInboxContent { transactions }) =
+        read_proxy_inbox(host, smart_rollup_address, tezos_contracts)?
     {
         let timestamp = current_timestamp(host);
         let blueprint = Blueprint {
@@ -81,8 +79,8 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
 ) -> Result<(), anyhow::Error> {
-    if let Some(InboxContent {
-        transactions,
+    if let Some(SequencerInboxContent {
+        delayed_transactions,
         sequencer_blueprints,
     }) = read_sequencer_inbox(
         host,
@@ -94,7 +92,7 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         let previous_timestamp = read_last_info_per_level_timestamp(host)?;
         let level = read_l1_level(host)?;
         // Store the transactions in the delayed inbox.
-        for transaction in transactions {
+        for transaction in delayed_transactions {
             delayed_inbox.save_transaction(
                 host,
                 transaction,
@@ -372,7 +370,7 @@ mod tests {
             .unwrap()
         {
             None => panic!("There should be an InboxContent"),
-            Some(InboxContent {
+            Some(ProxyInboxContent {
                 sequencer_blueprints,
                 ..
             }) => assert_eq!(
