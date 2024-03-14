@@ -320,7 +320,7 @@ let test_persistent_state =
   @@ fun protocol ->
   let* {sequencer; _} = setup_sequencer protocol in
   (* Force the sequencer to produce a block. *)
-  let* _ = Rpc.produce_block sequencer in
+  let*@ _ = Rpc.produce_block sequencer in
   (* Ask for the current block. *)
   let*@ block_number = Rpc.block_number sequencer in
   Check.is_true
@@ -354,7 +354,7 @@ let test_publish_blueprints =
   in
   let* _ =
     repeat 5 (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
 
@@ -402,7 +402,7 @@ let test_resilient_to_rollup_node_disconnect =
   (* Produce blueprints *)
   let* _ =
     repeat first_batch_blueprints_count (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
   let* () =
@@ -431,7 +431,7 @@ let test_resilient_to_rollup_node_disconnect =
      it cannot catchup in one go. *)
   let* _ =
     repeat (2 * max_blueprints_lag) (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
 
@@ -455,7 +455,7 @@ let test_resilient_to_rollup_node_disconnect =
      up at the end. *)
   let* _ =
     repeat max_blueprints_lag (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
 
@@ -508,7 +508,7 @@ let test_can_fetch_blueprint =
   let number_of_blocks = 5 in
   let* _ =
     repeat number_of_blocks (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
 
@@ -658,7 +658,7 @@ let test_rpc_produceBlock =
      triggered by the RPC call. *)
   let* {sequencer; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
   let*@ start_block_number = Rpc.block_number sequencer in
-  let* _ = Rpc.produce_block sequencer in
+  let*@ _ = Rpc.produce_block sequencer in
   let*@ new_block_number = Rpc.block_number sequencer in
   Check.((Int32.succ start_block_number = new_block_number) int32)
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
@@ -676,7 +676,7 @@ let wait_for_event ?(timeout = 30.) ?(levels = 10) event_watcher ~sequencer
     if n = 0 then Test.fail error_msg
     else
       let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-      let* _ = Rpc.produce_block sequencer in
+      let*@ _ = Rpc.produce_block sequencer in
       if Option.is_some !event_value then unit else rollup_node_loop (n - 1)
   in
   let* () = Lwt.pick [rollup_node_loop levels; Lwt_unix.sleep timeout] in
@@ -865,7 +865,7 @@ let test_init_from_rollup_node_data_dir =
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
@@ -893,7 +893,7 @@ let test_init_from_rollup_node_data_dir =
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
 
-  let* _ = Rpc.produce_block evm_node' in
+  let*@ _ = Rpc.produce_block evm_node' in
   let* () =
     bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node' ~proxy ()
   in
@@ -1049,7 +1049,7 @@ let test_upgrade_kernel_auto_sync =
      the kernel is upgraded. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ =
+        let*@ _ =
           Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
         in
         unit)
@@ -1069,7 +1069,7 @@ let test_upgrade_kernel_auto_sync =
      therefore not produce the block. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ =
+        let*@ _ =
           Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
         in
         unit)
@@ -1397,7 +1397,7 @@ let test_external_transaction_to_delayed_inbox_fails =
      if added *)
   let* () =
     repeat 10 (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
@@ -1588,7 +1588,7 @@ let test_migration_from_ghostnet =
   (* Produces a few blocks. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
   let* () =
@@ -1616,7 +1616,7 @@ let test_migration_from_ghostnet =
         unit)
   in
   (* Produce a block to trigger the upgrade. *)
-  let* _ = Rpc.produce_block sequencer in
+  let*@ _ = Rpc.produce_block sequencer in
   let* _ =
     repeat 4 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
@@ -1647,7 +1647,7 @@ let test_migration_from_ghostnet =
   (* Produces a few blocks. *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
   let* () =
@@ -1683,7 +1683,7 @@ let test_sequencer_upgrade =
       protocol
   in
   (* produce an initial block *)
-  let* _ = Rpc.produce_block sequencer in
+  let*@ _ = Rpc.produce_block sequencer in
   let* () =
     (* make sure rollup node saw it *)
     repeat 4 (fun () ->
@@ -1730,7 +1730,7 @@ let test_sequencer_upgrade =
   let nb_block = 4l in
   let* () =
     repeat (Int32.to_int nb_block) (fun () ->
-        let* _ = Rpc.produce_block sequencer in
+        let*@ _ = Rpc.produce_block sequencer in
         unit)
   in
   let* () =
@@ -1824,7 +1824,7 @@ let test_sequencer_diverge =
   in
   let* () =
     repeat 4 (fun () ->
-        let* _l2_level = Rpc.produce_block sequencer in
+        let*@ _l2_level = Rpc.produce_block sequencer in
         unit)
   in
   let* () =

@@ -57,7 +57,8 @@ let next_evm_level ~evm_node ~sc_rollup_node ~client =
       let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
       unit
   | Sequencer _ ->
-      let* _l2_level = Rpc.produce_block evm_node in
+      let open Rpc.Syntax in
+      let*@ _l2_level = Rpc.produce_block evm_node in
       unit
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
 
