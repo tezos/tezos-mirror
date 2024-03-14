@@ -248,13 +248,16 @@ let fill_any_missing_fields (cctxt : #Protocol_client_context.full) chain hash
     nonce_data =
   let open Lwt_result_syntax in
   if Option.is_none nonce_data.cycle || Option.is_none nonce_data.level then
-    let* rpc_level = Plugin.RPC.current_level cctxt (chain, `Hash (hash, 0)) in
-    return
-      {
-        nonce_data with
-        cycle = Some (Option.value nonce_data.cycle ~default:rpc_level.cycle);
-        level = Some (Option.value nonce_data.level ~default:rpc_level.level);
-      }
+    let*! rpc_level = Plugin.RPC.current_level cctxt (chain, `Hash (hash, 0)) in
+    match rpc_level with
+    | Ok {cycle; level; _} ->
+        return
+          {
+            nonce_data with
+            cycle = Some (Option.value nonce_data.cycle ~default:cycle);
+            level = Some (Option.value nonce_data.level ~default:level);
+          }
+    | Error _errs -> return nonce_data
   else return nonce_data
 
 (** [fill_missing_fields cctxt chain nonces_location nonces] iterates through the nonces map and
@@ -306,7 +309,7 @@ let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
                       let*! () = Events.(emit incoherent_nonce level) in
                       return acc
                   | Forgotten | Revealed _ -> return acc)
-              | None -> raise Not_found)
+              | None -> return acc)
           | Some _cycle -> return acc
           | None -> assert false)
         nonces
