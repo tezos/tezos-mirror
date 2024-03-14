@@ -157,6 +157,7 @@ val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
 val alpha_context :
   ?commitments:Commitment.t list ->
   ?min_proposal_quorum:int32 ->
+  ?consensus_rights_delay:int ->
   Parameters.bootstrap_account list ->
   Alpha_context.t tzresult Lwt.t
 
@@ -411,6 +412,7 @@ val prepare_initial_context_params :
   ?nonce_revelation_threshold:int32 ->
   ?dal:Constants.Parametric.dal ->
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
+  ?consensus_rights_delay:int ->
   unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )

@@ -550,7 +550,7 @@ let prepare_initial_context_params ?consensus_committee_size
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance () =
+    ?adaptive_issuance ?consensus_rights_delay () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_019_PtParisA_parameters in
   let constants = Default_parameters.constants_test in
@@ -617,6 +617,11 @@ let prepare_initial_context_params ?consensus_committee_size
   let adaptive_issuance =
     Option.value ~default:constants.adaptive_issuance adaptive_issuance
   in
+  let consensus_rights_delay =
+    Option.value
+      ~default:constants.consensus_rights_delay
+      consensus_rights_delay
+  in
 
   let constants =
     {
@@ -641,6 +646,7 @@ let prepare_initial_context_params ?consensus_committee_size
       adaptive_issuance;
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
+      consensus_rights_delay;
     }
   in
   let* () = check_constants_consistency constants in
@@ -726,11 +732,14 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
     constants;
   }
 
-let alpha_context ?commitments ?min_proposal_quorum
+let alpha_context ?commitments ?min_proposal_quorum ?consensus_rights_delay
     (bootstrap_accounts : Parameters.bootstrap_account list) =
   let open Lwt_result_syntax in
   let* constants, shell, _hash =
-    prepare_initial_context_params ?min_proposal_quorum ()
+    prepare_initial_context_params
+      ?min_proposal_quorum
+      ?consensus_rights_delay
+      ()
   in
   let* () =
     validate_bootstrap_accounts bootstrap_accounts constants.minimal_stake
