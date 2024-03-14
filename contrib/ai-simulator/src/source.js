@@ -148,6 +148,7 @@ const safe_get = (array, cycle) => {
  */
 
 export class Simulator {
+  #storage_issuance_bonus = [];
 
   constructor(config) {
     this.config = config;
@@ -246,5 +247,40 @@ export class Simulator {
       ? ratio_max
       : bigRat(1, 1600).multiply(bigRat.one.divide(staked_ratio.pow(2)));
     return bigRat.clip(static_rate, ratio_min, ratio_max);
+  }
+
+  dynamic_rate_for_next_cycle(cycle) {
+    if (cycle <= this.config.chain.ai_activation_cycle) {
+      return bigRat.zero;
+    }
+    if (this.#storage_issuance_bonus[cycle] != null) {
+      return bigRat(this.#storage_issuance_bonus[cycle]);
+    }
+    const previous_bonus = this.dynamic_rate_for_next_cycle(cycle - 1);
+    const staked_ratio = this.staked_ratio_for_next_cycle(cycle);
+    const new_cycle = cycle + 1;
+    const ratio_max = this.maximum_ratio(new_cycle);
+    const static_rate = this.static_rate_for_next_cycle(cycle);
+    const static_rate_dist_to_max = ratio_max.minus(static_rate);
+    const udist = bigRat.max(
+      bigRat.zero,
+      staked_ratio.minus(ratio_target).abs().minus(ratio_radius),
+    );
+    const dist = staked_ratio.geq(ratio_target) ? udist.negate() : udist;
+    const seconds_per_cycle =
+      this.config.proto.blocks_per_cycle *
+      this.config.proto.minimal_block_delay;
+    const days_per_cycle = bigRat(seconds_per_cycle).divide(seconds_per_day);
+    const max_new_bonus = bigRat.min(
+      static_rate_dist_to_max,
+      this.config.proto.max_bonus,
+    );
+    let new_bonus = previous_bonus.add(
+      dist.multiply(growth_rate).multiply(days_per_cycle),
+    );
+    new_bonus = bigRat.clip(new_bonus, bigRat.zero, max_new_bonus);
+    console.assert(0 <= new_bonus && new_bonus <= this.config.proto.max_bonus);
+    this.#storage_issuance_bonus[cycle] = new_bonus;
+    return new_bonus;
   }
 }
