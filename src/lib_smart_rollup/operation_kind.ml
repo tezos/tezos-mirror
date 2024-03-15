@@ -33,8 +33,6 @@ module Map = Map.Make (struct
   let compare = Stdlib.compare
 end)
 
-type fee_parameters = Injector_common.fee_parameter Map.t
-
 let to_string = function
   | Publish -> "publish"
   | Add_messages -> "add_messages"
@@ -75,8 +73,3 @@ let map_encoding value_encoding =
        ~string_of_key:to_string
        ~key_of_string:of_string_exn
        ~value_encoding)
-
-let fee_parameters_encoding ~default_fee_parameter =
-  map_encoding (fun (operation_kind : t) ->
-      Injector_common.fee_parameter_encoding
-        ~default_fee_parameter:(default_fee_parameter operation_kind))

@@ -26,7 +26,7 @@
 
 type state = {
   cctxt : Client_context.full;
-  fee_parameters : Operation_kind.fee_parameters;
+  fee_parameters : Configuration.fee_parameters;
   minimal_block_delay : int64;
   delay_increment_per_round : int64;
 }
