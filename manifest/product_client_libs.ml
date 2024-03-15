@@ -98,5 +98,5 @@ let _octez_codec_kaitai =
         [
           S "cram"
           :: G [S "deps" :: [S "codec.exe"]]
-          :: [S "package" :: [S "octez-codec"]];
+          :: [S "package" :: [S "octez-codec-kaitai"]];
         ]
