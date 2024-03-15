@@ -11,7 +11,7 @@ val init :
   own_frozen:Tez_repr.t ->
   staked_frozen:Tez_repr.t ->
   delegated:Tez_repr.t ->
-  current_cycle:Cycle_repr.t ->
+  current_level:Level_repr.t ->
   t
 
 val encoding : t Data_encoding.t
@@ -45,14 +45,14 @@ val has_minimal_frozen_stake : minimal_frozen_stake:Tez_repr.t -> t -> bool
 val has_minimal_stake_to_be_considered : minimal_stake:Tez_repr.t -> t -> bool
 
 val remove_delegated :
-  current_cycle:Cycle_repr.t -> amount:Tez_repr.t -> t -> t tzresult
+  current_level:Level_repr.t -> amount:Tez_repr.t -> t -> t tzresult
 
 val remove_own_frozen : amount:Tez_repr.t -> t -> t tzresult
 
 val remove_staked_frozen : amount:Tez_repr.t -> t -> t tzresult
 
 val add_delegated :
-  current_cycle:Cycle_repr.t -> amount:Tez_repr.t -> t -> t tzresult
+  current_level:Level_repr.t -> amount:Tez_repr.t -> t -> t tzresult
 
 val add_own_frozen : amount:Tez_repr.t -> t -> t tzresult
 
@@ -61,5 +61,5 @@ val add_staked_frozen : amount:Tez_repr.t -> t -> t tzresult
 module Internal_for_tests : sig
   val min_delegated_in_cycle : t -> Tez_repr.t
 
-  val cycle_of_min_delegated : t -> Cycle_repr.t
+  val level_of_min_delegated : t -> Level_repr.t option
 end
