@@ -87,6 +87,9 @@ Node
   whether or node the node is fully initialized and ready to answer to
   RPC requests (MR :gl:`!6820`).
 
+- Removed the deprecated ``local-listen-addrs`` configuration file
+  field. Use ``listen-addrs`` instead.
+
 Client
 ------
 
