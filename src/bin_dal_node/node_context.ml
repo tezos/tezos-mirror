@@ -32,6 +32,7 @@ type ready_ctxt = {
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   plugin_proto : int; (* the [proto_level] of the plugin *)
   last_processed_level : int32 option;
+  skip_list_cells_store : Skip_list_cells_store.t;
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -73,8 +74,8 @@ let init config store gs_worker transport_layer cctxt metrics_server =
     metrics_server;
   }
 
-let set_ready ctxt plugin cryptobox shards_proofs_precomputation
-    proto_parameters plugin_proto =
+let set_ready ctxt plugin skip_list_cells_store cryptobox
+    shards_proofs_precomputation proto_parameters plugin_proto =
   let open Result_syntax in
   match ctxt.status with
   | Starting ->
@@ -92,6 +93,7 @@ let set_ready ctxt plugin cryptobox shards_proofs_precomputation
             shards_proofs_precomputation;
             plugin_proto;
             last_processed_level = None;
+            skip_list_cells_store;
           } ;
       return_unit
   | Ready _ -> raise Status_already_ready

@@ -2728,7 +2728,13 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     in
     iter from_level
   in
-  let wait_block_processing = wait_for_layer1_head dal_node (last_level + 1) in
+
+  let wait_level = last_level + 1 in
+  let wait_block_processing_on_l1 = wait_for_layer1_head dal_node wait_level in
+
+  let wait_block_processing_on_dal =
+    wait_for_layer1_final_block dal_node (wait_level - 2)
+  in
 
   let* () =
     publish_and_bake
@@ -2743,7 +2749,8 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       not_all_delegates
   in
   let* () = bake_for client in
-  let* _lvl = wait_block_processing in
+  let* _lvl = wait_block_processing_on_l1 in
+  let* () = wait_block_processing_on_dal in
 
   Log.info "Check the attestation status of the published slots." ;
   let rec check_attestations level =

@@ -294,10 +294,27 @@ module Handler = struct
           Store.Value_size_hooks.set_share_size
             (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
           let* () = set_profile_context ctxt config proto_parameters in
+          (* We support at most 64 back-pointers, each of which takes 32 bytes.
+             The cells content itself takes less than 64 bytes. *)
+          let padded_encoded_cell_size = 64 * (32 + 1) in
+          (* A pointer hash is 32 bytes length, but because of the double
+             encoding in Dal_proto_types and then in skip_list_cells_store, we
+             have an extra 4 bytes for encoding the size. *)
+          let encoded_hash_size = 32 + 4 in
+          let* skip_list_cells_store =
+            Skip_list_cells_store.init
+              ~node_store_dir:(Configuration_file.store_path config)
+              ~skip_list_store_dir:"skip_list"
+              ~padded_encoded_cell_size
+              ~encoded_hash_size
+              ~number_of_slots:
+                proto_parameters.cryptobox_parameters.number_of_shards
+          in
           let*? () =
             Node_context.set_ready
               ctxt
               plugin
+              skip_list_cells_store
               cryptobox
               shards_proofs_precomputation
               proto_parameters
@@ -356,6 +373,7 @@ module Handler = struct
                   shards_proofs_precomputation = _;
                   plugin_proto;
                   last_processed_level;
+                  skip_list_cells_store;
                 } =
             ready_ctxt
           in
@@ -396,6 +414,26 @@ module Handler = struct
             in
             let*? block_round = Plugin.get_round shell_header.fitness in
             let* slot_headers = Plugin.get_published_slot_headers block_info in
+            let* cells_of_level =
+              Plugin.Skip_list.cells_of_level block_info cctxt
+            in
+            let cells_of_level =
+              List.map
+                (fun (hash, cell) ->
+                  ( Dal_proto_types.Skip_list_hash.of_proto
+                      Plugin.Skip_list.hash_encoding
+                      hash,
+                    Dal_proto_types.Skip_list_cell.of_proto
+                      Plugin.Skip_list.cell_encoding
+                      cell ))
+                cells_of_level
+            in
+            let* () =
+              Skip_list_cells_store.insert
+                skip_list_cells_store
+                ~attested_level:head_level
+                cells_of_level
+            in
             let* () =
               Slot_manager.store_slot_headers
                 ~number_of_slots:proto_parameters.number_of_slots

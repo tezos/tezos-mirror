@@ -37,6 +37,7 @@ type ready_ctxt = {
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
   plugin_proto : int;  (** Protocol level of the plugin. *)
   last_processed_level : int32 option;
+  skip_list_cells_store : Skip_list_cells_store.t;
 }
 
 (** The status of the dal node *)
@@ -62,14 +63,15 @@ val init :
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt dal_plugin cryptobox proto_parameters plugin_proto] updates
-    in place the status value to [Ready], and initializes the inner [ready_ctxt]
-    value with the given parameters.
+(** [set_ready ctxt dal_plugin skip_list_cells_store cryptobox proto_parameters
+    plugin_proto] updates in place the status value to [Ready], and initializes
+    the inner [ready_ctxt] value with the given parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  (module Tezos_dal_node_lib.Dal_plugin.T) ->
+  (module Dal_plugin.T) ->
+  Skip_list_cells_store.t ->
   Cryptobox.t ->
   Cryptobox.shards_proofs_precomputation option ->
   Dal_plugin.proto_parameters ->
@@ -77,8 +79,7 @@ val set_ready :
   unit tzresult
 
 (** Updates the plugin and the protocol level. *)
-val update_plugin_in_ready :
-  t -> (module Tezos_dal_node_lib.Dal_plugin.T) -> int -> unit
+val update_plugin_in_ready : t -> (module Dal_plugin.T) -> int -> unit
 
 type error += Node_not_ready
 
