@@ -148,13 +148,13 @@ let make_string_parameter name = function
   | None -> []
   | Some value -> [(name, `String value)]
 
-let test ~__FILE__ ?(tags = []) ?uses ?supports title f =
+let test ~__FILE__ ?(regression = false) ?(tags = []) ?uses ?supports title f =
   let tags = Tag.tezos2 :: "dal" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags ?uses ?supports f
-
-let regression_test ~__FILE__ ?(tags = []) ?uses title f =
-  let tags = Tag.tezos2 :: "dal" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags ?uses f
+  let register_test =
+    if regression then Protocol.register_regression_test
+    else Protocol.register_test
+  in
+  register_test ~__FILE__ ~title ~tags ?uses ?supports f
 
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
@@ -333,13 +333,15 @@ let with_dal_node ?peers ?attester_profiles ?producer_profiles
 
 (* Wrapper scenario functions that should be re-used as much as possible when
    writing tests. *)
-let scenario_with_layer1_node ?(tags = [team]) ?additional_bootstrap_accounts
-    ?attestation_lag ?number_of_shards ?custom_constants ?commitment_period
-    ?challenge_window ?(dal_enable = true) ?event_sections_levels
-    ?node_arguments ?activation_timestamp ?consensus_committee_size
-    ?minimal_block_delay ?delay_increment_per_round variant scenario =
+let scenario_with_layer1_node ?regression ?(tags = [team])
+    ?additional_bootstrap_accounts ?attestation_lag ?number_of_shards
+    ?number_of_slots ?custom_constants ?commitment_period ?challenge_window
+    ?(dal_enable = true) ?event_sections_levels ?node_arguments
+    ?activation_timestamp ?consensus_committee_size ?minimal_block_delay
+    ?delay_increment_per_round variant scenario =
   let description = "Testing DAL L1 integration" in
   test
+    ?regression
     ~__FILE__
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
@@ -352,6 +354,7 @@ let scenario_with_layer1_node ?(tags = [team]) ?additional_bootstrap_accounts
         ?delay_increment_per_round
         ?attestation_lag
         ?number_of_shards
+        ?number_of_slots
         ?commitment_period
         ?challenge_window
         ?event_sections_levels
@@ -362,14 +365,15 @@ let scenario_with_layer1_node ?(tags = [team]) ?additional_bootstrap_accounts
       @@ fun parameters cryptobox node client ->
       scenario protocol parameters cryptobox node client)
 
-let scenario_with_layer1_and_dal_nodes ?(tags = [team]) ?(uses = fun _ -> [])
-    ?custom_constants ?minimal_block_delay ?delay_increment_per_round
-    ?redundancy_factor ?slot_size ?number_of_shards ?number_of_slots
-    ?attestation_lag ?attestation_threshold ?commitment_period ?challenge_window
-    ?(dal_enable = true) ?activation_timestamp ?bootstrap_profile
-    ?producer_profiles variant scenario =
+let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
+    ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
+    ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
+    ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
+    ?challenge_window ?(dal_enable = true) ?activation_timestamp
+    ?bootstrap_profile ?producer_profiles variant scenario =
   let description = "Testing DAL node" in
   test
+    ?regression
     ~__FILE__
     ~tags
     ~uses:(fun protocol -> Constant.octez_dal_node :: uses protocol)
@@ -403,7 +407,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?activation_timestamp ?bootstrap_profile ?producer_profiles variant scenario
     =
   let description = "Testing DAL rollup and node with L1" in
-  regression_test
+  test
+    ~regression:true
     ~__FILE__
     ~tags
     ~uses:(fun protocol ->
@@ -1056,6 +1061,75 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
     mempool_is ~__LOC__ Mempool.{empty with outdated; validated = [h4; h4']}
   in
   check_slots_availability ~__LOC__ ~attested:[]
+
+let test_all_available_slots _protocol parameters cryptobox node client
+    _bootstrap_key =
+  let nb_slots = parameters.Dal.Parameters.number_of_slots in
+  (* We ensure there is at least one account per manager operation to
+     be included. This is because of the 1M restrction. Another way
+     could use batched operations, but the current DAL helpers are
+     difficult to use for batched operations. *)
+  let* accounts =
+    Seq.ints 0 |> Seq.take nb_slots |> List.of_seq
+    |> Lwt_list.map_p (fun index ->
+           Client.show_address
+             ~alias:("bootstrap" ^ string_of_int (1 + index))
+             client)
+  in
+  let* () =
+    Lwt_list.iter_p
+      (fun source ->
+        let*! () = Client.reveal ~src:source.Account.alias client in
+        unit)
+      (List.filteri
+         (fun i _ -> i >= Array.length Account.Bootstrap.keys)
+         accounts)
+  in
+  let* () = bake_for client in
+  let* () =
+    Lwt_list.iteri_p
+      (fun index source ->
+        let* (`OpHash _oph1) =
+          publish_dummy_slot
+            ~source
+            ~fee:1_000
+            ~index
+            ~message:"a"
+            cryptobox
+            client
+        in
+        unit)
+      accounts
+  in
+  let* () = bake_for client in
+  let* result =
+    Node.RPC.(call ~rpc_hooks node @@ get_chain_block_metadata_raw ())
+  in
+  JSON.encode result |> hooks.on_log ;
+  let* operations = Node.RPC.(call node @@ get_chain_block_operations ()) in
+  let () =
+    (* Check validity of operations *)
+    let manager_operations = JSON.(operations |=> 3 |> as_list) in
+    Check.(List.length manager_operations = nb_slots)
+      ~__LOC__
+      ~error_msg:"Expected %R manager operations.Got %L"
+      Check.int ;
+    List.iter
+      (fun operation ->
+        let status =
+          JSON.(
+            operation |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+            |-> "status" |> as_string)
+        in
+        Check.(status = "applied")
+          ~__LOC__
+          ~error_msg:
+            "Expected all slots to be included. At least one operation failed \
+             with status: %L"
+          Check.string)
+      manager_operations
+  in
+  unit
 
 (* Tests that DAL attestations are only included in a block if the attestation
    is from a DAL-committee member. This test may be fail sometimes (with
@@ -4933,6 +5007,17 @@ let register ~protocols =
     ~attestation_lag:5
     "slots attestation operation behavior"
     test_slots_attestation_operation_behavior
+    protocols ;
+  (* We want to test that the number of slots following mainnet
+     parameters can be included into one block. We hard-code the
+     mainnet value. It could be extended to higher values if
+     desired. *)
+  scenario_with_layer1_node
+    ~regression:true
+    ~number_of_slots:32
+    ~additional_bootstrap_accounts:(32 - Array.length Account.Bootstrap.keys)
+    "Use all available slots"
+    test_all_available_slots
     protocols ;
   scenario_with_layer1_node
     "slots attestation operation dal committee membership check"
