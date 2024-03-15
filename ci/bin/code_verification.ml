@@ -637,12 +637,28 @@ let jobs pipeline_type =
         ]
       |> job_external_split
     in
+    let job_semgrep : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.semgrep"
+        ~image:Images.semgrep_agent
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_semgrep_files ())
+        [
+          "echo \"OCaml code linting. For information on how to reproduce \
+           locally, check out scripts/semgrep/README.md\"";
+          "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
+        ]
+      |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
       job_oc_check_lift_limits_patch;
       job_oc_misc_checks;
       job_misc_opam_checks;
+      job_semgrep;
     ]
     @
     match pipeline_type with

@@ -188,7 +188,6 @@ let () =
     | ".gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml"
     | ".gitlab/ci/jobs/test/oc.script:test-gen-genesis.yml"
     | ".gitlab/ci/jobs/test/oc.script:test_octez_release_versions.yml"
-    | ".gitlab/ci/jobs/test/oc.semgrep.yml"
     | ".gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml"
     | ".gitlab/ci/jobs/test/oc.unit.yml"
     | ".gitlab/ci/jobs/test/test_etherlink_kernel-before_merging.yml"
