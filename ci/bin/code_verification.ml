@@ -139,8 +139,6 @@ let read_opam_packages =
         Some {name; group; batch_index}
     | _ -> fail ()
 
-let changeset_unit_test_arm64 = ["src/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"]
-
 let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
     ~job_build_arm64_release ~job_build_arm64_exp_dev_extra : tezos_job list =
   let build_dependencies = function
@@ -241,7 +239,7 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
       ~rules:
         [
           job_rule ~if_:Rules.schedule_extended_tests ~when_:Always ();
-          job_rule ~changes:changeset_unit_test_arm64 ();
+          job_rule ~changes:changeset_octez ();
         ]
       ~make_targets:["test-nonproto-unit"; "test-webassembly"]
         (* No coverage for arm64 jobs -- the code they test is a
