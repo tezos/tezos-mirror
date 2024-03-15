@@ -2489,12 +2489,15 @@ let test_kernel_upgrade_failing_migration =
          client,
          evm_node,
          _original_kernel_boot_wasm,
-         _root_hash ) =
+         root_hash ) =
     gen_test_kernel_upgrade
       ~installee:Constant.WASM.failed_migration
       ~should_fail:true
       protocol
   in
+  let*@! found_root_hash = Rpc.tez_kernelRootHash evm_node in
+  Check.((root_hash <> found_root_hash) string)
+    ~error_msg:"The failed migration should not upgrade the kernel root hash" ;
   (* We make sure that we can't read under the tmp file, after migration failed,
      everything is reverted. *)
   let* tmp_dummy =
