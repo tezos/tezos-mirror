@@ -6366,6 +6366,7 @@ let hash = Protocol.hash
             octez_client_base |> open_;
             octez_client_base_unix |> open_;
             client |> if_some |> open_;
+            dal |> if_some |> if_ N.(number >= 019) |> open_;
             octez_context_encoding;
             octez_context_helpers;
             main |> open_;

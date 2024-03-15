@@ -11,6 +11,7 @@
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
   octez-protocol-019-PtParisA-libs.client
+  octez-protocol-019-PtParisA-libs.dal
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
   tezos-protocol-019-PtParisA.protocol
@@ -54,6 +55,7 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_019_PtParisA
+  -open Tezos_dal_019_PtParisA
   -open Tezos_protocol_019_PtParisA
   -open Tezos_protocol_plugin_019_PtParisA
   -open Tezos_protocol_019_PtParisA_parameters

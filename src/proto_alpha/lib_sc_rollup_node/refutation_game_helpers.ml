@@ -158,16 +158,20 @@ let generate_proof (node_ctxt : _ Node_context.t)
     let+ context = Node_context.checkout_context node_ctxt start_hash in
     Context.index context
   in
-  let* dal_slots_history =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3805 *)
-    return Dal.Slots_history.genesis
+  let dal_slots_history =
+    (* Similarly to what's done for inbox snapshot above. *)
+    Sc_rollup_proto_types.Dal.Slot_history.of_octez game.dal_snapshot
   in
-  let* dal_slots_history_cache_view =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3805 *)
-    let* dal_slots_history_cache =
-      return (Dal.Slots_history.History_cache.empty ~capacity:0L)
+  let get_cell_from_hash hash =
+    (* each time a DAL skip list cell is requested by hash, we retrieve it from the DAL node. *)
+    (* TODO: We may want to have a local cache here. *)
+    let open Lwt_syntax in
+    let dal_cctxt = node_ctxt.dal_cctxt in
+    let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
+    let+ res =
+      Dal_proto_client.get_commitments_history_hash_content dal_cctxt hash
     in
-    Dal.Slots_history.History_cache.view dal_slots_history_cache |> return
+    Result.to_option res
   in
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
@@ -254,11 +258,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
     module Dal_with_history = struct
       let confirmed_slots_history = dal_slots_history
 
-      let get_history ptr =
-        Dal.Slots_history.History_cache.Map.find
-          ptr
-          dal_slots_history_cache_view
-        |> Lwt.return
+      let get_history = get_cell_from_hash
 
       let dal_attestation_lag = dal_attestation_lag
 
