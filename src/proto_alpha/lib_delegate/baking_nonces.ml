@@ -85,9 +85,11 @@ type nonce_data = {
   nonce_state : nonce_state option;
 }
 
-type nonces = nonce_data Block_hash.Map.t
+type nonces = nonce_data Nonce_hash.Map.t
 
-let empty = Block_hash.Map.empty
+let empty = Nonce_hash.Map.empty
+
+let legacy_empty = Block_hash.Map.empty
 
 let nonce_state_encoding =
   let open Data_encoding in
@@ -143,39 +145,16 @@ let encoding =
   def "seed_nonce"
   @@ conv
        (fun m ->
-         Block_hash.Map.fold
-           (fun hash nonce_data acc -> (hash, nonce_data) :: acc)
+         Nonce_hash.Map.fold
+           (fun _hash nonce_data acc -> nonce_data :: acc)
            m
            [])
        (fun l ->
          List.fold_left
-           (fun map (hash, nonce) -> Block_hash.Map.add hash nonce map)
-           Block_hash.Map.empty
+           (fun map data -> Nonce_hash.Map.add data.nonce_hash data map)
+           Nonce_hash.Map.empty
            l)
-  @@ list
-       (obj2
-          (req "block" Block_hash.encoding)
-          (req "nonce_data" nonce_data_encoding))
-
-let may_migrate (wallet : Protocol_client_context.full) location =
-  let open Lwt_syntax in
-  let base_dir = wallet#get_base_dir in
-  let current_file =
-    Filename.Infix.((base_dir // Baking_files.filename location) ^ "s")
-  in
-  let* exists = Lwt_unix.file_exists current_file in
-  match exists with
-  | true ->
-      (* Migration already occured *)
-      return_unit
-  | false -> (
-      let legacy_file = Filename.Infix.(base_dir // "nonces") in
-      let* exists = Lwt_unix.file_exists legacy_file in
-      match exists with
-      | false ->
-          (* Do nothing *)
-          return_unit
-      | true -> Lwt_utils_unix.copy_file ~src:legacy_file ~dst:current_file)
+  @@ list nonce_data_encoding
 
 let load (wallet : #Client_context.wallet)
     ~(legacy_location : [`Legacy_nonce] Baking_files.location)
@@ -197,7 +176,7 @@ let load (wallet : #Client_context.wallet)
     (* If we fail to load the more detailed format, we try with the legacy format,
        which can only be found in the legacy file *)
     let* legacy_nonces =
-      wallet#load nonces_location ~default:empty legacy_encoding
+      wallet#load nonces_location ~default:legacy_empty legacy_encoding
     in
     return
     @@ Block_hash.Map.fold
@@ -213,7 +192,7 @@ let load (wallet : #Client_context.wallet)
                nonce_state = None;
              }
            in
-           Block_hash.Map.add block_hash data acc)
+           Nonce_hash.Map.add data.nonce_hash data acc)
          legacy_nonces
          empty
 
@@ -225,21 +204,27 @@ let save (wallet : #Client_context.wallet)
   (* If the flag is set, we can overwrite the nonces data in the legacy file *)
   if override_legacy_nonces_flag then
     wallet#write legacy_location nonces encoding
+  else
     (* Otherwise, we put the detailed data in a specific file, and the legacy data in
        the legacy file. *)
-  else
     let* () =
       wallet#write (Baking_files.filename stateful_location) nonces encoding
     in
-    let legacy_nonces = Block_hash.Map.map (fun {nonce; _} -> nonce) nonces in
+    let legacy_nonces =
+      Nonce_hash.Map.fold
+        (fun _ {nonce; block_hash; _} legacy_nonces ->
+          Block_hash.Map.add block_hash nonce legacy_nonces)
+        nonces
+        legacy_empty
+    in
     wallet#write legacy_location legacy_nonces legacy_encoding
 
-let add nonces hash nonce = Block_hash.Map.add hash nonce nonces
+let add nonces nonce = Nonce_hash.Map.add nonce.nonce_hash nonce nonces
 
-let remove nonces hash = Block_hash.Map.remove hash nonces
+let remove nonces hash = Nonce_hash.Map.remove hash nonces
 
 let remove_all nonces nonces_to_remove =
-  Block_hash.Map.fold
+  Nonce_hash.Map.fold
     (fun hash _ acc -> remove acc hash)
     nonces_to_remove
     nonces
@@ -251,7 +236,7 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet)
   let legacy_location = Baking_files.filename legacy_location in
   if not override_legacy_nonces_flag then
     let* legacy_nonces =
-      wallet#load legacy_location ~default:empty legacy_encoding
+      wallet#load legacy_location ~default:legacy_empty legacy_encoding
     in
     let detailed_nonces =
       Block_hash.Map.fold
@@ -267,7 +252,7 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet)
               nonce_state = None;
             }
           in
-          Block_hash.Map.add block_hash data acc)
+          Nonce_hash.Map.add data.nonce_hash data acc)
         legacy_nonces
         empty
     in
@@ -287,17 +272,17 @@ let get_outdated_nonces state nonces current_cycle =
   let {Constants.parametric = {consensus_rights_delay; _}; _} =
     state.constants
   in
-  Block_hash.Map.fold
-    (fun hash nonce acc ->
+  Nonce_hash.Map.fold
+    (fun _hash nonce acc ->
       let orphans, outdated = acc in
       match nonce.cycle with
       | Some cycle ->
           if
             Int32.sub current_cycle (Cycle.to_int32 cycle)
             > Int32.of_int consensus_rights_delay
-          then (orphans, add outdated hash nonce)
+          then (orphans, add outdated nonce)
           else acc
-      | None -> (add orphans hash nonce, outdated))
+      | None -> (add orphans nonce, outdated))
     nonces
     (empty, empty)
 
@@ -313,11 +298,13 @@ let filter_outdated_nonces state nonces current_cycle =
 
 (** [fill_any_missing_fields cctxt chain hash nonce_data] fills the [None] fields of a particular
     [nonce_data] entry and only makes an RPC call when there is a missing field. *)
-let fill_any_missing_fields (cctxt : #Protocol_client_context.full) chain hash
+let fill_any_missing_fields (cctxt : #Protocol_client_context.full) chain
     nonce_data =
   let open Lwt_result_syntax in
   if Option.is_none nonce_data.cycle || Option.is_none nonce_data.level then
-    let*! rpc_level = Plugin.RPC.current_level cctxt (chain, `Hash (hash, 0)) in
+    let*! rpc_level =
+      Plugin.RPC.current_level cctxt (chain, `Hash (nonce_data.block_hash, 0))
+    in
     match rpc_level with
     | Ok {cycle; level; _} ->
         return
@@ -336,10 +323,10 @@ let fill_missing_fields (cctxt : #Protocol_client_context.full) chain
     ~legacy_location ~stateful_location nonces =
   let open Lwt_result_syntax in
   let* filled_nonces =
-    Block_hash.Map.fold_es
+    Nonce_hash.Map.fold_es
       (fun hash nonce_data acc ->
-        let* nonce_data = fill_any_missing_fields cctxt chain hash nonce_data in
-        return @@ Block_hash.Map.add hash nonce_data acc)
+        let* nonce_data = fill_any_missing_fields cctxt chain nonce_data in
+        return @@ Nonce_hash.Map.add hash nonce_data acc)
       nonces
       empty
   in
@@ -366,8 +353,8 @@ let get_unrevealed_nonces {cctxt; chain; legacy_location; stateful_location; _}
           ~stateful_location
           nonces
       in
-      Block_hash.Map.fold_es
-        (fun hash {nonce; cycle; level; _} acc ->
+      Nonce_hash.Map.fold_es
+        (fun _hash {nonce; cycle; level; block_hash; _} acc ->
           match cycle with
           | Some cycle when Cycle.(cycle = previous_cycle) -> (
               match level with
@@ -378,7 +365,7 @@ let get_unrevealed_nonces {cctxt; chain; legacy_location; stateful_location; _}
                   match nonce_info with
                   | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
                       let*! () =
-                        Events.(emit found_nonce_to_reveal (hash, level))
+                        Events.(emit found_nonce_to_reveal (block_hash, level))
                       in
                       return ((level, nonce) :: acc)
                   | Missing _nonce_hash ->
@@ -427,7 +414,6 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
   let nonces =
     add
       nonces
-      block_hash
       {
         nonce;
         nonce_hash = Nonce.hash nonce;
@@ -549,7 +535,6 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
   let stateful_location =
     Baking_files.resolve_location ~chain_id `Stateful_nonce
   in
-  let*! () = may_migrate cctxt legacy_location in
   let*! _ =
     may_create_detailed_nonces_file cctxt ~legacy_location ~stateful_location
   in
