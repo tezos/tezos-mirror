@@ -88,6 +88,17 @@ module Local_directory = Make_directory (struct
     Lwt_result.return (Node_context.readonly node_ctxt)
 end)
 
+module Admin_directory = Make_directory (struct
+  include Rollup_node_services.Admin
+
+  type context = Node_context.rw
+
+  type subcontext = Node_context.ro
+
+  let context_of_prefix node_ctxt () =
+    Lwt_result.return (Node_context.readonly node_ctxt)
+end)
+
 let () =
   Root_directory.register0 Rollup_node_services.Root.health
   @@ fun _node_ctxt () () -> Lwt_result_syntax.return_unit
@@ -463,6 +474,13 @@ let () =
 
   return status
 
+let () =
+  Admin_directory.register0 Rollup_node_services.Admin.injector_queues_total
+  @@ fun _node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let totals = Injector.total_queued_operations () in
+  return totals
+
 let add_describe dir =
   Tezos_rpc.Directory.register_describe_directory_service
     dir
@@ -476,6 +494,7 @@ let top_directory (node_ctxt : _ Node_context.t) =
       Root_directory.build_directory;
       Global_directory.build_directory;
       Local_directory.build_directory;
+      Admin_directory.build_directory;
     ]
 
 let block_prefix =

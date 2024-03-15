@@ -449,6 +449,16 @@ module Encodings = struct
           (fun (processed_level, l1_head_level, percentage_done) ->
             Synchronizing {processed_level; l1_head_level; percentage_done});
       ]
+
+  let injector_queues_total =
+    obj2
+      (req
+         "injectors"
+         (list
+            (obj2
+               (req "tags" (list Operation_kind.encoding))
+               (req "queue_size" int31))))
+      (req "total" int31)
 end
 
 module Arg = struct
@@ -502,6 +512,16 @@ module Arg = struct
         Commitment.Hash.of_b58check_opt s
         |> Option.to_result ~none:"Invalid commitment hash")
       ()
+
+  let operation_kind : Operation_kind.t Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
+      ~descr:"A kind of operation for the injector."
+      ~name:"operation_kind"
+      ~construct:Operation_kind.to_string
+      ~destruct:(fun s ->
+        Operation_kind.of_string s
+        |> Option.to_result ~none:"Invalid operation kind")
+      ()
 end
 
 module Query = struct
@@ -511,6 +531,12 @@ module Query = struct
     let open Tezos_rpc.Query in
     query (fun protocol -> {protocol})
     |+ opt_field "protocol" Protocol_hash.rpc_arg (fun p -> p.protocol)
+    |> seal
+
+  let operation_tag_query : Operation_kind.t option Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query (fun tag -> tag)
+    |+ opt_field "tag" Arg.operation_kind (fun k -> k)
     |> seal
 end
 
@@ -708,4 +734,21 @@ module Root = struct
       ~query:Query.proto_query
       ~output:Data_encoding.json
       (path / "openapi")
+end
+
+module Admin = struct
+  open Tezos_rpc.Path
+
+  include Make_services (struct
+    type prefix = unit
+
+    let prefix = open_root / "admin"
+  end)
+
+  let injector_queues_total =
+    Tezos_rpc.Service.get_service
+      ~description:"Get total operations queued in injectors"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.injector_queues_total
+      (path / "injector" / "queues" / "total")
 end
