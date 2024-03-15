@@ -233,6 +233,15 @@ export class Simulator {
     );
   }
 
+  set_staked_ratio_at(cycle, value) {
+    const ratio = bigRat.clip(bigRat(value), bigRat.zero, bigRat.one);
+    const total_supply = safe_get(this.config.chain.total_supply, cycle);
+    const res = ratio.multiply(total_supply).ceil();
+    const i = cycle + this.config.proto.consensus_rights_delay + 1;
+    this.config.chain.total_frozen_stake[i] = res;
+    this.#clear();
+  }
+
   staked_ratio_for_next_cycle(cycle) {
     const total_supply = safe_get(this.config.chain.total_supply, cycle);
     const total_frozen_stake = safe_get(
