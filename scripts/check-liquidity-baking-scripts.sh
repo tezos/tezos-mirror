@@ -19,13 +19,14 @@ usage() {
 #   "$PROTOCOL_DIR"/lib_protocol/liquidity_baking_lqt.ml
 #
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
   usage
   exit 1
 fi
 
 COMMIT_HASH="${1}"
 PROTOCOL_DIR="${2}"
+LINE_OFFSET="${3}"
 
 # --------------------
 echo "* Configuration"
@@ -108,8 +109,8 @@ compare() {
   fi
 }
 
-source_hex "$TOP_DIR"/"$PROTOCOL_DIR"/lib_protocol/liquidity_baking_lqt.ml 3 source.lqt.bin
+source_hex "$TOP_DIR"/"$PROTOCOL_DIR"/lib_protocol/liquidity_baking_lqt.ml "${LINE_OFFSET}" source.lqt.bin
 compare lqt source.lqt.bin lqt.bin
 
-source_hex "$TOP_DIR"/"$PROTOCOL_DIR"/lib_protocol/liquidity_baking_cpmm.ml 3 source.cpmm.bin
+source_hex "$TOP_DIR"/"$PROTOCOL_DIR"/lib_protocol/liquidity_baking_cpmm.ml "${LINE_OFFSET}" source.cpmm.bin
 compare cpmm source.cpmm.bin cpmm.bin
