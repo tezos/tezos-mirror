@@ -174,7 +174,6 @@ let () =
   (* Paths to exclude from generation check. As files are translated
      to CI-in-OCaml, they should be removed from this function *)
   let exclude = function
-    | ".gitlab/ci/jobs/build/bin_packages_common.yml"
     | ".gitlab/ci/jobs/build/common.yml"
     | ".gitlab/ci/jobs/build/oc.build_kernels.yml"
     | ".gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml"
