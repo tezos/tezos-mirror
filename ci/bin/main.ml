@@ -186,7 +186,6 @@ let () =
     | ".gitlab/ci/jobs/test/common.yml"
     | ".gitlab/ci/jobs/test/install_octez.yml"
     | ".gitlab/ci/jobs/test/misc_opam_checks.yml"
-    | ".gitlab/ci/jobs/test/oc.check_lift_limits_patch.yml"
     | ".gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml"
     | ".gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml"
     | ".gitlab/ci/jobs/test/oc.misc_checks-schedule_extended_test.yml"

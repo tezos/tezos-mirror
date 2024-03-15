@@ -318,6 +318,14 @@ let changeset_kaitai_e2e_files =
 let changeset_ocaml_files =
   ["src/**/*"; "tezt/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"; "devtools/**/*"]
 
+let changeset_lift_limits_patch =
+  [
+    "src/bin_tps_evaluation/lift_limits.patch";
+    "src/proto_alpha/lib_protocol/main.ml";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.

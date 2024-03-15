@@ -39,7 +39,7 @@ include:
   # because of absence of certain changes
   - .gitlab/ci/jobs/test/kaitai_checks-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/kaitai_e2e_checks-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch.yml
+  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.misc_checks-schedule_extended_test.yml
   - .gitlab/ci/jobs/test/misc_opam_checks.yml
   - .gitlab/ci/jobs/test/oc.semgrep.yml

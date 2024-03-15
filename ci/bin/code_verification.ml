@@ -573,7 +573,27 @@ let jobs pipeline_type =
         ]
       |> job_external_split
     in
-    [job_kaitai_checks; job_kaitai_e2e_checks]
+    let job_oc_check_lift_limits_patch =
+      job
+        ~__POS__
+        ~name:"oc.check_lift_limits_patch"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_lift_limits_patch ())
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        [
+          (* Check that the patch only modifies the
+             src/proto_alpha/lib_protocol. If not, the rules above have to be
+             updated. *)
+          "[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | \
+           cut -f3) = \"src/proto_alpha/lib_protocol/main.ml\" ]";
+          "git apply src/bin_tps_evaluation/lift_limits.patch";
+          "dune build @src/proto_alpha/lib_protocol/check";
+        ]
+      |> job_external_split
+    in
+    [job_kaitai_checks; job_kaitai_e2e_checks; job_oc_check_lift_limits_patch]
   in
   let doc = [] in
   let manual =
