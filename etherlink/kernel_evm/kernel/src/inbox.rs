@@ -296,9 +296,11 @@ impl InputHandler for SequencerInput {
             Self::DelayedInput(tx) => {
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
+                log!(host, Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)?
             }
             Self::SequencerBlueprint(seq_blueprint) => {
+                log!(host, Benchmarking, "Handling a blueprint input");
                 log!(
                     host,
                     Debug,

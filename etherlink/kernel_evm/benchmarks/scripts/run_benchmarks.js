@@ -158,9 +158,10 @@ function run_profiler(path, logs) {
             opcodes: [],
             bloom_size: [],
             precompiles: [],
-            blueprint_chunks: [],
             tx_type: [],
-            reason: []
+            reason: [],
+            nb_blueprint_chunks: 0,
+            nb_delayed_inputs: 0,
         }
         let nb_reboots = 0;
 
@@ -188,6 +189,8 @@ function run_profiler(path, logs) {
             fs.appendFileSync(logs, output);
         });
 
+        let blueprint_regexp = new RegExp(/\[Benchmarking\] Handling a blueprint input/);
+        let delayed_regexp = new RegExp(/\[Benchmarking\] Handling a delayed input/);
         childProcess.stdout.on('data', (data) => {
             const output = data.toString();
             if (!output.includes("__wasm_debugger__")) fs.appendFileSync(logs, output)
@@ -200,6 +203,8 @@ function run_profiler(path, logs) {
                 results.profiler_output_path = profiler_output_path_result;
                 if (KEEP_TEMP) console.log(`Flamechart: ${profiler_output_path_result}`)
             }
+            if(blueprint_regexp.test(output)) results.nb_blueprint_chunks += 1;
+            if(delayed_regexp.test(output)) results.nb_delayed_inputs += 1;
             push_match(output, results.gas_costs, /\[Benchmarking\] gas_used:\s*(\d+)/g)
             push_match(output, results.tx_status, /\[Benchmarking\] Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
             push_match(output, results.estimated_ticks, /\[Benchmarking\] Estimated ticks:\s*(\d+)/g)
@@ -209,7 +214,6 @@ function run_profiler(path, logs) {
             push_match(output, results.block_in_progress_read, /\[Benchmarking\] Reading Block In Progress of size\s*(\d+)/g)
             push_match(output, results.receipt_size, /\[Benchmarking\] Storing receipt of size \s*(\d+)/g)
             push_match(output, results.bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
-            push_match(output, results.blueprint_chunks, /\[Benchmarking\] number of blueprint chunks read:\s*(\d+)/g)
             push_match(output, results.tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
             push_match(output, results.reason, /\[Benchmarking\] reason: ([A-Za-z()_]+)\b/g)
             push_profiler_sections(output, results.opcodes, results.precompiles);
@@ -379,7 +383,8 @@ function log_benchmark_result(benchmark_name, data) {
         interpreter_init_ticks: data.interpreter_init_ticks?.[0],
         interpreter_decode_ticks: data.interpreter_decode_ticks?.[0],
         stage_one_ticks: data.stage_one_ticks?.[0],
-        blueprint_chunks: data.blueprint_chunks?.[0],
+        blueprint_chunks: data.nb_blueprint_chunks,
+        delayed_inputs: data.nb_delayed_inputs,
         kernel_run_ticks: data.kernel_run_ticks?.[0],
         estimated_ticks: data.estimated_ticks?.[0],
         inbox_size: data.inbox_size,
@@ -395,7 +400,6 @@ function log_benchmark_result(benchmark_name, data) {
             interpreter_init_ticks: data.interpreter_init_ticks?.[j],
             interpreter_decode_ticks: data.interpreter_decode_ticks?.[j],
             stage_one_ticks: data.stage_one_ticks?.[j],
-            blueprint_chunks: data.blueprint_chunks?.[j],
             kernel_run_ticks: data.kernel_run_ticks?.[j],
             estimated_ticks: data.estimated_ticks?.[j],
             block_in_progress_store: data.block_in_progress_store[j] ? data.block_in_progress_store[j] : '',
