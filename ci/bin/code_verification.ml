@@ -621,11 +621,28 @@ let jobs pipeline_type =
         else [])
       |> job_external_split
     in
+    let job_misc_opam_checks : tezos_job =
+      job
+        ~__POS__
+        ~name:"misc_opam_checks"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.test
+        ~retry:2
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        [
+          (* checks that all deps of opam packages are already installed *)
+          "./scripts/opam-check.sh";
+        ]
+      |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
       job_oc_check_lift_limits_patch;
       job_oc_misc_checks;
+      job_misc_opam_checks;
     ]
   in
   let doc = [] in
