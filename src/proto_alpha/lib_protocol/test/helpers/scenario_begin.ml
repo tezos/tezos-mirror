@@ -117,8 +117,8 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
   --> set S.Adaptive_issuance.ns_enable false
 
 (** Initialize the test, given some initial parameters *)
-let begin_test ?(burn_rewards = false) delegates_name_list :
-    (constants, t) scenarios =
+let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
+    delegates_name_list : (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
       let bootstrap = "__bootstrap__" in
@@ -181,6 +181,7 @@ let begin_test ?(burn_rewards = false) delegates_name_list :
             pending_slashes = [];
             double_signings = [];
             ai_activation_cycle = None;
+            force_attest_all;
           }
       in
       let* () = check_all_balances block state in

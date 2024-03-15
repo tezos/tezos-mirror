@@ -124,6 +124,26 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
   in
   return_unit
 
+let attest_all_ =
+  let open Lwt_result_syntax in
+  fun (block, state) ->
+    let dlgs =
+      String.Map.bindings state.State.account_map
+      |> List.filter (fun (name, acc) ->
+             match acc.delegate with
+             | Some x -> String.equal x name
+             | None -> false)
+      |> List.map snd
+    in
+    let* ops =
+      List.map_es (fun dlg -> Op.attestation ~delegate:dlg.pkh block) dlgs
+    in
+    let state = State.add_pending_operations ops state in
+    return (block, state)
+
+(* Does not produce a new block *)
+let attest_all = exec attest_all_
+
 (** Bake a block, with the given baker and the given operations. *)
 let bake ?baker : t -> t tzresult Lwt.t =
  fun (block, state) ->
@@ -211,6 +231,10 @@ let bake ?baker : t -> t tzresult Lwt.t =
     else apply_end_cycle current_cycle previous_block block state
   in
   let* () = check_all_balances block state in
+  let* block, state =
+    if state.force_attest_all then attest_all_ (block, state)
+    else return (block, state)
+  in
   return (block, state)
 
 (** Bake until a cycle is reached, using [bake] instead of [Block.bake] *)

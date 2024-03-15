@@ -33,6 +33,7 @@ type t = {
     (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list;
   double_signings : double_signing_state list;
   ai_activation_cycle : Protocol.Alpha_context.Cycle.t option;
+  force_attest_all : bool;
 }
 
 (** Expected number of cycles before staking parameters get applied *)

@@ -146,29 +146,32 @@ let test_overdelegation =
      begin with 4M tz, with 5% staked *)
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable true
+  --> set S.consensus_committee_size 7000
   --> activate_ai `No
-  --> begin_test ["delegate"; "faucet1"; "faucet2"; "faucet3"]
+  --> begin_test
+        ~force_attest_all:true
+        ["delegate"; "faucet1"; "faucet2"; "faucet3"]
   --> add_account_with_funds
         "delegator_to_fund"
         ~funder:"delegate"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
   (* Delegate has 200k staked and 200k liquid *)
   --> set_delegate "delegator_to_fund" (Some "delegate")
-  (* Delegate stake will not change at the end of cycle: same stake *)
+      (* Delegate stake will not change at the end of cycle: same stake *)
   --> next_cycle
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
   --> transfer
         "faucet1"
         "delegator_to_fund"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
-  (* Delegate is not overdelegated, but will need to freeze 180k *)
+      (* Delegate is not overdelegated, but will need to freeze 180k *)
   --> next_cycle
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 380_000_000_000L)
   --> transfer
         "faucet2"
         "delegator_to_fund"
         (Amount (Tez.of_mutez 3_600_000_000_000L))
-  (* Delegate is now overdelegated, it will freeze 100% *)
+      (* Delegate is now overdelegated, it will freeze 100% *)
   --> next_cycle
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 400_000_000_000L)
   --> transfer
