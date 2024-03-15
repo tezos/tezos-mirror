@@ -105,6 +105,12 @@ type version = {
   context_version : string;
 }
 
+type injector_operation = {
+  op : L1_operation.t;
+  errors : int;
+  last_error : tztrace option;
+}
+
 module Encodings = struct
   open Data_encoding
 
@@ -459,6 +465,24 @@ module Encodings = struct
                (req "tags" (list Operation_kind.encoding))
                (req "queue_size" int31))))
       (req "total" int31)
+
+  let injector_operation =
+    conv
+      (fun {op; errors; last_error} -> (op, (errors, last_error)))
+      (fun (op, (errors, last_error)) -> {op; errors; last_error})
+    @@ merge_objs
+         L1_operation.encoding
+         (obj1
+            (dft
+               "errors"
+               (obj2 (req "count" int31) (opt "last" trace_encoding))
+               (0, None)))
+
+  let injector_queues =
+    list
+      (obj2
+         (req "tags" (list Operation_kind.encoding))
+         (req "queue" (list injector_operation)))
 end
 
 module Arg = struct
@@ -751,4 +775,11 @@ module Admin = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Encodings.injector_queues_total
       (path / "injector" / "queues" / "total")
+
+  let injector_queues =
+    Tezos_rpc.Service.get_service
+      ~description:"Get operation queues of injectors"
+      ~query:Query.operation_tag_query
+      ~output:Encodings.injector_queues
+      (path / "injector" / "queues")
 end

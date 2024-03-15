@@ -481,6 +481,26 @@ let () =
   let totals = Injector.total_queued_operations () in
   return totals
 
+let () =
+  Admin_directory.register0 Rollup_node_services.Admin.injector_queues
+  @@ fun _node_ctxt tag () ->
+  let open Lwt_result_syntax in
+  let queues = Injector.get_queues ?tag () in
+  let queues =
+    List.map
+      (fun (tags, ops) ->
+        let rops =
+          List.rev_map
+            (fun Injector.Inj_operation.
+                   {operation = op; errors = {count; last_error}; id = _} ->
+              Rollup_node_services.{op; errors = count; last_error})
+            ops
+        in
+        (tags, List.rev rops))
+      queues
+  in
+  return queues
+
 let add_describe dir =
   Tezos_rpc.Directory.register_describe_directory_service
     dir
