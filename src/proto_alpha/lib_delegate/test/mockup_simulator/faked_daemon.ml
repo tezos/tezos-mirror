@@ -1,3 +1,10 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
 module Baker = struct
   let run ~(cctxt : #Protocol_client_context.full) ~stop_on_event ~chain_id
       ~(context_index : Abstract_context_index.t) ~delegates =

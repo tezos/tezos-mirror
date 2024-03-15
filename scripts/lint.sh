@@ -45,22 +45,11 @@ src/proto_019_PtParisA/lib_client_sapling/wallet.mli
 src/proto_019_PtParisA/lib_delegate/test/mockup_simulator/faked_daemon.ml
 src/proto_019_PtParisA/lib_delegate/test/mockup_simulator/faked_services.ml
 src/proto_019_PtParisA/lib_delegate/test/test_scenario.ml
-src/proto_019_PtParisA/lib_protocol/cache_repr_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/carbonated_map_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/dal_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/global_constants_costs_generated.ml
 src/proto_019_PtParisA/lib_protocol/lazy_storage_diff.mli
 src/proto_019_PtParisA/lib_protocol/liquidity_baking_cpmm.ml
 src/proto_019_PtParisA/lib_protocol/liquidity_baking_lqt.ml
-src/proto_019_PtParisA/lib_protocol/michelson_v1_gas_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/sapling_storage_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/sc_rollup_costs_generated.ml
 src/proto_019_PtParisA/lib_protocol/sc_rollup_inbox_merkelized_payload_hashes_repr.ml
 src/proto_019_PtParisA/lib_protocol/sc_rollup_inbox_merkelized_payload_hashes_repr.mli
-src/proto_019_PtParisA/lib_protocol/script_repr_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/script_typed_ir_size_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/skip_list_costs_generated.ml
-src/proto_019_PtParisA/lib_protocol/storage_costs_generated.ml
 src/proto_019_PtParisA/lib_protocol/test/helpers/nonce.ml
 src/proto_019_PtParisA/lib_protocol/test/helpers/script_big_map.ml
 src/proto_019_PtParisA/lib_protocol/test/helpers/script_big_map.mli
@@ -75,7 +64,7 @@ src/proto_019_PtParisA/lib_protocol/test/integration/validate/test_sanity.ml
 src/proto_019_PtParisA/lib_protocol/test/integration/validate/test_validation_batch.ml
 src/proto_019_PtParisA/lib_protocol/test/unit/test_time_repr.ml
 src/proto_019_PtParisA/lib_protocol/test/unit/test_zk_rollup_storage.ml
-src/proto_019_PtParisA/lib_protocol/ticket_costs_generated.ml
+.*_generated.ml
 EOF
 )
 
