@@ -235,7 +235,7 @@ module RPC : sig
 
   type topic = {topic_slot_index : int; topic_pkh : string}
 
-  (* Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
+  (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
      each topic. *)
   val get_topics_peers :
     subscribed:bool -> (topic * string list) list RPC_core.t
