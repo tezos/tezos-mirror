@@ -4,8 +4,11 @@
 
 #![allow(non_upper_case_globals)]
 
+mod fields;
+mod satp;
 pub mod xstatus;
 
+use self::satp::{SvLength, TranslationAlgorithm};
 use crate::{
     machine_state::mode::Mode,
     state_backend::{self as backend, Region},
@@ -603,18 +606,19 @@ impl CSRegister {
                 new_value & CSRegister::WARL_MASK_XEPC
             }
             CSRegister::satp => {
-                let satp_mode = new_value >> CSRegister::SATP_MODE_OFFSET;
+                // Implementations are not required to support all MODE settings,
+                // and if satp is written with an unsupported MODE,
+                // the entire write has no effect; no fields in satp are modified.
+                let satp_mode = satp::get_MODE(new_value)?;
                 match satp_mode {
                     // when address translation for memory address is active, consider the other fields valid
-                    CSRegister::SATP_MODE_SV39
-                    | CSRegister::SATP_MODE_SV48
-                    | CSRegister::SATP_MODE_SV57 => new_value,
+                    TranslationAlgorithm::Sv(SvLength::Sv39)
+                    | TranslationAlgorithm::Sv(SvLength::Sv48)
+                    | TranslationAlgorithm::Sv(SvLength::Sv57) => new_value,
                     // The RISC-V spec has UNSPECIFIED behaviour when Bare mode is selected
-                    // and any of the other fields contain non-zero values. (Section 4.1.11)
+                    // and any of the other fields contain non-zero values. (Section 5.1.11)
                     // Therefore we set all other fields to 0.
-                    CSRegister::SATP_MODE_BARE => CSRegister::SATP_DEFAULT,
-                    // RISC-V spec explicitly mentions no update must take place
-                    _ => return None,
+                    satp::TranslationAlgorithm::Bare => satp::DEFAULT_VALUE,
                 }
             }
             CSRegister::mstatus => xstatus::apply_warl_mstatus(new_value),
@@ -675,17 +679,6 @@ impl CSRegister {
     ///
     /// Since extension C is supported, we only make the low bit read-only 0
     const WARL_MASK_XEPC: CSRValue = !1;
-
-    // allowed `MODE` for `satp` register.
-    // Section 4.1.11
-    /// `satp.MODE = satp[63:60]`
-    const SATP_MODE_OFFSET: u32 = 60;
-    const SATP_MODE_BARE: CSRValue = 0;
-    const SATP_MODE_SV39: CSRValue = 8;
-    const SATP_MODE_SV48: CSRValue = 9;
-    const SATP_MODE_SV57: CSRValue = 10;
-    /// We consider the default `SATP` value to be the `BARE` mode.
-    const SATP_DEFAULT: CSRValue = CSRegister::SATP_MODE_BARE << CSRegister::SATP_MODE_OFFSET;
 
     /// Get the default value for the register.
     fn default_value(&self) -> u64 {
@@ -986,7 +979,7 @@ impl CSRegister {
             CSRegister::sie | CSRegister::mie => 0,
 
             // No address translation initially
-            CSRegister::satp => CSRegister::SATP_DEFAULT,
+            CSRegister::satp => satp::DEFAULT_VALUE,
 
             // No exception or trap inflight or pending
             CSRegister::scause | CSRegister::mcause => 0,
