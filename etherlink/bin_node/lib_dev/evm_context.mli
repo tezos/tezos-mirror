@@ -77,9 +77,10 @@ val last_produced_blueprint : t -> Blueprint_types.t tzresult Lwt.t
 (** [apply_blueprint ctxt blueprint] applies [blueprint] in the freshest EVM
     state stored under [ctxt]. It commits the result if the blueprint produces
     the expected block. *)
-val apply_blueprint : t -> Blueprint_types.payload -> unit tzresult Lwt.t
+val apply_blueprint :
+  t -> Time.Protocol.t -> Blueprint_types.payload -> unit tzresult Lwt.t
 
 (** Same as {!apply_blueprint}, but additionally publish the blueprint if it is
     correct. *)
 val apply_and_publish_blueprint :
-  t -> Sequencer_blueprint.t -> unit tzresult Lwt.t
+  t -> Time.Protocol.t -> Sequencer_blueprint.t -> unit tzresult Lwt.t

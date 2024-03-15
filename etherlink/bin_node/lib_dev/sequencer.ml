@@ -309,7 +309,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
           ~number:Ethereum_types.(Qty Z.zero)
           ~parent_hash:Ethereum_types.genesis_parent_hash
       in
-      Evm_context.apply_and_publish_blueprint ctxt genesis
+      Evm_context.apply_and_publish_blueprint ctxt genesis_timestamp genesis
     else return_unit
   in
 

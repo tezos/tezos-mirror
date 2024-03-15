@@ -189,17 +189,37 @@ module Q = struct
         ]
     end
 
-    let all : migration list = [(module V0); (module V1); (module V2)]
+    module V3 = struct
+      let name = "add_timestamp_to_blueprints"
+
+      let up =
+        [
+          (* We need to drop the content of [Executable_blueprint] in order to
+             add a column that should not be left empty. *)
+          migration_step
+            {|
+            DELETE FROM executable_blueprints
+        |};
+          migration_step
+            {|
+            ALTER TABLE executable_blueprints
+            ADD COLUMN timestamp DATETIME NOT NULL
+        |};
+        ]
+    end
+
+    let all : migration list =
+      [(module V0); (module V1); (module V2); (module V3)]
   end
 
   module Executable_blueprints = struct
     let insert =
-      (t2 level payload ->. unit)
-      @@ {eos|INSERT INTO executable_blueprints (id, payload) VALUES (?, ?)|eos}
+      (t3 level timestamp payload ->. unit)
+      @@ {eos|INSERT INTO executable_blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
 
     let select =
-      (level ->? payload)
-      @@ {eos|SELECT (payload) FROM executable_blueprints WHERE id = ?|eos}
+      (level ->? t2 payload timestamp)
+      @@ {eos|SELECT payload, timestamp FROM executable_blueprints WHERE id = ?|eos}
   end
 
   module Publishable_blueprints = struct
@@ -209,7 +229,7 @@ module Q = struct
 
     let select =
       (level ->? payload)
-      @@ {eos|SELECT (payload) FROM publishable_blueprints WHERE id = ?|eos}
+      @@ {eos|SELECT payload FROM publishable_blueprints WHERE id = ?|eos}
   end
 
   module Context_hashes = struct
@@ -370,13 +390,21 @@ let init ~data_dir =
   return store
 
 module Executable_blueprints = struct
-  let store store number blueprint =
+  let store store (blueprint : Blueprint_types.t) =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Executable_blueprints.insert (number, blueprint)
+    Db.exec
+      conn
+      Q.Executable_blueprints.insert
+      (blueprint.number, blueprint.timestamp, blueprint.payload)
 
   let find store number =
+    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Executable_blueprints.select number
+    let+ opt = Db.find_opt conn Q.Executable_blueprints.select number in
+    match opt with
+    | Some (payload, timestamp) ->
+        Some Blueprint_types.{payload; timestamp; number}
+    | None -> None
 end
 
 module Publishable_blueprints = struct

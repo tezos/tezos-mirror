@@ -131,7 +131,7 @@ let () =
     This is because [apply_blueprint_store_unsafe] is expected to be called
     within a SQL transaction to make sure the node’s store is not left in an
     inconsistent state in case of error. *)
-let apply_blueprint_store_unsafe ctxt payload =
+let apply_blueprint_store_unsafe ctxt timestamp payload =
   let open Lwt_result_syntax in
   Store.assert_in_transaction ctxt.store ;
   let*! evm_state = evm_state ctxt in
@@ -145,8 +145,7 @@ let apply_blueprint_store_unsafe ctxt payload =
       let* () =
         Store.Executable_blueprints.store
           ctxt.store
-          (Qty blueprint_number)
-          payload
+          {number = Qty blueprint_number; timestamp; payload}
       in
       let* context = commit_next_head ctxt evm_state in
       return (context, current_block_hash)
@@ -156,22 +155,25 @@ let apply_blueprint_store_unsafe ctxt payload =
       let*! () = Blueprint_events.invalid_blueprint_produced next in
       tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-let on_new_head ctxt context block_hash payload =
+let on_new_head ctxt timestamp context block_hash payload =
   let (Qty level) = ctxt.session.next_blueprint_number in
   ctxt.session.context <- context ;
   ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
   ctxt.session.current_block_hash <- block_hash ;
-  Lwt_watcher.notify ctxt.blueprint_watcher {number = Qty level; payload} ;
+  Lwt_watcher.notify
+    ctxt.blueprint_watcher
+    {number = Qty level; timestamp; payload} ;
   Blueprint_events.blueprint_applied (level, block_hash)
 
-let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
+let apply_and_publish_blueprint (ctxt : t) timestamp
+    (blueprint : Sequencer_blueprint.t) =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
   let (Qty level) = ctxt.session.next_blueprint_number in
   let* context, current_block_hash =
     with_store_transaction ctxt @@ fun ctxt ->
     let* current_block_hash =
-      apply_blueprint_store_unsafe ctxt blueprint.to_execute
+      apply_blueprint_store_unsafe ctxt timestamp blueprint.to_execute
     in
     let* () =
       Store.Publishable_blueprints.store
@@ -182,17 +184,19 @@ let apply_and_publish_blueprint (ctxt : t) (blueprint : Sequencer_blueprint.t) =
     return current_block_hash
   in
 
-  let*! () = on_new_head ctxt context current_block_hash blueprint.to_execute in
+  let*! () =
+    on_new_head ctxt timestamp context current_block_hash blueprint.to_execute
+  in
   Blueprints_publisher.publish level blueprint.to_publish
 
-let apply_blueprint ctxt payload =
+let apply_blueprint ctxt timestamp payload =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
   let* context, current_block_hash =
     with_store_transaction ctxt @@ fun ctxt ->
-    apply_blueprint_store_unsafe ctxt payload
+    apply_blueprint_store_unsafe ctxt timestamp payload
   in
-  let*! () = on_new_head ctxt context current_block_hash payload in
+  let*! () = on_new_head ctxt timestamp context current_block_hash payload in
   return_unit
 
 let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
@@ -360,6 +364,5 @@ let last_produced_blueprint (ctxt : t) =
   let current = Ethereum_types.Qty Z.(pred next) in
   let* blueprint = Store.Executable_blueprints.find ctxt.store current in
   match blueprint with
-  | Some blueprint ->
-      return Blueprint_types.{number = current; payload = blueprint}
+  | Some blueprint -> return blueprint
   | None -> failwith "Could not fetch the last produced blueprint"
