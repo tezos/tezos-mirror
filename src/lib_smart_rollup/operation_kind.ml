@@ -68,7 +68,7 @@ let map_encoding value_encoding =
   conv
     Map.bindings
     (fun l -> List.to_seq l |> Map.of_seq)
-    (Utils.dictionary_encoding
+    (Dictionary_encoding.dictionary_encoding
        ~keys:all
        ~string_of_key:to_string
        ~key_of_string:of_string_exn

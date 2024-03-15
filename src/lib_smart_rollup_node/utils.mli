@@ -26,21 +26,6 @@
 (** A map addressed by (protocol agnostic) DAC reveal hashes. *)
 module Reveal_hash_map : Map.S with type key = Dac_plugin.hash
 
-(** [dictionary_encoding keys string_of_key key_of_string
-    value_encoding]: a json only encoding of a [(key, 'value)
-    list]. JSON is of the form
-{v
-{ "k1" : v1,
-  "k2" : v2,
-  "k3" : v3 }
-v} *)
-val dictionary_encoding :
-  keys:'k list ->
-  string_of_key:('k -> string) ->
-  key_of_string:(string -> 'k) ->
-  value_encoding:('k -> 'v Data_encoding.t) ->
-  ('k * 'v) list Data_encoding.t
-
 (** {2 Lock files}  *)
 
 (** [lock ?when_lock path] acquires a lock on the file [path] and returns the
