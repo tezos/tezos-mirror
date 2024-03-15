@@ -158,6 +158,10 @@ end) : sig
   (** [length q] is the number of bindings held by [q]. *)
   val length : t -> int
 
+  (** [clear q] empties the queue [q] and removes its persistent content on
+      disk. *)
+  val clear : t -> unit Lwt.t
+
   (** [load_from_disk ~warn_unreadable ~capacity ~data_dir ~filter] creates a
       bounded hash queue of capacity [capacity]. The queue is populated by
       persistent elements present in [data_dir/N.name] which pass the [filter]

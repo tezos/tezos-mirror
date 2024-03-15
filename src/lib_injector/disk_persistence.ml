@@ -343,6 +343,32 @@ struct
       return_unit
     else return_unit
 
+  let clear q =
+    let open Lwt_syntax in
+    Q.clear q.queue ;
+    (* Remove the persistent elements from the disk. *)
+    let elts = Lwt_unix.files_of_directory q.path in
+    let metadata_elts = Lwt_unix.files_of_directory q.metadata_path in
+    let unlink file =
+      Lwt.catch
+        (fun () ->
+          if Sys.is_directory file then return_unit else Lwt_unix.unlink file)
+        (fun e ->
+          Format.ksprintf
+            Stdlib.failwith
+            "Error in unlink %s: %s"
+            file
+            (Printexc.to_string e))
+    in
+    let* () =
+      Lwt_stream.iter_s (fun f -> unlink (Filename.concat q.path f)) elts
+    and* () =
+      Lwt_stream.iter_s
+        (fun m -> unlink (Filename.concat q.metadata_path m))
+        metadata_elts
+    in
+    return_unit
+
   let fold f q = Q.fold f q.queue
 
   let length q = Q.length q.queue

@@ -338,6 +338,10 @@ module type S = sig
       tag. *)
   val get_queues : ?tag:tag -> unit -> (tag list * Inj_operation.t list) list
 
+  (** Clears the injectors queues completely. If [tag] is provided, only queues
+      for the injector which handles this tag is cleared. *)
+  val clear_queues : ?tag:tag -> unit -> unit tzresult Lwt.t
+
   (** Register a protocol client for a specific protocol to be used by the
       injector. This function {b must} be called for all protocols that the
       injector is meant support. *)
