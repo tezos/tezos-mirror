@@ -247,6 +247,7 @@
       - scripts/**/*
       - docs/**/*
       - contrib/**/*
+      - client-libs/**/*
       - etherlink/**/*
       - .gitlab-ci.yml
       - .gitlab/**/*
