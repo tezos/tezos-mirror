@@ -72,7 +72,7 @@ distribution from the `Octez release page
 and then installing them with your package tool manager. Most of the
 configuration options are accessible by the user in ``/etc/default/<package>``.
 
-If you are upgrading from a different package distributor such as `Serokell's tezos-packaging<https://github.com/serokell/tezos-packaging>`__,
+If you are upgrading from a different package distributor such as `Serokell's tezos-packaging <https://github.com/serokell/tezos-packaging>`__,
 please pay attention to the possible differences between the two packages, in
 particular regarding the home directory for the ``tezos`` user.
 
