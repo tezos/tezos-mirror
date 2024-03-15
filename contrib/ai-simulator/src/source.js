@@ -150,6 +150,10 @@ const safe_get = (array, cycle) => {
 export class Simulator {
   #storage_issuance_bonus = [];
 
+  #clear() {
+    this.#storage_issuance_bonus = [];
+  }
+
   constructor(config) {
     this.config = config;
   }
