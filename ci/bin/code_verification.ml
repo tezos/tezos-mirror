@@ -35,6 +35,39 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Common
 
+(* Encodes the conditional [before_merging] pipeline and its
+   unconditional variant [schedule_extended_test]. *)
+type code_verification_pipeline = Before_merging | Schedule_extended_test
+
+(* [make_rules] makes rules for jobs that are:
+     - automatic in scheduled pipelines;
+     - conditional in [before_merging] pipelines.
+
+     If [label], [changes] and [manual] are omitted, then rules will
+     enable the job [On_success] in the [before_merging]
+     pipeline. This is safe, but prefer specifying a [changes] clause
+     if possible. *)
+let make_rules ?label ?changes ?(manual = false) ?(dependent = false)
+    pipeline_type =
+  match pipeline_type with
+  | Schedule_extended_test ->
+      (* The scheduled pipeline always runs all jobs unconditionally
+         -- unless they are dependent on a previous, non-trigger job, in the
+         pipeline. *)
+      [job_rule ~when_:(if dependent then On_success else Always) ()]
+  | Before_merging ->
+      (* MR labels can be used to force tests to run. *)
+      (match label with
+      | Some label ->
+          [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
+      | None -> [])
+      (* Modifying some files can force tests to run. *)
+      @ (match changes with
+        | None -> []
+        | Some changes -> [job_rule ~changes ~when_:On_success ()])
+      (* For some tests, it can be relevant to have a manual trigger. *)
+      @ if manual then [job_rule ~when_:Manual ()] else []
+
 type opam_package_group = Executable | All
 
 type opam_package = {
@@ -140,7 +173,8 @@ let read_opam_packages =
     | _ -> fail ()
 
 let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
-    ~job_build_arm64_release ~job_build_arm64_exp_dev_extra : tezos_job list =
+    ~job_build_arm64_release ~job_build_arm64_exp_dev_extra pipeline_type :
+    tezos_job list =
   let build_dependencies = function
     | Amd64 ->
         Dependent
@@ -149,10 +183,20 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
         Dependent
           [Job job_build_arm64_release; Job job_build_arm64_exp_dev_extra]
   in
+  let rules =
+    (* TODO: Note that all jobs defined in this function are
+       [dependent] in the sense that they all have
+       [dependencies:]. However, AFAICT, these dependencies are all
+       dummy dependencies for ordering -- not for artifacts. This
+       means that these unit tests can very well run even if their
+       dependencies failed. Moreover, the ordering serves no purpose
+       on scheduled pipelines, so we might even remove them for that
+       [pipeline_type]. *)
+    make_rules ~changes:changeset_octez ~dependent:true pipeline_type
+  in
   let job_unit_test ~__POS__ ?(image = Images.runtime_build_dependencies)
       ?timeout ?parallel_vector ~arch ~name ?(enable_coverage = true)
-      ?(rules = [job_rule ~changes:changeset_octez ()]) ~make_targets () :
-      tezos_job =
+      ~make_targets () : tezos_job =
     let arch_string = arch_to_string arch in
     let script =
       ["make $MAKE_TARGETS"]
@@ -236,11 +280,6 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
       ~parallel_vector:2
       ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
       ~image:Images.runtime_build_test_dependencies
-      ~rules:
-        [
-          job_rule ~if_:Rules.schedule_extended_tests ~when_:Always ();
-          job_rule ~changes:changeset_octez ();
-        ]
       ~make_targets:["test-nonproto-unit"; "test-webassembly"]
         (* No coverage for arm64 jobs -- the code they test is a
            subset of that tested by x86_64 unit tests. *)
@@ -255,7 +294,7 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
       ~image:Images.runtime_build_test_dependencies
       ~stage:Stages.test
       ~dependencies:(build_dependencies Amd64)
-      ~rules:[job_rule ~changes:changeset_octez ()]
+      ~rules
       ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
            This test takes around 2 to 4min to complete, but it sometimes
@@ -273,7 +312,7 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
       ~image:Images.runtime_build_test_dependencies
       ~stage:Stages.test
       ~dependencies:(build_dependencies Amd64)
-      ~rules:[job_rule ~changes:changeset_octez ()]
+      ~rules
       ~retry:2
       ~variables:[("RUNTEZTALIAS", "true")]
       ~before_script:
@@ -293,7 +332,7 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
       ~image:Images.runtime_build_dependencies
       ~stage:Stages.test
       ~dependencies:(build_dependencies Amd64)
-      ~rules:[job_rule ~changes:changeset_octez ()]
+      ~rules
       ~before_script:(before_script ~source_version:true ~eval_opam:true [])
       ["dune build @runtest_compile_protocol"]
   in
@@ -309,11 +348,10 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
 
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
-type code_verification_pipeline = Before_merging | Schedule_extended_test
-
-(* Encodes the conditional [before_merging] pipeline and its unconditional variant
-   [schedule_extended_test]. *)
 let jobs pipeline_type =
+  let make_rules ?label ?changes ?manual ?dependent () =
+    make_rules ?label ?changes ?manual ?dependent pipeline_type
+  in
   (* Externalization *)
   let job_external_split ?(before_merging_suffix = "before_merging")
       ?(scheduled_suffix = "scheduled_extended_test") job =
@@ -348,34 +386,6 @@ let jobs pipeline_type =
     match pipeline_type with
     | Before_merging -> jobs_external ~path jobs
     | Schedule_extended_test -> jobs
-  in
-  (* [make_rules] makes rules for jobs that are:
-     - automatic in scheduled pipelines;
-     - conditional in [before_merging] pipelines.
-
-     If [label], [changes] and [manual] are omitted, then rules will
-     enable the job [On_success] in the [before_merging]
-     pipeline. This is safe, but prefer specifying a [changes] clause
-     if possible. *)
-  let make_rules ?label ?changes ?(manual = false) ?(dependent = false) () =
-    match pipeline_type with
-    | Schedule_extended_test ->
-        (* The scheduled pipeline always runs all jobs unconditionally
-           -- unless they are dependent on a previous, non-trigger job, in the
-           pipeline. *)
-        [job_rule ~when_:(if dependent then On_success else Always) ()]
-    | Before_merging ->
-        (* MR labels can be used to force tests to run. *)
-        (match label with
-        | Some label ->
-            [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
-        | None -> [])
-        (* Modifying some files can force tests to run. *)
-        @ (match changes with
-          | None -> []
-          | Some changes -> [job_rule ~changes ~when_:On_success ()])
-        (* For some tests, it can be relevant to have a manual trigger. *)
-        @ if manual then [job_rule ~when_:Manual ()] else []
   in
   (* Stages *)
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
@@ -842,6 +852,7 @@ let jobs pipeline_type =
         ~job_build_x86_64_exp_dev_extra
         ~job_build_arm64_release
         ~job_build_arm64_exp_dev_extra
+        pipeline_type
       |> jobs_external_split ~path:"test/oc.unit"
     in
     [

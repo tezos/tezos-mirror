@@ -130,8 +130,6 @@ oc.unit:non-proto-arm64:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
-    when: always
   - changes:
     - src/**/*
     - etherlink/**/*
