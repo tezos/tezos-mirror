@@ -118,6 +118,9 @@ const safe_get = (array, cycle) => {
  * vdf revelation tip corresponding to the given cycle, in mutez.
  * @property {function(number):bigRat} current_yearly_rate_value - Returns the
  * current yearly rate corresponding to the given cycle.
+ * @property {function(number, number):null} set_staked_ratio_at - Takes a cycle and
+ * a ratio as arguments. Sets the frozen balance by applying the ratio to the total supply
+ * of the given cycle. The ratio is clipped between 0 and 1.
  */
 
 /**
