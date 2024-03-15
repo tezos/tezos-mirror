@@ -151,6 +151,10 @@ end) : sig
       otherwise. *)
   val find_opt : t -> K.t -> V.t option
 
+  (** [elemets q] returns the elements of the queue [q] from oldest to
+      newest. *)
+  val elements : t -> V.t list
+
   (** [length q] is the number of bindings held by [q]. *)
   val length : t -> int
 

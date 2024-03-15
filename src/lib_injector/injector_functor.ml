@@ -1516,5 +1516,32 @@ module Make (Parameters : PARAMETERS) = struct
       (fun (_signer, w) -> op_status_in_worker (Worker.state w) l1_hash)
       workers
 
+  let total_queued_operations () =
+    let workers = Worker.list table in
+    List.fold_left
+      (fun (acc, total) (tags, w) ->
+        let state = Worker.state w in
+        let len = Op_queue.length state.queue in
+        let tag_list = Tags.to_seq tags |> List.of_seq in
+        ((tag_list, len) :: acc, total + len))
+      ([], 0)
+      workers
+
+  let get_queues ?tag () =
+    let workers = Worker.list table in
+    List.fold_left
+      (fun acc (tags, w) ->
+        let to_count =
+          match tag with None -> true | Some tag -> Tags.mem tag tags
+        in
+        if not to_count then acc
+        else
+          let state = Worker.state w in
+          let queue = Op_queue.elements state.queue in
+          let tag_list = Tags.to_seq tags |> List.of_seq in
+          (tag_list, queue) :: acc)
+      []
+      workers
+
   let register_proto_client = Inj_proto.register
 end
