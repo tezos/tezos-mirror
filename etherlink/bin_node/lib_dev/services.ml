@@ -446,6 +446,18 @@ let dispatch_private_request (_config : 'a Configuration.t)
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in
         build ~f module_ parameters
+    | Method (Durable_state_value.Method, module_) ->
+        let f path =
+          let open Lwt_result_syntax in
+          let*? path =
+            Option.to_result
+              ~none:[error_of_fmt "missing params, please provide a path"]
+              path
+          in
+          let* value = Backend_rpc.Reader.read path in
+          rpc_ok value
+        in
+        build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
   return JSONRPC.{value; id}
