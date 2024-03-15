@@ -128,7 +128,7 @@ module type S = sig
 end
 
 module type Backend = sig
-  module READER : Durable_storage.READER
+  module Reader : Durable_storage.READER
 
   module TxEncoder : Publisher.TxEncoder
 
@@ -144,7 +144,7 @@ module type Backend = sig
 end
 
 module Make (Backend : Backend) : S = struct
-  include Durable_storage.Make (Backend.READER)
+  include Durable_storage.Make (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
 

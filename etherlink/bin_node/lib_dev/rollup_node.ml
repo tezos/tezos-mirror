@@ -34,7 +34,7 @@ module MakeBackend (Base : sig
 
   val smart_rollup_address : string
 end) : Services_backend_sig.Backend = struct
-  module READER = struct
+  module Reader = struct
     let read path =
       call_service
         ~base:Base.base
