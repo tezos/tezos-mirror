@@ -4,6 +4,7 @@
 
 #![deny(rustdoc::broken_intra_doc_links)]
 
+mod address_translation;
 pub mod bus;
 pub mod csregisters;
 pub mod hart_state;
