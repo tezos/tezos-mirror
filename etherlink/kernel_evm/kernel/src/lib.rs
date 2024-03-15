@@ -31,7 +31,6 @@ use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
 use tezos_smart_rollup_host::runtime::Runtime;
-use upgrade::set_kernel_root_hash;
 
 mod apply;
 mod block;
@@ -165,12 +164,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // The alternative is to enforce every new kernels use the
             // installer configuration to initialize this value.
             set_kernel_version(host)?;
-            // We also update the current root hash of the kernel. Note that
-            // it will update the root hash only if the kernel was upgraded,
-            // it won't store any version in the storage if the rollup was
-            // just originated. If you want to have the kernel root hash
-            // at origination, you have to provide it in the installer.
-            set_kernel_root_hash(host)?;
         }
         // If the migration is still in progress or was finished, we abort the
         // current kernel run.
@@ -182,8 +175,6 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             // If a migrtion was finished, we update the kernel version
             // in the storage.
             set_kernel_version(host)?;
-            // We also update the current root hash of the kernel.
-            set_kernel_root_hash(host)?;
             host.mark_for_reboot()?;
             let configuration = fetch_configuration(host);
             log!(
