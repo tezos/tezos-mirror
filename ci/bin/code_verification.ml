@@ -644,6 +644,24 @@ let jobs pipeline_type =
       job_oc_misc_checks;
       job_misc_opam_checks;
     ]
+    @
+    match pipeline_type with
+    | Before_merging ->
+        let job_commit_titles : tezos_job =
+          job
+            ~__POS__
+            ~name:"commit_titles"
+            ~image:Images.runtime_prebuild_dependencies
+            ~stage:Stages.test
+            ~dependencies:dependencies_needs_trigger
+            (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
+               invalid commits titles in situations where that is allowed. *)
+            ["./scripts/ci/check_commit_messages.sh || exit $?"]
+            ~allow_failure:(With_exit_codes [65])
+          |> job_external
+        in
+        [job_commit_titles]
+    | Schedule_extended_test -> []
   in
   let doc = [] in
   let manual =

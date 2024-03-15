@@ -1,14 +1,16 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
 commit_titles:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_prebuild_dependencies
-    - .needs__trigger
-  stage: "test"
-  script:
-    # Check commit messages
-    - ./scripts/ci/check_commit_messages.sh || exit $?
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - job: trigger
+    optional: true
+  dependencies: []
   allow_failure:
-    # ./scripts/ci/check_commit_messages.sh exits with code 65 when a
-    # git history contains invalid commits titles in situations where
-    # that is allowed.
-    exit_codes: [65]
+    exit_codes: 65
+  script:
+  - ./scripts/ci/check_commit_messages.sh || exit $?
