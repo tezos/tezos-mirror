@@ -1053,6 +1053,11 @@ let test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to =
     ~title:"protocol migration with denunciations"
     ~tags:["protocol"; "migration"; "double"; "attestation"]
   @@ fun () ->
+  if not (Protocol.number migrate_from = Protocol.number Protocol.Oxford) then
+    Test.fail
+      "This test is designed for the migration from Oxford to Paris. Other \
+       protocols have a different semantics for duplicate denunciations so the \
+       test would fail." ;
   let blocks_per_cycle = 4 in
   let migration_level = 2 * blocks_per_cycle in
   Log.info
@@ -1276,4 +1281,5 @@ let register ~migrate_from ~migrate_to =
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
-  test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to
+  if Protocol.number migrate_from = Protocol.number Protocol.Oxford then
+    test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to
