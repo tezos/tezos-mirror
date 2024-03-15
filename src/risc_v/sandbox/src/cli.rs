@@ -1,8 +1,27 @@
-use clap::Parser;
+// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
+
+use clap::{Parser, Subcommand};
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum Mode {
+    /// Run a program using the RISC-V interpreter
+    Run(Options),
+    /// Run a program using rvemu
+    Rvemu(Options),
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Mode,
+}
 
 /// Structure that encodes the CLI options, flags and commands
 #[derive(Debug, Clone, Parser)]
-pub struct Cli {
+pub struct Options {
     /// Path to the input ELF executable
     #[arg(short, long)]
     pub input: String,

@@ -31,7 +31,7 @@ let run_kernel ?(posix = false) ~input ?initrd () =
     Process.spawn
       ~hooks:Tezt_tezos.Tezos_regression.hooks
       (Uses.path risc_v_sandbox)
-      (["--input"; input]
+      (["rvemu"; "--input"; input]
       @ Option.fold ~none:[] ~some:(fun initrd -> ["--initrd"; initrd]) initrd
       @ if posix then ["--posix"] else [])
   in
