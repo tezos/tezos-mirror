@@ -69,3 +69,9 @@ module Kernel_upgrades : sig
     Ethereum_types.Upgrade.t ->
     unit tzresult Lwt.t
 end
+
+module L1_latest_known_level : sig
+  val store : t -> int32 -> unit tzresult Lwt.t
+
+  val find : t -> int32 option tzresult Lwt.t
+end

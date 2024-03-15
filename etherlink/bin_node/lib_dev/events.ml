@@ -27,6 +27,15 @@ let ignored_kernel_arg =
     ~level:Warning
     ()
 
+let catching_up_evm_event =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"catching_up"
+    ~msg:"the EVM node is catching up on evm event from {from} to {to}"
+    ~level:Notice
+    ("from", Data_encoding.int32)
+    ("to", Data_encoding.int32)
+
 let event_is_ready =
   Internal_event.Simple.declare_2
     ~section
@@ -75,6 +84,8 @@ let event_callback_log =
 let received_upgrade payload = emit received_upgrade payload
 
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
+
+let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
 let is_ready ~rpc_addr ~rpc_port = emit event_is_ready (rpc_addr, rpc_port)
 

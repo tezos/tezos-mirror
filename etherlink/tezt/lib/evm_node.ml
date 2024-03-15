@@ -227,14 +227,61 @@ let wait_for_blueprint_applied ~timeout evm_node level =
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
-let wait_for_evm_event evm_node ~event_kind =
+type 'a evm_event_kind =
+  | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
+  | Sequencer_upgrade : (string * Hex.t * Client.Time.t) evm_event_kind
+  | Blueprint_applied : (int * string) evm_event_kind
+
+let string_of_evm_event_kind : type a. a evm_event_kind -> string = function
+  | Kernel_upgrade -> "kernel_upgrade"
+  | Sequencer_upgrade -> "sequencer_upgrade"
+  | Blueprint_applied -> "blueprint_applied"
+
+let parse_evm_event_kind : type a. a evm_event_kind -> JSON.t -> a option =
+ fun kind json ->
+  let open JSON in
+  match kind with
+  | Kernel_upgrade -> (
+      match as_list (json |-> "event") with
+      | [hash; timestamp] ->
+          let hash = as_string hash in
+          let timestamp = as_string timestamp |> Client.Time.of_notation_exn in
+          Some (hash, timestamp)
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "invalid json for the evm event kind kernel upgrade")
+  | Sequencer_upgrade -> (
+      match as_list (json |-> "event") with
+      | [hash; pool_address; timestamp] ->
+          let hash = as_string hash in
+          let pool_address = as_string pool_address |> Hex.of_string in
+          let timestamp = as_string timestamp |> Client.Time.of_notation_exn in
+          Some (hash, pool_address, timestamp)
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "invalid json for the evm event kind sequencer upgrade")
+  | Blueprint_applied -> (
+      match as_list (json |-> "event") with
+      | [number; hash] ->
+          let number = as_int number in
+          let hash = as_string hash in
+          Some (number, hash)
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "invalid json for the evm event kind blueprint applied")
+
+let wait_for_evm_event event ?(check = parse_evm_event_kind event) evm_node =
   wait_for
     evm_node
     "evm_events_new_event.v0"
     JSON.(
       fun json ->
         let found_event_kind = json |-> "kind" |> as_string in
-        if event_kind = found_event_kind then Some () else None)
+        let expected_event_kind = string_of_evm_event_kind event in
+        if expected_event_kind = found_event_kind then check json else None)
 
 let wait_for_shutdown_event evm_node =
   wait_for evm_node "shutting_down.v0" @@ fun json ->

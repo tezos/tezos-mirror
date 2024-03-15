@@ -43,6 +43,8 @@ module Q = struct
   open Caqti_type.Std
   open Ethereum_types
 
+  let l1_level = int32
+
   let level =
     custom
       ~encode:(fun (Qty x) -> Ok Z.(to_int x))
@@ -169,7 +171,25 @@ module Q = struct
         ]
     end
 
-    let all : migration list = [(module V0); (module V1)]
+    module V2 = struct
+      let name = "add_lastest_tezos_level"
+
+      let up =
+        [
+          migration_step
+            {|
+        CREATE TABLE l1_latest_level (
+          lock CHAR(1) PRIMARY KEY NOT NULL DEFAULT 'l',
+          level INT,
+          CONSTRAINT CK_T1_Locked CHECK (lock='l')
+        );|};
+          (* The CONSTRAINT allows no more than 1 row in this
+             table, making sure we only have 1 tezos level at
+             most *)
+        ]
+    end
+
+    let all : migration list = [(module V0); (module V1); (module V2)]
   end
 
   module Executable_blueprints = struct
@@ -210,6 +230,15 @@ module Q = struct
     let insert =
       (t3 level root_hash timestamp ->. unit)
       @@ {|INSERT INTO kernel_upgrades (applied_before, root_hash, activation_timestamp) VALUES (?, ?, ?)|}
+  end
+
+  module L1_latest_level = struct
+    let insert =
+      (l1_level ->. unit)
+      @@ {eos|REPLACE INTO l1_latest_level (level) VALUES (?)|eos}
+
+    let get =
+      (unit ->! l1_level) @@ {eos|SELECT (level) FROM l1_latest_level|eos}
   end
 end
 
@@ -383,8 +412,17 @@ module Kernel_upgrades = struct
       (next_blueprint_number, event.hash, event.timestamp)
 end
 
-(* Error registration *)
+module L1_latest_known_level = struct
+  let store store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_latest_level.insert level
 
+  let find store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.L1_latest_level.get ()
+end
+
+(* Error registration *)
 let () =
   register_error_kind
     `Permanent

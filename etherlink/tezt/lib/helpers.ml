@@ -131,6 +131,7 @@ let check_block_consistency ~left ~right ?error_msg ~block () =
   in
   let*@ left_head = Rpc.get_block_by_number ~block left in
   let*@ right_head = Rpc.get_block_by_number ~block right in
+  Check.((left_head.number = right_head.number) int32) ~error_msg ;
   Check.((left_head.hash = right_head.hash) string) ~error_msg ;
   unit
 

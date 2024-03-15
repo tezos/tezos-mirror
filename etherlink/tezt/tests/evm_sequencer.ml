@@ -489,7 +489,9 @@ let test_resilient_to_rollup_node_disconnect =
   (* Check the consistency again *)
   let* () =
     check_head_consistency
-      ~error_msg:"The head should be the same after the outage"
+      ~error_msg:
+        "The head should be the same after the outage. Sequencer: {%L}, proxy: \
+         {%R}"
       ~left:sequencer
       ~right:proxy
       ()
@@ -1701,8 +1703,7 @@ let test_sequencer_upgrade =
   (* Sends the upgrade to L1. *)
   Log.info "Sending the sequencer upgrade to the L1 contract" ;
   let new_sequencer_key = Constant.bootstrap2.alias in
-  let* () =
-    Evm_node.wait_for_evm_event sequencer ~event_kind:"sequencer_upgrade"
+  let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
   and* () =
     let* () =
       sequencer_upgrade
@@ -1864,6 +1865,60 @@ let test_sequencer_diverge =
   in
   unit
 
+(** This test that the sequencer evm node can catchup event from the
+    rollup node. *)
+let test_sequencer_can_catch_up_on_event =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "event"]
+    ~title:"Evm node can catchup event from the rollup node"
+    ~uses
+  @@ fun protocol ->
+  let* {sc_rollup_node; client; sequencer; proxy; _} =
+    setup_sequencer
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      protocol
+  in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = Rpc.produce_block sequencer in
+        unit)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let* _ = Rpc.produce_block sequencer in
+  let*@ last_produced_block = Rpc.block_number sequencer in
+  let* () =
+    Evm_node.wait_for_blueprint_injected
+      sequencer
+      ~timeout:5.
+      (Int32.to_int last_produced_block)
+  in
+  let* () = Evm_node.terminate sequencer in
+  let* () =
+    (* produces some blocks so the rollup node applies latest produced block. *)
+    repeat 4 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let check json =
+    let open JSON in
+    match as_list (json |-> "event") with
+    | [number; hash] ->
+        let number = as_int number in
+        let hash = as_string hash in
+        if number = Int32.to_int last_produced_block then Some (number, hash)
+        else None
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "invalid json for the evm event kind blueprint applied"
+  in
+  let* _json = Evm_node.wait_for_evm_event ~check Blueprint_applied sequencer
+  and* () = Evm_node.run sequencer in
+  let* () = check_head_consistency ~left:proxy ~right:sequencer () in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -1891,4 +1946,5 @@ let () =
   test_no_automatic_block_production protocols ;
   test_migration_from_ghostnet protocols ;
   test_sequencer_upgrade protocols ;
-  test_sequencer_diverge protocols
+  test_sequencer_diverge protocols ;
+  test_sequencer_can_catch_up_on_event protocols
