@@ -19,7 +19,7 @@ let job_docker_promote_to_latest ~ci_docker_hub : tezos_job =
     ~__POS__
     ~stage:Stages.publish_release
     ~name:"docker:promote_to_latest"
-    ~variables:[("CI_DOCKER_HUB", Bool.to_string ci_docker_hub)]
+    ~ci_docker_hub
     ["./scripts/ci/docker_promote_to_latest.sh"]
 
 let jobs ?(test = false) () =
