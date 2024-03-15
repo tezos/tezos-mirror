@@ -1,26 +1,26 @@
 .PHONY: all
-all: # Regenerate GitLab CI configuration.
-	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe)
+all:  # Regenerate GitLab CI configuration.
+	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe
 
 .PHONY: verbose
 verbose: # Regenerate GitLab CI configuration with verbose output.
-	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --verbose)
+	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --verbose
 
 .PHONY: inline-source-info
 inline-source-info: # Regenerate GitLab CI configuration, inlining source information in generated files.
-	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info)
+	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --inline-source-info
 
-.PHONY: verbose
+.PHONY: remove-extra-files
 remove-extra-files: # Regenerate GitLab CI configuration and remove any non-generated files.
-	(cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files)
+	cd .. && ${MAKE} -C manifest && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --remove-extra-files
 
 .PHONY: docker-do-%
 docker-do-%:
-	@( cd .. \
+	@cd .. \
 	    && . ./scripts/version.sh \
 	    && docker run -it -w$$(pwd) -v$$(pwd):$$(pwd) --entrypoint opam \
 	         registry.gitlab.com/tezos/opam-repository:runtime-build-dependencies--$${opam_repository_tag} exec -- \
-	         make -C ci $* )
+			 make --always-make -C ci $* # --always-make to not mix build artifacts from host and guest system.
 
 .PHONY: docker-all
 docker-all: docker-do-all # Build the target 'all' using the 'runtime-build-dependencies' Docker image.

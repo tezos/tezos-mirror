@@ -1,72 +1,46 @@
-# This template is used by the opam test jobs defined in
-# .gitlab/ci/jobs/packaging/opam_package.yml
-.opam_template:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_prebuild_dependencies
-    # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
-    # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
-    # At the time of writing, the opam tests were quite flaky.
-    # Therefore, a retry was added. This should be removed once the
-    # underlying tests have been fixed.
-    - .oc.template__retry_flaky
-  stage: packaging
-  needs: [opam:prepare]
-  dependencies: [opam:prepare]
-  before_script:
-    - eval $(opam env)
-    - mkdir -p $CI_PROJECT_DIR/opam_logs
-    # Start sccache. If sccache fails to start, it will set
-    # RUSTC_WRAPPER to "", inhibiting sccache in the rest of the
-    # script.
-    - . ./scripts/ci/sccache-start.sh
-  script:
-    - opam remote add dev-repo ./_opam-repo-for-release
-    - opam install --yes ${package}.dev
-    - opam reinstall --yes --with-test ${package}.dev
-  after_script:
-    # Stores logs in opam_logs for artifacts and outputs an excerpt on
-    # failure. [after_script] runs in a separate shell and so requires
-    # a second opam environment initialization.
-    - sccache --stop-server || true
-    - eval $(opam env)
-    - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  artifacts:
-    paths:
-      - opam_logs/
-    expire_in: 1 week
-    when: always
-  variables:
-    # See `.gitlab-ci.yml` for details on `RUNTEZTALIAS`
-    RUNTEZTALIAS: "true"
-    # We store caches in _build for two reasons: (1) the _build
-    # folder is excluded from opam's rsync. (2) gitlab ci cache
-    # requires that cached files are in a sub-folder of the checkout.
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
-    SCCACHE_LOG: debug
-    # Disable timeout
-    SCCACHE_IDLE_TIMEOUT: 0
-    RUSTC_WRAPPER: "sccache"
-  cache:
-    key: opam-sccache
-    paths:
-      - _build/_sccache
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
 
 opam:prepare:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_prebuild_dependencies
-    - .needs__trigger
-    - .rules_template__trigger_exec_opam_batch_1
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
+  tags:
+  - gcp
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
+    when: delayed
+    start_in: 1 minute
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--opam(?:$|,)/
+    when: delayed
+    start_in: 1 minute
+  - changes:
+    - '**/dune'
+    - '**/dune.inc'
+    - '**/*.dune.inc'
+    - '**/dune-project'
+    - '**/dune-workspace'
+    - '**/*.opam'
+    - .gitlab/ci/jobs/packaging/opam:prepare.yml
+    - .gitlab/ci/jobs/packaging/opam_package.yml
+    - manifest/manifest.ml
+    - manifest/main.ml
+    - scripts/opam-prepare-repo.sh
+    - scripts/version.sh
+    if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: delayed
+    start_in: 1 minute
+  - when: never
+  needs:
+  - job: trigger
+    optional: true
+  dependencies: []
   before_script:
-    - eval $(opam env)
+  - eval $(opam env)
   script:
-    - git init _opam-repo-for-release
-    - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
-    - git -C _opam-repo-for-release add packages
-    - git -C _opam-repo-for-release commit -m "tezos packages"
+  - git init _opam-repo-for-release
+  - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
+  - git -C _opam-repo-for-release add packages
+  - git -C _opam-repo-for-release commit -m "tezos packages"
   artifacts:
     paths:
-      - _opam-repo-for-release/
+    - _opam-repo-for-release/
