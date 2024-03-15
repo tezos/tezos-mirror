@@ -7,8 +7,8 @@ use crate::blueprint_storage::{store_immediate_blueprint, store_inbox_blueprint}
 use crate::configuration::{Configuration, ConfigurationMode, TezosContracts};
 use crate::current_timestamp;
 use crate::delayed_inbox::DelayedInbox;
-use crate::inbox::ProxyInboxContent;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
+use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -22,7 +22,7 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
-) -> Result<(), anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error> {
     if let Some(ProxyInboxContent { transactions }) =
         read_proxy_inbox(host, smart_rollup_address, tezos_contracts)?
     {
@@ -34,7 +34,7 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
         // Store the blueprint.
         store_inbox_blueprint(host, blueprint)?;
     }
-    Ok(())
+    Ok(StageOneStatus::Done)
 }
 
 fn fetch_delayed_transactions<Host: Runtime>(
@@ -74,10 +74,8 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     delayed_inbox: &mut DelayedInbox,
     sequencer: PublicKey,
-) -> Result<(), anyhow::Error> {
-    // Returns true if the inbox has been emptied during this round of reading,
-    // so that the delayed inbox is not flushed twice in the same L1 level.
-    if read_sequencer_inbox(
+) -> Result<StageOneStatus, anyhow::Error> {
+    match read_sequencer_inbox(
         host,
         smart_rollup_address,
         tezos_contracts,
@@ -85,20 +83,25 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
         sequencer,
         delayed_inbox,
     )? {
-        // Check if there are timed-out transactions in the delayed inbox
-        let timed_out = delayed_inbox.first_has_timed_out(host)?;
-        if timed_out {
-            fetch_delayed_transactions(host, delayed_inbox)?
+        StageOneStatus::Done => {
+            // Check if there are timed-out transactions in the delayed inbox
+            let timed_out = delayed_inbox.first_has_timed_out(host)?;
+            if timed_out {
+                fetch_delayed_transactions(host, delayed_inbox)?
+            };
+            // Force the kernel to reboot, so that the first blueprint will have
+            // the maximum tick capacity
+            Ok(StageOneStatus::Reboot)
         }
+        status => Ok(status),
     }
-    Ok(())
 }
 
 pub fn fetch<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config: &mut Configuration,
-) -> Result<(), anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error> {
     match &mut config.mode {
         ConfigurationMode::Sequencer {
             delayed_bridge,

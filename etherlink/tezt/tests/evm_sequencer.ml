@@ -1919,6 +1919,90 @@ let test_sequencer_can_catch_up_on_event =
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   unit
 
+let test_stage_one_reboot =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "reboot"]
+    ~title:
+      "Checks the stage one reboots when reading too much chunks in a single \
+       L1 level"
+    ~uses
+  @@ fun protocol ->
+  let* {sc_rollup_node; client; sc_rollup_address; _} =
+    setup_sequencer
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      protocol
+  in
+  let* chunks =
+    Lwt_list.map_s (fun i ->
+        Evm_node.chunk_data
+          ~rollup_address:sc_rollup_address
+          ~sequencer_key:Constant.bootstrap1.alias
+          ~client
+          ~number:i
+          [])
+    @@ List.init 400 Fun.id
+  in
+  let chunks = List.flatten chunks in
+  let send_chunks chunks src =
+    let messages =
+      `A (List.map (fun c -> `String c) chunks)
+      |> JSON.annotate ~origin:"send_message"
+      |> JSON.encode
+    in
+    Client.Sc_rollup.send_message
+      ?wait:None
+      ~msg:("hex:" ^ messages)
+      ~src
+      client
+  in
+  let rec split_chunks acc chunks =
+    match chunks with
+    | [] -> acc
+    | _ ->
+        let messages, rem = Tezos_stdlib.TzList.split_n 100 chunks in
+        split_chunks (messages :: acc) rem
+  in
+  let splitted_messages = split_chunks [] chunks in
+  let* () =
+    Lwt_list.iteri_s
+      (fun i messages -> send_chunks messages Account.Bootstrap.keys.(i).alias)
+      splitted_messages
+  in
+  let* total_tick_number_before_expected_reboots =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
+  let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+  let* total_tick_number_with_expected_reboots =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_total_ticks ()
+  in
+  let ticks_after_expected_reboot =
+    total_tick_number_with_expected_reboots
+    - total_tick_number_before_expected_reboots
+  in
+
+  (* The PVM takes 11G ticks for collecting inputs, 11G for a kernel_run. As such,
+     an L1 level is at least 22G ticks. *)
+  let ticks_per_snapshot =
+    Tezos_protocol_alpha.Protocol.Sc_rollup_wasm.V2_0_0.ticks_per_snapshot
+    |> Z.to_int
+  in
+  let min_ticks_per_l1_level = ticks_per_snapshot * 2 in
+  (* If the inbox is not empty, the kernel enforces a reboot after reading it,
+     to give the maximum ticks available for the first block production. *)
+  let min_ticks_when_inbox_is_not_empty =
+    min_ticks_per_l1_level + ticks_per_snapshot
+  in
+  Check.((ticks_after_expected_reboot > min_ticks_when_inbox_is_not_empty) int)
+    ~error_msg:
+      "The number of ticks spent during the period should be higher than %R, \
+       but got %L, which implies there have been no reboot, contrary to what \
+       was expected." ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -1947,4 +2031,5 @@ let () =
   test_migration_from_ghostnet protocols ;
   test_sequencer_upgrade protocols ;
   test_sequencer_diverge protocols ;
-  test_sequencer_can_catch_up_on_event protocols
+  test_sequencer_can_catch_up_on_event protocols ;
+  test_stage_one_reboot protocols

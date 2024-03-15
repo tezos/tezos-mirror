@@ -20,6 +20,8 @@ use crate::storage::{
     remove_chunked_transaction, remove_sequencer, store_l1_level,
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
+use crate::tick_model::constants::MAX_ALLOWED_TICKS;
+use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::upgrade::*;
 use crate::Error;
 use crate::{simulation, upgrade};
@@ -177,7 +179,7 @@ pub fn read_input<Host: Runtime, Mode: Parsable>(
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     inbox_is_empty: &mut bool,
-    parsing_context: &Mode::Context,
+    parsing_context: &mut Mode::Context,
 ) -> Result<InputResult<Mode>, Error> {
     let input = host.read_input()?;
 
@@ -432,7 +434,7 @@ fn read_and_dispatch_input<Host: Runtime, Mode: Parsable + InputHandler>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
-    parsing_context: &Mode::Context,
+    parsing_context: &mut Mode::Context,
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
 ) -> anyhow::Result<ReadStatus> {
@@ -489,7 +491,7 @@ pub fn read_proxy_inbox<Host: Runtime>(
             host,
             smart_rollup_address,
             tezos_contracts,
-            &(),
+            &mut (),
             &mut inbox_is_empty,
             &mut res,
         ) {
@@ -513,6 +515,25 @@ pub fn read_proxy_inbox<Host: Runtime>(
     }
 }
 
+/// The StageOne can yield with three possible states:
+///
+/// - Done: the inbox has been fully read during the current `kernel_run`
+///
+/// - Reboot: the inbox cannot been read further as there are not enough ticks
+///   and needs a reboot before continuing. This is only supported in sequencer
+///   mode as the inputs are stored directly in the process.
+///
+/// - Skipped: the inbox was empty during the current `kernel_run`, implying it
+///   has been emptied during a previous `kernel_run` and the kernel is
+///   currently processing blueprints. It prevents the automatic reboot after
+///   completing the stage one to start the block production, and producing an
+///   empty blueprint in proxy mode.
+pub enum StageOneStatus {
+    Done,
+    Reboot,
+    Skipped,
+}
+
 pub fn read_sequencer_inbox<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
@@ -520,22 +541,28 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     delayed_bridge: ContractKt1Hash,
     sequencer: PublicKey,
     delayed_inbox: &mut DelayedInbox,
-) -> Result<bool, anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
     // inbox was empty or not. As we consume all the inbox in one go, if the
     // variable remains true, that means that the inbox was already consumed
     // during this kernel run.
     let mut inbox_is_empty = true;
-    let parsing_context = SequencerParsingContext {
+    let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
+        allocated_ticks: MAX_ALLOWED_TICKS,
     };
     loop {
+        // Checks there will be enough ticks to handle at least another chunk of
+        // full size. If it is not the case, asks for reboot.
+        if parsing_context.allocated_ticks < maximum_ticks_for_sequencer_chunk() {
+            return Ok(StageOneStatus::Reboot);
+        };
         match read_and_dispatch_input::<Host, SequencerInput>(
             host,
             smart_rollup_address,
             tezos_contracts,
-            &parsing_context,
+            &mut parsing_context,
             &mut inbox_is_empty,
             delayed_inbox,
         ) {
@@ -553,8 +580,8 @@ pub fn read_sequencer_inbox<Host: Runtime>(
                 )
             }
             Ok(ReadStatus::Ongoing) => (),
-            Ok(ReadStatus::FinishedRead) => return Ok(true),
-            Ok(ReadStatus::FinishedIgnore) => return Ok(false),
+            Ok(ReadStatus::FinishedRead) => return Ok(StageOneStatus::Done),
+            Ok(ReadStatus::FinishedIgnore) => return Ok(StageOneStatus::Skipped),
         }
     }
 }

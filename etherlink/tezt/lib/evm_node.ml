@@ -600,3 +600,30 @@ let sequencer_upgrade_payload ?(devmode = true) ?client ~public_key
   in
   let* payload = Process.check_and_read_stdout process in
   return (String.trim payload)
+
+let chunk_data ?(devmode = true) ~rollup_address ?sequencer_key ?timestamp
+    ?parent_hash ?number ?client data =
+  let args = "chunk" :: "data" :: data in
+  let sequencer =
+    match sequencer_key with
+    | None -> []
+    | Some key -> ["--as-blueprint"; "--sequencer-key"; key]
+  in
+  let rollup_address = ["--rollup-address"; Fun.id rollup_address] in
+  let timestamp = Cli_arg.optional_arg "timestamp" Fun.id timestamp in
+  let parent_hash = Cli_arg.optional_arg "parent-hash" Fun.id parent_hash in
+  let number = Cli_arg.optional_arg "number" string_of_int number in
+  let devmode = Cli_arg.optional_switch "devmode" devmode in
+  let process =
+    Process.spawn (Uses.path Constant.octez_evm_node)
+    @@ args @ rollup_address @ sequencer @ timestamp @ parent_hash @ number
+    @ devmode
+    @ Cli_arg.optional_arg
+        "wallet-dir"
+        Fun.id
+        (Option.map Client.base_dir client)
+  in
+  let* output = Process.check_and_read_stdout process in
+  (* `tl` will remove the first line `Chunked_transactions :` *)
+  let chunks = String.split_on_char '\n' (String.trim output) |> List.tl in
+  return chunks

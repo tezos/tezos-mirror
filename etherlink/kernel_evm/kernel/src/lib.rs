@@ -14,6 +14,7 @@ use anyhow::Context;
 use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
 use fallback_upgrade::fallback_backup_kernel;
+use inbox::StageOneStatus;
 use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
@@ -99,7 +100,7 @@ pub fn stage_one<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; 20],
     configuration: &mut Configuration,
-) -> Result<(), anyhow::Error> {
+) -> Result<StageOneStatus, anyhow::Error> {
     log!(host, Debug, "Entering stage one.");
     log!(host, Debug, "Configuration: {}", configuration);
 
@@ -224,8 +225,13 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    stage_one(host, smart_rollup_address, &mut configuration)
-        .context("Failed during stage 1")?;
+    if let StageOneStatus::Reboot =
+        stage_one(host, smart_rollup_address, &mut configuration)
+            .context("Failed during stage 1")?
+    {
+        host.mark_for_reboot()?;
+        return Ok(());
+    };
 
     let block_fees = retrieve_block_fees(host)?;
     // Start processing blueprints
