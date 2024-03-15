@@ -187,8 +187,6 @@ let () =
     | ".gitlab/ci/jobs/test/install_octez.yml"
     | ".gitlab/ci/jobs/test/misc_opam_checks.yml"
     | ".gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml"
-    | ".gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml"
-    | ".gitlab/ci/jobs/test/oc.misc_checks-schedule_extended_test.yml"
     | ".gitlab/ci/jobs/test/oc.script:b58_prefix.yml"
     | ".gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml"
     | ".gitlab/ci/jobs/test/oc.script:test-gen-genesis.yml"

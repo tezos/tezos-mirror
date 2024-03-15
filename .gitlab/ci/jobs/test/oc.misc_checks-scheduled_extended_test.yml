@@ -7,20 +7,7 @@ oc.misc_checks:
   tags:
   - gcp
   rules:
-  - changes:
-    - src/**/*
-    - tezt/**/*
-    - devtools/**/*
-    - scripts/**/*
-    - docs/**/*
-    - client-libs/**/*
-    - etherlink/**/*
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    when: on_success
-  needs:
-  - job: trigger
-    optional: true
+  - when: always
   dependencies: []
   before_script:
   - ./scripts/ci/take_ownership.sh
@@ -30,4 +17,3 @@ oc.misc_checks:
   script:
   - ./scripts/ci/lint_misc_check.sh
   - scripts/check_wasm_pvm_regressions.sh check
-  - ./scripts/ci/lint_check_licenses.sh

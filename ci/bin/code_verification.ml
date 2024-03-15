@@ -593,7 +593,40 @@ let jobs pipeline_type =
         ]
       |> job_external_split
     in
-    [job_kaitai_checks; job_kaitai_e2e_checks; job_oc_check_lift_limits_patch]
+    let job_oc_misc_checks : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.misc_checks"
+        ~image:Images.runtime_build_test_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_lint_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             ~init_python_venv:true
+             [])
+        ([
+           "./scripts/ci/lint_misc_check.sh";
+           "scripts/check_wasm_pvm_regressions.sh check";
+         ]
+        @
+        (* The license check only applies to new files (in the sense
+           of [git add]), so can only run in [before_merging]
+           pipelines. *)
+        if pipeline_type = Before_merging then
+          ["./scripts/ci/lint_check_licenses.sh"]
+        else [])
+      |> job_external_split
+    in
+    [
+      job_kaitai_checks;
+      job_kaitai_e2e_checks;
+      job_oc_check_lift_limits_patch;
+      job_oc_misc_checks;
+    ]
   in
   let doc = [] in
   let manual =

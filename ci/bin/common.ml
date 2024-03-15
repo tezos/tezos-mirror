@@ -326,6 +326,21 @@ let changeset_lift_limits_patch =
     ".gitlab-ci.yml";
   ]
 
+(* The linting job runs over the set of [source_directories]
+   defined in [scripts/lint.sh] that must be included here: *)
+let changeset_lint_files =
+  [
+    "src/**/*";
+    "tezt/**/*";
+    "devtools/**/*";
+    "scripts/**/*";
+    "docs/**/*";
+    "client-libs/**/*";
+    "etherlink/**/*";
+    ".gitlab-ci.yml";
+    ".gitlab/**/*";
+  ]
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.
