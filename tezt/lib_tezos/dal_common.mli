@@ -240,6 +240,12 @@ module RPC : sig
   val get_topics_peers :
     subscribed:bool -> (topic * string list) list RPC_core.t
 
+  type peer_score = {peer : string; score : float}
+
+  (* Call RPC "GET /p2p/gossipsub/scores" to list the scores of peers with a
+     known score. *)
+  val get_scores : unit -> peer_score list RPC_core.t
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
   module Remote : RPC_core.CALLERS with type uri_provider := remote_uri_provider

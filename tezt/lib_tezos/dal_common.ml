@@ -379,6 +379,18 @@ module Dal_RPC = struct
     make ~query_string GET ["p2p"; "gossipsub"; "topics"; "peers"] (fun json ->
         JSON.(json |> as_list |> List.map as_topic_and_peers))
 
+  type peer_score = {peer : string; score : float}
+
+  let get_scores () =
+    make GET ["p2p"; "gossipsub"; "scores"] (fun json ->
+        JSON.(
+          json |> as_list
+          |> List.map (fun json ->
+                 {
+                   peer = get "peer" json |> as_string;
+                   score = get "score" json |> as_float;
+                 })))
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body
