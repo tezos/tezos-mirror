@@ -78,14 +78,20 @@ let get_hashes ~transactions ~delayed_transactions =
   in
   return (delayed_hashes @ hashes)
 
-let produce_block ~ctxt ~cctxt ~smart_rollup_address ~sequencer_key ~force
-    ~timestamp =
+let produce_block ~(ctxt : Evm_context.t) ~cctxt ~smart_rollup_address
+    ~sequencer_key ~force ~timestamp =
   let open Lwt_result_syntax in
+  Helpers.with_timing
+    (Blueprint_events.blueprint_production ctxt.session.next_blueprint_number)
+  @@ fun () ->
   let* transactions, delayed_transactions = Tx_pool.pop_transactions () in
   let n = List.length transactions + List.length delayed_transactions in
   if force || n > 0 then
     let*? hashes = get_hashes ~transactions ~delayed_transactions in
     let* blueprint =
+      Helpers.with_timing
+        (Blueprint_events.blueprint_proposal ctxt.session.next_blueprint_number)
+      @@ fun () ->
       Sequencer_blueprint.create
         ~sequencer_key
         ~cctxt
