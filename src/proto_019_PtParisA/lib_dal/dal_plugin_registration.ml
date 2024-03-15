@@ -159,6 +159,10 @@ module Plugin = struct
        replaced. Once Paris is injected. *)
     let cells_of_level _block_info _ctxt = Lwt_result_syntax.return []
   end
+
+  module RPC = struct
+    let directory _skip_list_cells_store = Tezos_rpc.Directory.empty
+  end
 end
 
 let () = Dal_plugin.register (module Plugin)
