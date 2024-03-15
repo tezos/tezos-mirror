@@ -211,6 +211,20 @@ let enable_coverage_location : tezos_job -> tezos_job =
   Tezos_ci.append_variables
     [("BISECT_FILE", "$CI_PROJECT_DIR/_coverage_output/")]
 
+(** Add variables for bisect_ppx output and store the traces as an
+    artifact.
+
+    This function should be applied to test jobs that produce coverage. *)
+let enable_coverage_output_artifact ?(expire_in = Days 1) :
+    tezos_job -> tezos_job =
+ fun job ->
+  job |> enable_coverage_location
+  |> Tezos_ci.add_artifacts
+       ~expire_in
+       ~name:"coverage-files-$CI_JOB_ID"
+       ~when_:On_success
+       ["$BISECT_FILE"]
+
 let enable_coverage_report job : tezos_job =
   job
   |> Tezos_ci.add_artifacts

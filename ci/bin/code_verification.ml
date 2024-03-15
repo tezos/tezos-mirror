@@ -139,6 +139,176 @@ let read_opam_packages =
         Some {name; group; batch_index}
     | _ -> fail ()
 
+let changeset_unit_test_arm64 = ["src/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"]
+
+let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
+    ~job_build_arm64_release ~job_build_arm64_exp_dev_extra : tezos_job list =
+  let build_dependencies = function
+    | Amd64 ->
+        Dependent
+          [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra]
+    | Arm64 ->
+        Dependent
+          [Job job_build_arm64_release; Job job_build_arm64_exp_dev_extra]
+  in
+  let job_unit_test ~__POS__ ?(image = Images.runtime_build_dependencies)
+      ?timeout ?parallel_vector ~arch ~name ?(enable_coverage = true)
+      ?(rules = [job_rule ~changes:changeset_octez ()]) ~make_targets () :
+      tezos_job =
+    let arch_string = arch_to_string arch in
+    let script =
+      ["make $MAKE_TARGETS"]
+      @ if enable_coverage then ["./scripts/ci/merge_coverage.sh"] else []
+    in
+    let dependencies = build_dependencies arch in
+    let variables =
+      [("ARCH", arch_string); ("MAKE_TARGETS", String.concat " " make_targets)]
+    in
+
+    let variables, parallel =
+      (* When parallel_vector is set to non-zero (translating to the
+         [parallel_vector:] clause), set the variable
+         [DISTRIBUTE_TESTS_TO_PARALLELS] to [true], so that
+         [scripts/test_wrapper.sh] partitions the set of @runtest
+         targets to build. *)
+      match parallel_vector with
+      | Some n ->
+          ( variables @ [("DISTRIBUTE_TESTS_TO_PARALLELS", "true")],
+            Some (Vector n) )
+      | None -> (variables, None)
+    in
+    let job =
+      job
+        ?timeout
+        ?parallel
+        ~__POS__
+        ~retry:2
+        ~name
+        ~stage:Stages.test
+        ~image
+        ~arch
+        ~dependencies
+        ~rules
+        ~variables
+        ~artifacts:
+          (artifacts
+             ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
+             ["test_results"]
+             ~reports:(reports ~junit:"test_results/*.xml" ())
+             ~expire_in:(Days 1)
+             ~when_:Always)
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        script
+    in
+    if enable_coverage then
+      job |> enable_coverage_instrumentation |> enable_coverage_output_artifact
+    else job
+  in
+  let oc_unit_non_proto_x86_64 =
+    job_unit_test
+      ~__POS__
+      ~name:"oc.unit:non-proto-x86_64"
+      ~arch:Amd64 (* The [lib_benchmark] unit tests require Python *)
+      ~image:Images.runtime_build_test_dependencies
+      ~make_targets:["test-nonproto-unit"]
+      ()
+  in
+  let oc_unit_other_x86_64 =
+    (* Runs unit tests for contrib. *)
+    job_unit_test
+      ~__POS__
+      ~name:"oc.unit:other-x86_64"
+      ~arch:Amd64
+      ~make_targets:["test-other-unit"]
+      ()
+  in
+  let oc_unit_proto_x86_64 =
+    (* Runs unit tests for protocol. *)
+    job_unit_test
+      ~__POS__
+      ~name:"oc.unit:proto-x86_64"
+      ~arch:Amd64
+      ~make_targets:["test-proto-unit"]
+      ()
+  in
+  let oc_unit_non_proto_arm64 =
+    job_unit_test
+      ~__POS__
+      ~name:"oc.unit:non-proto-arm64"
+      ~parallel_vector:2
+      ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
+      ~image:Images.runtime_build_test_dependencies
+      ~rules:
+        [
+          job_rule ~if_:Rules.schedule_extended_tests ~when_:Always ();
+          job_rule ~changes:changeset_unit_test_arm64 ();
+        ]
+      ~make_targets:["test-nonproto-unit"; "test-webassembly"]
+        (* No coverage for arm64 jobs -- the code they test is a
+           subset of that tested by x86_64 unit tests. *)
+      ~enable_coverage:false
+      ()
+  in
+  let oc_unit_webassembly_x86_64 =
+    job
+      ~__POS__
+      ~name:"oc.unit:webassembly-x86_64"
+      ~arch:Amd64 (* The wasm tests are written in Python *)
+      ~image:Images.runtime_build_test_dependencies
+      ~stage:Stages.test
+      ~dependencies:(build_dependencies Amd64)
+      ~rules:[job_rule ~changes:changeset_octez ()]
+      ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
+           This test takes around 2 to 4min to complete, but it sometimes
+           hangs. We use a timeout to retry the test in this case. The
+           underlying issue should be fixed eventually, turning this timeout
+           unnecessary. *)
+      ~timeout:(Minutes 20)
+      ["make test-webassembly"]
+  in
+  let oc_unit_js_components =
+    job
+      ~__POS__
+      ~name:"oc.unit:js_components"
+      ~arch:Amd64
+      ~image:Images.runtime_build_test_dependencies
+      ~stage:Stages.test
+      ~dependencies:(build_dependencies Amd64)
+      ~rules:[job_rule ~changes:changeset_octez ()]
+      ~retry:2
+      ~variables:[("RUNTEZTALIAS", "true")]
+      ~before_script:
+        (before_script
+           ~take_ownership:true
+           ~source_version:true
+           ~eval_opam:true
+           ~install_js_deps:true
+           [])
+      ["make test-js"]
+  in
+  let oc_unit_protocol_compiles =
+    job
+      ~__POS__
+      ~name:"oc.unit:protocol_compiles"
+      ~arch:Amd64
+      ~image:Images.runtime_build_dependencies
+      ~stage:Stages.test
+      ~dependencies:(build_dependencies Amd64)
+      ~rules:[job_rule ~changes:changeset_octez ()]
+      ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+      ["dune build @runtest_compile_protocol"]
+  in
+  [
+    oc_unit_non_proto_x86_64;
+    oc_unit_other_x86_64;
+    oc_unit_proto_x86_64;
+    oc_unit_non_proto_arm64;
+    oc_unit_webassembly_x86_64;
+    oc_unit_js_components;
+    oc_unit_protocol_compiles;
+  ]
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 type code_verification_pipeline = Before_merging | Schedule_extended_test
@@ -155,6 +325,18 @@ let jobs pipeline_type =
         | Before_merging -> before_merging_suffix
         | Schedule_extended_test -> scheduled_suffix)
       job
+  in
+  let jobs_external_split ?(before_merging_suffix = "before_merging")
+      ?(scheduled_suffix = "scheduled_extended_test") ~path jobs =
+    let path =
+      sf
+        "%s-%s.yml"
+        path
+        (match pipeline_type with
+        | Before_merging -> before_merging_suffix
+        | Schedule_extended_test -> scheduled_suffix)
+    in
+    jobs_external ~path jobs
   in
   (* Used to externalize jobs that are the same on both pipelines. They're only written once.
      Beware: there is no check that the two jobs are actually identical. *)
@@ -304,15 +486,41 @@ let jobs pipeline_type =
            [])
     |> job_external_split
   in
+  (* The build_x86_64 jobs are split in two to keep the artifact size
+     under the 1GB hard limit set by GitLab. *)
+  (* [job_build_x86_64_release] builds the released executables. *)
+  let job_build_x86_64_release =
+    job_build_dynamic_binaries
+      ~__POS__
+      ~arch:Amd64
+      ~dependencies:dependencies_needs_trigger
+      ~release:true
+      ~rules:(make_rules ~changes:changeset_octez ())
+      ()
+    |> job_external_split
+  in
+  (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
+     executables, as well as the tezt test suite used by the subsequent
+     'tezt' jobs and TPS evaluation tool. *)
+  let job_build_x86_64_exp_dev_extra =
+    job_build_dynamic_binaries
+      ~__POS__
+      ~arch:Amd64
+      ~dependencies:dependencies_needs_trigger
+      ~release:false
+      ~rules:(make_rules ~changes:changeset_octez ())
+      ()
+    |> job_external_split
+  in
+  let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
+  let job_build_arm64_release : Tezos_ci.tezos_job =
+    job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
+  in
+  let job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
+    job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
+    |> job_external_split
+  in
   let build =
-    let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
-    let job_build_arm64_release : Tezos_ci.tezos_job =
-      job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
-    in
-    let job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
-      job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
-      |> job_external_split
-    in
     let job_static_x86_64_experimental =
       job_build_static_binaries
         ~__POS__
@@ -338,32 +546,6 @@ let jobs pipeline_type =
           let job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
           [job_build_dpkg_amd64; job_build_rpm_amd64]
       | Before_merging -> []
-    in
-    (* The build_x86_64 jobs are split in two to keep the artifact size
-       under the 1GB hard limit set by GitLab. *)
-    (* [job_build_x86_64_release] builds the released executables. *)
-    let job_build_x86_64_release =
-      job_build_dynamic_binaries
-        ~__POS__
-        ~arch:Amd64
-        ~dependencies:dependencies_needs_trigger
-        ~release:true
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ()
-      |> job_external_split
-    in
-    (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
-       executables, as well as the tezt test suite used by the subsequent
-       'tezt' jobs and TPS evaluation tool. *)
-    let job_build_x86_64_exp_dev_extra =
-      job_build_dynamic_binaries
-        ~__POS__
-        ~arch:Amd64
-        ~dependencies:dependencies_needs_trigger
-        ~release:false
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ()
-      |> job_external_split
     in
     let job_ocaml_check : tezos_job =
       job
@@ -656,6 +838,14 @@ let jobs pipeline_type =
         ]
       |> job_external_split
     in
+    let jobs_unit : tezos_job list =
+      jobs_unit_tests
+        ~job_build_x86_64_release
+        ~job_build_x86_64_exp_dev_extra
+        ~job_build_arm64_release
+        ~job_build_arm64_exp_dev_extra
+      |> jobs_external_split ~path:"test/oc.unit"
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -664,6 +854,7 @@ let jobs pipeline_type =
       job_misc_opam_checks;
       job_semgrep;
     ]
+    @ jobs_unit
     @
     match pipeline_type with
     | Before_merging ->
