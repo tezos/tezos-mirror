@@ -782,4 +782,11 @@ module Admin = struct
       ~query:Query.operation_tag_query
       ~output:Encodings.injector_queues
       (path / "injector" / "queues")
+
+  let clear_injector_queues =
+    Tezos_rpc.Service.delete_service
+      ~description:"Clear operation queues of injectors"
+      ~query:Query.operation_tag_query
+      ~output:Data_encoding.unit
+      (path / "injector" / "queues")
 end

@@ -501,6 +501,10 @@ let () =
   in
   return queues
 
+let () =
+  Admin_directory.register0 Rollup_node_services.Admin.clear_injector_queues
+  @@ fun _node_ctxt tag () -> Injector.clear_queues ?tag ()
+
 let add_describe dir =
   Tezos_rpc.Directory.register_describe_directory_service
     dir
