@@ -38,6 +38,8 @@ let kernel_upgrade = EVM.make "/kernel_upgrade"
 
 let sequencer_upgrade = EVM.make "/sequencer_upgrade"
 
+let delayed_inbox = EVM.make "/delayed-inbox"
+
 module Accounts = struct
   let accounts = World_state.make "/eth_accounts"
 

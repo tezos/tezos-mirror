@@ -26,6 +26,8 @@ val kernel_upgrade : path
 
 val sequencer_upgrade : path
 
+val delayed_inbox : path
+
 (** Paths related to accounts. *)
 module Accounts : sig
   (** Path to the account's balance. *)
