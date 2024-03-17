@@ -85,10 +85,40 @@
       // Array whose values correspond to the cycles, starting from 0 to max_cycle.
       const idx = gen_idx(0, max_cycle);
 
+      // Helpers
+      const mutez_to_tez = (x) => Math.round(x / 1_000_000);
+
       // Creation of the simulator.
       const simulator = new Simulator(config);
 
-      const chart_config = {};
+      const chart_config = {
+          type: 'line',
+          data: {
+              labels: idx,
+              datasets: [
+                  {
+                      label: 'Total supply',
+                      borderColor: 'rgb(175, 92, 92)',
+                      yAxisID: 'y1',
+                      data: simulator.config.chain.total_supply.map(mutez_to_tez),
+                  },
+                  {
+                      label: 'Total frozen stake',
+                      borderColor: 'rgb(75, 192, 92)',
+                      yAxisID: 'y1',
+                      data: simulator.config.chain.total_frozen_stake.map(mutez_to_tez),
+                  },
+              ]
+          },
+          options: {
+              scales: {
+                  y1: {
+                      display: false,
+                  },
+              },
+              responsive: true,
+          },
+      };
 
       const before_activation_cycle_color = "text-white";
       const activation_cycle_color = "text-yellow-600";
