@@ -10,6 +10,7 @@
     <script type="module" src="app.js"></script>
   </head>
   <body class="bg-black">
+    <canvas id="chartJSContainer" class="w-full min-w-full min-w-screen"></canvas>
     <table class="table-fixed text-center min-w-full">
       <thead>
         <tr>
@@ -86,6 +87,8 @@
 
       // Creation of the simulator.
       const simulator = new Simulator(config);
+
+      const chart_config = {};
 
       const before_activation_cycle_color = "text-white";
       const activation_cycle_color = "text-yellow-600";
@@ -173,6 +176,12 @@
 
           tableBody.appendChild(new_row);
       });
+
+      document.addEventListener('DOMContentLoaded', function() {
+          var ctx = document.getElementById('chartJSContainer').getContext('2d');
+          window.chart = new Chart(ctx, chart_config);
+      });
+
     </script>
   </body>
 </html>
