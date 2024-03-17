@@ -224,7 +224,17 @@
                     },
                   }
                 },
-              },
+                dragData: {
+                  round: 5,
+                  showTooltip: true,
+                  onDrag: function(e, datasetIndex, index, value) {
+                    return
+                  },
+                  onDragEnd: function(e, datasetIndex, index, value) {
+                    return
+                  },
+                },
+              }
           }
       };
 
