@@ -101,19 +101,35 @@
                       borderColor: 'rgb(175, 92, 92)',
                       yAxisID: 'y1',
                       data: simulator.config.chain.total_supply.map(mutez_to_tez),
+                      order: 2,
                   },
                   {
                       label: 'Total frozen stake',
                       borderColor: 'rgb(75, 192, 92)',
                       yAxisID: 'y1',
                       data: simulator.config.chain.total_frozen_stake.map(mutez_to_tez),
+                      order: 2,
                   },
+                  {
+                      label: 'Staked ratio',
+                      yAxisID: 'y2',
+                      data: idx.map((i) => simulator.staked_ratio_for_next_cycle(i).toDecimal(4)),
+                      borderColor: 'rgb(75, 192, 192)',
+                      order: 1
+                  },
+
               ]
           },
           options: {
               scales: {
                   y1: {
                       display: false,
+                  },
+                  y2: {
+                      type: 'linear',
+                      position: 'left',
+                      max: 1,
+                      min: 0
                   },
               },
               responsive: true,
