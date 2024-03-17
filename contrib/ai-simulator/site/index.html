@@ -292,7 +292,8 @@
       const tableBody = document.getElementById("report");
 
       // Generates the AI data report.
-      idx.forEach((cycle) => {
+      function gen_report() {
+        idx.forEach((cycle) => {
           let new_row = document.createElement("tr");
           new_row.classList.add("hover:bg-gray-600");
 
@@ -335,11 +336,13 @@
           new_cell(simulator.vdf_revelation_tip(cycle));
 
           tableBody.appendChild(new_row);
-      });
+        });
+      };
 
       document.addEventListener('DOMContentLoaded', function() {
           var ctx = document.getElementById('chartJSContainer').getContext('2d');
           window.chart = new Chart(ctx, chart_config);
+          gen_report();
       });
 
     </script>
