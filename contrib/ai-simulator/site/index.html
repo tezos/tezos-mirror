@@ -85,6 +85,12 @@
       // Array whose values correspond to the cycles, starting from 0 to max_cycle.
       const idx = gen_idx(0, max_cycle);
 
+      // Array used to mask values before the AI activation cycle.
+      const idx_mask = Array(config.chain.ai_activation_cycle).fill(null);
+
+      // Array whose values are the cycles starting from the AI activation cycle to max_cycle.
+      const idx_ai = gen_idx(config.chain.ai_activation_cycle, max_cycle);
+
       // Helpers
       const mutez_to_tez = (x) => Math.round(x / 1_000_000);
 
@@ -117,6 +123,30 @@
                       borderColor: 'rgb(75, 192, 192)',
                       order: 1
                   },
+                  {
+                      label: 'Min issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.minimum_ratio(i).toDecimal(4))),
+                      borderColor: 'rgb(0, 0, 150)',
+                      order: 2,
+                      fill: {
+                          target: 'origin',
+                          above: 'rgb(5, 5, 5, 0.6)'
+                      }
+                  },
+                  {
+                      label: 'Max issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.maximum_ratio(i).toDecimal(4))),
+                      borderColor: 'rgb(150, 0, 0)',
+                      order: 2,
+                      fill: {
+                          target: {value: 0.1},
+                          below: 'rgb(5, 5, 5, 0.6)'
+                      }
+                  },
 
               ]
           },
@@ -130,6 +160,12 @@
                       position: 'left',
                       max: 1,
                       min: 0
+                  },
+                  y3: {
+                      type: 'linear',
+                      position: 'right',
+                      max: 0.1,
+                      min: 0.0
                   },
               },
               responsive: true,
