@@ -120,10 +120,12 @@
                   },
                   {
                       label: 'Staked ratio',
-                      yAxisID: 'y2',
+                      yAxisID: 'y4',
                       data: idx.map((i) => simulator.staked_ratio_for_next_cycle(i).toDecimal(4)),
                       borderColor: 'rgb(75, 192, 192)',
-                      order: 1
+                      order: 1,
+                      pointHitRadius: 25,
+                      tension: 0.2,
                   },
                   {
                       label: 'Min issuance rate',
@@ -198,6 +200,13 @@
                       max: 0.1,
                       min: 0.0,
                       dragData: false,
+                  },
+                  y4: {
+                      display: false,
+                      type: 'linear',
+                      display: false,
+                      max: 1,
+                      min: 0,
                   },
               },
               responsive: true,
