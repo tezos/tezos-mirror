@@ -147,7 +147,14 @@
                           below: 'rgb(5, 5, 5, 0.6)'
                       }
                   },
-
+                  {
+                      label: 'Issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4))),
+                      borderColor: 'rgb(150, 150, 20)',
+                      order: 1
+                  },
               ]
           },
           options: {
