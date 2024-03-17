@@ -155,6 +155,26 @@
                       borderColor: 'rgb(150, 150, 20)',
                       order: 1
                   },
+                  {
+                      label: 'Upper ratio target',
+                      yAxisID: 'y2',
+                      data: idx_mask.concat(idx_ai.map((_) => 0.52)),
+                      borderColor: 'rgb(0, 150, 0)',
+                      order: 2,
+                      borderWidth: 1,
+                      fill: {
+                          target: {value: 0.48},
+                          above: 'rgb(0, 100, 0, 0.3)'
+                      }
+                  },
+                  {
+                      label: 'Lower ratio target',
+                      yAxisID: 'y2',
+                      data: idx_mask.concat(idx_ai.map((_) => 0.48)),
+                      borderColor: 'rgb(0, 150, 0)',
+                      order: 2,
+                      borderWidth: 1,
+                  },
               ]
           },
           options: {
