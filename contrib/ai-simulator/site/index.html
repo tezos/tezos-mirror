@@ -197,7 +197,34 @@
                   },
               },
               responsive: true,
-          },
+              plugins: {
+                annotation: {
+                  annotations: {
+                    line_ai_launch: {
+                      type: 'line',
+                      xMin: simulator.initial_period_start_cycle,
+                      xMax: simulator.initial_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                      borderWidth: 1,
+                    },
+                    line_transition_period_start_cycle: {
+                      type: 'line',
+                      xMin: simulator.transition_period_start_cycle,
+                      xMax: simulator.transition_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                      borderWidth: 1,
+                    },
+                    line_final_period_start_cycle: {
+                      type: 'line',
+                      xMin: simulator.final_period_start_cycle,
+                      xMax: simulator.final_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                       borderWidth: 1,
+                    },
+                  }
+                },
+              },
+          }
       };
 
       const before_activation_cycle_color = "text-white";
