@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="app.js"></script>
   </head>
-  <body>
+  <body class="bg-black">
     <table class="table-fixed text-center min-w-full">
       <thead>
         <tr>
@@ -41,6 +41,10 @@
       <tbody id="report"></tbody>
     </table>
     <script type="module">
+      Chart.defaults.color = '#fff';
+      Chart.defaults.borderColor = '#454347';
+      Chart.defaults.backgroundColor = 'transparent';
+
       import {Simulator, total_supply_storage, total_frozen_stake_storage} from './app.js';
 
       const config = {
@@ -83,11 +87,11 @@
       // Creation of the simulator.
       const simulator = new Simulator(config);
 
-      const before_activation_cycle_color = "text-black";
+      const before_activation_cycle_color = "text-white";
       const activation_cycle_color = "text-yellow-600";
       const initial_period_color = "text-blue-600";
       const transition_period_color = "text-green-600";
-      const final_period_color = "text-black";
+      const final_period_color = "text-white";
 
       const dispatch_period_color = (cycle) => {
           if (simulator.is_ai_activated(cycle)) {
@@ -127,7 +131,7 @@
       // Generates the AI data report.
       idx.forEach((cycle) => {
           let new_row = document.createElement("tr");
-          new_row.classList.add("hover:bg-gray-200");
+          new_row.classList.add("hover:bg-gray-600");
 
           let new_cell = (content) => new_cell_for(new_row, content);
 
