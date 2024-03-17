@@ -422,6 +422,13 @@ let cors_allowed_origins_arg =
 let devmode_arg =
   Tezos_clic.switch ~long:"devmode" ~doc:"The EVM node in development mode." ()
 
+let keep_everything_arg =
+  Tezos_clic.switch
+    ~short:'k'
+    ~long:"keep-everything"
+    ~doc:"Do not filter out files outside of the `/evm` directory"
+    ()
+
 let verbose_arg =
   Tezos_clic.switch
     ~short:'v'
@@ -1157,13 +1164,13 @@ let dump_to_rlp =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args1 devmode_arg)
+    (args2 devmode_arg keep_everything_arg)
     (prefixes ["transform"; "dump"]
     @@ param ~name:"dump.json" ~desc:"Description" Params.string
     @@ prefixes ["to"; "rlp"]
     @@ param ~name:"dump.rlp" ~desc:"Description" Params.string
     @@ stop)
-    (fun devmode dump_json dump_rlp () ->
+    (fun (devmode, keep_everything) dump_json dump_rlp () ->
       let* dump_json = Lwt_utils_unix.Json.read_file dump_json in
       let config =
         Data_encoding.Json.destruct
@@ -1172,30 +1179,38 @@ let dump_to_rlp =
       in
 
       let bytes =
+        let aux =
+          let open Evm_node_lib_dev_encoding.Rlp in
+          if keep_everything then
+            fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
+            List [Value (String.to_bytes to_); Value (String.to_bytes value)]
+            :: acc
+          else fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
+            if String.starts_with ~prefix:"/evm" to_ then
+              List [Value (String.to_bytes to_); Value (String.to_bytes value)]
+              :: acc
+            else acc
+        in
         if devmode then
           let open Evm_node_lib_dev_encoding.Rlp in
-          List.fold_left
-            (fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
-              if String.starts_with ~prefix:"/evm" to_ then
-                List
-                  [Value (String.to_bytes to_); Value (String.to_bytes value)]
-                :: acc
-              else acc)
-            []
-            config
-          |> fun l -> encode (List l)
+          List.fold_left aux [] config |> fun l -> encode (List l)
         else
-          let open Evm_node_lib_prod_encoding.Rlp in
-          List.fold_left
-            (fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
+          let aux =
+            let open Evm_node_lib_prod_encoding.Rlp in
+            if keep_everything then
+              fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
+              List [Value (String.to_bytes to_); Value (String.to_bytes value)]
+              :: acc
+            else
+              fun acc Octez_smart_rollup.Installer_config.(Set {value; to_}) ->
               if String.starts_with ~prefix:"/evm" to_ then
                 List
                   [Value (String.to_bytes to_); Value (String.to_bytes value)]
                 :: acc
-              else acc)
-            []
-            config
-          |> fun l -> encode (List l)
+              else acc
+          in
+          let open Evm_node_lib_prod_encoding.Rlp in
+          List.fold_left aux [] config |> fun l -> encode (List l)
       in
 
       let write_bytes_to_file filename bytes =
