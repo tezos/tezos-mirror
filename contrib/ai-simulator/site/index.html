@@ -240,7 +240,12 @@
                   round: 5,
                   showTooltip: true,
                   onDrag: function(e, datasetIndex, index, value) {
-                    return
+                    simulator.set_staked_ratio_at(index, value);
+                    window.chart.data.datasets[1].data =
+                        simulator.config.chain.total_frozen_stake.map(mutez_to_tez);
+                    window.chart.data.datasets[5].data =
+                        idx_mask.concat(idx_ai.map((i) =>
+                            simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4)));
                   },
                   onDragEnd: function(e, datasetIndex, index, value) {
                     return
