@@ -374,6 +374,7 @@ module Handler = struct
                   plugin_proto;
                   last_processed_level;
                   skip_list_cells_store;
+                  ongoing_amplifications = _;
                 } =
             ready_ctxt
           in
