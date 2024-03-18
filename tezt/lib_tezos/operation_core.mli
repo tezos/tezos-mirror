@@ -382,6 +382,22 @@ module Anonymous : sig
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
+
+  (** Crafts two (pre)attestations that only differ in their block
+      payload hash, then a well-formed double (pre)attestation
+      evidence operation on them.
+
+      The denounced (pre)attestations have the specified
+      [misbehaviour_level] and [misbehaviour_round], the first slot of
+      [culprit], and two constant and distinct block payload
+      hashes. They are signed by [culprit]. *)
+  val make_double_consensus_evidence_with_distinct_bph :
+    kind:double_consensus_evidence_kind ->
+    misbehaviour_level:int ->
+    misbehaviour_round:int ->
+    culprit:Account.key ->
+    Client.t ->
+    t Lwt.t
 end
 
 (** Voting operations (validation pass [1]): [proposals] and [ballot].
@@ -689,3 +705,17 @@ val dal_data_availibility_attester_not_in_committee : rex
     {!rejected_by_full_mempool_with_needed_fee} as [rex]. *)
 val inject_error_check_recommended_fee :
   loc:string -> rex:rex -> expected_fee:int -> t -> Client.t -> unit Lwt.t
+
+(** Matches the message produced by
+    [Already_denounced {kind; delegate; level}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [delegate], [level], [kind]. *)
+val already_denounced : rex
+
+(** Matches the message produced by
+    [Outdated_denunciation {kind; level; last_cycle}]
+    from [src/proto_xxx/lib_protocol/validate_errors].
+
+    Captures [kind], [last_cycle], [level]. *)
+val outdated_denunciation : rex

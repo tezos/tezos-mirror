@@ -1017,10 +1017,269 @@ let test_migration_from_oxford_for_whole_cycle ~migrate_from ~migrate_to =
       unit
     done)
 
+(* Test the migration from Oxford when there are denunciations. The
+   two main goals of this test are:
+
+   - Ensure that the storage stitching doesn't crash when the entries
+   related to recent denunciations and slashings are non-empty.
+
+   - Test the changes in the semantics of duplicate denunciations:
+
+     + In Oxford, a delegate can be denounced at most once for double
+     attesting at a given level, no matter the round; in Paris, they
+     can be denounced for each round of each level. Which semantics is
+     used depends on the level of the double signing event, rather
+     than the level at which the denunciation is included.
+
+     + In Oxford, double attestations and double preattestations are
+     bundled together for the purpose of duplicate denunciations,
+     whereas in Paris they are considered separate. Which semantics is
+     used depends on the protocol during which the first denunciation
+     on a given level has been baked into a block.
+
+   TODO: https://gitlab.com/tezos/tezos/-/issues/7081
+   Things that are **not currently tested**, but would be nice to
+   test:
+
+   - Check when the related slashings happen and their value. Note
+   that currently, the cumulated slashing will quickly exceed 100%. To
+   be able to observe more details, we probably want to either switch
+   from double attestations to double bakings (or a mix of both) to
+   reduce the slashed amount, or denounce various delegates in turn
+   instead of always [bootstrap1]. *)
+let test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration with denunciations"
+    ~tags:["protocol"; "migration"; "double"; "attestation"]
+  @@ fun () ->
+  if not (Protocol.number migrate_from = Protocol.number Protocol.Oxford) then
+    Test.fail
+      "This test is designed for the migration from Oxford to Paris. Other \
+       protocols have a different semantics for duplicate denunciations so the \
+       test would fail." ;
+  let blocks_per_cycle = 4 in
+  let migration_level = 2 * blocks_per_cycle in
+  Log.info
+    "blocks_per_cycle=%d, migration_level=%d"
+    blocks_per_cycle
+    migration_level ;
+  Log.info "Start node and client." ;
+  let* client, node =
+    user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  Log.info "Activate protocol %s." (Protocol.name migrate_from) ;
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      [
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (* The nonce revelation threshold must be strictly smaller
+           than blocks_per_cycle and strictly positive. *)
+        (["nonce_revelation_threshold"], `Int (blocks_per_cycle / 2));
+      ]
+  in
+  let* () =
+    Client.activate_protocol ~protocol:migrate_from ~parameter_file client
+  in
+
+  (* Helper functions *)
+  let inject ?error denunciation =
+    (* We can't use [Operation.Anonymous.operation] to craft the
+       operation once and for all, then [Operation.inject] to try and
+       inject it multiple times: if we do this, the operation will
+       remain exactly the same, and the injection RPC will ignore it
+       silently. Instead, calling [Operation.Anonymous.inject] crafts
+       a new operation with the same parameters but a new branch at
+       each level, which ensures that the mempool handles it as its
+       own new operation and we can observe errors such as
+       [already_denounced]. *)
+    Operation.Anonymous.inject ?error denunciation client
+  in
+  (* Craft and inject a denunciation for a double (pre)attestation
+     that happened at the given level and round. *)
+  let mk_and_inject_kind ?error ~misbehaviour_level ~misbehaviour_round kind =
+    let* op =
+      Operation.Anonymous.make_double_consensus_evidence_with_distinct_bph
+        ~kind
+        ~misbehaviour_level
+        ~misbehaviour_round
+        ~culprit:Constant.bootstrap1
+        client
+    in
+    let* (`OpHash _) = inject ?error op in
+    return op
+  in
+  (* By default, we craft denunciations for double attestations. *)
+  let mk_and_inject ?error ~misbehaviour_level ~misbehaviour_round () =
+    mk_and_inject_kind
+      ?error
+      ~misbehaviour_level
+      ~misbehaviour_round
+      Double_attestation_evidence
+  in
+  let mk_and_inject_pre ?error ~misbehaviour_level ~misbehaviour_round () =
+    mk_and_inject_kind
+      ?error
+      ~misbehaviour_level
+      ~misbehaviour_round
+      Double_preattestation_evidence
+  in
+  let keys =
+    (* The keys to use for baking. Don't bake with [bootstrap1]
+       because it's going to be denounced and consequently
+       forbidden. *)
+    Constant.
+      [
+        bootstrap2.public_key_hash;
+        bootstrap3.public_key_hash;
+        bootstrap4.public_key_hash;
+        bootstrap5.public_key_hash;
+      ]
+  in
+  let bake () = Client.bake_for_and_wait ~keys client in
+  let bake_until_level target_level =
+    Client.bake_until_level ~target_level ~keys ~node client
+  in
+
+  let level_0a = 1 and level_0b = 2 in
+  Log.info "Inject a denunciation on level %d (cycle 0)." level_0a ;
+  let* denun_0a =
+    mk_and_inject ~misbehaviour_level:level_0a ~misbehaviour_round:0 ()
+  in
+
+  Log.info "Bake until right before the migration." ;
+  let* () = bake_until_level (migration_level - 1) in
+  Log.info "We are now in cycle 1." ;
+  let* current_level =
+    Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+  in
+  Check.((current_level.cycle = 1) ~__LOC__ int)
+    ~error_msg:"Expected cycle=%R, got %L" ;
+  let level_1a = blocks_per_cycle + 1 in
+  let level_1b = blocks_per_cycle + 2 in
+  let level_1c = blocks_per_cycle + 3 in
+  (* [blocks_per_cycle] needs to be large enough that [level_1c] is
+     still in cycle 1. *)
+  assert (current_level.level >= level_1c) ;
+  Log.info
+    "Inject denunciations on level %d (cycle 1) rounds 0 and 1, and on level \
+     %d round 3, but no denunciations on level %d. Also inject a denunciation \
+     on level %d (cycle 0), and check that the previous denunciation on level \
+     %d (cycle 0) can't be injected again."
+    level_1a
+    level_1b
+    level_1c
+    level_0b
+    level_0a ;
+  let* denun_1a_round0 =
+    mk_and_inject ~misbehaviour_level:level_1a ~misbehaviour_round:0 ()
+  and* denun_1a_round1 =
+    mk_and_inject ~misbehaviour_level:level_1a ~misbehaviour_round:1 ()
+  and* denun_1b_round3 =
+    mk_and_inject ~misbehaviour_level:level_1b ~misbehaviour_round:3 ()
+  and* denun_0b =
+    mk_and_inject ~misbehaviour_level:level_0b ~misbehaviour_round:0 ()
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_0a in
+
+  Log.info
+    "Bake one block and check that it is the migration block. This also brings \
+     us into cycle 2." ;
+  let* () = bake () in
+  let* level = Node.get_level node in
+  Check.((level = migration_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
+  let* () =
+    block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
+  in
+  Log.info
+    "Can't inject again any of the previous cycle 1 denunciations, nor \
+     denunciations on the same levels even with a different round. As to the \
+     denunciations on cycle 0, they are now outdated anyway." ;
+  let* (`OpHash _) = inject ~error:Operation.already_denounced denun_1a_round0
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_1a_round1
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_1b_round3
+  and* (_denun_1a_round5 : Operation.Anonymous.t) =
+    mk_and_inject
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1a
+      ~misbehaviour_round:5
+      ()
+  and* (_denun_1b_round0 : Operation.Anonymous.t) =
+    mk_and_inject
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1b
+      ~misbehaviour_round:0
+      ()
+  and* (`OpHash _) = inject ~error:Operation.outdated_denunciation denun_0a
+  and* (`OpHash _) = inject ~error:Operation.outdated_denunciation denun_0b in
+  let level_2a = (2 * blocks_per_cycle) + 1 in
+  Log.info
+    "Can still inject a denunciation on level %d (cycle 1), that has not been \
+     denounced at all. Also inject a denunciation on level %d (cycle 2)."
+    level_1c
+    level_2a ;
+  let* denun_1c =
+    mk_and_inject ~misbehaviour_level:level_1c ~misbehaviour_round:0 ()
+  and* denun_2a =
+    mk_and_inject ~misbehaviour_level:level_2a ~misbehaviour_round:0 ()
+  in
+  Log.info
+    "Bake a block so that the previous denunciations are applied. The same \
+     denunciations can't be reinjected. Can't inject a new denunciation on \
+     level %d (cycle 1) either, even with a new round, because the duplicate \
+     semantics of protocol %s wrt rounds is still used for cycle 1. But can \
+     inject a denunciation on level %d (cycle 2) with another round."
+    level_1c
+    (Protocol.name migrate_from)
+    level_2a ;
+  let* () = bake () in
+  let* (`OpHash _) = inject ~error:Operation.already_denounced denun_1c
+  and* (`OpHash _) = inject ~error:Operation.already_denounced denun_2a
+  and* (_denun_1c_round1 : Operation.Anonymous.t) =
+    mk_and_inject
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1c
+      ~misbehaviour_round:1
+      ()
+  and* (_denun_2a_round1 : Operation.Anonymous.t) =
+    mk_and_inject ~misbehaviour_level:level_2a ~misbehaviour_round:1 ()
+  in
+  Log.info
+    "The denunciation on level %d (cycle 1) was injected during protocol %s \
+     when attestations and preattestations were bundled together for the \
+     purpose of duplicate denunciations, so we can't inject a denunciation on \
+     double preattestations for the same level. On the other hand, the \
+     denunciation on level %d (still cycle 1) was injected during protocol %s \
+     so we can inject a separate denunciation on preattestations. And \
+     obviously, so can we for level %d (cycle 2)."
+    level_1a
+    (Protocol.name migrate_from)
+    level_1c
+    (Protocol.name migrate_to)
+    level_2a ;
+  let* (_ : Operation.Anonymous.t) =
+    mk_and_inject_pre
+      ~error:Operation.already_denounced
+      ~misbehaviour_level:level_1a
+      ~misbehaviour_round:10
+      ()
+  and* (_ : Operation.Anonymous.t) =
+    mk_and_inject_pre ~misbehaviour_level:level_1c ~misbehaviour_round:0 ()
+  and* (_ : Operation.Anonymous.t) =
+    mk_and_inject_pre ~misbehaviour_level:level_2a ~misbehaviour_round:0 ()
+  in
+
+  Log.info "Bake 5 more cycles to ensure that everything works fine." ;
+  let* () = bake_until_level ((7 * blocks_per_cycle) + 1) in
+  unit
+
 let register ~migrate_from ~migrate_to =
   test_migration_from_oxford_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
-  test_migration_with_snapshots ~migrate_from ~migrate_to
+  test_migration_with_snapshots ~migrate_from ~migrate_to ;
+  if Protocol.number migrate_from = Protocol.number Protocol.Oxford then
+    test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to
