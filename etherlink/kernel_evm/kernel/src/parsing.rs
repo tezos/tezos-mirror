@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::TezosContracts;
+use crate::tick_model::constants::TICKS_PER_DEPOSIT_PARSING;
 use crate::tick_model::{ticks_of_blueprint_chunk, ticks_of_delayed_input};
 use crate::{
     inbox::{Deposit, Transaction, TransactionContent},
@@ -164,6 +165,8 @@ pub trait Parsable {
     ) -> InputResult<Self>
     where
         Self: std::marker::Sized;
+
+    fn on_deposit(context: &mut Self::Context);
 }
 
 impl ProxyInput {
@@ -259,6 +262,8 @@ impl Parsable for ProxyInput {
     ) -> InputResult<Self> {
         InputResult::Unparsable
     }
+
+    fn on_deposit(_: &mut Self::Context) {}
 }
 
 pub struct SequencerParsingContext {
@@ -344,6 +349,12 @@ impl Parsable for SequencerInput {
             },
         ))))
     }
+
+    fn on_deposit(context: &mut Self::Context) {
+        context.allocated_ticks = context
+            .allocated_ticks
+            .saturating_sub(TICKS_PER_DEPOSIT_PARSING);
+    }
 }
 
 impl<Mode: Parsable> InputResult<Mode> {
@@ -402,7 +413,11 @@ impl<Mode: Parsable> InputResult<Mode> {
         ticket: FA2_1Ticket,
         receiver: MichelsonBytes,
         ticketer: &Option<ContractKt1Hash>,
+        context: &mut Mode::Context,
     ) -> Self {
+        // Account for tick at the beginning of the deposit, in case it fails
+        // directly. We prefer to overapproximate rather than under approximate.
+        Mode::on_deposit(context);
         match &ticket.creator().0 {
             Contract::Originated(kt1) if Some(kt1) == ticketer.as_ref() => (),
             _ => {
@@ -458,7 +473,13 @@ impl<Mode: Parsable> InputResult<Mode> {
         match transfer.payload {
             MichelsonOr::Left(left) => match left {
                 MichelsonOr::Left(MichelsonPair(receiver, ticket)) => {
-                    Self::parse_deposit(host, ticket, receiver, &tezos_contracts.ticketer)
+                    Self::parse_deposit(
+                        host,
+                        ticket,
+                        receiver,
+                        &tezos_contracts.ticketer,
+                        context,
+                    )
                 }
                 MichelsonOr::Right(MichelsonBytes(bytes)) => {
                     Mode::parse_internal_bytes(source, &bytes, context)
