@@ -17,7 +17,7 @@ kaitai_e2e_checks:
     #       environment is then the same as CI environment.
     - . ./scripts/install_build_deps.js.sh
   script:
-    - ./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh
-      contrib/kaitai-struct-files/files
-      contrib/kaitai-struct-files/input
+    - ./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh
+      client-libs/kaitai-struct-files/files
+      client-libs/kaitai-struct-files/input
       2>/dev/null

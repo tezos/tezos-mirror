@@ -139,27 +139,27 @@ $(ALL_EXECUTABLES):
 
 .PHONY: kaitai-struct-files-update
 kaitai-struct-files-update:
-	@dune exe contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/files
+	@dune exe client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files
 
 .PHONY: kaitai-struct-files
 kaitai-struct-files:
 	@$(MAKE) kaitai-struct-files-update
-	@$(MAKE) -C contrib/kaitai-struct-files/
+	@$(MAKE) -C client-libs/kaitai-struct-files/
 
 .PHONY: check-kaitai-struct-files
 check-kaitai-struct-files:
-	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
-	@dune build contrib/bin_codec_kaitai/codec.exe
-	@rm contrib/kaitai-struct-files/files/*.ksy
-	@_build/default/contrib/bin_codec_kaitai/codec.exe dump kaitai specs in contrib/kaitai-struct-files/files 2>/dev/null
-	@git add contrib/kaitai-struct-files/files/*.ksy
-	@git diff --exit-code HEAD -- contrib/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files with `make kaitai-struct-files-update`."; exit 1)
+	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files || (echo "Cannot check kaitai struct files, some changes are uncommitted"; exit 1)
+	@dune build client-libs/bin_codec_kaitai/codec.exe
+	@rm client-libs/kaitai-struct-files/files/*.ksy
+	@_build/default/client-libs/bin_codec_kaitai/codec.exe dump kaitai specs in client-libs/kaitai-struct-files/files 2>/dev/null
+	@git add client-libs/kaitai-struct-files/files/*.ksy
+	@git diff --exit-code HEAD -- client-libs/kaitai-struct-files/files/ || (echo "Kaitai struct files mismatch. Update the files with `make kaitai-struct-files-update`."; exit 1)
 
 .PHONY: validate-kaitai-struct-files
 validate-kaitai-struct-files:
 	@$(MAKE) check-kaitai-struct-files
-	@./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh contrib/kaitai-struct-files/files contrib/kaitai-struct-files/input 2>/dev/null || \
-	 (echo "To see the full log run: \"./contrib/kaitai-struct-files/scripts/kaitai_e2e.sh contrib/kaitai-struct-files/files contrib/kaitai-struct-files/input\""; exit 1)
+	@./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input 2>/dev/null || \
+	 (echo "To see the full log run: \"./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files client-libs/kaitai-struct-files/input\""; exit 1)
 
 # Remove the old names of executables.
 # Depending on the commit you are updating from (v14.0, v15 or some version of master),
@@ -275,7 +275,7 @@ test-protocol-compile:
 
 PROTO_DIRS := $(shell find src/ -maxdepth 1 -type d -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
 NONPROTO_DIRS := $(shell find src/ -maxdepth 1 -mindepth 1 -type d -not -path "src/proto_*" 2>/dev/null | LC_COLLATE=C sort)
-OTHER_DIRS := $(shell find contrib/ ci/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
+OTHER_DIRS := $(shell find contrib/ ci/ client-libs/ -maxdepth 1 -mindepth 1 -type d 2>/dev/null | LC_COLLATE=C sort)
 
 .PHONY: test-proto-unit
 test-proto-unit:
