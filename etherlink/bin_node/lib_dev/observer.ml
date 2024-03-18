@@ -12,7 +12,7 @@ module MakeBackend (Ctxt : sig
 
   val evm_node_endpoint : Uri.t
 end) : Services_backend_sig.Backend = struct
-  module READER = struct
+  module Reader = struct
     let read path =
       let open Lwt_result_syntax in
       let*! res = Evm_context.inspect Ctxt.ctxt path in

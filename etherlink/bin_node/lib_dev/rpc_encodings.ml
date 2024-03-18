@@ -653,6 +653,20 @@ module Produce_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Durable_state_value = struct
+  type input = Durable_storage_path.path
+
+  type output = Bytes.t option
+
+  let input_encoding = Data_encoding.string
+
+  let output_encoding = Data_encoding.(option bytes)
+
+  let method_ = "stateValue"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -695,6 +709,7 @@ let supported_methods : (module METHOD) list =
     (module Web3_clientVersion);
     (module Web3_sha3);
     (module Produce_block);
+    (module Durable_state_value);
   ]
 
 let unsupported_methods : string list =

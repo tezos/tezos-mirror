@@ -6,6 +6,8 @@
 (*****************************************************************************)
 
 module type S = sig
+  module Reader : Durable_storage.READER
+
   (** [balance address] returns the [address]'s balance. *)
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
@@ -128,7 +130,7 @@ module type S = sig
 end
 
 module type Backend = sig
-  module READER : Durable_storage.READER
+  module Reader : Durable_storage.READER
 
   module TxEncoder : Publisher.TxEncoder
 
@@ -144,7 +146,8 @@ module type Backend = sig
 end
 
 module Make (Backend : Backend) : S = struct
-  include Durable_storage.Make (Backend.READER)
+  module Reader = Backend.Reader
+  include Durable_storage.Make (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
 
