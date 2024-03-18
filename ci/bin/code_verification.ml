@@ -177,11 +177,13 @@ let jobs pipeline_type =
      enable the job [On_success] in the [before_merging]
      pipeline. This is safe, but prefer specifying a [changes] clause
      if possible. *)
-  let make_rules ?label ?changes ?(manual = false) () =
+  let make_rules ?label ?changes ?(manual = false) ?(dependent = false) () =
     match pipeline_type with
     | Schedule_extended_test ->
-        (* The scheduled pipeline always runs all tests unconditionally. *)
-        [job_rule ~when_:Always ()]
+        (* The scheduled pipeline always runs all jobs unconditionally
+           -- unless they are dependent on a previous, non-trigger job, in the
+           pipeline. *)
+        [job_rule ~when_:(if dependent then On_success else Always) ()]
     | Before_merging ->
         (* MR labels can be used to force tests to run. *)
         (match label with
@@ -237,6 +239,7 @@ let jobs pipeline_type =
           |> job_external
         in
         (* TODO: put job_trigger here when full pipeline is generated *)
+        (* TODO: the dependency on job_trigger does not have to be optional *)
         ([], Dependent [Optional job_trigger])
   in
   let sanity =
@@ -284,6 +287,24 @@ let jobs pipeline_type =
       ()
     |> job_external_split
   in
+  let _job_docker_client_libs_dependencies =
+    job_docker_authenticated
+      ~__POS__
+      ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
+      ~stage:Stages.build
+      ~name:"oc.docker:client-libs-dependencies"
+        (* These image are not built for external use. *)
+      ~ci_docker_hub:false
+        (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
+      ~skip_docker_initialization:true
+      ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
+      ~artifacts:
+        (artifacts
+           ~reports:
+             (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
+           [])
+    |> job_external_split
+  in
   let build =
     let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
     let _job_build_arm64_release : Tezos_ci.tezos_job =
@@ -317,7 +338,127 @@ let jobs pipeline_type =
         let _job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
         ()
     | Before_merging -> ()) ;
-    (* TODO: include the jobs defined above when full pipeline is generated *)
+    (* The build_x86_64 jobs are split in two to keep the artifact size
+       under the 1GB hard limit set by GitLab. *)
+    (* [_job_build_x86_64_release] builds the released executables. *)
+    let _job_build_x86_64_release =
+      job_build_dynamic_binaries
+        ~__POS__
+        ~arch:Amd64
+        ~dependencies:dependencies_needs_trigger
+        ~release:true
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ()
+      |> job_external_split
+    in
+    (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
+       executables, as well as the tezt test suite used by the subsequent
+       'tezt' jobs and TPS evaluation tool. *)
+    let _job_build_x86_64_exp_dev_extra =
+      job_build_dynamic_binaries
+        ~__POS__
+        ~arch:Amd64
+        ~dependencies:dependencies_needs_trigger
+        ~release:false
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ()
+      |> job_external_split
+    in
+    let _job_ocaml_check : tezos_job =
+      job
+        ~__POS__
+        ~name:"ocaml-check"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.build
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_ocaml_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["dune build @check"]
+      |> job_external_split
+    in
+    let _job_build_kernels : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.build_kernels"
+        ~image:Images.rust_toolchain
+        ~stage:Stages.build
+        ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+        ~rules:
+          (make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+        [
+          "make -f kernels.mk build";
+          "make -f etherlink.mk evm_kernel.wasm";
+          "make -C src/risc_v risc-v-sandbox risc-v-dummy.elf";
+          "make -C src/risc_v/tests/ build";
+        ]
+        ~artifacts:
+          (artifacts
+             ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
+             ~expire_in:(Days 1)
+             ~when_:On_success
+             [
+               "evm_kernel.wasm";
+               "smart-rollup-installer";
+               "sequenced_kernel.wasm";
+               "tx_kernel.wasm";
+               "tx_kernel_dal.wasm";
+               "dal_echo_kernel.wasm";
+               "src/risc_v/risc-v-sandbox";
+               "src/risc_v/risc-v-dummy.elf";
+               "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
+             ])
+        ~cache:
+          [
+            {key = "kernels"; paths = ["cargo/"]};
+            {key = "kernels-sccache"; paths = ["_sccache"]};
+          ]
+      |> enable_kernels |> enable_sccache |> job_external_split
+    in
+    (* Fetch records for Tezt generated on the last merge request pipeline
+       on the most recently merged MR and makes them available in artifacts
+       for future merge request pipelines. *)
+    let _job_tezt_fetch_records : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.tezt:fetch-records"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.build
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ~rules:(make_rules ~changes:changeset_octez ())
+        [
+          "dune exec scripts/ci/update_records/update.exe -- --log-file \
+           tezt-fetch-records.log --from \
+           last-successful-schedule-extended-test --info";
+        ]
+        ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
+          (* Allow failure of this job, since Tezt can use the records
+             stored in the repo as backup for balancing. *)
+        ~allow_failure:Yes
+        ~artifacts:
+          (artifacts
+             ~expire_in:(Hours 4)
+             ~when_:Always
+             [
+               "tezt-fetch-records.log";
+               "tezt/records/*.json";
+               (* Keep broken records for debugging *)
+               "tezt/records/*.json.broken";
+             ])
+      |> job_external_split
+    in
+    (* TODO: include the jobs defined above when full pipeline is
+       generated, as well as rust tool chain and client libs docker
+       builds. *)
     []
   in
   let packaging =

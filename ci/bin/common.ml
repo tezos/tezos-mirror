@@ -174,6 +174,8 @@ let before_script ?(take_ownership = false) ?(source_version = false)
   @ toggle install_js_deps ". ./scripts/install_build_deps.js.sh"
   @ before_script
 
+let opt_var name f = function Some value -> [(name, f value)] | None -> []
+
 (** Add variable for bisect_ppx instrumentation.
 
     This template should be extended by jobs that build OCaml targets
@@ -219,12 +221,20 @@ let enable_coverage_report job : tezos_job =
     which has a configured sccache Gitlab CI cache. *)
 let enable_sccache ?error_log ?idle_timeout ?log
     ?(dir = "$CI_PROJECT_DIR/_sccache") : tezos_job -> tezos_job =
-  let opt_var name = function Some value -> [(name, value)] | None -> [] in
   Tezos_ci.append_variables
     ([("SCCACHE_DIR", dir); ("RUSTC_WRAPPER", "sccache")]
-    @ opt_var "SCCACHE_ERROR_LOG" error_log
-    @ opt_var "SCCACHE_IDLE_TIMEOUT" idle_timeout
-    @ opt_var "SCCACHE_LOG" log)
+    @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
+    @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
+    @ opt_var "SCCACHE_LOG" Fun.id log)
+
+(** Add common variables used by jobs compiling kernels *)
+let enable_kernels =
+  Tezos_ci.append_variables
+    [
+      ("CC", "clang");
+      ("CARGO_HOME", "$CI_PROJECT_DIR/cargo");
+      ("NATIVE_TARGET", "x86_64-unknown-linux-musl");
+    ]
 
 (** {2 Changesets} *)
 
@@ -296,17 +306,34 @@ let changeset_opam_jobs =
     "scripts/version.sh";
   ]
 
+let changeset_kaitai_e2e_files =
+  [
+    "images/**/*";
+    "src/**/*";
+    "contrib/*kaitai*/**/*";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
+let changeset_ocaml_files =
+  ["src/**/*"; "tezt/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"; "devtools/**/*"]
+
 (** {2 Job makers} *)
 
-(** Helper to create jobs that uses the docker deamon.
+(** Helper to create jobs that uses the Docker daemon.
 
-    It:
-    - Sets the appropriate image.
-    - Activates the Docker daemon as a service.
-    - It sets up authentification with docker registries *)
-let job_docker_authenticated ?(skip_docker_initialization = false) ?artifacts
-    ?variables ?rules ?dependencies ?arch ?when_ ?allow_failure ~__POS__ ~stage
-    ~name script : tezos_job =
+    It sets the appropriate image. Furthermore, unless
+    [skip_docker_initialization] is [true], it:
+    - activates the Docker daemon as a service;
+    - sets up authentification with Docker registries
+    in the job's [before_script] section.
+
+    If [ci_docker_hub] is set to [true], then the job will
+    authenticate with Docker Hub provided the environment variable
+    [CI_DOCKER_AUTH] contains the appropriate credentials. *)
+let job_docker_authenticated ?(skip_docker_initialization = false)
+    ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies ?arch
+    ?when_ ?allow_failure ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.6" in
   job
     ?rules
@@ -318,7 +345,9 @@ let job_docker_authenticated ?(skip_docker_initialization = false) ?artifacts
     ~__POS__
     ~image:Images.docker
     ~variables:
-      ([("DOCKER_VERSION", docker_version)] @ Option.value ~default:[] variables)
+      ([("DOCKER_VERSION", docker_version)]
+      @ opt_var "CI_DOCKER_HUB" Bool.to_string ci_docker_hub
+      @ variables)
     ~before_script:
       (if not skip_docker_initialization then
        ["./scripts/ci/docker_initialize.sh"]
@@ -372,7 +401,7 @@ let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
     ~skip_docker_initialization:true
     ~stage:Stages.build
     ~name:"oc.docker:rust-toolchain"
-    ~variables:[("CI_DOCKER_HUB", "false")]
+    ~ci_docker_hub:false
     ~artifacts:
       (artifacts
          ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
@@ -408,6 +437,11 @@ type docker_build_type = Experimental | Release | Test | Test_manual
 let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
     docker_build_type : tezos_job =
   let arch_string = match arch with Amd64 -> "amd64" | Arm64 -> "arm64" in
+  let ci_docker_hub =
+    match docker_build_type with
+    | Release | Experimental -> true
+    | Test | Test_manual -> false
+  in
   let variables =
     [
       ( "DOCKER_BUILD_TARGET",
@@ -415,11 +449,6 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
         | Amd64, (Test_manual | Experimental) -> "with-evm-artifacts"
         | _ -> "without-evm-artifacts" );
       ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
-      ( "CI_DOCKER_HUB",
-        Bool.to_string
-          (match docker_build_type with
-          | Release | Experimental -> true
-          | Test | Test_manual -> false) );
       ( "EXECUTABLE_FILES",
         match docker_build_type with
         | Release -> "script-inputs/released-executables"
@@ -447,6 +476,7 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
       ?allow_failure
       ?rules
       ?dependencies
+      ~ci_docker_hub
       ~__POS__
       ~stage
       ~arch
@@ -471,7 +501,7 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
          [docker:{amd64,arm64}] into a single multi-architecture image, and
          so must be run after these jobs. *)
     ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
-    ~variables:[("CI_DOCKER_HUB", Bool.to_string ci_docker_hub)]
+    ~ci_docker_hub
     ["./scripts/ci/docker_merge_manifests.sh"]
 
 type bin_package_target = Dpkg | Rpm

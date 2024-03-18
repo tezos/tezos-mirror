@@ -13,15 +13,15 @@ include:
 
   # These jobs are necessary to run flaky tezts
   - .gitlab/ci/jobs/build/oc.docker:rust-toolchain-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-other.yml
-  - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra.yml
-  - .gitlab/ci/jobs/build/oc.build_x86_64-released.yml
-  - .gitlab/ci/jobs/build/oc.build_kernels.yml
-  - .gitlab/ci/jobs/build/oc.tezt:fetch-records.yml
+  - .gitlab/ci/jobs/build/oc.docker:client-libs-dependencies-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_x86_64-released-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.build_kernels-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/build/oc.tezt:fetch-records-scheduled_extended_test.yml
 
   # These jobs may not have been run in before_merging pipeline
   # because of absence of certain changes
-  - .gitlab/ci/jobs/build/ocaml-check.yml
+  - .gitlab/ci/jobs/build/ocaml-check-scheduled_extended_test.yml
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-scheduled_extended_test.yml
   - .gitlab/ci/jobs/doc/documentation.yml
 
