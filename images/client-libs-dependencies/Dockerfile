@@ -5,6 +5,7 @@
 # - kaitai-struct-compiler installed from the source.
 # - xxd.
 # - java.
+# - node version $recommended_node_version and dependencies from package.json in the root.
 
 # This image is intended for
 # - Running end-to-end semantic validation of automatically generated
@@ -80,3 +81,10 @@ WORKDIR /home/tezos
 
 COPY --chown=tezos:tezos install-nvm.sh /tmp/install-nvm.sh
 RUN /tmp/install-nvm.sh && rm -rf /tmp/install-nvm.sh
+
+# Install the recommended Node version and the Octez JS dependencies.
+ARG recommended_node_version=18.18.2
+COPY --chown=tezos:tezos install_build_deps.js.sh /tmp/install_build_deps.js.sh
+COPY --chown=tezos:tezos package.json /home/tezos/package.json
+COPY --chown=tezos:tezos package-lock.json /home/tezos/package-lock.json
+RUN /tmp/install_build_deps.js.sh && rm -rf /tmp/install_build_deps.js.sh /home/tezos/package.json /home/tezos/package-lock.json

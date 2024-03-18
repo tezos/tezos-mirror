@@ -5,10 +5,10 @@ the Docker distribution of Octez.
 
 The images, their content and indented usage, are:
 
-| Image                             | Contents                           | Usage                             |
-|-----------------------------------|------------------------------------|-----------------------------------|
-| `rust-toolchain`                  | cargo                              | CI: kernel build, test and SDK    |
-| `client-libs-dependencies`        | kaitai-struct-compiler, xxd, java  | CI: Kaitai e2e tests              |
+| Image                      | Contents                                | Usage                          |
+|----------------------------|-----------------------------------------|--------------------------------|
+| `rust-toolchain`           | cargo                                   | CI: kernel build, test and SDK |
+| `client-libs-dependencies` | kaitai-struct-compiler, xxd, java, node | CI: Kaitai e2e tests           |
 
 For more details on the contents and usage of each image, see below
 and in the header comment of each corresponding Dockerfile.
