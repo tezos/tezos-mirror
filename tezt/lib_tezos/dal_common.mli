@@ -240,6 +240,9 @@ module RPC : sig
 
   type topic = {topic_slot_index : int; topic_pkh : string}
 
+  (** Call RPC "GET /p2p/gossipsub/topics" to list the topics *)
+  val get_topics : unit -> topic list RPC_core.t
+
   (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
      each topic. *)
   val get_topics_peers :

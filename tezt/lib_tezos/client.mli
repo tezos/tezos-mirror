@@ -3075,10 +3075,22 @@ val get_receipt_for :
   operation:string -> ?check_previous:int -> t -> string Lwt.t
 
 (** Run [octez-client stake <amount> for <staker>]. *)
-val stake : ?wait:string -> Tez.t -> staker:string -> t -> unit Lwt.t
+val stake :
+  ?wait:string ->
+  ?hooks:Process_hooks.t ->
+  Tez.t ->
+  staker:string ->
+  t ->
+  unit Lwt.t
 
 (** Same as [stake], but do not wait for the process to exit. *)
-val spawn_stake : ?wait:string -> Tez.t -> staker:string -> t -> Process.t
+val spawn_stake :
+  ?wait:string ->
+  ?hooks:Process_hooks.t ->
+  Tez.t ->
+  staker:string ->
+  t ->
+  Process.t
 
 (** Run [octez-client unstake <amount> for <staker>]. *)
 val unstake : ?wait:string -> Tez.t -> staker:string -> t -> unit Lwt.t

@@ -232,7 +232,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_lag ?slot_size ?number_of_slots ?page_size
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
-    ?node_arguments ?activation_timestamp ?dal_bootstrap_peers f ~protocol =
+    ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
+    ?(parameters = []) f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -264,6 +265,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_string_parameter
         ["delay_increment_per_round"]
         delay_increment_per_round
+    @ parameters
   in
   let* node, client, dal_parameters =
     setup_node
@@ -5570,6 +5572,176 @@ let dal_crypto_benchmark () =
   Profiler.close_and_unplug Profiler.main instance ;
   Lwt.return_unit
 
+(*
+ * Test proposing to setup a node, and dal node, a baker, in multiple steps.
+ * The scenario tries to follow the tutorial steps described in
+ *    https://docs.tezos.com/tutorials/join-dal-baker
+ * that concerns weeklynet. We use a sandbox node to simplify
+ * Regressions in this test can highlight the tutorial is out of sync with
+ * the octez components behavior, and the tutorial might have to be fixed.
+ * an issue/pull request should be opened to
+ * https://github.com/trilitech/tezos-developer-docs/ in these cases, in order
+ * to change the tutorial
+ *)
+let scenario_tutorial_dal_baker =
+  let description = "Test following dal and baker tutorial commands" in
+  test
+    ~regression:true
+    ~__FILE__
+    ~tags:["tutorial"; "dal"; "baker"]
+    ~uses:(fun protocol -> [Protocol.baker protocol; Constant.octez_dal_node])
+    (Printf.sprintf "%s" description)
+    (fun protocol ->
+      (* Note: Step 1 consists in setting up docker which we don't use
+       * in this test
+       *)
+      Log.info "Step 2: Running octez node with adaptive issuance" ;
+      with_layer1
+        ~parameters:
+          [
+            (* Force activation of adaptive issuance *)
+            (["adaptive_issuance_force_activation"], `Bool true);
+            (["adaptive_issuance_activation_vote_enable"], `Bool false);
+          ]
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        ~protocol
+      @@ fun _parameters _cryptobox node client _key ->
+      Log.info "Step 3: setup a baker account" ;
+      (* Generate the "my_baker" user *)
+      let* my_baker = Client.gen_and_show_keys ~alias:"my_baker" client in
+
+      (* Transfer 500k to "my_baker"
+       * This value differs from the tutorial to obtain attestation rights *)
+      let stake = Tez.of_int 500_000 in
+      let* () =
+        Client.transfer
+          ~hooks
+          ~giver:Constant.bootstrap1.alias
+          ~receiver:my_baker.alias
+          ~amount:stake
+          ~burn_cap:Tez.one
+          client
+      in
+      let* () = bake_for client in
+
+      (* Check adaptive issuance is enabled, should be 0 *)
+      let* adaptive_issuance_launch_cycle =
+        Client.RPC.call ~hooks client
+        @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
+      in
+      Check.(
+        (JSON.as_int adaptive_issuance_launch_cycle = 0)
+          ~__LOC__
+          Check.int
+          ~error_msg:
+            "Adaptive issuance will only be launched at cycle %L, expected: %R") ;
+
+      let* balance = Client.get_balance_for ~account:my_baker.alias client in
+      Check.(balance = stake)
+        ~__LOC__
+        Tez.typ
+        ~error_msg:"Unexpected balance for 'mybaker'. Expected: %L. Got: %R" ;
+
+      (* Register my_baker as a baker *)
+      let* () = Client.register_key ~hooks my_baker.alias client in
+      let* () = bake_for client in
+
+      (* As in the tutorial, we stake 99.8% of the balance. *)
+      let* () =
+        Client.stake
+          ~hooks
+          Tez.(stake - of_int 100)
+          ~staker:my_baker.alias
+          client
+      in
+      let* () = bake_for client in
+
+      let* _ =
+        Client.RPC.call ~hooks client
+        @@ RPC.get_chain_block_context_delegate my_baker.public_key_hash
+      in
+
+      (* Calculate how many cycles to wait for my_baker to be a baker *)
+      let* proto_params =
+        Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+      in
+      let blocks_per_cycle =
+        JSON.(proto_params |-> "blocks_per_cycle" |> as_int)
+      in
+      let num_cycles = 7 (* Value specified in tutorial *) in
+      Log.info
+        "Bake for %d cycles for %s to be a baker"
+        num_cycles
+        my_baker.alias ;
+      let* () = bake_for ~count:(num_cycles * blocks_per_cycle) client in
+
+      let* attestation_rights =
+        Client.RPC.call client
+        @@ RPC.get_chain_block_helper_attestation_rights
+             ~delegate:my_baker.public_key_hash
+             ()
+      in
+
+      let attestation_power =
+        attestation_rights |> JSON.as_list |> List.length
+      in
+      Log.info
+        "Attestation rights: %s\n%!"
+        (if attestation_power > 0 then "OK" else "KO") ;
+      Check.(attestation_power > 0)
+        Check.int
+        ~__LOC__
+        ~error_msg:"Attestation rights should be acquired" ;
+
+      (* Only test the request can be processed *)
+      let* _ =
+        Client.RPC.call client @@ RPC.get_chain_block_context_dal_shards ()
+      in
+
+      (* Launch dal node (Step 4) *)
+      Log.info "Step 4: Run an Octez dal node" ;
+      let* dal_node = make_dal_node node in
+
+      let* topics = Dal_RPC.Local.call dal_node @@ Dal_RPC.get_topics () in
+      Check.(
+        (List.length topics = 0)
+          int
+          ~__LOC__
+          ~error_msg:"Expecting a empty list of topics") ;
+
+      let wait_join_event_promise =
+        Dal_node.wait_for dal_node "gossipsub_worker_event-join.v0" (fun _ ->
+            Some ())
+      in
+
+      let all_delegates =
+        Account.Bootstrap.keys |> Array.to_list |> List.cons my_baker
+        |> List.map (fun key -> key.Account.alias)
+      in
+      Log.info "Step 5: Run an Octez baking daemon" ;
+      let* _baker =
+        Baker.init
+          ~event_sections_levels:[(Protocol.name protocol ^ ".baker", `Debug)]
+          ~protocol
+          ~dal_node
+          ~delegates:all_delegates
+          ~liquidity_baking_toggle_vote:(Some On)
+          ~state_recorder:true
+          ~force_apply:true
+          node
+          client
+      in
+      (* Wait for subscribed events, as expected in the tutorial *)
+      let* () = wait_join_event_promise in
+
+      let* topics = Dal_RPC.Local.call dal_node @@ Dal_RPC.get_topics () in
+      Check.(
+        (List.length topics > 0)
+          int
+          ~__LOC__
+          ~error_msg:"Expecting a non-empty list of topcis") ;
+      unit)
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -5823,6 +5995,9 @@ let register ~protocols =
     ~producer_profiles:[0]
     Tx_kernel_e2e.test_echo_kernel_e2e
     protocols ;
+
+  (* Register tutorial test *)
+  scenario_tutorial_dal_baker protocols ;
 
   (* Register end-to-end tests *)
   register_end_to_end_tests ~protocols ;

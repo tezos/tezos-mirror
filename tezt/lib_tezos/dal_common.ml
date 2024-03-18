@@ -369,6 +369,16 @@ module Dal_RPC = struct
 
   type topic = {topic_slot_index : int; topic_pkh : string}
 
+  let get_topics () =
+    let open JSON in
+    let as_topic json =
+      let topic_slot_index = get "slot_index" json |> as_int in
+      let topic_pkh = get "pkh" json |> as_string in
+      {topic_slot_index; topic_pkh}
+    in
+    make ~query_string:[] GET ["p2p"; "gossipsub"; "topics"] (fun json ->
+        JSON.(json |> as_list |> List.map as_topic))
+
   let get_topics_peers ~subscribed =
     let open JSON in
     let query_string = if subscribed then [("subscribed", "true")] else [] in
