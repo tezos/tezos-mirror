@@ -361,6 +361,12 @@ module Dal_RPC = struct
   let delete_p2p_peer_disconnect ~peer_id =
     make DELETE ["p2p"; "peers"; "disconnect"; peer_id] as_empty_object_or_fail
 
+  let patch_p2p_peers_by_id ~peer_id ?acl () =
+    let data =
+      Option.map (fun acl -> RPC_core.Data (`O [("acl", `String acl)])) acl
+    in
+    make ?data PATCH ["p2p"; "peers"; "by-id"; peer_id] (fun _json -> ())
+
   type topic = {topic_slot_index : int; topic_pkh : string}
 
   let get_topics_peers ~subscribed =

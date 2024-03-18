@@ -184,6 +184,22 @@ let wait_for_ready dal_node =
         resolver :: dal_node.persistent_state.pending_ready ;
       check_event dal_node "dal_node_is_ready.v0" promise
 
+let wait_for_connections node connections =
+  let counter = ref 0 in
+  let waiter, resolver = Lwt.task () in
+  on_event node (fun {name; _} ->
+      match name with
+      | "new_connection.v0" ->
+          incr counter ;
+          if !counter = connections then Lwt.wakeup resolver ()
+      | _ -> ()) ;
+  let* () = wait_for_ready node in
+  waiter
+
+let wait_for_disconnection node ~peer_id =
+  wait_for node "disconnected.v0" (fun event ->
+      if JSON.(event |-> "peer" |> as_string) = peer_id then Some () else None)
+
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
