@@ -39,7 +39,6 @@ type nonces
     returns a data structure containing the stored information. *)
 val load :
   #Client_context.wallet ->
-  legacy_location:[`Legacy_nonce] Baking_files.location ->
   stateful_location:[`Stateful_nonce] Baking_files.location ->
   nonces tzresult Lwt.t
 
