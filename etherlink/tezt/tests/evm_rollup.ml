@@ -2305,7 +2305,7 @@ let get_kernel_boot_wasm ~sc_rollup_node =
   | Some boot_wasm -> return boot_wasm
   | None -> failwith "Kernel `boot.wasm` should be accessible/readable."
 
-let gen_test_kernel_upgrade ?admin_contract ?timestamp
+let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
     ?(activation_timestamp = "0") ?evm_setup ?rollup_address
     ?(should_fail = false) ~installee ?with_administrator ?expect_l1_failure
     ?(admin = Constant.bootstrap1) ?(upgrador = admin) protocol =
@@ -2322,6 +2322,7 @@ let gen_test_kernel_upgrade ?admin_contract ?timestamp
     | Some evm_setup -> return evm_setup
     | None ->
         setup_evm_kernel
+          ?setup_kernel_root_hash
           ?timestamp
           ?with_administrator
           ~admin:(Some admin)
@@ -2489,12 +2490,21 @@ let test_kernel_upgrade_failing_migration =
          client,
          evm_node,
          _original_kernel_boot_wasm,
-         _root_hash ) =
+         root_hash ) =
     gen_test_kernel_upgrade
+      ~setup_kernel_root_hash:false
       ~installee:Constant.WASM.failed_migration
       ~should_fail:true
       protocol
   in
+  let*@! found_root_hash = Rpc.tez_kernelRootHash evm_node in
+  Check.((root_hash <> found_root_hash) string)
+    ~error_msg:"The failed migration should not upgrade the kernel root hash" ;
+  Check.(
+    ("000000000000000000000000000000000000000000000000000000000000000000"
+   = found_root_hash)
+      string)
+    ~error_msg:"The fallback root hash should be %L, got %R" ;
   (* We make sure that we can't read under the tmp file, after migration failed,
      everything is reverted. *)
   let* tmp_dummy =

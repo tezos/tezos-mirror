@@ -37,9 +37,7 @@ use tezos_smart_rollup_host::runtime::Runtime;
 use tezos_smart_rollup_installer_config::binary::promote::upgrade_reveal_flow;
 
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
-const APPLIED_KERNEL_UPGRADE: RefPath =
-    RefPath::assert_from(b"/evm/__applied_kernel_upgrade");
-const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
+pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
 const SEQUENCER_UPGRADE: RefPath = RefPath::assert_from(b"/evm/sequencer_upgrade");
 
 #[derive(Debug, PartialEq, Clone)]
@@ -126,7 +124,8 @@ pub fn upgrade<Host: Runtime>(
         .evaluate(host)
         .map_err(UpgradeProcessError::InternalUpgrade)?;
 
-    host.store_move(&KERNEL_UPGRADE, &APPLIED_KERNEL_UPGRADE)?;
+    host.store_write_all(&KERNEL_ROOT_HASH, &root_hash)?;
+    host.store_delete(&KERNEL_UPGRADE)?;
 
     // Mark for reboot, the upgrade/migration will happen at next
     // kernel run, it doesn't matter if it is within the Tezos level
@@ -134,13 +133,6 @@ pub fn upgrade<Host: Runtime>(
     host.mark_for_reboot()?;
 
     log!(host, Info, "Kernel is ready to be upgraded.");
-    Ok(())
-}
-
-pub fn set_kernel_root_hash(host: &mut impl Runtime) -> anyhow::Result<()> {
-    if let Some(kernel_upgrade) = read_kernel_upgrade_at(host, &APPLIED_KERNEL_UPGRADE)? {
-        host.store_write_all(&KERNEL_ROOT_HASH, &kernel_upgrade.preimage_hash)?;
-    };
     Ok(())
 }
 

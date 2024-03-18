@@ -9,7 +9,8 @@ use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, DELAYED_BRIDGE,
     STORAGE_VERSION,
 };
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::path::RefPath;
+use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
 pub enum MigrationStatus {
     None,
@@ -17,9 +18,21 @@ pub enum MigrationStatus {
     Done,
 }
 
+// /!\ the following functions are migratin helpers, do not remove them /!\
+
+#[allow(dead_code)]
 fn is_etherlink_ghostnet(host: &impl Runtime) -> anyhow::Result<bool> {
     let chain_id = read_chain_id(host)?;
     Ok(chain_id == 128123.into())
+}
+
+#[allow(dead_code)]
+fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeError> {
+    match res {
+        Ok(()) => Ok(()),
+        Err(RuntimeError::PathNotFound) => Ok(()),
+        Err(err) => Err(err),
+    }
 }
 
 // The workflow for migration is the following:
@@ -48,6 +61,11 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
             host.store_write_all(
                 &DELAYED_BRIDGE,
                 b"KT1J9H3fCg4WxRAR2ELZkWoZZYV9pHJhSWUB",
+            )?;
+            allow_path_not_found(
+                host.store_delete(&RefPath::assert_from(
+                    b"/evm/__applied_kernel_upgrade",
+                )),
             )?;
         }
         // MIGRATION CODE - END
