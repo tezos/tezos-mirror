@@ -357,7 +357,6 @@ and p2p = {
 
 and rpc = {
   listen_addrs : string list;
-  local_listen_addrs : string list;
   external_listen_addrs : string list;
   cors_origins : string list;
   cors_headers : string list;
@@ -387,7 +386,6 @@ let default_p2p =
 let default_rpc =
   {
     listen_addrs = [];
-    local_listen_addrs = [];
     external_listen_addrs = [];
     cors_origins = [];
     cors_headers = [];
@@ -561,7 +559,6 @@ let rpc : rpc Data_encoding.t =
            cors_origins;
            cors_headers;
            listen_addrs;
-           local_listen_addrs;
            external_listen_addrs;
            tls;
            acl;
@@ -573,21 +570,13 @@ let rpc : rpc Data_encoding.t =
         | None -> (None, None)
         | Some {cert; key} -> (Some cert, Some key)
       in
-      let local_listen_addrs =
-        match local_listen_addrs with [] -> None | v -> Some v
-      in
       let external_listen_addrs =
         match external_listen_addrs with [] -> None | v -> Some v
       in
-      ( ( Some listen_addrs,
-          local_listen_addrs,
-          external_listen_addrs,
-          None,
-          cors_origins ),
+      ( (Some listen_addrs, external_listen_addrs, None, cors_origins),
         (cors_headers, cert, key, acl, media_type, max_active_rpc_connections)
       ))
     (fun ( ( listen_addrs,
-             local_listen_addrs,
              external_listen_addrs,
              legacy_listen_addr,
              cors_origins ),
@@ -613,12 +602,8 @@ let rpc : rpc Data_encoding.t =
           external_listen_addrs
           ~default:default_rpc.external_listen_addrs
       in
-      let local_listen_addrs =
-        Option.value local_listen_addrs ~default:default_rpc.local_listen_addrs
-      in
       {
         listen_addrs;
-        local_listen_addrs;
         external_listen_addrs;
         cors_origins;
         cors_headers;
@@ -628,20 +613,12 @@ let rpc : rpc Data_encoding.t =
         max_active_rpc_connections;
       })
     (merge_objs
-       (obj5
+       (obj4
           (opt
              "listen-addrs"
              ~description:
                "Hosts to listen to. If the port is not specified, the default \
                 port 8732 will be assumed."
-             (list string))
-          ((*FIXME: https://gitlab.com/tezos/tezos/-/issues/6925
-             Remove this deprecated config field. *)
-           opt
-             "local-listen-addrs"
-             ~description:
-               "DEPRECATED: Hosts to listen to. If the port is not specified, \
-                the default port 8732 will be assumed."
              (list string))
           (opt
              "external-listen-addrs"
@@ -878,8 +855,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
-    ?(local_rpc_listen_addrs = []) ?(external_rpc_listen_addrs = [])
-    ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
+    ?(external_rpc_listen_addrs = []) ?(allow_all_rpc = [])
+    ?(media_type = Media_type.Command_line.Any)
     ?(max_active_rpc_connections = default_rpc.max_active_rpc_connections)
     ?(metrics_addr = []) ?operation_metadata_size_limit
     ?(private_mode = default_p2p.private_mode)
@@ -962,8 +939,6 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   and rpc : rpc =
     {
       listen_addrs = unopt_list ~default:cfg.rpc.listen_addrs rpc_listen_addrs;
-      local_listen_addrs =
-        unopt_list ~default:cfg.rpc.local_listen_addrs local_rpc_listen_addrs;
       external_listen_addrs =
         unopt_list
           ~default:cfg.rpc.external_listen_addrs
