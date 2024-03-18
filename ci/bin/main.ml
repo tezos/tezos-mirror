@@ -75,9 +75,9 @@ let job_dummy : job =
    pipeline is defined. At the moment, all these pipelines are defined
    manually in .yml, but will eventually be generated. *)
 let () =
-  (* Matches release tags, e.g. [v1.2.3] or [v1.2.3-rc4]. *)
+  (* Matches Octez release tags, e.g. [octez-v1.2.3] or [octez-v1.2.3-rc4]. *)
   let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
-  (* Matches beta release tags, e.g. [v1.2.3-beta5]. *)
+  (* Matches Octez beta release tags, e.g. [octez-v1.2.3-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
   let open Rules in
   let open Pipeline in
@@ -110,23 +110,23 @@ let () =
   register
     "octez_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_release_tag_re)
-    ~jobs:(Release_tag.jobs Release_tag) ;
+    ~jobs:(Release_tag.octez_jobs Release_tag) ;
   register
     "octez_beta_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
-    ~jobs:(Release_tag.jobs Beta_release_tag) ;
+    ~jobs:(Release_tag.octez_jobs Beta_release_tag) ;
   register
     "octez_release_tag_test"
     If.(not_on_tezos_namespace && push && has_any_octez_release_tag)
-    ~jobs:(Release_tag.jobs ~test:true Release_tag) ;
+    ~jobs:(Release_tag.octez_jobs ~test:true Release_tag) ;
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)
-    ~jobs:(Release_tag.jobs Non_release_tag) ;
+    ~jobs:(Release_tag.octez_jobs Non_release_tag) ;
   register
     "non_release_tag_test"
     If.(not_on_tezos_namespace && push && has_non_release_tag)
-    ~jobs:(Release_tag.jobs ~test:true Non_release_tag) ;
+    ~jobs:(Release_tag.octez_jobs ~test:true Non_release_tag) ;
   register
     "schedule_extended_test"
     schedule_extended_tests
