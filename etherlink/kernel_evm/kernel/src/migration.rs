@@ -5,13 +5,21 @@
 // SPDX-License-Identifier: MIT
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
-use crate::storage::{read_storage_version, store_storage_version, STORAGE_VERSION};
+use crate::storage::{
+    read_chain_id, read_storage_version, store_storage_version, DELAYED_BRIDGE,
+    STORAGE_VERSION,
+};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 pub enum MigrationStatus {
     None,
     InProgress,
     Done,
+}
+
+fn is_etherlink_ghostnet(host: &impl Runtime) -> anyhow::Result<bool> {
+    let chain_id = read_chain_id(host)?;
+    Ok(chain_id == 128123.into())
 }
 
 // The workflow for migration is the following:
@@ -36,6 +44,12 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
     let current_version = read_storage_version(host)?;
     if STORAGE_VERSION == current_version + 1 {
         // MIGRATION CODE - START
+        if is_etherlink_ghostnet(host)? {
+            host.store_write_all(
+                &DELAYED_BRIDGE,
+                b"KT1J9H3fCg4WxRAR2ELZkWoZZYV9pHJhSWUB",
+            )?;
+        }
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;
         return Ok(MigrationStatus::Done);

@@ -31,7 +31,7 @@ use tezos_ethereum::wei::Wei;
 
 use primitive_types::{H160, H256, U256};
 
-pub const STORAGE_VERSION: u64 = 10;
+pub const STORAGE_VERSION: u64 = 11;
 pub const STORAGE_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/storage_version");
 
 const KERNEL_VERSION_PATH: RefPath = RefPath::assert_from(b"/evm/kernel_version");
@@ -43,7 +43,7 @@ pub const SEQUENCER_GOVERNANCE: RefPath =
 pub const KERNEL_GOVERNANCE: RefPath = RefPath::assert_from(b"/evm/kernel_governance");
 pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/kernel_security_governance");
-const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
+pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
 
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath =
@@ -590,7 +590,7 @@ pub fn store_chain_id<Host: Runtime>(
     write_u256(host, &EVM_CHAIN_ID.into(), chain_id)
 }
 
-pub fn read_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
+pub fn read_chain_id<Host: Runtime>(host: &Host) -> Result<U256, Error> {
     read_u256(host, &EVM_CHAIN_ID.into())
 }
 
