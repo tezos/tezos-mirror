@@ -143,6 +143,14 @@ macro_rules! run_xret_instr {
     }};
 }
 
+/// Runs a no-arguments instruction (wfi, fenceI)
+macro_rules! run_no_args_instr {
+    ($state: ident, $instr: ident, $run_fn: ident) => {{
+        $state.$run_fn();
+        Ok(Add($instr.width()))
+    }};
+}
+
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
@@ -255,16 +263,16 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Csrrci(args) => run_csr_imm_instr!(self, instr, args, run_csrrci),
 
             // Zifencei instructions
-            Instr::FenceI => {
-                self.run_fencei();
-                Ok(Add(instr.width()))
-            }
+            Instr::FenceI => run_no_args_instr!(self, instr, run_fencei),
 
             // Privileged instructions
+            // Trap-Return
             Instr::Mret => run_xret_instr!(self, run_mret),
             Instr::Sret => run_xret_instr!(self, run_sret),
             // Currently not implemented instruction (part of Smrnmi extension)
             Instr::Mnret => Err(Exception::IllegalInstruction),
+            // Interrupt-Management
+            Instr::Wfi => run_no_args_instr!(self, instr, run_wfi),
 
             Instr::Unknown { instr: _ } => Err(Exception::IllegalInstruction),
             Instr::UnknownCompressed { instr: _ } => Err(Exception::IllegalInstruction),

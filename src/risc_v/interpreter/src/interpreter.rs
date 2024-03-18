@@ -5,5 +5,6 @@
 
 pub mod rv32i;
 pub mod rv64i;
+pub mod rv64priv;
 pub mod rv64zicsr;
 pub mod rv64zifencei;

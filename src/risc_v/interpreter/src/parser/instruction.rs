@@ -143,9 +143,12 @@ pub enum Instr {
     FenceI,
 
     // Privileged instructions
+    // Trap-Return
     Mret,
     Sret,
     Mnret,
+    // Interrupt-Management
+    Wfi,
 
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
@@ -221,6 +224,7 @@ impl Instr {
             | Mret
             | Sret
             | Mnret
+            | Wfi
             | Unknown { instr: _ } => 4,
 
             // 2 bytes instructions (compressed instructions)
@@ -440,9 +444,12 @@ impl fmt::Display for Instr {
             FenceI => write!(f, "fence.i"),
 
             // Privileged instructions
+            // Trap-Return
             Mret => write!(f, "mret"),
             Sret => write!(f, "sret"),
             Mnret => write!(f, "mnret"),
+            // Interrupt-management
+            Wfi => write!(f, "wfi"),
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
