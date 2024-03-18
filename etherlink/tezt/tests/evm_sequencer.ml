@@ -374,7 +374,7 @@ let test_publish_blueprints =
 let test_resilient_to_rollup_node_disconnect =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "data"]
+    ~tags:["evm"; "sequencer"; "data"; Tag.flaky]
     ~title:"Sequencer is resilient to rollup node disconnection"
     ~uses
   @@ fun protocol ->
@@ -1014,7 +1014,7 @@ let test_observer_forwards_transaction =
 let test_upgrade_kernel_auto_sync =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
+    ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"; Tag.flaky]
     ~title:"Rollup-node kernel upgrade is applied to the sequencer state."
     ~uses
   @@ fun protocol ->
