@@ -3,6 +3,7 @@
 
 use crate::{
     current_timestamp,
+    event::Event,
     inbox::{Deposit, Transaction, TransactionContent},
     linked_list::LinkedList,
     storage,
@@ -166,7 +167,7 @@ impl DelayedInbox {
         timestamp: Timestamp,
         level: u32,
     ) -> Result<()> {
-        let Transaction { tx_hash, content } = tx;
+        let Transaction { tx_hash, content } = tx.clone();
         let transaction = match content {
             TransactionContent::Ethereum(_) => anyhow::bail!("Non-delayed evm transaction should not be saved to the delayed inbox. {:?}", tx.tx_hash),
             TransactionContent::EthereumDelayed(tx) => DelayedTransaction::Ethereum(tx),
@@ -177,6 +178,9 @@ impl DelayedInbox {
             timestamp,
             level,
         };
+
+        Event::NewDelayedTransaction(Box::new(tx)).store(host)?;
+
         self.0.push(host, &Hash(tx_hash), &item)?;
         log!(
             host,
