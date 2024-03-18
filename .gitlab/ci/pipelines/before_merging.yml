@@ -38,7 +38,7 @@ include:
   - .gitlab/ci/jobs/test/commit_titles.yml
   - .gitlab/ci/jobs/test/oc.semgrep-before_merging.yml
   - .gitlab/ci/jobs/test/oc.unit-before_merging.yml
-  - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml
+  - .gitlab/ci/jobs/test/oc.integration:compiler-rejections-before_merging.yml
   - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml
   - .gitlab/ci/jobs/test/oc.script:test-gen-genesis.yml
   - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions.yml

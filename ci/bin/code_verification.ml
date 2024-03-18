@@ -855,6 +855,20 @@ let jobs pipeline_type =
         pipeline_type
       |> jobs_external_split ~path:"test/oc.unit"
     in
+    let job_oc_integration_compiler_rejections : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.integration:compiler-rejections"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ~dependencies:
+          (Dependent
+             [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        ["dune build @runtest_rejections"]
+      |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -862,6 +876,7 @@ let jobs pipeline_type =
       job_oc_misc_checks;
       job_misc_opam_checks;
       job_semgrep;
+      job_oc_integration_compiler_rejections;
     ]
     @ jobs_unit
     @
