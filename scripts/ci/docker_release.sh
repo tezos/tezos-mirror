@@ -22,15 +22,15 @@ OCTEZ_EXECUTABLES="$(cat $EXECUTABLE_FILES)"
 
 # Build minimal, bare and debug images
 ./scripts/create_docker_image.sh \
-  "${DOCKER_IMAGE_NAME}" \
-  "${DOCKER_IMAGE_TAG}" \
-  "${build_deps_image_name}" \
-  "${build_deps_image_version}" \
-  "${OCTEZ_EXECUTABLES}" \
-  "${CI_COMMIT_SHORT_SHA}" \
-  "${DOCKER_BUILD_TARGET}" \
-  "${rust_toolchain_image_name}" \
-  "${rust_toolchain_image_tag}"
+  --image-name "${DOCKER_IMAGE_NAME}" \
+  --image-version "${DOCKER_IMAGE_TAG}" \
+  --build-deps-image-name "${build_deps_image_name}" \
+  --build-deps-image-version "${build_deps_image_version}" \
+  --executables "${OCTEZ_EXECUTABLES}" \
+  --commit-short-sha "${CI_COMMIT_SHORT_SHA}" \
+  --docker-target "${DOCKER_BUILD_TARGET}" \
+  --rust-toolchain-image "${rust_toolchain_image_name}" \
+  --rust-toolchain-image-tag "${rust_toolchain_image_tag}"
 
 # auth gitlab or dockerhub registry
 # notice the different namespace for gitlab and that we remove the `-`
