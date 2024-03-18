@@ -34,7 +34,7 @@ say() {
 
 declare -a source_directories
 
-source_directories=(src docs/doc_gen tezt devtools contrib etherlink)
+source_directories=(src docs/doc_gen tezt devtools contrib etherlink client-libs)
 # Set of newline-separated basic regular expressions to exclude from --check-licenses-git-new.
 license_check_exclude=$(
   cat << EOF
