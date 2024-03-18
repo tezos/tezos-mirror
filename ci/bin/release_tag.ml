@@ -137,3 +137,17 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   match (test, release_tag_pipeline_type) with
   | false, Release_tag -> [job_opam_release]
   | _ -> []
+
+(** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
+let etherlink_jobs () =
+  let job_gitlab_release : Tezos_ci.tezos_job =
+    job
+      ~__POS__
+      ~image:Images.ci_release
+      ~stage:Stages.publish_package_gitlab
+      ~interruptible:false
+      ~dependencies:(Dependent [])
+      ~name:"gitlab:publish"
+      ["./scripts/ci/create_gitlab_etherlink_release.sh"]
+  in
+  [job_gitlab_release]

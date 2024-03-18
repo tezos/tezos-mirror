@@ -127,12 +127,12 @@ let () =
   register
     "etherlink_release_tag"
     If.(on_tezos_namespace && push && has_tag_match etherlink_release_tag_re)
-    ~jobs:(Release_tag.jobs Release_tag) ;
+    ~jobs:(Release_tag.etherlink_jobs ()) ;
   register
     "etherlink_release_tag_test"
     If.(
       not_on_tezos_namespace && push && has_tag_match etherlink_release_tag_re)
-    ~jobs:(Release_tag.jobs ~test:true Release_tag) ;
+    ~jobs:(Release_tag.etherlink_jobs ()) ;
   register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)
