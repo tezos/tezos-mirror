@@ -17,6 +17,35 @@ let received_upgrade =
     ~level:Notice
     ("payload", Data_encoding.string)
 
+let pending_upgrade =
+  declare_2
+    ~section
+    ~name:"pending_upgrade"
+    ~msg:
+      "Pending upgrade to root hash {root_hash} expected to activate at \
+       {timestamp}"
+    ~level:Notice
+    ("root_hash", Ethereum_types.hash_encoding)
+    ("timestamp", Time.Protocol.encoding)
+
+let applied_upgrade =
+  declare_2
+    ~section
+    ~name:"applied_upgrade"
+    ~msg:"Kernel successfully upgraded to {root_hash} with blueprint {level}"
+    ~level:Notice
+    ("root_hash", Ethereum_types.hash_encoding)
+    ("level", Data_encoding.n)
+
+let failed_upgrade =
+  declare_2
+    ~section
+    ~name:"failed_upgrade"
+    ~msg:"Kernel failed to upgrade to {root_hash} with blueprint {level}"
+    ~level:Warning
+    ("root_hash", Ethereum_types.hash_encoding)
+    ("level", Data_encoding.n)
+
 let ignored_kernel_arg =
   declare_0
     ~section
@@ -82,6 +111,15 @@ let event_callback_log =
     ("body", Data_encoding.string)
 
 let received_upgrade payload = emit received_upgrade payload
+
+let pending_upgrade (upgrade : Ethereum_types.Upgrade.t) =
+  emit pending_upgrade (upgrade.hash, upgrade.timestamp)
+
+let applied_upgrade root_hash Ethereum_types.(Qty level) =
+  emit applied_upgrade (root_hash, level)
+
+let failed_upgrade root_hash Ethereum_types.(Qty level) =
+  emit failed_upgrade (root_hash, level)
 
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
 

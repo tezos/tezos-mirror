@@ -91,6 +91,14 @@ module Q = struct
         else Error "invalid negative timestamp")
       int64
 
+  let upgrade =
+    custom
+      ~encode:(fun Ethereum_types.Upgrade.{hash; timestamp} ->
+        Ok (hash, timestamp))
+      ~decode:(fun (hash, timestamp) ->
+        Ok Ethereum_types.Upgrade.{hash; timestamp})
+      (t2 root_hash timestamp)
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -208,8 +216,40 @@ module Q = struct
         ]
     end
 
+    module V4 = struct
+      let name = "upgrade_events_table_improvement"
+
+      let up =
+        [
+          (* We need to drop the previous contents because the contents has not
+             been kept up to date *)
+          migration_step {|
+        DELETE FROM kernel_upgrades
+        |};
+          (* We use this opportunity to do some renaming. *)
+          migration_step
+            {|
+        ALTER TABLE kernel_upgrades
+        RENAME COLUMN applied_before TO injected_before
+        |};
+          migration_step
+            {|
+        ALTER TABLE kernel_upgrades
+        RENAME COLUMN applied TO applied_before
+        |};
+          (* We add a constraint that we can only have one kernel upgrade not
+             applied at a given time *)
+          migration_step
+            {|
+        CREATE UNIQUE INDEX unapplied_upgrade
+        ON kernel_upgrades (applied_before)
+        WHERE applied_before IS NULL
+    |};
+        ]
+    end
+
     let all : migration list =
-      [(module V0); (module V1); (module V2); (module V3)]
+      [(module V0); (module V1); (module V2); (module V3); (module V4)]
   end
 
   module Executable_blueprints = struct
@@ -249,7 +289,21 @@ module Q = struct
   module Kernel_upgrades = struct
     let insert =
       (t3 level root_hash timestamp ->. unit)
-      @@ {|INSERT INTO kernel_upgrades (applied_before, root_hash, activation_timestamp) VALUES (?, ?, ?)|}
+      @@ {|REPLACE INTO kernel_upgrades (injected_before, root_hash, activation_timestamp) VALUES (?, ?, ?)|}
+
+    let get_latest_unapplied =
+      (unit ->? upgrade)
+      @@ {|SELECT root_hash, activation_timestamp
+           FROM kernel_upgrades WHERE applied_before IS NULL
+           ORDER BY applied_before DESC
+           LIMIT 1
+    |}
+
+    let record_apply =
+      (level ->. unit)
+      @@ {|
+      UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before = NULL
+    |}
   end
 
   module L1_latest_level = struct
@@ -438,6 +492,14 @@ module Kernel_upgrades = struct
       conn
       Q.Kernel_upgrades.insert
       (next_blueprint_number, event.hash, event.timestamp)
+
+  let find_latest_pending store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Kernel_upgrades.get_latest_unapplied ()
+
+  let record_apply store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Kernel_upgrades.record_apply level
 end
 
 module L1_latest_known_level = struct

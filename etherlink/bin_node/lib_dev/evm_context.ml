@@ -9,6 +9,7 @@ type session_state = {
   mutable context : Irmin_context.rw;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
+  mutable pending_upgrade : Ethereum_types.Upgrade.t option;
 }
 
 type t = {
@@ -79,9 +80,14 @@ let replace_current_commit (ctxt : t) evm_state =
 
 let evm_state ctxt = Irmin_context.PVMState.get ctxt.session.context
 
+let inspect ctxt path =
+  let open Lwt_syntax in
+  let* evm_state = evm_state ctxt in
+  Evm_state.inspect evm_state path
+
 let on_modified_head ctxt context = ctxt.session.context <- context
 
-let replace_current_head (ctxt : t) k =
+let replace_current_head ?(on_success = fun _ -> ()) (ctxt : t) k =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
   let* context =
@@ -91,6 +97,7 @@ let replace_current_head (ctxt : t) k =
     replace_current_commit ctxt evm_state
   in
   on_modified_head ctxt context ;
+  on_success ctxt.session ;
   return_unit
 
 let execution_config ctxt =
@@ -123,6 +130,45 @@ let () =
       | _ -> None)
     (fun local_state_level -> Cannot_apply_blueprint {local_state_level})
 
+let check_pending_upgrade ctxt timestamp =
+  match ctxt.session.pending_upgrade with
+  | None -> None
+  | Some upgrade ->
+      if Time.Protocol.(upgrade.timestamp <= timestamp) then Some upgrade.hash
+      else None
+
+let check_upgrade ctxt evm_state =
+  let open Lwt_result_syntax in
+  function
+  | Some root_hash ->
+      let* () =
+        Store.Kernel_upgrades.record_apply
+          ctxt.store
+          ctxt.session.next_blueprint_number
+      in
+
+      let*! bytes =
+        Evm_state.inspect evm_state Durable_storage_path.kernel_root_hash
+      in
+      let new_hash_candidate =
+        Option.map
+          (fun bytes ->
+            let (`Hex hex) = Hex.of_bytes bytes in
+            Ethereum_types.hash_of_string hex)
+          bytes
+      in
+
+      let*! () =
+        match new_hash_candidate with
+        | Some current_root_hash when root_hash = current_root_hash ->
+            Events.applied_upgrade root_hash ctxt.session.next_blueprint_number
+        | _ ->
+            Events.failed_upgrade root_hash ctxt.session.next_blueprint_number
+      in
+
+      return_true
+  | None -> return_false
+
 (** [apply_blueprint_store_unsafe ctxt payload] applies the blueprint [payload]
     on the head of [ctxt], and commit the resulting state to Irmin and the
     node’s store.
@@ -137,6 +183,7 @@ let apply_blueprint_store_unsafe ctxt timestamp payload =
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
   let (Qty next) = ctxt.session.next_blueprint_number in
+
   let* try_apply = Evm_state.apply_blueprint ~config evm_state payload in
 
   match try_apply with
@@ -147,15 +194,19 @@ let apply_blueprint_store_unsafe ctxt timestamp payload =
           ctxt.store
           {number = Qty blueprint_number; timestamp; payload}
       in
+
+      let root_hash_candidate = check_pending_upgrade ctxt timestamp in
+      let* applied_upgrade = check_upgrade ctxt evm_state root_hash_candidate in
+
       let* context = commit_next_head ctxt evm_state in
-      return (context, current_block_hash)
+      return (context, current_block_hash, applied_upgrade)
   | Apply_success _ (* Produced a block, but not of the expected height *)
   | Apply_failure (* Did not produce a block *) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
       let*! () = Blueprint_events.invalid_blueprint_produced next in
       tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-let on_new_head ctxt timestamp context block_hash payload =
+let on_new_head ctxt ~applied_upgrade timestamp context block_hash payload =
   let (Qty level) = ctxt.session.next_blueprint_number in
   ctxt.session.context <- context ;
   ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
@@ -163,6 +214,7 @@ let on_new_head ctxt timestamp context block_hash payload =
   Lwt_watcher.notify
     ctxt.blueprint_watcher
     {number = Qty level; timestamp; payload} ;
+  if applied_upgrade then ctxt.session.pending_upgrade <- None ;
   Blueprint_events.blueprint_applied (level, block_hash)
 
 let apply_and_publish_blueprint (ctxt : t) timestamp
@@ -170,7 +222,7 @@ let apply_and_publish_blueprint (ctxt : t) timestamp
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
   let (Qty level) = ctxt.session.next_blueprint_number in
-  let* context, current_block_hash =
+  let* context, current_block_hash, applied_upgrade =
     with_store_transaction ctxt @@ fun ctxt ->
     let* current_block_hash =
       apply_blueprint_store_unsafe ctxt timestamp blueprint.to_execute
@@ -183,20 +235,33 @@ let apply_and_publish_blueprint (ctxt : t) timestamp
     in
     return current_block_hash
   in
-
   let*! () =
-    on_new_head ctxt timestamp context current_block_hash blueprint.to_execute
+    on_new_head
+      ctxt
+      ~applied_upgrade
+      timestamp
+      context
+      current_block_hash
+      blueprint.to_execute
   in
   Blueprints_publisher.publish level blueprint.to_publish
 
 let apply_blueprint ctxt timestamp payload =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
-  let* context, current_block_hash =
+  let* context, current_block_hash, applied_upgrade =
     with_store_transaction ctxt @@ fun ctxt ->
     apply_blueprint_store_unsafe ctxt timestamp payload
   in
-  let*! () = on_new_head ctxt timestamp context current_block_hash payload in
+  let*! () =
+    on_new_head
+      ctxt
+      ~applied_upgrade
+      timestamp
+      context
+      current_block_hash
+      payload
+  in
   return_unit
 
 let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
@@ -211,6 +276,7 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   let* store, context, next_blueprint_number, current_block_hash, loaded =
     load ~data_dir index
   in
+  let* pending_upgrade = Store.Kernel_upgrades.find_latest_pending store in
   let ctxt =
     {
       index;
@@ -218,7 +284,8 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       preimages;
       preimages_endpoint;
       smart_rollup_address = destination;
-      session = {context; next_blueprint_number; current_block_hash};
+      session =
+        {context; next_blueprint_number; current_block_hash; pending_upgrade};
       blueprint_watcher = Lwt_watcher.create_input ();
       store;
       head_lock = Lwt_mutex.create ();
@@ -242,6 +309,12 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
           failwith
             "Cannot compute the initial EVM state without the path to the \
              initial kernel"
+  in
+
+  let*! () =
+    Option.iter_s
+      (fun upgrade -> Events.pending_upgrade upgrade)
+      pending_upgrade
   in
 
   return (ctxt, loaded)
@@ -355,11 +428,6 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   in
   return_unit
 
-let inspect ctxt path =
-  let open Lwt_syntax in
-  let* evm_state = evm_state ctxt in
-  Evm_state.inspect evm_state path
-
 let execute_and_inspect ?wasm_entrypoint ~input ctxt =
   let open Lwt_result_syntax in
   let config = execution_config ctxt in
@@ -374,3 +442,28 @@ let last_produced_blueprint (ctxt : t) =
   match blueprint with
   | Some blueprint -> return blueprint
   | None -> failwith "Could not fetch the last produced blueprint"
+
+let inject_kernel_upgrade ctxt upgrade =
+  let open Lwt_result_syntax in
+  let payload = Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes in
+  let* () =
+    replace_current_head
+      ~on_success:(fun session -> session.pending_upgrade <- Some upgrade)
+      ctxt
+      (fun evm_state ->
+        let*! evm_state =
+          Evm_state.modify
+            ~key:Durable_storage_path.kernel_upgrade
+            ~value:payload
+            evm_state
+        in
+        let* () =
+          Store.Kernel_upgrades.store
+            ctxt.store
+            ctxt.session.next_blueprint_number
+            upgrade
+        in
+        let*! () = Events.pending_upgrade upgrade in
+        return evm_state)
+  in
+  return_unit

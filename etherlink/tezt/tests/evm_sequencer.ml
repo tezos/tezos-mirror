@@ -1096,6 +1096,86 @@ let test_observer_forwards_transaction =
 
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
+let test_self_upgrade_kernel =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "upgrade"; "self"]
+    ~title:"EVM Kernel can upgrade to itself"
+    ~uses:(fun protocol -> uses protocol)
+  @@ fun protocol ->
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+
+  let* {
+         sc_rollup_node;
+         l1_contracts;
+         sc_rollup_address;
+         client;
+         sequencer;
+         proxy;
+         _;
+       } =
+    setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
+  in
+  (* Sends the upgrade to L1, but not to the sequencer. *)
+  let* () =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.evm_kernel
+      ~activation_timestamp
+  in
+
+  (* Per the activation timestamp, the state will remain synchronised until
+     the kernel is upgraded. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ =
+          Rpc.produce_block ~timestamp:"2020-01-01T00:00:05Z" sequencer
+        in
+        unit)
+  in
+
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
+  and* _ = Evm_node.wait_for_pending_upgrade sequencer in
+
+  let* () =
+    check_head_consistency
+      ~left:sequencer
+      ~right:proxy
+      ~error_msg:"The head should be the same before the upgrade"
+      ()
+  in
+
+  (* Produce a block after activation timestamp, both the rollup
+     node and the sequencer will upgrade to itself. *)
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ =
+          Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
+        in
+        unit)
+  and* _ = Evm_node.wait_for_successful_upgrade sequencer in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+
+  let* () =
+    check_head_consistency
+      ~left:sequencer
+      ~right:proxy
+      ~error_msg:"The head should be the same after the upgrade"
+      ()
+  in
+
+  unit
+
+(** This tests the situation where the kernel has an upgrade and the
+    sequencer upgrade by following the event of the kernel. *)
 let test_upgrade_kernel_auto_sync =
   Protocol.register_test
     ~__FILE__
@@ -2116,6 +2196,7 @@ let () =
   test_observer_applies_blueprint protocols ;
   test_observer_forwards_transaction protocols ;
   test_upgrade_kernel_auto_sync protocols ;
+  test_self_upgrade_kernel protocols ;
   test_force_kernel_upgrade protocols ;
   test_force_kernel_upgrade_too_early protocols ;
   test_external_transaction_to_delayed_inbox_fails protocols ;

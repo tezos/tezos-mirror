@@ -106,6 +106,10 @@ val wait_for_blueprint_applied : timeout:float -> t -> int -> unit Lwt.t
     [evm_node] has injected a blueprint for level [level] to its rollup node. *)
 val wait_for_blueprint_injected : timeout:float -> t -> int -> unit Lwt.t
 
+val wait_for_pending_upgrade : t -> (string * string) Lwt.t
+
+val wait_for_successful_upgrade : t -> (string * int) Lwt.t
+
 (** [init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server with {!create}
     and runs it with {!run}. *)

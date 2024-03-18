@@ -11,6 +11,7 @@ type session_state = {
       (** Number for the next bluerpint to be produced. *)
   mutable current_block_hash : Ethereum_types.block_hash;
       (** Hash of the latest processed block *)
+  mutable pending_upgrade : Ethereum_types.Upgrade.t option;
 }
 
 type t = {
@@ -53,7 +54,10 @@ val init_from_rollup_node :
     [f], and commits results to disk. As a consequence, the next blueprint will
     be applied on top of the resulting state. *)
 val replace_current_head :
-  t -> (Evm_state.t -> Evm_state.t tzresult Lwt.t) -> unit tzresult Lwt.t
+  ?on_success:(session_state -> unit) ->
+  t ->
+  (Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
+  unit tzresult Lwt.t
 
 (** [inspect ctxt path] returns the value stored in [path] of the freshest EVM
     state, if it exists. *)
@@ -84,3 +88,5 @@ val apply_blueprint :
     correct. *)
 val apply_and_publish_blueprint :
   t -> Time.Protocol.t -> Sequencer_blueprint.t -> unit tzresult Lwt.t
+
+val inject_kernel_upgrade : t -> Ethereum_types.Upgrade.t -> unit tzresult Lwt.t

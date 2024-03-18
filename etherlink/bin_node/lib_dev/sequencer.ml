@@ -47,26 +47,7 @@ end) : Services_backend_sig.Backend = struct
     Tezos_crypto.Hashed.Smart_rollup_address.to_string
       Ctxt.ctxt.smart_rollup_address
 
-  let inject_kernel_upgrade upgrade =
-    let open Lwt_result_syntax in
-    let payload = Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes in
-    let* () =
-      Evm_context.replace_current_head Ctxt.ctxt (fun evm_state ->
-          let*! evm_state =
-            Evm_state.modify
-              ~key:Durable_storage_path.kernel_upgrade
-              ~value:payload
-              evm_state
-          in
-          let* () =
-            Store.Kernel_upgrades.store
-              Ctxt.ctxt.store
-              Ctxt.ctxt.session.next_blueprint_number
-              upgrade
-          in
-          return evm_state)
-    in
-    return_unit
+  let inject_kernel_upgrade = Evm_context.inject_kernel_upgrade Ctxt.ctxt
 
   let inject_sequencer_upgrade ~payload =
     let open Lwt_result_syntax in

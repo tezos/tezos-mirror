@@ -62,6 +62,10 @@ module Kernel_upgrades : sig
     Ethereum_types.quantity ->
     Ethereum_types.Upgrade.t ->
     unit tzresult Lwt.t
+
+  val find_latest_pending : t -> Ethereum_types.Upgrade.t option tzresult Lwt.t
+
+  val record_apply : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 module L1_latest_known_level : sig

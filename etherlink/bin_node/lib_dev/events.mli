@@ -14,6 +14,20 @@ val section : string list
     upgrade of payload [payload]. *)
 val received_upgrade : string -> unit Lwt.t
 
+(** [pending_upgrade upgrade] advertises that the EVM node is aware that an
+    upgrade is pending. *)
+val pending_upgrade : Ethereum_types.Upgrade.t -> unit Lwt.t
+
+(** [applied_upgrade root_hash level] advertises that the kernel of the EVM
+    node successfully upgraded to [root_hash] with the [level]th blueprint. *)
+val applied_upgrade :
+  Ethereum_types.hash -> Ethereum_types.quantity -> unit Lwt.t
+
+(** [failed_upgrade root_hash level] advertises that the kernel of the EVM
+    node failed to upgrade to [root_hash] with the [level]th blueprint. *)
+val failed_upgrade :
+  Ethereum_types.hash -> Ethereum_types.quantity -> unit Lwt.t
+
 (** [ignored_kernel_arg ()] advertises that the EVM node has ignored
     the path to the initial kernel given as a command-line argument
     since its EVM state was already initialized. *)
