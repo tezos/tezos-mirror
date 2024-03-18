@@ -69,5 +69,6 @@
     "benchmarks/bench_linear_erc1155_create.js --count 200",
     "benchmarks/bench_linear_verifySignature.js --count 200",
     "benchmarks/bench_loop_progressive.js",
-    "benchmarks/bench_loop_expensive.js"
+    "benchmarks/bench_loop_expensive.js",
+    "benchmarks/bench_deposit.js"
 ]
