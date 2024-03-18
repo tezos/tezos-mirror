@@ -82,6 +82,8 @@ let empty = Nonce_hash.Map.empty
 
 let legacy_empty = Block_hash.Map.empty
 
+let reinjection_threshold = 2l
+
 let nonce_state_encoding =
   let open Data_encoding in
   union
@@ -171,14 +173,6 @@ let save (wallet : #Client_context.wallet)
   wallet#write legacy_location legacy_nonces legacy_encoding
 
 let add nonces nonce = Nonce_hash.Map.add nonce.nonce_hash nonce nonces
-
-let remove nonces hash = Nonce_hash.Map.remove hash nonces
-
-let remove_all nonces nonces_to_remove =
-  Nonce_hash.Map.fold
-    (fun hash _ acc -> remove acc hash)
-    nonces_to_remove
-    nonces
 
 let is_outdated constants committed_cycle current_cycle =
   let {Constants.parametric = {consensus_rights_delay; _}; _} = constants in
@@ -272,63 +266,66 @@ let try_migrate_legacy_nonces state =
       Events.(emit ignore_failed_nonce_migration failed_migration)
   | Error _ -> Lwt.return_unit
 
-(** [get_outdated_nonces state nonces currnet_cycle] returns an (orphans, outdated) 
-    pair of lists of nonces (paired with their block hashes); "orphans" are nonces
-    for which we could not retrieve the block level, which can happen in case
-    of a snapshot import or of a block reorganisation; "outdated" nonces
-    appear in cycles which are [consensus_rights_delay] older than the 
-    [current_cycle]. *)
-let get_outdated_nonces state nonces current_cycle =
-  Nonce_hash.Map.fold
-    (fun _hash nonce acc ->
-      let orphans, outdated = acc in
-      if is_outdated state.constants nonce.cycle current_cycle then
-        (orphans, add outdated nonce)
-      else (orphans, outdated))
-    nonces
-    (empty, empty)
-
-(** [filter_outdated_nonces state nonces current_cyce] computes the pair of "orphaned" 
-    and "outdated" nonces; emits a warning in case our map contains too many "orphaned"
-    nonces, and removes all the oudated nonces. *)
-let filter_outdated_nonces state nonces current_cycle =
-  let open Lwt_result_syntax in
-  let _orphans, outdated_nonces =
-    get_outdated_nonces state nonces current_cycle
-  in
-  return (remove_all nonces outdated_nonces)
-
-(** [get_unrevealed_nonces state nonces current_cycle] retrieves all the nonces which 
-    have been computed for blocks from the previous cycle (w.r.t. [current_cycle]), 
-    which have not been yet revealed. *)
-let get_unrevealed_nonces {cctxt; chain; _} nonces current_cycle =
+(** [partition_unrevealed_nonces state nonces current_cycle current_level] partitions
+    nonces into 2 groups: 
+     - nonces that need to be re/revealed
+     - nonces that are live 
+    Nonces that are not relevant can be dropped.
+*)
+let partition_unrevealed_nonces {cctxt; chain; _} nonces current_cycle
+    current_level =
   let open Lwt_result_syntax in
   match Cycle.pred current_cycle with
   | None ->
       (* This will be [None] iff [current_cycle = 0] which only
          occurs during genesis. *)
-      return_nil
+      return (empty, nonces)
   | Some previous_cycle ->
+      (* Partition nonces into nonces that need to be re/injected and
+         those that do not. *)
       Nonce_hash.Map.fold_es
-        (fun _hash {nonce; cycle; level; block_hash; _} acc ->
+        (fun _hash nonce_data (nonces_to_reveal, live) ->
+          let {nonce_hash; cycle; level; nonce_state; _} = nonce_data in
           match cycle with
           | cycle when Cycle.(cycle = previous_cycle) -> (
-              let* nonce_info =
+              (* Only process nonces that are part of previous cycle. *)
+              let+ nonce_info =
                 Alpha_services.Nonce.get cctxt (chain, `Head 0) level
               in
-              match nonce_info with
-              | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
-                  let*! () =
-                    Events.(emit found_nonce_to_reveal (block_hash, level))
-                  in
-                  return ((level, nonce) :: acc)
-              | Missing _nonce_hash ->
-                  let*! () = Events.(emit incoherent_nonce level) in
-                  return acc
-              | Forgotten | Revealed _ -> return acc)
-          | _cycle -> return acc)
+              match (nonce_state, nonce_info) with
+              | Committed, Missing expected_nonce_hash
+                when Nonce_hash.(nonce_hash = expected_nonce_hash) ->
+                  (* Nonce was committed and block is part of main chain *)
+                  (add nonces_to_reveal nonce_data, live)
+              | Committed, _ ->
+                  (* Nonce was committed but block is not part of main chain *)
+                  (nonces_to_reveal, live)
+              | Revealed injection_level, Missing expected_nonce_hash
+                when Nonce_hash.(nonce_hash = expected_nonce_hash) ->
+                  if
+                    Raw_level.diff current_level injection_level
+                    > reinjection_threshold
+                  then
+                    (* [reinjection_threshold] levels have passed since nonce revelation
+                       was injected. It might have been lost so reinject. *)
+                    (add nonces_to_reveal nonce_data, live)
+                  else
+                    (* We are waiting for nonce revelation to be included. *)
+                    (nonces_to_reveal, add live nonce_data)
+              | Revealed _injection_level, Missing _
+              | Revealed _injection_level, Forgotten
+              | Revealed _injection_level, Revealed _ ->
+                  (nonces_to_reveal, live))
+          | cycle when Cycle.(cycle = current_cycle) ->
+              (* Nothing to do if nonce was committed as part of current
+                 cycle. *)
+              return (nonces_to_reveal, add live nonce_data)
+          | _ ->
+              (* Nonces not part of current or previous cycles are orphaned and can
+                 be dropped. *)
+              return (nonces_to_reveal, live))
         nonces
-        []
+        (empty, empty)
 
 (* Nonce creation *)
 
@@ -439,42 +436,58 @@ let reveal_potential_nonces state new_proposal =
         let*! () = Events.(emit cannot_read_nonces err) in
         return_unit
     | Ok nonces -> (
-        let* {cycle = current_cycle; _} =
+        let* {cycle; level; _} =
           Plugin.RPC.current_level cctxt (chain, `Head 0)
         in
-        let*! nonces_to_reveal =
-          get_unrevealed_nonces state nonces current_cycle
+        let*! partitioned_nonces =
+          partition_unrevealed_nonces state nonces cycle level
         in
-        match nonces_to_reveal with
+        match partitioned_nonces with
         | Error err ->
             let*! () = Events.(emit cannot_retrieve_unrevealed_nonces err) in
             return_unit
-        | Ok [] -> return_unit
-        | Ok nonces_to_reveal -> (
-            let*! result =
-              inject_seed_nonce_revelation
-                cctxt
-                ~chain
-                ~block
-                ~branch
-                nonces_to_reveal
-            in
-            match result with
-            | Error err ->
-                let*! () = Events.(emit cannot_inject_nonces err) in
-                return_unit
-            | Ok () ->
-                (* If some nonces are to be revealed it means:
-                   - We entered a new cycle and we can clear old nonces ;
-                   - A revelation was not included yet in the cycle beginning.
-                     So, it is safe to only filter outdated_nonces there *)
-                let* live_nonces =
-                  filter_outdated_nonces state nonces current_cycle
-                in
-                let* () =
-                  save cctxt ~legacy_location ~stateful_location live_nonces
-                in
-                return_unit)))
+        | Ok (nonces_to_reveal, live_nonces) -> (
+            if Nonce_hash.Map.is_empty nonces_to_reveal then return_unit
+            else
+              let prepared_nonces =
+                Nonce_hash.Map.fold
+                  (fun _ {level; nonce; _} acc -> (level, nonce) :: acc)
+                  nonces_to_reveal
+                  []
+              in
+              let*! result =
+                inject_seed_nonce_revelation
+                  cctxt
+                  ~chain
+                  ~block
+                  ~branch
+                  prepared_nonces
+              in
+              match result with
+              | Error err ->
+                  let*! () = Events.(emit cannot_inject_nonces err) in
+                  return_unit
+              | Ok () ->
+                  let updated_nonces =
+                    let nonce_with_new_states =
+                      Nonce_hash.Map.map
+                        (fun nonce_data ->
+                          {nonce_data with nonce_state = Revealed level})
+                        nonces_to_reveal
+                    in
+                    Nonce_hash.Map.fold
+                      (fun hash nonce acc -> Nonce_hash.Map.add hash nonce acc)
+                      nonce_with_new_states
+                      live_nonces
+                  in
+                  let* () =
+                    save
+                      cctxt
+                      ~legacy_location
+                      ~stateful_location
+                      updated_nonces
+                  in
+                  return_unit)))
   else return_unit
 
 (* We suppose that the block stream is cloned by the caller *)
