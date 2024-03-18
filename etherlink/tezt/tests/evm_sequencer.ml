@@ -1884,7 +1884,7 @@ let test_sequencer_diverge =
 let test_sequencer_can_catch_up_on_event =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "event"]
+    ~tags:["evm"; "sequencer"; "event"; Tag.slow]
     ~title:"Evm node can catchup event from the rollup node"
     ~uses
   @@ fun protocol ->
