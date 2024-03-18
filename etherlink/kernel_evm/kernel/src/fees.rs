@@ -29,8 +29,8 @@ use tezos_smart_rollup_host::runtime::Runtime;
 
 use std::mem::size_of;
 
-/// Minimum base fee per gas, set to 0.05Gwei.
-pub const MINIMUM_BASE_FEE_PER_GAS: u64 = 5 * 10_u64.pow(7);
+/// Minimum base fee per gas, set to 1 Gwei.
+pub const MINIMUM_BASE_FEE_PER_GAS: u64 = 10_u64.pow(9);
 
 // We assume a tx (with empty data) consumes roughly 150 bytes in the inbox.
 //

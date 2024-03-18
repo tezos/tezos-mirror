@@ -3624,7 +3624,7 @@ let test_rpc_gasPrice =
     ~tags:["evm"; "rpc"; "gas_price"]
     ~title:"RPC methods eth_gasPrice"
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
-  let expected_gas_price = Wei.of_gwei_string "0.05" in
+  let expected_gas_price = Wei.of_gwei_string "1" in
   let* gas_price =
     Evm_node.(
       let* price =

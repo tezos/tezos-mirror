@@ -5,6 +5,7 @@
 ### Features
 
 - Delayed EVM transactions no longer pay data-availability fee. (!12401)
+- Raise minimum gas price to **1 gwei**. (!12514)
 
 ### Bug fixes
 
