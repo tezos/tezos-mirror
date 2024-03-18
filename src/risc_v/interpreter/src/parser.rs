@@ -245,6 +245,7 @@ const F3_6: u32 = 0b110;
 const F3_7: u32 = 0b111;
 
 const F7_0: u32 = 0b0;
+const F7_1: u32 = 0b1;
 const F7_8: u32 = 0b000_1000;
 const F7_20: u32 = 0b10_0000;
 const F7_24: u32 = 0b001_1000;
@@ -275,10 +276,12 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             },
             F3_6 => match funct7(instr) {
                 F7_0 => r_instr!(Or, instr),
+                F7_1 => r_instr!(Rem, instr),
                 _ => Unknown { instr },
             },
             F3_7 => match funct7(instr) {
                 F7_0 => r_instr!(And, instr),
+                F7_1 => r_instr!(Remu, instr),
                 _ => Unknown { instr },
             },
             F3_1 => match funct7(instr) {
@@ -300,6 +303,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 F7_0 => r_instr!(Sltu, instr),
                 _ => Unknown { instr },
             },
+
             _ => Unknown { instr },
         },
         OP_ARITH_W => match funct3(instr) {
@@ -314,6 +318,16 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 F7_20 => r_instr!(Sraw, instr),
                 _ => Unknown { instr },
             },
+
+            F3_6 => match funct7(instr) {
+                F7_1 => r_instr!(Remw, instr),
+                _ => Unknown { instr },
+            },
+            F3_7 => match funct7(instr) {
+                F7_1 => r_instr!(Remuw, instr),
+                _ => Unknown { instr },
+            },
+
             _ => Unknown { instr },
         },
 

@@ -917,26 +917,10 @@ test_case!(
     test_suite_rv64um_p_mulw,
     "rv64um-p-mulw"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_rem,
-    "rv64um-p-rem"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_remu,
-    "rv64um-p-remu"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_remuw,
-    "rv64um-p-remuw"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_remw,
-    "rv64um-p-remw"
-);
+test_case!(test_suite_rv64um_p_rem, "rv64um-p-rem", Mode::User);
+test_case!(test_suite_rv64um_p_remu, "rv64um-p-remu", Mode::User);
+test_case!(test_suite_rv64um_p_remuw, "rv64um-p-remuw", Mode::User);
+test_case!(test_suite_rv64um_p_remw, "rv64um-p-remw", Mode::User);
 
 test_case!(
     #[ignore]
