@@ -4469,6 +4469,153 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   Log.info "Slot sucessfully attested" ;
   unit
 
+let test_commitments_history_rpcs _protocol dal_parameters _cryptobox node
+    client dal_node =
+  let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let lag = dal_parameters.attestation_lag in
+  let number_of_slots = dal_parameters.number_of_slots in
+  let index = number_of_slots - 1 in
+  Log.info "attestation_lag = %d, number_of_slots = %d" lag number_of_slots ;
+  let last_confirmed_level = 5 in
+  let max_level = last_confirmed_level + lag + 2 in
+  let wait_for_dal_node =
+    wait_for_layer1_final_block dal_node (last_confirmed_level + lag)
+  in
+
+  let rec publish level commitments =
+    (* Try to publish a slot at each level *)
+    if level >= max_level then return @@ List.rev commitments
+    else
+      let* commitment =
+        publish_and_store_slot
+          client
+          dal_node
+          Constant.bootstrap1
+          ~index
+          ~force:true
+        @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
+      in
+      let* () = bake_for client ~dal_node_endpoint in
+      let* _level = Node.wait_for_level node (level + 1) in
+      publish (level + 1) (commitment :: commitments)
+  in
+
+  let* () = bake_for client in
+  let* first_level = Client.level client in
+  Log.info "No slot published at level %d" first_level ;
+  Log.info "Publishing slots and baking up to level %d" max_level ;
+  let* commitments = publish first_level [] in
+  let commitments = Array.of_list commitments in
+
+  let module SeenIndexes = Set.Make (struct
+    type t = int
+
+    let compare = compare
+  end) in
+  let seen_indexes = ref SeenIndexes.empty in
+  let rec check_history level =
+    (* Try to publish a slot at each level *)
+    if level > max_level then unit
+    else
+      let* cell =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_context_dal_commitments_history
+             ~block:(string_of_int level)
+             ()
+      in
+      let* () = check_cell cell ~check_level:(Some level) in
+      check_history (level + 1)
+  and check_cell cell ~check_level =
+    let skip_list_kind = JSON.(cell |-> "kind" |> as_string) in
+    let expected_skip_list_kind = "dal_skip_list" in
+    Check.(
+      (skip_list_kind = expected_skip_list_kind)
+        string
+        ~error_msg:"Unexpected skip list kind: got %L, expected %R") ;
+    let skip_list = JSON.(cell |-> "skip_list") in
+    let cell_index = JSON.(skip_list |-> "index" |> as_int) in
+    if SeenIndexes.mem cell_index !seen_indexes then unit
+    else (
+      seen_indexes := SeenIndexes.add cell_index !seen_indexes ;
+      let content = JSON.(skip_list |-> "content") in
+      let cell_level = JSON.(content |-> "level" |> as_int) in
+      let published_level =
+        match check_level with
+        | Some level ->
+            let expected_level = max 0 (level - lag) in
+            Check.(
+              (cell_level = expected_level)
+                int
+                ~error_msg:"Unexpected cell level: got %L, expected %R") ;
+            level - lag
+        | None -> cell_level
+      in
+      let slot_index = JSON.(content |-> "index" |> as_int) in
+      let () =
+        match check_level with
+        | None -> ()
+        | Some level ->
+            let expected_slot_index =
+              if level < lag then (* the "slot index" of genesis *) 0
+              else number_of_slots - 1
+            in
+            Check.(
+              (slot_index = expected_slot_index)
+                int
+                ~error_msg:"Unexpected slot index: got %L, expected %R")
+      in
+      (if cell_index > 0 then
+       Check.(
+         (cell_index = ((cell_level - 1) * number_of_slots) + slot_index)
+           int
+           ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
+      let cell_kind = JSON.(content |-> "kind" |> as_string) in
+      let expected_kind =
+        if published_level <= first_level || slot_index != index then
+          "unattested"
+        else "attested"
+      in
+      Check.(
+        (cell_kind = expected_kind)
+          string
+          ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
+      (if cell_kind = "attested" then
+       let commitment = JSON.(content |-> "commitment" |> as_string) in
+       Check.(
+         (commitment = commitments.(cell_level - (first_level + 1)))
+           string
+           ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
+      let back_pointers =
+        JSON.(skip_list |-> "back_pointers" |> as_list)
+        |> List.map JSON.as_string
+      in
+      let expecting_no_back_pointers =
+        match check_level with
+        | Some level ->
+            level < lag || (level = lag && slot_index = number_of_slots - 1)
+        | None -> cell_index = 0
+      in
+      let no_back_pointers = back_pointers = [] in
+      Check.(
+        (no_back_pointers = expecting_no_back_pointers)
+          bool
+          ~error_msg:
+            "Unexpected non-existence of back_pointers: got %L, expected %R") ;
+      if cell_level > first_level && cell_level <= last_confirmed_level then
+        Lwt_list.iter_s
+          (fun hash ->
+            let* cell =
+              Dal_RPC.(
+                call dal_node @@ get_plugin_commitments_history_hash ~hash ())
+            in
+            check_cell cell ~check_level:None)
+          back_pointers
+      else unit)
+  in
+  let* () = wait_for_dal_node in
+  check_history 1
+
 module Tx_kernel_e2e = struct
   open Tezos_protocol_alpha.Protocol
   open Tezt_tx_kernel
@@ -5177,6 +5324,11 @@ let register ~protocols =
     ~bootstrap_profile:true
     "attestation through p2p"
     test_attestation_through_p2p
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~producer_profiles:[15]
+    "commitments history RPCs"
+    test_commitments_history_rpcs
     protocols ;
 
   (* Tests with all nodes *)

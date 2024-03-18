@@ -391,6 +391,9 @@ module Dal_RPC = struct
                    score = get "score" json |> as_float;
                  })))
 
+  let get_plugin_commitments_history_hash ~hash () =
+    make GET ["plugin"; "commitments_history"; "hash"; hash] Fun.id
+
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct
     let call ?rpc_hooks ?log_request ?log_response_status ?log_response_body

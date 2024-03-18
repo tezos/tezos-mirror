@@ -235,16 +235,20 @@ module RPC : sig
 
   type topic = {topic_slot_index : int; topic_pkh : string}
 
-  (* Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
+  (** Call RPC "GET /p2p/gossipsub/topics/peers" to list the peers on
      each topic. *)
   val get_topics_peers :
     subscribed:bool -> (topic * string list) list RPC_core.t
 
   type peer_score = {peer : string; score : float}
 
-  (* Call RPC "GET /p2p/gossipsub/scores" to list the scores of peers with a
+  (** Call RPC "GET /p2p/gossipsub/scores" to list the scores of peers with a
      known score. *)
   val get_scores : unit -> peer_score list RPC_core.t
+
+  (** Call RPC /plugin/commitments_history/hash/[hash]. *)
+  val get_plugin_commitments_history_hash :
+    hash:string -> unit -> JSON.t RPC_core.t
 
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
