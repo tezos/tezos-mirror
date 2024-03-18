@@ -259,7 +259,7 @@ module Delegate : sig
     frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
-    min_delegated_in_current_cycle : Tez.t;
+    min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
     total_delegated_stake : Tez.t;
     staking_denominator : Staking_pseudotoken.t;
     deactivated : bool;

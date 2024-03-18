@@ -61,7 +61,7 @@ type info = {
   frozen_deposits_limit : Tez.t option;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
-  min_delegated_in_current_cycle : Tez.t;
+  min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
   total_delegated_stake : Tez.t;
   staking_denominator : Staking_pseudotoken.t;
   deactivated : bool;

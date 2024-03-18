@@ -45,7 +45,7 @@ let equal_full_staking_balance (a : Full_staking_balance_repr.t)
     (b : Full_staking_balance_repr.t) =
   let open Lwt_result_syntax in
   let open Full_staking_balance_repr in
-  let open Full_staking_balance_repr.Internal_for_tests in
+  let open Full_staking_balance_repr.Internal_for_tests_and_RPCs in
   let equal_tez_repr ~loc a b =
     Assert.equal_int64 ~loc (Tez_repr.to_mutez a) (Tez_repr.to_mutez b)
   in
@@ -65,10 +65,12 @@ let equal_full_staking_balance (a : Full_staking_balance_repr.t)
       (min_delegated_in_cycle b)
   in
   let* () =
-    equal_cycle_repr
-      ~loc:__LOC__
-      (cycle_of_min_delegated a)
-      (cycle_of_min_delegated b)
+    let cycle s =
+      match level_of_min_delegated s with
+      | None -> Cycle_repr.root
+      | Some l -> l.cycle
+    in
+    equal_cycle_repr ~loc:__LOC__ (cycle a) (cycle b)
   in
   return_unit
 
@@ -100,7 +102,7 @@ let test_encodings () =
       ~own_frozen
       ~staked_frozen
       ~delegated
-      ~current_cycle:Cycle_repr.root
+      ~current_level:Level_repr.Internal_for_tests.root
   in
   let encoding = Full_staking_balance_repr.encoding in
   let sb_bytes = Binary.to_bytes_exn encoding staking_balance in

@@ -362,4 +362,13 @@ module Internal_for_tests = struct
       level_position =
         Int32.add level.level_position (Int32.of_int (n * blocks_per_cycle));
     }
+
+  let root =
+    {
+      level = Raw_level_repr.root;
+      level_position = 0l;
+      cycle = Cycle_repr.root;
+      cycle_position = 0l;
+      expected_commitment = false;
+    }
 end
