@@ -933,9 +933,9 @@ module Chain_traversal = struct
     let open Lwt_syntax in
     let rec loop acc block_head n =
       let hashes = Block.all_operation_hashes block_head in
-      let acc = f acc (Block.hash block_head, hashes) in
       if n = 0 then Lwt.return acc
       else
+        let acc = f acc (Block.hash block_head, hashes) in
         let* o = Block.read_predecessor_opt chain_store block_head in
         match o with
         | None -> Lwt.return acc
