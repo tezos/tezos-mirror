@@ -3,13 +3,16 @@
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
+
+use crate::blueprint_storage::{blueprint_path, read_next_blueprint_number};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::storage::{
     read_chain_id, read_storage_version, store_storage_version, DELAYED_BRIDGE,
     STORAGE_VERSION,
 };
-use tezos_smart_rollup_host::path::RefPath;
+use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_host::path::{concat, RefPath};
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
 pub enum MigrationStatus {
@@ -33,6 +36,32 @@ fn allow_path_not_found(res: Result<(), RuntimeError>) -> Result<(), RuntimeErro
         Err(RuntimeError::PathNotFound) => Ok(()),
         Err(err) => Err(err),
     }
+}
+
+fn wipe_blueprints<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    let next_blueprint = read_next_blueprint_number(host)?;
+    let path = blueprint_path(next_blueprint)?;
+    let tmp = concat(&RefPath::assert_from(b"/tmp"), &path)?;
+
+    if host.store_move(&path, &tmp).is_err() {
+        log!(
+            host,
+            Info,
+            "Moving the next blueprint failed, but it can be expected."
+        )
+    };
+
+    allow_path_not_found(host.store_delete(&crate::blueprint_storage::EVM_BLUEPRINTS))?;
+
+    if host.store_move(&tmp, &path).is_err() {
+        log!(
+            host,
+            Info,
+            "Moving back the next blueprint failed, but it can be expected."
+        );
+    };
+
+    Ok(())
 }
 
 // The workflow for migration is the following:
@@ -67,6 +96,8 @@ fn migration<Host: Runtime>(host: &mut Host) -> anyhow::Result<MigrationStatus> 
                     b"/evm/__applied_kernel_upgrade",
                 )),
             )?;
+            wipe_blueprints(host)?;
+            allow_path_not_found(host.store_delete(&RefPath::assert_from(b"/tmp")))?;
         }
         // MIGRATION CODE - END
         store_storage_version(host, STORAGE_VERSION)?;

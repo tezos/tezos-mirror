@@ -17,7 +17,7 @@ use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
-const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
+pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 
@@ -75,7 +75,7 @@ impl Decodable for StoreBlueprint {
     }
 }
 
-fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
+pub fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
     let number_as_path: Vec<u8> = format!("/{}", number).into();
     // The key being an integer value, it will always be valid as a path,
     // `assert_from` cannot fail.
