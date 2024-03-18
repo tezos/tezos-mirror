@@ -693,8 +693,11 @@ mod tests {
     const CHAIN_ID: u32 = 1337;
 
     fn mock_block_constants() -> BlockConstants {
-        let block_fees =
-            BlockFees::new(U256::from(12345), U256::from(2_000_000_000_000u64));
+        let block_fees = BlockFees::new(
+            U256::from(12345),
+            U256::from(12345),
+            U256::from(2_000_000_000_000u64),
+        );
         BlockConstants::first_block(
             U256::from(Timestamp::from(0).as_u64()),
             CHAIN_ID.into(),
@@ -755,13 +758,10 @@ mod tests {
         resign(transaction)
     }
 
-    fn gas_for_fees_no_data(
-        block_constants: &BlockConstants,
-        effective_gas_price: U256,
-    ) -> u64 {
+    fn gas_for_fees_no_data(block_constants: &BlockConstants) -> u64 {
         gas_for_fees(
             block_constants.block_fees.da_fee_per_byte(),
-            effective_gas_price,
+            block_constants.block_fees.minimum_base_fee_per_gas(),
             vec![].as_slice(),
             vec![].as_slice(),
         )
@@ -777,7 +777,7 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
         let balance = U256::from(fee_gas + 21000) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
@@ -810,7 +810,7 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
         // account doesnt have enough funds for execution
         let balance = U256::from(fee_gas) * gas_price;
         let gas_limit = 21000 + fee_gas;
@@ -844,7 +844,7 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
         let balance = U256::from(fee_gas + 21000) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
@@ -878,7 +878,7 @@ mod tests {
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let gas_price = U256::from(21000);
-        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
         let balance = U256::from(fee_gas + 21000) * gas_price;
         let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
@@ -949,7 +949,7 @@ mod tests {
         let gas_price = U256::from(21000);
         let max_gas_price = U256::one();
         // account doesnt have enough funds for execution
-        let fee_gas = gas_for_fees_no_data(&block_constants, gas_price);
+        let fee_gas = gas_for_fees_no_data(&block_constants);
         let gas_limit = 21000 + fee_gas;
         let mut transaction = valid_tx(gas_limit);
         // set a max base fee too low

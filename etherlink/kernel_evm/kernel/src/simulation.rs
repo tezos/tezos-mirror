@@ -53,6 +53,7 @@ const MAX_GAS_FEE_TOO_LOW: &str = "Max gas fee too low.";
 const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
     is allocated. Try reducing its gas consumption or splitting the call in
     multiple steps, if possible.";
+const GAS_LIMIT_TOO_LOW: &str = "Gas limit too low.";
 
 // Redefined Result as we cannot implement Decodable and Encodable traits on Result
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -276,13 +277,9 @@ impl Evaluation {
             false,
         ) {
             Ok(Some(outcome)) => {
-                let outcome = simulation_add_gas_for_fees(
-                    outcome,
-                    &block_fees,
-                    gas_price,
-                    &self.data,
-                )
-                .map_err(Error::Simulation)?;
+                let outcome =
+                    simulation_add_gas_for_fees(outcome, &block_fees, &self.data)
+                        .map_err(Error::Simulation)?;
 
                 let result: SimulationResult<CallResult, String> =
                     Result::Ok(Some(outcome)).into();
@@ -373,7 +370,7 @@ impl TxValidation {
             );
 
         let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false) else {
-            return Self::to_error(MAX_GAS_FEE_TOO_LOW);
+            return Self::to_error(GAS_LIMIT_TOO_LOW);
         };
 
         match run_transaction(
@@ -984,7 +981,7 @@ mod tests {
         let tx_access_list = vec![];
         let fee_gas = gas_for_fees(
             block_fees.da_fee_per_byte(),
-            gas_price,
+            block_fees.minimum_base_fee_per_gas(),
             tx_data.as_slice(),
             tx_access_list.as_slice(),
         )
@@ -1078,7 +1075,7 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(
-            SimulationResult::Err(String::from(super::MAX_GAS_FEE_TOO_LOW)),
+            SimulationResult::Err(String::from(super::GAS_LIMIT_TOO_LOW)),
             result.unwrap()
         );
     }

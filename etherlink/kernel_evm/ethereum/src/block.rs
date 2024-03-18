@@ -20,14 +20,20 @@ use tezos_smart_rollup_encoding::timestamp::Timestamp;
 /// Container for fee calculation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockFees {
+    minimum_base_fee_per_gas: U256,
     base_fee_per_gas: U256,
     da_fee_per_byte: U256,
 }
 
 impl BlockFees {
     /// Setup fee information for the current block
-    pub const fn new(base_fee_per_gas: U256, da_fee_per_byte: U256) -> Self {
+    pub const fn new(
+        minimum_base_fee_per_gas: U256,
+        base_fee_per_gas: U256,
+        da_fee_per_byte: U256,
+    ) -> Self {
         Self {
+            minimum_base_fee_per_gas,
             base_fee_per_gas,
             da_fee_per_byte,
         }
@@ -37,6 +43,12 @@ impl BlockFees {
     #[inline(always)]
     pub const fn base_fee_per_gas(&self) -> U256 {
         self.base_fee_per_gas
+    }
+
+    /// The minimum base fee per gas
+    #[inline(always)]
+    pub const fn minimum_base_fee_per_gas(&self) -> U256 {
+        self.minimum_base_fee_per_gas
     }
 
     /// The da fee per byte charged per transaction.

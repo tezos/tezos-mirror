@@ -20,8 +20,9 @@ use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use safe_storage::WORLD_STATE_PATH;
 use storage::{
-    read_chain_id, read_da_fee, read_kernel_version, read_last_info_per_level_timestamp,
-    read_last_info_per_level_timestamp_stats, store_chain_id, store_da_fee,
+    read_base_fee_per_gas, read_chain_id, read_da_fee, read_kernel_version,
+    read_last_info_per_level_timestamp, read_last_info_per_level_timestamp_stats,
+    read_minimum_base_fee_per_gas, store_base_fee_per_gas, store_chain_id, store_da_fee,
     store_kernel_version, store_storage_version, STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -136,7 +137,18 @@ fn retrieve_chain_id<Host: Runtime>(host: &mut Host) -> Result<U256, Error> {
     }
 }
 fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Error> {
-    let base_fee_per_gas = crate::gas_price::load_gas_price(host)?;
+    let minimum_base_fee_per_gas = read_minimum_base_fee_per_gas(host)
+        .unwrap_or_else(|_| crate::fees::MINIMUM_BASE_FEE_PER_GAS.into());
+
+    let base_fee_per_gas = match read_base_fee_per_gas(host) {
+        Ok(base_fee_per_gas) if base_fee_per_gas > minimum_base_fee_per_gas => {
+            base_fee_per_gas
+        }
+        _ => {
+            store_base_fee_per_gas(host, minimum_base_fee_per_gas)?;
+            minimum_base_fee_per_gas
+        }
+    };
 
     let da_fee = match read_da_fee(host) {
         Ok(da_fee) => da_fee,
@@ -147,7 +159,7 @@ fn retrieve_block_fees<Host: Runtime>(host: &mut Host) -> Result<BlockFees, Erro
         }
     };
 
-    let block_fees = BlockFees::new(base_fee_per_gas, da_fee);
+    let block_fees = BlockFees::new(minimum_base_fee_per_gas, base_fee_per_gas, da_fee);
 
     Ok(block_fees)
 }
@@ -313,7 +325,11 @@ mod tests {
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
     fn dummy_block_fees() -> BlockFees {
-        BlockFees::new(U256::from(DUMMY_BASE_FEE_PER_GAS), DUMMY_DA_FEE.into())
+        BlockFees::new(
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            DUMMY_DA_FEE.into(),
+        )
     }
 
     fn set_balance<Host: Runtime>(
@@ -506,6 +522,7 @@ mod tests {
         // Assert
         let expected = BlockFees::new(
             fees::MINIMUM_BASE_FEE_PER_GAS.into(),
+            fees::MINIMUM_BASE_FEE_PER_GAS.into(),
             fees::DA_FEE_PER_BYTE.into(),
         );
 
@@ -523,7 +540,8 @@ mod tests {
         let mut host = MockHost::default();
 
         let min_base_fee = U256::from(17);
-        storage::store_base_fee_per_gas(&mut host, U256::one()).unwrap();
+        let curr_base_fee = U256::from(20);
+        storage::store_base_fee_per_gas(&mut host, curr_base_fee).unwrap();
         storage::write_u256(&mut host, &min_path, min_base_fee).unwrap();
 
         // Act
@@ -531,12 +549,13 @@ mod tests {
         let base_fee = storage::read_base_fee_per_gas(&mut host);
 
         // Assert
-        let expected = BlockFees::new(min_base_fee, fees::DA_FEE_PER_BYTE.into());
+        let expected =
+            BlockFees::new(min_base_fee, curr_base_fee, fees::DA_FEE_PER_BYTE.into());
 
         assert!(result.is_ok());
         assert_eq!(expected, result.unwrap());
 
         assert!(base_fee.is_ok());
-        assert_eq!(min_base_fee, base_fee.unwrap());
+        assert_eq!(curr_base_fee, base_fee.unwrap());
     }
 }

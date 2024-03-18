@@ -2345,8 +2345,11 @@ mod test {
     }
 
     fn dummy_first_block() -> BlockConstants {
-        let block_fees =
-            BlockFees::new(U256::from(12345), U256::from(2_000_000_000_000u64));
+        let block_fees = BlockFees::new(
+            U256::one(),
+            U256::from(12345),
+            U256::from(2_000_000_000_000u64),
+        );
         BlockConstants::first_block(U256::zero(), U256::one(), block_fees)
     }
 

@@ -520,7 +520,11 @@ mod tests {
     const DUMMY_DA_FEE: u64 = 2_000_000_000_000u64;
 
     fn dummy_block_fees() -> BlockFees {
-        BlockFees::new(U256::from(DUMMY_BASE_FEE_PER_GAS), U256::from(DUMMY_DA_FEE))
+        BlockFees::new(
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            U256::from(DUMMY_BASE_FEE_PER_GAS),
+            U256::from(DUMMY_DA_FEE),
+        )
     }
 
     fn dummy_eth_gen_transaction(
@@ -531,8 +535,13 @@ mod tests {
         let gas_price = U256::from(40000000u64);
         let gas_limit = 21000u64;
 
-        let gas_for_fees =
-            crate::fees::gas_for_fees(DUMMY_DA_FEE.into(), gas_price, &[], &[]).unwrap();
+        let gas_for_fees = crate::fees::gas_for_fees(
+            DUMMY_DA_FEE.into(),
+            DUMMY_BASE_FEE_PER_GAS.into(),
+            &[],
+            &[],
+        )
+        .unwrap();
         let gas_limit = gas_limit + gas_for_fees;
 
         let to = address_from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea");
@@ -727,7 +736,7 @@ mod tests {
 
     #[test]
     // Test if a valid transaction is producing a receipt with a success status
-    fn tst_valid_transactions_receipt_status() {
+    fn test_valid_transactions_receipt_status() {
         let mut host = MockHost::default();
         crate::storage::store_minimum_base_fee_per_gas(
             &mut host,
@@ -751,7 +760,7 @@ mod tests {
             &mut host,
             &mut evm_account_storage,
             &sender,
-            U256::from(5000000000000000u64),
+            U256::from(1_000_000_000_000_000_000u64),
         );
 
         produce(
@@ -902,7 +911,14 @@ mod tests {
 
         let base_gas = U256::from(21000);
         crate::storage::store_minimum_base_fee_per_gas(&mut host, base_gas).unwrap();
-        let gas_for_fees = U256::from(7479012);
+        let dummy_block_fees = dummy_block_fees();
+        let gas_for_fees = crate::fees::gas_for_fees(
+            dummy_block_fees.da_fee_per_byte(),
+            dummy_block_fees.base_fee_per_gas(),
+            &[],
+            &[],
+        )
+        .unwrap();
 
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
@@ -932,7 +948,7 @@ mod tests {
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
+            dummy_block_fees,
             &mut Configuration::default(),
         )
         .expect("The block production failed.");
@@ -1009,7 +1025,7 @@ mod tests {
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
         let da_fee = crate::fees::da_fee(DUMMY_DA_FEE.into(), &[], &[]);
-        let rounding_amount = 39000000;
+        let rounding_amount = 6000;
         let expected_fees = dummy_block_fees().base_fee_per_gas() * expected_gas
             + da_fee
             + rounding_amount;
@@ -1043,12 +1059,13 @@ mod tests {
         let indexed_accounts = accounts_index.length(&host).unwrap();
 
         let sender = dummy_eth_caller();
+        println!("caller {sender:?}");
         let mut evm_account_storage = init_account_storage().unwrap();
         set_balance(
             &mut host,
             &mut evm_account_storage,
             &sender,
-            U256::from(5000000000000000u64),
+            U256::from(1_000_000_000_000_000_000u64),
         );
         produce(
             &mut host,
@@ -1629,6 +1646,8 @@ mod tests {
 
         // init host
         let mut host = MockHost::default();
+        // ensure we're using the default block fees to test.
+        let block_fees = crate::retrieve_block_fees(&mut host).unwrap();
 
         // see
         // https://basescan.org/tx/0x07471adfe8f4ec553c1199f495be97fc8be8e0626ae307281c22534460184ed1
@@ -1664,13 +1683,13 @@ mod tests {
             &mut host,
             &mut evm_account_storage,
             &sender,
-            U256::from(500000000000000000u64),
+            U256::from(1_000_000_000_000_000_000u64),
         );
 
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
-            dummy_block_fees(),
+            block_fees,
             &mut Configuration::default(),
         )
         .expect("The block production failed.");
@@ -1833,7 +1852,7 @@ mod tests {
             &mut host,
             &mut evm_account_storage,
             &sender,
-            U256::from(5000000000000000u64),
+            U256::from(1_000_000_000_000_000_000u64),
         );
 
         produce(
