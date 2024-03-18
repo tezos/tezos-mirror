@@ -147,6 +147,15 @@ impl Transaction {
             }
         }
     }
+
+    pub fn is_delayed(&self) -> bool {
+        match &self.content {
+            TransactionContent::Deposit(_) | TransactionContent::EthereumDelayed(_) => {
+                true
+            }
+            TransactionContent::Ethereum(_) => false,
+        }
+    }
 }
 
 impl Encodable for Transaction {

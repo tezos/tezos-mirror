@@ -12,6 +12,8 @@ open Ethereum_types
 
 type path = string
 
+val evm_node_flag : path
+
 val chain_id : path
 
 val base_fee_per_gas : path

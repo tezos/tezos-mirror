@@ -308,6 +308,16 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
     Irmin_context.checkout_exn evm_node_index checkpoint
   in
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
+
+  (* Tell the kernel that it is executed by an EVM node *)
+  let*! evm_state = Evm_state.flag_local_exec evm_state in
+
+  (* For changes made to [evm_state] to take effect, we commit the result *)
+  let*! evm_node_context =
+    Irmin_context.PVMState.set evm_node_context evm_state
+  in
+  let*! checkpoint = Irmin_context.commit evm_node_context in
+
   (* Assert we can read the current blueprint number *)
   let* current_blueprint_number =
     let*! current_blueprint_number_opt =

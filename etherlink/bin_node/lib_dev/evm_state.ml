@@ -42,15 +42,19 @@ let execute ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint)
   in
   return evm_state
 
+let modify ~key ~value evm_state = Wasm.set_durable_value evm_state key value
+
+let flag_local_exec evm_state =
+  modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
+
 let init ~kernel =
   let open Lwt_result_syntax in
   let evm_state = Irmin_context.PVMState.empty () in
   let* evm_state =
     Wasm.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
   in
+  let*! evm_state = flag_local_exec evm_state in
   return evm_state
-
-let modify ~key ~value evm_state = Wasm.set_durable_value evm_state key value
 
 let inspect evm_state key =
   let open Lwt_syntax in
