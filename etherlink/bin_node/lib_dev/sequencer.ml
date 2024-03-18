@@ -215,8 +215,7 @@ let loop_sequencer :
         in
         let* nb_transactions =
           Block_producer.produce_block ~force ~timestamp:now
-        in
-        let*! () = Lwt_unix.sleep 0.5 in
+        and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
         if nb_transactions > 0 || force then loop now
         else loop last_produced_block
   in
