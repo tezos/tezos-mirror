@@ -21,6 +21,8 @@ pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
 
+const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
+
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
 /// which can be chunked, and blueprints constructed from
@@ -182,6 +184,7 @@ pub enum BlueprintValidity {
     InvalidParentHash,
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
+    UnexpectedDeposit,
 }
 
 /// Check that the parent hash of the [blueprint_with_hashes] is equal
@@ -216,6 +219,19 @@ fn fetch_delayed_txs<Host: Runtime>(
             None => return Ok(BlueprintValidity::DelayedHashMissing(tx_hash)),
         }
     }
+
+    let evm_node_exec_flag = host.store_has(&EVM_NODE_FLAG)?.is_some();
+
+    if !evm_node_exec_flag
+        && blueprint_with_hashes
+            .blueprint
+            .transactions
+            .iter()
+            .any(|txn| txn.is_delayed())
+    {
+        return Ok(BlueprintValidity::UnexpectedDeposit);
+    }
+
     delayed_txs.extend(blueprint_with_hashes.blueprint.transactions);
     Ok(BlueprintValidity::Valid(Blueprint {
         transactions: delayed_txs,

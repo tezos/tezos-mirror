@@ -12,6 +12,8 @@ open Ethereum_types
 
 type path = string
 
+let evm_node_flag = "/__evm_node"
+
 module EVM = struct
   let root = "/evm"
 

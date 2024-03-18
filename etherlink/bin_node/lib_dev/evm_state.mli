@@ -57,3 +57,7 @@ val apply_blueprint :
   t ->
   Blueprint_types.payload ->
   apply_result tzresult Lwt.t
+
+(** [flag_local_exec evm_state] adds a flag telling the kernel it is executed
+    by an EVM node, not a rollup node. *)
+val flag_local_exec : t -> t Lwt.t
