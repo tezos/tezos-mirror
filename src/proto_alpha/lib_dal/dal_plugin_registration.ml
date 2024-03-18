@@ -202,7 +202,7 @@ module Plugin = struct
             let* previous_cell_opt =
               (* Should not be negative as attestation_lag > 0. *)
               let prev_level = Int32.pred level in
-              Plugin.RPC.Dal.dal_confirmed_slots_history
+              Plugin.RPC.Dal.dal_commitments_history
                 cpctxt
                 (`Main, `Level prev_level)
             in

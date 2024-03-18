@@ -1217,9 +1217,9 @@ val get_chain_block_context_issuance_expected_issuance :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** Call RPC
-   /chains/[chain]/blocks/[block]/context/dal/confirmed_slot_headers_history.
+   /chains/[chain]/blocks/[block]/context/dal/commitments_history.
    [chain] defaults to ["main"].  [block] defaults to ["head"]. *)
-val get_chain_block_context_dal_confirmed_slot_headers_history :
+val get_chain_block_context_dal_commitments_history :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** Call RPC /chains/[chain]/blocks/[block]/context/raw/json.

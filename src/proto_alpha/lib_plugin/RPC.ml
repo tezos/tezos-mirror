@@ -3137,16 +3137,16 @@ module Dal = struct
     RPC_path.(open_root / "context" / "dal")
 
   module S = struct
-    let dal_confirmed_slot_headers_history =
+    let dal_commitments_history =
       let output = Data_encoding.option Dal.Slots_history.encoding in
       let query = RPC_query.(seal @@ query ()) in
       RPC_service.get_service
         ~description:
-          "Returns the value of the DAL confirmed slots history skip list if \
-           DAL is enabled, or [None] otherwise."
+          "Returns the (currently last) DAL skip list cell if DAL is enabled, \
+           or [None] otherwise."
         ~output
         ~query
-        RPC_path.(path / "confirmed_slot_headers_history")
+        RPC_path.(path / "commitments_history")
 
     let level_query =
       RPC_query.(
@@ -3201,19 +3201,19 @@ module Dal = struct
         RPC_path.(path / "published_slot_headers")
   end
 
-  let register_dal_confirmed_slot_headers_history () =
+  let register_dal_commitments_history () =
     let open Lwt_result_syntax in
     Registration.register0
       ~chunked:false
-      S.dal_confirmed_slot_headers_history
+      S.dal_commitments_history
       (fun ctxt () () ->
         if (Constants.parametric ctxt).dal.feature_enable then
           let+ result = Dal.Slots_storage.get_slot_headers_history ctxt in
           Option.some result
         else return_none)
 
-  let dal_confirmed_slots_history ctxt block =
-    RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
+  let dal_commitments_history ctxt block =
+    RPC_context.make_call0 S.dal_commitments_history ctxt block () ()
 
   let dal_shards ctxt block ?level ?(delegates = []) () =
     RPC_context.make_call0 S.shards ctxt block {level; delegates} ()
@@ -3257,7 +3257,7 @@ module Dal = struct
         @@ Published_slot_headers_not_initialized level
 
   let register () =
-    register_dal_confirmed_slot_headers_history () ;
+    register_dal_commitments_history () ;
     register_shards () ;
     register_published_slot_headers ()
 end
