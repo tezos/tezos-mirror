@@ -351,7 +351,7 @@ let add_staked_frozen ~amount
     level_of_min_delegated;
   }
 
-module Internal_for_tests = struct
+module Internal_for_tests_and_RPCs = struct
   let min_delegated_in_cycle
       {
         own_frozen = _;

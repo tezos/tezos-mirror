@@ -108,6 +108,13 @@ let consensus_key_info_encoding =
                 consensus_key_encoding))
           []))
 
+let min_delegated_in_current_cycle_encoding =
+  let open Data_encoding in
+  conv
+    (fun (min_delegated, anchor) -> (min_delegated, anchor))
+    (fun (min_delegated, anchor) -> (min_delegated, anchor))
+    (obj2 (req "amount" Tez.encoding) (opt "level" Level_repr.encoding))
+
 type info = {
   full_balance : Tez.t;
   current_frozen_deposits : Tez.t;
@@ -116,7 +123,7 @@ type info = {
   frozen_deposits_limit : Tez.t option;
   delegated_contracts : Contract.t list;
   delegated_balance : Tez.t;
-  min_delegated_in_current_cycle : Tez.t;
+  min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
   total_delegated_stake : Tez.t;
   staking_denominator : Staking_pseudotoken.t;
   deactivated : bool;
@@ -199,7 +206,9 @@ let info_encoding =
           (opt "frozen_deposits_limit" Tez.encoding)
           (req "delegated_contracts" (list Contract.encoding))
           (req "delegated_balance" Tez.encoding)
-          (req "min_delegated_in_current_cycle" Tez.encoding)
+          (req
+             "min_delegated_in_current_cycle"
+             min_delegated_in_current_cycle_encoding)
           (req "deactivated" bool)
           (req "grace_period" Cycle.encoding))
        (merge_objs
@@ -419,9 +428,10 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the minimum of delegated tez (in mutez) over the current \
-         cycle."
+         cycle and the block level where this value was last updated (* Level \
+         is `None` when decoding values from protocol O)."
       ~query:RPC_query.empty
-      ~output:Tez.encoding
+      ~output:min_delegated_in_current_cycle_encoding
       RPC_path.(path / "min_delegated_in_current_cycle")
 
   let deactivated =

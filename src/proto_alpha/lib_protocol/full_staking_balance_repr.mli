@@ -58,7 +58,7 @@ val add_own_frozen : amount:Tez_repr.t -> t -> t tzresult
 
 val add_staked_frozen : amount:Tez_repr.t -> t -> t tzresult
 
-module Internal_for_tests : sig
+module Internal_for_tests_and_RPCs : sig
   val min_delegated_in_cycle : t -> Tez_repr.t
 
   val level_of_min_delegated : t -> Level_repr.t option

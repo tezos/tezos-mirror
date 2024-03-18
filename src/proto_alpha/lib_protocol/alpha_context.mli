@@ -2500,7 +2500,7 @@ module Delegate : sig
     val staking_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 
     val min_delegated_in_current_cycle :
-      context -> public_key_hash -> Tez.t tzresult Lwt.t
+      context -> public_key_hash -> (Tez.t * Level_repr.t option) tzresult Lwt.t
 
     val has_pending_denunciations : context -> public_key_hash -> bool Lwt.t
 
