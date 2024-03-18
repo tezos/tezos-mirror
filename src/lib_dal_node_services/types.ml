@@ -277,6 +277,19 @@ end
 (* Declaration of types used as inputs and/or outputs. *)
 module Slot_id = struct
   type t = {slot_level : level; slot_index : slot_index}
+
+  let compare {slot_level = l1; slot_index = i1}
+      {slot_level = l2; slot_index = i2} =
+    let open Compare in
+    or_else (Int32.compare l1 l2) (fun () -> Int.compare i1 i2)
+
+  module Comparable = struct
+    type nonrec t = t
+
+    let compare = compare
+  end
+
+  module Set = Set.Make (Comparable)
 end
 
 type slot_id = Slot_id.t

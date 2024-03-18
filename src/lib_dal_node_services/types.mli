@@ -37,6 +37,8 @@ type page_index = int
 (** An ID associated to a slot or to its commitment. *)
 module Slot_id : sig
   type t = {slot_level : level; slot_index : slot_index}
+
+  module Set : Set.S with type elt = t
 end
 
 type slot_id = Slot_id.t
