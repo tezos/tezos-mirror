@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
@@ -340,7 +340,7 @@ impl Parsable for SequencerInput {
         InputResult::Input(Input::ModeSpecific(Self::DelayedInput(Box::new(
             Transaction {
                 tx_hash,
-                content: TransactionContent::Ethereum(tx),
+                content: TransactionContent::EthereumDelayed(tx),
             },
         ))))
     }

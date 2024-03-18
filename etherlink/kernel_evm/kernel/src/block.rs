@@ -452,6 +452,7 @@ mod tests {
     use crate::inbox::Transaction;
     use crate::inbox::TransactionContent;
     use crate::inbox::TransactionContent::Ethereum;
+    use crate::inbox::TransactionContent::EthereumDelayed;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_current_block;
     use crate::storage::{init_blocks_index, init_transaction_hashes_index};
@@ -1643,14 +1644,14 @@ mod tests {
         let transaction = EthereumTransactionCommon::from_bytes(&signed_transaction)
             .expect("The MultiCall3 transaction shouldn't be unparsable");
 
-        println!("Transaction: {:?}", transaction);
-
         let mut tx_hash = [0; TRANSACTION_HASH_SIZE];
         tx_hash.copy_from_slice(&expected_tx_hash);
 
+        // *NB*: due to the da fee, this will fail by default - so we inject it through the
+        // delayed inbox instead, so that it doesn't pay the da fee.
         let tx = Transaction {
             tx_hash,
-            content: Ethereum(transaction),
+            content: EthereumDelayed(transaction),
         };
 
         let transactions: Vec<Transaction> = vec![tx];

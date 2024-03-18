@@ -15,6 +15,7 @@
 //!
 //! Additionally, we charge a _data-availability_ fee, for each tx posted through L1.
 
+use crate::inbox::TransactionContent;
 use crate::storage::read_sequencer_pool_address;
 
 use evm_execution::account_storage::{account_path, EthereumAccountStorage};
@@ -63,9 +64,31 @@ pub struct FeeUpdates {
     pub compensate_sequencer_amount: U256,
 }
 
+impl TransactionContent {
+    /// Returns fee updates of the transaction.
+    ///
+    /// *NB* this is not the gas price used _for execution_, but rather the gas price that
+    /// should be reported in the transaction receipt.
+    ///
+    /// # Prerequisites
+    /// The user must have already paid for 'execution gas fees'.
+    pub fn fee_updates(
+        &self,
+        block_fees: &BlockFees,
+        execution_gas_used: U256,
+    ) -> FeeUpdates {
+        match self {
+            Self::Deposit(_) => FeeUpdates::for_deposit(execution_gas_used),
+            Self::Ethereum(tx) => FeeUpdates::for_tx(tx, block_fees, execution_gas_used),
+            Self::EthereumDelayed(tx) => {
+                FeeUpdates::for_delayed_tx(tx, block_fees, execution_gas_used)
+            }
+        }
+    }
+}
+
 impl FeeUpdates {
-    /// Returns the fee updates for a deposit.
-    pub fn for_deposit(gas_used: U256) -> Self {
+    fn for_deposit(gas_used: U256) -> Self {
         Self {
             overall_gas_used: gas_used,
             overall_gas_price: U256::zero(),
@@ -75,20 +98,33 @@ impl FeeUpdates {
         }
     }
 
-    /// Returns fee updates of the transaction.
-    ///
-    /// *NB* this is not the gas price used _for execution_, but rather the gas price that
-    /// should be reported in the transaction receipt.
-    ///
-    /// # Prerequisites
-    /// The user must have already paid for 'execution gas fees'.
-    pub fn for_tx(
+    fn for_tx(
         tx: &EthereumTransactionCommon,
         block_fees: &BlockFees,
         execution_gas_used: U256,
     ) -> Self {
-        let execution_gas_fees = execution_gas_used * block_fees.base_fee_per_gas();
         let da_fee = da_fee(block_fees.da_fee_per_byte(), &tx.data, &tx.access_list);
+
+        Self::of_tx(tx, block_fees, execution_gas_used, da_fee)
+    }
+
+    fn for_delayed_tx(
+        tx: &EthereumTransactionCommon,
+        block_fees: &BlockFees,
+        execution_gas_used: U256,
+    ) -> Self {
+        let da_fee = U256::zero();
+
+        Self::of_tx(tx, block_fees, execution_gas_used, da_fee)
+    }
+
+    fn of_tx(
+        tx: &EthereumTransactionCommon,
+        block_fees: &BlockFees,
+        execution_gas_used: U256,
+        da_fee: U256,
+    ) -> Self {
+        let execution_gas_fees = execution_gas_used * block_fees.base_fee_per_gas();
 
         let initial_added_fees = da_fee;
         let initial_total_fees = initial_added_fees + execution_gas_fees;
@@ -194,10 +230,16 @@ pub fn simulation_add_gas_for_fees(
 ///
 /// The user pre-pays this (in addition to the data availability fee) prior to execution.
 /// If execution does not use all of the execution gas limit, they will be partially refunded.
+/// If the transaction was sent through the delayed inbox, no additional fees need to be included
 pub fn tx_execution_gas_limit(
     tx: &EthereumTransactionCommon,
     fees: &BlockFees,
+    delayed: bool,
 ) -> Result<u64, EthereumError> {
+    if delayed {
+        return Ok(tx.gas_limit_with_fees());
+    }
+
     let gas_for_fees = gas_for_fees(
         fees.da_fee_per_byte(),
         tx.max_fee_per_gas,
@@ -273,9 +315,9 @@ mod tests {
             da_fee in any::<u64>().prop_map(U256::from),
             data in any::<Vec<u8>>(),
             execution_gas_used in (1_u64..).prop_map(U256::from),
-            (max_fee_per_gas, base_fee_per_gas) in (1_u64.., 1_u64..)
-                .prop_map(|(a, b)| if a > b {(a, b)} else {(b, a)})
-                .prop_map(|(a, b)| (a.into(), b.into())),
+            (max_fee_per_gas, base_fee_per_gas) in [1_u64.., 1_u64..]
+                .prop_map(|mut prices| {prices.sort(); prices} )
+                .prop_map(|[a, b]| (a.into(), b.into())),
         ) {
             // Arrange
             let data_size = data.len();

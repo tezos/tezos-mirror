@@ -48,35 +48,44 @@ impl Transaction {
     fn to(&self) -> Option<H160> {
         match &self.content {
             TransactionContent::Deposit(Deposit { receiver, .. }) => Some(*receiver),
-            TransactionContent::Ethereum(transaction) => transaction.to,
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => transaction.to,
         }
     }
 
     fn data(&self) -> Vec<u8> {
         match &self.content {
             TransactionContent::Deposit(_) => vec![],
-            TransactionContent::Ethereum(transaction) => transaction.data.clone(),
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => {
+                transaction.data.clone()
+            }
         }
     }
 
     fn value(&self) -> U256 {
         match &self.content {
             TransactionContent::Deposit(Deposit { amount, .. }) => *amount,
-            TransactionContent::Ethereum(transaction) => transaction.value,
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => transaction.value,
         }
     }
 
     fn nonce(&self) -> u64 {
         match &self.content {
             TransactionContent::Deposit(_) => 0,
-            TransactionContent::Ethereum(transaction) => transaction.nonce,
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => transaction.nonce,
         }
     }
 
     fn signature(&self) -> Option<TxSignature> {
         match &self.content {
             TransactionContent::Deposit(_) => None,
-            TransactionContent::Ethereum(transaction) => transaction.signature.clone(),
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => {
+                transaction.signature.clone()
+            }
         }
     }
 }
@@ -140,7 +149,7 @@ fn make_object_info(
     fee_updates: &FeeUpdates,
 ) -> Result<TransactionObjectInfo, anyhow::Error> {
     let (gas, gas_price) = match &transaction.content {
-        TransactionContent::Ethereum(e) => {
+        TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
             (e.gas_limit_with_fees().into(), e.max_fee_per_gas)
         }
         TransactionContent::Deposit(_) => {
@@ -213,6 +222,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
     effective_gas_price: U256,
+    is_delayed: bool,
 ) -> Result<Validity, Error> {
     // Chain id is correct.
     if transaction.chain_id.is_some()
@@ -274,7 +284,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     }
 
     // check that enough gas is provided to cover fees
-    let Ok(gas_limit) =  tx_execution_gas_limit(transaction, &block_constant.block_fees)
+    let Ok(gas_limit) =  tx_execution_gas_limit(transaction, &block_constant.block_fees, is_delayed)
     else {
         log!(host, Benchmarking, "Transaction status: ERROR_GAS_FEE.");
          return Ok(Validity::InvalidNotEnoughGasForFees)
@@ -303,6 +313,7 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &Vec
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
@@ -311,6 +322,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     transaction: &EthereumTransactionCommon,
     allocated_ticks: u64,
     retriable: bool,
+    is_delayed: bool,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
@@ -319,6 +331,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         transaction,
         block_constants,
         effective_gas_price,
+        is_delayed,
     )? {
         Validity::Valid(caller, gas_limit) => (caller, gas_limit),
         _reason => {
@@ -546,12 +559,9 @@ pub fn handle_transaction_result<Host: Runtime>(
 
     let to = transaction.to();
 
-    let fee_updates = match &transaction.content {
-        TransactionContent::Deposit(_) => FeeUpdates::for_deposit(gas_used),
-        TransactionContent::Ethereum(tx) => {
-            FeeUpdates::for_tx(tx, &block_constants.block_fees, gas_used)
-        }
-    };
+    let fee_updates = transaction
+        .content
+        .fee_updates(&block_constants.block_fees, gas_used);
 
     if let Some(outcome) = &mut execution_outcome {
         log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
@@ -608,6 +618,17 @@ pub fn apply_transaction<Host: Runtime>(
             tx,
             allocated_ticks,
             retriable,
+            false,
+        )?,
+        TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
+            host,
+            block_constants,
+            precompiles,
+            evm_account_storage,
+            tx,
+            allocated_ticks,
+            retriable,
+            true,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
@@ -770,6 +791,7 @@ mod tests {
             &transaction,
             &block_constants,
             gas_price,
+            false,
         );
         assert_eq!(
             Validity::Valid(address, 21000),
@@ -803,6 +825,7 @@ mod tests {
             &transaction,
             &block_constants,
             gas_price,
+            false,
         );
         assert_eq!(
             Validity::InvalidPrePay,
@@ -836,6 +859,7 @@ mod tests {
             &transaction,
             &block_constants,
             gas_price,
+            false,
         );
         assert_eq!(
             Validity::InvalidSignature,
@@ -871,6 +895,7 @@ mod tests {
             &transaction,
             &block_constants,
             gas_price,
+            false,
         );
         assert_eq!(
             Validity::InvalidNonce,
@@ -904,6 +929,7 @@ mod tests {
             &transaction,
             &block_constants,
             gas_price,
+            false,
         );
         assert_eq!(
             Validity::InvalidChainId,
@@ -937,6 +963,7 @@ mod tests {
             &transaction,
             &block_constants,
             gas_price,
+            false,
         );
         assert_eq!(
             Validity::InvalidMaxBaseFee,
@@ -971,11 +998,28 @@ mod tests {
             &transaction,
             &block_constants,
             gas_price,
+            false,
         );
         assert_eq!(
             Validity::InvalidNotEnoughGasForFees,
             res.expect("Verification should not have raise an error"),
             "Transaction should have been rejected"
+        );
+
+        let res = is_valid_ethereum_transaction_common(
+            &mut host,
+            &mut evm_account_storage,
+            &transaction,
+            &block_constants,
+            gas_price,
+            true,
+        );
+        assert!(
+            matches!(
+                res.expect("Verification should not have raise an error"),
+                Validity::Valid(_, _)
+            ),
+            "Transaction should have been accepted through delayed inbox"
         );
     }
 }
