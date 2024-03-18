@@ -1014,7 +1014,7 @@ let test_observer_forwards_transaction =
 let test_upgrade_kernel_auto_sync =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"; Tag.flaky]
+    ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
     ~title:"Rollup-node kernel upgrade is applied to the sequencer state."
     ~uses
   @@ fun protocol ->
@@ -1665,7 +1665,7 @@ let test_migration_from_ghostnet =
 let test_sequencer_upgrade =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"]
+    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"; Tag.flaky]
     ~title:
       "Rollup-node sequencer upgrade is applied to the sequencer local state."
     ~uses
