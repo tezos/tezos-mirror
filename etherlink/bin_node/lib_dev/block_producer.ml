@@ -102,7 +102,9 @@ let produce_block ~(ctxt : Evm_context.t) ~cctxt ~smart_rollup_address
         ~parent_hash:ctxt.Evm_context.session.current_block_hash
         ~number:ctxt.Evm_context.session.next_blueprint_number
     in
-    let* _ctxt = Evm_context.apply_and_publish_blueprint ctxt blueprint in
+    let* () =
+      Evm_context.apply_and_publish_blueprint ctxt timestamp blueprint
+    in
     let*! () =
       List.iter_p
         (fun hash -> Block_producer_events.transaction_selected ~hash)

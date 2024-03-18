@@ -26,16 +26,10 @@ val with_transaction : t -> (t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 val assert_in_transaction : t -> unit
 
 module Executable_blueprints : sig
-  val store :
-    t ->
-    Ethereum_types.quantity ->
-    Blueprint_types.payload ->
-    unit tzresult Lwt.t
+  val store : t -> Blueprint_types.t -> unit tzresult Lwt.t
 
   val find :
-    t ->
-    Ethereum_types.quantity ->
-    Blueprint_types.payload option tzresult Lwt.t
+    t -> Ethereum_types.quantity -> Blueprint_types.t option tzresult Lwt.t
 end
 
 module Publishable_blueprints : sig

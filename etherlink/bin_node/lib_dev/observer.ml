@@ -146,7 +146,7 @@ let on_new_blueprint (ctxt : Evm_context.t) (blueprint : Blueprint_types.t) =
   let (Qty level) = blueprint.number in
   let (Qty number) = ctxt.session.next_blueprint_number in
   if Z.(equal level number) then
-    Evm_context.apply_blueprint ctxt blueprint.payload
+    Evm_context.apply_blueprint ctxt blueprint.timestamp blueprint.payload
   else failwith "Received a blueprint with an unexpected number."
 
 let main (ctxt : Evm_context.t) ~evm_node_endpoint =

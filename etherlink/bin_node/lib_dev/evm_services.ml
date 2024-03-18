@@ -20,7 +20,7 @@ let get_blueprint_service =
   Service.get_service
     ~description:"Fetch the contents of a blueprint"
     ~query:Query.empty
-    ~output:Blueprint_types.payload_encoding
+    ~output:Blueprint_types.encoding
     Path.(evm_services_root / "blueprint" /: Arg.uint63)
 
 let blueprint_watcher_service =
@@ -65,8 +65,7 @@ let create_blueprint_watcher_service (ctxt : Evm_context.t) from_level =
           Store.Executable_blueprints.find ctxt.store (Qty current_request)
         in
         match blueprint with
-        | Ok (Some payload) ->
-            return_some Blueprint_types.{number = Qty current_request; payload}
+        | Ok (Some blueprint) -> return_some blueprint
         | Ok None -> return_none
         | Error _ ->
             Stdlib.failwith
