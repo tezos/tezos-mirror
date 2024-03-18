@@ -111,7 +111,7 @@ impl Decodable for DelayedTransaction {
 // Elements in the delayed inbox
 #[derive(Clone)]
 pub struct DelayedInboxItem {
-    transaction: DelayedTransaction,
+    pub transaction: DelayedTransaction,
     timestamp: Timestamp,
     level: u32,
 }
@@ -187,7 +187,7 @@ impl DelayedInbox {
         Ok(())
     }
 
-    fn transaction_from_delayed(
+    pub fn transaction_from_delayed(
         tx_hash: Hash,
         delayed: DelayedTransaction,
     ) -> Transaction {
