@@ -795,9 +795,7 @@ let check_dal_raw_context node =
       JSON.unannotate j |> Ezjsonm.wrap |> Ezjsonm.to_string
     in
     let* confirmed_slots_opt =
-      Node.RPC.(
-        call node
-        @@ get_chain_block_context_dal_confirmed_slot_headers_history ())
+      Node.RPC.(call node @@ get_chain_block_context_dal_commitments_history ())
     in
     if JSON.is_null confirmed_slots_opt then
       Test.fail

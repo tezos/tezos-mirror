@@ -1600,19 +1600,11 @@ let get_chain_block_context_issuance_expected_issuance ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_dal_confirmed_slot_headers_history ?(chain = "main")
+let get_chain_block_context_dal_commitments_history ?(chain = "main")
     ?(block = "head") () =
   make
     GET
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "dal";
-      "confirmed_slot_headers_history";
-    ]
+    ["chains"; chain; "blocks"; block; "context"; "dal"; "commitments_history"]
     Fun.id
 
 let get_chain_block_context_raw_json ?(chain = "main") ?(block = "head")
