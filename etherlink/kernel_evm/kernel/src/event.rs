@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{storage, upgrade};
+use crate::{inbox::Transaction, storage, upgrade};
 use primitive_types::{H256, U256};
 use rlp::{Encodable, RlpStream};
 use tezos_ethereum::rlp_helpers::append_u256_le;
@@ -11,12 +11,14 @@ use tezos_smart_rollup_host::runtime::Runtime;
 pub const UPGRADE_TAG: u8 = 0x01;
 pub const SEQUENCER_UPGRADE_TAG: u8 = 0x02;
 pub const BLUEPRINT_APPLIED_TAG: u8 = 0x03;
+pub const NEW_DELAYED_TRANSACTION_TAG: u8 = 0x04;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Event {
     Upgrade(upgrade::KernelUpgrade),
     SequencerUpgrade(upgrade::SequencerUpgrade),
     BlueprintApplied { number: U256, hash: H256 },
+    NewDelayedTransaction(Box<Transaction>),
 }
 
 impl Encodable for Event {
@@ -36,6 +38,10 @@ impl Encodable for Event {
                 stream.begin_list(2);
                 append_u256_le(stream, number);
                 stream.append(hash);
+            }
+            Event::NewDelayedTransaction(txn) => {
+                stream.append(&NEW_DELAYED_TRANSACTION_TAG);
+                stream.append(txn);
             }
         }
     }
