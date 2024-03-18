@@ -107,15 +107,30 @@ module Autostake = struct
          staking_delegate_denominator = _;
          frozen_rights = _;
          slashed_cycles = _;
+         last_active_cycle;
        } :
         account_state) state =
     let open Result_syntax in
+    (* TODO: use Protocol.Constants_storage.tolerated_inactivity_period *)
+    let tolerated_inactivity_period =
+      (2 * state.constants.consensus_rights_delay) + 1
+    in
     if Some name <> delegate then (
       Log.debug
         "Model Autostaking: %s <> %s, noop@."
         name
         (Option.value ~default:"None" delegate) ;
       return state)
+    else if
+      Cycle.(old_cycle = add last_active_cycle tolerated_inactivity_period)
+    then
+      return
+      @@ update_map
+           ~f:(apply_unstake (Cycle.succ old_cycle) Tez.max_tez name)
+           state
+    else if
+      Cycle.(old_cycle > add last_active_cycle tolerated_inactivity_period)
+    then return state
     else
       let* current_liquid_delegated = liquid_delegated ~name state in
       let current_frozen = Frozen_tez.total_current frozen_deposits in

@@ -14,7 +14,7 @@ open Scenario_base
 (** Applies when baking the last block of a cycle *)
 let apply_end_cycle current_cycle previous_block block state :
     State.t tzresult Lwt.t =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
   (* Apply all slashes *)
   let* state =
@@ -165,8 +165,19 @@ let bake ?baker : t -> t tzresult Lwt.t =
         Some (Block.By_account pkh)
   in
   let* baker, _, _, _ = Block.get_next_baker ?policy block in
-  let baker_name, {contract = baker_contract; _} =
+  let baker_name, ({contract = baker_contract; _} as baker_acc) =
     State.find_account_from_pkh baker state
+  in
+  let current_cycle = Block.current_cycle block in
+  (* update baker activity *)
+  let state =
+    State.update_map
+      ~f:(fun acc_map ->
+        String.Map.add
+          baker_name
+          {baker_acc with last_active_cycle = current_cycle}
+          acc_map)
+      state
   in
   let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
   assert (Protocol.Alpha_context.Cycle.(level.cycle = Block.current_cycle block)) ;
@@ -176,7 +187,6 @@ let bake ?baker : t -> t tzresult Lwt.t =
     (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
     (Protocol.Alpha_context.Cycle.to_int32 level.cycle)
     baker_name ;
-  let current_cycle = Block.current_cycle block in
   let adaptive_issuance_vote =
     if state.force_ai_vote_yes then
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
