@@ -14,12 +14,12 @@ let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id f =
       ready_ctxt.ongoing_amplifications <-
         add slot_id ready_ctxt.ongoing_amplifications
     in
-    let* () = f () in
+    let*! res = f () in
     let () =
       ready_ctxt.ongoing_amplifications <-
         remove slot_id ready_ctxt.ongoing_amplifications
     in
-    return_unit
+    Lwt_syntax.return res
 
 let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
     commitment ~published_level ~slot_index gs_worker node_ctxt =
