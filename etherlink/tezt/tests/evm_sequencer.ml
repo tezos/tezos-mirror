@@ -909,6 +909,86 @@ let test_init_from_rollup_node_data_dir =
 
   unit
 
+let test_init_from_rollup_node_with_delayed_inbox =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "rollup_node"; "init"; "delayed_inbox"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+    ~title:
+      "Init evm node sequencer data dir from a rollup node data dir with \
+       delayed items"
+  @@ fun protocol ->
+  let* {
+         sc_rollup_node;
+         sequencer;
+         proxy;
+         client;
+         l1_contracts;
+         sc_rollup_address;
+         _;
+       } =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+
+  (* a sequencer is needed to produce an initial block *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = Evm_node.terminate sequencer in
+
+  (* deposit *)
+  let amount = Tez.of_int 16 in
+  let depositor = Constant.bootstrap5 in
+  let receiver = Eth_account.bootstrap_accounts.(0) in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver:receiver.address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+
+  (* start a new sequnecer *)
+  let evm_node' =
+    Evm_node.create
+      ~mode:(Evm_node.mode sequencer)
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () =
+    (* bake 2 blocks so rollup context is for the finalized l1 level
+       and can't be reorged. *)
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      evm_node'
+      sc_rollup_node
+  in
+
+  let* () = Evm_node.run evm_node' in
+
+  let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
+
+  let*@ _ = Rpc.produce_block evm_node' in
+  let* () =
+    bake_until_sync ~sc_rollup_node ~client ~sequencer:evm_node' ~proxy ()
+  in
+
+  let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
+
+  unit
+
 let test_observer_applies_blueprint =
   Protocol.register_test
     ~__FILE__
@@ -2032,6 +2112,7 @@ let () =
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
   test_init_from_rollup_node_data_dir protocols ;
+  test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;
   test_observer_forwards_transaction protocols ;
   test_upgrade_kernel_auto_sync protocols ;

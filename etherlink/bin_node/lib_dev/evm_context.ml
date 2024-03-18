@@ -315,6 +315,13 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
 
   (* Tell the kernel that it is executed by an EVM node *)
   let*! evm_state = Evm_state.flag_local_exec evm_state in
+  (* We remove the delayed inbox from the EVM state. Its contents will be
+     retrieved by the sequencer by inspecting the rollup node durable storage.
+
+     If we do not remove the delayed inbox from the state, the contents will
+     never be flushed (because of the distinction between executable /
+     publishable) *)
+  let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
 
   (* For changes made to [evm_state] to take effect, we commit the result *)
   let*! evm_node_context =
@@ -331,6 +338,7 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
     | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
     | None -> failwith "The blueprint number was not found"
   in
+
   (* Assert we can read the current block hash *)
   let* () =
     let*! current_block_hash_opt =
