@@ -309,15 +309,9 @@ let exec_op f =
   --> next_block
 
 (** Waiting functions *)
-let rec wait_n_cycles n =
-  if n <= 0 then noop
-  else if n = 1 then next_cycle
-  else wait_n_cycles (n - 1) --> next_cycle
+let wait_n_cycles n = loop n next_cycle
 
-let rec wait_n_blocks n =
-  if n <= 0 then noop
-  else if n = 1 then next_block
-  else wait_n_blocks (n - 1) --> next_block
+let wait_n_blocks n = loop n next_block
 
 let wait_cycle_f_es (condition : t -> t -> bool tzresult Lwt.t) :
     (t, t) scenarios =
@@ -338,14 +332,8 @@ let wait_cycle_f_es (condition : t -> t -> bool tzresult Lwt.t) :
 *)
 let wait_cycle_f (condition : t -> t -> bool) : (t, t) scenarios =
   let open Lwt_result_syntax in
-  exec (fun init_t ->
-      let rec bake_while t =
-        if condition init_t t then return t
-        else
-          let* t = next_cycle_ t in
-          bake_while t
-      in
-      bake_while init_t)
+  let condition a b = return @@ condition a b in
+  wait_cycle_f_es condition
 
 (** Wait until we are in a cycle satisfying the given condition.
     Fails if AI_activation is requested and AI is not set to be activated in the future. *)
@@ -442,16 +430,6 @@ let wait_ai_activation =
 let wait_delegate_parameters_activation =
   wait_cycle_until `delegate_parameters_activation
 
-let wait_n_cycles_f (n_cycles : t -> int) =
-  let condition ((init_block, _init_state) as t_init)
-      ((current_block, _current_state) as _t_current) =
-    let n = n_cycles t_init in
-    let init_cycle = Block.current_cycle init_block in
-    let current_cycle = Block.current_cycle current_block in
-    Cycle.(current_cycle >= add init_cycle n)
-  in
-  wait_cycle_f condition
-
 let wait_n_cycles_f_es (n_cycles : t -> int tzresult Lwt.t) =
   let open Lwt_result_syntax in
   let condition ((init_block, _init_state) as t_init)
@@ -462,3 +440,8 @@ let wait_n_cycles_f_es (n_cycles : t -> int tzresult Lwt.t) =
     return Cycle.(current_cycle >= add init_cycle n)
   in
   wait_cycle_f_es condition
+
+let wait_n_cycles_f (n_cycles : t -> int) =
+  let open Lwt_result_syntax in
+  let n_cycles n = return @@ n_cycles n in
+  wait_n_cycles_f_es n_cycles
