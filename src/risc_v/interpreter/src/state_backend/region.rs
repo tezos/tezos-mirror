@@ -8,7 +8,7 @@ use std::mem;
 macro_rules! read_only_write {
     () => {
         panic!("cannot write to an immutable reference to a region")
-    }
+    };
 }
 
 /// Dedicated region in a [`super::Backend`]
