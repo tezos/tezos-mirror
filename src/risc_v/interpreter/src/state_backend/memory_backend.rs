@@ -72,6 +72,8 @@ impl<T> Clone for InMemoryBackend<T> {
 
 impl<L: Layout> backend::BackendManagement for InMemoryBackend<L> {
     type Manager<'backend> = SliceManager<'backend>;
+
+    type ManagerRO<'backend> = SliceManagerRO<'backend>;
 }
 
 impl<L: Layout> backend::Backend for InMemoryBackend<L> {
@@ -82,6 +84,14 @@ impl<L: Layout> backend::Backend for InMemoryBackend<L> {
         placed: backend::PlacedOf<Self::Layout>,
     ) -> backend::AllocatedOf<Self::Layout, Self::Manager<'_>> {
         let mut manager = SliceManager::new(self.borrow_mut());
+        L::allocate(&mut manager, placed)
+    }
+
+    fn allocate_ro(
+        &self,
+        placed: backend::PlacedOf<Self::Layout>,
+    ) -> backend::AllocatedOf<Self::Layout, Self::ManagerRO<'_>> {
+        let mut manager = SliceManagerRO::new(self.borrow());
         L::allocate(&mut manager, placed)
     }
 
@@ -137,6 +147,45 @@ impl<'backend> backend::Manager for SliceManager<'backend> {
     }
 }
 
+/// Read-only manager for in-memory backing storage
+pub struct SliceManagerRO<'backend> {
+    backing_storage: usize,
+    _lifetime: PhantomData<&'backend [u8]>,
+}
+
+impl<'backend> SliceManagerRO<'backend> {
+    /// Manage the given slice.
+    pub fn new(backing_storage: &'backend [u8]) -> Self {
+        Self {
+            backing_storage: backing_storage.as_ptr() as usize,
+            _lifetime: PhantomData,
+        }
+    }
+}
+
+impl<'backend> backend::Manager for SliceManagerRO<'backend> {
+    type Region<E: backend::Elem, const LEN: usize> = &'backend [E; LEN];
+
+    fn allocate_region<E: backend::Elem, const LEN: usize>(
+        &mut self,
+        loc: backend::Location<[E; LEN]>,
+    ) -> Self::Region<E, LEN> {
+        unsafe {
+            let ptr = self.backing_storage + loc.offset();
+            &*(ptr as *const [E; LEN])
+        }
+    }
+
+    type DynRegion<const LEN: usize> = &'backend [u8; LEN];
+
+    fn allocate_dyn_region<const LEN: usize>(
+        &mut self,
+        loc: backend::Location<[u8; LEN]>,
+    ) -> Self::DynRegion<LEN> {
+        self.allocate_region::<u8, LEN>(loc)
+    }
+}
+
 pub mod test_helpers {
     use super::InMemoryBackend;
     use crate::state_backend::{test_helpers::TestBackendFactory, Layout};
@@ -156,6 +205,35 @@ pub mod test_helpers {
 pub mod tests {
     use super::*;
     use crate::state_backend::{AllocatedOf, Array, Atom, Backend, Cell, Manager, Region};
+
+    #[test]
+    fn test_ro() {
+        type L = (Atom<u64>, Array<u32, 4>);
+
+        struct T<M: Manager> {
+            first: Cell<u64, M>,
+            second: M::Region<u32, 4>,
+        }
+
+        impl<M: Manager> T<M> {
+            fn bind(space: AllocatedOf<L, M>) -> Self {
+                T {
+                    first: space.0,
+                    second: space.1,
+                }
+            }
+        }
+
+        let (backend, placed) = InMemoryBackend::<L>::new();
+
+        let mut t = T::bind(backend.allocate_ro(placed));
+        let r = t.second.read(0);
+
+        assert_eq!(r, 0);
+
+        let result = std::panic::catch_unwind(move || t.first.write(1373));
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_backend_reuse() {
