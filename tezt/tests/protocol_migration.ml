@@ -1192,6 +1192,24 @@ let test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to =
   let* () =
     block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
   in
+
+  Log.info "Check that bootstrap1 is forbidden to bake." ;
+  let* is_forbidden =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_is_forbidden
+         Constant.bootstrap1.public_key_hash
+  in
+  assert is_forbidden ;
+  let* () =
+    Process.check_error
+      ~msg:
+        (rex
+           (Format.sprintf
+              "Delegate %s has committed too many misbehaviours; it is \
+               temporarily not allowed to bake/preattest/attest."
+              Constant.bootstrap1.public_key_hash))
+    @@ Client.spawn_bake_for ~keys:[Constant.bootstrap1.public_key_hash] client
+  in
   Log.info
     "Can't inject again any of the previous cycle 1 denunciations, nor \
      denunciations on the same levels even with a different round. As to the \
