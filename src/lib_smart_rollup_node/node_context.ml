@@ -538,7 +538,7 @@ let get_predecessor_header node_ctxt head =
 
 (** Returns the block that is right before [tick]. [big_step_blocks] is used to
     first look for a block before the [tick] *)
-let tick_search ~big_step_blocks node_ctxt head tick =
+let tick_search ~big_step_blocks node_ctxt ?min_level head tick =
   let open Lwt_result_syntax in
   if Z.Compare.(head.Sc_rollup_block.initial_tick <= tick) then
     if Z.Compare.(Sc_rollup_block.final_tick head < tick) then
@@ -554,26 +554,40 @@ let tick_search ~big_step_blocks node_ctxt head tick =
       | Some {first_available_level = l; _} -> l
       | None -> node_ctxt.genesis_info.level
     in
+    let min_level =
+      match min_level with
+      | Some min_level -> Int32.max min_level first_available_level
+      | None -> first_available_level
+    in
     let rec find_big_step (end_block : Sc_rollup_block.t) =
+      (* Each iteration of [find_big_step b] looks if the [tick] happened in
+         [b - 4096; b[. *)
       let start_level =
         Int32.sub end_block.header.level (Int32.of_int big_step_blocks)
       in
       let start_level =
-        if start_level < first_available_level then first_available_level
-        else start_level
+        (* We stop the coarse search at [min_level] in any case. *)
+        Int32.max start_level min_level
       in
       let* start_block = get_l2_block_by_level node_ctxt start_level in
       if Z.Compare.(start_block.initial_tick <= tick) then
+        (* The tick happened after [start_block] and we know it happened before
+           [end_block]. *)
         return (start_block, end_block)
-      else if start_level = first_available_level then
+      else if start_level = min_level then
+        (* We've reached the hard lower bound for the search and we know the
+           tick happened before. *)
         failwith
-          "Tick %a happened before first available level %ld with tick %a"
+          "Tick %a happened before minimal level %ld with tick %a"
           Z.pp_print
           tick
-          first_available_level
+          min_level
           Z.pp_print
           start_block.initial_tick
-      else find_big_step start_block
+      else
+        (* The tick happened before [start_block], so we restart the coarse
+           search with it as the upper bound. *)
+        find_big_step start_block
     in
     let block_level Sc_rollup_block.{header = {level; _}; _} =
       Int32.to_int level
@@ -601,7 +615,7 @@ let tick_search ~big_step_blocks node_ctxt head tick =
     (* Then do dichotomy on interval [start_block; end_block] *)
     dicho start_block end_block
 
-let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
+let block_with_tick ({store; _} as node_ctxt) ?min_level ~max_level tick =
   let open Lwt_result_syntax in
   let open Lwt_result_option_syntax in
   Error.trace_lwt_result_with
@@ -619,7 +633,7 @@ let block_with_tick ({store; _} as node_ctxt) ~max_level tick =
        if head.header.level <= max_level then return_some head
        else find_l2_block_by_level node_ctxt max_level
      in
-     tick_search ~big_step_blocks:4096 node_ctxt head tick
+     tick_search ~big_step_blocks:4096 node_ctxt ?min_level head tick
 
 let find_commitment {store; _} commitment_hash =
   let open Lwt_result_syntax in

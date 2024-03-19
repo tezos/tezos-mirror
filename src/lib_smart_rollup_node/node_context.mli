@@ -288,12 +288,17 @@ val get_tezos_reorg_for_new_head :
   Layer1.head ->
   Layer1.head Reorg.t tzresult Lwt.t
 
-(** [block_with_tick store ~max_level tick] returns [Some b] where [b] is the
-    last layer 2 block which contains the [tick] before [max_level]. If no such
-    block exists (the tick happened after [max_level], or we are too late), the
-    function returns [None]. *)
+(** [block_with_tick store ?min_level ~max_level tick] returns [Some b] where
+    [b] is the last layer 2 block which contains the [tick] before
+    [max_level]. If no such block exists (the tick happened after [max_level],
+    or we are too late), the function returns [None]. Fails if the tick happened
+    before [min_level]. *)
 val block_with_tick :
-  _ t -> max_level:int32 -> Z.t -> Sc_rollup_block.t option tzresult Lwt.t
+  _ t ->
+  ?min_level:int32 ->
+  max_level:int32 ->
+  Z.t ->
+  Sc_rollup_block.t option tzresult Lwt.t
 
 (** [tick_offset_of_commitment_period node_ctxt commtient] returns the global
     initial tick (since genesis) of the PVM for the state at the beginning of the
