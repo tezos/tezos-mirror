@@ -14,7 +14,9 @@ fn interpret_test(contents: &[u8], mode: Mode) {
         Interpreter::new(&mut backend, contents, None, mode).expect("Boot failed");
     match interpreter.run(MAX_STEPS) {
         Exit { code: 0, .. } => (),
-        Exit { code, .. } => panic!("Failed at test case {}", code >> 1),
+        Exit { code, steps } => {
+            panic!("Failed at test case: {} - Steps done: {}", code >> 1, steps)
+        }
         Running(_) => panic!("Timeout"),
         Exception(exc, _) => panic!("Unexpected exception: {:?}", exc),
     }

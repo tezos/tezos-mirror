@@ -12,7 +12,10 @@
 // Allow non snake case for setters & getters
 #![allow(non_snake_case)]
 
-use super::{fields::FieldValue, ones};
+use super::{
+    fields::{FieldProps, FieldValue},
+    ones,
+};
 use crate::{create_field, machine_state::csregisters::CSRValue};
 
 /// Field in `mstatus` for a boolean value
@@ -155,8 +158,8 @@ create_field!(MNPV, bool, 7, 1);
 // When 1 - Non-maskable interrupts are enabled (and all other interrupts behave as normal)
 create_field!(NMIE, bool, 3, 1);
 
-const fn field_mask(field_data: (u64, u64)) -> CSRValue {
-    ones(field_data.1) << field_data.0
+const fn field_mask(field_data: FieldProps) -> CSRValue {
+    ones(field_data.width) << field_data.offset
 }
 
 pub const SSTATUS_FIELDS_MASK: CSRValue = field_mask(SD)

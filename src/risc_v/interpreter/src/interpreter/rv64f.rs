@@ -54,9 +54,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::hart_state::{HartState, HartStateLayout};
-    use crate::machine_state::registers::{parse_fregister, parse_xregister};
-    use crate::{backend_test, create_backend, create_state};
+    use crate::{
+        backend_test, create_backend, create_state,
+        machine_state::{
+            hart_state::{HartState, HartStateLayout},
+            registers::{parse_fregister, parse_xregister},
+        },
+    };
     use proptest::prelude::*;
     use softfloat_wrapper::{Float, F32, F64};
 
