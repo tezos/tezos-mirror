@@ -8,8 +8,7 @@
 type parameters = {
   rollup_node_endpoint : Uri.t;
       (** Rollup node endpoint used to monitor kernel events. *)
-  backend : (module Services_backend_sig.S);
-      (** Local backend to propagate events in local state. *)
+  ctxt : Evm_context.t;
 }
 
 (** [start parameters] starts the events follower. *)

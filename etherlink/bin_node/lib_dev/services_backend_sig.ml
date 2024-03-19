@@ -117,16 +117,6 @@ module type S = sig
     Ethereum_types.hex tzresult Lwt.t
 
   val smart_rollup_address : string
-
-  (**/**)
-
-  (** [inject_kernel_upgrade upgrade] injects the kernel [upgrade]
-      in the local state. *)
-  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
-
-  (** [inject_sequencer_upgrade ~payload] injects the sequencer
-      upgrade payload [payload] in the local state. *)
-  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module type Backend = sig
@@ -139,10 +129,6 @@ module type Backend = sig
   module SimulatorBackend : Simulator.SimulationBackend
 
   val smart_rollup_address : string
-
-  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
-
-  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
 end
 
 module Make (Backend : Backend) : S = struct
@@ -152,8 +138,4 @@ module Make (Backend : Backend) : S = struct
   include Simulator.Make (Backend.SimulatorBackend)
 
   let smart_rollup_address = Backend.smart_rollup_address
-
-  let inject_kernel_upgrade = Backend.inject_kernel_upgrade
-
-  let inject_sequencer_upgrade = Backend.inject_sequencer_upgrade
 end

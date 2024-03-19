@@ -87,14 +87,95 @@ let inspect ctxt path =
 
 let on_modified_head ctxt context = ctxt.session.context <- context
 
-let replace_current_head ?(on_success = fun _ -> ()) (ctxt : t) k =
+let apply_evm_event_unsafe on_success ctxt evm_state event =
+  let open Lwt_result_syntax in
+  let open Ethereum_types in
+  let*! () = Evm_events_follower_events.new_event event in
+  match event with
+  | Evm_events.Upgrade_event upgrade ->
+      let on_success session =
+        session.pending_upgrade <- Some upgrade ;
+        on_success session
+      in
+      let payload =
+        Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes
+      in
+      let*! evm_state =
+        Evm_state.modify
+          ~key:Durable_storage_path.kernel_upgrade
+          ~value:payload
+          evm_state
+      in
+      let* () =
+        Store.Kernel_upgrades.store
+          ctxt.store
+          ctxt.session.next_blueprint_number
+          upgrade
+      in
+      let*! () = Events.pending_upgrade upgrade in
+      return (evm_state, on_success)
+  | Sequencer_upgrade_event sequencer_upgrade ->
+      let payload =
+        Sequencer_upgrade.to_bytes sequencer_upgrade |> String.of_bytes
+      in
+      let*! evm_state =
+        Evm_state.modify
+          ~key:Durable_storage_path.sequencer_upgrade
+          ~value:payload
+          evm_state
+      in
+      return (evm_state, on_success)
+  | Blueprint_applied {number = Qty number; hash = expected_block_hash} -> (
+      let* block_hash_opt =
+        let*! bytes =
+          inspect
+            ctxt
+            (Durable_storage_path.Indexes.block_by_number (Nth number))
+        in
+        return (Option.map decode_block_hash bytes)
+      in
+      match block_hash_opt with
+      | Some found_block_hash ->
+          if found_block_hash = expected_block_hash then
+            let*! () =
+              Evm_events_follower_events.upstream_blueprint_applied
+                (number, expected_block_hash)
+            in
+            return (evm_state, on_success)
+          else
+            let*! () =
+              Evm_events_follower_events.diverged
+                (number, expected_block_hash, found_block_hash)
+            in
+            tzfail
+              (Node_error.Diverged
+                 (number, expected_block_hash, Some found_block_hash))
+      | None ->
+          let*! () =
+            Evm_events_follower_events.missing_block
+              (number, expected_block_hash)
+          in
+          tzfail (Node_error.Diverged (number, expected_block_hash, None)))
+
+let apply_evm_events ~finalized_level (ctxt : t) events =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock ctxt.head_lock @@ fun () ->
-  let* context =
+  let* context, on_success =
     with_store_transaction ctxt @@ fun ctxt ->
     let*! evm_state = evm_state ctxt in
-    let* evm_state = k evm_state in
-    replace_current_commit ctxt evm_state
+    let* on_success, ctxt, evm_state =
+      List.fold_left_es
+        (fun (on_success, ctxt, evm_state) event ->
+          let* evm_state, on_success =
+            apply_evm_event_unsafe on_success ctxt evm_state event
+          in
+          return (on_success, ctxt, evm_state))
+        (ignore, ctxt, evm_state)
+        events
+    in
+    let* _ = Store.L1_latest_known_level.store ctxt.store finalized_level in
+    let* ctxt = replace_current_commit ctxt evm_state in
+    return (ctxt, on_success)
   in
   on_modified_head ctxt context ;
   on_success ctxt.session ;
@@ -442,28 +523,3 @@ let last_produced_blueprint (ctxt : t) =
   match blueprint with
   | Some blueprint -> return blueprint
   | None -> failwith "Could not fetch the last produced blueprint"
-
-let inject_kernel_upgrade ctxt upgrade =
-  let open Lwt_result_syntax in
-  let payload = Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes in
-  let* () =
-    replace_current_head
-      ~on_success:(fun session -> session.pending_upgrade <- Some upgrade)
-      ctxt
-      (fun evm_state ->
-        let*! evm_state =
-          Evm_state.modify
-            ~key:Durable_storage_path.kernel_upgrade
-            ~value:payload
-            evm_state
-        in
-        let* () =
-          Store.Kernel_upgrades.store
-            ctxt.store
-            ctxt.session.next_blueprint_number
-            upgrade
-        in
-        let*! () = Events.pending_upgrade upgrade in
-        return evm_state)
-  in
-  return_unit

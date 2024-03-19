@@ -46,22 +46,6 @@ end) : Services_backend_sig.Backend = struct
   let smart_rollup_address =
     Tezos_crypto.Hashed.Smart_rollup_address.to_string
       Ctxt.ctxt.smart_rollup_address
-
-  let inject_kernel_upgrade = Evm_context.inject_kernel_upgrade Ctxt.ctxt
-
-  let inject_sequencer_upgrade ~payload =
-    let open Lwt_result_syntax in
-    let* () =
-      Evm_context.replace_current_head Ctxt.ctxt (fun evm_state ->
-          let*! evm_state =
-            Evm_state.modify
-              ~key:Durable_storage_path.sequencer_upgrade
-              ~value:payload
-              evm_state
-          in
-          return evm_state)
-    in
-    return_unit
 end
 
 module Make (Ctxt : sig
@@ -310,14 +294,9 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let* () =
     Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
   in
-  let* () =
-    Evm_events_follower.start
-      {rollup_node_endpoint; backend = (module Sequencer)}
-  in
+  let* () = Evm_events_follower.start {rollup_node_endpoint; ctxt} in
   let* () = catchup_evm_event ~rollup_node_endpoint ctxt.store in
-  let* () =
-    Rollup_node_follower.start {rollup_node_endpoint; store = ctxt.store}
-  in
+  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in
