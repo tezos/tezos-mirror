@@ -127,15 +127,12 @@ let make_sc_rollup_parameter ~dal_activation_level
       riscv_pvm_enable = false;
     }
 
-(* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
-
-   Think harder about those values. *)
 let default_cryptobox_parameters =
   {
-    Dal.page_size = 4096;
-    slot_size = 1 lsl 20;
-    redundancy_factor = 16;
-    number_of_shards = 2048;
+    Dal.page_size = 3967;
+    slot_size = 126_944;
+    redundancy_factor = 8;
+    number_of_shards = 512;
   }
 
 let default_dal =
@@ -143,9 +140,9 @@ let default_dal =
     {
       feature_enable = true;
       incentives_enable = false;
-      number_of_slots = 256;
-      attestation_lag = 4;
-      attestation_threshold = 50;
+      number_of_slots = 32;
+      attestation_lag = 8;
+      attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
     }
 
@@ -332,12 +329,7 @@ let constants_sandbox =
           constants_mainnet.dal with
           number_of_slots = 16;
           cryptobox_parameters =
-            {
-              Dal.redundancy_factor = 16;
-              page_size = 4096;
-              number_of_shards = 2048;
-              slot_size = 1 lsl 16;
-            };
+            {default_cryptobox_parameters with number_of_shards = 256};
         };
     issuance_weights;
     blocks_preservation_cycles = 1;
@@ -359,7 +351,7 @@ let constants_sandbox =
   }
 
 let constants_test =
-  let consensus_committee_size = 25 in
+  let consensus_committee_size = 67 in
   let Constants.Generated.
         {max_slashing_threshold = _; consensus_threshold; issuance_weights} =
     Constants.Generated.generate ~consensus_committee_size
@@ -373,10 +365,9 @@ let constants_test =
           number_of_slots = 8;
           cryptobox_parameters =
             {
-              redundancy_factor = 16;
-              page_size = 4096;
-              number_of_shards = 2048;
-              slot_size = 1 lsl 16;
+              default_cryptobox_parameters with
+              redundancy_factor = 2;
+              number_of_shards = 64;
             };
         };
     issuance_weights;
