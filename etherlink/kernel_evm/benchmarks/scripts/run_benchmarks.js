@@ -165,6 +165,7 @@ function run_profiler(path, logs) {
             chunks_in_bip: [],
             bip_size: [],
             txs_in_bip: [],
+            data_size: [],
         }
         let nb_reboots = 0;
 
@@ -222,6 +223,7 @@ function run_profiler(path, logs) {
             push_match(output, results.chunks_in_bip, /\[Benchmarking\] Number of chunks in blueprint: (\d+)\b/g)
             push_match(output, results.bip_size, /\[Benchmarking\] Size of blueprint: (\d+)\b/g)
             push_match(output, results.txs_in_bip, /\[Benchmarking\] Number of transactions in blueprint: (\d+)\b/g)
+            push_match(output, results.data_size, /\[Benchmarking\] Transaction data size: (\d+)\b/g)
             push_profiler_sections(output, results.opcodes, results.precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
@@ -240,6 +242,7 @@ function run_profiler(path, logs) {
                 check(results.block_in_progress_read.length, nb_reboots, "Missing read bip size value $?")
                 check(results.tx_status.length, results.tx_type.length, "Missing transaction type $?")
                 check(results.tx_status.length, results.reason.length, "Missing transaction exit reason $?")
+                check(results.tx_status.length, results.data_size.length, "Missing data size info $?")
             }
             resolve(results);
         });
@@ -285,6 +288,7 @@ async function analyze_profiler_output(path) {
     results.kernel_run_ticks = await get_ticks(path, "kernel_run");
     results.run_transaction_ticks = await get_ticks(path, "run_transaction");
     results.signature_verification_ticks = await get_ticks(path, "EthereumTransactionCommon.*caller");
+    results.hashing_ticks = await get_ticks(path, "EthereumTransactionCommon.*message");
     results.sputnik_runtime_ticks = await get_ticks(path, "EvmHandler.*Host.*execute");
     results.store_transaction_object_ticks = await get_ticks(path, "storage.*store_transaction_object");
     results.store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
@@ -343,9 +347,11 @@ function log_benchmark_result(benchmark_name, data) {
         let row = {
             benchmark_name,
             signature_verification_ticks: data.signature_verification_ticks?.[j],
+            hashing_ticks: data.hashing_ticks?.[j],
             status,
             estimated_ticks: data.estimated_ticks_per_tx[j],
             tx_type: data.tx_type[j],
+            data_size: data.data_size?.[j],
         }
         if (status.includes("OK_UNKNOWN")) {
             // no outcome should mean never invoking sputnik
@@ -384,8 +390,7 @@ function log_benchmark_result(benchmark_name, data) {
 
     // first kernel run
     // the nb of tx correspond to the full inbox, not just those done in first run
-    // FIXME: bip_idx unreliable in FAST_MODE
-    let bip_idx = 0
+    let reboot_idx = 0
     rows.push({
         benchmark_name: benchmark_name + "(all)",
         interpreter_init_ticks: data.interpreter_init_ticks?.[0],
@@ -397,8 +402,9 @@ function log_benchmark_result(benchmark_name, data) {
         estimated_ticks: data.estimated_ticks?.[0],
         inbox_size: data.inbox_size,
         nb_tx: data.tx_status.length,
+        nb_msg: data.nb_msg,
         block_in_progress_store: data.block_in_progress_store[0] ? data.block_in_progress_store[0] : '',
-        block_in_progress_store_ticks: data.block_in_progress_store[0] ? data.block_in_progress_store_ticks?.[bip_idx++] : ''
+        block_in_progress_store_ticks: data.block_in_progress_store[0] ? data.block_in_progress_store_ticks?.[reboot_idx++] : ''
     });
 
     //reboots
@@ -411,11 +417,11 @@ function log_benchmark_result(benchmark_name, data) {
             kernel_run_ticks: data.kernel_run_ticks?.[j],
             estimated_ticks: data.estimated_ticks?.[j],
             block_in_progress_store: data.block_in_progress_store[j] ? data.block_in_progress_store[j] : '',
-            block_in_progress_store_ticks: data.block_in_progress_store[j] ? data.block_in_progress_store_ticks?.[bip_idx] : '',
+            block_in_progress_store_ticks: data.block_in_progress_store[j] ? data.block_in_progress_store_ticks?.[reboot_idx] : '',
             block_in_progress_read: data.block_in_progress_read[j - 1], // the first read correspond to second run
-            block_in_progress_read_ticks: data.block_in_progress_read[j - 1] ? data.block_in_progress_read_ticks?.[bip_idx - 1] : ''
+            block_in_progress_read_ticks: data.block_in_progress_read[j - 1] ? data.block_in_progress_read_ticks?.[reboot_idx - 1] : ''
         });
-        if (data.block_in_progress_read[j - 1]) bip_idx++
+        if (data.block_in_progress_read[j - 1]) reboot_idx++
     }
 
     // ticks that are not covered by identified area of interest

@@ -449,6 +449,7 @@ impl EthereumTransactionCommon {
     }
 
     /// Extracts the Keccak encoding of a message from an EthereumTransactionCommon
+    #[cfg_attr(feature = "benchmark", inline(never))]
     fn message(&self) -> Message {
         let to_sign = EthereumTransactionCommon {
             signature: None,

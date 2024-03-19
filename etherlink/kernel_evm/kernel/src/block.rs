@@ -89,6 +89,7 @@ fn compute<Host: Runtime>(
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
         let data_size: u64 = transaction.data_size();
 
+        log!(host, Benchmarking, "Transaction data size: {}", data_size);
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
             limits.maximum_allowed_ticks,
