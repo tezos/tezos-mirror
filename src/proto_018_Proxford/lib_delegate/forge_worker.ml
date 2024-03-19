@@ -124,7 +124,11 @@ let handle_forge_block worker baking_state (block_to_bake : block_to_bake) =
   in
   let queue = get_or_create_queue worker block_to_bake.delegate in
   Delegate_signing_queue.push_task
-    ~on_error:(fun _err -> Lwt.return_unit)
+    ~on_error:(fun err ->
+      let*! () =
+        Events.(emit failed_to_forge_block (block_to_bake.delegate, err))
+      in
+      Lwt.return_unit)
     task
     queue
 
