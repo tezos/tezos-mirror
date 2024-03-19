@@ -50,13 +50,13 @@ val init :
 val init_from_rollup_node :
   data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
 
-(** [replace_current_head ctxt f] modifies the local state of the chain using
-    [f], and commits results to disk. As a consequence, the next blueprint will
-    be applied on top of the resulting state. *)
-val replace_current_head :
-  ?on_success:(session_state -> unit) ->
+(** [apply_evm_events ~finalized_level ctxt events] applies all the
+    events [events] on the local context [ctxt]. The events are
+    performed in a transactional context. *)
+val apply_evm_events :
+  finalized_level:int32 ->
   t ->
-  (Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
+  Ethereum_types.Evm_events.t list ->
   unit tzresult Lwt.t
 
 (** [inspect ctxt path] returns the value stored in [path] of the freshest EVM
@@ -88,5 +88,3 @@ val apply_blueprint :
     correct. *)
 val apply_and_publish_blueprint :
   t -> Time.Protocol.t -> Sequencer_blueprint.t -> unit tzresult Lwt.t
-
-val inject_kernel_upgrade : t -> Ethereum_types.Upgrade.t -> unit tzresult Lwt.t

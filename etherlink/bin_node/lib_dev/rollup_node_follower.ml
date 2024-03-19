@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {rollup_node_endpoint : Uri.t; store : Store.t}
+type parameters = {rollup_node_endpoint : Uri.t}
 
 module Types = struct
   type state = Uri.t
@@ -109,7 +109,7 @@ let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
       return_unit
   | _ -> return_unit
 
-let process_new_block ~store ~rollup_node_endpoint block =
+let process_new_block ~rollup_node_endpoint block =
   let open Lwt_syntax in
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
   let* _ = Delayed_inbox.new_rollup_block finalized_level in
@@ -117,10 +117,9 @@ let process_new_block ~store ~rollup_node_endpoint block =
   let* () =
     advertize_blueprints_publisher rollup_node_endpoint finalized_level
   in
-  let* _ = Store.L1_latest_known_level.store store finalized_level in
   return_unit
 
-let rec process_rollup_node_stream ~stream ~rollup_node_endpoint ~store worker =
+let rec process_rollup_node_stream ~stream ~rollup_node_endpoint worker =
   let open Lwt_syntax in
   let* new_head = Lwt_stream.get stream in
   match new_head with
@@ -132,10 +131,10 @@ let rec process_rollup_node_stream ~stream ~rollup_node_endpoint ~store worker =
         Rollup_node_follower_events.new_block
           Sc_rollup_block.(block.header.level)
       in
-      let* () = process_new_block ~rollup_node_endpoint ~store block in
-      process_rollup_node_stream ~stream ~rollup_node_endpoint ~store worker
+      let* () = process_new_block ~rollup_node_endpoint block in
+      process_rollup_node_stream ~stream ~rollup_node_endpoint worker
 
-let start ({rollup_node_endpoint; store} as parameters) =
+let start ({rollup_node_endpoint} as parameters) =
   let open Lwt_result_syntax in
   let*! () = Rollup_node_follower_events.started () in
   let+ worker = Worker.launch table () parameters (module Handlers) in
@@ -145,7 +144,7 @@ let start ({rollup_node_endpoint; store} as parameters) =
         let*! stream =
           Rollup_services.make_streamed_call ~rollup_node_endpoint
         in
-        process_rollup_node_stream ~stream ~rollup_node_endpoint ~store worker)
+        process_rollup_node_stream ~stream ~rollup_node_endpoint worker)
       (fun _ -> ())
   in
   Lwt.wakeup worker_waker worker

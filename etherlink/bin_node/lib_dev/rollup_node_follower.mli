@@ -9,7 +9,6 @@ type parameters = {
   rollup_node_endpoint : Uri.t;
       (** Rollup node endpoint used to monitor the stream of rollup
           node block. *)
-  store : Store.t;
 }
 
 (** [start parameters] starts the rollup node follower. *)

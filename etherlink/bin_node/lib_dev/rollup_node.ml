@@ -96,10 +96,6 @@ end) : Services_backend_sig.Backend = struct
   end
 
   let smart_rollup_address = Base.smart_rollup_address
-
-  let inject_kernel_upgrade _upgrade = Lwt_result_syntax.return_unit
-
-  let inject_sequencer_upgrade ~payload:_ = Lwt_result_syntax.return_unit
 end
 
 module Make (Base : sig
