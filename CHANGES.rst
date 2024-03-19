@@ -83,6 +83,10 @@ Node
 - Removed the deprecated ``local-listen-addrs`` configuration file
   field. Use ``listen-addrs`` instead.
 
+- Augmented the ``--max-active-rpc-connections <NUM>`` argument to contain
+  an ``unlimited`` option to remove the threshold of RPC connections.
+  (MR :gl:`!12324`)
+
 Client
 ------
 
