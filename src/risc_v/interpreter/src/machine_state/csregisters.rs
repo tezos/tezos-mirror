@@ -571,7 +571,8 @@ impl CSRegister {
         const ATOMIC_EXT: u64 = 1 << 0;
         const COMPRESSED_EXT: u64 = 1 << 2;
         const DOUBLE_EXT: u64 = 1 << 3;
-        const SINGLE_EXT: u64 = 1 << 5;
+        // TODO: Enable F extension once F instructions are implemented <https://app.asana.com/0/0/1206826205624200/f>
+        // const SINGLE_EXT: u64 = 1 << 5;
         const RV64I_ISA_EXT: u64 = 1 << 8;
         const MULT_DIV_EXT: u64 = 1 << 12;
         const SUPERVISOR_EXT: u64 = 1 << 18;
@@ -582,8 +583,8 @@ impl CSRegister {
         ATOMIC_EXT |
         COMPRESSED_EXT |
         DOUBLE_EXT |
-        SINGLE_EXT |
-        SINGLE_EXT |
+        // TODO: Enable F extension once F instructions are implemented <https://app.asana.com/0/0/1206826205624200/f>
+        // SINGLE_EXT |
         RV64I_ISA_EXT |
         MULT_DIV_EXT |
         SUPERVISOR_EXT |
@@ -1446,8 +1447,8 @@ mod tests {
         let check = |reg: csreg, value| reg.make_value_writable(value).unwrap();
 
         // misa field
-        assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_112D);
-        assert!(check(csreg::misa, 0x0) == 0x8000_0000_0014_112D);
+        assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_110D);
+        assert!(check(csreg::misa, 0x0) == 0x8000_0000_0014_110D);
 
         // medeleg / mideleg
         assert!(check(csreg::medeleg, 0x0) == 0x0);

@@ -468,11 +468,12 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<(), MachineError> {
+        // Reset hart state & set pc to entrypoint
+        self.hart.reset(program.entrypoint);
         // Write program to main memory and point the PC at its start
         for (addr, data) in program.segments.iter() {
             self.bus.write_all(*addr, data)?;
         }
-        self.hart.pc.write(program.entrypoint);
 
         // Set booting Hart ID (a0) to 0
         self.hart.xregisters.write(registers::a0, 0);

@@ -8,10 +8,10 @@ use std::fs;
 const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const MAX_STEPS: usize = 1_000_000;
 
-fn interpret_test(contents: &[u8], mode: Mode) {
+fn interpret_test(contents: &[u8], exit_mode: Mode) {
     let mut backend = Interpreter::create_backend();
     let mut interpreter =
-        Interpreter::new(&mut backend, contents, None, mode).expect("Boot failed");
+        Interpreter::new(&mut backend, contents, None, exit_mode).expect("Boot failed");
     match interpreter.run(MAX_STEPS) {
         Exit { code: 0, .. } => (),
         Exit { code, steps } => {
@@ -23,6 +23,7 @@ fn interpret_test(contents: &[u8], mode: Mode) {
 }
 
 macro_rules! test_case {
+    // Default start & exit mode (Machine & Machine)
     ($(#[$m:meta])* $name: ident, $path: expr) => {
         #[test]
         $(#[$m])*
@@ -32,6 +33,7 @@ macro_rules! test_case {
         }
     };
 
+    // Choose exit mode, default start mode (Machine)
     ($(#[$m:meta])* $name: ident, $path: expr, $mode: expr) => {
         #[test]
         $(#[$m])*
@@ -48,7 +50,7 @@ test_case!(
     test_suite_rv64mi_p_breakpoint,
     "rv64mi-p-breakpoint"
 );
-test_case!(test_suite_rv64mi_p_csr, "rv64mi-p-csr");
+test_case!(test_suite_rv64mi_p_csr, "rv64mi-p-csr", Mode::User);
 test_case!(
     #[ignore]
     test_suite_rv64mi_p_illegal,
@@ -63,11 +65,7 @@ test_case!(
     test_suite_rv64mi_p_ma_fetch,
     "rv64mi-p-ma_fetch"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64mi_p_mcsr,
-    "rv64mi-p-mcsr"
-);
+test_case!(test_suite_rv64mi_p_mcsr, "rv64mi-p-mcsr");
 test_case!(test_suite_rv64mi_p_sbreak, "rv64mi-p-sbreak");
 test_case!(
     #[ignore]

@@ -22,7 +22,6 @@ where
     ///
     /// If successful, returns next instruction address to be executed from `MEPC`
     pub fn run_mret(&mut self) -> Result<Address, Exception> {
-        // println!("run mret?");
         // Only M-mode (and Debug) can run mret
         match self.mode.read() {
             Mode::User | Mode::Supervisor => return Err(Exception::IllegalInstruction),
