@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -151,6 +151,14 @@ macro_rules! run_no_args_instr {
     }};
 }
 
+/// Runs a F mv instruction over the hart state
+macro_rules! run_f_mv_instr {
+    ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
+        $state.hart.$run_fn($args.rs1, $args.rd);
+        Ok(Add($instr.width()))
+    }};
+}
+
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
@@ -259,6 +267,14 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Remu(args) => run_r_type_instr!(self, instr, args, run_remu),
             Instr::Remw(args) => run_r_type_instr!(self, instr, args, run_remw),
             Instr::Remuw(args) => run_r_type_instr!(self, instr, args, run_remuw),
+
+            // RV64F move instructions
+            Instr::FmvXW(args) => run_f_mv_instr!(self, instr, args, run_fmv_x_w),
+            Instr::FmvWX(args) => run_f_mv_instr!(self, instr, args, run_fmv_w_x),
+
+            // RV64D move instructions
+            Instr::FmvXD(args) => run_f_mv_instr!(self, instr, args, run_fmv_x_d),
+            Instr::FmvDX(args) => run_f_mv_instr!(self, instr, args, run_fmv_d_x),
 
             // Zicsr instructions
             Instr::Csrrw(args) => run_csr_instr!(self, instr, args, run_csrrw),

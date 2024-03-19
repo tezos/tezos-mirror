@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
 use std::fmt;
 
-use crate::machine_state::{csregisters::CSRegister, registers::XRegister};
+use crate::machine_state::{csregisters::CSRegister, registers::FRegister, registers::XRegister};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct RTypeArgs {
@@ -59,6 +60,18 @@ pub struct FenceSet {
 pub struct FenceArgs {
     pub pred: FenceSet,
     pub succ: FenceSet,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FmvToIArgs {
+    pub rd: XRegister,
+    pub rs1: FRegister,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FmvToFArgs {
+    pub rd: FRegister,
+    pub rs1: XRegister,
 }
 
 /// RISC-V parsed instructions. Along with legal instructions, potentially
@@ -136,6 +149,14 @@ pub enum Instr {
     Remu(RTypeArgs),
     Remw(RTypeArgs),
     Remuw(RTypeArgs),
+
+    // RV64F instructions
+    FmvXW(FmvToIArgs),
+    FmvWX(FmvToFArgs),
+
+    // RV64D instructions
+    FmvXD(FmvToIArgs),
+    FmvDX(FmvToFArgs),
 
     // Zicsr instructions
     Csrrw(CsrArgs),
@@ -224,6 +245,10 @@ impl Instr {
             | Remu(_)
             | Remw(_)
             | Remuw(_)
+            | FmvXW(_)
+            | FmvWX(_)
+            | FmvXD(_)
+            | FmvDX(_)
             | Csrrw(_)
             | Csrrs(_)
             | Csrrc(_)
@@ -288,6 +313,12 @@ macro_rules! b_instr {
 macro_rules! u_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {},{}", $op, $args.rd, $args.imm)
+    };
+}
+
+macro_rules! f_mv_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{}", $op, $args.rd, $args.rs1)
     };
 }
 
@@ -443,6 +474,14 @@ impl fmt::Display for Instr {
             Remu(args) => r_instr!(f, "remu", args),
             Remw(args) => r_instr!(f, "remw", args),
             Remuw(args) => r_instr!(f, "remuw", args),
+
+            // RV64F instructions
+            FmvXW(args) => f_mv_instr!(f, "fmv.x.w", args),
+            FmvWX(args) => f_mv_instr!(f, "fmv.w.x", args),
+
+            // RV64D instructions
+            FmvXD(args) => f_mv_instr!(f, "fmv.x.d", args),
+            FmvDX(args) => f_mv_instr!(f, "fmv.d.x", args),
 
             // Zicsr instructions
             Csrrw(args) => csr_instr!(f, "csrrw", args),

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -6,7 +7,7 @@ pub mod instruction;
 
 use crate::machine_state::{
     csregisters::{try_parse_csregister, CSRegister},
-    registers::{parse_xregister, XRegister},
+    registers::{parse_fregister, parse_xregister, FRegister, XRegister},
 };
 use core::ops::Range;
 use instruction::*;
@@ -14,7 +15,7 @@ use instruction::*;
 /// Given an instruction encoded as a little-endian `u32`, extract `n` bits
 /// starting at `pos`.
 #[inline(always)]
-fn bits(bytes: u32, pos: usize, n: usize) -> u32 {
+const fn bits(bytes: u32, pos: usize, n: usize) -> u32 {
     (bytes >> pos) & (!0 >> (32 - n))
 }
 
@@ -34,6 +35,11 @@ fn funct3(instr: u32) -> u32 {
 }
 
 #[inline(always)]
+const fn funct5(instr: u32) -> u32 {
+    bits(instr, 27, 5)
+}
+
+#[inline(always)]
 fn funct7(instr: u32) -> u32 {
     bits(instr, 25, 7)
 }
@@ -44,6 +50,11 @@ fn rd(instr: u32) -> XRegister {
 }
 
 #[inline(always)]
+fn rd_f(instr: u32) -> FRegister {
+    parse_fregister(bits(instr, 7, 5))
+}
+
+#[inline(always)]
 fn rs1_bits(instr: u32) -> u32 {
     bits(instr, 15, 5)
 }
@@ -51,6 +62,11 @@ fn rs1_bits(instr: u32) -> u32 {
 #[inline(always)]
 fn rs1(instr: u32) -> XRegister {
     parse_xregister(rs1_bits(instr))
+}
+
+#[inline(always)]
+fn rs1_f(instr: u32) -> FRegister {
+    parse_fregister(rs1_bits(instr))
 }
 
 #[inline(always)]
@@ -71,6 +87,16 @@ fn imm_11_6(instr: u32) -> u32 {
 #[inline(always)]
 fn fm(instr: u32) -> u32 {
     bits(instr, 28, 4)
+}
+
+/// Rounding mode for F/D
+#[allow(non_upper_case_globals)]
+const rm: fn(u32) -> u32 = funct3;
+
+/// Floating-point format field encoding
+#[inline(always)]
+const fn fmt(instr: u32) -> u32 {
+    bits(instr, 25, 2)
 }
 
 fn csr(instr: u32) -> Option<CSRegister> {
@@ -234,6 +260,7 @@ const OP_LUI: u32 = 0b011_0111;
 const OP_AUIPC: u32 = 0b001_0111;
 const OP_JAL: u32 = 0b110_1111;
 const OP_JALR: u32 = 0b110_0111;
+const OP_FP: u32 = 0b1010011;
 
 const F3_0: u32 = 0b000;
 const F3_1: u32 = 0b001;
@@ -244,12 +271,20 @@ const F3_5: u32 = 0b101;
 const F3_6: u32 = 0b110;
 const F3_7: u32 = 0b111;
 
+const F5_28: u32 = 0b1_1100;
+const F5_30: u32 = 0b1_1110;
+
 const F7_0: u32 = 0b0;
 const F7_1: u32 = 0b1;
 const F7_8: u32 = 0b000_1000;
 const F7_20: u32 = 0b10_0000;
 const F7_24: u32 = 0b001_1000;
 const F7_56: u32 = 0b011_1000;
+
+const FMT_S: u32 = 0b0;
+const FMT_D: u32 = 0b01;
+
+const RM_0: u32 = 0b0;
 
 const RS1_0: u32 = 0b0;
 const RS2_0: u32 = 0b0;
@@ -431,6 +466,33 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         // U-type instructions
         OP_LUI => u_instr!(Lui, instr),
         OP_AUIPC => u_instr!(Auipc, instr),
+
+        // F/D-type instructions
+        OP_FP => match fmt(instr) {
+            FMT_S => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_28, RM_0, RS2_0) => FmvXW(FmvToIArgs {
+                    rd: rd(instr),
+                    rs1: rs1_f(instr),
+                }),
+                (F5_30, RM_0, RS2_0) => FmvWX(FmvToFArgs {
+                    rd: rd_f(instr),
+                    rs1: rs1(instr),
+                }),
+                _ => Unknown { instr },
+            },
+            FMT_D => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_28, RM_0, RS2_0) => FmvXD(FmvToIArgs {
+                    rd: rd(instr),
+                    rs1: rs1_f(instr),
+                }),
+                (F5_30, RM_0, RS2_0) => FmvDX(FmvToFArgs {
+                    rd: rd_f(instr),
+                    rs1: rs1(instr),
+                }),
+                _ => Unknown { instr },
+            },
+            _ => Unknown { instr },
+        },
 
         // Jump instructions
         OP_JAL => j_instr!(Jal, instr),
