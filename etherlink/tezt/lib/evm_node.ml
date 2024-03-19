@@ -28,7 +28,7 @@
 type time_between_blocks = Nothing | Time_between_blocks of float
 
 type mode =
-  | Observer of {initial_kernel : string; preimage_dir : string}
+  | Observer of {initial_kernel : string; preimages_dir : string}
   | Sequencer of {
       initial_kernel : string;
       preimage_dir : string;
@@ -432,7 +432,7 @@ let run_args evm_node =
             genesis_timestamp
         @ Cli_arg.optional_switch "devmode" devmode
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Observer {preimage_dir; initial_kernel} ->
+    | Observer {preimages_dir; initial_kernel} ->
         [
           "run";
           "observer";
@@ -440,7 +440,7 @@ let run_args evm_node =
           "endpoint";
           evm_node.persistent_state.endpoint;
           "--preimages-dir";
-          preimage_dir;
+          preimages_dir;
           "--initial-kernel";
           initial_kernel;
         ]

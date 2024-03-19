@@ -36,7 +36,7 @@ type time_between_blocks =
 
 (** EVM node mode. *)
 type mode =
-  | Observer of {initial_kernel : string; preimage_dir : string}
+  | Observer of {initial_kernel : string; preimages_dir : string}
   | Sequencer of {
       initial_kernel : string;
           (** Path to the initial kernel used by the sequencer. *)

@@ -1050,14 +1050,14 @@ let test_observer_applies_blueprint =
   let* {sequencer = sequencer_node; sc_rollup_node; _} =
     setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
   in
-  let preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
   let observer_node =
     Evm_node.create
       ~mode:
         (Observer
            {
              initial_kernel = Evm_node.initial_kernel sequencer_node;
-             preimage_dir;
+             preimages_dir;
            })
       (Evm_node.endpoint sequencer_node)
   in
@@ -1100,14 +1100,14 @@ let test_observer_forwards_transaction =
   let* {sequencer = sequencer_node; sc_rollup_node; _} =
     setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
   in
-  let preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
   let* observer_node =
     Evm_node.init
       ~mode:
         (Observer
            {
              initial_kernel = Evm_node.initial_kernel sequencer_node;
-             preimage_dir;
+             preimages_dir;
            })
       (Evm_node.endpoint sequencer_node)
   in
