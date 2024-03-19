@@ -521,7 +521,27 @@ let jobs pipeline_type =
     in
     jobs_opam_packages
   in
-  let test = [] in
+  let test =
+    (* check that ksy files are still up-to-date with octez *)
+    let job_kaitai_checks : tezos_job =
+      job
+        ~__POS__
+        ~name:"kaitai_checks"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        [
+          "make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez \
+           encodings and Kaitai files seem to be out of sync. You might need \
+           to run `make check-kaitai-struct-files` and commit the resulting \
+           diff.' ; false)";
+        ]
+      |> job_external_split
+    in
+    [job_kaitai_checks]
+  in
   let doc = [] in
   let manual =
     match pipeline_type with
