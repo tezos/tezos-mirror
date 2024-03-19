@@ -235,53 +235,49 @@ impl Instr {
 
 macro_rules! r_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{:?},{:?}", $op, $args.rd, $args.rs1, $args.rs2)
+        write!($f, "{} {},{},{}", $op, $args.rd, $args.rs1, $args.rs2)
     };
 }
 
 macro_rules! i_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{:?},{}", $op, $args.rd, $args.rs1, $args.imm)
+        write!($f, "{} {},{},{}", $op, $args.rd, $args.rs1, $args.imm)
     };
 }
 
 macro_rules! i_instr_hex {
     ($f:expr, $op:expr, $args:expr) => {
-        write!(
-            $f,
-            "{} {:?},{:?},0x{:x}",
-            $op, $args.rd, $args.rs1, $args.imm
-        )
+        write!($f, "{} {},{},0x{:x}", $op, $args.rd, $args.rs1, $args.imm)
     };
 }
 
 macro_rules! i_instr_load {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{}({:?})", $op, $args.rd, $args.imm, $args.rs1)
+        write!($f, "{} {},{}({})", $op, $args.rd, $args.imm, $args.rs1)
     };
 }
 
 macro_rules! j_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},0x{:x}", $op, $args.rd, $args.imm)
+        write!($f, "{} {},0x{:x}", $op, $args.rd, $args.imm)
     };
 }
 
 macro_rules! s_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{}({:?})", $op, $args.rs2, $args.imm, $args.rs1)
+        write!($f, "{} {},{}({})", $op, $args.rs2, $args.imm, $args.rs1)
     };
 }
 
 macro_rules! b_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{:?},{}", $op, $args.rs1, $args.rs2, $args.imm)
+        write!($f, "{} {},{},{}", $op, $args.rs1, $args.rs2, $args.imm)
     };
 }
 
 macro_rules! u_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{}", $op, $args.rd, $args.imm)
+        write!($f, "{} {},{}", $op, $args.rd, $args.imm)
     };
 }
 
@@ -293,13 +289,13 @@ macro_rules! fence_instr {
 
 macro_rules! csr_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{},{:?}", $op, $args.rd, $args.csr, $args.rs1)
+        write!($f, "{} {},{},{}", $op, $args.rd, $args.csr, $args.rs1)
     };
 }
 
 macro_rules! csri_instr {
     ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {:?},{},{}", $op, $args.rd, $args.csr, $args.imm)
+        write!($f, "{} {},{},{}", $op, $args.rd, $args.csr, $args.imm)
     };
 }
 

@@ -63,7 +63,7 @@ lazy_static! {
     };
 }
 
-const OBJDUMP_OPTS: [&str; 3] = ["--disassemble", "-M", "no-aliases,numeric"];
+const OBJDUMP_OPTS: [&str; 3] = ["--disassemble", "-M", "no-aliases"];
 
 /// Disassemble a RISC-V binary using objdump and return a vector of tuples
 /// consisting of the address of the instruction, the parsed instruction, and
@@ -151,7 +151,7 @@ fn parser_riscv_jstz() {
     // Test currently disabled in CI because running objdump on the jstz kernel
     // is slow (~15 min) and the resulting file is very large (~110MB).
     // To run locally, generate a dump on the compiled jstz kernel:
-    // `objdump -d -M no-aliases,numeric jstz/target/riscv64gc-unknown-hermit/release/jstz > interpreter/tests/jstz_objdump`
+    // `objdump -d -M no-aliases jstz/target/riscv64gc-unknown-hermit/release/jstz > interpreter/tests/jstz_objdump`
     let fname = "tests/jstz_objdump";
     let instructions = objdump(fname, true);
     check_instructions(fname, instructions)
