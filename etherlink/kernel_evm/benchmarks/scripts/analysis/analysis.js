@@ -11,6 +11,7 @@ const tx_register = require('./tx_register')
 const tx_overhead = require('./tx_overhead')
 const queue = require('./queue')
 const stage_one = require('./stage_one')
+const bip_loading = require('./bip_loading')
 
 const tmp = require("tmp");
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
@@ -65,6 +66,7 @@ function init_analysis() {
         runs_infos: [],
         stage_one_data: [],
         tmp_stage_one_data: [],
+        bip_loading: []
     };
     return empty
 }
@@ -75,6 +77,11 @@ async function print_analysis({ filename, report, analysis_acc }, dir) {
     const doc = new PDFDocument();
     pdf_utils.output_msg(`Data: ${path.basename(filename)}`, doc);
 
+    console.info(`-------------------------------------------------------`)
+    console.info(`Bip loading analysis`)
+    console.info(`----------------------------------`)
+    doc.addPage()
+    let error_bip_loading = bip_loading.print_analysis(infos, dir, doc)
     console.info(`-------------------------------------------------------`)
     console.info(`Stage One analysis`)
     console.info(`----------------------------------`)
@@ -117,7 +124,7 @@ async function print_analysis({ filename, report, analysis_acc }, dir) {
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
     await savePdfToFile(doc, report);
-    return error_stage_one + error_block_finalization + error_register + error_queue
+    return error_bip_loading + error_stage_one + error_block_finalization + error_register + error_queue
 }
 
 function process_record(record, acc) {
@@ -128,7 +135,8 @@ function process_record(record, acc) {
     else console.log("[WARNING] couldn't sort record " + JSON.stringify(record))
 }
 
-function process_blueprint_reading_record(record, acc) {
+function process_blueprint_reading_record(record, acc){
+    acc.bip_loading.push(record)
 }
 
 function process_run_record(record, acc) {
