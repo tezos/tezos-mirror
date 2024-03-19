@@ -1292,6 +1292,223 @@ let test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to =
   let* () = bake_until_level ((7 * blocks_per_cycle) + 1) in
   unit
 
+(** Test deactivation delay changes between Oxford and Paris.
+ - Checks that with PreservedCycles = 5, the grace period is 10 cycles for new delegates.
+ - Ensures migrations don't change the grace period for existing delegates.
+ - After migration, with CONSENUS_RIGHTS_DELAY = 2, checks that the grace period is 4 cycles for new delegates.
+ - Ensures an inactive delegate is correctly deactivated after the grace period, after migration.
+*)
+let test_migration_deactivation_delays ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~title:"protocol migration with deactivations"
+    ~tags:["protocol"; "migration"; "deactivation"]
+  @@ fun () ->
+  if not (Protocol.number migrate_from = Protocol.number Protocol.Oxford) then
+    Test.fail
+      "This test is designed for the migration from Oxford to Paris. Other \
+       protocols have a different semantics for duplicate denunciations so the \
+       test would fail." ;
+  let blocks_per_cycle = 4 in
+  let migration_level = 8 * blocks_per_cycle in
+  Log.info
+    "blocks_per_cycle=%d, migration_level=%d"
+    blocks_per_cycle
+    migration_level ;
+  Log.info "Start node and client." ;
+  let* client, node =
+    user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  Log.info "Activate protocol %s." (Protocol.name migrate_from) ;
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      [
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (["preserved_cycles"], `Int 5);
+        (* The nonce revelation threshold must be strictly smaller
+           than blocks_per_cycle and strictly positive. *)
+        (["nonce_revelation_threshold"], `Int (blocks_per_cycle / 2));
+      ]
+  in
+
+  let* () =
+    Client.activate_protocol ~protocol:migrate_from ~parameter_file client
+  in
+  let* delegate1 = Client.gen_keys client in
+  let* delegate2 = Client.gen_keys client in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 1000000)
+      ~receiver:delegate1
+      ~giver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.(of_mutez_int 64250)
+      client
+  in
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 1000000)
+      ~receiver:delegate2
+      ~giver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.(of_mutez_int 64250)
+      client
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  let* _ = Client.register_delegate ~delegate:delegate1 client in
+
+  let keys =
+    (* The keys to use for baking. Don't bake with [bootstrap1]
+       because it's going to be deactivated. *)
+    Constant.
+      [
+        bootstrap2.public_key_hash;
+        bootstrap3.public_key_hash;
+        bootstrap4.public_key_hash;
+        bootstrap5.public_key_hash;
+      ]
+  in
+
+  let* grace_period =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_grace_period
+         Constant.bootstrap1.public_key_hash
+  in
+
+  Log.info
+    "Bootstrap1 Grace period at startup: %d."
+    (grace_period |> JSON.as_int) ;
+
+  let bake () = Client.bake_for_and_wait ~keys client in
+  let* () = bake () in
+  let bake_until_level target_level =
+    Client.bake_until_level ~target_level ~keys ~node client
+  in
+  let bake_until_cycle target_cycle =
+    Client.bake_until_cycle ~target_cycle ~keys ~node client
+  in
+  let bake_until_cycle_end target_cycle =
+    Client.bake_until_cycle_end ~target_cycle ~keys ~node client
+  in
+
+  Log.info "Check new delegate grace delay is 10 cycles" ;
+  let* () = bake_until_cycle 1 in
+
+  let grace_delay node delegate =
+    let* delegate_key = Client.show_address client ~alias:delegate in
+    let* grace_period =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegate_grace_period
+           delegate_key.public_key_hash
+    in
+    let* level = Node.get_level node in
+    let grace_period = grace_period |> JSON.as_int in
+    let grace_delay = grace_period - (level / blocks_per_cycle) in
+    Log.info
+      "%s grace period : %d (for %d cycles)."
+      delegate
+      grace_period
+      grace_delay ;
+    return (grace_period, grace_delay)
+  in
+  let* delegate1_grace_period, delegate1_grace_delay =
+    grace_delay node delegate1
+  in
+  assert (delegate1_grace_delay = 10) ;
+
+  Log.info "Bake until right before the migration." ;
+  let* () = bake_until_level (migration_level - 1) in
+
+  Log.info "Check that bootstrap1 is not deactivated." ;
+  let* is_deactivated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_deactivated
+         Constant.bootstrap1.public_key_hash
+  in
+  assert (not (JSON.as_bool is_deactivated)) ;
+
+  let* grace_period_before =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_grace_period
+         Constant.bootstrap2.public_key_hash
+  in
+
+  Log.info
+    "Bootstrap2 Grace period before migration: %d."
+    (grace_period_before |> JSON.as_int) ;
+
+  Log.info
+    "Bake one block and check that it is the migration block. This also brings \
+     us into cycle 8." ;
+  let* () = bake () in
+  let* level = Node.get_level node in
+  Check.((level = migration_level) ~__LOC__ int)
+    ~error_msg:"Expected level=%R, got %L" ;
+  assert (level / blocks_per_cycle = 8) ;
+
+  let* () =
+    block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
+  in
+
+  Log.info "Check consensus rights delay after migration." ;
+  let* constants =
+    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(constants |-> "consensus_rights_delay" |> as_int)
+  in
+  Log.info
+    "After migration: CONSENSUS_RIGHTS_DELAY = %d."
+    consensus_rights_delay ;
+  assert (consensus_rights_delay = 2) ;
+
+  Log.info "Register delegate2 as delegate." ;
+  let* _ = Client.register_delegate ~delegate:delegate2 client in
+  Log.info "Bake until delegate2 is registered." ;
+  let* () = bake_until_cycle 9 in
+
+  let* _, gd = grace_delay node delegate2 in
+  assert (gd = 4) ;
+
+  let* grace_period_after =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_grace_period
+         Constant.bootstrap2.public_key_hash
+  in
+
+  Log.info "Check bootstrap2 grace period has not changed." ;
+  assert (JSON.(as_int grace_period_after = as_int grace_period_before)) ;
+
+  Log.info
+    "Wait until last block of bootstrap1 grace_period (at cycle %d)"
+    (delegate1_grace_period + 1) ;
+  let* () = bake_until_cycle_end delegate1_grace_period in
+  let* level = Node.get_level node in
+  assert (level / blocks_per_cycle = 11) ;
+
+  Log.info "Check bootstrap1 is not yet deactivated." ;
+  let* is_deactivated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_deactivated
+         Constant.bootstrap1.public_key_hash
+  in
+  Log.info "bootstrap1 is deactivated: %s" (JSON.encode is_deactivated) ;
+  assert (not (is_deactivated |> JSON.as_bool)) ;
+
+  Log.info "Bake one more block to deactivate bootstrap1." ;
+  let* () = bake () in
+  let* level = Node.get_level node in
+  assert (level / blocks_per_cycle = 12) ;
+
+  Log.info "Check bootstrap1 is deactivated." ;
+  let* is_deactivated =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_delegate_deactivated
+         Constant.bootstrap1.public_key_hash
+  in
+  Log.info "bootstrap1 is deactivated: %s" (JSON.encode is_deactivated) ;
+  assert (is_deactivated |> JSON.as_bool) ;
+  unit
+
 let register ~migrate_from ~migrate_to =
   test_migration_from_oxford_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
@@ -1299,5 +1516,6 @@ let register ~migrate_from ~migrate_to =
   test_forked_migration_bakers ~migrate_from ~migrate_to ;
   test_forked_migration_manual ~migrate_from ~migrate_to () ;
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
-  if Protocol.number migrate_from = Protocol.number Protocol.Oxford then
-    test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to
+  if Protocol.number migrate_from = Protocol.number Protocol.Oxford then (
+    test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to ;
+    test_migration_deactivation_delays ~migrate_from ~migrate_to)
