@@ -306,7 +306,7 @@ pub const ft11: FRegister = f31;
 #[derive(
     Clone, Copy, PartialEq, PartialOrd, Default, Debug, derive_more::From, derive_more::Into,
 )]
-pub struct FValue(f64);
+pub struct FValue(u64);
 
 impl backend::Elem for FValue {
     #[inline(always)]
