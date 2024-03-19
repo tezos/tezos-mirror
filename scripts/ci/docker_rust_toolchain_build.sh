@@ -46,9 +46,8 @@ image_base="${rust_toolchain_image_name}"
 image_tag="${rust_toolchain_image_tag:-}"
 if [ -z "$image_tag" ]; then
   # by default, tag with the hash of this image's input which is the set of paths
-  # defined in images/rust-toolchain/inputs. Requires wordsplitting on the inputs.
-  # shellcheck disable=SC2046
-  image_tag=$(git ls-files -s -- $(cat images/rust-toolchain/inputs) | git hash-object --stdin)
+  # defined in images/rust-toolchain/inputs.
+  image_tag=$(./images/image_tag.sh images/rust-toolchain)
 fi
 image_name="${image_base}:${image_tag}"
 

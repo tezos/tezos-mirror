@@ -18,8 +18,9 @@ and in the header comment of each corresponding Dockerfile.
 Images are rebuilt on-demand in the Tezos CI whenever one of their
 inputs change.  The inputs are image-specific and correspond to a set
 of paths in the tree. Images are tagged with the input hash and the
-branch on which they were produced. More provenance meta-data can be
-found by inspecting the labels of an image's manifest:
+branch on which they were produced (see `images/image_tag.sh` for more
+details). More provenance meta-data can be found by inspecting the
+labels of an image's manifest:
 
  - `com.tezos.build-pipeline-id`: The ID of the CI pipeline in which
    the image was produced.
