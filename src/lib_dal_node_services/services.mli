@@ -98,6 +98,17 @@ val get_commitment_proof :
   ; query : unit >
   service
 
+(** Compute the proof associated to the page whose index is given of the given
+    slot. *)
+val get_page_proof :
+  < input : Cryptobox.slot
+  ; meth : [`POST]
+  ; output : Cryptobox.page_proof
+  ; params : unit * Types.page_index
+  ; prefix : unit
+  ; query : unit >
+  service
+
 (** Compute and save the shards of the slot associated to the given
     commitment. If the input's flag is true, the proofs associated with the
     computed shards are also computed and stored in memory. *)
