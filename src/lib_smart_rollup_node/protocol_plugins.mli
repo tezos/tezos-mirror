@@ -65,6 +65,11 @@ val proto_plugin_for_block :
     node. *)
 val last_proto_plugin : _ Node_context.t -> proto_plugin tzresult Lwt.t
 
+(** Same as {!last_proto_plugin} but returns [None] if the rollup node has not
+    registered any protocol information yet *)
+val last_proto_plugin_opt :
+  _ Node_context.t -> proto_plugin option tzresult Lwt.t
+
 (** {2 Safe protocol specific constants}
 
     These functions provide a way to retrieve constants in a safe manner,
