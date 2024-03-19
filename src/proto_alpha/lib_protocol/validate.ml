@@ -1278,7 +1278,9 @@ module Anonymous = struct
     let current_cycle = vi.current_level.cycle in
     let given_cycle = (Level.from_raw vi.ctxt given_level).cycle in
     let max_slashing_period = Constants.max_slashing_period in
-    let last_slashable_cycle = Cycle.add given_cycle max_slashing_period in
+    let last_slashable_cycle =
+      Cycle.add given_cycle (max_slashing_period - 1)
+    in
     let* () =
       error_unless
         Cycle.(given_cycle <= current_cycle)
@@ -1286,7 +1288,7 @@ module Anonymous = struct
            {kind; level = given_level; current = vi.current_level.level})
     in
     error_unless
-      Cycle.(last_slashable_cycle > current_cycle)
+      Cycle.(last_slashable_cycle >= current_cycle)
       (Outdated_denunciation
          {kind; level = given_level; last_cycle = last_slashable_cycle})
 

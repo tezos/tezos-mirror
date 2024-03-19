@@ -95,7 +95,7 @@ let test_simple_slash =
                         ~current_level:
                           (Protocol.Raw_level_repr.to_int32
                              ds.misbehaviour.level))
-                     Protocol.Constants_repr.max_slashing_period
+                     (Protocol.Constants_repr.max_slashing_period - 1)
                  in
                  let (kind : Protocol.Alpha_context.Misbehaviour.kind) =
                    (* This conversion would not be needed if
