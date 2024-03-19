@@ -134,6 +134,30 @@ module Slots_handlers = struct
             let*? proof = commitment_proof_from_slot cryptobox slot in
             return_some proof)
 
+  let get_page_proof ctxt page_index () slot_data =
+    call_handler2 ctxt (fun _store {cryptobox; _} ->
+        let open Lwt_result_syntax in
+        let proof =
+          let open Result_syntax in
+          let* polynomial =
+            Cryptobox.polynomial_from_slot cryptobox slot_data
+          in
+          Cryptobox.prove_page cryptobox polynomial page_index
+        in
+        match proof with
+        | Ok proof -> return proof
+        | Error e ->
+            let msg =
+              match e with
+              | `Fail s -> "Fail " ^ s
+              | `Page_index_out_of_range -> "Page_index_out_of_range"
+              | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
+              | ( `Invalid_degree_strictly_less_than_expected _
+                | `Prover_SRS_not_loaded ) as commit_error ->
+                  Cryptobox.string_of_commit_error commit_error
+            in
+            tzfail (Cryptobox_error ("get_page_proof", msg)))
+
   let put_commitment_shards ctxt commitment () Types.{with_proof} =
     call_handler2
       ctxt
@@ -356,6 +380,10 @@ let register_new :
        Tezos_rpc.Directory.opt_register1
        Services.get_commitment_proof
        (Slots_handlers.get_commitment_proof ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register1
+       Services.get_page_proof
+       (Slots_handlers.get_page_proof ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
        Services.put_commitment_shards
