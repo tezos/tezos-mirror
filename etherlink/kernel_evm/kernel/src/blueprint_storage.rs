@@ -362,6 +362,12 @@ fn read_all_chunks_and_validate<Host: Runtime>(
             if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
                 validity
             {
+                log!(
+                    host,
+                    Benchmarking,
+                    "Number of transactions in blueprint: {}",
+                    blueprint.transactions.len()
+                );
                 Ok((Some(blueprint), size_with_delayed_transactions))
             } else {
                 invalidate_blueprint(host, blueprint_path, &validity.0)?;
@@ -380,6 +386,12 @@ pub fn read_next_blueprint<Host: Runtime>(
     let exists = host.store_has(&blueprint_path)?.is_some();
     if exists {
         let nb_chunks = read_blueprint_nb_chunks(host, &blueprint_path)?;
+        log!(
+            host,
+            Benchmarking,
+            "Number of chunks in blueprint: {}",
+            nb_chunks
+        );
         let n_subkeys = host.store_count_subkeys(&blueprint_path)?;
         let available_chunks = n_subkeys as u16 - 1;
         if available_chunks == nb_chunks {
@@ -399,6 +411,13 @@ pub fn read_next_blueprint<Host: Runtime>(
             Ok((None, 0))
         }
     } else {
+        log!(host, Benchmarking, "Number of chunks in blueprint: {}", 0);
+        log!(
+            host,
+            Benchmarking,
+            "Number of transactions in blueprint: {}",
+            0
+        );
         Ok((None, 0))
     }
 }

@@ -162,6 +162,9 @@ function run_profiler(path, logs) {
             reason: [],
             nb_blueprint_chunks: 0,
             nb_delayed_inputs: 0,
+            chunks_in_bip: [],
+            bip_size: [],
+            txs_in_bip: [],
         }
         let nb_reboots = 0;
 
@@ -216,6 +219,9 @@ function run_profiler(path, logs) {
             push_match(output, results.bloom_size, /\[Benchmarking\] bloom size:\s*(\d+)/g)
             push_match(output, results.tx_type, /\[Benchmarking\] Transaction type: ([A-Z]+)\b/g)
             push_match(output, results.reason, /\[Benchmarking\] reason: ([A-Za-z()_]+)\b/g)
+            push_match(output, results.chunks_in_bip, /\[Benchmarking\] Number of chunks in blueprint: (\d+)\b/g)
+            push_match(output, results.bip_size, /\[Benchmarking\] Size of blueprint: (\d+)\b/g)
+            push_match(output, results.txs_in_bip, /\[Benchmarking\] Number of transactions in blueprint: (\d+)\b/g)
             push_profiler_sections(output, results.opcodes, results.precompiles);
             if (output.includes("Kernel was rebooted.")) nb_reboots++;
         });
@@ -289,6 +295,7 @@ async function analyze_profiler_output(path) {
     results.logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     results.block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
     results.block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
+    results.next_bip_ticks = await get_ticks(path, "next_bip_from_blueprint");
     return results;
 }
 
@@ -306,6 +313,7 @@ async function run_benchmark(path, logs) {
             }
         });
     }
+    if(!FAST_MODE) check(run_profiler_result.bip_size.length, profiler_output_analysis_result.next_bip_ticks?.length, "Pb with nb of ticks of next bip $?");
     return {
         inbox_size,
         ...profiler_output_analysis_result,
@@ -427,6 +435,18 @@ function log_benchmark_result(benchmark_name, data) {
         unaccounted_ticks,
         block_finalize: finalize_ticks
     });
+
+    // rows concerning blueprint reading when creating bip
+    for(let i = 0; i < data.bip_size.length; i++){
+        rows.push({
+            benchmark_name: benchmark_name + "(bip)",
+            next_bip_ticks: data.next_bip_ticks?.[i],
+            bip_size: data.bip_size?.[i],
+            chunks_in_bip: data.chunks_in_bip?.[i],
+            txs_in_bip: data.txs_in_bip?.[i],
+        })
+    }
+
     return rows;
 }
 

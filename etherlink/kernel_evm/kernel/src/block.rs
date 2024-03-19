@@ -196,6 +196,7 @@ enum BlueprintParsing {
     RebootNeeded,
 }
 
+#[cfg_attr(feature = "benchmark", inline(never))]
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
@@ -212,6 +213,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     }
 
     let (blueprint, size) = read_next_blueprint(host, config)?;
+    log!(host, Benchmarking, "Size of blueprint: {}", size);
     let ticks = tick_counter
         .c
         .saturating_add(ticks_for_next_blueprint(size as u64));
