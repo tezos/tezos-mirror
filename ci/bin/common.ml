@@ -310,7 +310,7 @@ let changeset_kaitai_e2e_files =
   [
     "images/**/*";
     "src/**/*";
-    "contrib/*kaitai*/**/*";
+    "client-libs/*kaitai*/**/*";
     ".gitlab/**/*";
     ".gitlab-ci.yml";
   ]
