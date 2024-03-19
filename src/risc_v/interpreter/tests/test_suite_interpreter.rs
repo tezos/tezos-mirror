@@ -105,11 +105,7 @@ test_case!(
     test_suite_rv64si_p_scall,
     "rv64si-p-scall"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64si_p_wfi,
-    "rv64si-p-wfi"
-);
+test_case!(test_suite_rv64si_p_wfi, "rv64si-p-wfi");
 
 test_case!(
     #[ignore]

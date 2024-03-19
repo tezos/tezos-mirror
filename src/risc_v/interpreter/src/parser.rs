@@ -254,6 +254,7 @@ const RS1_0: u32 = 0b0;
 const RS2_0: u32 = 0b0;
 const RS2_1: u32 = 0b1;
 const RS2_2: u32 = 0b10;
+const RS2_5: u32 = 0b101;
 
 const FM_0: u32 = 0b0;
 const FM_8: u32 = 0b1000;
@@ -379,6 +380,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                     (RS2_2, F7_8) => Sret,
                     (RS2_2, F7_24) => Mret,
                     (RS2_2, F7_56) => Mnret,
+                    (RS2_5, F7_8) => Wfi,
                     _ => Unknown { instr },
                 },
                 _ => Unknown { instr },
