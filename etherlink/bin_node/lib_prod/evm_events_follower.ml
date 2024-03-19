@@ -5,10 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {
-  rollup_node_endpoint : Uri.t;
-  backend : (module Services_backend_sig.S);
-}
+type parameters = {rollup_node_endpoint : Uri.t; ctxt : Evm_context.t}
 
 module StringSet = Set.Make (String)
 
@@ -72,44 +69,6 @@ let read_from_rollup_node path level rollup_node_endpoint =
     {key = path}
     ()
 
-let on_new_event ({backend; _} : Types.state) event =
-  let open Lwt_result_syntax in
-  let open Ethereum_types in
-  let (module Backend) = backend in
-  let*! () = Evm_events_follower_events.new_event event in
-  match event with
-  | Evm_events.Upgrade_event upgrade -> Backend.inject_kernel_upgrade upgrade
-  | Evm_events.Sequencer_upgrade_event sequencer_upgrade ->
-      let payload =
-        Sequencer_upgrade.to_bytes sequencer_upgrade |> String.of_bytes
-      in
-      Backend.inject_sequencer_upgrade ~payload
-  | Evm_events.Blueprint_applied
-      {number = Qty number; hash = expected_block_hash} -> (
-      let* block_hash_opt = Backend.nth_block_hash number in
-      match block_hash_opt with
-      | Some found_block_hash ->
-          if found_block_hash = expected_block_hash then
-            let*! () =
-              Evm_events_follower_events.upstream_blueprint_applied
-                (number, expected_block_hash)
-            in
-            return_unit
-          else
-            let*! () =
-              Evm_events_follower_events.diverged
-                (number, expected_block_hash, found_block_hash)
-            in
-            tzfail
-              (Node_error.Diverged
-                 (number, expected_block_hash, Some found_block_hash))
-      | None ->
-          let*! () =
-            Evm_events_follower_events.missing_block
-              (number, expected_block_hash)
-          in
-          tzfail (Node_error.Diverged (number, expected_block_hash, None)))
-
 let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
     event_index =
   let open Lwt_result_syntax in
@@ -125,7 +84,7 @@ let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
   in
   return event_opt
 
-let on_new_head ({rollup_node_endpoint; _} as state : Types.state)
+let on_new_head ({rollup_node_endpoint; ctxt} as state : Types.state)
     rollup_block_lvl =
   let open Lwt_result_syntax in
   let* nb_of_events_bytes =
@@ -150,10 +109,8 @@ let on_new_head ({rollup_node_endpoint; _} as state : Types.state)
           nb_of_events
           (fetch_event state rollup_block_lvl)
       in
-      List.iter_es
-        (function
-          | None -> return_unit | Some event -> on_new_event state event)
-        events
+      let events = List.filter_map Fun.id events in
+      Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl ctxt events
 
 module Handlers = struct
   type self = worker

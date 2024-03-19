@@ -8,7 +8,11 @@
 (** A chunked blueprint, ready to be executed localy. *)
 type payload = [`External of string] list
 
-type t = {number : Ethereum_types.quantity; payload : payload}
+type t = {
+  number : Ethereum_types.quantity;
+  timestamp : Time.Protocol.t;
+  payload : payload;
+}
 
 val encoding : t Data_encoding.t
 

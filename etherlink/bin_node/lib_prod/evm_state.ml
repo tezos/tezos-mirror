@@ -42,15 +42,19 @@ let execute ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint)
   in
   return evm_state
 
+let modify ~key ~value evm_state = Wasm.set_durable_value evm_state key value
+
+let flag_local_exec evm_state =
+  modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
+
 let init ~kernel =
   let open Lwt_result_syntax in
   let evm_state = Irmin_context.PVMState.empty () in
   let* evm_state =
     Wasm.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
   in
+  let*! evm_state = flag_local_exec evm_state in
   return evm_state
-
-let modify ~key ~value evm_state = Wasm.set_durable_value evm_state key value
 
 let inspect evm_state key =
   let open Lwt_syntax in
@@ -125,3 +129,25 @@ let apply_blueprint ~config evm_state (blueprint : Blueprint_types.payload) =
   if Z.(equal (succ before_height) after_height) then
     return (Apply_success (evm_state, Block_height after_height, block_hash))
   else return Apply_failure
+
+let clear_delayed_inbox evm_state =
+  let open Lwt_syntax in
+  let delayed_inbox_path =
+    Tezos_scoru_wasm.Durable.key_of_string_exn
+      Durable_storage_path.delayed_inbox
+  in
+  let* pvm_state =
+    Wasm_utils.Ctx.Tree_encoding_runner.decode
+      Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+      evm_state
+  in
+  let* durable =
+    Tezos_scoru_wasm.Durable.delete
+      ~kind:Directory
+      pvm_state.durable
+      delayed_inbox_path
+  in
+  Wasm_utils.Ctx.Tree_encoding_runner.encode
+    Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+    {pvm_state with durable}
+    evm_state

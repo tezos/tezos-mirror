@@ -12,6 +12,8 @@ open Ethereum_types
 
 type path = string
 
+val evm_node_flag : path
+
 val chain_id : path
 
 val base_fee_per_gas : path
@@ -23,6 +25,8 @@ val kernel_root_hash : path
 val kernel_upgrade : path
 
 val sequencer_upgrade : path
+
+val delayed_inbox : path
 
 (** Paths related to accounts. *)
 module Accounts : sig

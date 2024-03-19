@@ -12,11 +12,10 @@ module MakeBackend (Ctxt : sig
 
   val evm_node_endpoint : Uri.t
 end) : Services_backend_sig.Backend = struct
-  module READER = struct
+  module Reader = struct
     let read path =
       let open Lwt_result_syntax in
-      let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
-      let*! res = Evm_state.inspect evm_state path in
+      let*! res = Evm_context.inspect Ctxt.ctxt path in
       return res
   end
 
@@ -103,62 +102,27 @@ end) : Services_backend_sig.Backend = struct
       | _ -> Error_monad.failwith "Invalid insights format"
   end
 
-  let inject_kernel_upgrade upgrade =
-    let open Lwt_result_syntax in
-    let payload = Ethereum_types.Upgrade.to_bytes upgrade |> String.of_bytes in
-    let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
-    let*! evm_state =
-      Evm_state.modify
-        ~key:Durable_storage_path.kernel_upgrade
-        ~value:payload
-        evm_state
-    in
-    let (Qty next) = Ctxt.ctxt.next_blueprint_number in
-    let* () =
-      Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
-    in
-    let* () =
-      Store.Kernel_upgrades.store
-        Ctxt.ctxt.store
-        Ctxt.ctxt.next_blueprint_number
-        upgrade
-    in
-    return_unit
-
-  let inject_sequencer_upgrade ~payload =
-    let open Lwt_result_syntax in
-    let*! evm_state = Evm_context.evm_state Ctxt.ctxt in
-    let*! evm_state =
-      Evm_state.modify
-        ~key:Durable_storage_path.sequencer_upgrade
-        ~value:payload
-        evm_state
-    in
-    let (Qty next) = Ctxt.ctxt.next_blueprint_number in
-    let* () =
-      Evm_context.commit ~number:(Qty Z.(pred next)) Ctxt.ctxt evm_state
-    in
-    return_unit
+  let smart_rollup_address =
+    Tezos_crypto.Hashed.Smart_rollup_address.to_string
+      Ctxt.ctxt.smart_rollup_address
 end
 
 let on_new_blueprint (ctxt : Evm_context.t) (blueprint : Blueprint_types.t) =
   let (Qty level) = blueprint.number in
-  let (Qty number) = ctxt.next_blueprint_number in
+  let (Qty number) = ctxt.session.next_blueprint_number in
   if Z.(equal level number) then
-    Evm_context.apply_blueprint ctxt blueprint.payload
+    Evm_context.apply_blueprint ctxt blueprint.timestamp blueprint.payload
   else failwith "Received a blueprint with an unexpected number."
 
 let main (ctxt : Evm_context.t) ~evm_node_endpoint =
   let open Lwt_result_syntax in
-  let rec loop ctxt stream =
+  let rec loop stream =
     let*! candidate = Lwt_stream.get stream in
     match candidate with
     | Some blueprint ->
-        let* ctxt = on_new_blueprint ctxt blueprint in
-        let* _ =
-          Tx_pool.produce_block ~force:false ~timestamp:(Helpers.now ())
-        in
-        loop ctxt stream
+        let* () = on_new_blueprint ctxt blueprint in
+        let* _ = Tx_pool.pop_and_inject_transactions () in
+        loop stream
     | None -> return_unit
   in
 
@@ -167,10 +131,10 @@ let main (ctxt : Evm_context.t) ~evm_node_endpoint =
   let*! blueprints_stream =
     Evm_services.monitor_blueprints
       ~evm_node_endpoint
-      ctxt.next_blueprint_number
+      ctxt.session.next_blueprint_number
   in
 
-  loop ctxt blueprints_stream
+  loop blueprints_stream
 
 module Make (Ctxt : sig
   val ctxt : Evm_context.t

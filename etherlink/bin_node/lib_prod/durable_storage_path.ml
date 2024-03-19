@@ -12,6 +12,8 @@ open Ethereum_types
 
 type path = string
 
+let evm_node_flag = "/__evm_node"
+
 module EVM = struct
   let root = "/evm"
 
@@ -35,6 +37,8 @@ let kernel_root_hash = EVM.make "/kernel_root_hash"
 let kernel_upgrade = EVM.make "/kernel_upgrade"
 
 let sequencer_upgrade = EVM.make "/sequencer_upgrade"
+
+let delayed_inbox = EVM.make "/delayed-inbox"
 
 module Accounts = struct
   let accounts = World_state.make "/eth_accounts"

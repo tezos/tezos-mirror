@@ -6,6 +6,8 @@
 (*****************************************************************************)
 
 module type S = sig
+  module Reader : Durable_storage.READER
+
   (** [balance address] returns the [address]'s balance. *)
   val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
 
@@ -114,19 +116,11 @@ module type S = sig
     Ethereum_types.quantity ->
     Ethereum_types.hex tzresult Lwt.t
 
-  (**/**)
-
-  (** [inject_kernel_upgrade upgrade] injects the kernel [upgrade]
-      in the local state. *)
-  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
-
-  (** [inject_sequencer_upgrade ~payload] injects the sequencer
-      upgrade payload [payload] in the local state. *)
-  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
+  val smart_rollup_address : string
 end
 
 module type Backend = sig
-  module READER : Durable_storage.READER
+  module Reader : Durable_storage.READER
 
   module TxEncoder : Publisher.TxEncoder
 
@@ -134,17 +128,14 @@ module type Backend = sig
 
   module SimulatorBackend : Simulator.SimulationBackend
 
-  val inject_kernel_upgrade : Ethereum_types.Upgrade.t -> unit tzresult Lwt.t
-
-  val inject_sequencer_upgrade : payload:string -> unit tzresult Lwt.t
+  val smart_rollup_address : string
 end
 
 module Make (Backend : Backend) : S = struct
-  include Durable_storage.Make (Backend.READER)
+  module Reader = Backend.Reader
+  include Durable_storage.Make (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
 
-  let inject_kernel_upgrade = Backend.inject_kernel_upgrade
-
-  let inject_sequencer_upgrade = Backend.inject_sequencer_upgrade
+  let smart_rollup_address = Backend.smart_rollup_address
 end

@@ -17,6 +17,35 @@ let received_upgrade =
     ~level:Notice
     ("payload", Data_encoding.string)
 
+let pending_upgrade =
+  declare_2
+    ~section
+    ~name:"pending_upgrade"
+    ~msg:
+      "Pending upgrade to root hash {root_hash} expected to activate at \
+       {timestamp}"
+    ~level:Notice
+    ("root_hash", Ethereum_types.hash_encoding)
+    ("timestamp", Time.Protocol.encoding)
+
+let applied_upgrade =
+  declare_2
+    ~section
+    ~name:"applied_upgrade"
+    ~msg:"Kernel successfully upgraded to {root_hash} with blueprint {level}"
+    ~level:Notice
+    ("root_hash", Ethereum_types.hash_encoding)
+    ("level", Data_encoding.n)
+
+let failed_upgrade =
+  declare_2
+    ~section
+    ~name:"failed_upgrade"
+    ~msg:"Kernel failed to upgrade to {root_hash} with blueprint {level}"
+    ~level:Warning
+    ("root_hash", Ethereum_types.hash_encoding)
+    ("level", Data_encoding.n)
+
 let ignored_kernel_arg =
   declare_0
     ~section
@@ -27,11 +56,29 @@ let ignored_kernel_arg =
     ~level:Warning
     ()
 
+let catching_up_evm_event =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"catching_up"
+    ~msg:"the EVM node is catching up on evm event from {from} to {to}"
+    ~level:Notice
+    ("from", Data_encoding.int32)
+    ("to", Data_encoding.int32)
+
 let event_is_ready =
   Internal_event.Simple.declare_2
     ~section
     ~name:"is_ready"
     ~msg:"the EVM node is listening to {addr}:{port}"
+    ~level:Notice
+    ("addr", Data_encoding.string)
+    ("port", Data_encoding.uint16)
+
+let event_private_server_is_ready =
+  declare_2
+    ~section
+    ~name:"private_server_is_ready"
+    ~msg:"the EVM node private RPC server is listening to {addr}:{port}"
     ~level:Notice
     ("addr", Data_encoding.string)
     ("port", Data_encoding.uint16)
@@ -65,9 +112,23 @@ let event_callback_log =
 
 let received_upgrade payload = emit received_upgrade payload
 
+let pending_upgrade (upgrade : Ethereum_types.Upgrade.t) =
+  emit pending_upgrade (upgrade.hash, upgrade.timestamp)
+
+let applied_upgrade root_hash Ethereum_types.(Qty level) =
+  emit applied_upgrade (root_hash, level)
+
+let failed_upgrade root_hash Ethereum_types.(Qty level) =
+  emit failed_upgrade (root_hash, level)
+
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
+let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
+
 let is_ready ~rpc_addr ~rpc_port = emit event_is_ready (rpc_addr, rpc_port)
+
+let private_server_is_ready ~rpc_addr ~rpc_port =
+  emit event_private_server_is_ready (rpc_addr, rpc_port)
 
 let shutdown_rpc_server ~private_ =
   emit (event_shutdown_rpc_server ~private_) ()

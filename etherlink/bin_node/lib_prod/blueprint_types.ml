@@ -7,7 +7,11 @@
 
 type payload = [`External of string] list
 
-type t = {number : Ethereum_types.quantity; payload : payload}
+type t = {
+  number : Ethereum_types.quantity;
+  timestamp : Time.Protocol.t;
+  payload : payload;
+}
 
 let payload_encoding =
   let open Data_encoding in
@@ -20,6 +24,9 @@ let payload_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {number = Qty n; payload} -> (n, payload))
-    (fun (n, payload) -> {number = Qty n; payload})
-    (obj2 (req "number" n) (req "payload" payload_encoding))
+    (fun {number = Qty n; timestamp; payload} -> (n, timestamp, payload))
+    (fun (n, timestamp, payload) -> {number = Qty n; timestamp; payload})
+    (obj3
+       (req "number" n)
+       (req "timestamp" Time.Protocol.encoding)
+       (req "payload" payload_encoding))

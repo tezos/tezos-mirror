@@ -6,9 +6,10 @@
 (*****************************************************************************)
 
 type parameters = {
-  rollup_node_endpoint : Uri.t;
-      (** Rollup node endpoint used to monitor kernel events. *)
   ctxt : Evm_context.t;
+  cctxt : Client_context.wallet;
+  smart_rollup_address : string;
+  sequencer_key : Client_keys.sk_uri;
 }
 
 (** [start parameters] starts the events follower. *)
@@ -17,7 +18,9 @@ val start : parameters -> unit tzresult Lwt.t
 (** [shutdown ()] stops the events follower. *)
 val shutdown : unit -> unit Lwt.t
 
-(** [new_rollup_block rollup_level] tells the worker that a new L2
-    head has been published and that the rollup head is now
-    [rollup_level]. *)
-val new_rollup_block : Int32.t -> unit tzresult Lwt.t
+(** [produce_block  ~force ~timestamp] takes the transactions
+    in the tx pool and produces a block from it, returns the number of
+    transaction in the block. The block is not produced if the list of
+    transactions is empty and [force] is set to [false]. *)
+val produce_block :
+  force:bool -> timestamp:Time.Protocol.t -> int tzresult Lwt.t

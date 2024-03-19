@@ -57,3 +57,11 @@ val apply_blueprint :
   t ->
   Blueprint_types.payload ->
   apply_result tzresult Lwt.t
+
+(** [flag_local_exec evm_state] adds a flag telling the kernel it is executed
+    by an EVM node, not a rollup node. *)
+val flag_local_exec : t -> t Lwt.t
+
+(** [clear_delayed_inbox evm_state] removes the delayed inbox from the current
+    EVM state. *)
+val clear_delayed_inbox : t -> t Lwt.t
