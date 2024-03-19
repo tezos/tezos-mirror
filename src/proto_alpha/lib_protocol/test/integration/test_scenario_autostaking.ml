@@ -40,12 +40,24 @@ let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
       Log.debug ~color:warning_color "Balances changes failed:@." ;
       Log.debug "@[<v 2>Old Balance@ %a@]@." balance_pp old_balance ;
       Log.debug "@[<v 2>New Balance@ %a@]@." balance_pp new_balance ;
+      Log.debug
+        "@[<v 2>Diff between balances@ %a@]@."
+        Q.pp_print
+        Q.(new_b - old_b) ;
       failwith "%s Unexpected stake evolution for %s" loc name)
   else (
     Log.error
       "Test_scenario_autostaking.assert_balance_evolution: account %s not found"
       name ;
     assert false)
+
+let gt_diff diff new_b old_b =
+  let diff = Q.of_int64 @@ Tez.to_mutez diff in
+  Q.equal new_b (Q.add old_b diff)
+
+let lt_diff diff new_b old_b =
+  let diff = Q.of_int64 @@ Tez.to_mutez diff in
+  Q.equal new_b (Q.sub old_b diff)
 
 let delegate = "delegate"
 
@@ -74,40 +86,43 @@ let setup ~activate_ai =
 
 let test_autostaking =
   Tag "No Ai" --> setup ~activate_ai:false
+  (* Delegate will need to freeze 5% * 2k = 100 *)
   --> check_snapshot_balances
         ~f:
           (assert_balance_evolution
              ~loc:__LOC__
              ~for_accounts:[delegate]
              ~part:`staked
-             Q.gt)
+             (gt_diff @@ Tez.of_mutez 100_000_000L))
         "before delegation"
   --> snapshot_balances "before second delegation" [delegate]
   --> (Tag "increase delegation"
        --> set_delegate delegator2 (Some delegate)
        --> next_cycle
+       (* Delegate will need to freeze 5% * 2k = 100 *)
        --> check_snapshot_balances
              ~f:
                (assert_balance_evolution
                   ~loc:__LOC__
                   ~for_accounts:[delegate]
                   ~part:`staked
-                  Q.gt)
+                  (gt_diff @@ Tez.of_mutez 100_000_000L))
              "before second delegation"
       |+ Tag "constant delegation"
          --> snapshot_balances "after stake change" [delegate]
-         --> wait_n_cycles 8
+         --> wait_n_cycles 6
          --> check_snapshot_balances "after stake change"
       |+ Tag "decrease delegation"
          --> set_delegate delegator1 None
          --> next_cycle
+         (* Delegate will need to unfreeze 5% * 2k = 100 *)
          --> check_snapshot_balances
                ~f:
                  (assert_balance_evolution
                     ~loc:__LOC__
                     ~for_accounts:[delegate]
                     ~part:`staked
-                    Q.lt)
+                    (lt_diff @@ Tez.of_mutez 100_000_000L))
                "before second delegation"
          --> check_snapshot_balances
                ~f:
@@ -115,19 +130,19 @@ let test_autostaking =
                     ~loc:__LOC__
                     ~for_accounts:[delegate]
                     ~part:`unstaked_frozen
-                    Q.gt)
+                    (gt_diff @@ Tez.of_mutez 100_000_000L))
                "before second delegation"
          --> snapshot_balances "after unstake" [delegate]
          --> next_cycle
          --> check_snapshot_balances "after unstake"
-         --> wait_n_cycles 4
+         --> wait_n_cycles_f Test_scenario_stake.(unstake_wait -- 1)
          --> check_snapshot_balances
                ~f:
                  (assert_balance_evolution
                     ~loc:__LOC__
                     ~for_accounts:[delegate]
                     ~part:`unstaked_frozen
-                    Q.lt)
+                    (lt_diff @@ Tez.of_mutez 100_000_000L))
                "after unstake"
          (* finalizable are auto-finalize immediately  *)
          --> check_snapshot_balances
@@ -136,8 +151,8 @@ let test_autostaking =
                     ~loc:__LOC__
                     ~for_accounts:[delegate]
                     ~part:`liquid
-                    Q.lt)
-               "before finalisation")
+                    (gt_diff @@ Tez.of_mutez 100_000_000L))
+               "after unstake")
   |+ Tag "Yes AI" --> setup ~activate_ai:true
      --> check_snapshot_balances "before delegation"
 
