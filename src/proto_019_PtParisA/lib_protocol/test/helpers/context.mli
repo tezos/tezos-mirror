@@ -199,8 +199,9 @@ module Dal : sig
   val shards :
     t ->
     ?level:Raw_level.t ->
+    ?delegates:Signature.public_key_hash list ->
     unit ->
-    (Signature.Public_key_hash.t * (int * int)) list tzresult Lwt.t
+    Plugin.RPC.Dal.S.shards_output tzresult Lwt.t
 end
 
 module Contract : sig
@@ -256,7 +257,7 @@ module Delegate : sig
     frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
-    min_delegated_in_current_cycle : Tez.t;
+    min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
     total_delegated_stake : Tez.t;
     staking_denominator : Staking_pseudotoken.t;
     deactivated : bool;

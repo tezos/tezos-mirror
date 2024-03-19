@@ -20,3 +20,11 @@ val get :
   level:Level_repr.t ->
   Signature.public_key_hash list ->
   (Raw_context.t * Percentage.t) tzresult Lwt.t
+
+module Internal_for_tests : sig
+  val for_double_attestation :
+    Raw_context.t ->
+    int Signature.Public_key_hash.Map.t ->
+    Signature.Public_key_hash.t list ->
+    Percentage.t
+end

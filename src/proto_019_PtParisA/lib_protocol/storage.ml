@@ -153,6 +153,7 @@ module Missed_attestations_info = struct
       (obj2 (req "remaining_slots" int31) (req "missed_levels" int31))
 end
 
+(* TODO #6918: move closer to its only use left after P *)
 module Slashed_deposits_history = struct
   type slashed_percentage = Percentage.t
 
@@ -486,15 +487,6 @@ module Contract = struct
         let name = ["frozen_deposits_limit"]
       end)
       (Tez_repr)
-
-  (* TODO #6918: change name back after P *)
-  module Slashed_deposits =
-    Indexed_context.Make_map
-      (Registered)
-      (struct
-        let name = ["slashed_deposits_p"]
-      end)
-      (Slashed_deposits_history)
 
   (* TODO #6918: Remove after P *)
   module Slashed_deposits__Oxford =
@@ -1109,6 +1101,15 @@ module Pending_denunciations =
        end))
        (Public_key_hash_index)
     (Denunciations_repr)
+
+module Slashed_deposits =
+  Make_indexed_data_storage
+    (Make_subcontext (Registered) (Raw_context)
+       (struct
+         let name = ["slashed_deposits"]
+       end))
+       (Public_key_hash_index)
+    (Slashed_deposits_history)
 
 (** Per cycle storage *)
 

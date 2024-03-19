@@ -29,8 +29,8 @@ open Alpha_context
 type consensus_info = {
   predecessor_level : Raw_level.t;
   predecessor_round : Round.t;
-  preattestation_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
-  attestation_slot_map : (Consensus_key.pk * int) Slot.Map.t option;
+  preattestation_slot_map : (Consensus_key.pk * int * int) Slot.Map.t option;
+  attestation_slot_map : (Consensus_key.pk * int * int) Slot.Map.t option;
 }
 
 let init_consensus_info ctxt (predecessor_level, predecessor_round) =
@@ -505,7 +505,7 @@ module Consensus = struct
     let*? () = check_round kind locked_round round in
     let expected_payload_hash = block_info.header_contents.payload_hash in
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power =
+    let*? consensus_key, voting_power, _dal_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
     return (consensus_key, voting_power)
@@ -533,7 +533,7 @@ module Consensus = struct
        however check that all preattestations have the same round in
        [check_construction_preattestation_round_consistency] further below. *)
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power =
+    let*? consensus_key, voting_power, _dal_power =
       get_delegate_details consensus_info.preattestation_slot_map kind slot
     in
     return (consensus_key, voting_power)
@@ -697,10 +697,11 @@ module Consensus = struct
 
   (** Attestation checks for all modes that involve a block:
       Application, Partial_validation, and Construction.
+      Checks regarding the DAL content are done separately.
 
       Return the slot owner's consensus key and voting power. *)
   let check_block_attestation vi consensus_info
-      {level; round; block_payload_hash = bph; slot} dal_content_opt =
+      {level; round; block_payload_hash = bph; slot} =
     let open Lwt_result_syntax in
     let*? expected_payload_hash =
       match Consensus.attestation_branch vi.ctxt with
@@ -717,19 +718,8 @@ module Consensus = struct
     let*? () = check_level kind consensus_info.predecessor_level level in
     let*? () = check_round kind consensus_info.predecessor_round round in
     let*? () = check_payload_hash kind expected_payload_hash bph in
-    let*? consensus_key, voting_power =
+    let*? consensus_key, voting_power, _dal_power =
       get_delegate_details consensus_info.attestation_slot_map kind slot
-    in
-    let* () =
-      Option.fold
-        ~none:return_unit
-        ~some:(fun dal ->
-          Dal_apply.validate_block_attestation
-            vi.ctxt
-            level
-            consensus_key
-            dal.attestation)
-        dal_content_opt
     in
     return (consensus_key, voting_power)
 
@@ -747,19 +737,8 @@ module Consensus = struct
     let* consensus_key, voting_power =
       match vi.mode with
       | Application _ | Partial_validation _ | Construction _ ->
-          check_block_attestation
-            vi
-            consensus_info
-            consensus_content
-            dal_content
+          check_block_attestation vi consensus_info consensus_content
       | Mempool ->
-          let* () =
-            Option.fold
-              ~none:return_unit
-              ~some:(fun dal ->
-                Dal_apply.validate_mempool_attestation vi.ctxt dal.attestation)
-              dal_content
-          in
           check_mempool_consensus
             vi
             consensus_info
@@ -767,6 +746,18 @@ module Consensus = struct
             consensus_content
     in
     let* () = check_delegate_is_not_forbidden vi.ctxt consensus_key.delegate in
+    let* () =
+      Option.fold
+        ~none:return_unit
+        ~some:(fun dal ->
+          Dal_apply.validate_attestation
+            vi.ctxt
+            consensus_content.level
+            consensus_content.slot
+            consensus_key
+            dal.attestation)
+        dal_content
+    in
     let*? () =
       if check_signature then
         Operation.check_signature

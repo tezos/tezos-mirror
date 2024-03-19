@@ -65,6 +65,7 @@ let frozen_staker =
       Frozen_staker_repr.single_staker
         ~staker:default_contract
         ~delegate:default_delegate;
+      Frozen_staker_repr.baker_edge default_delegate;
     ]
 
 let deposits =

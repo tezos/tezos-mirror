@@ -72,3 +72,11 @@ val finalize_pending_slot_headers :
    in [ctxt], or Slots_history.genesis if no value is stored yet. *)
 val get_slot_headers_history :
   Raw_context.t -> Dal_slot_repr.History.t tzresult Lwt.t
+
+(** [compute_attested_slot_headers ~is_slot_attested published_slot_headers]
+    filter the given [published_slot_headers] and return the list of attested
+    slot headers and the corresponding bitset. *)
+val compute_attested_slot_headers :
+  is_slot_attested:(Dal_slot_repr.Header.t -> bool) ->
+  Dal_slot_repr.Header.t list ->
+  Dal_slot_repr.Header.t list * Dal_attestation_repr.t

@@ -208,11 +208,7 @@ struct
       QCheck2.Gen.(
         let nb_slots = 0 -- Parameters.(dal_parameters.number_of_slots) in
         let nb_levels = 4 -- 30 in
-        let* start_level =
-          let* n = small_nat in
-          return (n + 1)
-          (* skip level 0 by adding 1 *)
-        in
+        let* start_level = small_nat in
         (* The slot is confirmed iff the boolean is true *)
         let slot = bool in
         let slots = list_size nb_slots slot in

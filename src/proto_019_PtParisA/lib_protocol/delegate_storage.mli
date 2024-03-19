@@ -162,5 +162,7 @@ module For_RPC : sig
     Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
   val min_delegated_in_current_cycle :
-    Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+    Raw_context.t ->
+    Signature.Public_key_hash.t ->
+    (Tez_repr.t * Level_repr.t option) tzresult Lwt.t
 end

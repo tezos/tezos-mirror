@@ -487,7 +487,7 @@ module Delegate = struct
     frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
-    min_delegated_in_current_cycle : Tez.t;
+    min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
     total_delegated_stake : Tez.t;
     staking_denominator : Staking_pseudotoken.t;
     deactivated : bool;
@@ -716,8 +716,7 @@ let init_with_constants_gen tup constants =
   let n = tup_n tup in
   let*? bootstrap_accounts, contracts = create_bootstrap_accounts n in
   let parameters =
-    Tezos_protocol_019_PtParisA_parameters.Default_parameters
-    .parameters_of_constants
+    Tezos_protocol_019_PtParisA_parameters.Default_parameters.parameters_of_constants
       ~bootstrap_accounts
       constants
   in

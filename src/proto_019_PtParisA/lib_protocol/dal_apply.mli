@@ -28,37 +28,27 @@
 
 open Alpha_context
 
-(** [validate_block_attestation ctxt level consensus_key attestation] checks
+(** [validate_attestation ctxt level slot consensus_key attestation] checks
     whether the DAL attestation [attestation] emitted at given [level] by the
-    attester with the given [consensus_key] is valid for block inclusion. If an
+    attester with the given [consensus_key] and given [slot] is valid. If an
     [Error _] is returned, the [op] is not valid. The checks made are:
     * the attestation size does not exceed the maximum;
     * the delegate is in the DAL committee.
 
     These are checks done for the DAL part alone, checks on other fields of an
-    attestation (like level, round, slot) are done by the caller. *)
-val validate_block_attestation :
+    attestation (like level, round) are done by the caller. *)
+val validate_attestation :
   t ->
   Raw_level.t ->
+  Slot.t ->
   Consensus_key.pk ->
   Dal.Attestation.t ->
   unit tzresult Lwt.t
 
-(** [validate_mempool_attestation ctxt level consensus_key attestation] checks
-    whether the DAL attestation [attestation] is valid for the mempool. It is
-    similar to [check_block_attestion], but it performs only the check on the
-    size, as [consensus_key] is not available. If an [Error _] is returned, the
-    [op] is not valid.
-
-    These are checks done for the DAL part alone, checks on other fields of an
-    attestation (like level, round, slot) are done by the caller. *)
-val validate_mempool_attestation : t -> Dal.Attestation.t -> unit tzresult Lwt.t
-
-(** [apply_attestation ctxt consensus_key level attestation] applies
-    [attestation] into the [ctxt] assuming [consensus_key.delegate] issued those
-    attestations at level [level]. *)
-val apply_attestation :
-  t -> Consensus_key.pk -> Raw_level.t -> Dal.Attestation.t -> t tzresult
+(** [apply_attestation ctxt attestation] records in the context that the given
+    [attestation] was issued and the corresponding attester has the given
+    [power]. *)
+val apply_attestation : t -> Dal.Attestation.t -> power:int -> t tzresult
 
 (** [validate_publish_commitment ctxt slot] ensures that [slot_header] is
    valid and prevents an operation containing [slot_header] to be
@@ -80,12 +70,3 @@ val apply_publish_commitment :
    [lag] is a parametric constant specific to the data-availability
    layer.  *)
 val finalisation : t -> (t * Dal.Attestation.t) tzresult Lwt.t
-
-(** [initialize ctxt ~level] should be executed at block
-   initialisation time. It allows to cache the committee for [level]
-   in memory so that every time we need to use this committee, there
-   is no need to recompute it again. *)
-val initialisation : t -> level:Level.t -> t tzresult Lwt.t
-
-(** [compute_committee ctxt level] computes the DAL committee for [level]. *)
-val compute_committee : t -> Level.t -> Dal.Attestation.committee tzresult Lwt.t

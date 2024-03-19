@@ -23,11 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [shards ctxt ~level] returns the DAL committee as an association
-   list that associates to the public key hash [pkh] of the member of
-   the committee an interval [(s,n)], meaning that the slots
-   [s;s+1;...;s+n-1] belongs to [pkh]. It is guaranteed that [n>0]. *)
+(** [shards ctxt ~level] returns the DAL committee as a mapping from the public
+    key hash of members of the committee to the list of shard indexes associated
+    to that member. *)
 val shards :
   Alpha_context.t ->
-  level:Alpha_context.Raw_level.t ->
-  (Signature.Public_key_hash.t * (int * int)) list tzresult Lwt.t
+  level:Alpha_context.Level.t ->
+  (Alpha_context.t * int list Signature.Public_key_hash.Map.t) tzresult Lwt.t

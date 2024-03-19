@@ -264,29 +264,6 @@ module Contract : sig
        and type value = Z.t
        and type t := Raw_context.t
 
-  (** History of slashed deposits: an associative list of cycles to slashed
-      percentages.
-
-      This storage is inefficient but is not expected to grow large (as of
-      2023-11-28, the last slashing on mainnet dates back to:
-      - 2021-12-17 for double baking (154 events in total),
-      - 2019-08-08 for double endorsing (24 events in total).
-      Since slashings are here grouped by baker and cycle, there would only be
-      a few elements in each list.
-
-      The slashing percentages are used to compute the real value of stake
-      withdrawals.
-      Currently there is no limit to the age of the events we need to store
-      because there is no such limit for stake withdrawals.
-      At worst we can revisit this decision in a later protocol amendment (in
-      25 cycles) or clean up this storage manually or automatically.
-  *)
-  module Slashed_deposits :
-    Indexed_data_storage
-      with type key = Contract_repr.t
-       and type value = Slashed_deposits_history.t
-       and type t := Raw_context.t
-
   (* TODO #6918: Remove after P *)
   module Slashed_deposits__Oxford :
     Indexed_data_storage
@@ -484,6 +461,28 @@ module Pending_denunciations :
     with type t := Raw_context.t
      and type key = Signature.public_key_hash
      and type value = Denunciations_repr.t
+
+(** History of slashed deposits: an associative list of cycles to slashed
+    percentages.
+
+    This storage is inefficient but is not expected to grow large (as of
+    2023-11-28, the last slashing on mainnet dates back to:
+    - 2021-12-17 for double baking (154 events in total),
+    - 2019-08-08 for double endorsing (24 events in total).
+    Since slashings are here grouped by baker and cycle, there would only be
+    a few elements in each list.
+
+    The slashing percentages are used to compute the real value of stake
+    withdrawals.
+    Currently there is no limit to the age of the events we need to store
+    because there is no such limit for stake withdrawals.
+    At worst we can revisit this decision in a later protocol amendment (in
+    25 cycles) or clean up this storage manually or automatically. *)
+module Slashed_deposits :
+  Indexed_data_storage
+    with type t := Raw_context.t
+     and type key = Signature.public_key_hash
+     and type value = Slashed_deposits_history.t
 
 (** Needed for the stitching from Oxford to P.
     TODO #6957: Remove this from protocol Q. *)

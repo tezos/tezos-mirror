@@ -42,6 +42,7 @@ type error +=
   | Dal_data_availibility_attester_not_in_committee of {
       attester : Signature.Public_key_hash.t;
       level : Raw_level_repr.t;
+      slot : Slot_repr.t;
     }
   | Dal_cryptobox_error of {explanation : string}
   | Dal_register_invalid_slot_header of {
@@ -186,24 +187,29 @@ let () =
     ~id:"Dal_data_availibility_attester_not_in_committee"
     ~title:"The attester is not part of the DAL committee for this level"
     ~description:"The attester is not part of the DAL committee for this level"
-    ~pp:(fun ppf (attester, level) ->
+    ~pp:(fun ppf (attester, level, slot) ->
       Format.fprintf
         ppf
-        "The attester %a is not part of the DAL committee for the level %a"
+        "The attester %a, with slot %a, is not part of the DAL committee for \
+         the level %a."
         Signature.Public_key_hash.pp
         attester
+        Slot_repr.pp
+        slot
         Raw_level_repr.pp
         level)
     Data_encoding.(
-      obj2
+      obj3
         (req "attester" Signature.Public_key_hash.encoding)
-        (req "level" Raw_level_repr.encoding))
+        (req "level" Raw_level_repr.encoding)
+        (req "slot" Slot_repr.encoding))
     (function
-      | Dal_data_availibility_attester_not_in_committee {attester; level} ->
-          Some (attester, level)
+      | Dal_data_availibility_attester_not_in_committee {attester; level; slot}
+        ->
+          Some (attester, level, slot)
       | _ -> None)
-    (fun (attester, level) ->
-      Dal_data_availibility_attester_not_in_committee {attester; level}) ;
+    (fun (attester, level, slot) ->
+      Dal_data_availibility_attester_not_in_committee {attester; level; slot}) ;
   register_error_kind
     `Permanent
     ~id:"dal_cryptobox_error"

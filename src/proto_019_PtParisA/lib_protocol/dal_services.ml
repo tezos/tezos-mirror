@@ -32,12 +32,23 @@ let assert_dal_feature_enabled ctxt =
     Compare.Bool.(feature_enable = true)
     Dal_errors.Dal_feature_disabled
 
+(* Slots returned by this function are assumed by consumers to be in increasing
+   order, hence the use of [Slot.Range.rev_fold_es]. *)
 let shards ctxt ~level =
   let open Lwt_result_syntax in
-  let open Dal.Attestation in
   let*? () = assert_dal_feature_enabled ctxt in
-  let level = Level.from_raw ctxt level in
-  (* We do not cache this committee. This function being used by RPCs
-     to know the DAL committee at some particular level. *)
-  let+ committee = Dal_apply.compute_committee ctxt level in
-  Signature.Public_key_hash.Map.bindings committee.pkh_to_shards
+  let number_of_shards = Dal.number_of_shards ctxt in
+  let*? slots = Slot.Range.create ~min:0 ~count:number_of_shards in
+  Slot.Range.rev_fold_es
+    (fun (ctxt, map) slot ->
+      let* ctxt, consensus_pk = Stake_distribution.slot_owner ctxt level slot in
+      let slot = Slot.to_int slot in
+      let map =
+        Signature.Public_key_hash.Map.update
+          consensus_pk.delegate
+          (function None -> Some [slot] | Some slots -> Some (slot :: slots))
+          map
+      in
+      return (ctxt, map))
+    (ctxt, Signature.Public_key_hash.Map.empty)
+    slots
