@@ -632,6 +632,16 @@ let resolve points =
        ~default_port:(Configuration_file.default.listen_addr |> snd))
     points
 
+let wait_for_l1_bootstrapped (cctxt : Rpc_context.t) =
+  let open Lwt_result_syntax in
+  let*! () = Event.(emit waiting_l1_node_bootstrapped) () in
+  let* stream, _stop = Monitor_services.bootstrapped cctxt in
+  let*! () =
+    Lwt_stream.iter_s (fun (_hash, _timestamp) -> Lwt.return_unit) stream
+  in
+  let*! () = Event.(emit l1_node_bootstrapped) () in
+  return_unit
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
    Improve general architecture, handle L1 disconnection etc
 *)
@@ -763,6 +773,8 @@ let run ~data_dir configuration_override =
   let*! () = Event.(emit rpc_server_is_ready rpc_addr) in
   (* Start collecting stats related to the Gossipsub worker. *)
   Dal_metrics.collect_gossipsub_metrics gs_worker ;
+  (* First wait for the L1 node to be bootstrapped. *)
+  let* () = wait_for_l1_bootstrapped cctxt in
   (* Start daemon to resolve current protocol plugin *)
   let* () =
     daemonize
