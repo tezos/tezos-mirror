@@ -548,17 +548,31 @@ let tick_search ~big_step_blocks node_ctxt head tick =
       (* The starting block contains the tick we want, we are done. *)
       return_some head
   else
-    let genesis_level = node_ctxt.genesis_info.level in
+    let* gc_levels = Store.Gc_levels.read node_ctxt.store.gc_levels in
+    let first_available_level =
+      match gc_levels with
+      | Some {first_available_level = l; _} -> l
+      | None -> node_ctxt.genesis_info.level
+    in
     let rec find_big_step (end_block : Sc_rollup_block.t) =
       let start_level =
         Int32.sub end_block.header.level (Int32.of_int big_step_blocks)
       in
       let start_level =
-        if start_level < genesis_level then genesis_level else start_level
+        if start_level < first_available_level then first_available_level
+        else start_level
       in
       let* start_block = get_l2_block_by_level node_ctxt start_level in
       if Z.Compare.(start_block.initial_tick <= tick) then
         return (start_block, end_block)
+      else if start_level = first_available_level then
+        failwith
+          "Tick %a happened before first available level %ld with tick %a"
+          Z.pp_print
+          tick
+          first_available_level
+          Z.pp_print
+          start_block.initial_tick
       else find_big_step start_block
     in
     let block_level Sc_rollup_block.{header = {level; _}; _} =
