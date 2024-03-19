@@ -31,6 +31,9 @@ type level = int32
 (** An index of a DAL slot header. *)
 type slot_index = int
 
+(** An index of a DAL page. *)
+type page_index = int
+
 (** An ID associated to a slot or to its commitment. *)
 type slot_id = {slot_level : level; slot_index : slot_index}
 
