@@ -457,6 +457,27 @@ let jobs pipeline_type =
              ])
       |> job_external_split
     in
+    (* Used in [before_merging] and [schedule_extended_tests].
+
+       Fetch records for Tezt generated on the last merge request pipeline
+       on the most recently merged MR and makes them available in artifacts
+       for future merge request pipelines. *)
+    let job_select_tezts : tezos_job =
+      job
+        ~__POS__
+        ~name:"select_tezts"
+          (* We need:
+             - Git (to run git diff)
+             - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
+        ~image:Images.runtime_prebuild_dependencies
+        ~stage:Stages.build
+        ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
+        ["scripts/ci/select_tezts.sh || exit $?"]
+        ~allow_failure:(With_exit_codes [17])
+        ~artifacts:
+          (artifacts ~expire_in:(Days 3) ~when_:Always ["selected_tezts.tsl"])
+      |> job_external_once
+    in
     [
       job_docker_rust_toolchain;
       job_docker_client_libs_dependencies;
@@ -468,6 +489,7 @@ let jobs pipeline_type =
       job_ocaml_check;
       job_build_kernels;
       job_tezt_fetch_records;
+      job_select_tezts;
     ]
     @ bin_packages_jobs
   in
