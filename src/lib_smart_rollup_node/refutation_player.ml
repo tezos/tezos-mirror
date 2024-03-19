@@ -31,6 +31,8 @@ module Types = struct
     node_ctxt : Node_context.rw;
     self : Signature.public_key_hash;
     opponent : Signature.public_key_hash;
+    conflict : Game.conflict;
+    commitment_period_tick_offset : Z.t;
     mutable last_move_cache :
       (Octez_smart_rollup.Game.game_state * int32) option;
   }
@@ -54,8 +56,9 @@ type worker = Worker.infinite Worker.queue Worker.t
 
 let table = Worker.create_table Queue
 
-let on_play game Types.{node_ctxt; self; opponent; _} =
-  play node_ctxt ~self game opponent
+let on_play game
+    Types.{node_ctxt; self; opponent; commitment_period_tick_offset; _} =
+  play node_ctxt ~self ~commitment_period_tick_offset game opponent
 
 let on_play_opening conflict (Types.{node_ctxt; _} : Types.state) =
   play_opening_move node_ctxt conflict
@@ -77,8 +80,22 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w _name Types.{node_ctxt; self; conflict} =
-    Lwt_result.return
-      Types.{node_ctxt; self; opponent = conflict.other; last_move_cache = None}
+    let open Lwt_result_syntax in
+    let* commitment_period_tick_offset =
+      Node_context.tick_offset_of_commitment_period
+        node_ctxt
+        conflict.our_commitment
+    in
+    return
+      Types.
+        {
+          node_ctxt;
+          self;
+          opponent = conflict.other;
+          conflict;
+          commitment_period_tick_offset;
+          last_move_cache = None;
+        }
 
   let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
       unit tzresult Lwt.t =

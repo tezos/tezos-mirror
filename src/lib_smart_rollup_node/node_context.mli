@@ -314,6 +314,11 @@ val get_tezos_reorg_for_new_head :
 val block_with_tick :
   _ t -> max_level:int32 -> Z.t -> Sc_rollup_block.t option tzresult Lwt.t
 
+(** [tick_offset_of_commitment_period node_ctxt commtient] returns the global
+    initial tick (since genesis) of the PVM for the state at the beginning of the
+    commitment period that [commitment] concludes. *)
+val tick_offset_of_commitment_period : _ t -> Commitment.t -> Z.t tzresult Lwt.t
+
 (** {3 Commitments} *)
 
 (** [get_commitment t hash] returns the commitment with [hash] stored by the

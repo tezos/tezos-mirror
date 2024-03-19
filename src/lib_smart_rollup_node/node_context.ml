@@ -524,6 +524,19 @@ let save_commitment {store; _} commitment =
   in
   hash
 
+let tick_offset_of_commitment_period node_ctxt (commitment : Commitment.t) =
+  let open Lwt_result_syntax in
+  let+ commitment_block =
+    get_l2_block_by_level node_ctxt commitment.inbox_level
+  in
+  (* Final tick of commitment period *)
+  let commitment_final_tick =
+    Z.add commitment_block.initial_tick (Z.of_int64 commitment_block.num_ticks)
+  in
+  (* Final tick of predecessor commitment, i.e. initial tick of commitment
+     period *)
+  Z.sub commitment_final_tick (Z.of_int64 commitment.number_of_ticks)
+
 let commitment_published_at_level {store; _} commitment =
   Store.Commitments_published_at_level.find
     store.commitments_published_at_level
