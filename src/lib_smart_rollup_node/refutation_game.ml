@@ -85,7 +85,8 @@ type pvm_intermediate_state =
   | Evaluated of Fuel.Accounted.t Pvm_plugin_sig.eval_state
 
 let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
-    ~default_number_of_sections node_ctxt last_level ok our_view =
+    ~default_number_of_sections ~commitment_period_tick_offset node_ctxt
+    last_level ok our_view =
   let open Lwt_result_syntax in
   let start_hash, start_tick, start_state =
     match ok with
@@ -107,6 +108,7 @@ let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
       ~start_chunk
       ~our_stop_chunk
       ~default_number_of_sections
+      ~commitment_period_tick_offset
       ~last_level
   in
   let*! () =
@@ -118,13 +120,15 @@ let new_dissection (module Plugin : Protocol_plugin_sig.S) ~opponent
   in
   return dissection
 
-(** [generate_from_dissection ~default_number_of_sections node_ctxt game
-      dissection] traverses the current [dissection] and returns a move which
-      performs a new dissection of the execution trace or provides a refutation
-      proof to serve as the next move of the [game]. *)
+(** [generate_from_dissection ~default_number_of_sections ~tick_offset node_ctxt
+    game dissection] traverses the current [dissection] and returns a move which
+    performs a new dissection of the execution trace or provides a refutation
+    proof to serve as the next move of the [game]. [tick_offset] is the initial
+    global tick (since genesis) of the PVM at the start of the commitment
+    period. *)
 let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
     ~default_number_of_sections node_ctxt ~opponent
-    (game : Octez_smart_rollup.Game.t)
+    ~commitment_period_tick_offset (game : Octez_smart_rollup.Game.t)
     (dissection : Octez_smart_rollup.Game.dissection_chunk list) =
   let open Lwt_result_syntax in
   let rec traverse ok = function
@@ -146,7 +150,7 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
             (module Plugin)
             node_ctxt
             ?start_state
-            ~tick
+            ~tick:(Z.add tick commitment_period_tick_offset)
             game.inbox_level
         in
         match (their_hash, our) with
@@ -168,6 +172,7 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
           (module Plugin)
           ~opponent
           ~default_number_of_sections
+          ~commitment_period_tick_offset
           node_ctxt
           game.inbox_level
           ok
@@ -187,14 +192,14 @@ let generate_next_dissection (module Plugin : Protocol_plugin_sig.S)
         Rollup_node_errors.Unreliable_tezos_node_returning_inconsistent_game
 
 let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt ~opponent
-    (game : Octez_smart_rollup.Game.t) =
+    ~commitment_period_tick_offset (game : Octez_smart_rollup.Game.t) =
   let open Lwt_result_syntax in
   let final_move start_tick =
     let* start_state =
       Interpreter.state_of_tick
         (module Plugin)
         node_ctxt
-        ~tick:start_tick
+        ~tick:(Z.add start_tick commitment_period_tick_offset)
         game.inbox_level
     in
     match start_state with
@@ -220,6 +225,7 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt ~opponent
           ~default_number_of_sections
           node_ctxt
           ~opponent
+          ~commitment_period_tick_offset
           game
           dissection
       in
@@ -231,9 +237,12 @@ let next_move (module Plugin : Protocol_plugin_sig.S) node_ctxt ~opponent
       let choice = agreed_start_chunk.tick in
       final_move choice
 
-let play_next_move plugin node_ctxt game opponent =
+let play_next_move plugin node_ctxt ~commitment_period_tick_offset game opponent
+    =
   let open Lwt_result_syntax in
-  let* refutation = next_move plugin node_ctxt ~opponent game in
+  let* refutation =
+    next_move plugin node_ctxt ~opponent ~commitment_period_tick_offset game
+  in
   inject_next_move node_ctxt ~refutation ~opponent
 
 let play_timeout (node_ctxt : _ Node_context.t) stakers =
@@ -248,12 +257,18 @@ let play_timeout (node_ctxt : _ Node_context.t) stakers =
   in
   return_unit
 
-let play node_ctxt ~self game opponent =
+let play node_ctxt ~self ~commitment_period_tick_offset game opponent =
   let open Lwt_result_syntax in
   let index = make_index self opponent in
   let* plugin = Protocol_plugins.last_proto_plugin node_ctxt in
   match turn ~self game index with
-  | Our_turn {opponent} -> play_next_move plugin node_ctxt game opponent
+  | Our_turn {opponent} ->
+      play_next_move
+        plugin
+        node_ctxt
+        ~commitment_period_tick_offset
+        game
+        opponent
   | Their_turn ->
       let module Plugin = (val plugin) in
       let* timeout_reached =
