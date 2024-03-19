@@ -250,7 +250,7 @@ and[@tailrec] catch_evm_event_aux ~rollup_node_endpoint store ~from ~to_ =
     catch_evm_event_aux ~rollup_node_endpoint store ~from:next_l1_level ~to_
 
 let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
-    ~max_blueprints_catchup ~catchup_cooldown
+    ~max_blueprints_ahead ~max_blueprints_catchup ~catchup_cooldown
     ?(genesis_timestamp = Helpers.now ()) ~cctxt ~sequencer
     ~(configuration : Configuration.sequencer Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
@@ -267,15 +267,17 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~smart_rollup_address
       ()
   in
+  let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
       ~max_blueprints_lag
+      ~max_blueprints_ahead
       ~max_blueprints_catchup
       ~catchup_cooldown
+      ~latest_level_seen:(Z.pred next_blueprint_number)
       ctxt.store
   in
-
   let* () =
     if not loaded then
       (* Create the first empty block. *)
