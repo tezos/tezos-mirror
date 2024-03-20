@@ -21,19 +21,24 @@
     [ { "kind": "minted", "category": "bootstrap",
         "change": "-20000000000000", "origin": "migration" },
       { "kind": "freezer", "category": "deposits",
-        "staker": { "baker": "[PUBLIC_KEY_HASH]" },
+        "staker":
+          { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
         "change": "400000000000", "origin": "migration" },
       { "kind": "freezer", "category": "deposits",
-        "staker": { "baker": "[PUBLIC_KEY_HASH]" },
+        "staker":
+          { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
         "change": "400000000000", "origin": "migration" },
       { "kind": "freezer", "category": "deposits",
-        "staker": { "baker": "[PUBLIC_KEY_HASH]" },
+        "staker":
+          { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
         "change": "400000000000", "origin": "migration" },
       { "kind": "freezer", "category": "deposits",
-        "staker": { "baker": "[PUBLIC_KEY_HASH]" },
+        "staker":
+          { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
         "change": "400000000000", "origin": "migration" },
       { "kind": "freezer", "category": "deposits",
-        "staker": { "baker": "[PUBLIC_KEY_HASH]" },
+        "staker":
+          { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
         "change": "400000000000", "origin": "migration" },
       { "kind": "contract",
         "contract": "[PUBLIC_KEY_HASH]",
@@ -53,7 +58,8 @@
       { "kind": "minted", "category": "baking rewards", "change": "-333334",
         "origin": "block" },
       { "kind": "freezer", "category": "deposits",
-        "staker": { "baker": "[PUBLIC_KEY_HASH]" },
+        "staker":
+          { "baker_own_stake": "[PUBLIC_KEY_HASH]" },
         "change": "333334", "origin": "block" },
       { "kind": "minted", "category": "baking rewards", "change": "-2999999",
         "origin": "block" },
