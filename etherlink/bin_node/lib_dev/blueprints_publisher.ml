@@ -7,7 +7,7 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  store : Store.t;
+  store : Evm_store.t;
   max_blueprints_lag : int;
   max_blueprints_ahead : int;
   max_blueprints_catchup : int;
@@ -16,7 +16,7 @@ type parameters = {
 }
 
 type state = {
-  store : Store.t;
+  store : Evm_store.t;
   rollup_node_endpoint : Uri.t;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
@@ -135,7 +135,9 @@ module Worker = struct
     let rec catching_up curr =
       if Z.Compare.(curr <= upper_bound) then
         let* payload =
-          Store.Publishable_blueprints.find (blueprint_store worker) (Qty curr)
+          Evm_store.Publishable_blueprints.find
+            (blueprint_store worker)
+            (Qty curr)
         in
         match payload with
         | Some payload ->

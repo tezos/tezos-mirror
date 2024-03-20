@@ -370,7 +370,7 @@ module Migrations = struct
         if applied <= known then return (List.drop_n applied all_migrations)
         else
           let*! () =
-            Store_events.migrations_from_the_future ~applied ~known:0
+            Evm_store_events.migrations_from_the_future ~applied ~known:0
           in
           failwith
             "Cannot use a store modified by a more up-to-date version of the \
@@ -409,7 +409,7 @@ let init ~data_dir =
     let* () =
       if not exists then
         let* () = Migrations.create_table store in
-        let*! () = Store_events.init_store () in
+        let*! () = Evm_store_events.init_store () in
         return_unit
       else
         let* table_exists = Migrations.table_exists store in
@@ -423,7 +423,7 @@ let init ~data_dir =
               let* old_db = Migrations.check_V0 store in
               if old_db then
                 let* () = Migrations.assume_old_store store in
-                let*! () = Store_events.assume_old_store () in
+                let*! () = Evm_store_events.assume_old_store () in
                 return_unit
               else
                 failwith "A store already exists, but its content is incorrect.")
@@ -435,7 +435,7 @@ let init ~data_dir =
       List.iter_es
         (fun (i, ((module M : Q.MIGRATION) as mig)) ->
           let* () = Migrations.apply_migration store i mig in
-          let*! () = Store_events.applied_migration M.name in
+          let*! () = Evm_store_events.applied_migration M.name in
           return_unit)
         migrations
     in

@@ -19,7 +19,7 @@ type t = {
   preimages_endpoint : Uri.t option;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
-  store : Store.t;
+  store : Evm_store.t;
   session : session_state;
   head_lock : Lwt_mutex.t;
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7073
@@ -28,15 +28,15 @@ type t = {
 }
 
 let with_store_transaction ctxt k =
-  Store.with_transaction ctxt.store (fun txn_store ->
+  Evm_store.with_transaction ctxt.store (fun txn_store ->
       k {ctxt with store = txn_store})
 
 let store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
 let load ~data_dir index =
   let open Lwt_result_syntax in
-  let* store = Store.init ~data_dir in
-  let* latest = Store.Context_hashes.find_latest store in
+  let* store = Evm_store.init ~data_dir in
+  let* latest = Evm_store.Context_hashes.find_latest store in
   match latest with
   | Some (Qty latest_blueprint_number, checkpoint) ->
       let*! context = Irmin_context.checkout_exn index checkpoint in
@@ -61,7 +61,7 @@ let commit_next_head (ctxt : t) evm_state =
   let*! context = Irmin_context.PVMState.set ctxt.session.context evm_state in
   let*! checkpoint = Irmin_context.commit context in
   let* () =
-    Store.Context_hashes.store
+    Evm_store.Context_hashes.store
       ctxt.store
       ctxt.session.next_blueprint_number
       checkpoint
@@ -74,7 +74,7 @@ let replace_current_commit (ctxt : t) evm_state =
   let*! context = Irmin_context.PVMState.set ctxt.session.context evm_state in
   let*! checkpoint = Irmin_context.commit context in
   let* () =
-    Store.Context_hashes.store ctxt.store (Qty Z.(pred next)) checkpoint
+    Evm_store.Context_hashes.store ctxt.store (Qty Z.(pred next)) checkpoint
   in
   return context
 
@@ -107,7 +107,7 @@ let apply_evm_event_unsafe on_success ctxt evm_state event =
           evm_state
       in
       let* () =
-        Store.Kernel_upgrades.store
+        Evm_store.Kernel_upgrades.store
           ctxt.store
           ctxt.session.next_blueprint_number
           upgrade
@@ -173,7 +173,7 @@ let apply_evm_events ~finalized_level (ctxt : t) events =
         (ignore, ctxt, evm_state)
         events
     in
-    let* _ = Store.L1_latest_known_level.store ctxt.store finalized_level in
+    let* _ = Evm_store.L1_latest_known_level.store ctxt.store finalized_level in
     let* ctxt = replace_current_commit ctxt evm_state in
     return (ctxt, on_success)
   in
@@ -223,7 +223,7 @@ let check_upgrade ctxt evm_state =
   function
   | Some root_hash ->
       let* () =
-        Store.Kernel_upgrades.record_apply
+        Evm_store.Kernel_upgrades.record_apply
           ctxt.store
           ctxt.session.next_blueprint_number
       in
@@ -260,7 +260,7 @@ let check_upgrade ctxt evm_state =
     inconsistent state in case of error. *)
 let apply_blueprint_store_unsafe ctxt timestamp payload =
   let open Lwt_result_syntax in
-  Store.assert_in_transaction ctxt.store ;
+  Evm_store.assert_in_transaction ctxt.store ;
   let*! evm_state = evm_state ctxt in
   let config = execution_config ctxt in
   let (Qty next) = ctxt.session.next_blueprint_number in
@@ -271,7 +271,7 @@ let apply_blueprint_store_unsafe ctxt timestamp payload =
   | Apply_success (evm_state, Block_height blueprint_number, current_block_hash)
     when Z.equal blueprint_number next ->
       let* () =
-        Store.Executable_blueprints.store
+        Evm_store.Executable_blueprints.store
           ctxt.store
           {number = Qty blueprint_number; timestamp; payload}
       in
@@ -309,7 +309,7 @@ let apply_and_publish_blueprint (ctxt : t) timestamp
       apply_blueprint_store_unsafe ctxt timestamp blueprint.to_execute
     in
     let* () =
-      Store.Publishable_blueprints.store
+      Evm_store.Publishable_blueprints.store
         ctxt.store
         (Qty level)
         blueprint.to_publish
@@ -357,7 +357,7 @@ let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   let* store, context, next_blueprint_number, current_block_hash, loaded =
     load ~data_dir index
   in
-  let* pending_upgrade = Store.Kernel_upgrades.find_latest_pending store in
+  let* pending_upgrade = Evm_store.Kernel_upgrades.find_latest_pending store in
   let ctxt =
     {
       index;
@@ -503,9 +503,12 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
     | None -> failwith "The block hash was not found"
   in
   (* Init the store *)
-  let* store = Store.init ~data_dir in
+  let* store = Evm_store.init ~data_dir in
   let* () =
-    Store.Context_hashes.store store (Qty current_blueprint_number) checkpoint
+    Evm_store.Context_hashes.store
+      store
+      (Qty current_blueprint_number)
+      checkpoint
   in
   return_unit
 
@@ -519,7 +522,7 @@ let last_produced_blueprint (ctxt : t) =
   let open Lwt_result_syntax in
   let (Qty next) = ctxt.session.next_blueprint_number in
   let current = Ethereum_types.Qty Z.(pred next) in
-  let* blueprint = Store.Executable_blueprints.find ctxt.store current in
+  let* blueprint = Evm_store.Executable_blueprints.find ctxt.store current in
   match blueprint with
   | Some blueprint -> return blueprint
   | None -> failwith "Could not fetch the last produced blueprint"

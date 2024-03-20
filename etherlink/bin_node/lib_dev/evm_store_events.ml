@@ -13,7 +13,7 @@ let init_store =
   declare_0
     ~section
     ~name:"store_init"
-    ~msg:"Store is being initialized for the first time"
+    ~msg:"Evm_store is being initialized for the first time"
     ~level:Notice
     ()
 
@@ -40,8 +40,8 @@ let migrations_from_the_future =
     ~section
     ~name:"migrations_from_the_future"
     ~msg:
-      "Store has {applied} migrations applied but the EVM node is only aware \
-       of {known}"
+      "Evm_store has {applied} migrations applied but the EVM node is only \
+       aware of {known}"
     ~level:Error
     ("applied", Data_encoding.int31)
     ("known", Data_encoding.int31)
