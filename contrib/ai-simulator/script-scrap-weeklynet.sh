@@ -13,11 +13,11 @@ l=$1
 
 batch_size=10
 
-for ((i = 0; i <= $l; i += batch_size)); do
+for ((i = 0; i <= l; i += batch_size)); do
 
   echo "Launching data request for batch starting with cycle: $i"
 
-  for ((n = i; n < $((i + batch_size)) && n <= $l; n++)); do
+  for ((n = i; n < $((i + batch_size)) && n <= l; n++)); do
     block=$((128 * (1 + n)))
 
     (curl -s https://rpc.weeklynet-2024-03-13.teztnets.com/chains/main/blocks/$block/context/total_supply > "/tmp/ai-sim-supply/$n.txt" &)
@@ -25,7 +25,7 @@ for ((i = 0; i <= $l; i += batch_size)); do
     (curl -s https://rpc.weeklynet-2024-03-13.teztnets.com/chains/main/blocks/$block/context/total_frozen_stake > "/tmp/ai-sim-frozen/$n.txt" &)
   done
 
-  for ((n = i; n < $((i + batch_size)) && n <= $l; n++)); do
+  for ((n = i; n < $((i + batch_size)) && n <= l; n++)); do
     echo -ne "Looking for data $n\r"
 
     until [ -s "/tmp/ai-sim-supply/$n.txt" ]; do
@@ -39,7 +39,7 @@ for ((i = 0; i <= $l; i += batch_size)); do
   done
 done
 
-for n in $(seq 0 $l); do
+for n in $(seq 0 "$l"); do
 
   supply=$(cat "/tmp/ai-sim-supply/$n.txt")
   frozen=$(cat "/tmp/ai-sim-frozen/$n.txt")
