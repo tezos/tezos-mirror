@@ -404,7 +404,37 @@ module Handler = struct
                cryptobox
                head_level
                proto_parameters.attestation_lag) ;
-
+          let oldest_level =
+            Node_context.get_oldest_stored_shard_level
+              ctxt
+              ~current_level:head_level
+          in
+          let number_of_slots = proto_parameters.number_of_slots in
+          let store = Node_context.get_store ctxt in
+          let*! commitments =
+            List.filter_map_s
+              (fun slot_index ->
+                let open Lwt_syntax in
+                let* result =
+                  Slot_manager.get_commitment_by_published_level_and_index
+                    ~level:oldest_level
+                    ~slot_index
+                    store
+                in
+                match result with
+                | Error `Not_found -> return_none
+                | Error (`Decoding_failed _) ->
+                    return_none (* TODO: add a warning *)
+                | Ok commitment -> return_some commitment)
+              (Seq.ints 0 |> Stdlib.Seq.take number_of_slots |> List.of_seq)
+          in
+          (* Check cache probably *)
+          let* () =
+            List.iter_es
+              (fun commitment ->
+                Store.Shards.remove store.shard_store commitment)
+              commitments
+          in
           let process_block block_level =
             let block = `Level block_level in
             let* block_info =

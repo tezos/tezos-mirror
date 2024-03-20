@@ -106,6 +106,24 @@ let update_plugin_in_ready ctxt plugin proto =
   | Ready ready_ctxt ->
       ctxt.status <- Ready {ready_ctxt with plugin; plugin_proto = proto}
 
+let get_oldest_stored_shard_level ctxt ~current_level =
+  match ctxt.config.history_mode with
+  | Full -> Int32.zero
+  | Rolling {blocks = `Some n} ->
+      Int32.(max zero (sub current_level (of_int n)))
+  | Rolling {blocks = `Auto} -> (
+      match ctxt.status with
+      | Starting -> Int32.zero
+      | Ready ready_ctxt ->
+          let n =
+            (* Let's give it 10 blocks of slack just in case
+               (finalisation period, of by one, attestation_lag,
+               ...). *)
+            ready_ctxt.proto_parameters.sc_rollup_challenge_window_in_blocks
+            + 10
+          in
+          Int32.(max zero (sub current_level (of_int n))))
+
 type error += Node_not_ready
 
 let () =

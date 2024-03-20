@@ -25,6 +25,14 @@
 
 type neighbor = {addr : string; port : int}
 
+(** The history mode decides for how long shards are kept in the store. *)
+type history_mode =
+  | Rolling of {blocks : [`Auto | `Some of int]}
+      (** [Rolling {block = `Some n}] keeps the shards for about [n]
+          blocks. [Rolling {block = `Auto}] infers the number of
+          blocks depending on the L1 parametric constants. *)
+  | Full  (** [Full] keeps the shards forever *)
+
 type t = {
   data_dir : string;  (** The path to the DAL node data directory. *)
   rpc_addr : P2p_point.Id.t;
@@ -47,6 +55,7 @@ type t = {
       (** The TCP address of the node's server used to export metrics. *)
   profiles : Types.profiles;
       (** The profiles determining the topics of interest. *)
+  history_mode : history_mode;
 }
 
 (** [default] is the default configuration. *)

@@ -56,6 +56,8 @@ module Plugin = struct
         attestation_lag;
         attestation_threshold;
         cryptobox_parameters;
+        sc_rollup_challenge_window_in_blocks =
+          parametric.sc_rollup.challenge_window_in_blocks;
       }
 
   let block_info ?chain ?block ~metadata ctxt =
