@@ -36,6 +36,7 @@ let process_new_block ~rollup_node_endpoint block =
   let* () =
     advertize_blueprints_publisher rollup_node_endpoint finalized_level
   in
+  let* () = Tx_pool.pop_and_inject_transactions_lazy () in
   return_unit
 
 let rec process_rollup_node_stream ~stream ~rollup_node_endpoint =

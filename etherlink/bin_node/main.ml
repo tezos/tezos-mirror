@@ -622,6 +622,9 @@ let proxy_command =
                 mode = Proxy {rollup_node_endpoint};
               }
           in
+          let () =
+            Evm_node_lib_dev.Rollup_node_follower.start ~rollup_node_endpoint
+          in
           let* directory = dev_directory config rollup_config in
           let* server = start config ~directory in
           let (_ : Lwt_exit.clean_up_callback_id) =

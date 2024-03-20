@@ -460,35 +460,9 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let rec subscribe_l2_block ~stream_l2 worker =
-  let open Lwt_syntax in
-  let* new_head = Lwt_stream.get stream_l2 in
-  match new_head with
-  | Some _block ->
-      let* _pushed =
-        Worker.Queue.push_request worker Request.Pop_and_inject_transactions
-      in
-      subscribe_l2_block ~stream_l2 worker
-  | None ->
-      let* () = Tx_pool_events.connection_lost () in
-      let* () = Lwt_unix.sleep 1. in
-      subscribe_l2_block ~stream_l2 worker
-
-let start ({mode; _} as parameters) =
+let start parameters =
   let open Lwt_result_syntax in
   let+ worker = Worker.launch table () parameters (module Handlers) in
-  let () =
-    Lwt.dont_wait
-      (fun () ->
-        match mode with
-        | Proxy {rollup_node_endpoint} ->
-            let*! stream_l2 =
-              Rollup_services.make_streamed_call ~rollup_node_endpoint
-            in
-            subscribe_l2_block ~stream_l2 worker
-        | Sequencer | Observer -> Lwt.return_unit)
-      (fun _ -> ())
-  in
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
@@ -527,6 +501,14 @@ let pop_and_inject_transactions () =
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait worker Request.Pop_and_inject_transactions
   |> handle_request_error
+
+let pop_and_inject_transactions_lazy () =
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! (_pushed : bool) =
+    Worker.Queue.push_request w Request.Pop_and_inject_transactions
+  in
+  return_unit
 
 let lock_transactions () =
   let open Lwt_result_syntax in
