@@ -13,6 +13,7 @@ oc.misc_checks:
     - devtools/**/*
     - scripts/**/*
     - docs/**/*
+    - contrib/**/*
     - client-libs/**/*
     - etherlink/**/*
     - .gitlab-ci.yml

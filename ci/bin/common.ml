@@ -348,6 +348,7 @@ let changeset_lint_files =
     "devtools/**/*";
     "scripts/**/*";
     "docs/**/*";
+    "contrib/**/*";
     "client-libs/**/*";
     "etherlink/**/*";
     ".gitlab-ci.yml";
