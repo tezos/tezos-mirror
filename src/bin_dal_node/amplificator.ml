@@ -14,10 +14,14 @@ let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id f =
       ready_ctxt.ongoing_amplifications <-
         add slot_id ready_ctxt.ongoing_amplifications
     in
-    Lwt.finalize f (fun () ->
+    Lwt.catch f (fun exn ->
         ready_ctxt.ongoing_amplifications <-
           remove slot_id ready_ctxt.ongoing_amplifications ;
-        Lwt_syntax.return_unit)
+        (* Silently catch Unix errors to let the DAL node survive in
+           these cases. *)
+        match exn with
+        | Unix.Unix_error _ -> return_unit
+        | exn -> Lwt.reraise exn)
 
 let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
     commitment ~published_level ~slot_index gs_worker node_ctxt =
