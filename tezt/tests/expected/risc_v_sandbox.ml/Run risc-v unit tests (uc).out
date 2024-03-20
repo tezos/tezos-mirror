@@ -5,6 +5,6 @@ rv64uc-p-rvc: success
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64uc-v-rvc --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64uc-v-rvc: fail

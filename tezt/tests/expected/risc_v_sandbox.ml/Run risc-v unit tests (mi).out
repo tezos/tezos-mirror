@@ -7,7 +7,7 @@ rv64mi-p-access: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64mi-p-breakpoint --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception EnvironmentCallFromMMode at 0x800002cc: Requested
+Exception EnvironmentCallFromMMode at 0x800002d0: Requested
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64mi-p-breakpoint: fail
 
