@@ -21,7 +21,7 @@ type t = {
   preimages_endpoint : Uri.t option;  (** URI to fetch missing pre-images. *)
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   blueprint_watcher : Blueprint_types.t Lwt_watcher.input;
-  store : Store.t;
+  store : Evm_store.t;
   session : session_state;
   head_lock : Lwt_mutex.t;
       (** Lock to acquire to modify the head of the chain *)

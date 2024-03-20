@@ -62,7 +62,7 @@ let create_blueprint_watcher_service (ctxt : Evm_context.t) from_level =
         let current_request = !next_level_requested in
         (next_level_requested := Z.(succ current_request)) ;
         let* blueprint =
-          Store.Executable_blueprints.find ctxt.store (Qty current_request)
+          Evm_store.Executable_blueprints.find ctxt.store (Qty current_request)
         in
         match blueprint with
         | Ok (Some blueprint) -> return_some blueprint
@@ -83,7 +83,7 @@ let register_get_blueprint_service (ctxt : Evm_context.t) dir =
   Directory.opt_register1 dir get_blueprint_service (fun level () () ->
       let open Lwt_result_syntax in
       let number = Ethereum_types.Qty (Z.of_int64 level) in
-      let* blueprint = Store.Executable_blueprints.find ctxt.store number in
+      let* blueprint = Evm_store.Executable_blueprints.find ctxt.store number in
       return blueprint)
 
 let register_blueprint_watcher_service ctxt dir =

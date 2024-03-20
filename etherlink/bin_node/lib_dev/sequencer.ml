@@ -192,12 +192,12 @@ let[@tailrec] rec catchup_evm_event ~rollup_node_endpoint store =
   let* rollup_node_l1_level =
     Rollup_services.tezos_level rollup_node_endpoint
   in
-  let* latest_known_l1_level = Store.L1_latest_known_level.find store in
+  let* latest_known_l1_level = Evm_store.L1_latest_known_level.find store in
   match latest_known_l1_level with
   | None ->
       (* sequencer has no value to start from, it must be the initial
          start or we went from prod to dev. *)
-      let*! () = Store_events.no_l1_latest_level_to_catch_up () in
+      let*! () = Evm_store_events.no_l1_latest_level_to_catch_up () in
       return_unit
   | Some latest_known_l1_level ->
       let finalized_level = Int32.(sub rollup_node_l1_level 2l) in
@@ -230,7 +230,7 @@ and[@tailrec] catch_evm_event_aux ~rollup_node_endpoint store ~from ~to_ =
   else
     let next_l1_level = Int32.succ from in
     let* () = Evm_events_follower.new_rollup_block next_l1_level in
-    let* () = Store.L1_latest_known_level.store store next_l1_level in
+    let* () = Evm_store.L1_latest_known_level.store store next_l1_level in
     catch_evm_event_aux ~rollup_node_endpoint store ~from:next_l1_level ~to_
 
 let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
