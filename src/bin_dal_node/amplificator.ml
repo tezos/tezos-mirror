@@ -41,11 +41,12 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
         {slot_level = published_level; slot_index}
       in
       (* There are two situations where we don't want to reconstruct:
-         if we don't have enough shards or if we have more shards than
-         needed to reconstruct, because in this case a reconstruction
-         should have already been started previously. *)
-      if number_of_already_stored_shards <> number_of_needed_shards then
-        return_unit
+         if we don't have enough shards or if we already have all the
+         shards. *)
+      if
+        number_of_already_stored_shards < number_of_needed_shards
+        || number_of_already_stored_shards = number_of_shards
+      then return_unit
       else
         (* We have enough shards to reconstruct the whole slot. *)
         (* TODO: #7089
