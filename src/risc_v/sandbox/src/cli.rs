@@ -3,14 +3,23 @@
 //
 // SPDX-License-Identifier: MIT
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Mode {
     /// Run a program using the RISC-V interpreter
     Run(Options),
+    /// Launch a program in the debugger
+    Debug(Options),
     /// Run a program using rvemu
     Rvemu(Options),
+}
+
+#[derive(Clone, ValueEnum, Debug)]
+pub enum ExitMode {
+    User,
+    Supervisor,
+    Machine,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -45,6 +54,9 @@ pub struct Options {
     /// Rollup origination level
     #[arg(short = 'l', long, default_value_t = 0)]
     pub origination_level: u64,
+
+    #[arg(short = 'm', long, value_enum, default_value_t = ExitMode::User)]
+    pub posix_exit_mode: ExitMode,
 }
 
 /// Parse the command-line arguments.

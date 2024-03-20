@@ -14,7 +14,8 @@ pub mod traps;
 
 use crate::{
     machine_state::{
-        bus::main_memory::M1G, mode, MachineError, MachineState, MachineStateLayout, StepManyResult,
+        bus::main_memory::M1G, mode, registers::XRegister, MachineError, MachineState,
+        MachineStateLayout, StepManyResult,
     },
     program::Program,
     state_backend::{
@@ -28,6 +29,7 @@ use exec_env::{
     posix::{Posix, PosixState},
     ExecutionEnvironment, ExecutionEnvironmentState,
 };
+use std::collections::BTreeMap;
 use InterpreterResult::*;
 
 type StateLayout = (
@@ -40,6 +42,7 @@ pub struct Interpreter<'a> {
     machine_state: MachineState<M1G, SliceManager<'a>>,
 }
 
+#[derive(Debug)]
 pub enum InterpreterResult {
     /// Execution has not finished. Returns the number of steps executed.
     Running(usize),
@@ -63,6 +66,20 @@ impl<'a> Interpreter<'a> {
         InMemoryBackend::<StateLayout>::new().0
     }
 
+    fn init(
+        backend: &'a mut InMemoryBackend<StateLayout>,
+        mode: mode::Mode,
+    ) -> (
+        PosixState<SliceManager<'a>>,
+        MachineState<M1G, SliceManager<'a>>,
+    ) {
+        let alloc = backend.allocate(StateLayout::placed().into_location());
+        let mut posix_state = PosixState::bind(alloc.0);
+        posix_state.set_exit_mode(mode);
+        let machine_state = MachineState::<M1G, SliceManager<'a>>::bind(alloc.1);
+        (posix_state, machine_state)
+    }
+
     /// Initialise an interpreter with a given [program], starting execution in [mode].
     /// An initial ramdisk can also optionally be passed.
     pub fn new(
@@ -71,15 +88,9 @@ impl<'a> Interpreter<'a> {
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<Self, InterpreterError> {
-        let alloc = backend.allocate(StateLayout::placed().into_location());
-
-        let mut posix_state = PosixState::bind(alloc.0);
-        posix_state.set_exit_mode(mode);
-
-        let mut machine_state = MachineState::<M1G, SliceManager<'a>>::bind(alloc.1);
+        let (posix_state, mut machine_state) = Self::init(backend, mode);
         let elf_program = Program::<M1G>::from_elf(program)?;
         machine_state.setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
-
         Ok(Self {
             posix_state,
             machine_state,
@@ -122,6 +133,46 @@ impl<'a> Interpreter<'a> {
         let mut result = self.machine_state.step_many(max, |_| true);
         result.steps = result.steps.saturating_add(steps_done);
         self.handle_step_result(result, max)
+    }
+
+    pub fn step_many<F>(&mut self, max: usize, should_continue: F) -> InterpreterResult
+    where
+        F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
+    {
+        let result = self.machine_state.step_many(max, should_continue);
+        self.handle_step_result(result, max)
+    }
+
+    pub fn read_register(&self, reg: XRegister) -> u64 {
+        self.machine_state.hart.xregisters.read(reg)
+    }
+
+    pub fn read_pc(&self) -> u64 {
+        self.machine_state.hart.pc.read()
+    }
+}
+
+/// Debugger-specific functions
+impl<'a> Interpreter<'a> {
+    /// Initialise an interpreter with a given [program], starting execution in [mode].
+    /// An initial ramdisk can also optionally be passed. Returns both the interpreter
+    /// and the fully parsed program.
+    pub fn new_with_parsed_program(
+        backend: &'a mut InMemoryBackend<StateLayout>,
+        program: &[u8],
+        initrd: Option<&[u8]>,
+        mode: mode::Mode,
+    ) -> Result<(Self, BTreeMap<u64, String>), InterpreterError> {
+        let (posix_state, mut machine_state) = Self::init(backend, mode);
+        let elf_program = Program::<M1G>::from_elf(program)?;
+        machine_state.setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
+        Ok((
+            Self {
+                posix_state,
+                machine_state,
+            },
+            elf_program.parsed(),
+        ))
     }
 }
 

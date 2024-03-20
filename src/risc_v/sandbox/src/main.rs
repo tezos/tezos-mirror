@@ -9,12 +9,14 @@ use risc_v_interpreter::{
 };
 use rvemu::emulator::Emulator;
 use std::error::Error;
+use std::path::Path;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_smart_rollup_encoding::{
     michelson::MichelsonUnit, public_key_hash::PublicKeyHash, smart_rollup::SmartRollupAddress,
 };
 
 mod cli;
+mod debugger;
 mod devicetree;
 mod inbox;
 mod rvemu_boot;
@@ -26,9 +28,9 @@ pub fn exception_to_error(exc: EnvironException) -> Box<dyn Error> {
 }
 
 fn run(opts: Options) -> Result<(), Box<dyn Error>> {
-    let contents = std::fs::read(opts.input)?;
+    let contents = std::fs::read(&opts.input)?;
     let mut backend = Interpreter::create_backend();
-    let mut interpreter = Interpreter::new(&mut backend, &contents, None, Mode::Machine)?;
+    let mut interpreter = Interpreter::new(&mut backend, &contents, None, posix_exit_mode(opts))?;
 
     const MAX_STEPS: usize = 1000000;
 
@@ -38,6 +40,17 @@ fn run(opts: Options) -> Result<(), Box<dyn Error>> {
         Running(_) => Err("Timeout".into()),
         Exception(exc, _) => Err(exception_to_error(exc)),
     }
+}
+
+fn debug(opts: Options) -> Result<(), Box<dyn Error>> {
+    let path = Path::new(&opts.input);
+    let fname = path
+        .file_name()
+        .ok_or("Invalid program path")?
+        .to_str()
+        .ok_or("File name cannot be converted to string")?;
+    let contents = std::fs::read(path)?;
+    Ok(debugger::DebuggerApp::launch(fname, &contents)?)
 }
 
 fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
@@ -141,10 +154,19 @@ fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn posix_exit_mode(opts: Options) -> Mode {
+    match opts.posix_exit_mode {
+        cli::ExitMode::User => Mode::User,
+        cli::ExitMode::Supervisor => Mode::Supervisor,
+        cli::ExitMode::Machine => Mode::Machine,
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = cli::parse();
     match cli.command {
         cli::Mode::Rvemu(opts) => rvemu(opts),
         cli::Mode::Run(opts) => run(opts),
+        cli::Mode::Debug(opts) => debug(opts),
     }
 }

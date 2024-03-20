@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::machine_state::bus::{self, main_memory::MainMemoryLayout, Address};
+use crate::parser::parse_block;
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
 /// RISC-V program
@@ -116,6 +117,19 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
             entrypoint,
             segments: BTreeMap::from_iter([(entrypoint, Cow::Borrowed(code))]),
         }
+    }
+
+    pub fn parsed(&self) -> BTreeMap<u64, String> {
+        let mut parsed = BTreeMap::new();
+        for segment in &self.segments {
+            let mut address = *segment.0;
+            let instructions = parse_block(segment.1);
+            for instr in instructions {
+                parsed.insert(address, instr.to_string());
+                address += instr.width();
+            }
+        }
+        parsed
     }
 }
 
