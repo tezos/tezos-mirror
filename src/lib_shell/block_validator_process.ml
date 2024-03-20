@@ -894,7 +894,7 @@ module External_validator_process = struct
       Store.Block.resulting_context_hash chain_store predecessor
     in
     let request =
-      External_validation.Validate
+      External_validation.Apply
         {
           chain_id;
           block_header;
