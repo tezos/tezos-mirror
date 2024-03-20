@@ -63,43 +63,54 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
           Event.(emit reconstruct_starting_in (commitment, random_delay))
         in
         let*! () = Lwt_unix.sleep random_delay in
-        let*! () = Event.(emit reconstruct_started commitment) in
-        let shards =
-          Store.Shards.read_all shard_store commitment ~number_of_shards
-          |> Seq_s.filter_map (function
-                 | _, index, Ok share -> Some Cryptobox.{index; share}
-                 | _ -> None)
+        (* Count again the stored shards because we may have received
+           more shards during the random delay. *)
+        let* number_of_already_stored_shards =
+          Store.Shards.count_values shard_store commitment
         in
-        let* polynomial =
-          Slot_manager_legacy.polynomial_from_shards_lwt
-            cryptobox
-            shards
-            ~number_of_needed_shards
-        in
-        let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-        let* commitment =
-          Slot_manager.add_commitment slot_store slot cryptobox
-          |> Errors.to_tzresult
-        in
-        let* (_ : unit option) =
-          Slot_manager.add_commitment_shards
-            ~shards_proofs_precomputation
-            slot_store
-            cryptobox
-            commitment
-            ~with_proof:true
-          |> Errors.to_option_tzresult
-        in
-        let* () =
-          Slot_manager.publish_slot_data
-            ~level_committee:(Node_context.fetch_committee node_ctxt)
-            slot_store
-            gs_worker
-            cryptobox
-            proto_parameters
-            commitment
-            published_level
-            slot_index
-        in
-        let*! () = Event.(emit reconstruct_finished commitment) in
-        return_unit
+        (* If we have received all the shards while waiting the random
+           delay, there is no point in reconstructing anymore *)
+        if number_of_already_stored_shards = number_of_shards then
+          let*! () = Event.(emit reconstruct_canceled commitment) in
+          return_unit
+        else
+          let*! () = Event.(emit reconstruct_started commitment) in
+          let shards =
+            Store.Shards.read_all shard_store commitment ~number_of_shards
+            |> Seq_s.filter_map (function
+                   | _, index, Ok share -> Some Cryptobox.{index; share}
+                   | _ -> None)
+          in
+          let* polynomial =
+            Slot_manager_legacy.polynomial_from_shards_lwt
+              cryptobox
+              shards
+              ~number_of_needed_shards
+          in
+          let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
+          let* commitment =
+            Slot_manager.add_commitment slot_store slot cryptobox
+            |> Errors.to_tzresult
+          in
+          let* (_ : unit option) =
+            Slot_manager.add_commitment_shards
+              ~shards_proofs_precomputation
+              slot_store
+              cryptobox
+              commitment
+              ~with_proof:true
+            |> Errors.to_option_tzresult
+          in
+          let* () =
+            Slot_manager.publish_slot_data
+              ~level_committee:(Node_context.fetch_committee node_ctxt)
+              slot_store
+              gs_worker
+              cryptobox
+              proto_parameters
+              commitment
+              published_level
+              slot_index
+          in
+          let*! () = Event.(emit reconstruct_finished commitment) in
+          return_unit
