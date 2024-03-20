@@ -53,12 +53,16 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
       then return_unit
       else
         (* We have enough shards to reconstruct the whole slot. *)
-        (* TODO: #7089
-           add a random time before starting the reconstruction;
-           this will give some slack to receive all the shards while
-           the reconstruction is not needed, and also could avoid
-           having multiple node reconstruct at once. *)
         with_amplification_lock ready_ctxt slot_id @@ fun () ->
+        (* Wait a random delay between 1 and 2 seconds before starting
+           the reconstruction; this is to give some slack to receive
+           all the shards so that the reconstruction is not needed, and
+           also avoids having multiple nodes reconstruct at once. *)
+        let random_delay = 1. +. Random.float 1. in
+        let*! () =
+          Event.(emit reconstruct_starting_in (commitment, random_delay))
+        in
+        let*! () = Lwt_unix.sleep random_delay in
         let*! () = Event.(emit reconstruct_started commitment) in
         let shards =
           Store.Shards.read_all shard_store commitment ~number_of_shards
