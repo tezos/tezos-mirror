@@ -574,6 +574,56 @@ let test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to =
     ~description
     ()
 
+(* Test originate rollup in previous protocol and start node in a different
+   protocol. *)
+let test_originate_before_migration ~kind ~migrate_from ~migrate_to =
+  let tags = ["catchup"] in
+  let description =
+    "node can catch up on rollup originated in previous protocol"
+  in
+  let scenario_prior ~sc_rollup:_ ~rollup_node _tezos_node tezos_client =
+    Log.info "Stopping rollup node to start fresh." ;
+    let* () = Sc_rollup_node.terminate rollup_node in
+    Log.info "Sending messages on L1." ;
+    Sc_rollup_helpers.send_messages 2 tezos_client
+  in
+  let scenario_after ~sc_rollup ~rollup_node:_discarded tezos_node tezos_client
+      () =
+    let rollup_node =
+      Sc_rollup_node.create
+        Operator
+        tezos_node
+        ~base_dir:(Client.base_dir tezos_client)
+        ~default_operator:Constant.bootstrap4.alias
+    in
+    let* migration_level = Node.get_level tezos_node in
+    let* () = Sc_rollup_helpers.send_messages 1 tezos_client in
+    Log.info "Starting rollup node after migration." ;
+    let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
+    Log.info "Waiting for rollup node to catch up." ;
+    let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+    Log.info "Rollup node has caught up!" ;
+    let* _l2_block =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_global_block
+           ~block:(string_of_int (migration_level - 1))
+           ()
+    in
+    let* _l2_block =
+      Sc_rollup_node.RPC.call rollup_node @@ Sc_rollup_rpc.get_global_block ()
+    in
+    unit
+  in
+  test_l2_migration_scenario
+    ~tags
+    ~kind
+    ~migrate_from
+    ~migrate_to
+    ~scenario_prior
+    ~scenario_after
+    ~description
+    ()
+
 let l1_level_event level tezos_node _rollup_node =
   let* _ = Node.wait_for_level tezos_node level in
   unit
@@ -867,6 +917,7 @@ let register_migration ~kind ~migrate_from ~migrate_to =
   test_cont_refute_pre_migration ~kind ~migrate_from ~migrate_to ;
   test_rollup_node_simple_migration ~kind ~migrate_from ~migrate_to ;
   test_rollup_node_catchup_migration ~kind ~migrate_from ~migrate_to ;
+  test_originate_before_migration ~kind ~migrate_from ~migrate_to ;
   test_migration_removes_dead_games ~kind ~migrate_from ~migrate_to
 
 let register_migration_only_wasm ~migrate_from ~migrate_to =
