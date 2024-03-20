@@ -254,6 +254,12 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Jal(args) => Ok(Set(self.hart.run_jal(args.imm, args.rd))),
             Instr::Jalr(args) => Ok(Set(self.hart.run_jalr(args.imm, args.rs1, args.rd))),
 
+            // RV64M multiplication and division instructions
+            Instr::Rem(args) => run_r_type_instr!(self, instr, args, run_rem),
+            Instr::Remu(args) => run_r_type_instr!(self, instr, args, run_remu),
+            Instr::Remw(args) => run_r_type_instr!(self, instr, args, run_remw),
+            Instr::Remuw(args) => run_r_type_instr!(self, instr, args, run_remuw),
+
             // Zicsr instructions
             Instr::Csrrw(args) => run_csr_instr!(self, instr, args, run_csrrw),
             Instr::Csrrs(args) => run_csr_instr!(self, instr, args, run_csrrs),

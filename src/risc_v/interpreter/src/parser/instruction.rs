@@ -131,6 +131,12 @@ pub enum Instr {
     Jal(UJTypeArgs),
     Jalr(ITypeArgs),
 
+    // RV64M division instructions
+    Rem(RTypeArgs),
+    Remu(RTypeArgs),
+    Remw(RTypeArgs),
+    Remuw(RTypeArgs),
+
     // Zicsr instructions
     Csrrw(CsrArgs),
     Csrrs(CsrArgs),
@@ -214,6 +220,10 @@ impl Instr {
             | Auipc(_)
             | Jal(_)
             | Jalr(_)
+            | Rem(_)
+            | Remu(_)
+            | Remw(_)
+            | Remuw(_)
             | Csrrw(_)
             | Csrrs(_)
             | Csrrc(_)
@@ -427,6 +437,12 @@ impl fmt::Display for Instr {
             // RV64I jump instructions
             Jal(args) => u_instr!(f, "jal", args),
             Jalr(args) => i_instr_load!(f, "jalr", args),
+
+            // RV64M multiplication and division instructions
+            Rem(args) => r_instr!(f, "rem", args),
+            Remu(args) => r_instr!(f, "remu", args),
+            Remw(args) => r_instr!(f, "remw", args),
+            Remuw(args) => r_instr!(f, "remuw", args),
 
             // Zicsr instructions
             Csrrw(args) => csr_instr!(f, "csrrw", args),
