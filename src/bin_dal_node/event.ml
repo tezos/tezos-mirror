@@ -288,3 +288,12 @@ let reconstruct_finished =
     ~level:Notice
     ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
+
+let reconstruct_canceled =
+  declare_1
+    ~section
+    ~name:"reconstruct_canceled"
+    ~msg:"slot reconstruction for commitment {commitment} canceled"
+    ~level:Info
+    ~pp1:Cryptobox.Commitment.pp_short
+    ("commitment", Cryptobox.Commitment.encoding)
