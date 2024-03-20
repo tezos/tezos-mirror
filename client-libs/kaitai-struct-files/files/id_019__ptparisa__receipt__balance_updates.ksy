@@ -74,6 +74,10 @@ types:
       type: public_key_hash
       if: (id_019__ptparisa__frozen_staker_tag == id_019__ptparisa__frozen_staker_tag::baker)
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    - id: baker_edge
+      type: public_key_hash
+      if: (id_019__ptparisa__frozen_staker_tag == id_019__ptparisa__frozen_staker_tag::baker_edge)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
   id_019__ptparisa__operation_metadata__alpha__balance_and_update:
     seq:
     - id: id_019__ptparisa__operation_metadata__alpha__balance_and_update_tag
@@ -307,6 +311,7 @@ enums:
     0: single
     1: shared
     2: baker
+    3: baker_edge
   id_019__ptparisa__operation_metadata__alpha__balance_and_update_tag:
     0: contract
     2: block_fees
