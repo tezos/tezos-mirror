@@ -214,20 +214,6 @@
   services:
     - docker:${DOCKER_VERSION}-dind
 
-.oc.misc_checks:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies
-    - .needs__trigger
-  stage: "test"
-  before_script:
-    - ./scripts/ci/take_ownership.sh
-    - . ./scripts/version.sh
-    - eval $(opam env)
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . $HOME/.venv/bin/activate
-
 .test_etherlink_kernel:
   extends:
     - .oc.kernels_template
