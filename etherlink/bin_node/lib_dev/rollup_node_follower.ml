@@ -54,12 +54,37 @@ let rec process_rollup_node_stream ~stream ~rollup_node_endpoint =
       let* () = process_new_block ~rollup_node_endpoint block in
       process_rollup_node_stream ~stream ~rollup_node_endpoint
 
+let wait_first_valid_level_then_process ~rollup_node_endpoint ~stream =
+  let open Lwt_result_syntax in
+  let* first_rollup_node_known_l1_level =
+    Rollup_services.oldest_known_l1_level rollup_node_endpoint
+  in
+  let rec aux () =
+    let*! new_head = Lwt_stream.get stream in
+    match new_head with
+    | None ->
+        let*! () = Rollup_node_follower_events.connection_lost () in
+        (* In following commit we we'll try to recover the connection *)
+        Lwt_exit.exit_and_raise 1
+    | Some block ->
+        let finalized_level =
+          Sc_rollup_block.(Int32.(sub block.header.level 2l))
+        in
+        if first_rollup_node_known_l1_level <= finalized_level then
+          let* () = process_new_block ~rollup_node_endpoint block in
+          process_rollup_node_stream ~stream ~rollup_node_endpoint
+        else aux ()
+  in
+  aux ()
+
 let start ~rollup_node_endpoint =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
   let* stream = Rollup_services.make_streamed_call ~rollup_node_endpoint in
-  let* res = process_rollup_node_stream ~stream ~rollup_node_endpoint in
+  let* res =
+    wait_first_valid_level_then_process ~rollup_node_endpoint ~stream
+  in
   match res with
   | Ok () -> return_unit
   | Error errs ->

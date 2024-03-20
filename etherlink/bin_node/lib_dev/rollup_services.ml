@@ -56,6 +56,27 @@ let smart_rollup_address :
     ~output:(Data_encoding.Fixed.bytes 20)
     (open_root / "global" / "smart_rollup_address")
 
+let gc_info_encoding =
+  Data_encoding.(
+    obj3
+      (req "last_gc_level" int32)
+      (req "first_available_level" int32)
+      (opt "last_context_split_level" int32))
+
+let gc_info :
+    ( [`GET],
+      unit,
+      unit,
+      unit,
+      unit,
+      int32 * int32 * int32 option )
+    Service.service =
+  Service.get_service
+    ~description:"Smart rollup address"
+    ~query:Query.empty
+    ~output:gc_info_encoding
+    (open_root / "local" / "gc_info")
+
 type state_value_query = {key : string}
 
 module Block_id = struct
@@ -232,6 +253,16 @@ let smart_rollup_address base =
   in
   match answer with
   | Ok address -> return (Bytes.to_string address)
+  | Error trace -> fail trace
+
+let oldest_known_l1_level base =
+  let open Lwt_result_syntax in
+  let*! answer =
+    call_service ~base ~media_types:[Media_type.octet_stream] gc_info () () ()
+  in
+  match answer with
+  | Ok (_last_gc_level, first_available_level, _last_context_split) ->
+      return first_available_level
   | Error trace -> fail trace
 
 (** [tezos_level base] asks for the smart rollup node's
