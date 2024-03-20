@@ -14,7 +14,7 @@ type parameters = {
 val start : parameters -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the events follower. *)
-val shutdown : unit -> unit Lwt.t
+val shutdown : unit -> unit tzresult Lwt.t
 
 (** [new_rollup_block rollup_level] tells the worker that a new L2
     head has been published and that the rollup head is now

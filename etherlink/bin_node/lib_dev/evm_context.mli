@@ -90,7 +90,7 @@ val last_known_l1_level : unit -> int32 option tzresult Lwt.t
 
 val new_last_known_l1_level : int32 -> unit tzresult Lwt.t
 
-val shutdown : unit -> unit Lwt.t
+val shutdown : unit -> unit tzresult Lwt.t
 
 (** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
 val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t

@@ -20,7 +20,7 @@ val start : parameters -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the tx-pool, waiting for the ongoing request
     to be processed. *)
-val shutdown : unit -> unit Lwt.t
+val shutdown : unit -> unit tzresult Lwt.t
 
 (** [add raw_tx] adds a raw eth transaction to the tx-pool. *)
 val add : string -> (Ethereum_types.hash, string) result tzresult Lwt.t

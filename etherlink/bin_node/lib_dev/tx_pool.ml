@@ -429,7 +429,7 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-type error += No_tx_pool
+type error += No_worker
 
 type error += Tx_pool_terminated
 
@@ -437,8 +437,18 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
-    | Lwt.Sleep -> Error (TzTrace.make No_tx_pool))
+    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+
+let bind_worker f =
+  let open Lwt_result_syntax in
+  let res = Lazy.force worker in
+  match res with
+  | Error [No_worker] ->
+      (* There is no worker, nothing to do *)
+      return_unit
+  | Error errs -> fail errs
+  | Ok w -> f w
 
 let handle_request_error rq =
   let open Lwt_syntax in
@@ -482,15 +492,11 @@ let start ({mode; _} as parameters) =
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
-  let open Lwt_syntax in
-  let w = Lazy.force worker in
-  match w with
-  | Error _ ->
-      (* There is no tx-pool, nothing to do *)
-      Lwt.return_unit
-  | Ok w ->
-      let* () = Tx_pool_events.shutdown () in
-      Worker.shutdown w
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! () = Tx_pool_events.shutdown () in
+  let*! () = Worker.shutdown w in
+  return_unit
 
 let add raw_tx =
   let open Lwt_result_syntax in

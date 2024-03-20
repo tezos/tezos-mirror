@@ -163,9 +163,10 @@ let install_finalizer_observer server =
   let* () = Events.shutdown_node ~exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = Events.shutdown_rpc_server ~private_:false in
+  Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
   let* () = Evm_events_follower.shutdown () in
-  let* () = Tx_pool_events.shutdown () in
   Evm_context.shutdown ()
 
 let main_loop ~evm_node_endpoint =

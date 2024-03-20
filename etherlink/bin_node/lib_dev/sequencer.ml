@@ -59,6 +59,8 @@ let install_finalizer_seq server private_server =
         Events.shutdown_rpc_server ~private_:true)
       private_server
   in
+  Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
