@@ -251,8 +251,8 @@ let ensure_srs_validity ~is_fake ~mode ~slot_size ~page_size ~redundancy_factor
          so t.max_polynomial_length coefficients. *)
       (fun () ->
         Format.asprintf
-          "SRS on G1 size is too small. Expected more than %d. Got %d. Hint: \
-           you can reduce the size of a slot."
+          "The size of the SRS on G1 is too small. Expected more than %d. Got \
+           %d. Hint: you can reduce the size of a slot."
           min_g1
           srs_g1_length)
   in
@@ -268,8 +268,10 @@ let ensure_srs_validity ~is_fake ~mode ~slot_size ~page_size ~redundancy_factor
     && is_in_srs2 offset_monomial_degree)
     (fun () ->
       Format.asprintf
-        "SRS on should contain points of indices shard_length = %d, \
-         page_length_domain = %d & offset_monomial_degree = %d."
+        "The verifier SRS on G2 should contain points for indices shard_length \
+         = %d, page_length_domain = %d & offset_monomial_degree = %d. Hint: \
+         you can add new points to the SRS (to do that, use the function \
+         Srs.Internal_for_tests.Print.print_verifier_srs_from_file)."
         shard_length
         page_length_domain
         offset_monomial_degree)
