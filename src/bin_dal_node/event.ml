@@ -271,6 +271,19 @@ let saving_profiles_failed =
     ~level:Error
     ("error", Error_monad.trace_encoding)
 
+let reconstruct_starting_in =
+  declare_2
+    ~section
+    ~name:"reconstruct_starting_in"
+    ~msg:
+      "slot reconstruction for commitment {commitment} will start in {delay} \
+       seconds"
+    ~level:Info
+    ~pp1:Cryptobox.Commitment.pp_short
+    ("commitment", Cryptobox.Commitment.encoding)
+    ~pp2:Format.pp_print_float
+    ("delay", Data_encoding.float)
+
 let reconstruct_started =
   declare_1
     ~section
