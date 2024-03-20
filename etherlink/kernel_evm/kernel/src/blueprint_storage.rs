@@ -301,8 +301,10 @@ fn read_all_chunks_and_validate<Host: Runtime>(
                 chunks.concat().as_slice(),
                 delayed_inbox,
             )?;
-            if let (BlueprintValidity::Valid(blueprint), _) = validity {
-                Ok((Some(blueprint), size))
+            if let (BlueprintValidity::Valid(blueprint), size_of_delayed_transactions) =
+                validity
+            {
+                Ok((Some(blueprint), size + size_of_delayed_transactions))
             } else {
                 log!(
                     host,

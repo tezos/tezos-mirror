@@ -50,28 +50,12 @@ pub mod constants {
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
 
-    /// Overapproximation of the upper bound of the number of ticks used to
-    /// fetch the inbox. Considers an inbox with the size of a full block, and
-    /// apply a tick model affine in the size of the inbox.
-    /// NOT USED BUT KEPT FOR DOCUMENTATION
-    // pub const FETCH_UPPER_BOUND: u64 = 350_000_000;
-
-    /// Overapproximation of the upper bound of the number of ticks used to
-    /// read the queue from storage. Considers a queue with the same size as the
-    /// maximum inbox
-    /// size (512kB) and apply a tick model affine in the size
-    /// of the queue.
-    pub const QUEUE_READ_UPPER_BOUND: u64 = 500_000_000;
-
     /// Overapproximation of the number of ticks used in kernel initialization
     pub const KERNEL_INITIALIZATION: u64 = 50_000_000;
 
     /// Overapproximation of the number of ticks the kernel uses to initialise and
-    /// reload its state. Uses the maximum between reading the queue and reading
-    /// the inbox, and adds the kernel initialization.
-    /// max(FETCH_UPPER_BOUND, QUEUE_READ_UPPER_BOUND)
-    pub const INITIALISATION_OVERHEAD: u64 =
-        QUEUE_READ_UPPER_BOUND + KERNEL_INITIALIZATION;
+    /// reload its state.
+    pub const INITIALISATION_OVERHEAD: u64 = KERNEL_INITIALIZATION;
 
     /// Overapproximation of the upper bound of the number of ticks used to
     /// finalize a block. Considers a block corresponding to an inbox full of
@@ -110,6 +94,16 @@ pub mod constants {
 
     /// Number of ticks used to parse deposits
     pub const TICKS_PER_DEPOSIT_PARSING: u64 = 1_500_000;
+
+    /// Number of ticks used to read and transform a blueprint into a blpock in
+    /// progress
+    pub const TICKS_PER_BYTES_BLUEPRINT_TO_BIP: u64 = 3700;
+    pub const TICKS_BLUEPRINT_TO_BIP_INTERCEPT: u64 = 3_000_000;
+
+    /// A blueprint cannot exceed 512kB, this is the maximum size per L1 block.
+    /// This will be eventually updated with DAL and a better representation for
+    /// blueprint parsing.
+    pub const MAXIMUM_SIZE_FOR_BLUEPRINT: u64 = 512 * 1024;
 }
 
 /// Estimation of the number of ticks the kernel can safely spend in the
@@ -198,4 +192,15 @@ pub fn ticks_of_register(receipt_size: u64, obj_size: u64, bloom_size: u64) -> u
 
 pub fn maximum_ticks_for_sequencer_chunk() -> u64 {
     constants::TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE
+}
+
+pub fn ticks_for_next_blueprint(length: u64) -> u64 {
+    constants::TICKS_BLUEPRINT_TO_BIP_INTERCEPT.saturating_add(
+        constants::TICKS_PER_BYTES_BLUEPRINT_TO_BIP.saturating_mul(length),
+    )
+}
+
+#[inline(always)]
+pub fn maximum_ticks_per_blueprint() -> u64 {
+    ticks_for_next_blueprint(constants::MAXIMUM_SIZE_FOR_BLUEPRINT)
 }
