@@ -35,7 +35,11 @@ type slot_index = int
 type page_index = int
 
 (** An ID associated to a slot or to its commitment. *)
-type slot_id = {slot_level : level; slot_index : slot_index}
+module Slot_id : sig
+  type t = {slot_level : level; slot_index : slot_index}
+end
+
+type slot_id = Slot_id.t
 
 (** A topic is defined by a public key hash of an attester and a slot index.
     - A slot producer tracks the topic associated to a given slot index for all

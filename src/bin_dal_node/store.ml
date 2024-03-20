@@ -318,7 +318,7 @@ module Legacy = struct
       let slots_indices slot_level = root / Int32.to_string slot_level
 
       let headers index =
-        let open Types in
+        let open Types.Slot_id in
         slots_indices index.slot_level / Int.to_string index.slot_index
 
       let accepted_header index =
@@ -420,7 +420,9 @@ module Legacy = struct
           in
           (* This invariant should hold. *)
           assert (Int32.equal published_level block_level) ;
-          let index = Types.{slot_level = published_level; slot_index} in
+          let index =
+            Types.Slot_id.{slot_level = published_level; slot_index}
+          in
           let header_path = Path.Commitment.header commitment index in
           let*! () =
             set
@@ -489,7 +491,7 @@ module Legacy = struct
     let unattested_str = encode_header_status `Unattested in
     List.iter_s
       (fun slot_index ->
-        let index = Types.{slot_level = published_level; slot_index} in
+        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
         let status_path = Path.Level.accepted_header_status index in
         let msg =
           Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
@@ -522,7 +524,7 @@ module Legacy = struct
   let get_commitment_by_published_level_and_index ~level ~slot_index node_store
       =
     let open Lwt_result_syntax in
-    let index = Types.{slot_level = level; slot_index} in
+    let index = Types.Slot_id.{slot_level = level; slot_index} in
     let*! commitment_str_opt =
       find node_store.store @@ Path.Level.accepted_header_commitment index
     in
@@ -541,7 +543,7 @@ module Legacy = struct
         List.map_e (fun (slot_id, _) -> decode_slot_id slot_id) indexes
       in
       List.filter
-        (fun {Types.slot_level = l; slot_index = i} ->
+        (fun {Types.Slot_id.slot_level = l; slot_index = i} ->
           keep_field l slot_level && keep_field i slot_index)
         indexes
       |> return
@@ -657,7 +659,10 @@ module Legacy = struct
     let slot_ids =
       List.rev_map
         (fun (index, _tree) ->
-          {Types.slot_level = published_level; slot_index = int_of_string index})
+          {
+            Types.Slot_id.slot_level = published_level;
+            slot_index = int_of_string index;
+          })
         slots_indices
     in
     let* accu = get_other_headers slot_ids store [] in
