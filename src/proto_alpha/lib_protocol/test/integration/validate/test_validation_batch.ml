@@ -21,6 +21,13 @@ open Alpha_context
 open Manager_operation_helpers
 open Error_helpers
 
+let register_test =
+  Tezt_helpers.register_test_es ~__FILE__ ~file_tags:["validation"; "batch"]
+
+let make_test = make_test ~register_test
+
+let make_test_batched = make_test_batched ~register_test
+
 (** {2 Tests on operation batches} *)
 
 let batch_in_the_middle infos kind1 kind2 =
@@ -525,70 +532,44 @@ let batch_exceeding_block_gas ~mempool_mode infos kind1 kind2 =
   in
   return_unit
 
-let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects
-    info_builder =
-  let open Lwt_result_syntax in
-  Tztest.tztest name `Quick (fun () ->
-      let* infos = info_builder () in
-      List.iter_es
-        (fun kind1 ->
-          let k1s = kind_to_string kind1 in
-          List.iter_es
-            (fun kind2 ->
-              Format.fprintf
-                fmt
-                "%s: [%s ; %s]@."
-                name
-                k1s
-                (kind_to_string kind2) ;
-              test infos kind1 kind2)
-            subjects)
-        subjects)
-
-let tests =
-  let open Lwt_result_syntax in
+let () =
   let mk_default () = default_init_ctxt () in
   let mk_high_gas_limit () =
     init_ctxt {ctxt_req_default with hard_gas_limit_per_block = Some gb_limit}
   in
   let revealed = revealed_subjects in
-  [
-    ( Tztest.tztest "batch reveal and transaction" `Quick @@ fun () ->
-      let* infos = mk_default () in
-      batch_reveal_transaction infos );
-  ]
-  @ List.map
-      (fun (name, f, subjects, info_builder) ->
-        make_tztest name f subjects info_builder)
-      [("batch two reveals", batch_two_reveals, revealed, mk_default)]
-  @ List.map
-      (fun (name, f, subjects, info_builder) ->
-        make_tztest_batched name f subjects info_builder)
-      [
-        ("reveal in the middle", batch_in_the_middle, revealed, mk_default);
-        ("batch two sources", batch_two_sources, revealed, mk_default);
-        ("batch incons. counters", batch_incons_counters, revealed, mk_default);
-        ( "empty balance in middle of batch",
-          batch_emptying_balance_in_the_middle,
-          revealed,
-          mk_default );
-        ( "empty balance at end of batch",
-          batch_empty_at_end,
-          revealed,
-          mk_default );
-        ( "too much gas consumption",
-          batch_exceeding_block_gas ~mempool_mode:false,
-          revealed,
-          mk_high_gas_limit );
-        ( "too much gas consumption (mempool)",
-          batch_exceeding_block_gas ~mempool_mode:true,
-          revealed,
-          mk_high_gas_limit );
-      ]
-
-let () =
-  Alcotest_lwt.run
-    ~__FILE__
-    Protocol.name
-    [("batched managers validation", tests)]
-  |> Lwt_main.run
+  let () =
+    register_test ~title:"batch reveal and transaction" @@ fun () ->
+    let* infos = default_init_ctxt () in
+    let infos =
+      match infos with
+      | Error errs -> Tezt.Test.fail "Error: %a" Error_monad.pp_print_trace errs
+      | Ok infos -> infos
+    in
+    batch_reveal_transaction infos
+  in
+  List.iter
+    (fun (name, f, subjects, info_builder) ->
+      make_test name f subjects info_builder)
+    [("batch two reveals", batch_two_reveals, revealed, mk_default)] ;
+  List.iter
+    (fun (name, f, subjects, info_builder) ->
+      make_test_batched name f subjects info_builder)
+    [
+      ("reveal in the middle", batch_in_the_middle, revealed, mk_default);
+      ("batch two sources", batch_two_sources, revealed, mk_default);
+      ("batch incons. counters", batch_incons_counters, revealed, mk_default);
+      ( "empty balance in middle of batch",
+        batch_emptying_balance_in_the_middle,
+        revealed,
+        mk_default );
+      ("empty balance at end of batch", batch_empty_at_end, revealed, mk_default);
+      ( "too much gas consumption",
+        batch_exceeding_block_gas ~mempool_mode:false,
+        revealed,
+        mk_high_gas_limit );
+      ( "too much gas consumption (mempool)",
+        batch_exceeding_block_gas ~mempool_mode:true,
+        revealed,
+        mk_high_gas_limit );
+    ]
