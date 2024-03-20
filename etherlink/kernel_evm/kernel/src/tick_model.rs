@@ -85,6 +85,9 @@ pub mod constants {
     pub const TRANSACTION_OVERHEAD_COEF: u64 = 880;
     pub const TRANSFERT_OBJ_SIZE: u64 = 347;
 
+    pub const TRANSACTION_HASH_INTERCEPT: u64 = 200_000;
+    pub const TRANSACTION_HASH_COEF: u64 = 1400;
+
     /// The number of ticks to parse a blueprint chunk
     pub const TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE: u64 = 27_000_000;
     pub const TICKS_FOR_BLUEPRINT_INTERCEPT: u64 = 25_000_000;
@@ -123,9 +126,13 @@ fn ticks_of_transaction_overhead(tx_data_size: u64) -> u64 {
     // analysis was done using the object size. It is approximated from the
     // data size
     let tx_obj_size = tx_data_size + constants::TRANSFERT_OBJ_SIZE;
+    let tx_hash = tx_data_size
+        .saturating_mul(constants::TRANSACTION_HASH_COEF)
+        .saturating_add(constants::TRANSACTION_HASH_INTERCEPT);
     tx_obj_size
         .saturating_mul(constants::TRANSACTION_OVERHEAD_COEF)
         .saturating_add(constants::TRANSACTION_OVERHEAD_INTERCEPT)
+        .saturating_add(tx_hash)
 }
 
 /// An invalid transaction could not be transmitted to the VM, eg. the nonce
