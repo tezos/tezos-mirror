@@ -119,7 +119,7 @@ let process_new_block ~rollup_node_endpoint block =
   in
   return_unit
 
-let rec process_rollup_node_stream ~stream worker =
+let rec process_rollup_node_stream ~stream ~rollup_node_endpoint worker =
   let open Lwt_syntax in
   let* new_head = Lwt_stream.get stream in
   match new_head with
@@ -131,10 +131,8 @@ let rec process_rollup_node_stream ~stream worker =
         Rollup_node_follower_events.new_block
           Sc_rollup_block.(block.header.level)
       in
-      let* () =
-        process_new_block ~rollup_node_endpoint:(Worker.state worker) block
-      in
-      process_rollup_node_stream ~stream worker
+      let* () = process_new_block ~rollup_node_endpoint block in
+      process_rollup_node_stream ~stream ~rollup_node_endpoint worker
 
 let start ({rollup_node_endpoint} as parameters) =
   let open Lwt_result_syntax in
@@ -146,7 +144,7 @@ let start ({rollup_node_endpoint} as parameters) =
         let*! stream =
           Rollup_services.make_streamed_call ~rollup_node_endpoint
         in
-        process_rollup_node_stream ~stream worker)
+        process_rollup_node_stream ~stream ~rollup_node_endpoint worker)
       (fun _ -> ())
   in
   Lwt.wakeup worker_waker worker

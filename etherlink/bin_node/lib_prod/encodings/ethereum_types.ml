@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1021,35 +1022,62 @@ let hash_raw_tx str =
 let transaction_nonce bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* eip 2930*)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _])
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _; _]) ->
         let+ nonce = Rlp.decode_z nonce in
-        Qty nonce
+        nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else if String.starts_with ~prefix:"02" bytes then
-    (* eip 1559*)
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _])
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _]) ->
         let+ nonce = Rlp.decode_z nonce in
-        Qty nonce
+        nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
   else
-    (* Legacy *)
+    (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [Value nonce; _; _; _; _; _; _; _; _]) ->
         let+ nonce = Rlp.decode_z nonce in
-        Qty nonce
+        nonce
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
+
+(** [transaction_gas_limit bytes] returns the gas limit of a given raw transaction. *)
+let transaction_gas_limit bytes =
+  let open Result_syntax in
+  if String.starts_with ~prefix:"01" bytes then
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _; _; _; _]) ->
+        let+ gas_limit = Rlp.decode_z gas_limit in
+        gas_limit
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _])
+    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _; _; _; _]) ->
+        let+ gas_limit = Rlp.decode_z gas_limit in
+        gas_limit
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+  else
+    (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; Value gas_limit; _; _; _; _; _; _]) ->
+        let+ gas_limit = Rlp.decode_z gas_limit in
+        gas_limit
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
 (** [transaction_gas_price base_fee bytes] returns the maximum gas price the
     user can pay for the tx. *)
-let transaction_gas_price base_fee bytes =
+let transaction_gas_price bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* eip 2930*)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _])
     | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _; _; _; _]) ->
@@ -1057,41 +1085,23 @@ let transaction_gas_price base_fee bytes =
         return gas_price
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else if String.starts_with ~prefix:"02" bytes then
-    (* eip 1559*)
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok
-        (Rlp.List
-          [
-            _;
-            _;
-            Value max_priority_fee_per_gas;
-            Value max_fee_per_gas;
-            _;
-            _;
-            _;
-            _;
-          ])
-    | Ok
-        (Rlp.List
-          [
-            _;
-            _;
-            Value max_priority_fee_per_gas;
-            Value max_fee_per_gas;
-            _;
-            _;
-            _;
-            _;
-            _;
-            _;
-            _;
-          ]) ->
-        let* max_priority_fee_per_gas = Rlp.decode_z max_priority_fee_per_gas in
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _; _; _]) ->
+        (* Normally, max_priority_fee_per_gas would also be a fee paid per gas in
+           addition to base fee per gas.
+           This would incentivise miners to include the transaction.
+           More details see here https://eips.ethereum.org/EIPS/eip-1559#abstract
+
+           We choose to ignore this, however, as we actually do not implement EIP-1559
+           mechanism exactly. The sequencer is compensated for L1 inclusion cost via
+           the data availability fee. *)
         let* max_fee_per_gas = Rlp.decode_z max_fee_per_gas in
-        return Z.(min max_fee_per_gas (add base_fee max_priority_fee_per_gas))
+        return max_fee_per_gas
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
   else
-    (* Legacy *)
+    (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value gas_price; _; _; _; _; _; _; _]) ->
         let* gas_price = Rlp.decode_z gas_price in

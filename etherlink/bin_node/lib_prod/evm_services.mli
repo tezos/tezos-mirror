@@ -14,7 +14,7 @@ val get_smart_rollup_address :
 val get_blueprint :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
-  Blueprint_types.payload tzresult Lwt.t
+  Blueprint_types.t tzresult Lwt.t
 
 val register : Evm_context.t -> unit Directory.t -> unit Directory.t
 

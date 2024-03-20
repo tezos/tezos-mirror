@@ -146,6 +146,14 @@ let global_block_watcher :
     ~output:Sc_rollup_block.encoding
     (open_root / "global" / "monitor_blocks")
 
+let global_current_tezos_level :
+    ([`GET], unit, unit, unit, unit, int32 option) Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:"Current tezos level of the rollup node"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Data_encoding.(option int32)
+    (open_root / "global" / "tezos_level")
+
 let call_service ~base ?(media_types = Media_type.all_media_types) a b c d =
   let open Lwt_result_syntax in
   let*! res =
@@ -225,3 +233,28 @@ let smart_rollup_address base =
   match answer with
   | Ok address -> return (Bytes.to_string address)
   | Error trace -> fail trace
+
+(** [tezos_level base] asks for the smart rollup node's
+    latest l1 level, using the endpoint [base]. *)
+let tezos_level base =
+  let open Lwt_result_syntax in
+  let* level_opt =
+    call_service
+      ~base
+      ~media_types:[Media_type.octet_stream]
+      global_current_tezos_level
+      ()
+      ()
+      ()
+  in
+  let*? level =
+    Option.to_result
+      ~none:
+        [
+          error_of_fmt
+            "Rollup node is not yet bootstrapped, please wait for the rollup \
+             to process an initial block. ";
+        ]
+      level_opt
+  in
+  return level

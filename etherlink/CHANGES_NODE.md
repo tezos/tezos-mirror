@@ -4,9 +4,21 @@
 
 ### Features
 
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version for 0a81ce76b3d4f57d8c5194bcb9418f9294fd2be1
+
+### Features
+
 - The private RPC server is no longer launched by default. You need to provide
   the parameter `--private-rpc-port` to launch it. (!12449)
 - Delayed EVM transactions no longer pay data-availability fee. (!12401)
+- Stop block production if the rollup is lagging behind. (!12482)
+- Add a private RPC to access the storage. (!12504)
 
 ### Bug fixes
 
@@ -16,11 +28,18 @@
 ### Breaking changes
 
 - Delayed Transactions use a dedicated encoding tag in the block in progress. (!12401)
+- Record timestamps in executable blueprints. (!12487)
 
 ### Internal
 
 - If an error occurs during transaction injection, the trace of errors is
   logged. (!12451)
+- Improve resiliency to errors. (!12431)
+- Better catchup of possibly missed events. (!12365)
+- Improve upgrade detection. (!12459)
+- Don't import the delayed inbox when initializing from rollup. (!12506)
+- Forbid raw delayed transactions in blueprints sent to the rollup. (!12508)
+- Add event for delayed transactions. (!12513)
 
 ## Version for 79509a69d01c38eeba38d6cc7a323b4d69c58b94
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -14,6 +15,7 @@ module Pool = struct
     index : int64; (* Global index of the transaction. *)
     raw_tx : string; (* Current transaction. *)
     gas_price : Z.t; (* The maximum price the user can pay for fees. *)
+    gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
   }
 
   type t = {
@@ -29,15 +31,16 @@ module Pool = struct
       delayed_transactions = [];
     }
 
-  (** Add a transaction to the pool.*)
-  let add t pkey base_fee raw_tx =
+  (** Add a transaction to the pool. *)
+  let add t pkey raw_tx =
     let open Result_syntax in
     let {transactions; global_index; delayed_transactions} = t in
-    let* (Qty nonce) = Ethereum_types.transaction_nonce raw_tx in
-    let* gas_price = Ethereum_types.transaction_gas_price base_fee raw_tx in
-    let transaction = {index = global_index; raw_tx; gas_price} in
+    let* nonce = Ethereum_types.transaction_nonce raw_tx in
+    let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
+    let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
     (* Add the transaction to the user's transaction map *)
     let transactions =
+      let transaction = {index = global_index; raw_tx; gas_price; gas_limit} in
       Pkey_map.update
         pkey
         (function
@@ -64,7 +67,7 @@ module Pool = struct
         delayed_transactions;
       }
 
-  (** Add a delayed transacion to the pool.*)
+  (** Add a delayed transaction to the pool.*)
   let add_delayed t tx =
     let open Result_syntax in
     let delayed_transactions = tx :: t.delayed_transactions in
@@ -152,12 +155,17 @@ let add_transaction_encoding =
         (fun delayed -> Delayed delayed);
     ]
 
+type popped_transactions =
+  | Locked
+  | Transactions of string list * Ethereum_types.Delayed_transaction.t list
+
 module Types = struct
   type state = {
     rollup_node : (module Services_backend_sig.S);
     smart_rollup_address : string;
     mutable pool : Pool.t;
     mode : mode;
+    mutable locked : bool;
   }
 
   type nonrec parameters = parameters
@@ -181,7 +189,10 @@ module Request = struct
     | Add_transaction :
         add_transaction
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | Inject_transactions : (bool * Time.Protocol.t) -> (int, tztrace) t
+    | Pop_transactions : (popped_transactions, tztrace) t
+    | Pop_and_inject_transactions : (unit, tztrace) t
+    | Lock_transactions : (unit, tztrace) t
+    | Unlock_transactions : (unit, tztrace) t
 
   type view = View : _ t -> view
 
@@ -203,17 +214,28 @@ module Request = struct
           (fun ((), transaction) -> View (Add_transaction transaction));
         case
           (Tag 1)
-          ~title:"Inject_transactions"
-          (obj3
-             (req "request" (constant "new_l2_head"))
-             (req "force" bool)
-             (req "timestamp" Time.Protocol.encoding))
-          (function
-            | View (Inject_transactions (force, timestamp)) ->
-                Some ((), force, timestamp)
-            | _ -> None)
-          (fun ((), force, timestamp) ->
-            View (Inject_transactions (force, timestamp)));
+          ~title:"Pop_transactions"
+          (obj1 (req "request" (constant "pop_transactions")))
+          (function View Pop_transactions -> Some () | _ -> None)
+          (fun () -> View Pop_transactions);
+        case
+          (Tag 2)
+          ~title:"Pop_and_inject_transactions"
+          (obj1 (req "request" (constant "pop_and_inject_transactions")))
+          (function View Pop_and_inject_transactions -> Some () | _ -> None)
+          (fun () -> View Pop_and_inject_transactions);
+        case
+          (Tag 3)
+          ~title:"Lock_transactions"
+          (obj1 (req "request" (constant "lock_transactions")))
+          (function View Lock_transactions -> Some () | _ -> None)
+          (fun () -> View Lock_transactions);
+        case
+          (Tag 4)
+          ~title:"Unlock_transactions"
+          (obj1 (req "request" (constant "unlock_transactions")))
+          (function View Unlock_transactions -> Some () | _ -> None)
+          (fun () -> View Unlock_transactions);
       ]
 
   let pp ppf (View r) =
@@ -231,13 +253,11 @@ module Request = struct
               "Add delayed inbox tx [%a] to tx-pool"
               Ethereum_types.Delayed_transaction.pp_short
               delayed)
-    | Inject_transactions (force, timestamp) ->
-        Format.fprintf
-          ppf
-          "Inject transactions at %a (force is %b)"
-          Time.Protocol.pp
-          timestamp
-          force
+    | Pop_transactions -> Format.fprintf ppf "Popping transactions"
+    | Pop_and_inject_transactions ->
+        Format.fprintf ppf "Popping and injecting transactions"
+    | Lock_transactions -> Format.fprintf ppf "Locking the transactions"
+    | Unlock_transactions -> Format.fprintf ppf "Unlocking the transactions"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -249,7 +269,6 @@ let on_normal_transaction state tx_raw =
   let open Types in
   let {rollup_node = (module Rollup_node); pool; _} = state in
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
-  let* (Qty base_fee) = Rollup_node.base_fee_per_gas () in
   match is_valid with
   | Error err ->
       let*! () =
@@ -259,7 +278,7 @@ let on_normal_transaction state tx_raw =
       return (Error err)
   | Ok {address} ->
       (* Add the tx to the pool*)
-      let*? pool = Pool.add pool address base_fee tx_raw in
+      let*? pool = Pool.add pool address tx_raw in
       (* compute the hash *)
       let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
       let hash =
@@ -290,103 +309,133 @@ let on_transaction state transaction =
       let* () = on_delayed_transaction state delayed_transaction in
       return (Ok hash)
 
-let inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
-    =
+(** Checks that [balance] is enough to pay up to the maximum [gas_limit]
+    the sender defined parametrized by the [gas_price]. *)
+let can_prepay ~balance ~gas_price ~gas_limit =
+  balance >= Z.(gas_limit * gas_price)
+
+(** Checks that the transaction can be payed given the [gas_price] that was set
+    and the current [base_fee_per_gas]. *)
+let can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas =
+  gas_price >= base_fee_per_gas
+
+let pop_transactions state =
   let open Lwt_result_syntax in
-  let (module Rollup_node : Services_backend_sig.S) = rollup_node in
-  (* Get all the addresses in the tx-pool. *)
-  let addresses = Pool.addresses pool in
-  (* Get the nonce related to each address. *)
-  let*! addr_with_nonces =
-    Lwt_list.map_p
-      (fun address ->
-        let* nonce = Rollup_node.nonce address in
-        let nonce = Option.value ~default:(Qty Z.zero) nonce in
-        Lwt.return_ok (address, nonce))
-      addresses
+  let Types.
+        {
+          rollup_node = (module Rollup_node : Services_backend_sig.S);
+          pool;
+          locked;
+          _;
+        } =
+    state
   in
-  let addr_with_nonces = List.filter_ok addr_with_nonces in
-  (* Remove transactions with too low nonce. *)
-  let pool =
-    addr_with_nonces
-    |> List.fold_left
-         (fun pool (pkey, current_nonce) ->
-           Pool.remove
-             pkey
-             (fun nonce _tx ->
-               let (Ethereum_types.Qty current_nonce) = current_nonce in
-               Z.lt nonce current_nonce)
-             pool)
-         pool
-  in
-  (* Select transaction with nonce equal to user's nonce.
-     Also removes the transactions from the pool. *)
-  let txs, pool =
-    addr_with_nonces
-    |> List.fold_left
-         (fun (txs, pool) (pkey, current_nonce) ->
-           let selected, pool =
-             Pool.partition
+  if locked then return Locked
+  else
+    (* Get all the addresses in the tx-pool. *)
+    let addresses = Pool.addresses pool in
+    (* Get the nonce related to each address. *)
+    let*! addr_with_nonces =
+      Lwt_list.map_p
+        (fun address ->
+          let* nonce = Rollup_node.nonce address in
+          let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
+          let* (Qty balance) = Rollup_node.balance address in
+          Lwt.return_ok (address, balance, nonce))
+        addresses
+    in
+    let addr_with_nonces = List.filter_ok addr_with_nonces in
+    (* Remove transactions with too low nonce and the ones that
+       can not be prepayed anymore. *)
+    let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
+    let pool =
+      addr_with_nonces
+      |> List.fold_left
+           (fun pool (pkey, balance, current_nonce) ->
+             Pool.remove
                pkey
-               (fun nonce _tx ->
-                 let (Ethereum_types.Qty current_nonce) = current_nonce in
-                 Z.equal nonce current_nonce)
-               pool
-           in
-           let txs = List.append txs selected in
-           (txs, pool))
-         ([], pool)
-  in
-  (* Sorting transactions by index.
-     First tx in the pool is the first tx to be sent to the batcher. *)
-  let txs =
-    txs
-    |> List.sort (fun Pool.{index = index_a; _} {index = index_b; _} ->
-           Int64.compare index_a index_b)
-    |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
-  in
-
-  let n = List.length txs + List.length pool.delayed_transactions in
-
-  (* Add delayed transactions and empty the list *)
-  let delayed, pool =
-    (pool.delayed_transactions, {pool with delayed_transactions = []})
-  in
-  if n > 0 || force then
-    (* Send the txs to the rollup *)
-    let*! hashes =
-      Rollup_node.inject_raw_transactions
-        ~timestamp
-        ~smart_rollup_address
-        ~transactions:txs
-        ~delayed
+               (fun nonce {gas_limit; gas_price; _} ->
+                 nonce < current_nonce
+                 || not (can_prepay ~balance ~gas_price ~gas_limit))
+               pool)
+           pool
     in
-    let* nb_transactions =
-      match hashes with
-      | Error _ ->
-          let*! () = Tx_pool_events.transaction_injection_failed () in
-          return 0
-      | Ok hashes ->
-          let*! () =
-            List.iter_s
-              (fun hash -> Tx_pool_events.transaction_injected ~hash)
-              hashes
-          in
-          return n
+    (* Select transaction with nonce equal to user's nonce and that
+       can be prepaid.
+       Also removes the transactions from the pool. *)
+    let txs, pool =
+      addr_with_nonces
+      |> List.fold_left
+           (fun (txs, pool) (pkey, _, current_nonce) ->
+             let selected, pool =
+               Pool.partition
+                 pkey
+                 (fun nonce {gas_price; _} ->
+                   nonce = current_nonce
+                   && can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas)
+                 pool
+             in
+             let txs = List.append txs selected in
+             (txs, pool))
+           ([], pool)
     in
-    return (pool, nb_transactions)
-  else return (pool, 0)
+    (* Sorting transactions by index.
+       First tx in the pool is the first tx to be sent to the batcher. *)
+    let txs =
+      txs
+      |> List.sort (fun Pool.{index = index_a; _} {index = index_b; _} ->
+             Int64.compare index_a index_b)
+      |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
+    in
+    (* Add delayed transactions and empty the list *)
+    let delayed, pool =
+      (pool.delayed_transactions, {pool with delayed_transactions = []})
+    in
+    (* update the pool *)
+    state.pool <- pool ;
+    return (Transactions (txs, delayed))
 
-let on_head ~force ~timestamp state =
+let pop_and_inject_transactions state =
   let open Lwt_result_syntax in
   let open Types in
-  let {rollup_node; smart_rollup_address; pool; _} = state in
-  let* pool, nb_transactions =
-    inject_transactions ~force ~timestamp ~smart_rollup_address rollup_node pool
-  in
-  (* update the pool *)
-  state.pool <- pool ;
-  return nb_transactions
+  match state.mode with
+  | Sequencer ->
+      failwith
+        "Internal error: the sequencer is not supposed to use this function"
+  | Observer | Proxy _ -> (
+      let* res = pop_transactions state in
+      match res with
+      | Locked -> return_unit
+      | Transactions (txs, delayed) ->
+          if not (List.is_empty txs && List.is_empty delayed) then
+            let (module Rollup_node : Services_backend_sig.S) =
+              state.rollup_node
+            in
+            let*! hashes =
+              Rollup_node.inject_raw_transactions
+              (* The timestamp is ignored in observer and proxy mode, it's just for
+                 compatibility with sequencer mode. *)
+                ~timestamp:(Helpers.now ())
+                ~smart_rollup_address:state.smart_rollup_address
+                ~transactions:txs
+                ~delayed
+            in
+            match hashes with
+            | Error trace ->
+                let*! () = Tx_pool_events.transaction_injection_failed trace in
+                return_unit
+            | Ok hashes ->
+                let*! () =
+                  List.iter_s
+                    (fun hash -> Tx_pool_events.transaction_injected ~hash)
+                    hashes
+                in
+                return_unit
+          else return_unit)
+
+let lock_transactions state = state.Types.locked <- true
+
+let unlock_transactions state = state.Types.locked <- false
 
 module Handlers = struct
   type self = worker
@@ -397,9 +446,7 @@ module Handlers = struct
     match state.mode with
     | Observer ->
         let*! _ =
-          Worker.Queue.push_request
-            w
-            (Request.Inject_transactions (false, Helpers.now ()))
+          Worker.Queue.push_request w Request.Pop_and_inject_transactions
         in
         return_unit
     | Sequencer | Proxy _ -> return_unit
@@ -409,23 +456,34 @@ module Handlers = struct
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun w request ->
+    let open Lwt_result_syntax in
     let state = Worker.state w in
     match request with
     | Request.Add_transaction transaction ->
         protect @@ fun () ->
-        let open Lwt_result_syntax in
         let* res = on_transaction state transaction in
         let* () = observer_self_inject_request w in
         return res
-    | Request.Inject_transactions (force, timestamp) ->
-        protect @@ fun () -> on_head ~force ~timestamp state
+    | Request.Pop_transactions -> protect @@ fun () -> pop_transactions state
+    | Request.Pop_and_inject_transactions ->
+        protect @@ fun () -> pop_and_inject_transactions state
+    | Request.Lock_transactions ->
+        protect @@ fun () -> return (lock_transactions state)
+    | Request.Unlock_transactions -> return (unlock_transactions state)
 
   type launch_error = error trace
 
   let on_launch _w ()
       ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
     let state =
-      Types.{rollup_node; smart_rollup_address; pool = Pool.empty; mode}
+      Types.
+        {
+          rollup_node;
+          smart_rollup_address;
+          pool = Pool.empty;
+          mode;
+          locked = false;
+        }
     in
     Lwt_result_syntax.return state
 
@@ -471,9 +529,7 @@ let rec subscribe_l2_block ~stream_l2 worker =
   match new_head with
   | Some _block ->
       let* _pushed =
-        Worker.Queue.push_request
-          worker
-          (Request.Inject_transactions (true, Helpers.now ()))
+        Worker.Queue.push_request worker Request.Pop_and_inject_transactions
       in
       subscribe_l2_block ~stream_l2 worker
   | None ->
@@ -537,10 +593,26 @@ let nonce pkey =
   in
   return next_nonce
 
-let produce_block ~force ~timestamp =
+let pop_transactions () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait
-    worker
-    (Request.Inject_transactions (force, timestamp))
+  Worker.Queue.push_request_and_wait worker Request.Pop_transactions
+  |> handle_request_error
+
+let pop_and_inject_transactions () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Request.Pop_and_inject_transactions
+  |> handle_request_error
+
+let lock_transactions () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Request.Lock_transactions
+  |> handle_request_error
+
+let unlock_transactions () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Request.Unlock_transactions
   |> handle_request_error

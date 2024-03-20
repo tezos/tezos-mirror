@@ -31,8 +31,10 @@ open Transaction_format
 
 module MakeBackend (Base : sig
   val base : Uri.t
+
+  val smart_rollup_address : string
 end) : Services_backend_sig.Backend = struct
-  module READER = struct
+  module Reader = struct
     let read path =
       call_service
         ~base:Base.base
@@ -93,12 +95,12 @@ end) : Services_backend_sig.Backend = struct
       | _ -> failwith "Inconsistent simulation results"
   end
 
-  let inject_kernel_upgrade _upgrade = Lwt_result_syntax.return_unit
-
-  let inject_sequencer_upgrade ~payload:_ = Lwt_result_syntax.return_unit
+  let smart_rollup_address = Base.smart_rollup_address
 end
 
 module Make (Base : sig
   val base : Uri.t
+
+  val smart_rollup_address : string
 end) =
   Services_backend_sig.Make (MakeBackend (Base))

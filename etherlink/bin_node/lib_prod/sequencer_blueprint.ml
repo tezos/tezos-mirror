@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -50,7 +51,14 @@ let encode_transaction hash raw =
 
 let encode_delayed_transaction Delayed_transaction.{kind; hash; raw} =
   match kind with
-  | Transaction -> encode_transaction (hash_to_bytes hash) raw
+  | Transaction ->
+      let open Rlp in
+      let hash = hash_to_bytes hash in
+      List
+        [
+          Value (Bytes.of_string hash);
+          List [Value (Bytes.of_string "\003"); Value (Bytes.of_string raw)];
+        ]
   | Deposit ->
       let open Rlp in
       let hash = hash_to_bytes hash in

@@ -164,15 +164,17 @@ let callback_log server conn req body =
 let rollup_node_config_prod ~rollup_node_endpoint ~keep_alive =
   let open Lwt_result_syntax in
   let open Evm_node_lib_prod in
-  let module Rollup_node_rpc = Rollup_node.Make (struct
-    let base = rollup_node_endpoint
-  end) in
   let* smart_rollup_address =
     fetch_smart_rollup_address
       ~keep_alive
       Rollup_services.smart_rollup_address
       rollup_node_endpoint
   in
+  let module Rollup_node_rpc = Rollup_node.Make (struct
+    let base = rollup_node_endpoint
+
+    let smart_rollup_address = smart_rollup_address
+  end) in
   return
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
@@ -801,6 +803,7 @@ let sequencer_command =
           ~data_dir
           ~rollup_node_endpoint
           ~max_blueprints_lag
+          ~max_blueprints_ahead
           ~max_blueprints_catchup
           ~catchup_cooldown
           ?genesis_timestamp

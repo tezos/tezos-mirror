@@ -9,14 +9,17 @@ type parameters = {
   rollup_node_endpoint : Uri.t;
   store : Store.t;
   max_blueprints_lag : int;
+  max_blueprints_ahead : int;
   max_blueprints_catchup : int;
   catchup_cooldown : int;
+  latest_level_seen : Z.t;
 }
 
 type state = {
   store : Store.t;
   rollup_node_endpoint : Uri.t;
   max_blueprints_lag : Z.t;
+  max_blueprints_ahead : Z.t;
   max_blueprints_catchup : Z.t;
   catchup_cooldown : int;
   mutable latest_level_confirmed : Z.t;
@@ -69,13 +72,20 @@ module Worker = struct
 
   let max_blueprints_lag worker = (state worker).max_blueprints_lag
 
+  let max_level_ahead worker = (state worker).max_blueprints_ahead
+
   let max_blueprints_catchup worker = (state worker).max_blueprints_catchup
+
+  type lag = No_lag | Needs_republish | Needs_lock
 
   let rollup_is_lagging_behind worker =
     let missing_levels =
       Z.sub (latest_level_seen worker) (latest_level_confirmed worker)
     in
-    Z.(Compare.(missing_levels > max_blueprints_lag worker))
+    if Z.Compare.(missing_levels > max_level_ahead worker) then Needs_lock
+    else if Z.(Compare.(missing_levels > max_blueprints_lag worker)) then
+      Needs_republish
+    else No_lag
 
   let set_cooldown worker cooldown = (state worker).cooldown <- cooldown
 
@@ -90,19 +100,24 @@ module Worker = struct
     if on_cooldown worker then set_cooldown worker (current - 1) else ()
 
   let publish self payload level =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let rollup_node_endpoint = rollup_node_endpoint self in
     (* We do not check if we succeed or not: this will be done when new L2
        heads come from the rollup node. *)
     witness_level self level ;
-    let* res = Rollup_services.publish ~rollup_node_endpoint payload in
-    match res with
-    | Ok _ -> Blueprint_events.blueprint_injected level
-    | Error _ ->
-        (* We have failed to inject the blueprint. This is probably
-           the sign that the rollup node is down. It will be injected again
-           once the rollup node lag increases to [max_blueprints_lag]. *)
-        Blueprint_events.blueprint_injection_failed level
+    let*! res = Rollup_services.publish ~rollup_node_endpoint payload in
+    let*! () =
+      match res with
+      | Ok _ -> Blueprint_events.blueprint_injected level
+      | Error _ ->
+          (* We have failed to inject the blueprint. This is probably
+             the sign that the rollup node is down. It will be injected again
+             once the rollup node lag increases to [max_blueprints_lag]. *)
+          Blueprint_events.blueprint_injection_failed level
+    in
+    match rollup_is_lagging_behind self with
+    | No_lag | Needs_republish -> return_unit
+    | Needs_lock -> Tx_pool.lock_transactions ()
 
   let catch_up worker =
     let open Lwt_result_syntax in
@@ -124,7 +139,7 @@ module Worker = struct
         in
         match payload with
         | Some payload ->
-            let*! () = publish worker payload curr in
+            let* () = publish worker payload curr in
             catching_up Z.(succ curr)
         | None ->
             let*! () = Blueprint_events.missing_blueprint curr in
@@ -158,8 +173,10 @@ module Handlers = struct
          rollup_node_endpoint;
          store;
          max_blueprints_lag;
+         max_blueprints_ahead;
          max_blueprints_catchup;
          catchup_cooldown;
+         latest_level_seen;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -170,13 +187,11 @@ module Handlers = struct
           (* Will be set at the correct value once the next L2 block is
              received from the rollup node *)
           Z.zero;
-        latest_level_seen =
-          (* Will be set at the correct value once the sequencer produces
-             the next blueprint *)
-          Z.zero;
+        latest_level_seen;
         cooldown = 0;
         rollup_node_endpoint;
         max_blueprints_lag = Z.of_int max_blueprints_lag;
+        max_blueprints_ahead = Z.of_int max_blueprints_ahead;
         max_blueprints_catchup = Z.of_int max_blueprints_catchup;
         catchup_cooldown;
       }
@@ -188,15 +203,23 @@ module Handlers = struct
     let open Lwt_result_syntax in
     match request with
     | Publish {level; payload} ->
-        let*! () = Worker.publish self payload level in
+        let* () = Worker.publish self payload level in
         return_unit
-    | New_l2_head {rollup_head} ->
+    | New_l2_head {rollup_head} -> (
         Worker.set_latest_level_confirmed self rollup_head ;
-        if Worker.rollup_is_lagging_behind self && not (Worker.on_cooldown self)
-        then Worker.catch_up self
-        else (
-          Worker.decrement_cooldown self ;
-          return_unit)
+        match Worker.rollup_is_lagging_behind self with
+        | (Needs_republish | Needs_lock) when not (Worker.on_cooldown self) ->
+            (* The worker needs to republish, it's not in cooldown. *)
+            Worker.catch_up self
+        | Needs_lock ->
+            (* If the worker still needs to stop, we idle and wait for the cooldown .*)
+            Worker.decrement_cooldown self ;
+            return_unit
+        | No_lag | Needs_republish ->
+            Worker.decrement_cooldown self ;
+            (* If there is no lag or the worker just needs to republish we
+               unlock the transaction pool in case it was locked. *)
+            Tx_pool.unlock_transactions ())
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -215,8 +238,8 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_catchup
-    ~catchup_cooldown store =
+let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
+    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen store =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -226,8 +249,10 @@ let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_catchup
         rollup_node_endpoint;
         store;
         max_blueprints_lag;
+        max_blueprints_ahead;
         max_blueprints_catchup;
         catchup_cooldown;
+        latest_level_seen;
       }
       (module Handlers)
   in

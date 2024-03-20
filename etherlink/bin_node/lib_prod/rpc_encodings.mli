@@ -260,6 +260,11 @@ module Produce_block :
     with type input = Time.Protocol.t
      and type output = Ethereum_types.quantity
 
+module Durable_state_value :
+  METHOD
+    with type input = Durable_storage_path.path
+     and type output = Bytes.t option
+
 type map_result =
   | Method :
       ('input, 'output) method_

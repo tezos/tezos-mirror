@@ -8,8 +8,10 @@
 val start :
   rollup_node_endpoint:Uri.t ->
   max_blueprints_lag:int ->
+  max_blueprints_ahead:int ->
   max_blueprints_catchup:int ->
   catchup_cooldown:int ->
+  latest_level_seen:Z.t ->
   Store.t ->
   unit tzresult Lwt.t
 

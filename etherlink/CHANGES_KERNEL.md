@@ -4,8 +4,23 @@
 
 ### Features
 
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version d689a9dcfa16169aa0dbce1944e920093223c671t (Security Upgrade)
+
+### Bug fixes
+
+## Version 0a81ce76b3d4f57d8c5194bcb9418f9294fd2be1
+
+### Features
+
 - Delayed EVM transactions no longer pay data-availability fee. (!12401)
 - Raise minimum gas price to **1 gwei**. (!12514)
+- Set a delayed bridge for Ghostnet. (!12485)
 
 ### Bug fixes
 
@@ -16,6 +31,9 @@
 - Delayed EVM transactions use a dedicated encoding tag in blueprints. (!12401)
 
 ### Internal
+
+- Make parsing dependent on the kernel mode. (!12356, !12363)
+- Implements reboot scheduling for the stage one in sequencer mode. (!12400)
 
 ## Version d689a9dcfa16169aa0dbce1944e920093223c671t (Security Upgrade)
 
