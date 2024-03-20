@@ -49,72 +49,72 @@ rv64ud-p-structural: success
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fadd --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fadd: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fclass --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fclass: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fcmp --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fcmp: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fcvt --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fcvt: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fcvt_w --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fcvt_w: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fdiv --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fdiv: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fmadd --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fmadd: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-fmin --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-fmin: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-ldst --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-ldst: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-move --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-move: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-recoding --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-recoding: fail
 
 ./src/risc_v/risc-v-sandbox rvemu --input tezt/tests/riscv-tests/generated/rv64ud-v-structural --posix
 thread 'main' panicked at sandbox/src/main.rs:128:25:
-Exception InstructionPageFault(2147494160) at 0x80002910: Invisible
+Exception InstructionPageFault(2147494020) at 0x80002884: Invisible
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 rv64ud-v-structural: fail
