@@ -22,7 +22,7 @@ gitlab_upload() {
   local_path="${1}"
   remote_file="${2}"
   url="${3-${gitlab_octez_package_url}}"
-  echo "Upload to ${gitlab_octez_package_url}/${remote_file}"
+  echo "Upload to ${url}/${remote_file}"
 
   i=0
   max_attempts=10
