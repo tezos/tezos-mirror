@@ -5,8 +5,8 @@
 // Allow dead code while this module contains stubs.
 #![allow(dead_code)]
 
-use crate::exec_env::{self, ExecutionEnvironment, ExecutionEnvironmentState};
 use risc_v_interpreter::{
+    exec_env::{self, ExecutionEnvironment, ExecutionEnvironmentState},
     machine_state::{self, bus::main_memory, StepManyResult},
     state_backend,
     traps::EnvironException,
@@ -77,18 +77,16 @@ impl<EE: ExecutionEnvironment, ML: main_memory::MainMemoryLayout, M: state_backe
             EnvironException::EnvCallFromUMode
             | EnvironException::EnvCallFromSMode
             | EnvironException::EnvCallFromMMode => {
-                match self.syscall_state.handle_call(&mut self.machine_state) {
+                match self
+                    .syscall_state
+                    .handle_call(&mut self.machine_state, exception)
+                {
                     exec_env::EcallOutcome::Fatal => {
                         // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
                         unimplemented!("Fatal exceptions aren't implemented yet")
                     }
                     exec_env::EcallOutcome::Handled { continue_eval } => continue_eval,
                 }
-            }
-
-            EnvironException::TrapFromDMode => {
-                // TODO: https://app.asana.com/0/1206655199123740/1206682246825814/f
-                unimplemented!("Fatal exceptions aren't implemented yet")
             }
         }
     }

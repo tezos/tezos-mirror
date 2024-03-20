@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 pub mod devicetree;
+pub mod exec_env;
 mod interpreter;
 pub mod machine_state;
 pub mod parser;
@@ -13,10 +14,7 @@ pub mod traps;
 
 use crate::{
     machine_state::{
-        bus::main_memory::M1G,
-        mode,
-        registers::{a0, a7},
-        MachineError, MachineState, MachineStateLayout, StepManyResult,
+        bus::main_memory::M1G, mode, MachineError, MachineState, MachineStateLayout, StepManyResult,
     },
     program::Program,
     state_backend::{
@@ -26,13 +24,20 @@ use crate::{
     traps::EnvironException,
 };
 use derive_more::{Error, From};
+use exec_env::{
+    posix::{Posix, PosixState},
+    ExecutionEnvironment, ExecutionEnvironmentState,
+};
 use InterpreterResult::*;
 
-type StateLayout = MachineStateLayout<M1G>;
+type StateLayout = (
+    <Posix as ExecutionEnvironment>::Layout,
+    MachineStateLayout<M1G>,
+);
 
 pub struct Interpreter<'a> {
+    posix_state: PosixState<SliceManager<'a>>,
     machine_state: MachineState<M1G, SliceManager<'a>>,
-    steps: usize,
 }
 
 pub enum InterpreterResult {
@@ -67,41 +72,56 @@ impl<'a> Interpreter<'a> {
         mode: mode::Mode,
     ) -> Result<Self, InterpreterError> {
         let alloc = backend.allocate(StateLayout::placed().into_location());
-        let mut machine_state = MachineState::<M1G, SliceManager<'a>>::bind(alloc);
+
+        let mut posix_state = PosixState::bind(alloc.0);
+        posix_state.set_exit_mode(mode);
+
+        let mut machine_state = MachineState::<M1G, SliceManager<'a>>::bind(alloc.1);
         let elf_program = Program::<M1G>::from_elf(program)?;
-        machine_state.setup_boot(&elf_program, initrd, mode)?;
+        machine_state.setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
+
         Ok(Self {
+            posix_state,
             machine_state,
-            steps: 0,
         })
     }
 
-    // TODO: use execution environment for exception handling once merged
-    fn handle_step_result(&mut self, result: StepManyResult) -> InterpreterResult {
-        self.steps += result.steps;
-
+    fn handle_step_result(&mut self, mut result: StepManyResult, max: usize) -> InterpreterResult {
         match result.exception {
-            Some(exc) => {
-                // The only exception currently handled is exit
-                if (exc == EnvironException::EnvCallFromUMode
-                    || exc == EnvironException::EnvCallFromSMode
-                    || exc == EnvironException::EnvCallFromMMode)
-                    && self.machine_state.hart.xregisters.read(a7) == 93
-                {
-                    return Exit {
-                        code: self.machine_state.hart.xregisters.read(a0) as usize,
-                        steps: result.steps,
-                    };
-                };
-                Exception(exc, result.steps)
-            }
+            Some(exc) => match self.posix_state.handle_call(&mut self.machine_state, exc) {
+                exec_env::EcallOutcome::Fatal => Exception(exc, result.steps),
+                exec_env::EcallOutcome::Handled { continue_eval } => {
+                    // Handling the ECall marks the completion of a step
+                    result.steps = result.steps.saturating_add(1);
+
+                    let steps_left = max.saturating_sub(result.steps);
+                    if let Some(code) = self.posix_state.exit_code() {
+                        Exit {
+                            code: code as usize,
+                            steps: result.steps,
+                        }
+                    } else if continue_eval && steps_left > 0 {
+                        self.run_accum(result.steps, steps_left)
+                    } else {
+                        Running(result.steps)
+                    }
+                }
+            },
+
             None => Running(result.steps),
         }
     }
 
     pub fn run(&mut self, max: usize) -> InterpreterResult {
-        let result = self.machine_state.step_many(max, |_| true);
-        self.handle_step_result(result)
+        self.run_accum(0, max)
+    }
+
+    /// This function only exists to make the funneling of [steps_done]
+    /// tail-recursive.
+    fn run_accum(&mut self, steps_done: usize, max: usize) -> InterpreterResult {
+        let mut result = self.machine_state.step_many(max, |_| true);
+        result.steps = result.steps.saturating_add(steps_done);
+        self.handle_step_result(result, max)
     }
 }
 

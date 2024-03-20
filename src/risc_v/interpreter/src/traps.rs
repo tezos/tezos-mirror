@@ -19,12 +19,27 @@
 use crate::machine_state::{bus::Address, csregisters::CSRValue};
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
-#[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug)]
+#[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug, Clone, Copy)]
 pub enum EnvironException {
     EnvCallFromUMode,
     EnvCallFromSMode,
     EnvCallFromMMode,
-    TrapFromDMode,
+}
+
+impl EnvironException {
+    /// Convert from environment exception.
+    pub fn as_exception(&self) -> Exception {
+        // This is not implemeted as a `From<_>` implementation to not make `?`
+        // syntax harder which unfortunately tries to convert between `Exception` and
+        // `EnvironException` when "circular" implementations exist. These cycles
+        // can only be broken with explicit type annotations which is annoying.
+
+        match self {
+            Self::EnvCallFromUMode => Exception::EnvCallFromUMode,
+            Self::EnvCallFromSMode => Exception::EnvCallFromSMode,
+            Self::EnvCallFromMMode => Exception::EnvCallFromMMode,
+        }
+    }
 }
 
 impl TryFrom<&Exception> for EnvironException {
@@ -98,6 +113,12 @@ impl Interrupt {
     }
 }
 
+/// Flavour of the trap cause
+pub enum TrapKind {
+    Interrupt,
+    Exception,
+}
+
 /// Common trait for [`Exception`] & [`Interrupt`] traps used in the context of trap handling
 pub trait TrapContext {
     /// Trap values to be stored in `xtval` registers when taking a trap.
@@ -114,6 +135,9 @@ pub trait TrapContext {
 
     /// Computes the address pc should be set when entering the trap
     fn trap_handler_address(&self, xtvec_val: CSRValue) -> Address;
+
+    /// Obtain the kind that would cause this trap.
+    fn kind() -> TrapKind;
 }
 
 impl TrapContext for Exception {
@@ -152,6 +176,10 @@ impl TrapContext for Exception {
         // BASE[xLEN-1:2] = xtvec[xLEN-1:2]
         xtvec_val & !0b11
     }
+
+    fn kind() -> TrapKind {
+        TrapKind::Exception
+    }
 }
 
 impl TrapContext for Interrupt {
@@ -187,5 +215,9 @@ impl TrapContext for Interrupt {
         );
 
         xtvec_base + handler_offset
+    }
+
+    fn kind() -> TrapKind {
+        TrapKind::Interrupt
     }
 }

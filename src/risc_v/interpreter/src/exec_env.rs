@@ -4,9 +4,10 @@
 
 pub mod posix;
 
-use risc_v_interpreter::{
+use crate::{
     machine_state::{bus::main_memory::MainMemoryLayout, MachineState},
     state_backend::{self, AllocatedOf, Manager},
+    traps::EnvironException,
 };
 
 /// An execution environment
@@ -44,5 +45,6 @@ pub trait ExecutionEnvironmentState<M: Manager> {
     fn handle_call<ML: MainMemoryLayout>(
         &mut self,
         machine: &mut MachineState<ML, M>,
+        exception: EnvironException,
     ) -> EcallOutcome;
 }

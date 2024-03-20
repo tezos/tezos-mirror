@@ -19,7 +19,6 @@ use crate::{
         bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
         csregisters::CSRegister,
         hart_state::{HartState, HartStateLayout},
-        mode::TrapMode,
     },
     parser::{instruction::Instr, parse},
     program::Program,
@@ -38,6 +37,7 @@ pub struct MachineState<ML: main_memory::MainMemoryLayout, M: backend::Manager> 
 }
 
 /// How to modify the program counter
+#[derive(Debug)]
 enum ProgramCounterUpdate {
     /// Jump to a fixed address
     Set(Address),
@@ -336,28 +336,17 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     ///
     /// If trap is taken, return new address of program counter.
     /// Throw [`EnvironException`] if the interrupt has to be treated by the execution enviroment.
-    fn trap_interrupt(&mut self, interrupt: Interrupt) -> Result<Address, EnvironException> {
-        let current_mode = self.hart.mode.read();
+    fn address_on_interrupt(&mut self, interrupt: Interrupt) -> Result<Address, EnvironException> {
         let current_pc = self.hart.pc.read();
         let mip = self.hart.csregisters.read(CSRegister::mip);
 
-        // make the interrupt pending bit zero for the haandled interrupt
+        // Clear the bit in the set of pending interrupt, marking it as handled
         self.hart.csregisters.write(
             CSRegister::mip,
             mip.set_bit(interrupt.exception_code() as usize, false),
         );
 
-        let trap_mode = self.hart.get_interrupt_mode(&interrupt, current_mode)?;
-        let new_pc = match trap_mode {
-            TrapMode::Machine => self
-                .hart
-                .take_trap_machine(current_mode, current_pc, interrupt),
-            TrapMode::Supervisor => {
-                self.hart
-                    .take_trap_supervisor(current_mode, current_pc, interrupt)
-            }
-        };
-
+        let new_pc = self.hart.take_trap(interrupt, current_pc);
         Ok(new_pc)
     }
 
@@ -366,28 +355,20 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     ///
     /// Return the new address of the program counter, becoming the address of a trap handler.
     /// Throw [`EnvironException`] if the exception needs to be treated by the execution enviroment.
-    fn trap_exception(
+    fn address_on_exception(
         &mut self,
         exception: Exception,
         current_pc: Address,
     ) -> Result<Address, EnvironException> {
         if let Ok(exc) = EnvironException::try_from(&exception) {
+            // We need to commit the PC before returning because the caller (e.g.
+            // [step]) doesn't commit it eagerly.
+            self.hart.pc.write(current_pc);
+
             return Err(exc);
         }
 
-        let current_mode = self.hart.mode.read();
-        let trap_mode = self.hart.get_exception_mode(&exception, current_mode)?;
-        let new_pc = match trap_mode {
-            TrapMode::Supervisor => {
-                self.hart
-                    .take_trap_supervisor(current_mode, current_pc, exception)
-            }
-            TrapMode::Machine => self
-                .hart
-                .take_trap_machine(current_mode, current_pc, exception),
-        };
-
-        Ok(new_pc)
+        Ok(self.hart.take_trap(exception, current_pc))
     }
 
     /// Take an interrupt if available, and then
@@ -400,7 +381,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         // obtain the pc for the next instruction to be executed
         let instr_pc = match self.get_pending_interrupt() {
             None => self.hart.pc.read(),
-            Some(interrupt) => self.trap_interrupt(interrupt)?,
+            Some(interrupt) => self.address_on_interrupt(interrupt)?,
         };
 
         // Fetch & run the instruction
@@ -408,7 +389,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
         // Take exception if needed
         let pc_update = match instr_result {
-            Err(exc) => ProgramCounterUpdate::Set(self.trap_exception(exc, instr_pc)?),
+            Err(exc) => ProgramCounterUpdate::Set(self.address_on_exception(exc, instr_pc)?),
             Ok(upd) => upd,
         };
 
