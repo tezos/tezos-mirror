@@ -34,6 +34,8 @@ say() {
 
 declare -a source_directories
 
+# Make sure that the set of source_directories here are also reflected in
+# [changeset_lint_files] in [ci/bin/common.ml].
 source_directories=(src docs/doc_gen tezt devtools contrib etherlink client-libs)
 # Set of newline-separated basic regular expressions to exclude from --check-licenses-git-new.
 license_check_exclude=$(

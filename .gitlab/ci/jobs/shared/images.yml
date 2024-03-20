@@ -25,3 +25,5 @@
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 .image_template__rust_toolchain:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+.image_template__semgrep_agent:
+  image: returntocorp/semgrep-agent:sha-c6cd7cf

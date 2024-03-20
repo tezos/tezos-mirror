@@ -154,6 +154,19 @@ module Images = struct
 
   let hadolint =
     Image.register ~name:"hadolint" ~image_path:"hadolint/hadolint:2.9.3-debian"
+
+  (* We specify the semgrep image by hash to avoid flakiness. Indeed, if we took the
+     latest release, then an update in the parser or analyser could result in new
+     errors being found even if the code doesn't change. This would place the
+     burden for fixing the code on the wrong dev (the devs who happen to open an
+     MR coinciding with the semgrep update rather than the dev who wrote the
+     infringing code in the first place).
+     Update the hash in scripts/semgrep/README.md too when updating it here
+     Last update: 2022-01-03 *)
+  let semgrep_agent =
+    Image.register
+      ~name:"semgrep_agent"
+      ~image_path:"returntocorp/semgrep-agent:sha-c6cd7cf"
 end
 
 (** {2 Helpers} *)
@@ -317,6 +330,39 @@ let changeset_kaitai_e2e_files =
 
 let changeset_ocaml_files =
   ["src/**/*"; "tezt/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"; "devtools/**/*"]
+
+let changeset_lift_limits_patch =
+  [
+    "src/bin_tps_evaluation/lift_limits.patch";
+    "src/proto_alpha/lib_protocol/main.ml";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
+(* The linting job runs over the set of [source_directories]
+   defined in [scripts/lint.sh] that must be included here: *)
+let changeset_lint_files =
+  [
+    "src/**/*";
+    "tezt/**/*";
+    "devtools/**/*";
+    "scripts/**/*";
+    "docs/**/*";
+    "client-libs/**/*";
+    "etherlink/**/*";
+    ".gitlab-ci.yml";
+    ".gitlab/**/*";
+  ]
+
+let changeset_semgrep_files =
+  [
+    "src/**/*";
+    "tezt/**/*";
+    "devtools/**/*";
+    "scripts/semgrep/**/*";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
 
 (** {2 Job makers} *)
 

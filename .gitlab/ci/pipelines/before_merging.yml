@@ -30,13 +30,13 @@ include:
   - .gitlab/ci/jobs/build/select_tezts.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/kaitai_checks.yml
-  - .gitlab/ci/jobs/test/kaitai_e2e_checks.yml
-  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch.yml
+  - .gitlab/ci/jobs/test/kaitai_checks-before_merging.yml
+  - .gitlab/ci/jobs/test/kaitai_e2e_checks-before_merging.yml
+  - .gitlab/ci/jobs/test/oc.check_lift_limits_patch-before_merging.yml
   - .gitlab/ci/jobs/test/oc.misc_checks-before_merging.yml
-  - .gitlab/ci/jobs/test/misc_opam_checks.yml
+  - .gitlab/ci/jobs/test/misc_opam_checks-before_merging.yml
   - .gitlab/ci/jobs/test/commit_titles.yml
-  - .gitlab/ci/jobs/test/oc.semgrep.yml
+  - .gitlab/ci/jobs/test/oc.semgrep-before_merging.yml
   - .gitlab/ci/jobs/test/oc.unit.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections.yml
   - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml

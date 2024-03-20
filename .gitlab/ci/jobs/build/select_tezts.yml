@@ -1,20 +1,21 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
 select_tezts:
-  extends:
-    - .default_settings_template
-    # We need:
-    # - Git (to run git diff)
-    # - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest)
-    - .image_template__runtime_prebuild_dependencies
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: build
-  before_script:
-    - ./scripts/ci/take_ownership.sh
-    - eval $(opam env)
-  script:
-    - scripts/ci/select_tezts.sh || exit $?
+  tags:
+  - gcp
+  dependencies: []
   allow_failure:
     exit_codes: 17
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  script:
+  - scripts/ci/select_tezts.sh || exit $?
   artifacts:
-    when: always
-    paths:
-      - selected_tezts.tsl
     expire_in: 3 days
+    paths:
+    - selected_tezts.tsl
+    when: always

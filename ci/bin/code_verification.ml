@@ -238,12 +238,11 @@ let jobs pipeline_type =
             ]
           |> job_external
         in
-        (* TODO: put job_trigger here when full pipeline is generated *)
         (* TODO: the dependency on job_trigger does not have to be optional *)
-        ([], Dependent [Optional job_trigger])
+        ([job_trigger], Dependent [Optional job_trigger])
   in
   let sanity =
-    let _job_sanity_ci : tezos_job =
+    let job_sanity_ci : tezos_job =
       job
         ~__POS__
         ~name:"sanity_ci"
@@ -261,7 +260,7 @@ let jobs pipeline_type =
         ]
       |> job_external_once
     in
-    let _job_docker_hadolint =
+    let job_docker_hadolint =
       job
         ~rules:(make_rules ~changes:changeset_hadolint_docker_files ())
         ~__POS__
@@ -277,7 +276,7 @@ let jobs pipeline_type =
         ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
       |> job_external
     in
-    []
+    [job_sanity_ci; job_docker_hadolint]
   in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
@@ -287,7 +286,7 @@ let jobs pipeline_type =
       ()
     |> job_external_split
   in
-  let _job_docker_client_libs_dependencies =
+  let job_docker_client_libs_dependencies =
     job_docker_authenticated
       ~__POS__
       ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
@@ -307,14 +306,14 @@ let jobs pipeline_type =
   in
   let build =
     let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
-    let _job_build_arm64_release : Tezos_ci.tezos_job =
+    let job_build_arm64_release : Tezos_ci.tezos_job =
       job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
     in
-    let _job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
+    let job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
       job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
       |> job_external_split
     in
-    let _job_static_x86_64_experimental =
+    let job_static_x86_64_experimental =
       job_build_static_binaries
         ~__POS__
         ~arch:Amd64
@@ -328,20 +327,22 @@ let jobs pipeline_type =
       |> job_external_split
     in
     (* TODO: The code is a bit convulted here because these jobs are
-       either in the build or in the manual stage depeneding on the
+       either in the build or in the manual stage depending on the
        pipeline type. However, we can put them in the build stage on
        [before_merging] pipelines as long as we're careful to put
        [allow_failure: true]. *)
-    (match pipeline_type with
-    | Schedule_extended_test ->
-        let _job_build_dpkg_amd64 = job_build_dpkg_amd64 () |> job_external in
-        let _job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
-        ()
-    | Before_merging -> ()) ;
+    let bin_packages_jobs =
+      match pipeline_type with
+      | Schedule_extended_test ->
+          let job_build_dpkg_amd64 = job_build_dpkg_amd64 () |> job_external in
+          let job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
+          [job_build_dpkg_amd64; job_build_rpm_amd64]
+      | Before_merging -> []
+    in
     (* The build_x86_64 jobs are split in two to keep the artifact size
        under the 1GB hard limit set by GitLab. *)
-    (* [_job_build_x86_64_release] builds the released executables. *)
-    let _job_build_x86_64_release =
+    (* [job_build_x86_64_release] builds the released executables. *)
+    let job_build_x86_64_release =
       job_build_dynamic_binaries
         ~__POS__
         ~arch:Amd64
@@ -354,7 +355,7 @@ let jobs pipeline_type =
     (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
        executables, as well as the tezt test suite used by the subsequent
        'tezt' jobs and TPS evaluation tool. *)
-    let _job_build_x86_64_exp_dev_extra =
+    let job_build_x86_64_exp_dev_extra =
       job_build_dynamic_binaries
         ~__POS__
         ~arch:Amd64
@@ -364,7 +365,7 @@ let jobs pipeline_type =
         ()
       |> job_external_split
     in
-    let _job_ocaml_check : tezos_job =
+    let job_ocaml_check : tezos_job =
       job
         ~__POS__
         ~name:"ocaml-check"
@@ -381,7 +382,7 @@ let jobs pipeline_type =
         ["dune build @check"]
       |> job_external_split
     in
-    let _job_build_kernels : tezos_job =
+    let job_build_kernels : tezos_job =
       job
         ~__POS__
         ~name:"oc.build_kernels"
@@ -422,7 +423,7 @@ let jobs pipeline_type =
     (* Fetch records for Tezt generated on the last merge request pipeline
        on the most recently merged MR and makes them available in artifacts
        for future merge request pipelines. *)
-    let _job_tezt_fetch_records : tezos_job =
+    let job_tezt_fetch_records : tezos_job =
       job
         ~__POS__
         ~name:"oc.tezt:fetch-records"
@@ -456,10 +457,41 @@ let jobs pipeline_type =
              ])
       |> job_external_split
     in
-    (* TODO: include the jobs defined above when full pipeline is
-       generated, as well as rust tool chain and client libs docker
-       builds. *)
-    []
+    (* Used in [before_merging] and [schedule_extended_tests].
+
+       Fetch records for Tezt generated on the last merge request pipeline
+       on the most recently merged MR and makes them available in artifacts
+       for future merge request pipelines. *)
+    let job_select_tezts : tezos_job =
+      job
+        ~__POS__
+        ~name:"select_tezts"
+          (* We need:
+             - Git (to run git diff)
+             - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
+        ~image:Images.runtime_prebuild_dependencies
+        ~stage:Stages.build
+        ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
+        ["scripts/ci/select_tezts.sh || exit $?"]
+        ~allow_failure:(With_exit_codes [17])
+        ~artifacts:
+          (artifacts ~expire_in:(Days 3) ~when_:Always ["selected_tezts.tsl"])
+      |> job_external_once
+    in
+    [
+      job_docker_rust_toolchain;
+      job_docker_client_libs_dependencies;
+      job_build_arm64_release;
+      job_build_arm64_exp_dev_extra;
+      job_static_x86_64_experimental;
+      job_build_x86_64_release;
+      job_build_x86_64_exp_dev_extra;
+      job_ocaml_check;
+      job_build_kernels;
+      job_tezt_fetch_records;
+      job_select_tezts;
+    ]
+    @ bin_packages_jobs
   in
   let packaging =
     let job_opam_prepare : tezos_job =
@@ -480,21 +512,178 @@ let jobs pipeline_type =
         ]
       |> job_external_once
     in
-    let (_jobs_opam_packages : tezos_job list) =
+    let (jobs_opam_packages : tezos_job list) =
       read_opam_packages
       |> List.map
            (job_opam_package
               ~dependencies:(Dependent [Artifacts job_opam_prepare]))
       |> jobs_external_once ~path:"packaging/opam_package.yml"
     in
-    []
+    jobs_opam_packages
   in
-  let test = [] in
+  let test =
+    (* check that ksy files are still up-to-date with octez *)
+    let job_kaitai_checks : tezos_job =
+      job
+        ~__POS__
+        ~name:"kaitai_checks"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        [
+          "make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez \
+           encodings and Kaitai files seem to be out of sync. You might need \
+           to run `make check-kaitai-struct-files` and commit the resulting \
+           diff.' ; false)";
+        ]
+      |> job_external_split
+    in
+    let job_kaitai_e2e_checks =
+      job
+        ~__POS__
+        ~name:"kaitai_e2e_checks"
+        ~image:Images.client_libs_dependencies
+        ~stage:Stages.test
+        ~dependencies:
+          (Dependent
+             [
+               Artifacts job_docker_client_libs_dependencies;
+               Job job_kaitai_checks;
+             ])
+        ~rules:
+          (make_rules ~changes:changeset_kaitai_e2e_files ~dependent:true ())
+        ~before_script:
+          (before_script
+             ~source_version:true
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/5026
+                  As observed for the `unit:js_components` running `npm i`
+                  everytime we run a job is inefficient.
+
+                  The benefit of this approach is that we specify node version
+                  and npm dependencies (package.json) in one place, and that the local
+                  environment is then the same as CI environment. *)
+             ~install_js_deps:true
+             [])
+        [
+          "./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh \
+           client-libs/kaitai-struct-files/files \
+           client-libs/kaitai-struct-files/input 2>/dev/null";
+        ]
+      |> job_external_split
+    in
+    let job_oc_check_lift_limits_patch =
+      job
+        ~__POS__
+        ~name:"oc.check_lift_limits_patch"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_lift_limits_patch ())
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        [
+          (* Check that the patch only modifies the
+             src/proto_alpha/lib_protocol. If not, the rules above have to be
+             updated. *)
+          "[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | \
+           cut -f3) = \"src/proto_alpha/lib_protocol/main.ml\" ]";
+          "git apply src/bin_tps_evaluation/lift_limits.patch";
+          "dune build @src/proto_alpha/lib_protocol/check";
+        ]
+      |> job_external_split
+    in
+    let job_oc_misc_checks : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.misc_checks"
+        ~image:Images.runtime_build_test_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_lint_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             ~init_python_venv:true
+             [])
+        ([
+           "./scripts/ci/lint_misc_check.sh";
+           "scripts/check_wasm_pvm_regressions.sh check";
+         ]
+        @
+        (* The license check only applies to new files (in the sense
+           of [git add]), so can only run in [before_merging]
+           pipelines. *)
+        if pipeline_type = Before_merging then
+          ["./scripts/ci/lint_check_licenses.sh"]
+        else [])
+      |> job_external_split
+    in
+    let job_misc_opam_checks : tezos_job =
+      job
+        ~__POS__
+        ~name:"misc_opam_checks"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.test
+        ~retry:2
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        [
+          (* checks that all deps of opam packages are already installed *)
+          "./scripts/opam-check.sh";
+        ]
+      |> job_external_split
+    in
+    let job_semgrep : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.semgrep"
+        ~image:Images.semgrep_agent
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_semgrep_files ())
+        [
+          "echo \"OCaml code linting. For information on how to reproduce \
+           locally, check out scripts/semgrep/README.md\"";
+          "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
+        ]
+      |> job_external_split
+    in
+    [
+      job_kaitai_checks;
+      job_kaitai_e2e_checks;
+      job_oc_check_lift_limits_patch;
+      job_oc_misc_checks;
+      job_misc_opam_checks;
+      job_semgrep;
+    ]
+    @
+    match pipeline_type with
+    | Before_merging ->
+        let job_commit_titles : tezos_job =
+          job
+            ~__POS__
+            ~name:"commit_titles"
+            ~image:Images.runtime_prebuild_dependencies
+            ~stage:Stages.test
+            ~dependencies:dependencies_needs_trigger
+            (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
+               invalid commits titles in situations where that is allowed. *)
+            ["./scripts/ci/check_commit_messages.sh || exit $?"]
+            ~allow_failure:(With_exit_codes [65])
+          |> job_external
+        in
+        [job_commit_titles]
+    | Schedule_extended_test -> []
+  in
   let doc = [] in
   let manual =
     match pipeline_type with
     | Before_merging ->
-        let _job_docker_amd64_test_manual : Tezos_ci.tezos_job =
+        let job_docker_amd64_test_manual : Tezos_ci.tezos_job =
           job_docker_build
             ~__POS__
             ~external_:true
@@ -502,7 +691,7 @@ let jobs pipeline_type =
             ~arch:Amd64
             Test_manual
         in
-        let _job_docker_arm64_test_manual : Tezos_ci.tezos_job =
+        let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
           job_docker_build
             ~__POS__
             ~external_:true
@@ -510,7 +699,7 @@ let jobs pipeline_type =
             ~arch:Arm64
             Test_manual
         in
-        let _job_build_dpkg_amd64_manual =
+        let job_build_dpkg_amd64_manual =
           job_build_bin_package
             ~__POS__
             ~name:"oc.build:dpkg:amd64"
@@ -521,7 +710,7 @@ let jobs pipeline_type =
             ()
           |> job_external ~directory:"build" ~filename_suffix:"manual"
         in
-        let _job_build_rpm_amd64_manual =
+        let job_build_rpm_amd64_manual =
           job_build_bin_package
             ~__POS__
             ~rules:[job_rule ~when_:Manual ()]
@@ -532,8 +721,12 @@ let jobs pipeline_type =
             ()
           |> job_external ~directory:"build" ~filename_suffix:"manual"
         in
-        (* TODO: include the jobs defined above when full pipeline is generated *)
-        []
+        [
+          job_docker_amd64_test_manual;
+          job_docker_arm64_test_manual;
+          job_build_dpkg_amd64_manual;
+          job_build_rpm_amd64_manual;
+        ]
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
@@ -545,4 +738,5 @@ let jobs pipeline_type =
      (using {!job_external} or {!jobs_external}) and included by hand
      in the files [.gitlab/ci/pipelines/before_merging.yml] and
      [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
-  trigger @ sanity @ build @ packaging @ test @ doc @ manual
+  ignore (trigger @ sanity @ build @ packaging @ test @ doc @ manual) ;
+  []
