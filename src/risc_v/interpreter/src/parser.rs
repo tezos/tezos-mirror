@@ -6,7 +6,7 @@ pub mod instruction;
 
 use crate::machine_state::{
     csregisters::{try_parse_csregister, CSRegister},
-    registers::{parse_register, XRegister},
+    registers::{parse_xregister, XRegister},
 };
 use core::ops::Range;
 use instruction::*;
@@ -40,7 +40,7 @@ fn funct7(instr: u32) -> u32 {
 
 #[inline(always)]
 fn rd(instr: u32) -> XRegister {
-    parse_register(bits(instr, 7, 5))
+    parse_xregister(bits(instr, 7, 5))
 }
 
 #[inline(always)]
@@ -50,7 +50,7 @@ fn rs1_bits(instr: u32) -> u32 {
 
 #[inline(always)]
 fn rs1(instr: u32) -> XRegister {
-    parse_register(rs1_bits(instr))
+    parse_xregister(rs1_bits(instr))
 }
 
 #[inline(always)]
@@ -60,7 +60,7 @@ fn rs2_bits(instr: u32) -> u32 {
 
 #[inline(always)]
 fn rs2(instr: u32) -> XRegister {
-    parse_register(rs2_bits(instr))
+    parse_xregister(rs2_bits(instr))
 }
 
 #[inline(always)]
