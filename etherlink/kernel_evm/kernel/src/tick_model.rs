@@ -105,6 +105,9 @@ pub mod constants {
     pub const TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE: u64 = TICKS_FOR_CRYPTO;
     pub const TICKS_FOR_INBOX_READ_PER_BYTE: u64 = 1000;
     pub const TICKS_PER_BYTE_FOR_CHUNK_STORE: u64 = 1000;
+
+    /// Number of ticks used to parse deposits
+    pub const TICKS_PER_DEPOSIT_PARSING: u64 = 1_500_000;
 }
 
 /// Estimation of the number of ticks the kernel can safely spend in the
