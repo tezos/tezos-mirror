@@ -43,6 +43,12 @@ module Publishable_blueprints : sig
     t ->
     Ethereum_types.quantity ->
     Blueprint_types.payload option tzresult Lwt.t
+
+  val find_range :
+    t ->
+    from:Ethereum_types.quantity ->
+    to_:Ethereum_types.quantity ->
+    (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
 end
 
 module Context_hashes : sig
