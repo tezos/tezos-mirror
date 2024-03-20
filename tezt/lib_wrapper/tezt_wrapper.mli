@@ -150,3 +150,8 @@ val error_mode_for_missing_use : error_mode ref
       the wrapper will not be able to detect it, so one will have to call
       [Uses.path] just to suppress the error. *)
 val error_mode_for_useless_use : error_mode ref
+
+(** What to do if a test declares a [~uses] with a path that does not exist.
+
+    Recommended setting is [Fail], which is the default. *)
+val error_mode_for_non_existing_use : error_mode ref
