@@ -125,10 +125,10 @@ let reveal_accounts client accounts =
   if List.length unrevealed > 0 then (
     let* level = Node.get_level node in
     Log.info
-      "Waiting for a level (namely %d) to be \"sure\" the operations are \
+      "Waiting for two levels (namely %d) to be \"sure\" the operations are \
        included..."
-      (level + 1) ;
-    let* _new_level = Node.wait_for_level node (level + 1) in
+      (level + 2) ;
+    let* _new_level = Node.wait_for_level node (level + 2) in
     return ())
   else return ()
 
