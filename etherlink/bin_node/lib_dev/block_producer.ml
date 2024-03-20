@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 type parameters = {
-  ctxt : Evm_context.t;
   cctxt : Client_context.wallet;
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
@@ -78,23 +77,24 @@ let get_hashes ~transactions ~delayed_transactions =
   in
   return (delayed_hashes @ hashes)
 
-let produce_block ~(ctxt : Evm_context.t) ~cctxt ~smart_rollup_address
-    ~sequencer_key ~force ~timestamp =
+let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
+    =
   let open Lwt_result_syntax in
   let* tx_pool_response = Tx_pool.pop_transactions () in
   match tx_pool_response with
   | Transactions (transactions, delayed_transactions) ->
       let n = List.length transactions + List.length delayed_transactions in
       if force || n > 0 then
+        let* head_info = Evm_context.head_info () in
         Helpers.with_timing
           (Blueprint_events.blueprint_production
-             ctxt.session.next_blueprint_number)
+             head_info.next_blueprint_number)
         @@ fun () ->
         let*? hashes = get_hashes ~transactions ~delayed_transactions in
         let* blueprint =
           Helpers.with_timing
             (Blueprint_events.blueprint_proposal
-               ctxt.session.next_blueprint_number)
+               head_info.next_blueprint_number)
           @@ fun () ->
           Sequencer_blueprint.create
             ~sequencer_key
@@ -103,12 +103,12 @@ let produce_block ~(ctxt : Evm_context.t) ~cctxt ~smart_rollup_address
             ~smart_rollup_address
             ~transactions
             ~delayed_transactions
-            ~parent_hash:ctxt.Evm_context.session.current_block_hash
-            ~number:ctxt.Evm_context.session.next_blueprint_number
+            ~parent_hash:head_info.current_block_hash
+            ~number:head_info.next_blueprint_number
         in
-        let* _ctxt =
-          Evm_context.apply_and_publish_blueprint ctxt timestamp blueprint
-        in
+        let* () = Evm_context.apply_sequencer_blueprint timestamp blueprint in
+        let (Qty number) = head_info.next_blueprint_number in
+        let* () = Blueprints_publisher.publish number blueprint.to_publish in
         let*! () =
           List.iter_p
             (fun hash -> Block_producer_events.transaction_selected ~hash)
@@ -132,9 +132,8 @@ module Handlers = struct
     match request with
     | Request.Produce_block (timestamp, force) ->
         protect @@ fun () ->
-        let {ctxt; cctxt; smart_rollup_address; sequencer_key} = state in
+        let {cctxt; smart_rollup_address; sequencer_key} = state in
         produce_block
-          ~ctxt
           ~cctxt
           ~smart_rollup_address
           ~sequencer_key

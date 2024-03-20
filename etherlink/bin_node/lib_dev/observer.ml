@@ -8,15 +8,12 @@
 open Ethereum_types
 
 module MakeBackend (Ctxt : sig
-  val ctxt : Evm_context.t
-
   val evm_node_endpoint : Uri.t
+
+  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
-    let read path =
-      let open Lwt_result_syntax in
-      let*! res = Evm_context.inspect Ctxt.ctxt path in
-      return res
+    let read path = Evm_context.inspect path
   end
 
   module TxEncoder = struct
@@ -96,49 +93,50 @@ end) : Services_backend_sig.Backend = struct
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
-      let* raw_insights = Evm_context.execute_and_inspect Ctxt.ctxt ~input in
+      let* raw_insights = Evm_context.execute_and_inspect input in
       match raw_insights with
       | [Some bytes] -> return bytes
       | _ -> Error_monad.failwith "Invalid insights format"
   end
 
   let smart_rollup_address =
-    Tezos_crypto.Hashed.Smart_rollup_address.to_string
-      Ctxt.ctxt.smart_rollup_address
+    Tezos_crypto.Hashed.Smart_rollup_address.to_string Ctxt.smart_rollup_address
 end
 
-let on_new_blueprint (ctxt : Evm_context.t) (blueprint : Blueprint_types.t) =
+let on_new_blueprint next_blueprint_number (blueprint : Blueprint_types.t) =
   let (Qty level) = blueprint.number in
-  let (Qty number) = ctxt.session.next_blueprint_number in
+  let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
-    Evm_context.apply_blueprint ctxt blueprint.timestamp blueprint.payload
+    Evm_context.apply_blueprint blueprint.timestamp blueprint.payload
   else failwith "Received a blueprint with an unexpected number."
 
-let main (ctxt : Evm_context.t) ~evm_node_endpoint =
+let main ~evm_node_endpoint =
   let open Lwt_result_syntax in
-  let rec loop stream =
+  let rec loop (Qty next_blueprint_number) stream =
     let*! candidate = Lwt_stream.get stream in
     match candidate with
     | Some blueprint ->
-        let* () = on_new_blueprint ctxt blueprint in
+        let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
         let* _ = Tx_pool.pop_and_inject_transactions () in
-        loop stream
+        loop (Qty (Z.succ next_blueprint_number)) stream
     | None -> return_unit
   in
+
+  let* head = Evm_context.head_info () in
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6876
      Should be resilient to errors from the EVM node endpoint *)
   let*! blueprints_stream =
     Evm_services.monitor_blueprints
       ~evm_node_endpoint
-      ctxt.session.next_blueprint_number
+      head.next_blueprint_number
   in
 
-  loop blueprints_stream
+  loop head.next_blueprint_number blueprints_stream
 
 module Make (Ctxt : sig
-  val ctxt : Evm_context.t
-
   val evm_node_endpoint : Uri.t
+
+  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.S =
   Services_backend_sig.Make (MakeBackend (Ctxt))

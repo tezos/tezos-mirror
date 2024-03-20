@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {rollup_node_endpoint : Uri.t; ctxt : Evm_context.t}
+type parameters = {rollup_node_endpoint : Uri.t}
 
 module StringSet = Set.Make (String)
 
@@ -84,8 +84,8 @@ let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
   in
   return event_opt
 
-let on_new_head ({rollup_node_endpoint; ctxt} as state : Types.state)
-    rollup_block_lvl =
+let on_new_head ({rollup_node_endpoint} as state : Types.state) rollup_block_lvl
+    =
   let open Lwt_result_syntax in
   let* nb_of_events_bytes =
     read_from_rollup_node
@@ -110,7 +110,7 @@ let on_new_head ({rollup_node_endpoint; ctxt} as state : Types.state)
           (fetch_event state rollup_block_lvl)
       in
       let events = List.filter_map Fun.id events in
-      Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl ctxt events
+      Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
 
 module Handlers = struct
   type self = worker
@@ -140,12 +140,9 @@ module Handlers = struct
       (r, request_error) Request.t ->
       request_error ->
       unit tzresult Lwt.t =
-   fun _w _ req errs ->
+   fun _w _ _req _errs ->
     let open Lwt_result_syntax in
-    match (req, errs) with
-    | New_rollup_node_block _, [Node_error.Diverged _divergence] ->
-        Lwt_exit.exit_and_raise Node_error.exit_code_when_diverge
-    | _ -> return_unit
+    return_unit
 
   let on_completion _ _ _ _ = Lwt.return_unit
 

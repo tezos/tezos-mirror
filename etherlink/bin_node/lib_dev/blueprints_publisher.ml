@@ -7,7 +7,6 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  store : Evm_store.t;
   max_blueprints_lag : int;
   max_blueprints_ahead : int;
   max_blueprints_catchup : int;
@@ -16,7 +15,6 @@ type parameters = {
 }
 
 type state = {
-  store : Evm_store.t;
   rollup_node_endpoint : Uri.t;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
@@ -67,8 +65,6 @@ module Worker = struct
 
   let set_latest_level_confirmed worker level =
     (state worker).latest_level_confirmed <- level
-
-  let blueprint_store worker = (state worker).store
 
   let max_blueprints_lag worker = (state worker).max_blueprints_lag
 
@@ -133,10 +129,9 @@ module Worker = struct
     let*! () = Blueprint_events.catching_up lower_bound upper_bound in
 
     let* blueprints =
-      Evm_store.Publishable_blueprints.find_range
-        (blueprint_store worker)
-        ~from:(Qty lower_bound)
-        ~to_:(Qty upper_bound)
+      Evm_context.publishable_blueprints_range
+        (Qty lower_bound)
+        (Qty upper_bound)
     in
 
     let expected_count = Z.(to_int (sub upper_bound lower_bound)) + 1 in
@@ -176,7 +171,6 @@ module Handlers = struct
   let on_launch _self ()
       ({
          rollup_node_endpoint;
-         store;
          max_blueprints_lag;
          max_blueprints_ahead;
          max_blueprints_catchup;
@@ -187,7 +181,6 @@ module Handlers = struct
     let open Lwt_result_syntax in
     return
       {
-        store;
         latest_level_confirmed =
           (* Will be set at the correct value once the next L2 block is
              received from the rollup node *)
@@ -244,7 +237,7 @@ let table = Worker.create_table Queue
 let worker_promise, worker_waker = Lwt.task ()
 
 let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
-    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen store =
+    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -252,7 +245,6 @@ let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
       ()
       {
         rollup_node_endpoint;
-        store;
         max_blueprints_lag;
         max_blueprints_ahead;
         max_blueprints_catchup;

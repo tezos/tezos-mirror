@@ -6,7 +6,6 @@
 (*****************************************************************************)
 
 type parameters = {
-  ctxt : Evm_context.t;
   cctxt : Client_context.wallet;
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
