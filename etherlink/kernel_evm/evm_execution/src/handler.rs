@@ -4128,7 +4128,7 @@ mod test {
                 logs: vec![],
                 result: Some(vec![]),
                 withdrawals: vec![],
-                estimated_ticks_used: 1484809
+                estimated_ticks_used: 1531665
             }),
             result,
         )
