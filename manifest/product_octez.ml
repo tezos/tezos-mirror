@@ -5604,7 +5604,7 @@ end = struct
           ~with_macos_security_framework:true
           ~deps:
             [
-              alcotezt;
+              alcotezt |> if_ N.(number <= 019);
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
               main |> open_;
