@@ -71,15 +71,11 @@ for architecture in ${architectures}; do
 done
 
 echo "Upload debian packages"
-
-# Loop over debian packages
 for package in ${deb_packages}; do
   gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
 done
 
 echo "Upload rpm packages"
-
-# Loop over rpm packages
 for package in ${rpm_packages}; do
   gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
 done
