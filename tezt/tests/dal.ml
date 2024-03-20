@@ -4674,7 +4674,6 @@ module Amplification = struct
   let test_amplification _protocol dal_parameters _cryptobox node client
       dal_bootstrap =
     let number_of_banned_attesters = 2 in
-    let amplification_is_implemented = false in
     let slot_index = 0 in
     (* Parameters and constants. *)
     let {
@@ -5026,7 +5025,7 @@ module Amplification = struct
       let* () = wait_non_banned_promise in
       let* () = wait_observer_promise in
 
-      if amplification_is_implemented then wait_banned_promise else unit
+      wait_banned_promise
     in
     let* publication_level_bis, _commitment =
       publish_store_and_wait_slot

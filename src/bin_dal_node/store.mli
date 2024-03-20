@@ -57,6 +57,10 @@ module Shards : sig
     commitment ->
     number_of_shards:int ->
     (commitment * int * share tzresult) Seq_s.t
+
+  (** [count_values store commitment] returns the number of shards
+      which are stored for the given commitment. *)
+  val count_values : t -> commitment -> int tzresult Lwt.t
 end
 
 module Shard_proofs_cache : sig

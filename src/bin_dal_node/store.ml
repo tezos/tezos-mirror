@@ -142,6 +142,9 @@ module Shards = struct
 
   let read_values store keys = KVS.read_values store file_layout keys
 
+  let count_values store commitment =
+    KVS.count_values store file_layout commitment
+
   let init node_store_dir shard_store_dir =
     let root_dir = Filename.concat node_store_dir shard_store_dir in
     KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
