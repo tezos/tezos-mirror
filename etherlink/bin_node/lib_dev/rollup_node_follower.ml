@@ -82,9 +82,17 @@ let start ~rollup_node_endpoint =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
-  let* stream = Rollup_services.make_streamed_call ~rollup_node_endpoint in
   let* res =
-    wait_first_valid_level_then_process ~rollup_node_endpoint ~stream
+    let* res = Rollup_services.make_streamed_call ~rollup_node_endpoint in
+    match res with
+    | Ok (stream, close) ->
+        let* res =
+          wait_first_valid_level_then_process ~rollup_node_endpoint ~stream
+        in
+        close () ;
+        return res
+    | Error errs ->
+        Lwt.fail_with (Format.asprintf "%a" Error_monad.pp_print_trace errs)
   in
   match res with
   | Ok () -> return_unit
