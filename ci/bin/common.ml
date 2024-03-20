@@ -563,9 +563,18 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
   let image =
     match target with Dpkg -> Images.debian_bookworm | Rpm -> Images.fedora_39
   in
+  let parallel =
+    let distributions =
+      match target with
+      | Dpkg -> ["debian:bookworm"]
+      | Rpm -> ["fedora:39"; "rockylinux:9.3"]
+    in
+    Matrix [[("DISTRIBUTION", distributions)]]
+  in
   let artifacts =
     let artifact_path =
-      "octez-*." ^ match target with Dpkg -> "deb" | Rpm -> "rpm"
+      "$DISTRIBUTION"
+      // ("octez-*." ^ match target with Dpkg -> "deb" | Rpm -> "rpm")
     in
     artifacts
       ~expire_in:(Days 1)
@@ -574,27 +583,18 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
       [artifact_path]
   in
   let before_script =
-    ". ./scripts/version.sh"
-    ::
-    (match target with
-    | Dpkg ->
-        [
-          "apt update";
-          "apt-get install -y rsync git m4 build-essential patch unzip wget \
-           opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev \
-           libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev \
-           protobuf-compiler libsqlite3-dev jq";
-        ]
-    | Rpm ->
-        [
-          "dnf update -y";
-          "dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel \
-           zlib-devel libpq-devel m4 perl git pkg-config rpmdevtools \
-           python3-devel python3-setuptools wget opam rsync which cargo \
-           autoconf mock systemd systemd-rpm-macros cmake python3-wheel \
-           python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel \
-           sqlite-devel jq";
-        ])
+    before_script
+      ~source_version:true
+      (match target with
+      | Dpkg ->
+          [
+            "apt update";
+            "apt-get install -y rsync git m4 build-essential patch unzip wget \
+             opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev \
+             libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev \
+             protobuf-compiler libsqlite3-dev jq";
+          ]
+      | Rpm -> [".gitlab/ci/jobs/build/bin_packages_rpm.sh"])
   in
   job
     ?rules
@@ -612,6 +612,7 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
         ("ARCH", arch_string);
       ]
     ~artifacts
+    ~parallel
     ~before_script
     [
       "wget https://sh.rustup.rs/rustup-init.sh";
@@ -624,6 +625,8 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
       "make build-deps";
       "eval $(opam env)";
       "make $TARGET";
+      "mkdir $DISTRIBUTION";
+      "mv octez-*.* $DISTRIBUTION/";
     ]
 
 let job_build_dpkg_amd64 : unit -> tezos_job =

@@ -31,8 +31,9 @@ package_web_path() {
 
 gitlab_binaries_url=$(package_web_path "${gitlab_octez_binaries_package_name}")
 gitlab_octez_source_url=$(package_web_path "${gitlab_octez_source_package_name}")
-gitlab_deb_packages_url=$(package_web_path "${gitlab_octez_deb_package_name}")
-gitlab_rpm_packages_url=$(package_web_path "${gitlab_octez_rpm_package_name}")
+gitlab_debian_packages_url=$(package_web_path "${gitlab_octez_debian_package_name}")
+gitlab_fedora_packages_url=$(package_web_path "${gitlab_octez_fedora_package_name}")
+gitlab_rockylinux_packages_url=$(package_web_path "${gitlab_octez_rockylinux_package_name}")
 
 if [ "${CI_PROJECT_NAMESPACE}" = "tezos" ]; then
   ## Production => Docker Hub
@@ -72,5 +73,6 @@ release-cli create \
   --assets-link="{\"name\":\"Docker image\",\"url\":\"${docker_image_url}\",\"link_type\":\"image\"}" \
   --assets-link="{\"name\":\"Static binaries\",\"url\":\"${gitlab_binaries_url}\",\"link_type\":\"package\"}" \
   --assets-link="{\"name\":\"Octez source\",\"url\":\"${gitlab_octez_source_url}\",\"link_type\":\"other\"}" \
-  --assets-link="{\"name\":\"Debian packages\",\"url\":\"${gitlab_deb_packages_url}\",\"link_type\":\"package\"}" \
-  --assets-link="{\"name\":\"Red Hat packages\",\"url\":\"${gitlab_rpm_packages_url}\",\"link_type\":\"package\"}"
+  --assets-link="{\"name\":\"Debian packages\",\"url\":\"${gitlab_debian_packages_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Fedora packages\",\"url\":\"${gitlab_fedora_packages_url}\",\"link_type\":\"package\"}" \
+  --assets-link="{\"name\":\"Rocky Linux packages\",\"url\":\"${gitlab_rockylinux_packages_url}\",\"link_type\":\"package\"}"
