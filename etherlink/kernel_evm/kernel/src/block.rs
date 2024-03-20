@@ -161,7 +161,8 @@ fn next_bip_from_blueprints<Host: Runtime>(
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
 ) -> Result<Option<BlockInProgress>, anyhow::Error> {
-    match read_next_blueprint(host, config)? {
+    let (blueprint, _size) = read_next_blueprint(host, config)?;
+    match blueprint {
         Some(blueprint) => {
             if let Some(kernel_upgrade) = kernel_upgrade {
                 if blueprint.timestamp >= kernel_upgrade.activation_timestamp {
