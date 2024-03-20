@@ -121,11 +121,21 @@ module Frozen_tez = struct
       co_current
       Partial_tez.zero
 
-  let total_current a =
-    let r = total_co_current_q a.co_current in
+  let total_co_current t =
+    let r = total_co_current_q t.co_current in
     let tez, rem = Partial_tez.to_tez_rem r in
     assert (Q.(equal rem zero)) ;
-    Tez.(tez +! a.self_current)
+    tez
+
+  let total_current t = Tez.(t.self_current +! total_co_current t)
+
+  let total_current_with_limits ~limit_of_staking_over_baking t =
+    let max_co_current =
+      Tez.mul_q t.self_current limit_of_staking_over_baking
+      |> Tez.of_q ~round:`Down
+    in
+    let co_current = Tez.min (total_co_current t) max_co_current in
+    Tez.(t.self_current +! co_current)
 
   (* Precondition: 0 <= quantity < 1 && co_current + quantity is int *)
   let add_q_to_all_co_current quantity co_current =

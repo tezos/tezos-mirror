@@ -17,7 +17,7 @@ let apply_end_cycle current_cycle previous_block block state :
   let open Lwt_result_syntax in
   Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
   (* Sets initial frozen for future cycle *)
-  let* state = update_map_es ~f:(update_frozen_rights_cycle block) state in
+  let* state = update_map_es ~f:(compute_future_frozen_rights block) state in
   (* Apply all slashes *)
   let* state =
     Slashing_helpers.apply_all_slashes_at_cycle_end

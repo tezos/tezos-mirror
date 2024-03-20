@@ -40,6 +40,15 @@ type account_state = {
   staking_delegator_numerator : Z.t;
   staking_delegate_denominator : Z.t;
   frozen_rights : Tez.t CycleMap.t;
+      (** The portion of rights that comes from staking, used for
+          baking/attesting during the specified cycle.
+
+          At the end of cycle [c], the current frozen deposits of the
+          delegate (own + co-staked, taking
+          limit_of_staking_over_baking into account) are added to this
+          table for cycle [c + consensus_rights_delay + 1]. The table
+          is unmodified if at that time, the account is not a delegate
+          or is a deactivated delegate. *)
   slashed_cycles : Cycle.t list;
 }
 
@@ -521,3 +530,9 @@ let log_debug_balance_update account_name old_account_map new_account_map : unit
     old_total_balance
     Tez.pp
     new_total_balance
+
+let current_total_frozen_deposits_with_limits account_state =
+  Frozen_tez.total_current_with_limits
+    ~limit_of_staking_over_baking:
+      account_state.parameters.limit_of_staking_over_baking
+    account_state.frozen_deposits
