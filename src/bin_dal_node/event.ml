@@ -35,6 +35,22 @@ let starting_node =
     ~level:Notice
     ()
 
+let waiting_l1_node_bootstrapped =
+  declare_0
+    ~section
+    ~name:"waiting_l1_node_to_be_bootstrapped"
+    ~msg:"waiting for the L1 node to be bootstrapped"
+    ~level:Notice
+    ()
+
+let l1_node_bootstrapped =
+  declare_0
+    ~section
+    ~name:"l1_node_is_bootstrapped"
+    ~msg:"the L1 node is bootstrapped"
+    ~level:Notice
+    ()
+
 let shutdown_node =
   declare_1
     ~section
