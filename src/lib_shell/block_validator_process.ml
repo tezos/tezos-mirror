@@ -51,7 +51,7 @@ module type S = sig
 
   val apply_block :
     simulate:bool ->
-    ?should_precheck:bool ->
+    ?should_validate:bool ->
     t ->
     Store.chain_store ->
     predecessor:Store.Block.t ->
@@ -76,7 +76,7 @@ module type S = sig
     Block_validation.operation list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
-  val precheck_block :
+  val validate_block :
     t ->
     Store.chain_store ->
     predecessor:Store.Block.t ->
@@ -269,7 +269,7 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
       }
 
-  let apply_block ~simulate ?(should_precheck = true) validator chain_store
+  let apply_block ~simulate ?(should_validate = true) validator chain_store
       ~predecessor ~max_operations_ttl block_header operations =
     let open Lwt_result_syntax in
     let* env =
@@ -285,7 +285,7 @@ module Internal_validator_process = struct
       env.predecessor_resulting_context_hash
     in
     let*! () =
-      if should_precheck then
+      if should_validate then
         Events.(emit validation_request (block_hash, env.chain_id))
       else Events.(emit application_request (block_hash, env.chain_id))
     in
@@ -299,7 +299,7 @@ module Internal_validator_process = struct
       Block_validation.apply
         ~simulate
         ?cached_result:validator.preapply_result
-        ~should_validate:should_precheck
+        ~should_validate
         env
         block_header
         operations
@@ -314,7 +314,7 @@ module Internal_validator_process = struct
         {context_hash = result.validation_store.resulting_context_hash; cache} ;
     validator.preapply_result <- None ;
     let*! () =
-      if should_precheck then
+      if should_validate then
         Events.(emit validation_success (block_hash, timespan))
       else Events.(emit application_success (block_hash, timespan))
     in
@@ -376,7 +376,7 @@ module Internal_validator_process = struct
     validator.preapply_result <- Some apply_result ;
     return result
 
-  let precheck_block validator chain_store ~predecessor header _hash operations
+  let validate_block validator chain_store ~predecessor header _hash operations
       =
     let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
@@ -910,7 +910,7 @@ module External_validator_process = struct
     let*! () = Events.(emit init ()) in
     return validator
 
-  let apply_block ~simulate ?(should_precheck = true) validator chain_store
+  let apply_block ~simulate ?(should_validate = true) validator chain_store
       ~predecessor ~max_operations_ttl block_header operations =
     let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
@@ -935,7 +935,7 @@ module External_validator_process = struct
           predecessor_resulting_context_hash;
           operations;
           max_operations_ttl;
-          should_validate = should_precheck;
+          should_validate;
           simulate;
         }
     in
@@ -965,7 +965,7 @@ module External_validator_process = struct
     in
     send_request validator request
 
-  let precheck_block validator chain_store ~predecessor header hash operations =
+  let validate_block validator chain_store ~predecessor header hash operations =
     let open Lwt_result_syntax in
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
@@ -1097,13 +1097,13 @@ let reconfigure_event_logging (E {validator_process = (module VP); validator})
     config =
   VP.reconfigure_event_logging validator config
 
-let apply_block ?(simulate = false) ?(should_precheck = true)
+let apply_block ?(simulate = false) ?(should_validate = true)
     (E {validator_process = (module VP); validator}) chain_store ~predecessor
     header operations =
   let open Lwt_result_syntax in
   let block_hash = Block_header.hash header in
   let* () =
-    when_ (not should_precheck) (fun () ->
+    when_ (not should_validate) (fun () ->
         let*! is_validated =
           Store.Block.is_known_validated chain_store block_hash
         in
@@ -1125,7 +1125,7 @@ let apply_block ?(simulate = false) ?(should_precheck = true)
   in
   VP.apply_block
     ~simulate
-    ~should_precheck
+    ~should_validate
     validator
     chain_store
     ~predecessor
@@ -1133,9 +1133,9 @@ let apply_block ?(simulate = false) ?(should_precheck = true)
     header
     operations
 
-let precheck_block (E {validator_process = (module VP); validator}) chain_store
+let validate_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header operations =
-  VP.precheck_block validator chain_store ~predecessor header operations
+  VP.validate_block validator chain_store ~predecessor header operations
 
 let context_garbage_collection (E {validator_process = (module VP); validator})
     context_index context_hash ~gc_lockfile_path =

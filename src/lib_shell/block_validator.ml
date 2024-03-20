@@ -146,7 +146,7 @@ let precheck_block bvp chain_db chain_store ~predecessor block_header block_hash
   let open Lwt_result_syntax in
   let*! () = Events.(emit prechecking_block) block_hash in
   let* () =
-    Block_validator_process.precheck_block
+    Block_validator_process.validate_block
       bvp
       chain_store
       ~predecessor
@@ -278,7 +278,7 @@ let on_validation_request w
                                 let*! () = Events.(emit applying_block) hash in
                                 with_retry_to_load_protocol (fun () ->
                                     Block_validator_process.apply_block
-                                      ~should_precheck:false
+                                      ~should_validate:false
                                       bv.validation_process
                                       chain_store
                                       ~predecessor:pred
