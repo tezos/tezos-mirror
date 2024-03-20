@@ -60,7 +60,6 @@ let install_finalizer_seq server private_server =
       private_server
   in
   let* () = Tx_pool.shutdown () in
-  let* () = Rollup_node_follower.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
   return_unit
@@ -292,7 +291,8 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   in
   let* () = Evm_events_follower.start {rollup_node_endpoint} in
   let* () = catchup_evm_event ~rollup_node_endpoint in
-  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
+  let () = Rollup_node_follower.start ~rollup_node_endpoint in
+
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in

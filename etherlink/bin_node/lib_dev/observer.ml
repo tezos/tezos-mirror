@@ -164,7 +164,6 @@ let install_finalizer_observer server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = Events.shutdown_rpc_server ~private_:false in
   let* () = Tx_pool.shutdown () in
-  let* () = Rollup_node_follower.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Tx_pool_events.shutdown () in
   Evm_context.shutdown ()
@@ -240,6 +239,6 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
 
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
   let* () = Evm_events_follower.start {rollup_node_endpoint} in
-  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
+  let () = Rollup_node_follower.start ~rollup_node_endpoint in
 
   main_loop ~evm_node_endpoint
