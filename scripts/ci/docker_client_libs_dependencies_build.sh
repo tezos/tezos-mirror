@@ -5,7 +5,7 @@
 # Reads the following environment variables:
 #  - 'client_libs_dependencies_image_name'
 #  - 'client_libs_dependencies_image_tag' (optional)
-#  - 'CI_COMMIT_REF_SLUG': set by GitLab CI
+#  - 'CI_COMMIT_REF_NAME': set by GitLab CI
 #  - 'CI_DEFAULT_BRANCH': set by GitLab CI
 #  - 'CI_PIPELINE_ID': set by GitLab CI
 #  - 'CI_PIPELINE_URL': set by GitLab CI
@@ -13,21 +13,20 @@
 #  - 'CI_JOB_URL': set by GitLab CI
 #  - 'CI_COMMIT_SHA': set by GitLab CI
 #
-# The image is tagged with
-# $client_libs_dependencies_image_name:$CI_COMMIT_REF_SLUG and
-# $client_libs_dependencies_image_name:TAG. If
-# $client_libs_dependencies_image_tag is set, then TAG contains this
-# value. If not, TAG contains a hash of this image's inputs.
+# The image is tagged with $client_libs_dependencies_image_name:REF_TAG and
+# $client_libs_dependencies_image_name:TAG. REF_TAG is a sanitized version of $CI_COMMIT_REF_NAME.
+# If $client_libs_dependencies_image_tag is set, then TAG contains this value. If not, TAG contains
+# a hash of this image's inputs.
 #
 # When running in the CI, $client_libs_dependencies_image_tag is not set. The
 # image is tagged with the input hash. In order for subsequent jobs to
 # use the image built by this script, it stores the TAG in a dotenv
 # file that is passed as artifacts to those jobs. By also tagging with
-# the $CI_COMMIT_REF_SLUG, we allow subsequent pipelines to refer to
+# the REF_TAG, we allow subsequent pipelines to refer to
 # images built on a given branch, which is used for caching.
 #
 # When building the image, we get caches from
-#  - $client_libs_dependencies_image_name:$CI_COMMIT_REF_SLUG and
+#  - $client_libs_dependencies_image_name:REF_TAG and
 #  - $client_libs_dependencies_image_name:$CI_DEFAULT_BRANCH.
 # That is, from previous builds on the same branch and from previous
 # builds on the master branch.
@@ -51,31 +50,36 @@ if [ -z "$image_tag" ]; then
 fi
 image_name="${image_base}:${image_tag}"
 
+# shellcheck source=./scripts/ci/docker_registry.inc.sh
+. ./scripts/ci/docker_registry.inc.sh
+docker_image_ref_tag=$(echo "${CI_COMMIT_REF_NAME}" | sanitizeTag)
+
 # Store the image name for jobs that use it.
 echo "client_libs_dependencies_image_tag=$image_tag" > client_libs_dependencies_image_tag.env
 
+./scripts/ci/docker_initialize.sh
+
 # Build image unless it already exists in the registry.
 if docker manifest inspect "${image_name}" > /dev/null; then
-  echo "Image ${image_name} already exists in the registry, do nothing."
+  echo "Image ${image_name} already exists in the registry, update tag ${image_base}:${docker_image_ref_tag}."
+  regctl image copy "${image_name}" "${image_base}:${docker_image_ref_tag}"
   exit 0
 fi
 
 echo "Build ${image_name}"
 
-./scripts/ci/docker_initialize.sh
-
 ./images/create_client_libs_dependencies_image.sh \
   "${image_base}" \
   "${image_tag}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
-  --cache-from="${image_base}:${CI_COMMIT_REF_SLUG}" \
+  --cache-from="${image_base}:${docker_image_ref_tag}" \
   --cache-from="${image_base}:${CI_DEFAULT_BRANCH}" \
   --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
   --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  -t "${image_base}:${CI_COMMIT_REF_SLUG}"
+  -t "${image_base}:${docker_image_ref_tag}"
 
 ./images/client-libs-dependencies/check_versions.sh "${image_base}" "${image_tag}"
 
