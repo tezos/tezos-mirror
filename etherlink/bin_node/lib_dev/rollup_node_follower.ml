@@ -15,7 +15,7 @@ let read_from_rollup_node path level rollup_node_endpoint =
     ()
 
 let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let* finalized_current_number =
     read_from_rollup_node
       Durable_storage_path.Block.current_number
@@ -23,31 +23,31 @@ let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
       rollup_node_endpoint
   in
   match finalized_current_number with
-  | Ok (Some bytes) ->
+  | Some bytes ->
       let (Qty evm_block_number) = Ethereum_types.decode_number bytes in
-      let* _ = Blueprints_publisher.new_l2_head evm_block_number in
+      let* () = Blueprints_publisher.new_l2_head evm_block_number in
       return_unit
-  | _ -> return_unit
+  | None -> return_unit
 
 let process_new_block ~rollup_node_endpoint block =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
-  let* _ = Evm_events_follower.new_rollup_block finalized_level in
+  let* () = Evm_events_follower.new_rollup_block finalized_level in
   let* () =
     advertize_blueprints_publisher rollup_node_endpoint finalized_level
   in
   return_unit
 
 let rec process_rollup_node_stream ~stream ~rollup_node_endpoint =
-  let open Lwt_syntax in
-  let* new_head = Lwt_stream.get stream in
+  let open Lwt_result_syntax in
+  let*! new_head = Lwt_stream.get stream in
   match new_head with
   | None ->
-      let* () = Rollup_node_follower_events.connection_lost () in
+      let*! () = Rollup_node_follower_events.connection_lost () in
       (* In following commit we we'll try to recover the connection *)
       Lwt_exit.exit_and_raise 1
   | Some block ->
-      let* () =
+      let*! () =
         Rollup_node_follower_events.new_block
           Sc_rollup_block.(block.header.level)
       in
