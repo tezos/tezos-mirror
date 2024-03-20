@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::configuration::TezosContracts;
+use crate::delayed_inbox::DelayedInbox;
 use crate::tick_model::constants::TICKS_PER_DEPOSIT_PARSING;
 use crate::tick_model::{ticks_of_blueprint_chunk, ticks_of_delayed_input};
 use crate::{
@@ -62,6 +63,7 @@ pub fn split_at(bytes: &[u8], mid: usize) -> Option<(&[u8], &[u8])> {
 }
 
 pub const SIMULATION_TAG: u8 = u8::MAX;
+const EVM_NODE_DELAYED_INPUT_TAG: u8 = u8::MAX - 1;
 
 const SIMPLE_TRANSACTION_TAG: u8 = 0;
 
@@ -534,6 +536,15 @@ impl<Mode: Parsable> InputResult<Mode> {
         let (input_tag, remaining) = parsable!(bytes.split_first());
         if *input_tag == SIMULATION_TAG {
             return Self::parse_simulation(remaining);
+        };
+        if *input_tag == EVM_NODE_DELAYED_INPUT_TAG {
+            let mut delayed_inbox = DelayedInbox::new(host).unwrap();
+            if let Ok(transaction) = Transaction::from_rlp_bytes(remaining) {
+                delayed_inbox
+                    .save_transaction(host, transaction, 0.into(), 0u32)
+                    .unwrap();
+            }
+            return InputResult::Unparsable;
         };
 
         match InboxMessage::<RollupType>::parse(bytes) {
