@@ -651,6 +651,25 @@ val spawn_bake_for :
 val bake_until_level :
   target_level:int -> ?keys:string list -> ?node:Node.t -> t -> unit Lwt.t
 
+(** Bake until the node is at [target_cycle], using {!bake_for_and_wait}. This
+  function calls an RPC to know the exact "blocks_per_cycle" value to compute
+  the number of blocks to bake. As this occurs only once, the ending cycle might
+  be different from the target cycle if the "blocks_per_cycle" value changes
+  during the execution, for instance because of a protocol migration.
+
+  Fail if the node is already at [target_cycle] or higher. 
+
+  @param keys See {!bake_for}.
+
+  @param node See {!bake_for_and_wait}. *)
+val bake_until_cycle :
+  target_cycle:int -> ?keys:string list -> ?node:Node.t -> t -> unit Lwt.t
+
+(** Similar to {!bake_until_cycle} but stops at the last block of the queried
+  cycle. *)
+val bake_until_cycle_end :
+  target_cycle:int -> ?keys:string list -> ?node:Node.t -> t -> unit Lwt.t
+
 (** Run [octez-client attest for]. Run [octez-client endorse for] for protocol
     older than 018.
 
