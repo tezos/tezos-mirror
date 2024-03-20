@@ -74,9 +74,10 @@ let handle_protocol_migration ~catching_up state (head : Layer1.header) =
        need to use its predecessor to fetch constants from the correct
        context. For the other cases, the context of the predecessor is always
        the same protocol. *)
-    Protocol_plugins.get_constants_of_level
-      state.node_ctxt
-      (Int32.pred head.level)
+    let constants_level =
+      Int32.max (Int32.pred head.level) state.node_ctxt.genesis_info.level
+    in
+    Protocol_plugins.get_constants_of_level state.node_ctxt constants_level
   in
   let new_protocol =
     {
