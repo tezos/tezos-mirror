@@ -941,7 +941,7 @@ module Opam = struct
            Format.pp_print_string)
         available ;
     pp_line "synopsis: %a" pp_string synopsis ;
-    Option.iter (pp_line "version: %s") version ;
+    Option.iter (pp_line "version: %a" pp_string) version ;
     Option.iter pp_url url ;
     Option.iter (pp_line "description: %a" pp_string) description
 end
