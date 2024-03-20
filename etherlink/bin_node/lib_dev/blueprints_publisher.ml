@@ -132,29 +132,32 @@ module Worker = struct
 
     let*! () = Blueprint_events.catching_up lower_bound upper_bound in
 
-    let rec catching_up curr =
-      if Z.Compare.(curr <= upper_bound) then
-        let* payload =
-          Evm_store.Publishable_blueprints.find
-            (blueprint_store worker)
-            (Qty curr)
-        in
-        match payload with
-        | Some payload ->
-            let* () = publish worker payload curr in
-            catching_up Z.(succ curr)
-        | None ->
-            let*! () = Blueprint_events.missing_blueprint curr in
-            Stdlib.failwith
-              Format.(
-                asprintf
-                  "Blueprint for level %a missing from the store"
-                  Z.pp_print
-                  curr)
-      else return_unit
+    let* blueprints =
+      Evm_store.Publishable_blueprints.find_range
+        (blueprint_store worker)
+        ~from:(Qty lower_bound)
+        ~to_:(Qty upper_bound)
     in
 
-    let* () = catching_up lower_bound in
+    let expected_count = Z.(to_int (sub upper_bound lower_bound)) + 1 in
+    let actual_count = List.length blueprints in
+    let* () =
+      when_ (actual_count < expected_count) (fun () ->
+          let*! () =
+            Blueprint_events.missing_blueprints
+              (expected_count - actual_count)
+              (Qty lower_bound)
+              (Qty upper_bound)
+          in
+          return_unit)
+    in
+
+    let* () =
+      List.iter_es
+        (fun (Ethereum_types.Qty current, payload) ->
+          publish worker payload current)
+        blueprints
+    in
 
     (* We give ourselves a cooldown window Tezos blocks to inject everything *)
     set_cooldown worker (catchup_cooldown worker) ;

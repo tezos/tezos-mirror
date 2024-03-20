@@ -34,10 +34,11 @@ val blueprint_injection_failed : Z.t -> unit Lwt.t
     Ethereum block. *)
 val invalid_blueprint_produced : Z.t -> unit Lwt.t
 
-(** [missing_blueprint level] advertizes that a sequencer has tried to fetch
-    the blueprint for level [level] from its store and failed. This means the
+(** [missing_blueprints count from to_] advertizes that a sequencer has detect
+    it is missing [count] blueprints in the provided range. This means the
     sequencer store is inconsistent. *)
-val missing_blueprint : Z.t -> unit Lwt.t
+val missing_blueprints :
+  int -> Ethereum_types.quantity -> Ethereum_types.quantity -> unit Lwt.t
 
 (** [catching_up min max] advertizes that the sequencer is reinjecting
     blueprints from level [min] to [max] because the rollup node is lagging. *)

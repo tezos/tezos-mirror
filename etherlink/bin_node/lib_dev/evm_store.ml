@@ -19,6 +19,9 @@ module Db = struct
 
   let start (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.start ()
 
+  let collect_list (module Db : Caqti_lwt.CONNECTION) req arg =
+    caqti @@ Db.collect_list req arg
+
   let commit (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.commit ()
 
   let rollback (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.rollback ()
@@ -270,6 +273,12 @@ module Q = struct
     let select =
       (level ->? payload)
       @@ {eos|SELECT payload FROM publishable_blueprints WHERE id = ?|eos}
+
+    let select_range =
+      (t2 level level ->* t2 level payload)
+      @@ {|SELECT id, payload FROM publishable_blueprints
+           WHERE ? <= id AND id <= ?
+           ORDER BY id ASC|}
   end
 
   module Context_hashes = struct
@@ -469,6 +478,10 @@ module Publishable_blueprints = struct
   let find store number =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Publishable_blueprints.select number
+
+  let find_range store ~from ~to_ =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Publishable_blueprints.select_range (from, to_)
 end
 
 module Context_hashes = struct
