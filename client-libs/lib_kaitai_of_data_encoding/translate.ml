@@ -227,14 +227,14 @@ let rec seq_field_of_data_encoding0 :
       (state, [Ground.Attr.bool ~id])
   | Uint8 -> (state, [Ground.Attr.uint8 ~id])
   | Int8 -> (state, [Ground.Attr.int8 ~id])
-  | Uint16 -> (state, [Ground.Attr.uint16 ~id])
-  | Int16 -> (state, [Ground.Attr.int16 ~id])
-  | Int32 -> (state, [Ground.Attr.int32 ~id])
-  | Int64 -> (state, [Ground.Attr.int64 ~id])
-  | Int31 ->
-      Types.add state.types Ground.Type.int31 ;
-      (state, [Ground.Attr.int31 ~id])
-  | RangedInt {minimum; maximum} ->
+  | Uint16 endian -> (state, [Ground.Attr.uint16 ~id ~endian])
+  | Int16 endian -> (state, [Ground.Attr.int16 ~id ~endian])
+  | Int32 endian -> (state, [Ground.Attr.int32 ~id ~endian])
+  | Int64 endian -> (state, [Ground.Attr.int64 ~id ~endian])
+  | Int31 endian ->
+      Types.add state.types (Ground.Type.int31 ~endian) ;
+      (state, [Ground.Attr.int31 ~id ~endian])
+  | RangedInt {minimum; maximum; endianness = endian} ->
       let size = Data_encoding__Binary_size.range_to_size ~minimum ~maximum in
       if minimum <= 0 then (
         let valid =
@@ -249,13 +249,15 @@ let rec seq_field_of_data_encoding0 :
         in
         match size with
         | `Uint8 -> (state, [{(Ground.Attr.uint8 ~id) with valid = uvalid}])
-        | `Uint16 -> (state, [{(Ground.Attr.uint16 ~id) with valid = uvalid}])
-        | `Uint30 -> (state, [{(Ground.Attr.uint30 ~id) with valid = uvalid}])
+        | `Uint16 ->
+            (state, [{(Ground.Attr.uint16 ~id ~endian) with valid = uvalid}])
+        | `Uint30 ->
+            (state, [{(Ground.Attr.uint30 ~id ~endian) with valid = uvalid}])
         | `Int8 -> (state, [{(Ground.Attr.int8 ~id) with valid}])
-        | `Int16 -> (state, [{(Ground.Attr.int16 ~id) with valid}])
+        | `Int16 -> (state, [{(Ground.Attr.int16 ~id ~endian) with valid}])
         | `Int31 ->
-            Types.add state.types Ground.Type.int31 ;
-            (state, [{(Ground.Attr.int31 ~id) with valid}]))
+            Types.add state.types (Ground.Type.int31 ~endian) ;
+            (state, [{(Ground.Attr.int31 ~id ~endian) with valid}]))
       else
         (* when [minimum > 0] (as is the case in this branch), data-encoding
            shifts the value of the binary representation so that the minimum is at
@@ -267,7 +269,12 @@ let rec seq_field_of_data_encoding0 :
         let shifted_encoding : a DataEncoding.t =
           {
             encoding =
-              RangedInt {minimum = minimum - shift; maximum = maximum - shift};
+              RangedInt
+                {
+                  minimum = minimum - shift;
+                  maximum = maximum - shift;
+                  endianness = endian;
+                };
             json_encoding = None;
           }
         in
@@ -347,6 +354,20 @@ let rec seq_field_of_data_encoding0 :
       (state, [Ground.Attr.bytes ~id Dynamic16])
   | Dynamic_size
       {kind = `Uint30; encoding = {encoding = String (`Variable, _); _}} ->
+      Types.add state.types Ground.Type.bytes_dyn_uint30 ;
+      (state, [Ground.Attr.bytes ~id Dynamic30])
+  | Bigstring (`Fixed n, _) -> (state, [Ground.Attr.string ~id (Fixed n)])
+  | Bigstring (`Variable, _) -> (state, [Ground.Attr.string ~id Variable])
+  | Dynamic_size
+      {kind = `Uint8; encoding = {encoding = Bigstring (`Variable, _); _}} ->
+      Types.add state.types Ground.Type.bytes_dyn_uint8 ;
+      (state, [Ground.Attr.bytes ~id Dynamic8])
+  | Dynamic_size
+      {kind = `Uint16; encoding = {encoding = Bigstring (`Variable, _); _}} ->
+      Types.add state.types Ground.Type.bytes_dyn_uint16 ;
+      (state, [Ground.Attr.bytes ~id Dynamic16])
+  | Dynamic_size
+      {kind = `Uint30; encoding = {encoding = Bigstring (`Variable, _); _}} ->
       Types.add state.types Ground.Type.bytes_dyn_uint30 ;
       (state, [Ground.Attr.bytes ~id Dynamic30])
   | Dynamic_size {kind; encoding = {encoding = Check_size {limit; encoding}; _}}
