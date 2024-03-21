@@ -31,16 +31,6 @@ let tezt_etherlink =
       ]
     ~release_status:Unreleased
 
-let tezt_risc_v_sandbox =
-  private_lib
-    "tezt_risc_v_sandbox"
-    ~path:"tezt/lib_risc_v_sandbox"
-    ~opam:"tezt-risc-v-sandbox"
-    ~synopsis:"Test framework for RISC-V sandbox"
-    ~bisect_ppx:No
-    ~deps:[tezt_wrapper |> open_ |> open_ ~m:"Base"; tezt_tezos]
-    ~release_status:Unreleased
-
 (* Container of the registered sublibraries of [octez-evm-node] *)
 let registered_octez_evm_node_libs = Sub_lib.make_container ()
 
