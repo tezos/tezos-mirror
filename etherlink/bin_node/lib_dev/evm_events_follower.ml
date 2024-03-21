@@ -94,7 +94,7 @@ let on_new_head ({rollup_node_endpoint} as state : Types.state) rollup_block_lvl
       rollup_node_endpoint
   in
   match nb_of_events_bytes with
-  | None -> return_unit
+  | None -> Evm_context.new_last_known_l1_level rollup_block_lvl
   | Some nb_of_events_bytes ->
       let (Qty nb_of_events) =
         Ethereum_types.decode_number nb_of_events_bytes
