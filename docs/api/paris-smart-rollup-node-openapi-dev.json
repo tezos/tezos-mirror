@@ -3,7 +3,7 @@
     { "title": "Smart Rollup Node RPCs",
       "description":
         "Smart Rollup Node RPC API for protocol PtParisAaGGWiaegwuZTJ7ETnQKoqoHWJ3p6wNp7TcbAb7gLbMc",
-      "version": "19.1+dev (72118d1e)" },
+      "version": "Octez 0.0+dev (4fe3cc43)" },
   "paths":
     { "/describe":
         { "get":
@@ -1377,11 +1377,11 @@
                         { "application/json":
                             { "schema":
                                 { "description":
-                                    "Hashes of injected L2 messages",
+                                    "Ids of injected L2 messages",
                                   "type": "array",
                                   "items":
                                     { "$ref":
-                                        "#/components/schemas/sc_rollup_l2_message" } } } } },
+                                        "#/components/schemas/sc_rollup_l2_message_id" } } } } },
                   "default":
                     { "description": "",
                       "content":
@@ -1402,9 +1402,9 @@
                                   "items":
                                     { "type": "object",
                                       "properties":
-                                        { "hash":
+                                        { "id":
                                             { "$ref":
-                                                "#/components/schemas/sc_rollup_l2_message" },
+                                                "#/components/schemas/sc_rollup_l2_message_id" },
                                           "message":
                                             { "type": "object",
                                               "properties":
@@ -1416,7 +1416,7 @@
                                                         "#/components/schemas/sc_l2_message" } },
                                               "required":
                                                 [ "counter", "content" ] } },
-                                      "required": [ "hash", "message" ] } } } } },
+                                      "required": [ "id", "message" ] } } } } },
                   "default":
                     { "description": "",
                       "content":
@@ -1424,12 +1424,12 @@
                             { "schema":
                                 { "description":
                                     "The full list of errors is available with the global RPC `GET errors`" } } } } } } },
-      "/local/batcher/queue/{l2_message_hash}":
+      "/local/batcher/queue/{l2_message_id}":
         { "get":
             { "description": "Retrieve an L2 message and its status",
               "parameters":
-                [ { "name": "l2_message_hash", "in": "path",
-                    "description": "A L2 message hash.", "required": true,
+                [ { "name": "l2_message_id", "in": "path",
+                    "description": "A L2 message id.", "required": true,
                     "schema": { "type": "string" } } ],
               "responses":
                 { "200":
@@ -1788,6 +1788,50 @@
                             { "schema":
                                 { "description":
                                     "The full list of errors is available with the global RPC `GET errors`" } } } } } } },
+      "/local/synchronized":
+        { "get":
+            { "description":
+                "Wait for the node to have synchronized its L2 chain with the L1 chain, streaming its progress.",
+              "responses":
+                { "200":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "oneOf":
+                                    [ { "title": "synchronized",
+                                        "type": "string",
+                                        "enum": [ "synchronized" ] },
+                                      { "title": "synchronizing",
+                                        "type": "object",
+                                        "properties":
+                                          { "synchronizing":
+                                              { "type": "object",
+                                                "properties":
+                                                  { "processed_level":
+                                                      { "type": "integer",
+                                                        "minimum":
+                                                          -2147483648,
+                                                        "maximum": 2147483647 },
+                                                    "l1_head_level":
+                                                      { "type": "integer",
+                                                        "minimum":
+                                                          -2147483648,
+                                                        "maximum": 2147483647 },
+                                                    "percentage_done":
+                                                      { "type": "number" } },
+                                                "required":
+                                                  [ "processed_level",
+                                                    "l1_head_level",
+                                                    "percentage_done" ] } },
+                                        "required": [ "synchronizing" ] } ] } } } },
+                  "default":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "description":
+                                    "The full list of errors is available with the global RPC `GET errors`" } } } } } } },
       "/openapi":
         { "get":
             { "description": "OpenAPI specification of RPCs for rollup node",
@@ -2020,8 +2064,9 @@
           "sc_l2_message":
             { "description": "A hex encoded smart rollup message",
               "type": "string", "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" },
-          "sc_rollup_l2_message":
-            { "title": "A smart rollup layer 2 message (Base58Check-encoded)",
+          "sc_rollup_l2_message_id":
+            { "title":
+                "A smart rollup layer 2 message identifier (Base58Check-encoded)",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
           "sc_rollup_node_l1_operation":
             { "oneOf":

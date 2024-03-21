@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol paris RPC",
     "description": "The RPC API for protocol paris served by the Octez node.",
-    "version": "19.1+dev (72118d1e)"
+    "version": "Octez 0.0+dev (4fe3cc43)"
   },
   "paths": {
     "/": {
@@ -3576,12 +3576,21 @@
     },
     "/context/dal/shards": {
       "get": {
-        "description": "Get the shard assignements for a given level (the default is the current level)",
+        "description": "Get the shards assignment for a given level (the default is the current level) and given delegates (the default is all delegates)",
         "parameters": [
           {
             "name": "level",
             "in": "query",
             "description": "A level integer",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delegates",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
             "required": false,
             "schema": {
               "type": "string"
@@ -3596,31 +3605,24 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "array",
-                    "items": {
-                      "oneOf": [
-                        {
-                          "$ref": "#/components/schemas/Signature.Public_key_hash"
-                        },
-                        {
-                          "type": "array",
-                          "items": {
-                            "oneOf": [
-                              {
-                                "type": "integer",
-                                "minimum": -32768,
-                                "maximum": 32767
-                              },
-                              {
-                                "type": "integer",
-                                "minimum": -32768,
-                                "maximum": 32767
-                              }
-                            ]
-                          }
+                    "type": "object",
+                    "properties": {
+                      "delegate": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "indexes": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": -32768,
+                          "maximum": 32767
                         }
-                      ]
-                    }
+                      }
+                    },
+                    "required": [
+                      "delegate",
+                      "indexes"
+                    ]
                   }
                 }
               }
@@ -3750,7 +3752,55 @@
                       "$ref": "#/components/schemas/019-PtParisA.mutez"
                     },
                     "min_delegated_in_current_cycle": {
-                      "$ref": "#/components/schemas/019-PtParisA.mutez"
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "$ref": "#/components/schemas/019-PtParisA.mutez"
+                        },
+                        "level": {
+                          "type": "object",
+                          "properties": {
+                            "level": {
+                              "description": "The level of the block relative to genesis. This is also the Shell's notion of level.",
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "level_position": {
+                              "description": "The level of the block relative to the successor of the genesis block. More precisely, it is the position of the block relative to the block that starts the \"Alpha family\" of protocols, which includes all protocols except Genesis (that is, from 001 onwards).",
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
+                            },
+                            "cycle": {
+                              "description": "The current cycle's number. Note that cycles are a protocol-specific notion. As a result, the cycle number starts at 0 with the first block of the Alpha family of protocols.",
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
+                            },
+                            "cycle_position": {
+                              "description": "The current level of the block relative to the first block of the current cycle.",
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
+                            },
+                            "expected_commitment": {
+                              "description": "Tells whether the baker of this block has to commit a seed nonce hash.",
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "level",
+                            "level_position",
+                            "cycle",
+                            "cycle_position",
+                            "expected_commitment"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "amount"
+                      ]
                     },
                     "deactivated": {
                       "type": "boolean"
@@ -4502,9 +4552,9 @@
         }
       }
     },
-    "/context/delegates/{pkh}/min_delegated_in_current_cycle": {
+    "/context/delegates/{pkh}/is_forbidden": {
       "get": {
-        "description": "Returns the minimum of delegated tez (in mutez) over the current cycle.",
+        "description": "Returns true if the delegate is forbidden to participate in consensus.",
         "parameters": [
           {
             "name": "pkh",
@@ -4522,7 +4572,93 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/positive_bignum"
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/context/delegates/{pkh}/min_delegated_in_current_cycle": {
+      "get": {
+        "description": "Returns the minimum of delegated tez (in mutez) over the current cycle and the block level where this value was last updated (* Level is `None` when decoding values from protocol O).",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "amount": {
+                      "$ref": "#/components/schemas/019-PtParisA.mutez"
+                    },
+                    "level": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "description": "The level of the block relative to genesis. This is also the Shell's notion of level.",
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "level_position": {
+                          "description": "The level of the block relative to the successor of the genesis block. More precisely, it is the position of the block relative to the block that starts the \"Alpha family\" of protocols, which includes all protocols except Genesis (that is, from 001 onwards).",
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        },
+                        "cycle": {
+                          "description": "The current cycle's number. Note that cycles are a protocol-specific notion. As a result, the cycle number starts at 0 with the first block of the Alpha family of protocols.",
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        },
+                        "cycle_position": {
+                          "description": "The current level of the block relative to the first block of the current cycle.",
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        },
+                        "expected_commitment": {
+                          "description": "Tells whether the baker of this block has to commit a seed nonce hash.",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "level_position",
+                        "cycle",
+                        "cycle_position",
+                        "expected_commitment"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "amount"
+                  ]
                 }
               }
             }
@@ -5239,7 +5375,7 @@
     },
     "/context/issuance/expected_issuance": {
       "get": {
-        "description": "Returns the expected issued tez for the provided block and the next five cycles",
+        "description": "Returns the expected issued tez for the provided block and the next 'consensus_rights_delay' cycles",
         "responses": {
           "200": {
             "description": "",
@@ -12781,12 +12917,24 @@
             "title": "Baker",
             "type": "object",
             "properties": {
-              "baker": {
+              "baker_own_stake": {
                 "$ref": "#/components/schemas/Signature.Public_key_hash"
               }
             },
             "required": [
-              "baker"
+              "baker_own_stake"
+            ]
+          },
+          {
+            "title": "Baker_edge",
+            "type": "object",
+            "properties": {
+              "baker_edge": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              }
+            },
+            "required": [
+              "baker_edge"
             ]
           }
         ]
