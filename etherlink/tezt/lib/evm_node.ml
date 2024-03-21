@@ -28,7 +28,11 @@
 type time_between_blocks = Nothing | Time_between_blocks of float
 
 type mode =
-  | Observer of {initial_kernel : string; preimage_dir : string}
+  | Observer of {
+      initial_kernel : string;
+      preimages_dir : string;
+      rollup_node_endpoint : string;
+    }
   | Sequencer of {
       initial_kernel : string;
       preimage_dir : string;
@@ -432,15 +436,20 @@ let run_args evm_node =
             genesis_timestamp
         @ Cli_arg.optional_switch "devmode" devmode
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Observer {preimage_dir; initial_kernel} ->
+    | Observer {preimages_dir; initial_kernel; rollup_node_endpoint} ->
         [
           "run";
           "observer";
           "with";
           "endpoint";
           evm_node.persistent_state.endpoint;
+          "and";
+          "rollup";
+          "node";
+          "endpoint";
+          rollup_node_endpoint;
           "--preimages-dir";
-          preimage_dir;
+          preimages_dir;
           "--initial-kernel";
           initial_kernel;
         ]
@@ -653,3 +662,10 @@ let chunk_data ?(devmode = true) ~rollup_address ?sequencer_key ?timestamp
   (* `tl` will remove the first line `Chunked_transactions :` *)
   let chunks = String.split_on_char '\n' (String.trim output) |> List.tl in
   return chunks
+
+let wait_termination (evm_node : t) =
+  match evm_node.status with
+  | Not_running -> unit
+  | Running {process; _} ->
+      let* _status = Process.wait process in
+      unit

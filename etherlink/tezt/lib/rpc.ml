@@ -168,7 +168,7 @@ module Syntax = struct
   let ( let*@? ) x f =
     let* r = x in
     match r with
-    | Ok _ -> Test.fail "'let*@?' expected an error but got a valid response"
+    | Ok _ -> Test.fail "'let*@\\?' expected an error but got a valid response"
     | Error err -> f err
 end
 
