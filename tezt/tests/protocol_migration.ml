@@ -67,7 +67,7 @@ let user_migratable_node_init ?node_name ?client_name ?(more_node_args = [])
 
 (** [block_check ?level ~expected_block_type ~migrate_to ~migrate_from client]
     is generic check that a block of type [expected_block_type] contains
-    (protocol) metatadata conforming to its type at [level]. **)
+    (protocol) metadata conforming to its type at [level]. **)
 let block_check ?level ~expected_block_type ~migrate_to ~migrate_from client =
   let block =
     match level with Some level -> Some (string_of_int level) | None -> None
@@ -364,7 +364,7 @@ let check_attestations_in_block ~protocol ~level ~expected_count client =
    (which cannot bake in the past) without a hitch.
 
    @param consensus_threshold is a function of [consensus_committee_size],
-   defauls to the mainnet value (2/3 [consensus_committee_size] + 1), instead of
+   defaults to the mainnet value (2/3 [consensus_committee_size] + 1), instead of
    0 in the sandbox.
    @param round_duration is the (minimal) round duration in seconds (set by
    parameter [minimal_block_delay]), defaults to the sandbox value (typically 1s).
@@ -410,7 +410,7 @@ let start_protocol ?consensus_threshold ?round_duration
     ~parameter_file
     client
 
-(** Test that migration occuring through baker daemons
+(** Test that migration occurring through baker daemons
 
    - does not halt the chain;
    - and that the migration block is not attested by the newer
