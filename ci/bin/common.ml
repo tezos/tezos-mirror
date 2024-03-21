@@ -419,7 +419,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
      (they do not build experimental executables) *)
 let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ?dependencies () : tezos_job =
-  let arch_string = match arch with Amd64 -> "x86_64" | Arm64 -> "arm64" in
+  let arch_string = arch_to_string arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
   let artifacts =
     (* Extend the lifespan to prevent failure for external tools using artifacts. *)
@@ -486,7 +486,7 @@ type docker_build_type = Experimental | Release | Test | Test_manual
     also written to an external file. *)
 let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
     docker_build_type : tezos_job =
-  let arch_string = match arch with Amd64 -> "amd64" | Arm64 -> "arm64" in
+  let arch_string = arch_to_string_alt arch in
   let ci_docker_hub =
     match docker_build_type with
     | Release | Experimental -> true
@@ -558,7 +558,7 @@ type bin_package_target = Dpkg | Rpm
 
 let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
     ~target () : tezos_job =
-  let arch_string = match arch with Amd64 -> "amd64" | Arm64 -> "arm64" in
+  let arch_string = arch_to_string_alt arch in
   let target_string = match target with Dpkg -> "dpkg" | Rpm -> "rpm" in
   let image =
     match target with Dpkg -> Images.debian_bookworm | Rpm -> Images.fedora_39
@@ -645,7 +645,7 @@ let job_build_rpm_amd64 : unit -> tezos_job =
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     ?dependencies () =
-  let arch_string = match arch with Amd64 -> "x86_64" | Arm64 -> "arm64" in
+  let arch_string = arch_to_string arch in
   let name =
     sf
       "oc.build_%s-%s"

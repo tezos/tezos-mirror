@@ -130,6 +130,12 @@ end
 (** Represents architectures. *)
 type arch = Amd64 | Arm64
 
+(** String representation of architectures ([Amd64] is ["x86_64"]) *)
+val arch_to_string : arch -> string
+
+(** Alternative string representation of architectures ([Amd64] is ["amd64"]) *)
+val arch_to_string_alt : arch -> string
+
 (** A job dependency.
 
     - A job that depends on [Job j] will not start until [j] finishes.
