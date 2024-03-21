@@ -31,7 +31,6 @@
     Subject:      Test slashing scenarios in the protocol.
 *)
 
-open Adaptive_issuance_helpers
 open State_account
 open Tez_helpers.Ez_tez
 open Scenario
@@ -279,30 +278,6 @@ let test_slash_timing =
   --> double_bake "delegate"
   --> exclude_bakers ["delegate"]
   --> make_denunciations () --> next_cycle
-
-let init_scenario_with_delegators delegate_name faucet_name delegators_list =
-  let rec init_delegators = function
-    | [] -> Empty
-    | (delegator, amount) :: t ->
-        add_account_with_funds
-          delegator
-          ~funder:faucet_name
-          (Amount (Tez.of_mutez amount))
-        --> set_delegate delegator (Some delegate_name)
-        --> init_delegators t
-  in
-  let init_params =
-    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
-  in
-  init_constants ()
-  --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force
-  --> branch_flag S.Adaptive_issuance.ns_enable
-  --> begin_test [delegate_name; faucet_name]
-  --> set_baker faucet_name
-  --> set_delegate_params "delegate" init_params
-  --> init_delegators delegators_list
-  --> wait_delegate_parameters_activation
 
 let test_no_shortcut_for_cheaters =
   let amount = Amount (Tez.of_mutez 333_000_000_000L) in
