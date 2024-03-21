@@ -6,9 +6,12 @@
     <link href="app.css" rel="stylesheet">
     <link href="https://research-development.nomadic-labs.com/favicon.ico" rel="icon"
           sizes="100x100" type="image/gif"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src=" https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script type="module" src="app.js"></script>
   </head>
-  <body>
+  <body class="bg-black">
+    <canvas id="chartJSContainer" class="w-full min-w-full min-w-screen"></canvas>
     <table class="table-fixed text-center min-w-full">
       <thead>
         <tr>
@@ -40,6 +43,10 @@
       <tbody id="report"></tbody>
     </table>
     <script type="module">
+      Chart.defaults.color = '#fff';
+      Chart.defaults.borderColor = '#454347';
+      Chart.defaults.backgroundColor = 'transparent';
+
       import {Simulator, total_supply_storage, total_frozen_stake_storage} from './app.js';
 
       const config = {
@@ -79,14 +86,152 @@
       // Array whose values correspond to the cycles, starting from 0 to max_cycle.
       const idx = gen_idx(0, max_cycle);
 
+      // Array used to mask values before the AI activation cycle.
+      const idx_mask = Array(config.chain.ai_activation_cycle).fill(null);
+
+      // Array whose values are the cycles starting from the AI activation cycle to max_cycle.
+      const idx_ai = gen_idx(config.chain.ai_activation_cycle, max_cycle);
+
+      // Helpers
+      const mutez_to_tez = (x) => Math.round(x / 1_000_000);
+
       // Creation of the simulator.
       const simulator = new Simulator(config);
 
-      const before_activation_cycle_color = "text-black";
+      const chart_config = {
+          type: 'line',
+          data: {
+              labels: idx,
+              datasets: [
+                  {
+                      label: 'Total supply',
+                      borderColor: 'rgb(175, 92, 92)',
+                      yAxisID: 'y1',
+                      data: simulator.config.chain.total_supply.map(mutez_to_tez),
+                      order: 2,
+                  },
+                  {
+                      label: 'Total frozen stake',
+                      borderColor: 'rgb(75, 192, 92)',
+                      yAxisID: 'y1',
+                      data: simulator.config.chain.total_frozen_stake.map(mutez_to_tez),
+                      order: 2,
+                  },
+                  {
+                      label: 'Staked ratio',
+                      yAxisID: 'y2',
+                      data: idx.map((i) => simulator.staked_ratio_for_next_cycle(i).toDecimal(4)),
+                      borderColor: 'rgb(75, 192, 192)',
+                      order: 1
+                  },
+                  {
+                      label: 'Min issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.minimum_ratio(i).toDecimal(4))),
+                      borderColor: 'rgb(0, 0, 150)',
+                      order: 2,
+                      fill: {
+                          target: 'origin',
+                          above: 'rgb(5, 5, 5, 0.6)'
+                      }
+                  },
+                  {
+                      label: 'Max issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.maximum_ratio(i).toDecimal(4))),
+                      borderColor: 'rgb(150, 0, 0)',
+                      order: 2,
+                      fill: {
+                          target: {value: 0.1},
+                          below: 'rgb(5, 5, 5, 0.6)'
+                      }
+                  },
+                  {
+                      label: 'Issuance rate',
+                      yAxisID: 'y3',
+                      data: idx_mask.concat(idx_ai.map((i) =>
+                          simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4))),
+                      borderColor: 'rgb(150, 150, 20)',
+                      order: 1
+                  },
+                  {
+                      label: 'Upper ratio target',
+                      yAxisID: 'y2',
+                      data: idx_mask.concat(idx_ai.map((_) => 0.52)),
+                      borderColor: 'rgb(0, 150, 0)',
+                      order: 2,
+                      borderWidth: 1,
+                      fill: {
+                          target: {value: 0.48},
+                          above: 'rgb(0, 100, 0, 0.3)'
+                      }
+                  },
+                  {
+                      label: 'Lower ratio target',
+                      yAxisID: 'y2',
+                      data: idx_mask.concat(idx_ai.map((_) => 0.48)),
+                      borderColor: 'rgb(0, 150, 0)',
+                      order: 2,
+                      borderWidth: 1,
+                  },
+              ]
+          },
+          options: {
+              scales: {
+                  y1: {
+                      display: false,
+                  },
+                  y2: {
+                      type: 'linear',
+                      position: 'left',
+                      max: 1,
+                      min: 0
+                  },
+                  y3: {
+                      type: 'linear',
+                      position: 'right',
+                      max: 0.1,
+                      min: 0.0
+                  },
+              },
+              responsive: true,
+              plugins: {
+                annotation: {
+                  annotations: {
+                    line_ai_launch: {
+                      type: 'line',
+                      xMin: simulator.initial_period_start_cycle,
+                      xMax: simulator.initial_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                      borderWidth: 1,
+                    },
+                    line_transition_period_start_cycle: {
+                      type: 'line',
+                      xMin: simulator.transition_period_start_cycle,
+                      xMax: simulator.transition_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                      borderWidth: 1,
+                    },
+                    line_final_period_start_cycle: {
+                      type: 'line',
+                      xMin: simulator.final_period_start_cycle,
+                      xMax: simulator.final_period_start_cycle,
+                      borderColor: 'rgb(255, 255, 255)',
+                       borderWidth: 1,
+                    },
+                  }
+                },
+              },
+          }
+      };
+
+      const before_activation_cycle_color = "text-white";
       const activation_cycle_color = "text-yellow-600";
       const initial_period_color = "text-blue-600";
       const transition_period_color = "text-green-600";
-      const final_period_color = "text-black";
+      const final_period_color = "text-white";
 
       const dispatch_period_color = (cycle) => {
           if (simulator.is_ai_activated(cycle)) {
@@ -126,7 +271,7 @@
       // Generates the AI data report.
       idx.forEach((cycle) => {
           let new_row = document.createElement("tr");
-          new_row.classList.add("hover:bg-gray-200");
+          new_row.classList.add("hover:bg-gray-600");
 
           let new_cell = (content) => new_cell_for(new_row, content);
 
@@ -168,6 +313,12 @@
 
           tableBody.appendChild(new_row);
       });
+
+      document.addEventListener('DOMContentLoaded', function() {
+          var ctx = document.getElementById('chartJSContainer').getContext('2d');
+          window.chart = new Chart(ctx, chart_config);
+      });
+
     </script>
   </body>
 </html>
