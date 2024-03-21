@@ -7,7 +7,6 @@
 
 use crate::layer::Layer;
 use crate::StorageError;
-use core::marker::PhantomData;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
 use tezos_smart_rollup_host::runtime::Runtime;
 
@@ -17,7 +16,6 @@ extern crate alloc;
 pub struct Storage<T: From<OwnedPath>> {
     prefix: String,
     layers: Vec<Layer<T>>,
-    phantom: PhantomData<T>,
 }
 
 impl<T: From<OwnedPath>> Storage<T> {
@@ -29,7 +27,6 @@ impl<T: From<OwnedPath>> Storage<T> {
             prefix: String::from_utf8(name_bytes)
                 .map_err(|_| StorageError::InvalidAccountsPath)?,
             layers: vec![Layer::<T>::with_path(name)],
-            phantom: PhantomData,
         })
     }
 
