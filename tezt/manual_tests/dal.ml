@@ -47,11 +47,13 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
-let dal_parameters () =
+(* [is_fake] is true iff the mocked SRS is used. *)
+let dal_parameters ~is_fake =
+  let mode = if is_fake then "mock" else "real" in
   Test.register
     ~__FILE__
-    ~title:"Check the validity of DAL parameters"
-    ~tags:[Tag.tezos2; "dal"; "parameters"]
+    ~title:(sf "Check the validity of DAL parameters with %s SRS" mode)
+    ~tags:[Tag.tezos2; "dal"; "parameters"; mode]
   @@ fun () ->
   let open Dal.Cryptobox in
   let number_of_shards = Cli.get_int "number_of_shards" in
@@ -61,13 +63,40 @@ let dal_parameters () =
   let parameters =
     {number_of_shards; redundancy_factor; page_size; slot_size}
   in
-  match Internal_for_tests.ensure_validity_without_srs parameters with
-  | Ok _ ->
-      Internal_for_tests.init_prover_dal () ;
-      let _ = make parameters in
-      unit
-  | Error (`Fail s) ->
-      Test.fail "The set of parameters is invalid. Reason:@.%s@." s
+  let dal_config =
+    let use_mock_srs_for_testing = if is_fake then Some parameters else None in
+    Config.{activated = true; use_mock_srs_for_testing; bootstrap_peers = []}
+  in
+  let find_srs_files = Tezos_base.Dal_srs.find_trusted_setup_files in
+  let check_make error_msg =
+    match make parameters with
+    | Ok _ -> unit
+    | Error (`Fail s) -> Test.fail "%s. Reason:@.%s@." error_msg s
+  in
+  let* () =
+    let* res = Config.init_prover_dal ~find_srs_files dal_config in
+    match res with
+    | Ok () -> unit
+    | Error errs ->
+        Test.fail
+          "Could not init prover. Reason:@.%a@."
+          (Tezos_error_monad.Error_monad.TzTrace.pp_print_top
+             Tezos_error_monad.Error_monad.pp)
+          errs
+  in
+  let* () = check_make "The set of parameters is invalid for the verifier" in
+  let () =
+    match Config.init_verifier_dal dal_config with
+    | Ok () -> ()
+    | Error errs ->
+        Test.fail
+          "Could not init verifier. Reason:@.%a@."
+          (Tezos_error_monad.Error_monad.TzTrace.pp_print_top
+             Tezos_error_monad.Error_monad.pp)
+          errs
+  in
+  let* () = check_make "The set of parameters is invalid for the verifier." in
+  unit
 
 (** Start a layer 1 node on the given network, with the given data-dir and
     rpc-port if any. *)
@@ -463,7 +492,8 @@ let baker_test ~network =
     ()
 
 let register () =
-  dal_parameters () ;
+  dal_parameters ~is_fake:true ;
+  dal_parameters ~is_fake:false ;
   List.iter
     (fun network ->
       slots_injector_test ~network ;
