@@ -9,3 +9,6 @@ members = [
   "sandbox",
 ]
 exclude = ["jstz", "dummy_kernel", "tests"]
+
+[patch.crates-io]
+softfloat-sys = { git = "https://gitlab.com/trili/softfloat-sys" }
