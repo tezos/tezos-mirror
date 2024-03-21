@@ -54,3 +54,7 @@ let committee_cache_size = 50
 let shards_proofs_cache_size = 1024
 
 let shards_verification_sampling_frequency = 100
+
+let amplification_random_delay_min = 1.
+
+let amplification_random_delay_max = 2.

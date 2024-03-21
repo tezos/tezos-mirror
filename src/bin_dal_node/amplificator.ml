@@ -58,7 +58,13 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
            the reconstruction; this is to give some slack to receive
            all the shards so that the reconstruction is not needed, and
            also avoids having multiple nodes reconstruct at once. *)
-        let random_delay = 1. +. Random.float 1. in
+        let random_delay =
+          Constants.(
+            amplification_random_delay_min
+            +. Random.float
+                 (amplification_random_delay_max
+                -. amplification_random_delay_min))
+        in
         let*! () =
           Event.(emit reconstruct_starting_in (commitment, random_delay))
         in
