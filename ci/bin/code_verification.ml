@@ -877,6 +877,19 @@ let jobs pipeline_type =
         ["dune build @runtest_rejections"]
       |> job_external_split
     in
+    let job_oc_script_test_gen_genesis : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.script:test-gen-genesis"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ~before_script:
+          (before_script ~eval_opam:true ["cd scripts/gen-genesis"])
+        ["dune build gen_genesis.exe"]
+      |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -885,6 +898,7 @@ let jobs pipeline_type =
       job_misc_opam_checks;
       job_semgrep;
       job_oc_integration_compiler_rejections;
+      job_oc_script_test_gen_genesis;
     ]
     @ jobs_unit
     @
