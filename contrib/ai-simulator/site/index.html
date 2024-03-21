@@ -8,6 +8,7 @@
           sizes="100x100" type="image/gif"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src=" https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-dragdata@2.2.3/dist/chartjs-plugin-dragdata.min.js"></script>
     <script type="module" src="app.js"></script>
   </head>
   <body class="bg-black">
@@ -119,10 +120,12 @@
                   },
                   {
                       label: 'Staked ratio',
-                      yAxisID: 'y2',
+                      yAxisID: 'y4',
                       data: idx.map((i) => simulator.staked_ratio_for_next_cycle(i).toDecimal(4)),
                       borderColor: 'rgb(75, 192, 192)',
-                      order: 1
+                      order: 1,
+                      pointHitRadius: 25,
+                      tension: 0.2,
                   },
                   {
                       label: 'Min issuance rate',
@@ -182,18 +185,28 @@
               scales: {
                   y1: {
                       display: false,
+                      dragData: false,
                   },
                   y2: {
                       type: 'linear',
                       position: 'left',
                       max: 1,
-                      min: 0
+                      min: 0,
+                      dragData: false,
                   },
                   y3: {
                       type: 'linear',
                       position: 'right',
                       max: 0.1,
-                      min: 0.0
+                      min: 0.0,
+                      dragData: false,
+                  },
+                  y4: {
+                      display: false,
+                      type: 'linear',
+                      display: false,
+                      max: 1,
+                      min: 0,
                   },
               },
               responsive: true,
@@ -223,7 +236,23 @@
                     },
                   }
                 },
-              },
+                dragData: {
+                  round: 5,
+                  showTooltip: true,
+                  onDrag: function(e, datasetIndex, index, value) {
+                    simulator.set_staked_ratio_at(index, value);
+                    window.chart.data.datasets[1].data =
+                        simulator.config.chain.total_frozen_stake.map(mutez_to_tez);
+                    window.chart.data.datasets[5].data =
+                        idx_mask.concat(idx_ai.map((i) =>
+                            simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4)));
+                  },
+                  onDragEnd: function(e, datasetIndex, index, value) {
+                    tableBody.innerHTML = "";
+                    gen_report();
+                  },
+                },
+              }
           }
       };
 
@@ -269,7 +298,8 @@
       const tableBody = document.getElementById("report");
 
       // Generates the AI data report.
-      idx.forEach((cycle) => {
+      function gen_report() {
+        idx.forEach((cycle) => {
           let new_row = document.createElement("tr");
           new_row.classList.add("hover:bg-gray-600");
 
@@ -312,11 +342,13 @@
           new_cell(simulator.vdf_revelation_tip(cycle));
 
           tableBody.appendChild(new_row);
-      });
+        });
+      };
 
       document.addEventListener('DOMContentLoaded', function() {
           var ctx = document.getElementById('chartJSContainer').getContext('2d');
           window.chart = new Chart(ctx, chart_config);
+          gen_report();
       });
 
     </script>
