@@ -376,9 +376,10 @@ let apply_finalize staker_name account_map =
         account_map
         account_map
 
-(* Given cycle is the cycle for which the rights are computed, usually current +
-   consensus rights delay *)
-let update_frozen_rights_cycle block account_map =
+(** Compute the staking rights for [current_cycle +
+    consensus_rights_delay + 1] and save them into
+    [account.frozen_rights] for each delegate. *)
+let compute_future_frozen_rights block account_map =
   let open Lwt_result_syntax in
   String.Map.fold_es
     (fun key acc acc_map ->
@@ -395,15 +396,37 @@ let update_frozen_rights_cycle block account_map =
           in
           if delegate_pkh = acc.pkh then
             (* Account is a delegate *)
-            let cycle = Block.current_cycle block in
-            let* frozen_deposits =
+            let current_cycle = Block.current_cycle block in
+            (* Check the rights of current cycle. *)
+            let current_rights_state =
+              CycleMap.find (Block.current_cycle block) acc.frozen_rights
+              |> Option.value ~default:Tez.zero
+            in
+            let* current_rights_rpc =
               Context.Delegate.initial_frozen_deposits (B block) acc.pkh
             in
-
-            let frozen_rights =
-              CycleMap.add cycle frozen_deposits acc.frozen_rights
+            let* () =
+              Assert.equal_tez
+                ~loc:__LOC__
+                current_rights_state
+                current_rights_rpc
             in
-            return (String.Map.add key {acc with frozen_rights} acc_map)
+            (* Fill in the rights for future cycle. *)
+            let* deactivated = Context.Delegate.deactivated (B block) acc.pkh in
+            if deactivated then return acc_map
+            else
+              let future_cycle =
+                Cycle.add
+                  current_cycle
+                  (block.constants.consensus_rights_delay + 1)
+              in
+              let frozen_rights =
+                CycleMap.add
+                  future_cycle
+                  (current_total_frozen_deposits_with_limits acc)
+                  acc.frozen_rights
+              in
+              return (String.Map.add key {acc with frozen_rights} acc_map)
           else return acc_map)
     account_map
     account_map

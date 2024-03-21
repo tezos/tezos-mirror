@@ -38,7 +38,6 @@ let init_staker_delegate_or_external =
     --> Scenario_begin.activate_ai `Force
     --> begin_test [name]
     --> set_delegate_params name init_params
-    --> set_baker "__bootstrap__"
   in
   Tag "AI activated"
   --> (Tag "self stake" --> begin_test ~self_stake:true

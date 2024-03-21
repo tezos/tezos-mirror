@@ -32,7 +32,7 @@ let set_delegate_params delegate_name parameters : (t, t) scenarios =
         set_delegate_parameters (B block) delegate.contract ~parameters
       in
       (* Update state *)
-      let wait = state.constants.delegate_parameters_activation_delay - 1 in
+      let wait = state.constants.delegate_parameters_activation_delay in
       let state =
         {
           state with
