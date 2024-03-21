@@ -213,12 +213,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
   in
   let* observer =
     Evm_node.init
-      ~mode:
-        (Observer
-           {
-             initial_kernel = output;
-             preimages_dir;
-           })
+      ~mode:(Observer {initial_kernel = output; preimages_dir})
       (Evm_node.endpoint sequencer)
   in
   let* proxy =
@@ -516,7 +511,6 @@ let test_resilient_to_rollup_node_disconnect =
 
   let* () = Evm_node.terminate sequencer in
   let* () = Evm_node.run sequencer in
-  let* () = Evm_node.wait_for_ready sequencer in
 
   (* Produce enough blocks in advance to ensure the sequencer node will catch
      up at the end. *)
@@ -1899,13 +1893,8 @@ let test_sequencer_upgrade =
       protocol
   in
   (* produce an initial block *)
-  let*@ _ = Rpc.produce_block sequencer in
-  let* () =
-    (* make sure rollup node saw it *)
-    repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
+  let*@ _lvl = Rpc.produce_block sequencer in
+  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
   let* () =
     check_head_consistency
       ~left:proxy
@@ -1943,7 +1932,10 @@ let test_sequencer_upgrade =
       ()
   in
   let nb_block = 4l in
-  let*@? _ = Rpc.produce_block sequencer in
+  (* apply the upgrade in the kernel  *)
+  let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+  (*   produce_block fails because sequencer changed *)
+  let*@? _err = Rpc.produce_block sequencer in
   let* () =
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
@@ -2023,7 +2015,7 @@ let test_sequencer_upgrade =
 let test_sequencer_diverge =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"]
+    ~tags:["evm"; "sequencer"; "diverge"]
     ~title:"Runs two sequencers, one diverge and stop"
     ~uses
   @@ fun protocol ->
