@@ -118,6 +118,9 @@ const safe_get = (array, cycle) => {
  * vdf revelation tip corresponding to the given cycle, in mutez.
  * @property {function(number):bigRat} current_yearly_rate_value - Returns the
  * current yearly rate corresponding to the given cycle.
+ * @property {function(number, number):null} set_staked_ratio_at - Takes a cycle and
+ * a ratio as arguments. Sets the frozen balance by applying the ratio to the total supply
+ * of the given cycle. The ratio is clipped between 0 and 1.
  */
 
 /**
@@ -149,6 +152,10 @@ const safe_get = (array, cycle) => {
 
 export class Simulator {
   #storage_issuance_bonus = [];
+
+  #clear() {
+    this.#storage_issuance_bonus = [];
+  }
 
   constructor(config) {
     this.config = config;
@@ -227,6 +234,15 @@ export class Simulator {
       cycle >
       initial_period + transition_period + this.config.chain.ai_activation_cycle
     );
+  }
+
+  set_staked_ratio_at(cycle, value) {
+    const ratio = bigRat.clip(bigRat(value), bigRat.zero, bigRat.one);
+    const total_supply = safe_get(this.config.chain.total_supply, cycle);
+    const res = ratio.multiply(total_supply).ceil();
+    const i = cycle + this.config.proto.consensus_rights_delay + 1;
+    this.config.chain.total_frozen_stake[i] = res;
+    this.#clear();
   }
 
   staked_ratio_for_next_cycle(cycle) {
