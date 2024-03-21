@@ -4278,12 +4278,12 @@ let get_receipt_for ~operation ?(check_previous = 10) client =
      ]
   |> Process.check_and_read_stdout
 
-let spawn_stake ?(wait = "none") amount ~staker client =
-  spawn_command client
+let spawn_stake ?(wait = "none") ?hooks amount ~staker client =
+  spawn_command ?hooks client
   @@ ["--wait"; wait; "stake"; Tez.to_string amount; "for"; staker]
 
-let stake ?wait amount ~staker client =
-  spawn_stake ?wait amount ~staker client |> Process.check
+let stake ?wait ?hooks amount ~staker client =
+  spawn_stake ?wait ?hooks amount ~staker client |> Process.check
 
 let spawn_unstake ?(wait = "none") amount ~staker client =
   spawn_command client
