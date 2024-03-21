@@ -308,6 +308,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             },
             F3_4 => match funct7(instr) {
                 F7_0 => r_instr!(Xor, instr),
+                F7_1 => r_instr!(Div, instr),
                 _ => Unknown { instr },
             },
             F3_6 => match funct7(instr) {
@@ -326,6 +327,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             },
             F3_5 => match funct7(instr) {
                 F7_0 => r_instr!(Srl, instr),
+                F7_1 => r_instr!(Divu, instr),
                 F7_20 => r_instr!(Sra, instr),
                 _ => Unknown { instr },
             },
@@ -349,8 +351,13 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 _ => Unknown { instr },
             },
             F3_1 => r_instr!(Sllw, instr),
+            F3_4 => match funct7(instr) {
+                F7_1 => r_instr!(Divw, instr),
+                _ => Unknown { instr },
+            },
             F3_5 => match funct7(instr) {
                 F7_0 => r_instr!(Srlw, instr),
+                F7_1 => r_instr!(Divuw, instr),
                 F7_20 => r_instr!(Sraw, instr),
                 _ => Unknown { instr },
             },

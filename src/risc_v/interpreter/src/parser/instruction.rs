@@ -152,6 +152,10 @@ pub enum Instr {
     Remu(RTypeArgs),
     Remw(RTypeArgs),
     Remuw(RTypeArgs),
+    Div(RTypeArgs),
+    Divu(RTypeArgs),
+    Divw(RTypeArgs),
+    Divuw(RTypeArgs),
 
     // RV64F instructions
     FmvXW(FmvToIArgs),
@@ -250,6 +254,10 @@ impl Instr {
             | Remu(_)
             | Remw(_)
             | Remuw(_)
+            | Div(_)
+            | Divu(_)
+            | Divw(_)
+            | Divuw(_)
             | FmvXW(_)
             | FmvWX(_)
             | FmvXD(_)
@@ -480,6 +488,10 @@ impl fmt::Display for Instr {
             Remu(args) => r_instr!(f, "remu", args),
             Remw(args) => r_instr!(f, "remw", args),
             Remuw(args) => r_instr!(f, "remuw", args),
+            Div(args) => r_instr!(f, "div", args),
+            Divu(args) => r_instr!(f, "divu", args),
+            Divw(args) => r_instr!(f, "divw", args),
+            Divuw(args) => r_instr!(f, "divuw", args),
 
             // RV64F instructions
             FmvXW(args) => f_mv_instr!(f, "fmv.x.w", args),
