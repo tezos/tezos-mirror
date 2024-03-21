@@ -4,20 +4,31 @@
 
 const { is_transaction, is_scenario, is_run, is_blueprint_reading } = require('./utils')
 
+const fs = require('fs')
+const path = require('node:path')
 
+let FILENAME = "sanity.log";
 module.exports = { init_sanity, check_record, print_summary }
 
 // initialize the accumulator
 function init_sanity() { return [] }
 
+function print(str, filepath) {
+    fs.appendFileSync(filepath, `${str} \n`);
+    console.log(str);
+}
+
 // print a summaro of all errors recorded in an accumulator
-function print_summary(sanity_acc) {
-    console.info(`-------------------------------------------------------`)
-    console.log(`Sanity check: ${sanity_acc.length} problems spotted`)
+function print_summary(sanity_acc, dirname) {
+    let filepath = path.format({ dir: dirname, base: FILENAME })
+
+    fs.writeFileSync(filepath, '')
+    print(`-------------------------------------------------------`, filepath)
+    print(`Sanity check: ${sanity_acc.length} problems spotted`, filepath)
     for (datum of sanity_acc) {
-        console.log(`${datum.name}: ${datum.type} record ->  ${datum.errors.join(', ')}`)
+        print(`${datum.name}: ${datum.type} record ->  ${datum.errors.join(', ')}`, filepath)
     }
-    console.info(`-------------------------------------------------------`)
+    print(`-------------------------------------------------------`, filepath)
 }
 
 // Check that a given record is sane

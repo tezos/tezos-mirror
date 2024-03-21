@@ -11,8 +11,18 @@ let graphs = require("./analysis/graph")
 let sanity = require("./analysis/sanity")
 let { parse } = require('csv-parse')
 
-var args = process.argv.slice(2)
 
+
+const commander = require('commander');
+commander
+    .usage('[OPTIONS] <benchmark_data.csv>')
+    .option('-o, --output-dir <path>', "Output directory", "analysis_result")
+    .parse(process.argv);
+
+let args = commander.args
+
+
+const OUTPUT_DIRECTORY = commander.opts().outputDir
 const cast_value = function(value, context) {
     let n = parseInt(value)
     if (isNaN(n)) return value;
@@ -66,8 +76,8 @@ async function processFile(filename, { analysis_acc, graph_acc, sanity_acc }) {
     // process files in ||
     await Promise.all(files.map((filename) => processFile(filename, infos)))
 
-    let exit_status = analysis.check_result(infos.analysis_acc)
-    sanity.print_summary(infos.sanity_acc)
-    await graphs.draw_tick_per_gas(infos.graph_acc)
+    let exit_status = analysis.check_result(infos.analysis_acc, OUTPUT_DIRECTORY)
+    sanity.print_summary(infos.sanity_acc, OUTPUT_DIRECTORY)
+    await graphs.draw_tick_per_gas(infos.graph_acc, OUTPUT_DIRECTORY)
     process.exit(exit_status)
 })()
