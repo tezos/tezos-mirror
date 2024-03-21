@@ -6702,7 +6702,7 @@ let hash = Protocol.hash
 
   let _018_Proxford = active (Name.v "Proxford" 018)
 
-  let _019_PtParisA = active (Name.v "PtParisA" 019)
+  let _019_PtParisB = active (Name.v "PtParisB" 019)
 
   let alpha = active Name.alpha
 
