@@ -50,3 +50,8 @@ val get_shard :
     of the slot with header [header]. *)
 val get_slot_pages :
   #cctxt -> Cryptobox.Commitment.t -> bytes list tzresult Lwt.t
+
+(** [get_page_proof cctxt page_index slot_data] computes and returns the proof
+    of the page whose index and slot are given. *)
+val get_page_proof :
+  #cctxt -> int -> bytes -> Cryptobox.page_proof tzresult Lwt.t

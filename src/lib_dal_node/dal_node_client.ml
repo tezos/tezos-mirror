@@ -55,3 +55,6 @@ let get_shard cctxt header shard_index =
 
 let get_slot_pages cctxt header =
   call cctxt Services.slot_pages ((), header) () ()
+
+let get_page_proof cctxt page_index slot_data =
+  call cctxt Services.get_page_proof ((), page_index) () slot_data

@@ -29,6 +29,8 @@ type level = int32
 
 type slot_index = int
 
+type page_index = int
+
 module Topic = struct
   type t = {slot_index : int; pkh : Signature.Public_key_hash.t}
 
