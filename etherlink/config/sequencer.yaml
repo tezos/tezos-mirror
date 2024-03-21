@@ -1,8 +1,5 @@
 instructions:
   - set:
-      value: 00
-      to: /evm/sequencer
-  - set:
       value: 0000dc0a0713000c1e0200000000000000000000000000000000000000000000
       to: /evm/world_state/eth_accounts/6ce4d79d4e77402e1ef3417fdda433aa744c6e1c/balance
   - set:
