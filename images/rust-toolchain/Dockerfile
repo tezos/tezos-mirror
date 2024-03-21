@@ -22,7 +22,7 @@ RUN apt-get update && \
     ca-certificates curl file \
     build-essential \
     git \
-    autoconf automake autotools-dev libtool xutils-dev clang \
+    autoconf automake autotools-dev libtool xutils-dev clang cmake \
     sccache && \
     rm -rf /var/lib/apt/lists/*
 

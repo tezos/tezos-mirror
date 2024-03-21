@@ -237,6 +237,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
+name = "c99"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b03049b0d9ea44294834dfc77cdf319fcd00832a9c676edf04e5166970ccf403"
+
+[[package]]
 name = "cassowary"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -277,6 +283,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1174fb0b6ec23863f8b971027804a42614e347eafb0a95bf0b12cdae21fc4d0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "cc-version"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e142b8a521e1a062f6cccb17827e45b06bc11cb65792535be5f8dec6c89e05c"
+dependencies = [
+ "cc",
+ "thiserror",
 ]
 
 [[package]]
@@ -1453,6 +1469,7 @@ dependencies = [
  "paste",
  "proptest",
  "rand 0.8.5",
+ "softfloat-wrapper",
  "strum 0.26.1",
  "thiserror",
  "twiddle",
@@ -1692,6 +1709,27 @@ name = "smallvec"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
+
+[[package]]
+name = "softfloat-sys"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b3ebcd12cb9c5e5bfe6731eb435ba863af244b76cef645d9a840b558bccc218"
+dependencies = [
+ "c99",
+ "cc",
+ "cc-version",
+]
+
+[[package]]
+name = "softfloat-wrapper"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d93ae834b62e7d8e3acf6d8e0466771dc774fe4293fa4a270ced6109dfe31fe1"
+dependencies = [
+ "num-traits",
+ "softfloat-sys",
+]
 
 [[package]]
 name = "spki"

@@ -703,10 +703,10 @@ mod tests {
             let succ = FenceSet { i: succ[0], o: succ[1], r: succ[2], w: succ[3] };
 
             state.hart.xregisters.write(t1, 123);
-            state.hart.fregisters.write(fa0, 0.1_f64.into());
+            state.hart.fregisters.write(fa0, 0.1_f64.to_bits().into());
             state.run_fence(pred, succ);
             assert_eq!(state.hart.xregisters.read(t1), 123);
-            assert_eq!(state.hart.fregisters.read(fa0), 0.1_f64.into());
+            assert_eq!(state.hart.fregisters.read(fa0), 0.1_f64.to_bits().into());
         });
     });
 
