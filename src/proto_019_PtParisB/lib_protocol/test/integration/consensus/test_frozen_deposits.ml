@@ -647,6 +647,16 @@ let test_deposits_unfrozen_after_deactivation () =
   let rec loop b n =
     if n = 0 then return b
     else
+      let* ai_activation_cycle =
+        Context.get_adaptive_issuance_launch_cycle (B b)
+      in
+      let frozen_deposits_when_deactivated =
+        match ai_activation_cycle with
+        | None -> Tez.zero
+        | Some cycle ->
+            if Cycle.(cycle > add root last_active_cycle) then Tez.zero
+            else initial_frozen_deposits
+      in
       let* b = Block.bake_until_cycle_end ~policy:(By_account account2) b in
       let* is_deactivated = Context.Delegate.deactivated (B b) account1 in
       let* frozen_deposits =
@@ -664,7 +674,8 @@ let test_deposits_unfrozen_after_deactivation () =
         Assert.equal_tez
           ~loc:__LOC__
           frozen_deposits
-          (if is_deactivated then Tez.zero else initial_frozen_deposits)
+          (if is_deactivated then frozen_deposits_when_deactivated
+          else initial_frozen_deposits)
       in
       loop b (pred n)
   in
