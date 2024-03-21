@@ -354,7 +354,7 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the amount (in mutez) frozen as a deposit at the time the \
-         staking rights for the current cycle where computed."
+         staking rights for the current cycle were computed."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "frozen_deposits")
