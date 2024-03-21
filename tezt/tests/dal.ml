@@ -5139,21 +5139,32 @@ module Amplification = struct
     (* Produce and publish a slot *)
     let source = Constant.bootstrap1 in
     let slot_content = "content" in
-    let wait_slot commitment =
+    let* before_publication_level = Client.level client in
+    let publication_level = 1 + before_publication_level in
+    let wait_slot _commitment =
       Log.info "Waiting for reconstruction to start" ;
       let* () =
         Dal_node.wait_for observer "reconstruct_started.v0" (fun event ->
-            let actual_commitment = JSON.(event |> as_string) in
-            if commitment = actual_commitment then Some () else None)
+            if
+              JSON.(
+                event |-> "level" |> as_int = publication_level
+                && event |-> "slot_index" |> as_int = index)
+            then Some ()
+            else None)
       in
       Log.info "Waiting for reconstruction to finish" ;
       let* () =
         Dal_node.wait_for observer "reconstruct_finished.v0" (fun event ->
-            if JSON.(event |> as_string) = commitment then Some () else None)
+            if
+              JSON.(
+                event |-> "level" |> as_int = publication_level
+                && event |-> "slot_index" |> as_int = index)
+            then Some ()
+            else None)
       in
       unit
     in
-    let* _publication_level, _commitment =
+    let* publication_level_bis, _commitment =
       publish_store_and_wait_slot
         node
         client
@@ -5164,6 +5175,10 @@ module Amplification = struct
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size slot_content
     in
+    Check.(publication_level_bis = publication_level)
+      ~__LOC__
+      Check.int
+      ~error_msg:"Unexpected publication level, actual:%L, expected:%R" ;
     unit
 end
 
