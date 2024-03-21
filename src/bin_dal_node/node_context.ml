@@ -33,6 +33,7 @@ type ready_ctxt = {
   plugin_proto : int; (* the [proto_level] of the plugin *)
   last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
+  mutable ongoing_amplifications : Types.Slot_id.Set.t;
 }
 
 type status = Ready of ready_ctxt | Starting
@@ -94,6 +95,7 @@ let set_ready ctxt plugin skip_list_cells_store cryptobox
             plugin_proto;
             last_processed_level = None;
             skip_list_cells_store;
+            ongoing_amplifications = Types.Slot_id.Set.empty;
           } ;
       return_unit
   | Ready _ -> raise Status_already_ready

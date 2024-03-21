@@ -38,6 +38,10 @@ type ready_ctxt = {
   plugin_proto : int;  (** Protocol level of the plugin. *)
   last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
+  mutable ongoing_amplifications : Types.Slot_id.Set.t;
+      (** The slot identifiers of the commitments currently being
+     amplified. This set is used to prevent concurrent amplifications
+     of the same slot. *)
 }
 
 (** The status of the dal node *)
