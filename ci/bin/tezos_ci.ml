@@ -330,33 +330,24 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
         name
   | _ -> ()) ;
   let needs, dependencies =
-    let expand_job = function
-      | {job = Gitlab_ci.Types.{name; parallel; _}; _} -> (
-          match parallel with
-          | None -> [name]
-          | Some n -> List.map (fun i -> sf "%s %d/%d" name i n) (range 1 n))
-    in
+    let name {job = {name; _}; _} = name in
     match dependencies with
-    | Staged dependencies -> (None, List.concat_map expand_job dependencies)
+    | Staged dependencies -> (None, List.map name dependencies)
     | Dependent dependencies ->
         let rec loop (needs, dependencies) = function
           | dep :: deps ->
-              let job_expanded =
-                match dep with
-                | Job j | Optional j | Artifacts j -> List.rev (expand_job j)
+              let dep_name =
+                match dep with Job j | Optional j | Artifacts j -> name j
               in
               let needs ~optional =
-                List.map
-                  (fun name -> Gitlab_ci.Types.{job = name; optional})
-                  job_expanded
-                @ needs
+                Gitlab_ci.Types.{job = dep_name; optional} :: needs
               in
               let needs, dependencies =
                 match dep with
                 | Job _ -> (needs ~optional:false, dependencies)
                 | Optional _ -> (needs ~optional:true, dependencies)
                 | Artifacts _ ->
-                    (needs ~optional:false, job_expanded @ dependencies)
+                    (needs ~optional:false, dep_name :: dependencies)
               in
               loop (needs, dependencies) deps
           | [] -> (Some (List.rev needs), List.rev dependencies)
