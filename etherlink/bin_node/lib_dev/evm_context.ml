@@ -334,6 +334,20 @@ module State = struct
                 (number, expected_block_hash)
             in
             tzfail (Node_error.Diverged (number, expected_block_hash, None)))
+    | New_delayed_transaction delayed_transaction ->
+        let*! config = execution_config in
+        let* evm_state =
+          Evm_state.execute
+            ~config
+            evm_state
+            [
+              `Input
+                ("\254"
+                ^ Bytes.to_string
+                    (Delayed_transaction.to_rlp delayed_transaction));
+            ]
+        in
+        return (evm_state, on_success)
 
   let apply_evm_events ~finalized_level (ctxt : t) events =
     let open Lwt_result_syntax in
