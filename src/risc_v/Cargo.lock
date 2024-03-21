@@ -1713,8 +1713,7 @@ checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 [[package]]
 name = "softfloat-sys"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b3ebcd12cb9c5e5bfe6731eb435ba863af244b76cef645d9a840b558bccc218"
+source = "git+https://gitlab.com/trili/softfloat-sys#1dcdb686a5044eda1f20b861c93cfda6e6e86b7e"
 dependencies = [
  "c99",
  "cc",
