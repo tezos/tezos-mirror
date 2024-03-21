@@ -140,16 +140,6 @@ let install_finalizer_dev server =
   let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
   Evm_node_lib_dev.Evm_context.shutdown ()
 
-let install_finalizer_observer server =
-  let open Lwt_syntax in
-  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  let* () = Internal_event.Simple.emit Event.event_shutdown_node exit_status in
-  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
-  let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
-  let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
-  Evm_node_lib_dev.Evm_context.shutdown ()
-
 let callback_log server conn req body =
   let open Cohttp in
   let open Lwt_syntax in
@@ -242,46 +232,6 @@ let start
       in
       return server)
     (fun _ -> return server)
-
-let observer_start
-    {
-      rpc_addr;
-      rpc_port;
-      cors_origins;
-      cors_headers;
-      mode = (_ : observer);
-      max_active_connections;
-      _;
-    } ~directory =
-  let open Lwt_result_syntax in
-  let open Tezos_rpc_http_server in
-  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
-  let host = Ipaddr.V6.to_string p2p_addr in
-  let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.allow_all in
-  let cors =
-    Resto_cohttp.Cors.
-      {allowed_headers = cors_headers; allowed_origins = cors_origins}
-  in
-  let server =
-    RPC_server.init_server
-      ~acl
-      ~cors
-      ~media_types:Media_type.all_media_types
-      directory
-  in
-  let*! () =
-    RPC_server.launch
-      ~max_active_connections
-      ~host
-      server
-      ~callback:(callback_log server)
-      node
-  in
-  let*! () =
-    Internal_event.Simple.emit Event.event_is_ready (rpc_addr, rpc_port)
-  in
-  return server
 
 module Params = struct
   let string = Tezos_clic.parameter (fun _ s -> Lwt.return_ok s)
@@ -872,51 +822,7 @@ let observer_command =
       ()
   in
   let* () = Configuration.save_observer ~force:true ~data_dir config in
-
-  let* smart_rollup_address =
-    Evm_services.get_smart_rollup_address ~evm_node_endpoint
-  in
-
-  let* _loaded =
-    Evm_context.start
-      ~data_dir
-      ?kernel_path:kernel
-      ~preimages:config.mode.preimages
-      ~preimages_endpoint:config.mode.preimages_endpoint
-      ~smart_rollup_address:
-        (Tezos_crypto.Hashed.Smart_rollup_address.to_string
-           smart_rollup_address)
-      ()
-  in
-
-  let observer_backend =
-    (module Observer.Make (struct
-      let smart_rollup_address = smart_rollup_address
-
-      let evm_node_endpoint = evm_node_endpoint
-    end) : Services_backend_sig.S)
-  in
-
-  let* () =
-    Tx_pool.start
-      {
-        rollup_node = observer_backend;
-        smart_rollup_address =
-          Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-            smart_rollup_address;
-        mode = Observer;
-      }
-  in
-  let* directory =
-    dev_directory config (observer_backend, smart_rollup_address)
-  in
-  let directory = directory |> Evm_services.register smart_rollup_address in
-
-  let* server = observer_start config ~directory in
-
-  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
-
-  Observer.main ~evm_node_endpoint
+  Observer.main ?kernel_path:kernel ~evm_node_endpoint ~data_dir ~config ()
 
 let make_prod_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
