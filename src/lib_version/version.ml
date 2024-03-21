@@ -61,6 +61,14 @@ let pp f {product; major; minor; additional_info} =
     minor
     (string_of_additional_info additional_info)
 
+let pp_simple f {product = _; major; minor; additional_info} =
+  Format.fprintf
+    f
+    "%i.%i%s"
+    major
+    minor
+    (string_of_additional_info additional_info)
+
 let to_string x = Format.asprintf "%a" pp x
 
 let to_json {product; major; minor; additional_info} commit_hash =

@@ -106,7 +106,12 @@ val to_json : t -> string -> string
     [pp f x] prints [to_string x] in [f] *)
 val pp : Format.formatter -> t -> unit
 
-(* Parse an Octez version.
+(** A simpler version printer.
+
+    Same as [pp] but does not print the product name. *)
+val pp_simple : Format.formatter -> t -> unit
+
+(** Parse an Octez version.
 
    Returns None if the version cannot be parsed. *)
 val parse_version : string -> t option

@@ -134,10 +134,10 @@ module Event = struct
     declare_3
       ~section
       ~name:"starting_node"
-      ~msg:"starting the Tezos node v{version} ({git_info})"
+      ~msg:"starting the Octez node {version} ({git_info})"
       ~level:Notice
       ("chain", Distributed_db_version.Name.encoding)
-      ~pp2:Tezos_version.Version.pp
+      ~pp2:Tezos_version.Version.pp_simple
       ("version", Tezos_version.Octez_node_version.version_encoding)
       ("git_info", Data_encoding.string)
 
