@@ -50,6 +50,7 @@ cd "${images_dir}/client-libs-dependencies" &&
     --build-arg SBT_VERSION=1.9.7 \
     --build-arg KSC_TAG=11b8e7f1b1849aaebcae32836b393d12be78b87f \
     --build-arg KSC_VERSION=0.11-SNAPSHOT \
+    --build-arg recommended_node_version="${recommended_node_version}" \
     -t "${image_name}" \
     "$@" \
     -

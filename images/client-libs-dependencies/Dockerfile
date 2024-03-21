@@ -5,6 +5,7 @@
 # - kaitai-struct-compiler installed from the source.
 # - xxd.
 # - java.
+# - node version $recommended_node_version and dependencies from package.json in the root.
 
 # This image is intended for
 # - Running end-to-end semantic validation of automatically generated
@@ -39,21 +40,22 @@ RUN apk update && apk add --no-cache \
 # Ignore warning from use of 'cd'.
 ARG SBT_VERSION=1.9.7
 COPY sbt-$SBT_VERSION.tgz.sha256 .
-# hadolint ignore=DL3003
 RUN wget -q https://github.com/sbt/sbt/releases/download/v${SBT_VERSION}/sbt-${SBT_VERSION}.tgz \
     && sha256sum --check sbt-${SBT_VERSION}.tgz.sha256 \
-    && tar xfz sbt-${SBT_VERSION}.tgz -C /tmp 
+    && tar xfz sbt-${SBT_VERSION}.tgz -C /tmp
 # Clone the repository.
 ARG KSC_TAG=11b8e7f1b1849aaebcae32836b393d12be78b87f
 ARG KSC_VERSION=0.11-SNAPSHOT
+# hadolint ignore=DL3003
 RUN git clone --recursive https://github.com/kaitai-io/kaitai_struct.git \
     # Change working directory to "kaitai_scruct/compiler" as specified here:
     #    - https://doc.kaitai.io/developers.html#_building_for_jvm
     && cd /tmp/kaitai_struct \
-    && git checkout --recurse-submodules ${KSC_TAG} 
+    && git checkout --recurse-submodules ${KSC_TAG}
 # Build universal zip package as specified here:
 #    - https://doc.kaitai.io/developers.html#_building_for_jvm
-RUN cd /tmp/kaitai_struct/compiler && /tmp/sbt/bin/sbt compilerJVM/universal:packageBin \
+WORKDIR /tmp/kaitai_struct/compiler
+RUN /tmp/sbt/bin/sbt compilerJVM/universal:packageBin \
     # Unzip executable to "/usr/local".
     && unzip jvm/target/universal/kaitai-struct-compiler-${KSC_VERSION}.zip -d /usr/local \
     # Remove "kaitai-struct" repository and "sbt".
@@ -79,3 +81,10 @@ WORKDIR /home/tezos
 
 COPY --chown=tezos:tezos install-nvm.sh /tmp/install-nvm.sh
 RUN /tmp/install-nvm.sh && rm -rf /tmp/install-nvm.sh
+
+# Install the recommended Node version and the Octez JS dependencies.
+ARG recommended_node_version=18.18.2
+COPY --chown=tezos:tezos install_build_deps.js.sh /tmp/install_build_deps.js.sh
+COPY --chown=tezos:tezos package.json /home/tezos/package.json
+COPY --chown=tezos:tezos package-lock.json /home/tezos/package-lock.json
+RUN /tmp/install_build_deps.js.sh && rm -rf /tmp/install_build_deps.js.sh /home/tezos/package.json /home/tezos/package-lock.json
