@@ -128,26 +128,96 @@ let status_quo_rountrip =
   --> finalize "staker"
   --> check_snapshot_balances "init"
 
-(* Test that a baker can stake from unstaked frozen funds. *)
+(* Test that a baker can stake from unstaked frozen funds.
+   The most recent unstakes are prioritized when staking. *)
 let shorter_roundtrip_for_baker =
-  let amount = Amount (Tez.of_mutez 333_000_000_000L) in
+  let unstake_amount = Amount (Tez.of_mutez 222_000_000_000L) in
   let consensus_rights_delay =
-    Default_parameters.constants_test.consensus_rights_delay
+    Default_parameters.constants_mainnet.consensus_rights_delay
+    (* mainnet value, = 2 *)
+  in
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
   in
   init_constants ()
   --> set S.Adaptive_issuance.autostaking_enable false
-  --> activate_ai `Force --> begin_test ["delegate"]
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+  --> set_delegate_params "delegate" init_params
+  --> add_account_with_funds
+        "staker1"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> add_account_with_funds
+        "staker2"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> wait_delegate_parameters_activation --> next_cycle
+  --> set_delegate "staker1" (Some "delegate")
+  --> set_delegate "staker2" (Some "delegate")
+  --> stake "staker1" Half --> stake "staker2" Half
+  -->
+  (* From now on, staker1 unstakes every cycle to fill all the containers, but
+     this shouldn't change anything for the baker *)
+  let next_cycle = unstake "staker1" Half --> next_cycle in
+  next_cycle
+  (* We unstake to have an amount in the last container for ufd *)
+  --> unstake "delegate" unstake_amount
   --> next_cycle
-  --> snapshot_balances "init" ["delegate"]
-  --> unstake "delegate" amount
-  --> (* Wait [n] cycles where [0 <= n <= consensus_rights_delay + 1]. *)
-  List.fold_left
-    (fun acc i -> acc |+ Tag (fs "wait %i cycles" i) --> wait_n_cycles i)
-    (Tag "wait 0 cycles" --> Empty)
-    (Stdlib.List.init (consensus_rights_delay + 1) (fun i -> i + 1))
-  --> stake "delegate" amount
-  --> check_snapshot_balances "init"
+  (* We unstake either one, two or three cycles later *)
+  --> (Tag "unstake cycle (current-2)"
+       --> unstake "delegate" unstake_amount
+       --> next_cycle --> next_cycle
+      |+ Tag "unstake cycle (current-1)" --> next_cycle
+         --> unstake "delegate" unstake_amount
+         --> next_cycle
+      |+ Tag "unstake cycle (current)" --> next_cycle --> next_cycle
+         --> unstake "delegate" unstake_amount)
+  (* Nothing is finalizable yet. If nothing else happens, next cycle the
+     first unstake request will become finalizable. *)
+  --> check_balance_field "delegate" `Unstaked_finalizable Tez.zero
+  --> (Tag "stake from unstake one container"
+       --> (Tag "one stake"
+            --> stake "delegate" (Amount (Tez.of_mutez 111_000_000_000L))
+           |+ Tag "two stakes"
+              --> stake "delegate" (Amount (Tez.of_mutez 100_000_000_000L))
+              --> stake "delegate" (Amount (Tez.of_mutez 11_000_000_000L)))
+       --> check_balance_field
+             "delegate"
+             `Unstaked_frozen_total
+             (Tez.of_mutez 333_000_000_000L)
+       (* We only removed unstake from the most recent unstake: we should
+          expect the first unstake request to finalize with its full amount on the next cycle *)
+       --> next_cycle
+       --> check_balance_field
+             "delegate"
+             `Unstaked_finalizable
+             (Tez.of_mutez 222_000_000_000L)
+       --> check_balance_field
+             "delegate"
+             `Unstaked_frozen_total
+             (Tez.of_mutez 111_000_000_000L)
+      |+ Tag "stake from unstake two containers"
+         --> stake "delegate" (Amount (Tez.of_mutez 333_000_000_000L))
+         --> check_balance_field
+               "delegate"
+               `Unstaked_frozen_total
+               (Tez.of_mutez 111_000_000_000L)
+         (* We should have removed all the unstake from the most recent container.
+            The rest will be finalizable next cycle. *)
+         --> next_cycle
+         --> check_balance_field
+               "delegate"
+               `Unstaked_finalizable
+               (Tez.of_mutez 111_000_000_000L)
+         --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
+      |+ Tag "stake from all unstaked + liquid"
+         --> stake "delegate" (Amount (Tez.of_mutez 555_000_000_000L))
+         (* Nothing remains unstaked *)
+         --> check_balance_field "delegate" `Unstaked_frozen_total Tez.zero
+         --> check_balance_field "delegate" `Unstaked_finalizable Tez.zero)
 
 (* Test three different ways to finalize unstake requests:
    - finalize_unstake operation
@@ -339,6 +409,92 @@ let forbid_costaking =
   (* Now possible *)
   --> stake "staker" amount
 
+(* Check that a delegate can be deactivated under AI by unstaking everything, even with stakers.
+   Check that such a delegate can reactivate later, and still have their stakers *)
+let test_deactivation =
+  let init_params =
+    {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
+  in
+  let fail_if_deactivated delegate =
+    let open Lwt_result_syntax in
+    exec_unit (fun (block, state) ->
+        let dlgt = State.find_account delegate state in
+        let* deactivated = Context.Delegate.deactivated (B block) dlgt.pkh in
+        Assert.is_true ~loc:__LOC__ (not deactivated))
+  in
+  init_constants ()
+  --> set S.Adaptive_issuance.autostaking_enable false
+  --> activate_ai `Force
+  --> begin_test ["delegate"; "faucet"]
+  --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
+  --> set_delegate_params "delegate" init_params
+  --> add_account_with_funds
+        "staker1"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> add_account_with_funds
+        "staker2"
+        ~funder:"faucet"
+        (Amount (Tez.of_mutez 200_000_000_000L))
+  --> wait_delegate_parameters_activation --> next_cycle
+  --> set_delegate "staker1" (Some "delegate")
+  --> set_delegate "staker2" (Some "delegate")
+  --> stake "staker1" Half --> stake "staker2" Half --> next_cycle
+  (* The delegate unstakes all, starting the deactivation process *)
+  --> unstake "delegate" All
+  (* "delegate" can still bake, but not for long... *)
+  --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay)
+  (* After consensus_rights_delay, the delegate still has rights... *)
+  --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> next_cycle
+  (* ...But not in the following cycle *)
+  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  (* The stakers still have stake, and can still stake/unstake *)
+  --> check_balance_field "staker1" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> check_balance_field "staker2" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> assert_success ~loc:__LOC__ (stake "staker1" Half)
+  --> assert_success
+        ~loc:__LOC__
+        (unstake "staker2" Half --> wait_n_cycles 5
+       --> finalize_unstake "staker2")
+  (* We wait until the delegate is completely deactivated *)
+  --> assert_success ~loc:__LOC__ (fail_if_deactivated "delegate")
+  (* We already waited for [consensus_rights_delay] + 1 cycles since 0 stake,
+     we must wait for [consensus_rights_delay] more. *)
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay)
+  --> assert_success ~loc:__LOC__ (fail_if_deactivated "delegate")
+  --> next_cycle
+  --> assert_failure ~loc:__LOC__ (fail_if_deactivated "delegate")
+  --> next_cycle
+  (* The stakers still have stake, and can still stake/unstake *)
+  --> check_balance_field "staker1" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> check_balance_field "staker2" `Staked (Tez.of_mutez 100_000_000_000L)
+  --> assert_success ~loc:__LOC__ (stake "staker1" Half)
+  --> assert_success
+        ~loc:__LOC__
+        (unstake "staker2" Half --> wait_n_cycles 5
+       --> finalize_unstake "staker2")
+  --> next_cycle
+  (* We now reactivate the delegate *)
+  --> set_delegate "delegate" (Some "delegate")
+  --> stake "delegate" (Amount (Tez.of_mutez 2_000_000_000_000L))
+  (* It cannot bake right away *)
+  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay)
+  (* After consensus_rights_delay, the delegate still has no rights... *)
+  --> assert_failure ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> next_cycle
+  (* ...But has enough to bake in the following cycle *)
+  --> assert_success ~loc:__LOC__ (next_block_with_baker "delegate")
+  --> exec_unit (fun (_, state) ->
+          let dlgt = State.find_account "delegate" state in
+          let total = Frozen_tez.total_current dlgt.frozen_deposits in
+          Assert.equal_tez ~loc:__LOC__ total (Tez.of_mutez 2_200_000_000_000L))
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -354,6 +510,7 @@ let tests =
        ("Test unset delegate", unset_delegate);
        ("Test forbid costake", forbid_costaking);
        ("Test stake from unstake", shorter_roundtrip_for_baker);
+       ("Test deactivation under AI", test_deactivation);
      ]
 
 let () = register_tests ~__FILE__ ~tags:["protocol"; "scenario"; "stake"] tests

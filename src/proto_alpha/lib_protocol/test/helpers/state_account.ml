@@ -89,7 +89,16 @@ let stake_from_unstake amount current_cycle consensus_rights_delay delegate_name
         let rec aux acc_unstakes rem_amount rem_unstakes =
           match rem_unstakes with
           | [] -> (acc_unstakes, rem_amount)
-          | (Unstaked_frozen.{initial; _} as h) :: t ->
+          | (Unstaked_frozen.{requests; slash_pct; _} as h) :: t ->
+              (* Stake from unstake cannot be called when slashing happened *)
+              assert (Compare.Int.(slash_pct = 0)) ;
+              (* This ensures initial = current for each requester.
+                 However, the "initial" field is for the sum of all unstakes,
+                 so cannot be used here *)
+              let initial =
+                String.Map.find_opt delegate_name requests
+                |> Option.value ~default:Tez.zero
+              in
               if Tez.(rem_amount = zero) then
                 (acc_unstakes @ rem_unstakes, Tez.zero)
               else if Tez.(rem_amount >= initial) then

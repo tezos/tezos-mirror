@@ -65,7 +65,7 @@ let test_wait_rewards_no_ai_yes_auto =
         --> next_block)
 
 (** Tests reward distribution under AI:
-    - with and without stakers;
+    - with and without stakers (sometimes overstaking);
     - with different values of edge. *)
 let test_wait_rewards_with_ai =
   let set_edge pct =
@@ -103,13 +103,31 @@ let test_wait_rewards_with_ai =
                 --> stake "staker2" (Amount (Tez.of_mutez 333_001_987L))
                 --> (Empty
                     |+ Tag "three stakers! ha ha ha"
+                       (* This staker overstakes *)
                        --> add_account_with_funds
                              "staker3"
                              ~funder:"faucet"
-                             (Amount (Tez.of_mutez 2_000_000_000L))
+                             (Amount (Tez.of_mutez 1_800_000_000_000L))
                        --> set_delegate "staker3" (Some "delegate")
-                       --> stake "staker3" (Amount (Tez.of_mutez 123_456_788L))
-                    )))
+                       --> stake
+                             "staker3"
+                             (Amount (Tez.of_mutez 1_799_123_456_788L))
+                       --> exec_unit (fun (_, state) ->
+                               let src = State.find_account "delegate" state in
+                               let self_frozen =
+                                 src.frozen_deposits.self_current
+                               in
+                               let staked =
+                                 Frozen_tez.total_co_current_q
+                                   src.frozen_deposits.co_current
+                               in
+                               Assert.is_true
+                                 ~loc:__LOC__
+                                 Q.(
+                                   Tez.mul_q
+                                     self_frozen
+                                     src.parameters.limit_of_staking_over_baking
+                                   < staked)))))
   --> set_baker "delegate" --> wait_n_cycles 20
 
 (** Tests reward distribution under AI for one baker and one staker,

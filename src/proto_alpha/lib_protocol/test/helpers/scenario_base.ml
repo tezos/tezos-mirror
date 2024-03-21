@@ -17,6 +17,9 @@ open Log_helpers
 (** For [assert_failure], when expected error does not match the actual error. *)
 type error += Unexpected_error
 
+(** For [assert_failure], when scenario actually succeeds when expected to fail. *)
+type error += Unexpected_success
+
 (** Usual threaded state for the tests. Contains the current block, pending operations
     and the known [State.t] *)
 type t = Block.t * State.t
@@ -139,14 +142,16 @@ let check_rate_evolution (f : Q.t -> Q.t -> bool) : (t, t) scenarios =
 
 (* ======== Misc functions ========*)
 
-let check_failure_aux ?expected_error :
+let check_failure_aux ?(loc = __LOC__) ?expected_error :
     ('a -> 'b tzresult Lwt.t) -> 'a -> 'a tzresult Lwt.t =
   let open Lwt_result_syntax in
   fun f input ->
     Log.info ~color:assert_block_color "Entering failing scenario..." ;
     let*! output = f input in
     match output with
-    | Ok _ -> failwith "Unexpected success"
+    | Ok _ ->
+        Log.info "%s: Unexpected success@." loc ;
+        tzfail Unexpected_success
     | Error e -> (
         match expected_error with
         | None ->
@@ -159,28 +164,44 @@ let check_failure_aux ?expected_error :
               return input)
             else (
               Log.info
-                ~color:Log.Color.FG.red
-                "Unexpected error:@.%a@.Expected:@.%a@."
+                "%s: Unexpected error:@.%a@.Expected:@.%a@."
+                loc
                 (Format.pp_print_list pp)
                 e
                 (Format.pp_print_list pp)
                 exp_e ;
               tzfail Unexpected_error))
 
-let check_fail_and_rollback ?expected_error :
+let check_fail_and_rollback ?(loc = __LOC__) ?expected_error :
     ('a, 'b) single_scenario -> 'a -> 'a tzresult Lwt.t =
- fun sc input -> check_failure_aux ?expected_error (run_scenario sc) input
+ fun sc input -> check_failure_aux ~loc ?expected_error (run_scenario sc) input
 
 (** Useful function to test expected failures: runs the given branch until it fails,
     then rollbacks to before execution. Fails if the given branch Succeeds *)
-let assert_failure ?expected_error : ('a, 'b) scenarios -> ('a, 'a) scenarios =
+let assert_failure ?(loc = __LOC__) ?expected_error :
+    ('a, 'b) scenarios -> ('a, 'a) scenarios =
  fun scenarios ->
   match unfold_scenarios scenarios with
   | [] -> Empty
-  | [(sc, _, _)] -> exec (check_fail_and_rollback ?expected_error sc)
+  | [(sc, _, _)] -> exec (check_fail_and_rollback ~loc ?expected_error sc)
   | _ ->
       exec (fun _ ->
-          failwith "Error: assert_failure used with branching scenario")
+          failwith "%s: Error: assert_failure used with branching scenario" loc)
+
+(** Check a scenario does not fail, and rolls back to before the assert *)
+let assert_success ?(loc = __LOC__) : ('a, 'b) scenarios -> ('a, 'a) scenarios =
+ fun scenarios ->
+  match unfold_scenarios scenarios with
+  | [] -> Empty
+  | [(sc, _, _)] ->
+      exec
+        (let open Lwt_result_syntax in
+        fun input ->
+          let* _ = run_scenario sc input in
+          return input)
+  | _ ->
+      exec (fun _ ->
+          failwith "%s: Error: assert_success used with branching scenario" loc)
 
 (** Loop *)
 let rec loop n : ('a, 'a) scenarios -> ('a, 'a) scenarios =
