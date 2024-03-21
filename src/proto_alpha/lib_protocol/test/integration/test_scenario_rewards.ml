@@ -84,7 +84,7 @@ let test_wait_rewards_with_ai =
       |+ Tag "edge = 0.24" --> set_edge 0.24
       |+ Tag "edge = 0.11... repeating" --> set_edge 0.1111111111
       |+ Tag "edge = 1" --> set_edge 1.)
-  --> wait_delegate_parameters_activation --> next_cycle
+  --> wait_delegate_parameters_activation
   --> (Tag "no staker" --> Empty
       |+ Tag "one staker"
          --> add_account_with_funds
@@ -146,7 +146,7 @@ let test_wait_rewards_with_ai_staker_variation =
   init_constants ~reward_per_block:1_000_000_007L ()
   --> activate_ai `Force
   --> begin_test ["delegate"; "faucet"]
-  --> set_edge 0.24 --> wait_delegate_parameters_activation --> next_cycle
+  --> set_edge 0.24 --> wait_delegate_parameters_activation
   --> add_account_with_funds
         "staker"
         ~funder:"faucet"

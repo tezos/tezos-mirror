@@ -348,6 +348,9 @@ let wait_cycle_until condition =
           ("AI activation (with votes)", "AI activated")
       | `delegate_parameters_activation ->
           ("delegate parameters activation", "delegate parameters activated")
+      | `right_before_delegate_parameters_activation ->
+          ( "right before delegate parameters activation",
+            "delegate parameters will activate next cycle" )
       | `And (cond1, cond2) ->
           let to1, done1 = get_names cond1 in
           let to2, done2 = get_names cond2 in
@@ -386,6 +389,17 @@ let wait_cycle_until condition =
                  activate with the current protocol parameters, aborting." ;
               assert false)
       | `delegate_parameters_activation ->
+          fun (block, _state) ->
+            let init_cycle = Block.current_cycle init_block in
+            let cycles_to_wait =
+              (* Delegate parameters wait for at least
+                 [delegate_parameters_activation_delay] **full
+                 cycles** to activate, so we need to add 1 to the
+                 number of cycles to wait. *)
+              init_state.constants.delegate_parameters_activation_delay + 1
+            in
+            Cycle.(Block.current_cycle block >= add init_cycle cycles_to_wait)
+      | `right_before_delegate_parameters_activation ->
           fun (block, _state) ->
             let init_cycle = Block.current_cycle init_block in
             let cycles_to_wait =

@@ -48,7 +48,7 @@ let init_staker_delegate_or_external =
                ~funder:"delegate"
                (Amount (Tez.of_mutez 2_000_000_000_000L))
          --> set_delegate "staker" (Some "delegate"))
-  --> wait_delegate_parameters_activation --> next_cycle
+  --> wait_delegate_parameters_activation
 
 let stake_init =
   stake "staker" Half
@@ -153,7 +153,7 @@ let shorter_roundtrip_for_baker =
         "staker2"
         ~funder:"faucet"
         (Amount (Tez.of_mutez 200_000_000_000L))
-  --> wait_delegate_parameters_activation --> next_cycle
+  --> wait_delegate_parameters_activation
   --> set_delegate "staker1" (Some "delegate")
   --> set_delegate "staker2" (Some "delegate")
   --> stake "staker1" Half --> stake "staker2" Half
@@ -316,7 +316,7 @@ let change_delegate =
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> snapshot_balances "init" ["staker"]
   --> set_delegate "staker" (Some "delegate1")
-  --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
+  --> wait_delegate_parameters_activation --> stake "staker" Half
   --> snapshot_balances "after_stake" ["staker"]
   (* Changing delegates. This also unstakes all staked funds. *)
   --> set_delegate "staker" (Some "delegate2")
@@ -364,7 +364,7 @@ let unset_delegate =
         ~funder:"delegate"
         (Amount (Tez.of_mutez 2_000_000L))
   --> set_delegate "staker" (Some "delegate")
-  --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
+  --> wait_delegate_parameters_activation --> stake "staker" Half
   --> unstake "staker" All --> next_cycle --> set_delegate "staker" None
   --> next_cycle
   --> transfer "staker" "dummy" All
@@ -403,16 +403,17 @@ let forbid_costaking =
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> set_delegate "staker" (Some "delegate")
   --> wait_cycle_until (`And (`AI_activation, `delegate_parameters_activation))
-  --> next_cycle
   (* try stake in normal conditions *)
   --> stake "staker" amount
   (* Change delegate parameters to forbid staking *)
   --> set_delegate_params "delegate" no_costake_params
   (* The changes are not immediate *)
   --> stake "staker" amount
-  (* The parameters change is applied exactly
-     [delegate_parameters_activation_delay] after the request *)
-  --> wait_delegate_parameters_activation
+  (* The parameters change is applied after at least
+     [delegate_parameters_activation_delay] full cycles have passed,
+     that is, exactly [delegate_parameters_activation_delay + 1]
+     cycles after the request. *)
+  --> wait_cycle_until `right_before_delegate_parameters_activation
   (* Not yet... *)
   --> stake "staker" amount
   --> next_cycle
@@ -426,7 +427,7 @@ let forbid_costaking =
   --> finalize_unstake "staker"
   (* Can authorize stake again *)
   --> set_delegate_params "delegate" init_params
-  --> wait_delegate_parameters_activation
+  --> wait_cycle_until `right_before_delegate_parameters_activation
   (* Not yet... *)
   --> assert_failure (stake "staker" amount)
   --> next_cycle
@@ -460,7 +461,7 @@ let test_deactivation =
         "staker2"
         ~funder:"faucet"
         (Amount (Tez.of_mutez 200_000_000_000L))
-  --> wait_delegate_parameters_activation --> next_cycle
+  --> wait_delegate_parameters_activation
   --> set_delegate "staker1" (Some "delegate")
   --> set_delegate "staker2" (Some "delegate")
   --> stake "staker1" Half --> stake "staker2" Half --> next_cycle
