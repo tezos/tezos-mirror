@@ -315,9 +315,9 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   let* () = bake_for tezos_client in
   f rollup_address sc_rollup_node
 
-let make_dal_node ?peers ?attester_profiles ?producer_profiles
+let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
     ?bootstrap_profile tezos_node =
-  let dal_node = Dal_node.create ~node:tezos_node () in
+  let dal_node = Dal_node.create ?name ~node:tezos_node () in
   let* () =
     Dal_node.init_config
       ?peers
