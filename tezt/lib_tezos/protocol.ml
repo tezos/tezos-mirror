@@ -52,7 +52,7 @@ let number = function Oxford -> 018 | Paris -> 019 | Alpha -> 020
 let directory = function
   | Alpha -> "proto_alpha"
   | Oxford -> "proto_018_Proxford"
-  | Paris -> "proto_019_PtParisA"
+  | Paris -> "proto_019_PtParisB"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)

@@ -30,7 +30,7 @@ depopts: [
   "octez-protocol-016-PtMumbai-libs"
   "octez-protocol-017-PtNairob-libs"
   "octez-protocol-018-Proxford-libs"
-  "octez-protocol-019-PtParisA-libs"
+  "octez-protocol-019-PtParisB-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -48,7 +48,7 @@ conflicts: [
   "octez-protocol-016-PtMumbai-libs" { != version }
   "octez-protocol-017-PtNairob-libs" { != version }
   "octez-protocol-018-Proxford-libs" { != version }
-  "octez-protocol-019-PtParisA-libs" { != version }
+  "octez-protocol-019-PtParisB-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
