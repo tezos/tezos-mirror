@@ -538,6 +538,11 @@ let jobs pipeline_type =
            to run `make check-kaitai-struct-files` and commit the resulting \
            diff.' ; false)";
         ]
+        ~artifacts:
+          (artifacts
+             ~expire_in:(Hours 1)
+             ~when_:On_success
+             ["_build/default/client-libs/bin_codec_kaitai/codec.exe"])
       |> job_external_split
     in
     let job_kaitai_e2e_checks =
@@ -550,7 +555,7 @@ let jobs pipeline_type =
           (Dependent
              [
                Artifacts job_docker_client_libs_dependencies;
-               Job job_kaitai_checks;
+               Artifacts job_kaitai_checks;
              ])
         ~rules:
           (make_rules ~changes:changeset_kaitai_e2e_files ~dependent:true ())
@@ -568,8 +573,7 @@ let jobs pipeline_type =
              [])
         [
           "./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh \
-           client-libs/kaitai-struct-files/files \
-           client-libs/kaitai-struct-files/input 2>/dev/null";
+           client-libs/kaitai-struct-files/files 2>/dev/null";
         ]
       |> job_external_split
     in

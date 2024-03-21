@@ -31,7 +31,9 @@ RUN apk update && apk add --no-cache \
     # Install Java for building and running "kaitai-struct-compiler".
     openjdk11 \
     # deps for nodejs/install-nvm.sh
-    bash wget gcc make
+    bash wget gcc make \
+    # deps for running compiled executables: _build/default/client-libs/bin_codec_kaitai/codec.exe
+    libev-dev hidapi-dev
 
 # Install "kaitai-struct-compiler".
 # Building "kaitai-struct-compiler" from source is described here:
