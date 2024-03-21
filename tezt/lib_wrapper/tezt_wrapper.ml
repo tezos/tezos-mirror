@@ -14,6 +14,8 @@ let error_mode_for_missing_use = ref Fail
 
 let error_mode_for_useless_use = ref Warn
 
+let error_mode_for_non_existing_use = ref Fail
+
 module Uses = struct
   type t = {tag : string; path : string}
 
@@ -95,6 +97,22 @@ let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
      [chdir] would let tests use [/tmp] and system executables more easily. *)
   let unused_uses_tags = ref uses_tags in
   let run_test () =
+    (* Check that [~uses] exist. Allows to fail earlier and with better error messages. *)
+    let uses_that_do_not_exist =
+      Fun.flip List.filter uses @@ fun uses -> not (Sys.file_exists uses.path)
+    in
+    (match uses_that_do_not_exist with
+    | [] -> ()
+    | _ :: _ ->
+        let paths =
+          Fun.flip List.map uses_that_do_not_exist @@ fun uses -> uses.path
+        in
+        error
+          !error_mode_for_non_existing_use
+          "In %S, test %S requires %s which do(es) not exist."
+          file
+          title
+          (String.concat ", " (List.map (sf "'%s'") paths))) ;
     (* Set hook so that tests can only call [Uses.path] on allowed paths. *)
     (Uses.path_handler :=
        fun uses ->
