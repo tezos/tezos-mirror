@@ -13,10 +13,7 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    type transactions = {
-      raw : string list;
-      delayed : Ethereum_types.Delayed_transaction.t list;
-    }
+    type transactions = string list
 
     type messages = transactions
 
@@ -66,7 +63,6 @@ let install_finalizer_seq server private_server =
   let* () = Rollup_node_follower.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
-  let* () = Delayed_inbox.shutdown () in
   return_unit
 
 let callback_log server conn req body =
@@ -275,7 +271,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       let* () =
         Evm_context.apply_sequencer_blueprint genesis_timestamp genesis
       in
-      Blueprints_publisher.publish Z.zero genesis.to_publish
+      Blueprints_publisher.publish Z.zero genesis
     else return_unit
   in
 
@@ -293,9 +289,6 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let* () =
     Block_producer.start
       {cctxt; smart_rollup_address; sequencer_key = sequencer}
-  in
-  let* () =
-    Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
   in
   let* () = Evm_events_follower.start {rollup_node_endpoint} in
   let* () = catchup_evm_event ~rollup_node_endpoint in

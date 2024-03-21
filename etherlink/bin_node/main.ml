@@ -890,7 +890,7 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   let* messages =
     match kind with
     | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
-        let* Sequencer_blueprint.{to_publish; _} =
+        let* blueprint =
           Sequencer_blueprint.create
             ~cctxt
             ~sequencer_key:sk_uri
@@ -901,7 +901,7 @@ let make_dev_messages ~kind ~smart_rollup_address data =
             ~transactions
             ~delayed_transactions:[]
         in
-        return @@ List.map (fun (`External s) -> s) to_publish
+        return @@ List.map (fun (`External s) -> s) blueprint
     | `Transaction ->
         let*? chunks =
           List.map_e

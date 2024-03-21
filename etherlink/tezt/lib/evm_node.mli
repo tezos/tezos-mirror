@@ -140,10 +140,13 @@ val terminate : ?timeout:float -> t -> unit Lwt.t
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
+type delayed_transaction_kind = Deposit | Transaction
+
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
   | Sequencer_upgrade : (string * Hex.t * Client.Time.t) evm_event_kind
   | Blueprint_applied : (int * string) evm_event_kind
+  | New_delayed_transaction : (delayed_transaction_kind * string) evm_event_kind
 
 (** [wait_for_evm_event evm_node ~event_kind] wait for the event
     [evm_events_new_event.v0] using {!wait_for} where the event kind

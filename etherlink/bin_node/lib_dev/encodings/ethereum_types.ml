@@ -1273,12 +1273,6 @@ module Delayed_transaction = struct
     let rlp = List [Value hash; List [Value tag; content]] in
     encode rlp
 
-  let of_bytes hash bytes =
-    match bytes |> Rlp.decode with
-    | Ok Rlp.(List [rlp_content; _timestamp; _level]) ->
-        of_rlp_content hash rlp_content
-    | _ -> None
-
   let pp_kind fmt = function
     | Transaction -> Format.pp_print_string fmt "Transaction"
     | Deposit -> Format.pp_print_string fmt "Deposit"

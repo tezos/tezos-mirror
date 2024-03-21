@@ -251,32 +251,50 @@ module Q = struct
         ]
     end
 
+    module V5 = struct
+      let name = "create_blueprints_table"
+
+      let up =
+        [
+          migration_step
+            {|
+        CREATE TABLE blueprints (
+          id SERIAL PRIMARY KEY,
+          payload BLOB NOT NULL,
+          timestamp DATETIME NOT NULL
+        )|};
+          migration_step {|
+          DROP TABLE executable_blueprints
+|};
+          migration_step {|
+          DROP TABLE publishable_blueprints
+|};
+        ]
+    end
+
     let all : migration list =
-      [(module V0); (module V1); (module V2); (module V3); (module V4)]
+      [
+        (module V0);
+        (module V1);
+        (module V2);
+        (module V3);
+        (module V4);
+        (module V5);
+      ]
   end
 
-  module Executable_blueprints = struct
+  module Blueprints = struct
     let insert =
       (t3 level timestamp payload ->. unit)
-      @@ {eos|INSERT INTO executable_blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
+      @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
 
     let select =
       (level ->? t2 payload timestamp)
-      @@ {eos|SELECT payload, timestamp FROM executable_blueprints WHERE id = ?|eos}
-  end
-
-  module Publishable_blueprints = struct
-    let insert =
-      (t2 level payload ->. unit)
-      @@ {eos|INSERT INTO publishable_blueprints (id, payload) VALUES (?, ?)|eos}
-
-    let select =
-      (level ->? payload)
-      @@ {eos|SELECT payload FROM publishable_blueprints WHERE id = ?|eos}
+      @@ {eos|SELECT payload, timestamp FROM blueprints WHERE id = ?|eos}
 
     let select_range =
       (t2 level level ->* t2 level payload)
-      @@ {|SELECT id, payload FROM publishable_blueprints
+      @@ {|SELECT id, payload FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
   end
@@ -452,36 +470,26 @@ let init ~data_dir =
   in
   return store
 
-module Executable_blueprints = struct
+module Blueprints = struct
   let store store (blueprint : Blueprint_types.t) =
     with_connection store @@ fun conn ->
     Db.exec
       conn
-      Q.Executable_blueprints.insert
+      Q.Blueprints.insert
       (blueprint.number, blueprint.timestamp, blueprint.payload)
 
   let find store number =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    let+ opt = Db.find_opt conn Q.Executable_blueprints.select number in
+    let+ opt = Db.find_opt conn Q.Blueprints.select number in
     match opt with
     | Some (payload, timestamp) ->
         Some Blueprint_types.{payload; timestamp; number}
     | None -> None
-end
-
-module Publishable_blueprints = struct
-  let store store number blueprint =
-    with_connection store @@ fun conn ->
-    Db.exec conn Q.Publishable_blueprints.insert (number, blueprint)
-
-  let find store number =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Publishable_blueprints.select number
 
   let find_range store ~from ~to_ =
     with_connection store @@ fun conn ->
-    Db.collect_list conn Q.Publishable_blueprints.select_range (from, to_)
+    Db.collect_list conn Q.Blueprints.select_range (from, to_)
 end
 
 module Context_hashes = struct

@@ -252,15 +252,24 @@ let wait_for_successful_upgrade evm_node =
         let level = json |-> "level" |> as_int in
         Some (root_hash, level))
 
+type delayed_transaction_kind = Deposit | Transaction
+
+let delayed_transaction_kind_of_string = function
+  | "transaction" -> Transaction
+  | "deposit" -> Deposit
+  | s -> Test.fail "%s is neither a transaction or deposit" s
+
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
   | Sequencer_upgrade : (string * Hex.t * Client.Time.t) evm_event_kind
   | Blueprint_applied : (int * string) evm_event_kind
+  | New_delayed_transaction : (delayed_transaction_kind * string) evm_event_kind
 
 let string_of_evm_event_kind : type a. a evm_event_kind -> string = function
   | Kernel_upgrade -> "kernel_upgrade"
   | Sequencer_upgrade -> "sequencer_upgrade"
   | Blueprint_applied -> "blueprint_applied"
+  | New_delayed_transaction -> "new_delayed_transaction"
 
 let parse_evm_event_kind : type a. a evm_event_kind -> JSON.t -> a option =
  fun kind json ->
@@ -297,6 +306,16 @@ let parse_evm_event_kind : type a. a evm_event_kind -> JSON.t -> a option =
           Test.fail
             ~__LOC__
             "invalid json for the evm event kind blueprint applied")
+  | New_delayed_transaction -> (
+      match as_list_opt (json |-> "event") with
+      | Some [kind; hash; _raw] ->
+          let kind = delayed_transaction_kind_of_string (as_string kind) in
+          let hash = as_string hash in
+          Some (kind, hash)
+      | _ ->
+          Test.fail
+            ~__LOC__
+            "invalid json for the evm event kind new delayed transaction")
 
 let wait_for_evm_event event ?(check = parse_evm_event_kind event) evm_node =
   wait_for

@@ -129,9 +129,7 @@ module Worker = struct
     let*! () = Blueprint_events.catching_up lower_bound upper_bound in
 
     let* blueprints =
-      Evm_context.publishable_blueprints_range
-        (Qty lower_bound)
-        (Qty upper_bound)
+      Evm_context.blueprints_range (Qty lower_bound) (Qty upper_bound)
     in
 
     let expected_count = Z.(to_int (sub upper_bound lower_bound)) + 1 in

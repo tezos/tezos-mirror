@@ -58,8 +58,8 @@ val execute_and_inspect :
   Simulation.Encodings.simulate_input ->
   bytes option list tzresult Lwt.t
 
-(** [last_produced_blueprint ctxt] returns the pair of publishable and
-    executable blueprints used to create the current head of the chain. *)
+(** [last_produced_blueprint ctxt] returns the blueprint used to
+    create the current head of the chain. *)
 val last_produced_blueprint : unit -> Blueprint_types.t tzresult Lwt.t
 
 (** [apply_blueprint ctxt blueprint] applies [blueprint] in the freshest EVM
@@ -78,10 +78,10 @@ val head_info : unit -> head tzresult Lwt.t
 val blueprints_watcher :
   unit -> Blueprint_types.t Lwt_stream.t * Lwt_watcher.stopper
 
-val executable_blueprint :
+val blueprint :
   Ethereum_types.quantity -> Blueprint_types.t option tzresult Lwt.t
 
-val publishable_blueprints_range :
+val blueprints_range :
   Ethereum_types.quantity ->
   Ethereum_types.quantity ->
   (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
@@ -91,3 +91,6 @@ val last_known_l1_level : unit -> int32 option tzresult Lwt.t
 val new_last_known_l1_level : int32 -> unit tzresult Lwt.t
 
 val shutdown : unit -> unit Lwt.t
+
+(** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
+val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t

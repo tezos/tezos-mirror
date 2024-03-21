@@ -40,6 +40,10 @@ val modify : key:string -> value:string -> t -> t Lwt.t
     [evm_state], if any. *)
 val inspect : t -> string -> bytes option Lwt.t
 
+(** [subkeys evm_state key] returns the list of value stored under [key] in
+    [evm_state]. *)
+val subkeys : t -> string -> string trace Lwt.t
+
 (** [execute_and_inspect ~data_dir ?wasm_entrypoint ~config ~input
     evm_state] executes the [wasm_entrypoint] function (default to
     [kernel_run]) with [input] within the inbox of [evm_state], and

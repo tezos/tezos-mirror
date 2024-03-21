@@ -37,6 +37,8 @@ let evm rst = sf "/evm%s" rst
 
 let world_state rst = evm (sf "/world_state%s" rst)
 
+let delayed_inbox = evm "/delayed-inbox"
+
 let kernel rst = sf "/kernel%s" rst
 
 let kernel_root_hash = evm "/kernel_root_hash"

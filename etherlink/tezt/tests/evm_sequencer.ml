@@ -782,19 +782,16 @@ let wait_for_event ?(timeout = 30.) ?(levels = 10) event_watcher ~sequencer
 let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
     ~client =
   let event_watcher =
-    let added =
-      Evm_node.wait_for sequencer "delayed_inbox_add_transaction.v0"
-      @@ fun json ->
-      let hash = JSON.(json |-> "hash" |> as_string) in
-      Some hash
-    in
+    let added = Evm_node.wait_for_evm_event New_delayed_transaction sequencer in
     let injected =
       Evm_node.wait_for sequencer "block_producer_transaction_injected.v0"
       @@ fun json ->
       let hash = JSON.(json |> as_string) in
       Some hash
     in
-    let* added_hash, injected_hash = Lwt.both added injected in
+    let* (_transaction_kind, added_hash), injected_hash =
+      Lwt.both added injected
+    in
     Check.((added_hash = injected_hash) string)
       ~error_msg:"Injected hash %R is not the expected one %L" ;
     Lwt.return_unit
@@ -808,32 +805,18 @@ let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
       "Timed out while waiting for transaction to be added to the delayed \
        inbox and injected"
 
-let wait_for_delayed_inbox_fetch ~sequencer ~sc_rollup_node ~client =
-  let event_watcher =
-    Evm_node.wait_for sequencer "delayed_inbox_fetch_succeeded.v0"
-    @@ fun json ->
-    let nb = JSON.(json |-> "nb" |> as_int) in
-    Some nb
+let check_delayed_inbox_is_empty ~sc_rollup_node =
+  let* subkeys =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:Durable_storage_path.delayed_inbox
+         ()
   in
-  wait_for_event
-    event_watcher
-    ~sequencer
-    ~sc_rollup_node
-    ~client
-    ~error_msg:"Timed out while waiting for delayed inbox to be fetched"
-
-let wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~client =
-  let levels = 10 in
-  let rec go n =
-    if n = 0 then
-      Test.fail "Timed out waiting for the delayed inbox to be empty"
-    else
-      let* nb =
-        wait_for_delayed_inbox_fetch ~sequencer ~sc_rollup_node ~client
-      in
-      if nb = 0 then Lwt.return_unit else go (n - 1)
-  in
-  go levels
+  Check.((List.length subkeys = 1) int)
+    ~error_msg:"Expected no elements in the delayed inbox" ;
+  unit
 
 let test_delayed_transfer_is_included =
   Protocol.register_test
@@ -843,7 +826,15 @@ let test_delayed_transfer_is_included =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
+  let* {
+         client;
+         l1_contracts;
+         sc_rollup_address;
+         sc_rollup_node;
+         sequencer;
+         proxy;
+         _;
+       } =
     setup_sequencer ~da_fee:arb_da_fee_for_delayed_inbox protocol
   in
   let endpoint = Evm_node.endpoint sequencer in
@@ -870,9 +861,8 @@ let test_delayed_transfer_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () =
-    wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~client
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
   Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
@@ -893,7 +883,15 @@ let test_delayed_deposit_is_included =
     ~uses
   @@ fun protocol ->
   (* Start the evm node *)
-  let* {client; l1_contracts; sc_rollup_address; sc_rollup_node; sequencer; _} =
+  let* {
+         client;
+         l1_contracts;
+         sc_rollup_address;
+         sc_rollup_node;
+         sequencer;
+         proxy;
+         _;
+       } =
     setup_sequencer ~da_fee:arb_da_fee_for_delayed_inbox protocol
   in
   let endpoint = Evm_node.endpoint sequencer in
@@ -929,9 +927,8 @@ let test_delayed_deposit_is_included =
       ~sc_rollup_node
       ~client
   in
-  let* () =
-    wait_until_delayed_inbox_is_empty ~sequencer ~sc_rollup_node ~client
-  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
   let* receiver_balance_next =
     Eth_cli.balance ~account:receiver.address ~endpoint
   in
