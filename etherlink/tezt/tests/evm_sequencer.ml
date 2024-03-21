@@ -65,6 +65,7 @@ type sequencer_setup = {
   client : Client.t;
   sc_rollup_address : string;
   sc_rollup_node : Sc_rollup_node.t;
+  observer : Evm_node.t;
   sequencer : Evm_node.t;
   proxy : Evm_node.t;
   l1_contracts : l1_contracts;
@@ -210,6 +211,16 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
   let* sequencer =
     Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* observer =
+    Evm_node.init
+      ~mode:
+        (Observer
+           {
+             initial_kernel = output;
+             preimages_dir;
+           })
+      (Evm_node.endpoint sequencer)
+  in
   let* proxy =
     Evm_node.init
       ~mode:(Proxy {devmode})
@@ -221,6 +232,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       client;
       sequencer;
       proxy;
+      observer;
       l1_contracts;
       sc_rollup_address;
       sc_rollup_node;
@@ -275,6 +287,7 @@ let test_remove_sequencer =
          client;
          sc_rollup_address;
          l1_contracts;
+         observer;
          _;
        } =
     setup_sequencer ~time_between_blocks:Nothing protocol
@@ -1047,22 +1060,9 @@ let test_observer_applies_blueprint =
   @@ fun protocol ->
   (* Start the evm node *)
   let tbb = 3. in
-  let* {sequencer = sequencer_node; sc_rollup_node; _} =
+  let* {sequencer = sequencer_node; observer = observer_node; _} =
     setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
   in
-  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let observer_node =
-    Evm_node.create
-      ~mode:
-        (Observer
-           {
-             initial_kernel = Evm_node.initial_kernel sequencer_node;
-             preimages_dir;
-           })
-      (Evm_node.endpoint sequencer_node)
-  in
-  let* () = Evm_node.run observer_node in
-  let* () = Evm_node.wait_for_ready observer_node in
   let levels_to_wait = 3 in
   let timeout = tbb *. float_of_int levels_to_wait *. 2. in
 
@@ -1097,21 +1097,9 @@ let test_observer_forwards_transaction =
   @@ fun protocol ->
   (* Start the evm node *)
   let tbb = 1. in
-  let* {sequencer = sequencer_node; sc_rollup_node; _} =
+  let* {sequencer = sequencer_node; observer = observer_node; _} =
     setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
   in
-  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
-  let* observer_node =
-    Evm_node.init
-      ~mode:
-        (Observer
-           {
-             initial_kernel = Evm_node.initial_kernel sequencer_node;
-             preimages_dir;
-           })
-      (Evm_node.endpoint sequencer_node)
-  in
-
   (* Ensure the sequencer has produced the block. *)
   let* () =
     Evm_node.wait_for_blueprint_applied ~timeout:10.0 sequencer_node 1
@@ -1318,6 +1306,7 @@ let test_delayed_transfer_timeout =
          sc_rollup_node;
          sequencer;
          proxy;
+         observer = _;
        } =
     setup_sequencer
       ~delayed_inbox_timeout:3
@@ -1381,6 +1370,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
          sc_rollup_node;
          sequencer;
          proxy;
+         observer = _;
        } =
     setup_sequencer
       ~delayed_inbox_timeout:3
@@ -1655,6 +1645,7 @@ let test_delayed_inbox_flushing =
          sc_rollup_node;
          sequencer;
          proxy;
+         observer = _;
        } =
     setup_sequencer
       ~delayed_inbox_timeout:1
