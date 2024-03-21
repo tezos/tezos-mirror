@@ -16,21 +16,13 @@ let apply_end_cycle current_cycle previous_block block state :
     State.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Log.debug ~color:time_color "Ending cycle %a" Cycle.pp current_cycle ;
+  (* Sets initial frozen for future cycle *)
+  let* state = update_map_es ~f:(update_frozen_rights_cycle block) state in
   (* Apply all slashes *)
   let* state =
     Slashing_helpers.apply_all_slashes_at_cycle_end
       current_cycle
       previous_block
-      state
-  in
-  (* Sets initial frozen for future cycle *)
-  let state =
-    update_map
-      ~f:
-        (update_frozen_rights_cycle
-           (Cycle.add
-              current_cycle
-              (state.constants.consensus_rights_delay + 1)))
       state
   in
   (* Apply autostaking *)
@@ -156,10 +148,13 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let baker_name, {contract = baker_contract; _} =
     State.find_account_from_pkh baker state
   in
+  let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
+  assert (Protocol.Alpha_context.Cycle.(level.cycle = Block.current_cycle block)) ;
   Log.info
     ~color:time_color
-    "Baking level %d with %s"
+    "Baking level %d (cycle %ld) with %s"
     (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
+    (Protocol.Alpha_context.Cycle.to_int32 level.cycle)
     baker_name ;
   let current_cycle = Block.current_cycle block in
   let adaptive_issuance_vote =

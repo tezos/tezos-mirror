@@ -369,10 +369,32 @@ let apply_finalize staker_name account_map =
 
 (* Given cycle is the cycle for which the rights are computed, usually current +
    consensus rights delay *)
-let update_frozen_rights_cycle cycle account_map =
-  String.Map.map
-    (fun ({frozen_deposits; frozen_rights; _} as acc) ->
-      let total_frozen = Frozen_tez.total_current frozen_deposits in
-      let frozen_rights = CycleMap.add cycle total_frozen frozen_rights in
-      {acc with frozen_rights})
+let update_frozen_rights_cycle block account_map =
+  let open Lwt_result_syntax in
+  String.Map.fold_es
+    (fun key acc acc_map ->
+      match acc.delegate with
+      | None -> return acc_map
+      | Some delegate_name ->
+          let delegate_pkh =
+            match String.Map.find delegate_name account_map with
+            | None ->
+                fail_account_not_found
+                  "update_frozen_rights_cycle"
+                  delegate_name
+            | Some delegate -> delegate.pkh
+          in
+          if delegate_pkh = acc.pkh then
+            (* Account is a delegate *)
+            let cycle = Block.current_cycle block in
+            let* frozen_deposits =
+              Context.Delegate.initial_frozen_deposits (B block) acc.pkh
+            in
+
+            let frozen_rights =
+              CycleMap.add cycle frozen_deposits acc.frozen_rights
+            in
+            return (String.Map.add key {acc with frozen_rights} acc_map)
+          else return acc_map)
+    account_map
     account_map

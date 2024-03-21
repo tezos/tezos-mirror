@@ -40,6 +40,8 @@ let set_baker baker : (t, t) scenarios =
 
 (** Exclude a list of delegates from baking *)
 let exclude_bakers bakers : (t, t) scenarios =
+  log ~color:event_color "Excluding bakers: [ %s ]" (String.concat ", " bakers)
+  -->
   let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       let bakers_pkh =

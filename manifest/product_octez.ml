@@ -5033,6 +5033,7 @@ end = struct
             ("test_scenario_rewards", N.(number >= 020));
             ("test_scenario_autostaking", N.(number >= 020));
             ("test_scenario_slashing", N.(number >= 020));
+            ("test_scenario_slashing_stakers", N.(number >= 020));
             ("test_liquidity_baking", true);
             ("test_storage_functions", true);
             ("test_storage", true);
