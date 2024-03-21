@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,6 +26,15 @@
 
 let risc_v_sandbox =
   Uses.make ~tag:"risc_v_sandbox" ~path:"./src/risc_v/risc-v-sandbox"
+
+(* Tell Manifezt that [risc_v_sandbox] itself depends on the full contents
+   of the [src/risc_v] directory. Manifezt doesn't know how to automatically
+   infer non-OCaml dependency relationships. Also declare a dependency on
+   the RISC-V test suite using the same tag to avoid warnings. *)
+let _ = Uses.make ~tag:"risc_v_sandbox" ~path:"./src/risc_v/"
+
+let _ =
+  Uses.make ~tag:"risc_v_sandbox" ~path:"./tezt/tests/riscv-tests/generated/"
 
 let run_kernel ?(posix = false) ~input ?initrd () =
   let process =
