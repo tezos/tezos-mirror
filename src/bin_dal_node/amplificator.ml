@@ -66,7 +66,10 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
                 -. amplification_random_delay_min))
         in
         let*! () =
-          Event.(emit reconstruct_starting_in (commitment, random_delay))
+          Event.(
+            emit
+              reconstruct_starting_in
+              (published_level, slot_index, random_delay))
         in
         let*! () = Lwt_unix.sleep random_delay in
         (* Count again the stored shards because we may have received
@@ -77,10 +80,21 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
         (* If we have received all the shards while waiting the random
            delay, there is no point in reconstructing anymore *)
         if number_of_already_stored_shards = number_of_shards then
-          let*! () = Event.(emit reconstruct_canceled commitment) in
+          let*! () =
+            Event.(
+              emit reconstruct_no_missing_shard (published_level, slot_index))
+          in
           return_unit
         else
-          let*! () = Event.(emit reconstruct_started commitment) in
+          let*! () =
+            Event.(
+              emit
+                reconstruct_started
+                ( published_level,
+                  slot_index,
+                  number_of_already_stored_shards,
+                  number_of_shards ))
+          in
           let shards =
             Store.Shards.read_all shard_store commitment ~number_of_shards
             |> Seq_s.filter_map (function
@@ -118,5 +132,7 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
               published_level
               slot_index
           in
-          let*! () = Event.(emit reconstruct_finished commitment) in
+          let*! () =
+            Event.(emit reconstruct_finished (published_level, slot_index))
+          in
           return_unit
