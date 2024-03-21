@@ -25,7 +25,7 @@
 
 type _ location
 
-type nonce_types = [`Legacy_nonce | `Stateful_nonce]
+type nonce_types = [`Legacy_nonce | `Stateful_nonce | `Orphaned_nonce]
 
 val resolve_location :
   chain_id:Chain_id.t ->

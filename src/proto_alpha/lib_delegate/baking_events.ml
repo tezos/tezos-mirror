@@ -1042,9 +1042,9 @@ module Nonces = struct
       ~level:Warning
       ~msg:
         "There is not enough block history to complete the migration. Try \
-         start from older snapshot or provide more block history. The \
-         following nonces will not be migrated:\n\
-        \   {failed} "
+         starting from an older snapshot or providing more block history. The \
+         nonces from the following blocks will not be migrated:\n\
+         {failed} "
       ~pp1:(Format.pp_print_list Block_hash.pp)
       ("failed", Data_encoding.list Block_hash.encoding)
 

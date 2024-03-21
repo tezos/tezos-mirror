@@ -25,7 +25,7 @@
 
 type _ location = string
 
-type nonce_types = [`Legacy_nonce | `Stateful_nonce]
+type nonce_types = [`Legacy_nonce | `Stateful_nonce | `Orphaned_nonce]
 
 let resolve_location ~chain_id (kind : 'a) : 'a location =
   let basename =
@@ -34,6 +34,7 @@ let resolve_location ~chain_id (kind : 'a) : 'a location =
     | `State -> "baker_state"
     | `Legacy_nonce -> "nonce"
     | `Stateful_nonce -> "stateful_nonce"
+    | `Orphaned_nonce -> "orphaned_nonce"
   in
   Format.asprintf "%a_%s" Chain_id.pp_short chain_id basename
 
