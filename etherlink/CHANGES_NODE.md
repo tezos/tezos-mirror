@@ -19,6 +19,8 @@
 - Delayed EVM transactions no longer pay data-availability fee. (!12401)
 - Stop block production if the rollup is lagging behind. (!12482)
 - Add a private RPC to access the storage. (!12504)
+- The kernel logs are now stored under `<data-dir>/kernel_logs/` and events
+  are emitted. (!12345)
 
 ### Bug fixes
 

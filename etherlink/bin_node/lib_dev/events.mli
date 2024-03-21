@@ -58,3 +58,11 @@ val shutdown_node : exit_status:int -> unit Lwt.t
 (** [callback_log ~uri ~meth ~body] is used as the debug event used as
     callback for resto to logs the requests. *)
 val callback_log : uri:string -> meth:string -> body:string -> unit Lwt.t
+
+type kernel_log_kind = Application | Simulation
+
+type kernel_log_level = Debug | Info | Error | Fatal
+
+(** Logs kernel log [Debug]. *)
+val event_kernel_log :
+  level:kernel_log_level -> kind:kernel_log_kind -> msg:string -> unit Lwt.t

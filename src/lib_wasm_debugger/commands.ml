@@ -416,7 +416,7 @@ let reveals config request =
   | Request_dal_page {slot_id = {published_level; index}; page_index} ->
       request_dal_page config num_retries published_level index page_index
 
-let write_debug config =
+let write_debug_default config =
   if config.Config.kernel_debug then
     Tezos_scoru_wasm.Builtins.Printer (fun msg -> Lwt_fmt.printf "%s%!" msg)
   else Tezos_scoru_wasm.Builtins.Noop
@@ -433,7 +433,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         let+ tree =
           Wasm.compute_step_with_debug
             ~wasm_entrypoint:Constants.wasm_entrypoint
-            ~write_debug:(write_debug config)
+            ~write_debug:(write_debug_default config)
             tree
         in
         (tree, 1L))
@@ -444,7 +444,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
   let eval_to_result config tree =
     trap_exn (fun () ->
         eval_to_result
-          ~write_debug:(write_debug config)
+          ~write_debug:(write_debug_default config)
           ~reveal_builtins:(reveals config)
           tree)
 
@@ -458,7 +458,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
           Wasm_fast.compute_step_many
             ~wasm_entrypoint
             ~reveal_builtins:(reveals config)
-            ~write_debug:(write_debug config)
+            ~write_debug:(write_debug_default config)
             ~stop_at_snapshot:true
             ~max_steps:Int64.max_int
             tree
@@ -469,8 +469,11 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         ))
 
   (* Wrapper around {Wasm_utils.eval_until_input_requested}. *)
-  let eval_until_input_requested ~wasm_entrypoint config tree =
+  let eval_until_input_requested ?write_debug ~wasm_entrypoint config tree =
     let open Lwt_syntax in
+    let write_debug =
+      Option.value ~default:(write_debug_default config) write_debug
+    in
     trap_exn (fun () ->
         let* info_before = Wasm.get_info tree in
         let* tree =
@@ -478,7 +481,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
             ~wasm_entrypoint
             ~fast_exec:true
             ~reveal_builtins:(Some (reveals config))
-            ~write_debug:(write_debug config)
+            ~write_debug
             ~max_steps:Int64.max_int
             tree
         in
@@ -546,7 +549,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
            %!" ;
         let+ tree, ticks, graph =
           Prof.eval_and_profile
-            ~write_debug:(write_debug config)
+            ~write_debug:(write_debug_default config)
             ~reveal_builtins:(reveals config)
             ~with_time
             ~no_reboot
@@ -616,7 +619,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         return (tree, inboxes, level)
 
   (* Eval dispatcher. *)
-  let eval ~wasm_entrypoint level inboxes config step tree =
+  let eval ?write_debug ~wasm_entrypoint level inboxes config step tree =
     let open Lwt_result_syntax in
     let return' ?(inboxes = inboxes) f =
       let* tree, count = f in
@@ -632,7 +635,11 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         | Ok () ->
             let* tree, inboxes, level = load_inputs inboxes level tree in
             let* tree, ticks =
-              eval_until_input_requested ~wasm_entrypoint config tree
+              eval_until_input_requested
+                ?write_debug
+                ~wasm_entrypoint
+                config
+                tree
             in
             return (tree, ticks, inboxes, level)
         | Error _ ->

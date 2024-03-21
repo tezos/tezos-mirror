@@ -436,10 +436,16 @@ module State = struct
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction ctxt.store ;
     let*! evm_state = evm_state ctxt in
-    let*! config = execution_config in
+    let*! _, config = execution_config in
     let (Qty next) = ctxt.session.next_blueprint_number in
 
-    let* try_apply = Evm_state.apply_blueprint ~config evm_state payload in
+    let* try_apply =
+      Evm_state.apply_blueprint
+        ~data_dir:ctxt.data_dir
+        ~config
+        evm_state
+        payload
+    in
 
     match try_apply with
     | Apply_success
@@ -549,7 +555,9 @@ module State = struct
         store;
       }
     in
-
+    let*! () =
+      Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
+    in
     let* () =
       match kernel_path with
       | Some kernel ->
@@ -729,12 +737,13 @@ module Handlers = struct
         ()
     in
     Lwt.wakeup execution_config_waker
-    @@ Config.config
-         ~preimage_directory:ctxt.preimages
-         ?preimage_endpoint:ctxt.preimages_endpoint
-         ~kernel_debug:true
-         ~destination:ctxt.smart_rollup_address
-         () ;
+    @@ ( ctxt.data_dir,
+         Config.config
+           ~preimage_directory:ctxt.preimages
+           ?preimage_endpoint:ctxt.preimages_endpoint
+           ~kernel_debug:true
+           ~destination:ctxt.smart_rollup_address
+           () ) ;
     Lwt.wakeup init_status_waker status ;
     return ctxt
 
@@ -879,8 +888,13 @@ let inspect path =
 let execute_and_inspect ?wasm_entrypoint input =
   let open Lwt_result_syntax in
   let* evm_state = evm_state () in
-  let*! config = execution_config in
-  Evm_state.execute_and_inspect ?wasm_entrypoint ~config ~input evm_state
+  let*! data_dir, config = execution_config in
+  Evm_state.execute_and_inspect
+    ~data_dir
+    ?wasm_entrypoint
+    ~config
+    ~input
+    evm_state
 
 let head_info () = worker_wait_for_request Head_info
 
