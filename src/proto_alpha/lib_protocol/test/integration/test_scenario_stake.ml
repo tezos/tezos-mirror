@@ -228,7 +228,9 @@ let shorter_roundtrip_for_baker =
 let scenario_finalize =
   init_staker_delegate_or_external --> stake "staker" Half --> next_cycle
   --> unstake "staker" Half
-  --> wait_n_cycles_f (unstake_wait ++ 2)
+  --> wait_n_cycles_f unstake_wait
+  --> (Tag "minimal wait after unstake" --> Empty
+      |+ Tag "wait longer after unstake" --> wait_n_cycles 2)
   --> assert_failure
         (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
   --> (Tag "finalize with finalize" --> finalize_unstake "staker"
