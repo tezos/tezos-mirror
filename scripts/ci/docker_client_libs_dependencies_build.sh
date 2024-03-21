@@ -47,7 +47,7 @@ image_tag="${client_libs_dependencies_image_tag:-}"
 if [ -z "$image_tag" ]; then
   # by default, tag with the hash of this image's input which is the set of paths
   # defined in images/client-libs-dependencies/inputs.
-  image_tag=$(./images/image_tag.sh images/rust-toolchain)
+  image_tag=$(./images/image_tag.sh images/client-libs-dependencies)
 fi
 image_name="${image_base}:${image_tag}"
 
