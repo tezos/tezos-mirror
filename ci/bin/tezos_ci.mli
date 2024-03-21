@@ -218,7 +218,7 @@ val job :
   ?when_:Gitlab_ci.Types.when_job ->
   ?coverage:string ->
   ?retry:int ->
-  ?parallel:int ->
+  ?parallel:Gitlab_ci.Types.parallel ->
   __POS__:string * int * int * int ->
   image:Image.t ->
   stage:Stage.t ->

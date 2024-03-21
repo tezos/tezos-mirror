@@ -190,6 +190,19 @@ let enc_needs (needs : need list) : value =
   in
   array enc_need needs
 
+let enc_parallel (parallel : parallel) : value =
+  match parallel with
+  | Vector n -> int n
+  | Matrix environments ->
+      let matrix =
+        Fun.flip list environments @@ fun environment ->
+        `O
+          (List.map
+             (fun (name, values) -> (name, list string values))
+             environment)
+      in
+      `O [("matrix", matrix)]
+
 let enc_job : job -> value =
  fun {
        name = _;
@@ -235,7 +248,7 @@ let enc_job : job -> value =
       opt "when" enc_when_job when_;
       opt "coverage" string coverage;
       opt "retry" int retry;
-      opt "parallel" int parallel;
+      opt "parallel" enc_parallel parallel;
     ]
 
 let enc_includes : include_ list -> value =

@@ -322,11 +322,16 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
             name)
   in
   let stage = Some (Stage.name stage) in
-  (match parallel with
-  | Some n when n < 2 ->
+  (match (parallel : Gitlab_ci.Types.parallel option) with
+  | Some (Vector n) when n < 2 ->
       failwith
         "[job] the argument [parallel] must be at least 2 or omitted, in job \
          '%s'."
+        name
+  | Some (Matrix []) ->
+      failwith
+        "[job] the argument [matrix] must be at a non empty list of variables, \
+         in job '%s'."
         name
   | _ -> ()) ;
   let needs, dependencies =
