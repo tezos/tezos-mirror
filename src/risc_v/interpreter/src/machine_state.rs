@@ -152,8 +152,8 @@ macro_rules! run_no_args_instr {
     }};
 }
 
-/// Runs a F mv instruction over the hart state
-macro_rules! run_f_mv_instr {
+/// Runs a F/D instruction over the hart state, touching both F & X registers.
+macro_rules! run_f_x_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state.hart.$run_fn($args.rs1, $args.rd);
         Ok(Add($instr.width()))
@@ -274,12 +274,14 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Divuw(args) => run_r_type_instr!(self, instr, args, run_divuw),
 
             // RV64F move instructions
-            Instr::FmvXW(args) => run_f_mv_instr!(self, instr, args, run_fmv_x_w),
-            Instr::FmvWX(args) => run_f_mv_instr!(self, instr, args, run_fmv_w_x),
+            Instr::FclassS(args) => run_f_x_instr!(self, instr, args, run_fclass_s),
+            Instr::FmvXW(args) => run_f_x_instr!(self, instr, args, run_fmv_x_w),
+            Instr::FmvWX(args) => run_f_x_instr!(self, instr, args, run_fmv_w_x),
 
             // RV64D move instructions
-            Instr::FmvXD(args) => run_f_mv_instr!(self, instr, args, run_fmv_x_d),
-            Instr::FmvDX(args) => run_f_mv_instr!(self, instr, args, run_fmv_d_x),
+            Instr::FclassD(args) => run_f_x_instr!(self, instr, args, run_fclass_d),
+            Instr::FmvXD(args) => run_f_x_instr!(self, instr, args, run_fmv_x_d),
+            Instr::FmvDX(args) => run_f_x_instr!(self, instr, args, run_fmv_d_x),
 
             // Zicsr instructions
             Instr::Csrrw(args) => run_csr_instr!(self, instr, args, run_csrrw),

@@ -9,15 +9,38 @@
 use crate::{
     machine_state::{
         hart_state::HartState,
-        registers::{FRegister, XRegister},
+        registers::{FRegister, FValue, XRegister},
     },
     state_backend as backend,
 };
+use softfloat_wrapper::{Float, F32};
+
+impl From<F32> for FValue {
+    fn from(f: F32) -> Self {
+        let val = f.to_bits();
+        f32_to_fvalue(val)
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<F32> for FValue {
+    fn into(self) -> F32 {
+        let val: u64 = self.into();
+        F32::from_bits(val as u32)
+    }
+}
 
 impl<M> HartState<M>
 where
     M: backend::Manager,
 {
+    /// `FCLASS.S` F-type instruction.
+    ///
+    /// See [Self::run_fclass].
+    pub fn run_fclass_s(&mut self, rs1: FRegister, rd: XRegister) {
+        self.run_fclass::<F32>(rs1, rd);
+    }
+
     /// `FMV.X.W` F-type instruction
     ///
     /// Moves the single-precision value in floating-point register `rs1`
@@ -44,12 +67,18 @@ where
     ///
     /// The bits are not modified in the transfer,
     /// and in particular, the payloads of non-canonical NaNs are preserved.
-    ///
-    /// *NB* the higher 32 bits are set to `1`, as with any f32 write.
     pub fn run_fmv_w_x(&mut self, rs1: XRegister, rd: FRegister) {
-        let rval = self.xregisters.read(rs1) as u32 as u64 | 0xffffffff00000000;
-        self.fregisters.write(rd, rval.into());
+        let rval = self.xregisters.read(rs1) as u32;
+        let rval = f32_to_fvalue(rval);
+
+        self.fregisters.write(rd, rval);
     }
+}
+
+/// The upper 32 bits are set to `1` for any `f32` write.
+#[inline(always)]
+fn f32_to_fvalue(val: u32) -> FValue {
+    (val as u64 | 0xffffffff00000000).into()
 }
 
 #[cfg(test)]

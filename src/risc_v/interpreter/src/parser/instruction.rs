@@ -66,13 +66,13 @@ pub struct FenceArgs {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct FmvToIArgs {
+pub struct FRegToXRegArgs {
     pub rd: XRegister,
     pub rs1: FRegister,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct FmvToFArgs {
+pub struct XRegToFRegArgs {
     pub rd: FRegister,
     pub rs1: XRegister,
 }
@@ -158,12 +158,14 @@ pub enum Instr {
     Divuw(RTypeArgs),
 
     // RV64F instructions
-    FmvXW(FmvToIArgs),
-    FmvWX(FmvToFArgs),
+    FclassS(FRegToXRegArgs),
+    FmvXW(FRegToXRegArgs),
+    FmvWX(XRegToFRegArgs),
 
     // RV64D instructions
-    FmvXD(FmvToIArgs),
-    FmvDX(FmvToFArgs),
+    FclassD(FRegToXRegArgs),
+    FmvXD(FRegToXRegArgs),
+    FmvDX(XRegToFRegArgs),
 
     // Zicsr instructions
     Csrrw(CsrArgs),
@@ -260,8 +262,10 @@ impl Instr {
             | Divuw(_)
             | FmvXW(_)
             | FmvWX(_)
+            | FclassS(_)
             | FmvXD(_)
             | FmvDX(_)
+            | FclassD(_)
             | Csrrw(_)
             | Csrrs(_)
             | Csrrc(_)
@@ -330,7 +334,7 @@ macro_rules! u_instr {
     };
 }
 
-macro_rules! f_mv_instr {
+macro_rules! f_s1_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {},{}", $op, $args.rd, $args.rs1)
     };
@@ -494,12 +498,14 @@ impl fmt::Display for Instr {
             Divuw(args) => r_instr!(f, "divuw", args),
 
             // RV64F instructions
-            FmvXW(args) => f_mv_instr!(f, "fmv.x.w", args),
-            FmvWX(args) => f_mv_instr!(f, "fmv.w.x", args),
+            FclassS(args) => f_s1_instr!(f, "fclass.s", args),
+            FmvXW(args) => f_s1_instr!(f, "fmv.x.w", args),
+            FmvWX(args) => f_s1_instr!(f, "fmv.w.x", args),
 
             // RV64D instructions
-            FmvXD(args) => f_mv_instr!(f, "fmv.x.d", args),
-            FmvDX(args) => f_mv_instr!(f, "fmv.d.x", args),
+            FclassD(args) => f_s1_instr!(f, "fclass.d", args),
+            FmvXD(args) => f_s1_instr!(f, "fmv.x.d", args),
+            FmvDX(args) => f_s1_instr!(f, "fmv.d.x", args),
 
             // Zicsr instructions
             Csrrw(args) => csr_instr!(f, "csrrw", args),
