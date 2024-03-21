@@ -598,12 +598,6 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
                 level
                 tree)
         in
-        let*! () =
-          Lwt_fmt.printf
-            "Loaded %d inputs at level %ld\n%!"
-            (List.length inputs)
-            level
-        in
         return (tree, inboxes, Int32.succ level)
     | None ->
         let*! () = Lwt_fmt.printf "No more inputs at level %ld\n%!" level in
