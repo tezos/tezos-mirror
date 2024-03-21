@@ -124,6 +124,15 @@ type t = {
   to_execute : Blueprint_types.payload;
 }
 
+let encoding =
+  Data_encoding.(
+    conv
+      (fun {to_publish; to_execute} -> (to_publish, to_execute))
+      (fun (to_publish, to_execute) -> {to_publish; to_execute})
+      (obj2
+         (req "to_publish" Blueprint_types.payload_encoding)
+         (req "to_execute" Blueprint_types.payload_encoding)))
+
 let create ~cctxt ~sequencer_key ~timestamp ~smart_rollup_address ~number
     ~parent_hash ~delayed_transactions ~transactions =
   let open Lwt_result_syntax in

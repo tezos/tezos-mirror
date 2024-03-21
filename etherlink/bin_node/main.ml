@@ -137,7 +137,8 @@ let install_finalizer_dev server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  Evm_node_lib_dev.Tx_pool_events.shutdown ()
+  let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
+  Evm_node_lib_dev.Evm_context.shutdown ()
 
 let install_finalizer_observer server =
   let open Lwt_syntax in
@@ -146,7 +147,8 @@ let install_finalizer_observer server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
   let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  Evm_node_lib_dev.Tx_pool_events.shutdown ()
+  let* () = Evm_node_lib_dev.Tx_pool_events.shutdown () in
+  Evm_node_lib_dev.Evm_context.shutdown ()
 
 let callback_log server conn req body =
   let open Cohttp in
@@ -875,8 +877,8 @@ let observer_command =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
   in
 
-  let* ctxt, _loaded =
-    Evm_context.init
+  let* _loaded =
+    Evm_context.start
       ~data_dir
       ?kernel_path:kernel
       ~preimages:config.mode.preimages
@@ -889,7 +891,7 @@ let observer_command =
 
   let observer_backend =
     (module Observer.Make (struct
-      let ctxt = ctxt
+      let smart_rollup_address = smart_rollup_address
 
       let evm_node_endpoint = evm_node_endpoint
     end) : Services_backend_sig.S)
@@ -908,13 +910,13 @@ let observer_command =
   let* directory =
     dev_directory config (observer_backend, smart_rollup_address)
   in
-  let directory = directory |> Evm_services.register ctxt in
+  let directory = directory |> Evm_services.register smart_rollup_address in
 
   let* server = observer_start config ~directory in
 
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
 
-  Observer.main ctxt ~evm_node_endpoint
+  Observer.main ~evm_node_endpoint
 
 let make_prod_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in

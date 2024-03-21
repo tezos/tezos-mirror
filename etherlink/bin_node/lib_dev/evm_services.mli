@@ -16,7 +16,10 @@ val get_blueprint :
   Ethereum_types.quantity ->
   Blueprint_types.t tzresult Lwt.t
 
-val register : Evm_context.t -> unit Directory.t -> unit Directory.t
+val register :
+  Tezos_crypto.Hashed.Smart_rollup_address.t ->
+  unit Directory.t ->
+  unit Directory.t
 
 val monitor_blueprints :
   evm_node_endpoint:Uri.t ->

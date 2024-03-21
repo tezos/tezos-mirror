@@ -8,7 +8,6 @@
 type parameters = {
   rollup_node_endpoint : Uri.t;
       (** Rollup node endpoint used to monitor kernel events. *)
-  ctxt : Evm_context.t;
 }
 
 (** [start parameters] starts the events follower. *)

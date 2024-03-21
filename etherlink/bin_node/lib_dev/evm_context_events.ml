@@ -5,12 +5,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main ctxt ~evm_node_endpoint] starts the main event-loop of the Observer,
-    consuming the blueprints received from [evm_node_endpoint]. *)
-val main : evm_node_endpoint:Uri.t -> unit tzresult Lwt.t
+include Internal_event.Simple
 
-module Make (Ctxt : sig
-  val evm_node_endpoint : Uri.t
+let section = Events.section @ ["evm_context"]
 
-  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
-end) : Services_backend_sig.S
+let ready =
+  declare_0
+    ~section
+    ~name:"evm_context_is_ready"
+    ~msg:"EVM Context worker is ready"
+    ~level:Info
+    ()
+
+let shutdown =
+  declare_0
+    ~section
+    ~name:"evm_context_shutdown"
+    ~msg:"EVM Context worker is shutting down"
+    ~level:Info
+    ()
+
+let ready () = emit ready ()
+
+let shutdown () = emit shutdown ()

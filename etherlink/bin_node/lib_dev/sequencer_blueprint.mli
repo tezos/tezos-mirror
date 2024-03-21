@@ -21,6 +21,8 @@ type t = {
   to_execute : Blueprint_types.payload;
 }
 
+val encoding : t Data_encoding.t
+
 (** [create ~secret_key ~timestamp ~smart_rollup_address ~number
     ~parent_hash ~delayed_transactions ~transactions]
     creates a sequencer blueprint at [timestamp] with a given [number]
