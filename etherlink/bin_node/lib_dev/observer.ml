@@ -168,6 +168,8 @@ let install_finalizer_observer server =
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = Events.shutdown_rpc_server ~private_:false in
   let* () = Tx_pool.shutdown () in
+  let* () = Rollup_node_follower.shutdown () in
+  let* () = Evm_events_follower.shutdown () in
   let* () = Tx_pool_events.shutdown () in
   Evm_context.shutdown ()
 
@@ -195,7 +197,7 @@ let main_loop ~evm_node_endpoint =
 
   loop head.next_blueprint_number blueprints_stream
 
-let main ?kernel_path ~evm_node_endpoint ~data_dir
+let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
     ~(config : Configuration.observer Configuration.t) () =
   let open Lwt_result_syntax in
   let* smart_rollup_address =
@@ -241,4 +243,7 @@ let main ?kernel_path ~evm_node_endpoint ~data_dir
   let* server = observer_start config ~directory in
 
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
+  let* () = Evm_events_follower.start {rollup_node_endpoint} in
+  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
+
   main_loop ~evm_node_endpoint

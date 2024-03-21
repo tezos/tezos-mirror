@@ -213,7 +213,13 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
   in
   let* observer =
     Evm_node.init
-      ~mode:(Observer {initial_kernel = output; preimages_dir})
+      ~mode:
+        (Observer
+           {
+             initial_kernel = output;
+             preimages_dir;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           })
       (Evm_node.endpoint sequencer)
   in
   let* proxy =
@@ -312,6 +318,13 @@ let test_remove_sequencer =
       client
   in
   let* missing_block_nb, _hash = Evm_node.wait_for_missing_block sequencer
+  and* () =
+    Lwt.pick
+      [
+        (let* _ = Evm_node.wait_for_missing_block observer in
+         unit);
+        Evm_node.wait_termination observer;
+      ]
   and* () =
     (* Produce L1 blocks to show that only the proxy is progressing *)
     repeat 5 (fun () ->
@@ -452,7 +465,15 @@ let test_resilient_to_rollup_node_disconnect =
   let first_batch_blueprints_count = 5 in
   let ensure_rollup_node_publish = 5 in
 
-  let* {sequencer; proxy; sc_rollup_node; sc_rollup_address; client; _} =
+  let* {
+         sequencer;
+         proxy;
+         sc_rollup_node;
+         sc_rollup_address;
+         client;
+         observer;
+         _;
+       } =
     setup_sequencer
       ~max_blueprints_lag
       ~max_blueprints_catchup
@@ -502,6 +523,11 @@ let test_resilient_to_rollup_node_disconnect =
       sequencer
       ~timeout:5.
       (first_batch_blueprints_count + (2 * max_blueprints_lag))
+  and* () =
+    Evm_node.wait_for_blueprint_applied
+      observer
+      ~timeout:5.
+      (first_batch_blueprints_count + (2 * max_blueprints_lag))
   in
 
   (* Kill the sequencer node, restart the rollup node, restart the sequencer to
@@ -511,6 +537,7 @@ let test_resilient_to_rollup_node_disconnect =
 
   let* () = Evm_node.terminate sequencer in
   let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run observer in
 
   (* Produce enough blocks in advance to ensure the sequencer node will catch
      up at the end. *)
@@ -523,6 +550,11 @@ let test_resilient_to_rollup_node_disconnect =
   let* () =
     Evm_node.wait_for_blueprint_applied
       sequencer
+      ~timeout:5.
+      (first_batch_blueprints_count + (2 * max_blueprints_catchup) + 1)
+  and* () =
+    Evm_node.wait_for_blueprint_applied
+      observer
       ~timeout:5.
       (first_batch_blueprints_count + (2 * max_blueprints_catchup) + 1)
   in
@@ -1147,6 +1179,7 @@ let test_self_upgrade_kernel =
          client;
          sequencer;
          proxy;
+         observer;
          _;
        } =
     setup_sequencer ~genesis_timestamp ~time_between_blocks:Nothing protocol
@@ -1174,7 +1207,8 @@ let test_self_upgrade_kernel =
   in
 
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy ()
-  and* _ = Evm_node.wait_for_pending_upgrade sequencer in
+  and* _upgrade_info = Evm_node.wait_for_pending_upgrade sequencer
+  and* _upgrade_info_observer = Evm_node.wait_for_pending_upgrade observer in
 
   let* () =
     check_head_consistency
@@ -1192,7 +1226,8 @@ let test_self_upgrade_kernel =
           Rpc.produce_block ~timestamp:"2020-01-01T00:00:15Z" sequencer
         in
         unit)
-  and* _ = Evm_node.wait_for_successful_upgrade sequencer in
+  and* _ = Evm_node.wait_for_successful_upgrade sequencer
+  and* _ = Evm_node.wait_for_successful_upgrade observer in
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   let* () =
@@ -1885,6 +1920,7 @@ let test_sequencer_upgrade =
          client;
          sequencer;
          proxy;
+         observer;
          _;
        } =
     setup_sequencer
@@ -1906,7 +1942,9 @@ let test_sequencer_upgrade =
   (* Sends the upgrade to L1. *)
   Log.info "Sending the sequencer upgrade to the L1 contract" ;
   let new_sequencer_key = Constant.bootstrap2.alias in
-  let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
+  let* _upgrade_info = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
+  and* _upgrade_info_observer =
+    Evm_node.wait_for_evm_event Sequencer_upgrade observer
   and* () =
     let* () =
       sequencer_upgrade
@@ -1983,6 +2021,8 @@ let test_sequencer_upgrade =
   let* () = Evm_node.run new_sequencer in
   let* _divergence = Evm_node.wait_for_missing_block sequencer
   and* _exit_code = Evm_node.wait_for_shutdown_event sequencer
+  and* _divergence_observer = Evm_node.wait_for_missing_block observer
+  and* _exit_code_observer = Evm_node.wait_for_shutdown_event observer
   and* () =
     let* () =
       repeat (Int32.to_int nb_block) (fun () ->
@@ -2019,7 +2059,7 @@ let test_sequencer_diverge =
     ~title:"Runs two sequencers, one diverge and stop"
     ~uses
   @@ fun protocol ->
-  let* {sc_rollup_node; client; sequencer; _} =
+  let* {sc_rollup_node; client; sequencer; observer; _} =
     setup_sequencer
       ~sequencer:Constant.bootstrap1
       ~time_between_blocks:Nothing
@@ -2046,21 +2086,32 @@ let test_sequencer_diverge =
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let observer_bis =
+    Evm_node.create
+      ~mode:(Evm_node.mode observer)
+      (Evm_node.endpoint sequencer_bis)
+  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~devmode:true
       sequencer_bis
       sc_rollup_node
   in
-  let diverged_and_shutdown sequencer =
+  let diverged_and_shutdown sequencer observer =
     let* _ = Evm_node.wait_for_diverged sequencer
-    and* _ = Evm_node.wait_for_shutdown_event sequencer in
+    and* _ = Evm_node.wait_for_shutdown_event sequencer
+    and* _ = Evm_node.wait_for_diverged observer
+    and* _ = Evm_node.wait_for_shutdown_event observer in
     unit
   in
   let* () = Evm_node.run sequencer_bis in
+  let* () = Evm_node.run observer_bis in
   let* () =
     Lwt.pick
-      [diverged_and_shutdown sequencer; diverged_and_shutdown sequencer_bis]
+      [
+        diverged_and_shutdown sequencer observer;
+        diverged_and_shutdown sequencer_bis observer_bis;
+      ]
   and* () =
     (* diff timestamp to differ *)
     let* _ = Rpc.produce_block ~timestamp:"0" sequencer
@@ -2080,7 +2131,7 @@ let test_sequencer_can_catch_up_on_event =
     ~title:"Evm node can catchup event from the rollup node"
     ~uses
   @@ fun protocol ->
-  let* {sc_rollup_node; client; sequencer; proxy; _} =
+  let* {sc_rollup_node; client; sequencer; proxy; observer; _} =
     setup_sequencer
       ~sequencer:Constant.bootstrap1
       ~time_between_blocks:Nothing
@@ -2121,7 +2172,14 @@ let test_sequencer_can_catch_up_on_event =
           "invalid json for the evm event kind blueprint applied"
   in
   let* _json = Evm_node.wait_for_evm_event ~check Blueprint_applied sequencer
-  and* () = Evm_node.run sequencer in
+  and* _json_observer =
+    Evm_node.wait_for_evm_event ~check Blueprint_applied observer
+  and* () = Evm_node.run sequencer
+  and* () =
+    Evm_node.run observer
+    (* terminated because connection
+       dropped *)
+  in
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   unit
 

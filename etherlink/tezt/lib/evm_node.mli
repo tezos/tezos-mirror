@@ -36,7 +36,11 @@ type time_between_blocks =
 
 (** EVM node mode. *)
 type mode =
-  | Observer of {initial_kernel : string; preimages_dir : string}
+  | Observer of {
+      initial_kernel : string;
+      preimages_dir : string;
+      rollup_node_endpoint : string;
+    }
   | Sequencer of {
       initial_kernel : string;
           (** Path to the initial kernel used by the sequencer. *)
@@ -245,3 +249,5 @@ val chunk_data :
   ?client:Client.t ->
   string list ->
   string list Lwt.t
+
+val wait_termination : t -> unit Lwt.t

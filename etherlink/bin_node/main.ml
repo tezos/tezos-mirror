@@ -445,16 +445,27 @@ let preimages_arg =
     ~placeholder:"_evm_installer_preimages"
     Params.string
 
+let uri_parameter =
+  Tezos_clic.parameter (fun () s -> Lwt.return_ok (Uri.of_string s))
+
 let preimages_endpoint_arg =
   Tezos_clic.arg
     ~long:"preimages-endpoint"
     ~placeholder:"url"
     ~doc:
-      (Format.sprintf
-         "The address of a service which provides pre-images for the rollup. \
-          Missing pre-images will be downloaded remotely if they are not \
-          already present on disk.")
-    (Tezos_clic.parameter (fun () s -> Lwt.return_ok (Uri.of_string s)))
+      "The address of a service which provides pre-images for the rollup. \
+       Missing pre-images will be downloaded remotely if they are not already \
+       present on disk."
+    uri_parameter
+
+let rollup_node_endpoint_param =
+  Tezos_clic.param
+    ~name:"rollup-node-endpoint"
+    ~desc:
+      "The address of a service which provides pre-images for the rollup. \
+       Missing pre-images will be downloaded remotely if they are not already \
+       present on disk."
+    uri_parameter
 
 let time_between_blocks_arg =
   Tezos_clic.arg
@@ -787,7 +798,8 @@ let observer_command =
            "The EVM node endpoint address (as ADDR:PORT) the node will \
             communicate with."
          Params.evm_node_endpoint
-    @@ stop)
+    @@ prefixes ["and"; "rollup"; "node"; "endpoint"]
+    @@ rollup_node_endpoint_param @@ stop)
   @@ fun ( data_dir,
            rpc_addr,
            rpc_port,
@@ -798,6 +810,7 @@ let observer_command =
            preimages,
            preimages_endpoint )
              evm_node_endpoint
+             rollup_node_endpoint
              () ->
   let open Evm_node_lib_dev in
   let*! () =
@@ -822,7 +835,13 @@ let observer_command =
       ()
   in
   let* () = Configuration.save_observer ~force:true ~data_dir config in
-  Observer.main ?kernel_path:kernel ~evm_node_endpoint ~data_dir ~config ()
+  Observer.main
+    ?kernel_path:kernel
+    ~rollup_node_endpoint
+    ~evm_node_endpoint
+    ~data_dir
+    ~config
+    ()
 
 let make_prod_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
