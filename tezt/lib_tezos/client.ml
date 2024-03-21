@@ -4315,6 +4315,9 @@ let spawn_set_delegate_parameters ~delegate ~limit ~edge client =
 let set_delegate_parameters ~delegate ~limit ~edge client =
   spawn_set_delegate_parameters ~delegate ~limit ~edge client |> Process.check
 
+(* Keep an alias to external RPC module to allow RPC calls *)
+module R = RPC
+
 module RPC = struct
   let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?endpoint ?hooks ?env ?protocol_hash client
@@ -4403,3 +4406,31 @@ module RPC = struct
       path
       client
 end
+
+let bake_until_cycle ~target_cycle ?keys ?node client =
+  let* constants = RPC.call client @@ R.get_chain_block_context_constants () in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+  Log.info
+    "Bake until cycle %d (level %d)"
+    target_cycle
+    (target_cycle * blocks_per_cycle) ;
+
+  bake_until_level
+    ~target_level:(target_cycle * blocks_per_cycle)
+    ?keys
+    ?node
+    client
+
+let bake_until_cycle_end ~target_cycle ?keys ?node client =
+  let* constants = RPC.call client @@ R.get_chain_block_context_constants () in
+  let blocks_per_cycle = JSON.(constants |-> "blocks_per_cycle" |> as_int) in
+  Log.info
+    "Bake until cycle %d (level %d)"
+    target_cycle
+    (target_cycle * blocks_per_cycle) ;
+
+  bake_until_level
+    ~target_level:(((target_cycle + 1) * blocks_per_cycle) - 1)
+    ?keys
+    ?node
+    client
