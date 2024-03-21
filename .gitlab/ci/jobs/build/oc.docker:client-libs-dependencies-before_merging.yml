@@ -8,6 +8,7 @@ oc.docker:client-libs-dependencies:
   - gcp
   rules:
   - changes:
+    - scripts/ci/**/*
     - images/**/*
     - src/**/*
     - client-libs/*kaitai*/**/*

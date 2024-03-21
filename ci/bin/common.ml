@@ -321,6 +321,9 @@ let changeset_opam_jobs =
 
 let changeset_kaitai_e2e_files =
   [
+    (* Regenerate the client-libs-dependencies image when the CI
+       scripts change. *)
+    "scripts/ci/**/*";
     "images/**/*";
     "src/**/*";
     "client-libs/*kaitai*/**/*";
