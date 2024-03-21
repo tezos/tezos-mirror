@@ -27,19 +27,9 @@
 open Protocol
 open Alpha_context
 
-type state = {
-  cctxt : Protocol_client_context.full;
-  chain : Chain_services.chain;
-  constants : Constants.t;
-  config : Baking_configuration.nonce_config;
-  legacy_location : [`Legacy_nonce] Baking_files.location;
-  stateful_location : [`Stateful_nonce] Baking_files.location;
-  mutable last_predecessor : Block_hash.t;
-}
+type state
 
 type t = state
-
-type nonce_data
 
 (** [nonces] is a hash map corresponding to the data which can be found in the
     file from [nonces_location] *)
@@ -51,7 +41,7 @@ val load :
   #Client_context.wallet ->
   legacy_location:[`Legacy_nonce] Baking_files.location ->
   stateful_location:[`Stateful_nonce] Baking_files.location ->
-  nonce_data Block_hash.Map.t tzresult Lwt.t
+  nonces tzresult Lwt.t
 
 (** [generate_seed_nonce nonce_config delegate level] computes a nonce via a 
     [Deterministic] or [Random] approach, depending on the [nonce_config]
