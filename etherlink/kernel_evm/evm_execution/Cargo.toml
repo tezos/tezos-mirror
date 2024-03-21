@@ -59,5 +59,6 @@ default = ["evm_execution"]
 testing = ["rand", "proptest"]
 evm_execution = []
 debug = ["tezos-evm-logging/debug"]
-# the `benchmark` feature flag instruments the kernel for profiling
-benchmark = ["debug"]
+# the `benchmark` and `opcodes` feature flags instrument the kernel for profiling
+benchmark = ["tezos-evm-logging/benchmark"]
+benchmark-opcodes = ["benchmark"]

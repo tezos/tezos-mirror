@@ -128,7 +128,7 @@ pub enum TransferExitReason {
     OutOfFund,
 }
 
-#[cfg(feature = "benchmark")]
+#[cfg(feature = "benchmark-opcodes")]
 mod benchmarks {
 
     use super::*;
@@ -606,7 +606,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // allocated ticks the transaction is marked as failed.
             let opcode = runtime.machine().inspect().map(|p| p.0);
 
-            #[cfg(feature = "benchmark")]
+            #[cfg(feature = "benchmark-opcodes")]
             if let Some(opcode) = opcode {
                 benchmarks::start_opcode_section(self.host, &opcode);
             }
@@ -614,18 +614,18 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             // For now, these variables capturing the gas one will be marked
             // unused without benchmarking, but they will be used during the
             // tick accounting.
-            #[cfg_attr(not(feature = "benchmark"), allow(unused_variables))]
+            #[cfg_attr(not(feature = "benchmark-opcodes"), allow(unused_variables))]
             let gas_before = self.gas_used();
 
             let step_result = runtime.step(self);
 
-            #[cfg_attr(not(feature = "benchmark"), allow(unused_variables))]
+            #[cfg_attr(not(feature = "benchmark-opcodes"), allow(unused_variables))]
             let gas_after = self.gas_used();
 
             if let Some(opcode) = opcode {
                 let gas = gas_after - gas_before;
                 self.account_for_ticks(&opcode, gas)?;
-                #[cfg(feature = "benchmark")]
+                #[cfg(feature = "benchmark-opcodes")]
                 benchmarks::end_opcode_section(self.host, gas, &step_result);
             };
 
@@ -990,7 +990,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 TransferExitReason::Returned => (), // Otherwise result is ok and we do nothing and continue
             }
         }
-        #[cfg(feature = "benchmark")]
+        #[cfg(feature = "benchmark-opcodes")]
         benchmarks::start_precompile_section(self.host, address, &input);
 
         let precompile_execution_result = self.precompiles.execute(
@@ -1002,7 +1002,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             transfer,
         );
 
-        #[cfg(feature = "benchmark")]
+        #[cfg(feature = "benchmark-opcodes")]
         benchmarks::end_precompile_section(self.host);
 
         if let Some(precompile_result) = precompile_execution_result {
