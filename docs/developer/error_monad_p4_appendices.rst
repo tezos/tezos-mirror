@@ -3,147 +3,6 @@ Part 4: Appendices
 
 These appendices are Part 4 of 4 of the :doc:`./error_monad` tutorial.
 
-Legacy code
-~~~~~~~~~~~
-
-(This section will be removed once the whole code-base has been updated
-to use the binding operators as recommended. In the meantime, you need
-to learn some legacy constructs so you can read code that hasn’t been
-upgraded yet. You should not use the operators introduced in this
-section to write new code.)
-
-The legacy code is written with infix bindings instead of ``let``-style
-binding operators. The binding ``>>?`` for ``result`` and ``tzresult``,
-``>>=`` for Lwt, and ``>>=?`` for Lwt-``result`` and Lwt-``tzresult``. A
-full equivalence table follows.
-
-+--------------------------------------+-------------------------------+
-| Modern                               | Legacy                        |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Result_syntax in         |    e >>? fun x ->             |
-|    let* x = e in                     |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Result_syntax in         |    e >|? fun x ->             |
-|    let+ x = e in                     |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_syntax in            |    e >>= fun x ->             |
-|    let* x = e in                     |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_syntax in            |    e >|= fun x ->             |
-|    let+ x = e in                     |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_result_syntax in     |    e >>=? fun x ->            |
-|    let* x = e in                     |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_result_syntax in     |    e >|=? fun x ->            |
-|    let+ x = e in                     |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-| ``and*``, ``and+`` (any syntax       | No equivalent, uses           |
-| module)                              | ``both_e``, ``both_p``, or    |
-|                                      | ``both_ep``                   |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_result_syntax in     |    (e >>= ok) >>=? fun x ->   |
-|    let*! x = e in                    |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_result_syntax in     |    e >>?= fun x ->            |
-|    let*? x = e in                    |    e'                         |
-|    e'                                |                               |
-+--------------------------------------+-------------------------------+
-
-In addition, instead of dedicated ``return`` and ``fail`` functions from
-a given syntax module, the legacy code relied on global values.
-
-+--------------------------------------+-------------------------------+
-| Modern                               | Legacy                        |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Result_syntax in         |    ok x                       |
-|    return x                          |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | No equivalent, uses           |
-|                                      | ``Error e``                   |
-|    let open Result_syntax in         |                               |
-|    fail e                            |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | No equivalent, uses           |
-|                                      | ``Lwt.return x``              |
-|    let open Lwt_syntax in            |                               |
-|    return x                          |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_result_syntax in     |    return x                   |
-|    return x                          |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | No equivalent, uses           |
-|                                      | ``Lwt.return_error e``        |
-|    let open Lwt_result_syntax in     |                               |
-|    fail e                            |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Result_syntax in         |    ok x                       |
-|    return x                          |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Result_syntax in         |    error e                    |
-|    tzfail e                          |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_result_syntax in     |    return x                   |
-|    return x                          |                               |
-+--------------------------------------+-------------------------------+
-| ::                                   | ::                            |
-|                                      |                               |
-|    let open Lwt_result_syntax in     |    fail e                     |
-|    tzfail e                          |                               |
-+--------------------------------------+-------------------------------+
-
-In addition to these syntactic differences, there are also usage
-differences. You might encounter the following patterns which you should
-not repeat:
-
--  Matching against a trace:
-
-   ::
-
-      match f () with
-      | Ok .. -> ..
-      | Error (Timeout :: _) -> ..
-      | Error trace -> ..
-
-   This is discouraged because the compiler is unable to warn you if the
-   matching is affected by a change in the code. E.g., if you add
-   context to an error in one place in the code, you may change the
-   result of the matching somewhere else in the code.
-
-
 In depth discussion: what even is a monad?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -509,3 +368,141 @@ fallback value as parameter.
 | Pros: there is no error.
 | Cons: doesn’t work for every function, works differently on different
   functions.
+
+Legacy code
+~~~~~~~~~~~
+
+The codebase contains only ``let``-style binding operators. However, 
+you might encounter infix bindings in older protocols. If you do and 
+you are unsure about what the many infix operators do, read on.
+
+The legacy code is written with infix bindings instead of ``let``-style
+binding operators. The binding ``>>?`` for ``result`` and ``tzresult``,
+``>>=`` for Lwt, and ``>>=?`` for Lwt-``result`` and Lwt-``tzresult``. A
+full equivalence table follows.
+
++--------------------------------------+-------------------------------+
+| Modern                               | Legacy                        |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Result_syntax in         |    e >>? fun x ->             |
+|    let* x = e in                     |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Result_syntax in         |    e >|? fun x ->             |
+|    let+ x = e in                     |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_syntax in            |    e >>= fun x ->             |
+|    let* x = e in                     |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_syntax in            |    e >|= fun x ->             |
+|    let+ x = e in                     |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_result_syntax in     |    e >>=? fun x ->            |
+|    let* x = e in                     |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_result_syntax in     |    e >|=? fun x ->            |
+|    let+ x = e in                     |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+| ``and*``, ``and+`` (any syntax       | No equivalent, uses           |
+| module)                              | ``both_e``, ``both_p``, or    |
+|                                      | ``both_ep``                   |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_result_syntax in     |    (e >>= ok) >>=? fun x ->   |
+|    let*! x = e in                    |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_result_syntax in     |    e >>?= fun x ->            |
+|    let*? x = e in                    |    e'                         |
+|    e'                                |                               |
++--------------------------------------+-------------------------------+
+
+In addition, instead of dedicated ``return`` and ``fail`` functions from
+a given syntax module, the legacy code relied on global values.
+
++--------------------------------------+-------------------------------+
+| Modern                               | Legacy                        |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Result_syntax in         |    ok x                       |
+|    return x                          |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | No equivalent, uses           |
+|                                      | ``Error e``                   |
+|    let open Result_syntax in         |                               |
+|    fail e                            |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | No equivalent, uses           |
+|                                      | ``Lwt.return x``              |
+|    let open Lwt_syntax in            |                               |
+|    return x                          |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_result_syntax in     |    return x                   |
+|    return x                          |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | No equivalent, uses           |
+|                                      | ``Lwt.return_error e``        |
+|    let open Lwt_result_syntax in     |                               |
+|    fail e                            |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Result_syntax in         |    ok x                       |
+|    return x                          |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Result_syntax in         |    error e                    |
+|    tzfail e                          |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_result_syntax in     |    return x                   |
+|    return x                          |                               |
++--------------------------------------+-------------------------------+
+| ::                                   | ::                            |
+|                                      |                               |
+|    let open Lwt_result_syntax in     |    fail e                     |
+|    tzfail e                          |                               |
++--------------------------------------+-------------------------------+
+
+In addition to these syntactic differences, there are also usage
+differences. You might encounter the following patterns which you should
+not repeat:
+
+-  Matching against a trace:
+
+   ::
+
+      match f () with
+      | Ok .. -> ..
+      | Error (Timeout :: _) -> ..
+      | Error trace -> ..
+
+   This is discouraged because the compiler is unable to warn you if the
+   matching is affected by a change in the code. E.g., if you add
+   context to an error in one place in the code, you may change the
+   result of the matching somewhere else in the code.
