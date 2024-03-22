@@ -5142,9 +5142,9 @@ module Amplification = struct
     let* before_publication_level = Client.level client in
     let publication_level = 1 + before_publication_level in
     let wait_slot _commitment =
-      Log.info "Waiting for reconstruction to start" ;
+      Log.info "Waiting for first reconstruction event" ;
       let* () =
-        Dal_node.wait_for observer "reconstruct_started.v0" (fun event ->
+        Dal_node.wait_for observer "reconstruct_starting_in.v0" (fun event ->
             if
               JSON.(
                 event |-> "level" |> as_int = publication_level
@@ -5152,9 +5152,14 @@ module Amplification = struct
             then Some ()
             else None)
       in
-      Log.info "Waiting for reconstruction to finish" ;
+      Log.info
+        "Waiting for reconstruction to be canceled because all shards were \
+         received" ;
       let* () =
-        Dal_node.wait_for observer "reconstruct_finished.v0" (fun event ->
+        Dal_node.wait_for
+          observer
+          "reconstruct_no_missing_shard.v0"
+          (fun event ->
             if
               JSON.(
                 event |-> "level" |> as_int = publication_level
