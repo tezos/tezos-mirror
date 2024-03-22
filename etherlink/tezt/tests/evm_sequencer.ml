@@ -830,6 +830,7 @@ let test_delayed_transfer_is_included =
          sc_rollup_node;
          sequencer;
          proxy;
+         observer;
          _;
        } =
     setup_sequencer ~da_fee:arb_da_fee_for_delayed_inbox protocol
@@ -844,7 +845,7 @@ let test_delayed_transfer_is_included =
   let receiver = Eth_account.bootstrap_accounts.(1).address in
   let* sender_balance_prev = Eth_cli.balance ~account:sender ~endpoint in
   let* receiver_balance_prev = Eth_cli.balance ~account:receiver ~endpoint in
-  let* _hash =
+  let* tx_hash =
     send_raw_transaction_to_delayed_inbox
       ~sc_rollup_node
       ~client
@@ -870,6 +871,9 @@ let test_delayed_transfer_is_included =
     ~error_msg:"Expected a smaller balance" ;
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
     ~error_msg:"Expected a bigger balance" ;
+  let*@! (_receipt : Transaction.transaction_receipt) =
+    Rpc.get_transaction_receipt ~tx_hash observer
+  in
   unit
 
 let test_largest_delayed_transfer_is_included =
