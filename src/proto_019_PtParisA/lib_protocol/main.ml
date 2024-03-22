@@ -223,7 +223,6 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
     | Partial_construction _ ->
         init_consensus_rights_for_mempool ctxt ~predecessor_level
   in
-  let* ctxt = Dal_apply.initialisation ~level:predecessor_level ctxt in
   return
     ( ctxt,
       migration_balance_updates,
@@ -481,4 +480,4 @@ module Mempool = struct
          ~predecessor_hash:head_hash)
 end
 
-(* Vanity nonce: 1907250713889696 *)
+(* Vanity nonce: 5417469600518139 *)

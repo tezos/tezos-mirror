@@ -5,10 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Adding and removing stake can be done from/toward a delegate, one
-   of its staker, or all its stakers at
-   once. We need to distinguish these cases to enforce the staking
-   over baking limit. *)
+(** Adding and removing stake can be done from/toward the funds
+    - a delegate directly stakes,
+    - one of its stakers stakes,
+    - all its stakers stakes at once,
+    - or from the edge a delegate may have on its stakers rewards.
+   We need to distinguish these cases to enforce the staking over baking
+   limit. *)
 type t = private
   | Baker of Signature.public_key_hash  (** The baker itself. *)
   | Single_staker of {
@@ -17,8 +20,12 @@ type t = private
     }  (** A single staker, cannot be the delegate. *)
   | Shared_between_stakers of {delegate : Signature.public_key_hash}
       (** The delegate's stakers simultaneously (delegate excluded). *)
+  | Baker_edge of Signature.public_key_hash
+      (** The baker edge over its stakers rewards. *)
 
 val baker : Signature.public_key_hash -> t
+
+val baker_edge : Signature.public_key_hash -> t
 
 val single_staker :
   staker:Contract_repr.t -> delegate:Signature.public_key_hash -> t

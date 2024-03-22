@@ -87,18 +87,19 @@ module Raw_consensus = struct
   type t = {
     current_attestation_power : int;
         (** Number of attestation slots recorded for the current block. *)
-    allowed_attestations : (consensus_pk * int) Slot_repr.Map.t option;
-        (** Attestations rights for the current block. Only an attestation
-            for the lowest slot in the block can be recorded. The map
-            associates to each initial slot the [pkh] associated to this
-            slot with its power. This is [None] only in mempool mode. *)
-    allowed_preattestations : (consensus_pk * int) Slot_repr.Map.t option;
+    allowed_attestations : (consensus_pk * int * int) Slot_repr.Map.t option;
+        (** Attestations rights for the current block. Only an attestation for
+            the lowest slot in the block can be recorded. The map associates to
+            each initial slot the [pkh] associated to this slot with its
+            consensus attestation power and DAL attestation power. This is
+            [None] only in mempool mode. *)
+    allowed_preattestations : (consensus_pk * int * int) Slot_repr.Map.t option;
         (** Preattestations rights for the current block. Only a preattestation
-            for the lowest slot in the block can be recorded. The map
-            associates to each initial slot the [pkh] associated to this
-            slot with its power. This is [None] only in mempool mode, or in
-            application mode when there is no locked round (so the block
-            cannot contain any preattestations). *)
+            for the lowest slot in the block can be recorded. The map associates
+            to each initial slot the [pkh] associated to this slot with its
+            consensus attestation power and DAL attestation power. This is
+            [None] only in mempool mode, or in application mode when there is no
+            locked round (so the block cannot contain any preattestations). *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
@@ -222,18 +223,6 @@ module Raw_consensus = struct
     {t with attestation_branch = Some attestation_branch}
 end
 
-type dal_committee = {
-  pkh_to_shards :
-    (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-  shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
-}
-
-let empty_dal_committee =
-  {
-    pkh_to_shards = Signature.Public_key_hash.Map.empty;
-    shard_to_pkh = Dal_attestation_repr.Shard_map.empty;
-  }
-
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -272,7 +261,6 @@ type back = {
          - We need to provide an incentive to avoid byzantines to post
      dummy slot headers. *)
   dal_attestation_slot_accountability : Dal_attestation_repr.Accountability.t;
-  dal_committee : dal_committee;
   dal_cryptobox : Dal.t option;
   adaptive_issuance_enable : bool;
 }
@@ -886,8 +874,8 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
         dal_attestation_slot_accountability =
           Dal_attestation_repr.Accountability.init
-            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
-        dal_committee = empty_dal_committee;
+            ~number_of_slots:
+              constants.Constants_parametric_repr.dal.number_of_slots;
         dal_cryptobox = None;
         adaptive_issuance_enable;
       };
@@ -1035,10 +1023,10 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
            change. *)
         let cryptobox_parameters =
           {
-            Dal.page_size = 4096;
-            slot_size = 1 lsl 20;
-            redundancy_factor = 16;
-            number_of_shards = 2048;
+            Dal.page_size = 3967;
+            slot_size = 126_944;
+            redundancy_factor = 8;
+            number_of_shards = 512;
           }
         in
         let dal =
@@ -1046,9 +1034,9 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             {
               feature_enable = true;
               incentives_enable = false;
-              number_of_slots = 256;
-              attestation_lag = 4;
-              attestation_threshold = 50;
+              number_of_slots = 32;
+              attestation_lag = 8;
+              attestation_threshold = 66;
               cryptobox_parameters;
             }
         in
@@ -1676,9 +1664,9 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  val allowed_attestations : t -> (consensus_pk * int) slot_map option
+  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
 
-  val allowed_preattestations : t -> (consensus_pk * int) slot_map option
+  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
 
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
@@ -1688,8 +1676,8 @@ module type CONSENSUS = sig
 
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int) slot_map option ->
+    allowed_attestations:(consensus_pk * int * int) slot_map option ->
+    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
     t
 
   val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
@@ -1833,12 +1821,15 @@ module Dal = struct
 
   let number_of_slots ctxt = ctxt.back.constants.dal.number_of_slots
 
-  let record_attested_shards ctxt attestation shards =
+  let number_of_shards ctxt =
+    ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
+
+  let record_number_of_attested_shards ctxt attestation number =
     let dal_attestation_slot_accountability =
-      Dal_attestation_repr.Accountability.record_attested_shards
+      Dal_attestation_repr.Accountability.record_number_of_attested_shards
         ctxt.back.dal_attestation_slot_accountability
         attestation
-        shards
+        number
     in
     {ctxt with back = {ctxt.back with dal_attestation_slot_accountability}}
 
@@ -1877,108 +1868,6 @@ module Dal = struct
       ctxt.back.dal_attestation_slot_accountability
       ~threshold
       ~number_of_shards
-
-  type committee = dal_committee = {
-    pkh_to_shards :
-      (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
-  }
-
-  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
-
-     A committee is selected by the callback function
-     [pkh_from_tenderbake_slot]. We use a callback because of circular
-     dependencies. It is not clear whether it will be the final choice
-     for the DAL committee. The current solution is a bit hackish but
-     should work. If we decide to differ from the Tenderbake
-     committee, one could just draw a new committee.
-
-     The problem with drawing a new committee is that it is not
-     guaranteed that everyone in the DAL committee will be in the
-     Tenderbake committee. Consequently, either we decide to have a
-     new consensus operation which does not count for Tenderbake,
-     and/or we take into account for the model of DAL that at every
-     level, a percentage of DAL attestations cannot be received. *)
-  let compute_committee ctxt pkh_from_tenderbake_slot =
-    let open Lwt_result_syntax in
-    let Constants_parametric_repr.
-          {
-            dal = {cryptobox_parameters = {number_of_shards; _}; _};
-            consensus_committee_size;
-            _;
-          } =
-      ctxt.back.constants
-    in
-    (* We first draw a committee by drawing slots from the Tenderbake
-       committee. To have a compact representation of slots, we can
-       sort the Tenderbake slots by [pkh], so that a committee is
-       actually only an interval. This is done by recomputing a
-       committee from the first one. *)
-    let update_committee committee pkh ~slot_index ~power =
-      {
-        pkh_to_shards =
-          Signature.Public_key_hash.Map.update
-            pkh
-            (function
-              | None -> Some (slot_index, power)
-              | Some (initial_shard_index, old_power) ->
-                  Some (initial_shard_index, old_power + power))
-            committee.pkh_to_shards;
-        shard_to_pkh =
-          List.fold_left
-            (fun shard_to_pkh slot ->
-              Dal_attestation_repr.Shard_map.add slot pkh shard_to_pkh)
-            committee.shard_to_pkh
-            Misc.(slot_index --> (slot_index + (power - 1)));
-      }
-    in
-    let rec compute_power index committee =
-      if Compare.Int.(index < 0) then return committee
-      else
-        let shard_index = index mod consensus_committee_size in
-        let*? slot = Slot_repr.of_int shard_index in
-        let* _ctxt, pkh = pkh_from_tenderbake_slot slot in
-        (* The [Slot_repr] module is related to the Tenderbake committee. *)
-        let slot_index = Slot_repr.to_int slot in
-        (* An optimisation could be to return only [pkh_to_shards] map
-           because the second one is not used. This can be done later
-           on, if it is a good optimisation. *)
-        let committee = update_committee committee pkh ~slot_index ~power:1 in
-        compute_power (index - 1) committee
-    in
-    (* This committee is an intermediate to compute the final DAL
-       committee. This one only projects the Tenderbake committee into
-       the DAL committee. The next one reorders the slots so that they
-       are grouped by public key hash. *)
-    let* unordered_committee =
-      compute_power (number_of_shards - 1) empty_dal_committee
-    in
-    let dal_committee =
-      Signature.Public_key_hash.Map.fold
-        (fun pkh (_, power) (total_power, committee) ->
-          let committee =
-            update_committee committee pkh ~slot_index:total_power ~power
-          in
-          let new_total_power = total_power + power in
-          (new_total_power, committee))
-        unordered_committee.pkh_to_shards
-        (0, empty_dal_committee)
-      |> snd
-    in
-    return dal_committee
-
-  let init_committee ctxt committee =
-    {ctxt with back = {ctxt.back with dal_committee = committee}}
-
-  let shards_of_attester ctxt ~attester:pkh =
-    let rec make acc (initial_shard_index, power) =
-      if Compare.Int.(power <= 0) then List.rev acc
-      else make (initial_shard_index :: acc) (initial_shard_index + 1, power - 1)
-    in
-    Signature.Public_key_hash.Map.find_opt
-      pkh
-      ctxt.back.dal_committee.pkh_to_shards
-    |> Option.map (fun pre_shards -> make [] pre_shards)
 end
 
 (* The type for relative context accesses instead from the root. In order for

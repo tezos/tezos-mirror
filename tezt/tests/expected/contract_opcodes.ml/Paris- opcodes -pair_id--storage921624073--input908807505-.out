@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtParisAeco71sYvYgfnVPb4rRJe6zgzYRDS5U8t5ednSRPUFN5 --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/pair_id.tz on storage None and input '(Pair True True)' --level 1 --trace-stack
+./octez-client --protocol PtParisAaGGWiaegwuZTJ7ETnQKoqoHWJ3p6wNp7TcbAb7gLbMc --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/pair_id.tz on storage None and input '(Pair True True)' --level 1 --trace-stack
 storage
   (Some (Pair True True))
 emitted operations

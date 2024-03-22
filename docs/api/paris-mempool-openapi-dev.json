@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Mempool RPC",
     "description": "The RPC API for the mempool served by the Octez node.",
-    "version": "19.1+dev (72118d1e)"
+    "version": "Octez 0.0+dev (4fe3cc43)"
   },
   "paths": {
     "/pending_operations": {
@@ -15,15 +15,6 @@
             "in": "query",
             "description": "Supported RPC versions are version \"1\" (deprecated) that will output attestation operations as \"endorsement\" in the \"kind\" field, version \"2\" (default) that will output \"attestation\" in the \"kind\" field",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "applied",
-            "in": "query",
-            "description": "(DEPRECATED use validated instead) Include validated operations",
-            "required": false,
             "schema": {
               "type": "string"
             }

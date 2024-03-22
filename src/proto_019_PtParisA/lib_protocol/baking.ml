@@ -110,6 +110,7 @@ let attesting_rights_by_first_slot ctxt level =
   let*? slots =
     Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
   in
+  let number_of_shards = Dal.number_of_shards ctxt in
   let* ctxt, (_, slots_map) =
     Slot.Range.fold_es
       (fun (ctxt, (delegates_map, slots_map)) slot ->
@@ -132,12 +133,16 @@ let attesting_rights_by_first_slot ctxt level =
         in
         (* [slots_map]'keys are the minimal slots of delegates because
            we fold on slots in increasing order *)
+        let in_dal_committee =
+          if Compare.Int.(Slot.to_int slot < number_of_shards) then 1 else 0
+        in
         let slots_map =
           Slot.Map.update
             initial_slot
             (function
-              | None -> Some (consensus_pk, 1)
-              | Some (consensus_pk, count) -> Some (consensus_pk, count + 1))
+              | None -> Some (consensus_pk, 1, in_dal_committee)
+              | Some (consensus_pk, count, dal_count) ->
+                  Some (consensus_pk, count + 1, dal_count + in_dal_committee))
             slots_map
         in
         (ctxt, (delegates_map, slots_map)))

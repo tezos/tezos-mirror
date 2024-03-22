@@ -328,15 +328,13 @@ module type CONSENSUS = sig
 
   type consensus_pk
 
-  (** Returns a map where each attester's pkh is associated to the
-     list of its attesting slots (in decreasing order) for a given
-     level. *)
-  val allowed_attestations : t -> (consensus_pk * int) slot_map option
+  (** Returns a map where from the initial slot of each attester in the TB
+      committee for a given level, to the attester's public key and its
+      consensus power and DAL power. *)
+  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
 
-  (** Returns a map where each attester's pkh is associated to the
-     list of its attesting slots (in decreasing order) for a given
-     level. *)
-  val allowed_preattestations : t -> (consensus_pk * int) slot_map option
+  (** See {!allowed_attestations}. *)
+  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
@@ -355,8 +353,8 @@ module type CONSENSUS = sig
       operation. *)
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int) slot_map option ->
+    allowed_attestations:(consensus_pk * int * int) slot_map option ->
+    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -433,12 +431,12 @@ module Dal : sig
 
   val number_of_slots : t -> int
 
-  (** [record_attested_shards ctxt attestation shards] records that the
-     list of shards [shards] were attested (declared available by some
-     attester). The function assumes that a shard belongs to the
-     interval [0; number_of_shards - 1]. Otherwise, for each shard
-     outside this interval, it is a no-op. *)
-  val record_attested_shards : t -> Dal_attestation_repr.t -> int list -> t
+  val number_of_shards : t -> int
+
+  (** [record_number_of_attested_shards ctxt attestation number_of_shards]
+      records that the [number_of_shards] shards were attested (declared
+      available by some attester). *)
+  val record_number_of_attested_shards : t -> Dal_attestation_repr.t -> int -> t
 
   (** [register_slot_header ctxt slot_header] returns a new context
      where the new candidate [slot] have been taken into
@@ -457,59 +455,4 @@ module Dal : sig
      otherwise. If the [index] is out of the interval
      [0;number_of_slots - 1], returns [false]. *)
   val is_slot_index_attested : t -> Dal_slot_index_repr.t -> bool
-
-  (** [shards_of_attester ctxt ~attester] returns the shard assignment
-     of the DAL committee of the current level for [attester]. This
-     function never returns an empty list. *)
-  val shards_of_attester :
-    t -> attester:Signature.Public_key_hash.t -> int list option
-
-  (** The DAL committee is a subset of the Tenderbake committee.  A
-     shard from [0;number_of_shards] is associated to a public key
-     hash. For efficiency reasons, the committee is both:
-     a mapping from public key hashes to shards and
-     a mapping from shards to public key hashes.
-     The DAL committee ensures the shards associated to the
-     same public key hash are contiguous. The list of shards is
-     represented as two natural numbers [(initial, power)] which
-     encodes the list of shards:
-     [initial; initial + 1; ... ; initial + power - 1].
-
-      This data-type ensures the following invariants:
-
-      - \forall pkh shard, find pkh_to_shards pkh = Some (start,n) ->
-     \forall i, i \in [start; start + n - 1] -> find shard_to_pkh i
-     = Some pkh
-
-      - forall pkh shard, find shard_to_pkh shard = Some pkh ->
-     \exists (start,n), find pkh_to_shards pkh = Some (start,n) /\
-     start <= shard <= start + n - 1
-
-      - Given an attester, all its shard assignments are contiguous
-     *)
-  type committee = {
-    pkh_to_shards :
-      (Dal_attestation_repr.shard_index * int) Signature.Public_key_hash.Map.t;
-    shard_to_pkh : Signature.Public_key_hash.t Dal_attestation_repr.Shard_map.t;
-  }
-
-  (** [compute_committee ctxt pkh_from_tenderbake_slot] computes the
-     DAL committee using the [pkh_from_tenderbake_slot] function. This
-     functions takes into account the fact that the DAL committee and
-     the Tenderbake committee may have different sizes. If the DAL
-     committee is smaller, then we simply take a projection of the
-     Tenderbake committee for the first [n] slots. If the DAL
-     committee is larger, shards are computed modulo the Tenderbake
-     committee. Slots assignments are reordered for a given a public
-     key hash to ensure all the slots (or shards in the context of
-     DAL) shards are contiguous (see {!type:committee}). *)
-  val compute_committee :
-    t ->
-    (Slot_repr.t -> (t * Signature.Public_key_hash.t) tzresult Lwt.t) ->
-    committee tzresult Lwt.t
-
-  (** [init_committee ctxt committee] returns a context where the
-     [committee] is cached. The committee is expected to be the one
-     for the current level. *)
-  val init_committee : t -> committee -> t
 end

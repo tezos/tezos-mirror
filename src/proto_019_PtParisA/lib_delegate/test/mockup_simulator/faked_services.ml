@@ -1,3 +1,10 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
 open Tezos_shell_services
 module Directory = Tezos_rpc.Directory
 module Chain_services = Tezos_shell_services.Chain_services

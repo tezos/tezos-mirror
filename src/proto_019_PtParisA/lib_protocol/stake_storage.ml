@@ -92,13 +92,13 @@ let has_minimal_stake ctxt staking_balance =
 
 let initialize_delegate ctxt delegate ~delegated =
   let open Lwt_result_syntax in
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
+  let current_level = Raw_context.current_level ctxt in
   let balance =
     Full_staking_balance_repr.init
       ~own_frozen:Tez_repr.zero
       ~staked_frozen:Tez_repr.zero
       ~delegated
-      ~current_cycle
+      ~current_level
   in
   let* ctxt = Storage.Stake.Staking_balance.init ctxt delegate balance in
   if has_minimal_stake ctxt balance then
@@ -150,8 +150,8 @@ let update_stake ~f ctxt delegate =
   | false, false | true, true -> return ctxt
 
 let remove_delegated_stake ctxt delegate amount =
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let f = Full_staking_balance_repr.remove_delegated ~current_cycle ~amount in
+  let current_level = Raw_context.current_level ctxt in
+  let f = Full_staking_balance_repr.remove_delegated ~current_level ~amount in
   update_stake ctxt delegate ~f
 
 let remove_own_frozen_stake ctxt delegate amount =
@@ -166,12 +166,16 @@ let remove_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
   | Frozen_staker_repr.Baker delegate ->
       remove_own_frozen_stake ctxt delegate amount
+  | Frozen_staker_repr.Baker_edge delegate ->
+      (* This case should not happen because [Baker_edge] is only
+         intended to be used for rewards. *)
+      remove_own_frozen_stake ctxt delegate amount
   | Single_staker {staker = _; delegate} | Shared_between_stakers {delegate} ->
       remove_staked_frozen_stake ctxt delegate amount
 
 let add_delegated_stake ctxt delegate amount =
-  let current_cycle = (Raw_context.current_level ctxt).cycle in
-  let f = Full_staking_balance_repr.add_delegated ~current_cycle ~amount in
+  let current_level = Raw_context.current_level ctxt in
+  let f = Full_staking_balance_repr.add_delegated ~current_level ~amount in
   update_stake ctxt delegate ~f
 
 let add_own_frozen_stake ctxt delegate amount =
@@ -185,6 +189,8 @@ let add_staked_frozen_stake ctxt delegate amount =
 let add_frozen_stake_only_call_from_token ctxt staker amount =
   match staker with
   | Frozen_staker_repr.Baker delegate ->
+      add_own_frozen_stake ctxt delegate amount
+  | Frozen_staker_repr.Baker_edge delegate ->
       add_own_frozen_stake ctxt delegate amount
   | Single_staker {staker = _; delegate} | Shared_between_stakers {delegate} ->
       add_staked_frozen_stake ctxt delegate amount

@@ -145,7 +145,7 @@ let pay_rewards ctxt ?active_stake ~source ~delegate rewards =
     Token.transfer
       ctxt
       source
-      (`Frozen_deposits (Frozen_staker_repr.baker delegate))
+      (`Frozen_deposits (Frozen_staker_repr.baker_edge delegate))
       to_baker_from_edge_over_stakers
   in
   let* ctxt, balance_updates_frozen_rewards_stakers =
