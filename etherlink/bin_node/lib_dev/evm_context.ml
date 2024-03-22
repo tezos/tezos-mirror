@@ -72,11 +72,6 @@ module Request = struct
         payload : Blueprint_types.payload;
       }
         -> (unit, tztrace) t
-    | Apply_sequencer_blueprint : {
-        timestamp : Time.Protocol.t;
-        blueprint : Sequencer_blueprint.t;
-      }
-        -> (unit, tztrace) t
     | Last_produce_blueprint : (Blueprint_types.t, tztrace) t
     | Head_info : (head, tztrace) t
     | Blueprint : {
@@ -128,31 +123,18 @@ module Request = struct
             View (Apply_blueprint {timestamp; payload}));
         case
           (Tag 2)
-          ~title:"Apply_sequencer_blueprint"
-          (obj3
-             (req "request" (constant "apply_sequencer_blueprint"))
-             (req "timestamp" Time.Protocol.encoding)
-             (req "blueprint" Blueprint_types.payload_encoding))
-          (function
-            | View (Apply_sequencer_blueprint {timestamp; blueprint}) ->
-                Some ((), timestamp, blueprint)
-            | _ -> None)
-          (fun ((), timestamp, blueprint) ->
-            View (Apply_sequencer_blueprint {timestamp; blueprint}));
-        case
-          (Tag 3)
           ~title:"Last_produce_blueprint"
           (obj1 (req "request" (constant "last_produce_blueprint")))
           (function View Last_produce_blueprint -> Some () | _ -> None)
           (fun () -> View Last_produce_blueprint);
         case
-          (Tag 4)
+          (Tag 3)
           ~title:"Head_info"
           (obj1 (req "request" (constant "head_info")))
           (function View Head_info -> Some () | _ -> None)
           (fun () -> View Head_info);
         case
-          (Tag 5)
+          (Tag 4)
           ~title:"Blueprint"
           (obj2
              (req "request" (constant "blueprint"))
@@ -160,7 +142,7 @@ module Request = struct
           (function View (Blueprint {level}) -> Some ((), level) | _ -> None)
           (fun ((), level) -> View (Blueprint {level}));
         case
-          (Tag 6)
+          (Tag 5)
           ~title:"Blueprints_range"
           (obj3
              (req "request" (constant "Blueprints_range"))
@@ -171,13 +153,13 @@ module Request = struct
             | _ -> None)
           (fun ((), from, to_) -> View (Blueprints_range {from; to_}));
         case
-          (Tag 7)
+          (Tag 6)
           ~title:"Last_known_L1_level"
           (obj1 (req "request" (constant "last_known_l1_level")))
           (function View Last_known_L1_level -> Some () | _ -> None)
           (fun () -> View Last_known_L1_level);
         case
-          (Tag 8)
+          (Tag 7)
           ~title:"New_last_known_L1_level"
           (obj2
              (req "request" (constant "new_last_known_l1_level"))
@@ -186,7 +168,7 @@ module Request = struct
             | View (New_last_known_L1_level l) -> Some ((), l) | _ -> None)
           (fun ((), l) -> View (New_last_known_L1_level l));
         case
-          (Tag 9)
+          (Tag 8)
           ~title:"Delayed_inbox_hashes"
           (obj1 (req "request" (constant "Delayed_inbox_hashes")))
           (function View Delayed_inbox_hashes -> Some () | _ -> None)
@@ -491,28 +473,6 @@ module State = struct
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     Blueprint_events.blueprint_applied (level, block_hash)
 
-  let apply_sequencer_blueprint (ctxt : t) timestamp
-      (blueprint : Sequencer_blueprint.t) =
-    let open Lwt_result_syntax in
-    let* evm_state, context, current_block_hash, applied_upgrade =
-      with_store_transaction ctxt @@ fun ctxt ->
-      let* current_block_hash =
-        apply_blueprint_store_unsafe ctxt timestamp blueprint
-      in
-      return current_block_hash
-    in
-    let*! () =
-      on_new_head
-        ctxt
-        ~applied_upgrade
-        evm_state
-        timestamp
-        context
-        current_block_hash
-        blueprint
-    in
-    return_unit
-
   let apply_blueprint ctxt timestamp payload =
     let open Lwt_result_syntax in
     let* evm_state, context, current_block_hash, applied_upgrade =
@@ -788,9 +748,6 @@ module Handlers = struct
     | Apply_blueprint {timestamp; payload} ->
         let ctxt = Worker.state self in
         State.apply_blueprint ctxt timestamp payload
-    | Apply_sequencer_blueprint {timestamp; blueprint} ->
-        let ctxt = Worker.state self in
-        State.apply_sequencer_blueprint ctxt timestamp blueprint
     | Last_produce_blueprint ->
         let ctxt = Worker.state self in
         State.last_produced_blueprint ctxt
@@ -911,9 +868,6 @@ let apply_evm_events ~finalized_level events =
 
 let apply_blueprint timestamp payload =
   worker_wait_for_request (Apply_blueprint {timestamp; payload})
-
-let apply_sequencer_blueprint timestamp blueprint =
-  worker_wait_for_request (Apply_sequencer_blueprint {timestamp; blueprint})
 
 let last_produced_blueprint () = worker_wait_for_request Last_produce_blueprint
 

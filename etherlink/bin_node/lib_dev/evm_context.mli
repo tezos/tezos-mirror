@@ -69,11 +69,6 @@ val last_produced_blueprint : unit -> Blueprint_types.t tzresult Lwt.t
 val apply_blueprint :
   Time.Protocol.t -> Blueprint_types.payload -> unit tzresult Lwt.t
 
-(** Same as {!apply_blueprint}, but additionally publish the blueprint if it is
-    correct. *)
-val apply_sequencer_blueprint :
-  Time.Protocol.t -> Sequencer_blueprint.t -> unit tzresult Lwt.t
-
 val head_info : unit -> head tzresult Lwt.t
 
 val blueprints_watcher :

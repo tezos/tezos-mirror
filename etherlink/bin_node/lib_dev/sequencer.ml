@@ -224,9 +224,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
           ~number:Ethereum_types.(Qty Z.zero)
           ~parent_hash:Ethereum_types.genesis_parent_hash
       in
-      let* () =
-        Evm_context.apply_sequencer_blueprint genesis_timestamp genesis
-      in
+      let* () = Evm_context.apply_blueprint genesis_timestamp genesis in
       Blueprints_publisher.publish Z.zero genesis
     else return_unit
   in
