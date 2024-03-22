@@ -75,6 +75,8 @@ val tezt_performance_regression : Manifest.target
 
 val tezt_tezos : Manifest.target
 
+val tezt_cloud : Manifest.target
+
 val tezt_tx_kernel : Manifest.target
 
 val tezt_wrapper : Manifest.target

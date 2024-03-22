@@ -2402,6 +2402,22 @@ let tezt_tezos =
     ~cram:true
     ~release_status:Released
 
+let tezt_cloud =
+  private_lib
+    "tezt_cloud"
+    ~path:"tezt/lib_cloud"
+    ~opam:"tezt-cloud"
+    ~synopsis:
+      "A library to ease the writing of test using machines onto cloud \
+       providers (GCP, AWS, ...)"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+      ]
+    ~release_status:Unreleased
+
 let octez_p2p_test_common =
   octez_shell_lib
     "p2p_test_common"
@@ -7270,19 +7286,6 @@ let _ppinclude =
     ~opam:"octez-libs"
     ~bisect_ppx:No
     ~deps:[compiler_libs_common]
-
-let _dal_throughput =
-  private_exe
-    "dal_throughput_gen"
-    ~path:
-      ("devtools" // "cloud-infrastructure" // "projects" // "nl-dal"
-     // "octogram")
-    ~synopsis:"DAL Throughput scenarii generator"
-    ~release_status:Unreleased
-    ~opam:""
-    ~deps:[ezjsonm]
-    ~static:false
-    ~bisect_ppx:No
 
 let _octez_node =
   let protocol_deps =
