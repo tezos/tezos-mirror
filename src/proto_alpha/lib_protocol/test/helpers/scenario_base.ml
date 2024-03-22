@@ -252,3 +252,9 @@ let check_balance_field src_name field amount : (t, t) scenarios =
             check src_total
       in
       return_unit)
+
+let check_balance_fields src_name ~liquid ~staked
+    ?(unstaked_frozen_total = Tez.zero) () =
+  check_balance_field src_name `Staked staked
+  --> check_balance_field src_name `Liquid liquid
+  --> check_balance_field src_name `Unstaked_frozen_total unstaked_frozen_total
