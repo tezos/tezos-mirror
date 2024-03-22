@@ -117,6 +117,13 @@ let inspect evm_state key =
   let* value = Wasm.Commands.find_key_in_durable evm_state key in
   Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
 
+let subkeys evm_state key =
+  let open Lwt_syntax in
+  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
+  let* durable = Wasm_utils.wrap_as_durable_storage evm_state in
+  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
+  Tezos_scoru_wasm.Durable.list durable key
+
 let current_block_height evm_state =
   let open Lwt_syntax in
   let* current_block_number =

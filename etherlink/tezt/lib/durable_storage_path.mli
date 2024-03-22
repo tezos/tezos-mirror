@@ -34,6 +34,8 @@ val normalize : string -> string
 (** Path in the Wasm PVM durable storage. *)
 type path = string
 
+val delayed_inbox : path
+
 (** [kernel_root_hash] is the path to the current kernel root hash. *)
 val kernel_root_hash : path
 

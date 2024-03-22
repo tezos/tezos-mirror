@@ -64,9 +64,6 @@ type worker = Worker.infinite Worker.queue Worker.t
 
 let get_hashes ~transactions ~delayed_transactions =
   let open Result_syntax in
-  let delayed_hashes =
-    List.map Ethereum_types.Delayed_transaction.hash delayed_transactions
-  in
   let hashes =
     List.map
       (fun transaction ->
@@ -75,14 +72,15 @@ let get_hashes ~transactions ~delayed_transactions =
           Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
       transactions
   in
-  return (delayed_hashes @ hashes)
+  return (delayed_transactions @ hashes)
 
 let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     =
   let open Lwt_result_syntax in
   let* tx_pool_response = Tx_pool.pop_transactions () in
   match tx_pool_response with
-  | Transactions (transactions, delayed_transactions) ->
+  | Transactions transactions ->
+      let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
       let n = List.length transactions + List.length delayed_transactions in
       if force || n > 0 then
         let* head_info = Evm_context.head_info () in
@@ -108,7 +106,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
         in
         let* () = Evm_context.apply_sequencer_blueprint timestamp blueprint in
         let (Qty number) = head_info.next_blueprint_number in
-        let* () = Blueprints_publisher.publish number blueprint.to_publish in
+        let* () = Blueprints_publisher.publish number blueprint in
         let*! () =
           List.iter_p
             (fun hash -> Block_producer_events.transaction_selected ~hash)

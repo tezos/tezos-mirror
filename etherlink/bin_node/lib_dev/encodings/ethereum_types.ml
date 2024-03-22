@@ -1220,13 +1220,13 @@ module Delayed_transaction = struct
         case
           (Tag 0)
           ~title:"transaction"
-          unit
+          (constant "transaction")
           (function Transaction -> Some () | _ -> None)
           (function () -> Transaction);
         case
           (Tag 1)
           ~title:"deposit"
-          unit
+          (constant "deposit")
           (function Deposit -> Some () | _ -> None)
           (function () -> Deposit);
       ]
@@ -1236,16 +1236,17 @@ module Delayed_transaction = struct
     conv
       (fun {kind; hash; raw} -> (kind, hash, raw))
       (fun (kind, hash, raw) -> {kind; hash; raw})
-      (obj3
-         (req "kind" encoding_kind)
-         (req "hash" hash_encoding)
-         (req "raw" string))
+      (tup3 encoding_kind hash_encoding (string' Hex))
 
-  let of_bytes hash bytes =
-    match bytes |> Rlp.decode with
-    | Ok Rlp.(List [List [Value tag; content]; _timestamp; _level]) -> (
+  let of_rlp_content hash rlp_content =
+    match rlp_content with
+    | Rlp.(List [Value tag; content]) -> (
         match (Bytes.to_string tag, content) with
-        | "\x01", Rlp.Value raw_tx ->
+        (* This is a bit counter intuitive but what we decode is actually
+           the TransactionContent, which is Ethereum|Deposit|DelayedTransaction.
+           Transaction cannot be in the delayed inbox by construction, therefore
+           we care only about Deposit and DelayedTransaction. *)
+        | "\x03", Rlp.Value raw_tx ->
             let hash =
               raw_tx |> Bytes.to_string |> hash_raw_tx |> Hex.of_string
               |> Hex.show |> hash_of_string
@@ -1257,6 +1258,21 @@ module Delayed_transaction = struct
         | _ -> None)
     | _ -> None
 
+  let to_rlp {kind; raw; hash} =
+    let open Rlp in
+    let tag =
+      (match kind with Transaction -> "\x03" | Deposit -> "\x02")
+      |> Bytes.of_string
+    in
+    let hash = hash_to_bytes hash |> Bytes.of_string in
+    let content =
+      match kind with
+      | Transaction -> Value (Bytes.of_string raw)
+      | Deposit -> decode_exn (Bytes.of_string raw)
+    in
+    let rlp = List [Value hash; List [Value tag; content]] in
+    encode rlp
+
   let pp_kind fmt = function
     | Transaction -> Format.pp_print_string fmt "Transaction"
     | Deposit -> Format.pp_print_string fmt "Deposit"
@@ -1264,7 +1280,8 @@ module Delayed_transaction = struct
   let pp fmt {raw; kind; _} =
     Format.fprintf fmt "%a: %a" pp_kind kind Hex.pp (Hex.of_string raw)
 
-  let pp_short fmt {hash = Hash (Hex h); _} = Format.pp_print_string fmt h
+  let pp_short fmt {kind; hash; _} =
+    Format.fprintf fmt "%a: %a" pp_kind kind pp_hash hash
 end
 
 module Upgrade = struct
@@ -1369,6 +1386,7 @@ module Evm_events = struct
     | Upgrade_event of Upgrade.t
     | Sequencer_upgrade_event of Sequencer_upgrade.t
     | Blueprint_applied of Blueprint_applied.t
+    | New_delayed_transaction of Delayed_transaction.t
 
   let of_bytes bytes =
     match bytes |> Rlp.decode with
@@ -1383,6 +1401,15 @@ module Evm_events = struct
         | "\x03" ->
             let blueprint_applied = Blueprint_applied.of_rlp rlp_content in
             Option.map (fun u -> Blueprint_applied u) blueprint_applied
+        | "\x04" -> (
+            match rlp_content with
+            | List [Value hash; transaction_content] ->
+                let hash = decode_hash hash in
+                let transaction =
+                  Delayed_transaction.of_rlp_content hash transaction_content
+                in
+                Option.map (fun u -> New_delayed_transaction u) transaction
+            | _ -> None)
         | _ -> None)
     | _ -> None
 
@@ -1412,6 +1439,12 @@ module Evm_events = struct
           Z.pp_print
           number
           hash
+    | New_delayed_transaction delayed_transaction ->
+        Format.fprintf
+          fmt
+          "New delayed transaction:@ %a"
+          Delayed_transaction.pp_short
+          delayed_transaction
 
   let encoding =
     let open Data_encoding in
@@ -1444,5 +1477,15 @@ module Evm_events = struct
           ~event_encoding:Blueprint_applied.encoding
           ~proj:(function Blueprint_applied info -> Some info | _ -> None)
           ~inj:(fun info -> Blueprint_applied info);
+        case
+          ~kind:"new_delayed_transaction"
+          ~tag:3
+          ~event_encoding:Delayed_transaction.encoding
+          ~proj:(function
+            | New_delayed_transaction delayed_transaction ->
+                Some delayed_transaction
+            | _ -> None)
+          ~inj:(fun delayed_transaction ->
+            New_delayed_transaction delayed_transaction);
       ]
 end

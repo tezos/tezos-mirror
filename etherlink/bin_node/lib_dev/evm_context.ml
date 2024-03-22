@@ -78,17 +78,18 @@ module Request = struct
     | Last_produce_blueprint : (Blueprint_types.t, tztrace) t
     | Evm_state : (Evm_state.t, tztrace) t
     | Head_info : (head, tztrace) t
-    | Executable_blueprint : {
+    | Blueprint : {
         level : Ethereum_types.quantity;
       }
         -> (Blueprint_types.t option, tztrace) t
-    | Publishable_blueprints_range : {
+    | Blueprints_range : {
         from : Ethereum_types.quantity;
         to_ : Ethereum_types.quantity;
       }
         -> ((Ethereum_types.quantity * Blueprint_types.payload) list, tztrace) t
     | Last_known_L1_level : (int32 option, tztrace) t
     | New_last_known_L1_level : int32 -> (unit, tztrace) t
+    | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
 
   type view = View : _ t -> view
 
@@ -130,7 +131,7 @@ module Request = struct
           (obj3
              (req "request" (constant "apply_sequencer_blueprint"))
              (req "timestamp" Time.Protocol.encoding)
-             (req "blueprint" Sequencer_blueprint.encoding))
+             (req "blueprint" Blueprint_types.payload_encoding))
           (function
             | View (Apply_sequencer_blueprint {timestamp; blueprint}) ->
                 Some ((), timestamp, blueprint)
@@ -157,27 +158,23 @@ module Request = struct
           (fun () -> View Head_info);
         case
           (Tag 6)
-          ~title:"Executable_blueprint"
+          ~title:"Blueprint"
           (obj2
-             (req "request" (constant "executable_blueprint"))
+             (req "request" (constant "blueprint"))
              (req "level" Ethereum_types.quantity_encoding))
-          (function
-            | View (Executable_blueprint {level}) -> Some ((), level)
-            | _ -> None)
-          (fun ((), level) -> View (Executable_blueprint {level}));
+          (function View (Blueprint {level}) -> Some ((), level) | _ -> None)
+          (fun ((), level) -> View (Blueprint {level}));
         case
           (Tag 7)
-          ~title:"Publishable_blueprints_range"
+          ~title:"Blueprints_range"
           (obj3
-             (req "request" (constant "publishable_blueprints_range"))
+             (req "request" (constant "Blueprints_range"))
              (req "from" Ethereum_types.quantity_encoding)
              (req "to" Ethereum_types.quantity_encoding))
           (function
-            | View (Publishable_blueprints_range {from; to_}) ->
-                Some ((), from, to_)
+            | View (Blueprints_range {from; to_}) -> Some ((), from, to_)
             | _ -> None)
-          (fun ((), from, to_) ->
-            View (Publishable_blueprints_range {from; to_}));
+          (fun ((), from, to_) -> View (Blueprints_range {from; to_}));
         case
           (Tag 8)
           ~title:"Last_known_L1_level"
@@ -193,6 +190,12 @@ module Request = struct
           (function
             | View (New_last_known_L1_level l) -> Some ((), l) | _ -> None)
           (fun ((), l) -> View (New_last_known_L1_level l));
+        case
+          (Tag 10)
+          ~title:"Delayed_inbox_hashes"
+          (obj1 (req "request" (constant "Delayed_inbox_hashes")))
+          (function View Delayed_inbox_hashes -> Some () | _ -> None)
+          (fun () -> View Delayed_inbox_hashes);
       ]
 
   let pp ppf view =
@@ -334,6 +337,21 @@ module State = struct
                 (number, expected_block_hash)
             in
             tzfail (Node_error.Diverged (number, expected_block_hash, None)))
+    | New_delayed_transaction delayed_transaction ->
+        let*! data_dir, config = execution_config in
+        let* evm_state =
+          Evm_state.execute
+            ~data_dir
+            ~config
+            evm_state
+            [
+              `Input
+                ("\254"
+                ^ Bytes.to_string
+                    (Delayed_transaction.to_rlp delayed_transaction));
+            ]
+        in
+        return (evm_state, on_success)
 
   let apply_evm_events ~finalized_level (ctxt : t) events =
     let open Lwt_result_syntax in
@@ -436,15 +454,11 @@ module State = struct
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction ctxt.store ;
     let*! evm_state = evm_state ctxt in
-    let*! _, config = execution_config in
+    let*! data_dir, config = execution_config in
     let (Qty next) = ctxt.session.next_blueprint_number in
 
     let* try_apply =
-      Evm_state.apply_blueprint
-        ~data_dir:ctxt.data_dir
-        ~config
-        evm_state
-        payload
+      Evm_state.apply_blueprint ~data_dir ~config evm_state payload
     in
 
     match try_apply with
@@ -452,7 +466,7 @@ module State = struct
         (evm_state, Block_height blueprint_number, current_block_hash)
       when Z.equal blueprint_number next ->
         let* () =
-          Evm_store.Executable_blueprints.store
+          Evm_store.Blueprints.store
             ctxt.store
             {number = Qty blueprint_number; timestamp; payload}
         in
@@ -484,17 +498,10 @@ module State = struct
   let apply_sequencer_blueprint (ctxt : t) timestamp
       (blueprint : Sequencer_blueprint.t) =
     let open Lwt_result_syntax in
-    let (Qty level) = ctxt.session.next_blueprint_number in
     let* context, current_block_hash, applied_upgrade =
       with_store_transaction ctxt @@ fun ctxt ->
       let* current_block_hash =
-        apply_blueprint_store_unsafe ctxt timestamp blueprint.to_execute
-      in
-      let* () =
-        Evm_store.Publishable_blueprints.store
-          ctxt.store
-          (Qty level)
-          blueprint.to_publish
+        apply_blueprint_store_unsafe ctxt timestamp blueprint
       in
       return current_block_hash
     in
@@ -505,7 +512,7 @@ module State = struct
         timestamp
         context
         current_block_hash
-        blueprint.to_execute
+        blueprint
     in
     return_unit
 
@@ -655,11 +662,7 @@ module State = struct
     (* Tell the kernel that it is executed by an EVM node *)
     let*! evm_state = Evm_state.flag_local_exec evm_state in
     (* We remove the delayed inbox from the EVM state. Its contents will be
-       retrieved by the sequencer by inspecting the rollup node durable storage.
-
-       If we do not remove the delayed inbox from the state, the contents will
-       never be flushed (because of the distinction between executable /
-       publishable) *)
+       retrieved by the sequencer by inspecting the evm events. *)
     let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
 
     (* For changes made to [evm_state] to take effect, we commit the result *)
@@ -701,10 +704,27 @@ module State = struct
     let open Lwt_result_syntax in
     let (Qty next) = ctxt.session.next_blueprint_number in
     let current = Ethereum_types.Qty Z.(pred next) in
-    let* blueprint = Evm_store.Executable_blueprints.find ctxt.store current in
+    let* blueprint = Evm_store.Blueprints.find ctxt.store current in
     match blueprint with
     | Some blueprint -> return blueprint
     | None -> failwith "Could not fetch the last produced blueprint"
+
+  let delayed_inbox_hashes evm_state =
+    let open Lwt_syntax in
+    let* keys =
+      Evm_state.subkeys
+        evm_state
+        Durable_storage_path.Delayed_transaction.hashes
+    in
+    let hashes =
+      (* Remove the empty, meta keys *)
+      List.filter_map
+        (fun key ->
+          if key = "" || key = "meta" then None
+          else Some (Ethereum_types.hash_of_string key))
+        keys
+    in
+    return hashes
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -776,18 +796,23 @@ module Handlers = struct
             next_blueprint_number = ctxt.session.next_blueprint_number;
             current_block_hash = ctxt.session.current_block_hash;
           }
-    | Executable_blueprint {level} ->
+    | Blueprint {level} ->
         let ctxt = Worker.state self in
-        Evm_store.Executable_blueprints.find ctxt.store level
-    | Publishable_blueprints_range {from; to_} ->
+        Evm_store.Blueprints.find ctxt.store level
+    | Blueprints_range {from; to_} ->
         let ctxt = Worker.state self in
-        Evm_store.Publishable_blueprints.find_range ctxt.store ~from ~to_
+        Evm_store.Blueprints.find_range ctxt.store ~from ~to_
     | Last_known_L1_level ->
         let ctxt = Worker.state self in
         Evm_store.L1_latest_known_level.find ctxt.store
     | New_last_known_L1_level l ->
         let ctxt = Worker.state self in
         Evm_store.L1_latest_known_level.store ctxt.store l
+    | Delayed_inbox_hashes ->
+        let ctxt = Worker.state self in
+        let*! evm_state = State.evm_state ctxt in
+        let*! hashes = State.delayed_inbox_hashes evm_state in
+        return hashes
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -900,16 +925,17 @@ let head_info () = worker_wait_for_request Head_info
 
 let blueprints_watcher () = Lwt_watcher.create_stream blueprint_watcher
 
-let executable_blueprint level =
-  worker_wait_for_request (Executable_blueprint {level})
+let blueprint level = worker_wait_for_request (Blueprint {level})
 
-let publishable_blueprints_range from to_ =
-  worker_wait_for_request (Publishable_blueprints_range {from; to_})
+let blueprints_range from to_ =
+  worker_wait_for_request (Blueprints_range {from; to_})
 
 let last_known_l1_level () = worker_wait_for_request Last_known_L1_level
 
 let new_last_known_l1_level l =
   worker_add_request ~request:(New_last_known_L1_level l)
+
+let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
 
 let shutdown () =
   let open Lwt_syntax in

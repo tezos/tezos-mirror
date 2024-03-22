@@ -19,22 +19,16 @@ module Pool = struct
   }
 
   type t = {
-    delayed_transactions : Ethereum_types.Delayed_transaction.t list;
     transactions : transaction Nonce_map.t Pkey_map.t;
     global_index : int64; (* Index to order the transactions. *)
   }
 
-  let empty : t =
-    {
-      transactions = Pkey_map.empty;
-      global_index = Int64.zero;
-      delayed_transactions = [];
-    }
+  let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
   (** Add a transaction to the pool. *)
   let add t pkey raw_tx =
     let open Result_syntax in
-    let {transactions; global_index; delayed_transactions} = t in
+    let {transactions; global_index} = t in
     let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
     let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
@@ -60,18 +54,7 @@ module Pool = struct
                    user_transactions))
         transactions
     in
-    return
-      {
-        transactions;
-        global_index = Int64.(add global_index one);
-        delayed_transactions;
-      }
-
-  (** Add a delayed transaction to the pool.*)
-  let add_delayed t tx =
-    let open Result_syntax in
-    let delayed_transactions = tx :: t.delayed_transactions in
-    return {t with delayed_transactions}
+    return {transactions; global_index = Int64.(add global_index one)}
 
   (** Returns all the addresses of the pool *)
   let addresses {transactions; _} =
@@ -79,8 +62,7 @@ module Pool = struct
 
   (** Returns the transaction matching the predicate.
       And remove them from the pool. *)
-  let partition pkey predicate
-      {transactions; global_index; delayed_transactions} =
+  let partition pkey predicate {transactions; global_index} =
     (* Get the sequence of transaction *)
     let selected, remaining =
       transactions |> Pkey_map.find pkey
@@ -94,7 +76,7 @@ module Pool = struct
     in
     (* Convert the sequence to a list *)
     let selected = selected |> Nonce_map.bindings |> List.map snd in
-    (selected, {transactions; global_index; delayed_transactions})
+    (selected, {transactions; global_index})
 
   (** Removes from the pool the transactions matching the predicate
       for the given pkey. *)
@@ -133,31 +115,7 @@ type parameters = {
   mode : mode;
 }
 
-type add_transaction =
-  | Transaction of string
-  | Delayed of Ethereum_types.Delayed_transaction.t
-
-let add_transaction_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"transaction"
-        string
-        (function Transaction transaction -> Some transaction | _ -> None)
-        (function transaction -> Transaction transaction);
-      case
-        (Tag 1)
-        ~title:"delayed"
-        Ethereum_types.Delayed_transaction.encoding
-        (function Delayed delayed -> Some delayed | _ -> None)
-        (fun delayed -> Delayed delayed);
-    ]
-
-type popped_transactions =
-  | Locked
-  | Transactions of string list * Ethereum_types.Delayed_transaction.t list
+type popped_transactions = Locked | Transactions of string list
 
 module Types = struct
   type state = {
@@ -187,7 +145,7 @@ end
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
-        add_transaction
+        string
         -> ((Ethereum_types.hash, string) result, tztrace) t
     | Pop_transactions : (popped_transactions, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
@@ -207,7 +165,7 @@ module Request = struct
           ~title:"Add_transaction"
           (obj2
              (req "request" (constant "add_transaction"))
-             (req "transaction" add_transaction_encoding))
+             (req "transaction" string))
           (function
             | View (Add_transaction transaction) -> Some ((), transaction)
             | _ -> None)
@@ -240,19 +198,11 @@ module Request = struct
 
   let pp ppf (View r) =
     match r with
-    | Add_transaction transaction -> (
-        match transaction with
-        | Transaction tx_raw ->
-            Format.fprintf
-              ppf
-              "Add tx [%s] to tx-pool"
-              (Hex.of_string tx_raw |> Hex.show)
-        | Delayed delayed ->
-            Format.fprintf
-              ppf
-              "Add delayed inbox tx [%a] to tx-pool"
-              Ethereum_types.Delayed_transaction.pp_short
-              delayed)
+    | Add_transaction tx_raw ->
+        Format.fprintf
+          ppf
+          "Add tx [%s] to tx-pool"
+          (Hex.of_string tx_raw |> Hex.show)
     | Pop_transactions -> Format.fprintf ppf "Popping transactions"
     | Pop_and_inject_transactions ->
         Format.fprintf ppf "Popping and injecting transactions"
@@ -289,24 +239,6 @@ let on_normal_transaction state tx_raw =
           ~transaction:(Ethereum_types.hash_to_string hash)
       in
       state.pool <- pool ;
-      return (Ok hash)
-
-let on_delayed_transaction state delayed_tx =
-  let open Lwt_result_syntax in
-  let open Types in
-  let {rollup_node = (module Rollup_node); pool; _} = state in
-  (* Add the tx to the pool*)
-  let*? pool = Pool.add_delayed pool delayed_tx in
-  state.pool <- pool ;
-  return_unit
-
-let on_transaction state transaction =
-  let open Lwt_result_syntax in
-  match transaction with
-  | Transaction transaction -> on_normal_transaction state transaction
-  | Delayed delayed_transaction ->
-      let hash = Ethereum_types.Delayed_transaction.hash delayed_transaction in
-      let* () = on_delayed_transaction state delayed_transaction in
       return (Ok hash)
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
@@ -387,13 +319,9 @@ let pop_transactions state =
              Int64.compare index_a index_b)
       |> List.map (fun Pool.{raw_tx; _} -> raw_tx)
     in
-    (* Add delayed transactions and empty the list *)
-    let delayed, pool =
-      (pool.delayed_transactions, {pool with delayed_transactions = []})
-    in
     (* update the pool *)
     state.pool <- pool ;
-    return (Transactions (txs, delayed))
+    return (Transactions txs)
 
 let pop_and_inject_transactions state =
   let open Lwt_result_syntax in
@@ -406,8 +334,8 @@ let pop_and_inject_transactions state =
       let* res = pop_transactions state in
       match res with
       | Locked -> return_unit
-      | Transactions (txs, delayed) ->
-          if not (List.is_empty txs && List.is_empty delayed) then
+      | Transactions txs ->
+          if not (List.is_empty txs) then
             let (module Rollup_node : Services_backend_sig.S) =
               state.rollup_node
             in
@@ -418,7 +346,6 @@ let pop_and_inject_transactions state =
                 ~timestamp:(Helpers.now ())
                 ~smart_rollup_address:state.smart_rollup_address
                 ~transactions:txs
-                ~delayed
             in
             match hashes with
             | Error trace ->
@@ -461,7 +388,7 @@ module Handlers = struct
     match request with
     | Request.Add_transaction transaction ->
         protect @@ fun () ->
-        let* res = on_transaction state transaction in
+        let* res = on_normal_transaction state transaction in
         let* () = observer_self_inject_request w in
         return res
     | Request.Pop_transactions -> protect @@ fun () -> pop_transactions state
@@ -568,17 +495,7 @@ let shutdown () =
 let add raw_tx =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait
-    w
-    (Request.Add_transaction (Transaction raw_tx))
-  |> handle_request_error
-
-let add_delayed delayed =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  Worker.Queue.push_request_and_wait
-    w
-    (Request.Add_transaction (Delayed delayed))
+  Worker.Queue.push_request_and_wait w (Request.Add_transaction raw_tx)
   |> handle_request_error
 
 let nonce pkey =
