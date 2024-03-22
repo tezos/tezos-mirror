@@ -70,7 +70,7 @@ val get_commitment_slot :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
+  (slot, [> Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof] registers the shards of the slot whose commitment is

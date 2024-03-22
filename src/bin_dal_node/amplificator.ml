@@ -150,12 +150,47 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
             |> Errors.to_tzresult
           in
           let* (_ : unit option) =
-            Slot_manager.add_commitment_shards
-              ~shards_proofs_precomputation
-              slot_store
-              cryptobox
-              commitment
-              ~with_proof:true
+            let with_proof = true in
+            (let* slot =
+               Slot_manager.get_commitment_slot slot_store cryptobox commitment
+             in
+             let*? polynomial =
+               let open Result_syntax in
+               match Cryptobox.polynomial_from_slot cryptobox slot with
+               | Ok r -> return r
+               | Error (`Slot_wrong_size _) ->
+                   let open Cryptobox in
+                   let provided = Bytes.length slot in
+                   let {slot_size = expected; _} =
+                     Cryptobox.parameters cryptobox
+                   in
+                   Error
+                     (Errors.other
+                        [Slot_manager.Invalid_slot_size {provided; expected}])
+             in
+             let shards =
+               Cryptobox.shards_from_polynomial cryptobox polynomial
+             in
+             let* () =
+               Store.(
+                 Shards.save_and_notify
+                   slot_store.shard_store
+                   slot_store.shards_watcher
+                   commitment
+                   shards)
+             in
+             if with_proof then
+               let*? precomputation =
+                 match shards_proofs_precomputation with
+                 | None -> Error (`Other [Slot_manager.No_prover_SRS])
+                 | Some precomputation -> Ok precomputation
+               in
+               let shard_proofs =
+                 Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
+               in
+               Store.save_shard_proofs slot_store commitment shard_proofs
+               |> return
+             else return_unit)
             |> Errors.to_option_tzresult
           in
           let* () =
