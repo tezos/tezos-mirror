@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base, Unix
-   Invocation:   dune exec src/lib_base/unix/test/main.exe
+   Invocation:   dune exec src/lib_base/unix/test/main.exe -- --file test_syslog.ml
    Subject:      Check syslog primitives
 *)
 

@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Base, Unix
-   Invocation:   dune exec src/lib_base/unix/test/main.exe
+   Invocation:   dune exec src/lib_base/unix/test/main.exe -- --file test_unix_error.ml
    Subject:      Check the serialization or deserialization of unix errors
 *)
 
