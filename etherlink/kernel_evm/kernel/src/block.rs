@@ -517,6 +517,12 @@ pub fn produce<Host: Runtime>(
             Ok(ComputationResult::RebootNeeded) => {
                 // The computation will resume at next reboot, we leave the
                 // storage untouched.
+                log!(
+                    safe_host,
+                    Benchmarking,
+                    "Estimated ticks: {}",
+                    tick_counter.c
+                );
                 return Ok(ComputationResult::RebootNeeded);
             }
             Err(err) => {
@@ -525,6 +531,12 @@ pub fn produce<Host: Runtime>(
                 // which point did it fail nor why. We cannot make assumption
                 // on how many ticks it consumed before failing. Therefore
                 // the safest solution is to simply reboot after a failure.
+                log!(
+                    safe_host,
+                    Benchmarking,
+                    "Estimated ticks: {}",
+                    tick_counter.c
+                );
                 return Ok(ComputationResult::RebootNeeded);
             }
         }
