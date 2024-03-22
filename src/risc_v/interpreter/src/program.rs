@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::machine_state::bus::{self, main_memory::MainMemoryLayout, Address};
-use crate::parser::parse_block;
+use crate::{
+    machine_state::bus::{self, main_memory::MainMemoryLayout, Address},
+    parser::parse_block,
+};
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
 /// RISC-V program

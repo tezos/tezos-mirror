@@ -276,6 +276,7 @@ const F5_30: u32 = 0b1_1110;
 
 const F7_0: u32 = 0b0;
 const F7_1: u32 = 0b1;
+const F7_9: u32 = 0b1001;
 const F7_8: u32 = 0b000_1000;
 const F7_20: u32 = 0b10_0000;
 const F7_24: u32 = 0b001_1000;
@@ -422,14 +423,27 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             _ => Unknown { instr },
         },
         OP_SYS => match funct3(instr) {
-            F3_0 => match rs1_bits(instr) {
-                RS1_0 => match (rs2_bits(instr), funct7(instr)) {
-                    (RS2_0, F7_0) => Ecall,
-                    (RS2_1, F7_0) => Ebreak,
-                    (RS2_2, F7_8) => Sret,
-                    (RS2_2, F7_24) => Mret,
-                    (RS2_2, F7_56) => Mnret,
-                    (RS2_5, F7_8) => Wfi,
+            F3_0 => match funct7(instr) {
+                F7_0 => match (rs1_bits(instr), rs2_bits(instr)) {
+                    (RS1_0, RS2_0) => Ecall,
+                    (RS1_0, RS2_1) => Ebreak,
+                    _ => Unknown { instr },
+                },
+                F7_9 => SFenceVma {
+                    vaddr: rs1(instr),
+                    asid: rs2(instr),
+                },
+                F7_8 => match (rs1_bits(instr), rs2_bits(instr)) {
+                    (RS1_0, RS2_2) => Sret,
+                    (RS1_0, RS2_5) => Wfi,
+                    _ => Unknown { instr },
+                },
+                F7_24 => match (rs1_bits(instr), rs2_bits(instr)) {
+                    (RS1_0, RS2_2) => Mret,
+                    _ => Unknown { instr },
+                },
+                F7_56 => match (rs1_bits(instr), rs2_bits(instr)) {
+                    (RS1_0, RS2_2) => Mnret,
                     _ => Unknown { instr },
                 },
                 _ => Unknown { instr },

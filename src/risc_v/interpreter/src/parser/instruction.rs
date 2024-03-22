@@ -5,7 +5,10 @@
 
 use std::fmt;
 
-use crate::machine_state::{csregisters::CSRegister, registers::FRegister, registers::XRegister};
+use crate::machine_state::{
+    csregisters::CSRegister,
+    registers::{FRegister, XRegister},
+};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct RTypeArgs {
@@ -176,6 +179,8 @@ pub enum Instr {
     Mnret,
     // Interrupt-Management
     Wfi,
+    // Supervisor Memory-Management
+    SFenceVma { asid: XRegister, vaddr: XRegister },
 
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
@@ -260,6 +265,7 @@ impl Instr {
             | Sret
             | Mnret
             | Wfi
+            | SFenceVma { .. }
             | Unknown { instr: _ } => 4,
 
             // 2 bytes instructions (compressed instructions)
@@ -501,6 +507,8 @@ impl fmt::Display for Instr {
             Mnret => write!(f, "mnret"),
             // Interrupt-management
             Wfi => write!(f, "wfi"),
+            // Supervisor Memory-Management
+            SFenceVma { asid, vaddr } => write!(f, "sfence.vma {vaddr},{asid}"),
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),

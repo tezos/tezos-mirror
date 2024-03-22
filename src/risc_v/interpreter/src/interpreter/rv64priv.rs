@@ -7,6 +7,7 @@ use crate::{
         },
         hart_state::HartState,
         mode::Mode,
+        registers::XRegister,
         MachineState,
     },
     state_backend as backend,
@@ -113,4 +114,72 @@ where
     pub fn run_wfi(&self) {
         // no-op
     }
+
+    /// `SFENCE.VMA` instruction
+    ///
+    /// The supervisor memory-management fence instruction SFENCE.VMA is used to
+    /// synchronize updates to in-memory memory-management data structures
+    /// with current execution. See sections 3.1.6.5, 3.7.2.
+    ///
+    /// Section 5.2.1: It is always legal to over-fence.
+    #[inline(always)]
+    pub fn sfence_vma(&self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
+        let mode = self.hart.mode.read();
+        let mstatus = self.hart.csregisters.read(CSRegister::mstatus);
+        let tvm = xstatus::get_TVM(mstatus);
+
+        if tvm && mode == Mode::Supervisor {
+            return Err(Exception::IllegalInstruction);
+        }
+
+        // Even if we over-fence, thus ignoring asid and vaddr, this instruction
+        // is still no-op since memory loads/stores are not cached currently.
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        backend_test, create_backend, create_state,
+        machine_state::{
+            bus::main_memory::tests::T1K,
+            csregisters::{xstatus, CSRValue, CSRegister},
+            mode::Mode,
+            registers::{a0, t0},
+            MachineState, MachineStateLayout,
+        },
+        traps::Exception,
+    };
+
+    backend_test!(test_sfence, F, {
+        type L = MachineStateLayout<T1K>;
+        let mut backend = create_backend!(L, F);
+        let mut state = create_state!(MachineState, L, F, backend, T1K);
+
+        let run_test = |state: &mut MachineState<_, _>,
+                        mode: Mode,
+                        bit: bool,
+                        result: Result<(), Exception>| {
+            state.hart.mode.write(mode);
+            state.hart.csregisters.set_bits(
+                CSRegister::mstatus,
+                (bit as CSRValue) << xstatus::TVM.offset,
+            );
+            let r = state.sfence_vma(t0, a0);
+            assert_eq!(r, result);
+        };
+
+        run_test(&mut state, Mode::User, false, Ok(()));
+        run_test(&mut state, Mode::Supervisor, false, Ok(()));
+        run_test(&mut state, Mode::Machine, false, Ok(()));
+        run_test(&mut state, Mode::User, true, Ok(()));
+        run_test(
+            &mut state,
+            Mode::Supervisor,
+            true,
+            Err(Exception::IllegalInstruction),
+        );
+        run_test(&mut state, Mode::Machine, true, Ok(()));
+    });
 }

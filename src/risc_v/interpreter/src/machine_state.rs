@@ -295,6 +295,11 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Mnret => Err(Exception::IllegalInstruction),
             // Interrupt-Management
             Instr::Wfi => run_no_args_instr!(self, instr, run_wfi),
+            // Supervisor Memory-Management
+            Instr::SFenceVma { asid, vaddr } => {
+                self.sfence_vma(asid, vaddr)?;
+                Ok(ProgramCounterUpdate::Add(instr.width()))
+            }
 
             Instr::Unknown { instr: _ } => Err(Exception::IllegalInstruction),
             Instr::UnknownCompressed { instr: _ } => Err(Exception::IllegalInstruction),

@@ -28,10 +28,22 @@ impl FieldValue for UnsignedValue {
     }
 }
 
+pub struct FieldProps {
+    pub offset: u64,
+    pub width: u64,
+}
+
+impl FieldProps {
+    pub const fn new(offset: u64, width: u64) -> Self {
+        Self { offset, width }
+    }
+}
+
 #[macro_export]
 macro_rules! create_field_constant {
     ($name:ident, $offset:expr, $width:expr) => {
-        const $name: (u64, u64) = ($offset, $width);
+        pub const $name: $crate::machine_state::csregisters::fields::FieldProps =
+            $crate::machine_state::csregisters::fields::FieldProps::new($offset, $width);
     };
 }
 
