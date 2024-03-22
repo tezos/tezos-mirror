@@ -623,7 +623,9 @@ let proxy_command =
               }
           in
           let () =
-            Evm_node_lib_dev.Rollup_node_follower.start ~rollup_node_endpoint
+            Evm_node_lib_dev.Rollup_node_follower.start
+              ~proxy:true
+              ~rollup_node_endpoint
           in
           let* directory = dev_directory config rollup_config in
           let* server = start config ~directory in

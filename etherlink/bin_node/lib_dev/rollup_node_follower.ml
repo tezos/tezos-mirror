@@ -116,16 +116,33 @@ let[@tailrec] rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
         ~rollup_node_endpoint
         ()
 
-(** [next_block ~connection] returns the next block found in
-    [connection.stream].
+(** [catchup_evm_event ~rollup_node_endpoint ~from ~to_] catchup on
+    evm events from [from] to [to_] from the rollup node. *)
+let[@tailrec] rec catchup_evm_event ~rollup_node_endpoint ~from ~to_ =
+  let open Lwt_result_syntax in
+  if from = to_ then (*we are catch up *) return_unit
+  else if from > to_ then
+    failwith
+      "Internal error: The catchup of evm_event went too far, it should be \
+       impossible."
+  else
+    (* reading event from [from] level then catching up from [from +
+       1]. *)
+    let next_l1_level = Int32.succ from in
+    let* () = Evm_events_follower.new_rollup_block next_l1_level in
+    let* () = Evm_context.new_last_known_l1_level next_l1_level in
+    catchup_evm_event ~rollup_node_endpoint ~from:next_l1_level ~to_
+
+(** [catchup_and_next_block ~proxy ~catchup_event ~connection]
+    returns the next block found in [connection.stream].
 
     - If the connection drops then it tries to reconnect the stream
     using [connect_to_stream].
 
     - If the connection timeout (takes more than [connection.timeout])
     or if the connection fails then reconnect with [connect_to_stream]
-    and try to fetch [next_block] with that new stream.*)
-let[@tailrec] rec next_block ~connection =
+    and try to fetch [catchup_and_next_block] with that new stream.*)
+let[@tailrec] rec catchup_and_next_block ~proxy ~catchup_event ~connection =
   let open Lwt_result_syntax in
   let get_promise () =
     let*! res = Lwt_stream.get connection.stream in
@@ -139,7 +156,25 @@ let[@tailrec] rec next_block ~connection =
     Lwt.pick [get_promise (); timeout_promise connection.timeout]
   in
   match get_or_timeout with
-  | Ok block -> return (block, connection)
+  | Ok block ->
+      let* () =
+        if catchup_event then
+          let* latest_known_l1_level = Evm_context.last_known_l1_level () in
+          match latest_known_l1_level with
+          | None ->
+              (* sequencer has no value to start from, it must be the
+                 initial start. *)
+              let*! () = Evm_store_events.no_l1_latest_level_to_catch_up () in
+              return_unit
+          | Some from ->
+              let to_ = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
+              catchup_evm_event
+                ~rollup_node_endpoint:connection.rollup_node_endpoint
+                ~from
+                ~to_
+        else return_unit
+      in
+      return (block, connection)
   | Error [Connection_lost] | Error [Connection_timeout] ->
       connection.close () ;
       let* connection =
@@ -148,18 +183,28 @@ let[@tailrec] rec next_block ~connection =
           ~rollup_node_endpoint:connection.rollup_node_endpoint
           ()
       in
-      (next_block [@tailcall]) ~connection
+      (catchup_and_next_block [@tailcall])
+        ~proxy
+        ~catchup_event:(not proxy)
+          (* catchup event if not in proxy mode, proxy does not have
+             `evm_context` and would fail to fetch some data. Else
+             catchup possible missed event.*)
+        ~connection
   | Error errs -> fail errs
 
 (** [loop_on_rollup_node_stream ~proxy
     ~oldest_rollup_node_known_l1_level ~connection] main loop to
-    process the block. get the current rollup node block from
-    [next_block] *)
-let[@tailrec] rec loop_on_rollup_node_stream ~oldest_rollup_node_known_l1_level
-    ~connection =
+    process the block.
+
+    get the current rollup node block with [catchup_and_next_block], process it
+    with [process_finalized_level] then loop over. *)
+let[@tailrec] rec loop_on_rollup_node_stream ~proxy
+    ~oldest_rollup_node_known_l1_level ~connection =
   let open Lwt_result_syntax in
   let start_time = Unix.gettimeofday () in
-  let* block, connection = next_block ~connection in
+  let* block, connection =
+    catchup_and_next_block ~proxy ~catchup_event:false ~connection
+  in
   let elapsed = Unix.gettimeofday () -. start_time in
   let connection = update_timeout ~elapsed ~connection in
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
@@ -170,10 +215,11 @@ let[@tailrec] rec loop_on_rollup_node_stream ~oldest_rollup_node_known_l1_level
       ~finalized_level
   in
   (loop_on_rollup_node_stream [@tailcall])
+    ~proxy
     ~oldest_rollup_node_known_l1_level
     ~connection
 
-let start ~rollup_node_endpoint =
+let start ~proxy ~rollup_node_endpoint =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
@@ -183,4 +229,7 @@ let start ~rollup_node_endpoint =
     Rollup_services.oldest_known_l1_level rollup_node_endpoint
   in
   let* connection = connect_to_stream ~rollup_node_endpoint () in
-  loop_on_rollup_node_stream ~oldest_rollup_node_known_l1_level ~connection
+  loop_on_rollup_node_stream
+    ~proxy
+    ~oldest_rollup_node_known_l1_level
+    ~connection

@@ -240,6 +240,6 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
 
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
   let* () = Evm_events_follower.start {rollup_node_endpoint} in
-  let () = Rollup_node_follower.start ~rollup_node_endpoint in
+  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
 
   main_loop ~evm_node_endpoint
