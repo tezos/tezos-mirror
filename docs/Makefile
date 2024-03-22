@@ -24,7 +24,7 @@ paris_long    = PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz
 oxford_long   = ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-paris_short   = PtParisA
+paris_short   = PtParisB
 oxford_short  = Proxford
 alpha_short   = alpha
 
