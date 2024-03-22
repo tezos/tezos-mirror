@@ -1391,7 +1391,7 @@ let check_rpc_ok client rpc =
 let test_fix_delegated_balance =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number Paris))
+    ~supports:Protocol.(From_protocol (number Paris + 1))
     ~title:"Test protocol fix for delegated balance rpc"
     ~tags:["rpc"; "delegated_balance"]
   @@ fun protocol ->
@@ -1464,15 +1464,15 @@ let test_fix_delegated_balance =
   | None -> Test.fail "No delegate found"
   | Some d -> Log.info "Delegated: %s" d) ;
 
-  log_step 7 "RPC calls should fail" ;
+  log_step 7 "RPC calls should not fail" ;
   let* () =
-    check_rpc_error
+    check_rpc_ok
       client
       (RPC.get_chain_block_context_delegate_delegated_balance
          delegator.public_key_hash)
   in
   let* () =
-    check_rpc_error
+    check_rpc_ok
       client
       (RPC.get_chain_block_context_delegate delegator.public_key_hash)
   in
