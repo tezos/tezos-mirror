@@ -156,25 +156,20 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
               shards
               ~number_of_needed_shards
           in
-          let* (_ : unit option) =
-            (let shards =
-               Cryptobox.shards_from_polynomial cryptobox polynomial
-             in
-             let* () =
-               Store.(
-                 Shards.save_and_notify
-                   slot_store.shard_store
-                   slot_store.shards_watcher
-                   commitment
-                   shards)
-             in
-             let shard_proofs =
-               Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
-             in
-             Store.save_shard_proofs slot_store commitment shard_proofs
-             |> return)
-            |> Errors.to_option_tzresult
+          let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+          let shard_proofs =
+            Cryptobox.prove_shards cryptobox ~precomputation ~polynomial
           in
+          let* () =
+            Store.(
+              Shards.save_and_notify
+                slot_store.shard_store
+                slot_store.shards_watcher
+                commitment
+                shards)
+            |> Errors.to_tzresult
+          in
+          Store.save_shard_proofs slot_store commitment shard_proofs ;
           let* () =
             Slot_manager.publish_slot_data
               ~level_committee:(Node_context.fetch_committee node_ctxt)
