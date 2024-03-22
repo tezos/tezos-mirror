@@ -102,6 +102,20 @@ module Q = struct
         Ok Ethereum_types.Upgrade.{hash; timestamp})
       (t2 root_hash timestamp)
 
+  let delayed_transaction =
+    custom
+      ~encode:(fun payload ->
+        Ok
+          (Data_encoding.Binary.to_string_exn
+             Ethereum_types.Delayed_transaction.encoding
+             payload))
+      ~decode:(fun bytes ->
+        Option.to_result ~none:"Not a valid blueprint payload"
+        @@ Data_encoding.Binary.of_string_opt
+             Ethereum_types.Delayed_transaction.encoding
+             bytes)
+      string
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -269,6 +283,14 @@ module Q = struct
           migration_step {|
           DROP TABLE publishable_blueprints
 |};
+          migration_step
+            {|
+        CREATE TABLE delayed_transactions (
+          injected_before INT NOT NULL,
+          hash TEXT NOT NULL,
+          payload TEXT NOT NULL
+        )
+        |};
         ]
     end
 
@@ -331,6 +353,12 @@ module Q = struct
       @@ {|
       UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before = NULL
     |}
+  end
+
+  module Delayed_transactions = struct
+    let insert =
+      (t3 level root_hash delayed_transaction ->. unit)
+      @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
   end
 
   module L1_latest_level = struct
@@ -521,6 +549,16 @@ module Kernel_upgrades = struct
   let record_apply store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Kernel_upgrades.record_apply level
+end
+
+module Delayed_transactions = struct
+  let store store next_blueprint_number
+      (delayed_transaction : Ethereum_types.Delayed_transaction.t) =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.Delayed_transactions.insert
+      (next_blueprint_number, delayed_transaction.hash, delayed_transaction)
 end
 
 module L1_latest_known_level = struct
