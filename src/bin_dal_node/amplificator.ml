@@ -162,24 +162,7 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
             |> Errors.to_tzresult
           in
           let* (_ : unit option) =
-            (let* slot =
-               Slot_manager.get_commitment_slot slot_store cryptobox commitment
-             in
-             let*? polynomial =
-               let open Result_syntax in
-               match Cryptobox.polynomial_from_slot cryptobox slot with
-               | Ok r -> return r
-               | Error (`Slot_wrong_size _) ->
-                   let open Cryptobox in
-                   let provided = Bytes.length slot in
-                   let {slot_size = expected; _} =
-                     Cryptobox.parameters cryptobox
-                   in
-                   Error
-                     (Errors.other
-                        [Slot_manager.Invalid_slot_size {provided; expected}])
-             in
-             let shards =
+            (let shards =
                Cryptobox.shards_from_polynomial cryptobox polynomial
              in
              let* () =
