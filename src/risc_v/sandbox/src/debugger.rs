@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -48,12 +49,22 @@ pub struct DebuggerApp<'a> {
     status: InterpreterResult,
 }
 
-macro_rules! register_line {
+macro_rules! xregister_line {
     ($self: ident, $reg: ident) => {
         Line::from(vec![
             format!("   {0} ({0:?}): ", $reg).into(),
-            format!("{} ", $self.interpreter.read_register($reg)).fg(YELLOW),
-            format!("0x{:x}", $self.interpreter.read_register($reg)).fg(ORANGE),
+            format!("{} ", $self.interpreter.read_xregister($reg)).fg(YELLOW),
+            format!("0x{:x}", $self.interpreter.read_xregister($reg)).fg(ORANGE),
+        ])
+    };
+}
+
+macro_rules! fregister_line {
+    ($self: ident, $reg: ident) => {
+        Line::from(vec![
+            format!("   {0} ({0:?}): ", $reg).into(),
+            format!("{} ", u64::from($self.interpreter.read_fregister($reg))).fg(YELLOW),
+            format!("0x{:x}", u64::from($self.interpreter.read_fregister($reg))).fg(ORANGE),
         ])
     };
 }
@@ -176,8 +187,8 @@ impl<'a> DebuggerApp<'a> {
         StatefulWidget::render(list, area, buf, &mut self.program.state)
     }
 
-    fn render_registers_pane(&mut self, area: Rect, buf: &mut Buffer) {
-        let title = Title::from(" Registers ".bold());
+    fn render_xregisters_pane(&mut self, area: Rect, buf: &mut Buffer) {
+        let title = Title::from(" X Registers ".bold());
         let block = Block::default()
             .title(title.alignment(Alignment::Left))
             .borders(Borders::ALL)
@@ -185,37 +196,85 @@ impl<'a> DebuggerApp<'a> {
 
         use registers::*;
         let registers_text = Text::from(vec![
-            register_line!(self, ra),
-            register_line!(self, sp),
-            register_line!(self, gp),
-            register_line!(self, tp),
-            register_line!(self, t0),
-            register_line!(self, t1),
-            register_line!(self, t2),
-            register_line!(self, s0),
-            register_line!(self, s1),
-            register_line!(self, a0),
-            register_line!(self, a1),
-            register_line!(self, a2),
-            register_line!(self, a3),
-            register_line!(self, a4),
-            register_line!(self, a5),
-            register_line!(self, a6),
-            register_line!(self, a7),
-            register_line!(self, s2),
-            register_line!(self, s3),
-            register_line!(self, s4),
-            register_line!(self, s5),
-            register_line!(self, s6),
-            register_line!(self, s7),
-            register_line!(self, s8),
-            register_line!(self, s9),
-            register_line!(self, s10),
-            register_line!(self, s11),
-            register_line!(self, t3),
-            register_line!(self, t4),
-            register_line!(self, t5),
-            register_line!(self, t6),
+            xregister_line!(self, ra),
+            xregister_line!(self, sp),
+            xregister_line!(self, gp),
+            xregister_line!(self, tp),
+            xregister_line!(self, t0),
+            xregister_line!(self, t1),
+            xregister_line!(self, t2),
+            xregister_line!(self, s0),
+            xregister_line!(self, s1),
+            xregister_line!(self, a0),
+            xregister_line!(self, a1),
+            xregister_line!(self, a2),
+            xregister_line!(self, a3),
+            xregister_line!(self, a4),
+            xregister_line!(self, a5),
+            xregister_line!(self, a6),
+            xregister_line!(self, a7),
+            xregister_line!(self, s2),
+            xregister_line!(self, s3),
+            xregister_line!(self, s4),
+            xregister_line!(self, s5),
+            xregister_line!(self, s6),
+            xregister_line!(self, s7),
+            xregister_line!(self, s8),
+            xregister_line!(self, s9),
+            xregister_line!(self, s10),
+            xregister_line!(self, s11),
+            xregister_line!(self, t3),
+            xregister_line!(self, t4),
+            xregister_line!(self, t5),
+            xregister_line!(self, t6),
+        ]);
+
+        Paragraph::new(registers_text)
+            .left_aligned()
+            .block(block)
+            .render(area, buf)
+    }
+
+    fn render_fregisters_pane(&mut self, area: Rect, buf: &mut Buffer) {
+        let title = Title::from(" F Registers ".bold());
+        let block = Block::default()
+            .title(title.alignment(Alignment::Left))
+            .borders(Borders::ALL)
+            .border_set(border::THICK);
+
+        use registers::*;
+        let registers_text = Text::from(vec![
+            fregister_line!(self, ft0),
+            fregister_line!(self, ft1),
+            fregister_line!(self, ft2),
+            fregister_line!(self, ft3),
+            fregister_line!(self, ft4),
+            fregister_line!(self, ft5),
+            fregister_line!(self, ft6),
+            fregister_line!(self, ft7),
+            fregister_line!(self, fs0),
+            fregister_line!(self, fs1),
+            fregister_line!(self, fa0),
+            fregister_line!(self, fa1),
+            fregister_line!(self, fa2),
+            fregister_line!(self, fa3),
+            fregister_line!(self, fa4),
+            fregister_line!(self, fa5),
+            fregister_line!(self, fa6),
+            fregister_line!(self, fa7),
+            fregister_line!(self, fs2),
+            fregister_line!(self, fs3),
+            fregister_line!(self, fs4),
+            fregister_line!(self, fs5),
+            fregister_line!(self, fs6),
+            fregister_line!(self, fs7),
+            fregister_line!(self, fs8),
+            fregister_line!(self, fs9),
+            fregister_line!(self, fs10),
+            fregister_line!(self, ft8),
+            fregister_line!(self, ft9),
+            fregister_line!(self, ft10),
+            fregister_line!(self, ft11),
         ]);
 
         Paragraph::new(registers_text)
@@ -295,8 +354,14 @@ impl Widget for &mut DebuggerApp<'_> {
             .constraints(vec![Constraint::Fill(1), Constraint::Length(5)]);
         let [registers_area, status_area] = rhs_layout.areas(rhs_area);
 
+        let registers_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Fill(1), Constraint::Percentage(50)]);
+        let [xregisters_area, fregisters_area] = registers_layout.areas(registers_area);
+
         self.render_program_pane(program_area, buf);
-        self.render_registers_pane(registers_area, buf);
+        self.render_xregisters_pane(xregisters_area, buf);
+        self.render_fregisters_pane(fregisters_area, buf);
         self.render_status_pane(status_area, buf);
         self.render_bottom_bar(outer_layout[1], buf);
     }
