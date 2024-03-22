@@ -21,3 +21,11 @@ let with_timing event k =
   let* () = event diff in
 
   return res
+
+let unwrap_error_monad f =
+  let open Lwt_syntax in
+  let* res = f () in
+  match res with
+  | Ok v -> return v
+  | Error errs ->
+      Lwt.fail_with (Format.asprintf "%a" Error_monad.pp_print_trace errs)

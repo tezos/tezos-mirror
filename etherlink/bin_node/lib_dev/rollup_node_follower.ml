@@ -5,86 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {rollup_node_endpoint : Uri.t}
-
-module Types = struct
-  type state = Uri.t
-
-  type nonrec parameters = parameters
-end
-
-module Name = struct
-  (* We only have a single rollup node follower in the evm node *)
-  type t = unit
-
-  let encoding = Data_encoding.unit
-
-  let base = ["evm_node"; "dev"; "l2_block"; "follower"; "worker"]
-
-  let pp _ _ = ()
-
-  let equal () () = true
-end
-
-module Request = struct
-  type ('a, 'b) t = Unit : (unit, tztrace) t
-
-  type view = View : _ t -> view
-
-  let view (req : _ t) = View req
-
-  let encoding : view Data_encoding.t =
-    let open Data_encoding in
-    conv (fun (View _) -> ()) (fun () -> View Unit) unit
-
-  let pp _ppf (View _) = ()
-end
-
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
-
-type worker = Worker.infinite Worker.queue Worker.t
-
-module Handlers = struct
-  type self = worker
-
-  let on_request :
-      type r request_error.
-      worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
-      =
-   fun _w request ->
-    match request with
-    | Request.Unit -> protect @@ fun () -> Lwt_result_syntax.return_unit
-
-  type launch_error = error trace
-
-  let on_launch _w () ({rollup_node_endpoint; _} : Types.parameters) =
-    let state = rollup_node_endpoint in
-    Lwt_result_syntax.return state
-
-  let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
-      unit tzresult Lwt.t =
-    Lwt_result_syntax.return_unit
-
-  let on_completion _ _ _ _ = Lwt.return_unit
-
-  let on_no_request _ = Lwt.return_unit
-
-  let on_close _ = Lwt.return_unit
-end
-
-let table = Worker.create_table Queue
-
-let worker_promise, worker_waker = Lwt.task ()
-
-type error += No_l2_block_follower
-
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
-    | Lwt.Sleep -> Error (TzTrace.make No_l2_block_follower))
-
 let read_from_rollup_node path level rollup_node_endpoint =
   let open Rollup_services in
   call_service
@@ -95,7 +15,7 @@ let read_from_rollup_node path level rollup_node_endpoint =
     ()
 
 let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let* finalized_current_number =
     read_from_rollup_node
       Durable_storage_path.Block.current_number
@@ -103,56 +23,213 @@ let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
       rollup_node_endpoint
   in
   match finalized_current_number with
-  | Ok (Some bytes) ->
+  | Some bytes ->
       let (Qty evm_block_number) = Ethereum_types.decode_number bytes in
-      let* _ = Blueprints_publisher.new_l2_head evm_block_number in
+      let* () = Blueprints_publisher.new_l2_head evm_block_number in
       return_unit
-  | _ -> return_unit
+  | None -> return_unit
 
-let process_new_block ~rollup_node_endpoint block =
-  let open Lwt_syntax in
-  let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
-  let* _ = Evm_events_follower.new_rollup_block finalized_level in
+let process_new_block ~rollup_node_endpoint ~finalized_level =
+  let open Lwt_result_syntax in
+  let* () = Evm_events_follower.new_rollup_block finalized_level in
   let* () =
     advertize_blueprints_publisher rollup_node_endpoint finalized_level
   in
-  return_unit
+  Tx_pool.pop_and_inject_transactions_lazy ()
 
-let rec process_rollup_node_stream ~stream ~rollup_node_endpoint worker =
-  let open Lwt_syntax in
-  let* new_head = Lwt_stream.get stream in
-  match new_head with
-  | None ->
-      let* () = Rollup_node_follower_events.connection_lost () in
-      Worker.shutdown worker
-  | Some block ->
-      let* () =
-        Rollup_node_follower_events.new_block
-          Sc_rollup_block.(block.header.level)
-      in
-      let* () = process_new_block ~rollup_node_endpoint block in
-      process_rollup_node_stream ~stream ~rollup_node_endpoint worker
+type error += Connection_lost | Connection_timeout
 
-let start ({rollup_node_endpoint} as parameters) =
+(** [process_finalized_level ~oldest_rollup_node_known_l1_level
+    ~finalized_level ~rollup_node_endpoint] process the rollup node
+    block level [finalized_level] iff it's known by the rollup node
+    (i.e. superior to [oldest_rollup_node_known_l1_level].
+
+    This is necessary for the very beginning of the rollup life, when
+    the evm node is started at the same moment at the origination of
+    the rollup, and so `finalized_level` is < origination level. *)
+let process_finalized_level ~oldest_rollup_node_known_l1_level ~finalized_level
+    ~rollup_node_endpoint =
   let open Lwt_result_syntax in
-  let*! () = Rollup_node_follower_events.started () in
-  let+ worker = Worker.launch table () parameters (module Handlers) in
-  let () =
-    Lwt.dont_wait
-      (fun () ->
-        let*! stream =
-          Rollup_services.make_streamed_call ~rollup_node_endpoint
-        in
-        process_rollup_node_stream ~stream ~rollup_node_endpoint worker)
-      (fun _ -> ())
-  in
-  Lwt.wakeup worker_waker worker
+  if oldest_rollup_node_known_l1_level <= finalized_level then
+    process_new_block ~finalized_level ~rollup_node_endpoint
+  else return_unit
 
-let shutdown () =
+let reconnection_delay = 5.0
+
+let min_timeout = 10.
+
+let timeout_factor = 10.
+
+type rollup_node_connection = {
+  close : unit -> unit;  (** stream closing function *)
+  stream : Sc_rollup_block.t Lwt_stream.t;
+      (** current rollup node block stream *)
+  rollup_node_endpoint : Uri.t;  (** endpoint used to reconnect to the node *)
+  timeout : Float.t;
+      (** expected time to receive a l2 block from the rollup node. is
+          recalculated at each received block. *)
+}
+
+(** [timeout] is updated to reflect reality of how long we should with
+    the next block or assume the connection is failing/hanging. *)
+let update_timeout ~elapsed ~connection =
+  let new_timeout = elapsed *. timeout_factor in
+  if new_timeout < min_timeout then connection
+  else {connection with timeout = new_timeout}
+
+let sleep_before_reconnection ~factor =
   let open Lwt_syntax in
-  let w = Lazy.force worker in
-  match w with
-  | Error _ -> Lwt.return_unit
-  | Ok w ->
-      let* () = Rollup_node_follower_events.shutdown () in
-      Worker.shutdown w
+  if factor = 0 then return_unit
+  else
+    (* randomised the sleep time to not DoS the rollup node if
+       multiple evm node are connected to the same rollup node *)
+    let fcount = float_of_int (factor - 1) in
+    (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
+    let delay = reconnection_delay *. (1.5 ** fcount) in
+    let delay = min delay 3600. in
+    let randomization_factor = 0.5 (* 50% *) in
+    let delay =
+      delay
+      +. Random.float (delay *. 2. *. randomization_factor)
+      -. (delay *. randomization_factor)
+    in
+    let* () = Rollup_node_follower_events.trying_reconnection delay in
+    Lwt_unix.sleep delay
+
+(**[connect_to_stream ?count ~rollup_node_endpoint ()] try to connect
+   to the stream of rollup node block. If [count] is superior to [0]
+   then sleep some time with [sleep_before_reconnection] before trying
+   to reconnect.
+
+    [count] is the number of time we tried to reconnect in a row. *)
+let[@tailrec] rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
+  let open Lwt_result_syntax in
+  let*! () = sleep_before_reconnection ~factor:count in
+  let*! res = Rollup_services.make_streamed_call ~rollup_node_endpoint in
+  match res with
+  | Ok (stream, close) ->
+      let*! () = Rollup_node_follower_events.connection_acquired () in
+      return {close; stream; rollup_node_endpoint; timeout = 300.}
+  | Error _e ->
+      (connect_to_stream [@tailcall])
+        ~count:(count + 1)
+        ~rollup_node_endpoint
+        ()
+
+(** [catchup_evm_event ~rollup_node_endpoint ~from ~to_] catchup on
+    evm events from [from] to [to_] from the rollup node. *)
+let[@tailrec] rec catchup_evm_event ~rollup_node_endpoint ~from ~to_ =
+  let open Lwt_result_syntax in
+  if from = to_ then (*we are catch up *) return_unit
+  else if from > to_ then
+    failwith
+      "Internal error: The catchup of evm_event went too far, it should be \
+       impossible."
+  else
+    (* reading event from [from] level then catching up from [from +
+       1]. *)
+    let next_l1_level = Int32.succ from in
+    let* () = Evm_events_follower.new_rollup_block next_l1_level in
+    let* () = Evm_context.new_last_known_l1_level next_l1_level in
+    catchup_evm_event ~rollup_node_endpoint ~from:next_l1_level ~to_
+
+(** [catchup_and_next_block ~proxy ~catchup_event ~connection]
+    returns the next block found in [connection.stream].
+
+    - If the connection drops then it tries to reconnect the stream
+    using [connect_to_stream].
+
+    - If the connection timeout (takes more than [connection.timeout])
+    or if the connection fails then reconnect with [connect_to_stream]
+    and try to fetch [catchup_and_next_block] with that new stream.*)
+let[@tailrec] rec catchup_and_next_block ~proxy ~catchup_event ~connection =
+  let open Lwt_result_syntax in
+  let get_promise () =
+    let*! res = Lwt_stream.get connection.stream in
+    match res with None -> tzfail Connection_lost | Some block -> return block
+  in
+  let timeout_promise timeout =
+    let*! () = Lwt_unix.sleep timeout in
+    tzfail Connection_timeout
+  in
+  let*! get_or_timeout =
+    Lwt.pick [get_promise (); timeout_promise connection.timeout]
+  in
+  match get_or_timeout with
+  | Ok block ->
+      let* () =
+        if catchup_event then
+          let* latest_known_l1_level = Evm_context.last_known_l1_level () in
+          match latest_known_l1_level with
+          | None ->
+              (* sequencer has no value to start from, it must be the
+                 initial start. *)
+              let*! () = Evm_store_events.no_l1_latest_level_to_catch_up () in
+              return_unit
+          | Some from ->
+              let to_ = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
+              catchup_evm_event
+                ~rollup_node_endpoint:connection.rollup_node_endpoint
+                ~from
+                ~to_
+        else return_unit
+      in
+      return (block, connection)
+  | Error [Connection_lost] | Error [Connection_timeout] ->
+      connection.close () ;
+      let* connection =
+        connect_to_stream
+          ~count:1
+          ~rollup_node_endpoint:connection.rollup_node_endpoint
+          ()
+      in
+      (catchup_and_next_block [@tailcall])
+        ~proxy
+        ~catchup_event:(not proxy)
+          (* catchup event if not in proxy mode, proxy does not have
+             `evm_context` and would fail to fetch some data. Else
+             catchup possible missed event.*)
+        ~connection
+  | Error errs -> fail errs
+
+(** [loop_on_rollup_node_stream ~proxy
+    ~oldest_rollup_node_known_l1_level ~connection] main loop to
+    process the block.
+
+    get the current rollup node block with [catchup_and_next_block], process it
+    with [process_finalized_level] then loop over. *)
+let[@tailrec] rec loop_on_rollup_node_stream ~proxy
+    ~oldest_rollup_node_known_l1_level ~connection =
+  let open Lwt_result_syntax in
+  let start_time = Unix.gettimeofday () in
+  let* block, connection =
+    catchup_and_next_block ~proxy ~catchup_event:false ~connection
+  in
+  let elapsed = Unix.gettimeofday () -. start_time in
+  let connection = update_timeout ~elapsed ~connection in
+  let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
+  let* () =
+    process_finalized_level
+      ~oldest_rollup_node_known_l1_level
+      ~rollup_node_endpoint:connection.rollup_node_endpoint
+      ~finalized_level
+  in
+  (loop_on_rollup_node_stream [@tailcall])
+    ~proxy
+    ~oldest_rollup_node_known_l1_level
+    ~connection
+
+let start ~proxy ~rollup_node_endpoint =
+  Lwt.async @@ fun () ->
+  let open Lwt_syntax in
+  let* () = Rollup_node_follower_events.started () in
+  Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
+  let* oldest_rollup_node_known_l1_level =
+    Rollup_services.oldest_known_l1_level rollup_node_endpoint
+  in
+  let* connection = connect_to_stream ~rollup_node_endpoint () in
+  loop_on_rollup_node_stream
+    ~proxy
+    ~oldest_rollup_node_known_l1_level
+    ~connection

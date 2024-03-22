@@ -261,12 +261,22 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
-    | Lwt.Sleep -> Error (TzTrace.make No_worker))
+    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+
+let bind_worker f =
+  let open Lwt_result_syntax in
+  let res = Lazy.force worker in
+  match res with
+  | Error [No_worker] ->
+      (* There is no worker, nothing to do *)
+      return_unit
+  | Error errs -> fail errs
+  | Ok w -> f w
 
 let worker_add_request ~request =
   let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
+  bind_worker @@ fun w ->
   let*! (_pushed : bool) = Worker.Queue.push_request w request in
   return_unit
 
@@ -277,11 +287,8 @@ let new_l2_head rollup_head =
   worker_add_request ~request:(New_l2_head {rollup_head})
 
 let shutdown () =
-  let open Lwt_syntax in
-  match Lazy.force worker with
-  | Error _ ->
-      (* There is no publisher, nothing to do *)
-      Lwt.return_unit
-  | Ok w ->
-      let* () = Blueprint_events.publisher_shutdown () in
-      Worker.shutdown w
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! () = Blueprint_events.publisher_shutdown () in
+  let*! () = Worker.shutdown w in
+  return_unit

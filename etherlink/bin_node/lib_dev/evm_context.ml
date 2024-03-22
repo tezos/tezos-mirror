@@ -844,9 +844,19 @@ let worker =
     | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
     | Lwt.Sleep -> Error (TzTrace.make No_worker))
 
+let bind_worker f =
+  let open Lwt_result_syntax in
+  let res = Lazy.force worker in
+  match res with
+  | Error [No_worker] ->
+      (* There is no worker, nothing to do *)
+      return_unit
+  | Error errs -> fail errs
+  | Ok w -> f w
+
 let worker_add_request ~request =
   let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
+  bind_worker @@ fun w ->
   let*! (_pushed : bool) = Worker.Queue.push_request w request in
   return_unit
 
@@ -938,11 +948,8 @@ let new_last_known_l1_level l =
 let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
 
 let shutdown () =
-  let open Lwt_syntax in
-  match Lazy.force worker with
-  | Error _ ->
-      (* There is no publisher, nothing to do *)
-      Lwt.return_unit
-  | Ok w ->
-      let* () = Worker.shutdown w in
-      Evm_context_events.shutdown ()
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! () = Evm_context_events.shutdown () in
+  let*! () = Worker.shutdown w in
+  return_unit

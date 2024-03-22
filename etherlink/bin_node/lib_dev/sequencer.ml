@@ -59,8 +59,9 @@ let install_finalizer_seq server private_server =
         Events.shutdown_rpc_server ~private_:true)
       private_server
   in
+  Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
-  let* () = Rollup_node_follower.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
   return_unit
@@ -179,51 +180,6 @@ let loop_sequencer :
   let now = Helpers.now () in
   loop now
 
-let[@tailrec] rec catchup_evm_event ~rollup_node_endpoint =
-  let open Lwt_result_syntax in
-  let* rollup_node_l1_level =
-    Rollup_services.tezos_level rollup_node_endpoint
-  in
-  let* latest_known_l1_level = Evm_context.last_known_l1_level () in
-  match latest_known_l1_level with
-  | None ->
-      (* sequencer has no value to start from, it must be the initial
-         start or we went from prod to dev. *)
-      let*! () = Evm_store_events.no_l1_latest_level_to_catch_up () in
-      return_unit
-  | Some latest_known_l1_level ->
-      let finalized_level = Int32.(sub rollup_node_l1_level 2l) in
-      if latest_known_l1_level = finalized_level then return_unit
-      else if latest_known_l1_level > finalized_level then
-        tzfail
-          (error_of_fmt
-             "Internal error: The sequencer has processed more l1 level than \
-              the rollup node, it should be impossible. ")
-      else
-        let*! () =
-          Events.catching_up_evm_event
-            ~from:latest_known_l1_level
-            ~to_:finalized_level
-        in
-        catch_evm_event_aux
-          ~rollup_node_endpoint
-          ~from:latest_known_l1_level
-          ~to_:finalized_level
-
-and[@tailrec] catch_evm_event_aux ~rollup_node_endpoint ~from ~to_ =
-  let open Lwt_result_syntax in
-  if from = to_ then catchup_evm_event ~rollup_node_endpoint
-  else if from > to_ then
-    tzfail
-      (error_of_fmt
-         "Internal error: The catchup of evm_event went too far, it should be \
-          impossible.")
-  else
-    let next_l1_level = Int32.succ from in
-    let* () = Evm_events_follower.new_rollup_block next_l1_level in
-    let* () = Evm_context.new_last_known_l1_level next_l1_level in
-    catch_evm_event_aux ~rollup_node_endpoint ~from:next_l1_level ~to_
-
 let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
     ~max_blueprints_ahead ~max_blueprints_catchup ~catchup_cooldown
     ?(genesis_timestamp = Helpers.now ()) ~cctxt ~sequencer
@@ -291,8 +247,8 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       {cctxt; smart_rollup_address; sequencer_key = sequencer}
   in
   let* () = Evm_events_follower.start {rollup_node_endpoint} in
-  let* () = catchup_evm_event ~rollup_node_endpoint in
-  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
+  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
+
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in

@@ -259,6 +259,12 @@ let delayed_transaction_kind_of_string = function
   | "deposit" -> Deposit
   | s -> Test.fail "%s is neither a transaction or deposit" s
 
+let wait_for_rollup_node_follower_connection_acquired evm_node =
+  wait_for
+    evm_node
+    "rollup_node_follower_connection_acquired.v0"
+    (Fun.const (Some ()))
+
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
   | Sequencer_upgrade : (string * Hex.t * Client.Time.t) evm_event_kind

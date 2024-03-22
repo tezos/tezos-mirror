@@ -20,7 +20,7 @@ val start : parameters -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the tx-pool, waiting for the ongoing request
     to be processed. *)
-val shutdown : unit -> unit Lwt.t
+val shutdown : unit -> unit tzresult Lwt.t
 
 (** [add raw_tx] adds a raw eth transaction to the tx-pool. *)
 val add : string -> (Ethereum_types.hash, string) result tzresult Lwt.t
@@ -37,6 +37,11 @@ val pop_transactions : unit -> popped_transactions tzresult Lwt.t
     the pool using {!pop_transactions }and injects them using
     [inject_raw_transactions] provided by {!parameters.rollup_node}. *)
 val pop_and_inject_transactions : unit -> unit tzresult Lwt.t
+
+(** [pop_and_inject_transactions_lazy ()] same as
+    [pop_and_inject_transactions] but don't wait for the request to
+    complete *)
+val pop_and_inject_transactions_lazy : unit -> unit tzresult Lwt.t
 
 (** [lock_transactions] locks the transactions in the pool, new transactions
     can be added but nothing can be retrieved with {!pop_transactions}. *)

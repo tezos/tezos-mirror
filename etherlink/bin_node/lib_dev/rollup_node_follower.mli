@@ -5,14 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {
-  rollup_node_endpoint : Uri.t;
-      (** Rollup node endpoint used to monitor the stream of rollup
-          node block. *)
-}
-
-(** [start parameters] starts the rollup node follower. *)
-val start : parameters -> unit tzresult Lwt.t
-
-(** [shutdown ()] stops the rollup node follower. *)
-val shutdown : unit -> unit Lwt.t
+(** [start ~proxy ~rollup_node_endpoint] starts the rollup node
+    follower. In proxy mode does not try to catchup evm event. *)
+val start : proxy:bool -> rollup_node_endpoint:Uri.t -> unit
