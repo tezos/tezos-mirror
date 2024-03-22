@@ -323,6 +323,12 @@ module Internal_validator_process = struct
     let operation_metadata_size_limit =
       validator.operation_metadata_size_limit
     in
+    let cache =
+      match validator.cache with
+      | None -> `Load
+      | Some block_cache ->
+          `Inherited (block_cache, predecessor_resulting_context_hash)
+    in
     let* result, apply_result =
       Block_validation.preapply
         ~chain_id
@@ -340,6 +346,7 @@ module Internal_validator_process = struct
         ~predecessor_max_operations_ttl
         ~predecessor_block_metadata_hash
         ~predecessor_ops_metadata_hash
+        ~cache
         operations
     in
     validator.preapply_result <- Some apply_result ;

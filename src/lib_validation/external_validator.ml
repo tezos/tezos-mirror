@@ -377,6 +377,11 @@ let handle_request :
         in
         let*! protocol_hash = Context_ops.get_protocol predecessor_context in
         let* () = load_protocol protocol_hash protocol_root in
+        let cache =
+          match cache with
+          | None -> `Load
+          | Some cache -> `Inherited (cache, predecessor_resulting_context_hash)
+        in
         with_retry_to_load_protocol protocol_root (fun () ->
             Block_validation.preapply
               ~chain_id
@@ -394,6 +399,7 @@ let handle_request :
               ~predecessor_block_metadata_hash
               ~predecessor_ops_metadata_hash
               ~predecessor_resulting_context_hash
+              ~cache
               operations)
       in
       let*! res, cachable_result =
