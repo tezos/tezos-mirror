@@ -5,7 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {rollup_node_endpoint : Uri.t}
+type parameters = {
+  rollup_node_endpoint : Uri.t;
+  filter_event : Ethereum_types.Evm_events.t -> bool;
+}
 
 module StringSet = Set.Make (String)
 
@@ -84,8 +87,8 @@ let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
   in
   return event_opt
 
-let on_new_head ({rollup_node_endpoint} as state : Types.state) rollup_block_lvl
-    =
+let on_new_head ({rollup_node_endpoint; filter_event} as state : Types.state)
+    rollup_block_lvl =
   let open Lwt_result_syntax in
   let* nb_of_events_bytes =
     read_from_rollup_node
@@ -109,7 +112,12 @@ let on_new_head ({rollup_node_endpoint} as state : Types.state) rollup_block_lvl
           nb_of_events
           (fetch_event state rollup_block_lvl)
       in
-      let events = List.filter_map Fun.id events in
+      let events =
+        List.filter_map
+          (function
+            | Some event when filter_event event -> Some event | _ -> None)
+          events
+      in
       Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
 
 module Handlers = struct
