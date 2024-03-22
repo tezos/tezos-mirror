@@ -246,7 +246,10 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
     Block_producer.start
       {cctxt; smart_rollup_address; sequencer_key = sequencer}
   in
-  let* () = Evm_events_follower.start {rollup_node_endpoint} in
+  let* () =
+    Evm_events_follower.start
+      {rollup_node_endpoint; filter_event = (fun _ -> true)}
+  in
   let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
 
   let directory =
