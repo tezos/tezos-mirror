@@ -874,26 +874,11 @@ test_case!(
     "rv64ui-v-xori"
 );
 
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_div,
-    "rv64um-p-div"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_divu,
-    "rv64um-p-divu"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_divuw,
-    "rv64um-p-divuw"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_divw,
-    "rv64um-p-divw"
-);
+test_case!(test_suite_rv64um_p_div, "rv64um-p-div", Mode::User);
+test_case!(test_suite_rv64um_p_divu, "rv64um-p-divu", Mode::User);
+test_case!(test_suite_rv64um_p_divuw, "rv64um-p-divuw", Mode::User);
+test_case!(test_suite_rv64um_p_divw, "rv64um-p-divw", Mode::User);
+
 test_case!(
     #[ignore]
     test_suite_rv64um_p_mul,

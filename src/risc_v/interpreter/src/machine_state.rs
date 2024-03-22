@@ -267,6 +267,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Remu(args) => run_r_type_instr!(self, instr, args, run_remu),
             Instr::Remw(args) => run_r_type_instr!(self, instr, args, run_remw),
             Instr::Remuw(args) => run_r_type_instr!(self, instr, args, run_remuw),
+            Instr::Div(args) => run_r_type_instr!(self, instr, args, run_div),
+            Instr::Divu(args) => run_r_type_instr!(self, instr, args, run_divu),
+            Instr::Divw(args) => run_r_type_instr!(self, instr, args, run_divw),
+            Instr::Divuw(args) => run_r_type_instr!(self, instr, args, run_divuw),
 
             // RV64F move instructions
             Instr::FmvXW(args) => run_f_mv_instr!(self, instr, args, run_fmv_x_w),
