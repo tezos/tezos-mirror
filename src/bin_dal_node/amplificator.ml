@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id
-    ~on_error ~on_exception (f : unit -> unit tzresult Lwt.t) =
+    ~on_error (f : unit -> unit tzresult Lwt.t) =
   let open Lwt_result_syntax in
   let open Types.Slot_id.Set in
   let aquire_lock () =
@@ -23,14 +23,18 @@ let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id
     let () =
       Lwt.dont_wait
         (fun () ->
-          let*! res = f () in
+          (* Convert any exception into an error *)
+          let*! res = Lwt.catch f Error_monad.fail_with_exn in
           let () = release_lock () in
           match res with
           | Ok () -> Lwt_syntax.return_unit
           | Error err -> on_error err)
-        (fun exn ->
-          let () = release_lock () in
-          on_exception exn)
+        (fun _exn ->
+          (* This exception handler can only run if an exception was
+             raised by the on_error call. In that edge case, we
+             prefer to ignore the exception and let the DAL node
+             continue to run. *)
+          ())
     in
     return_unit
 
@@ -71,8 +75,6 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
             Event.(
               fun err ->
                 emit reconstruct_error (published_level, slot_index, err))
-          ~on_exception:(function
-            | Unix.Unix_error _ -> () | exn -> Lwt.reraise exn)
         @@ fun () ->
         (* Wait a random delay between 1 and 2 seconds before starting
            the reconstruction; this is to give some slack to receive
