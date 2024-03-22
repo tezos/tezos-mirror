@@ -156,11 +156,6 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
               shards
               ~number_of_needed_shards
           in
-          let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-          let* commitment =
-            Slot_manager.add_commitment slot_store slot cryptobox
-            |> Errors.to_tzresult
-          in
           let* (_ : unit option) =
             (let shards =
                Cryptobox.shards_from_polynomial cryptobox polynomial
