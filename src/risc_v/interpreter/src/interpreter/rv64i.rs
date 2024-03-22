@@ -237,7 +237,11 @@ where
     M: backend::Manager,
 {
     /// Generic read function for loading `mem::size_of<T>` bytes from address val(rs1) + imm
-    fn read_from_bus<T: backend::Elem>(&self, imm: i64, rs1: XRegister) -> Result<T, Exception> {
+    pub fn read_from_bus<T: backend::Elem>(
+        &self,
+        imm: i64,
+        rs1: XRegister,
+    ) -> Result<T, Exception> {
         let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
         self.bus
             .read(address)
@@ -321,7 +325,7 @@ where
     }
 
     /// Generic store-operation for writing `mem::size_of<T>` bytes starting at address val(rs1) + imm
-    fn write_to_bus<T: backend::Elem>(
+    pub fn write_to_bus<T: backend::Elem>(
         &mut self,
         imm: i64,
         rs1: XRegister,

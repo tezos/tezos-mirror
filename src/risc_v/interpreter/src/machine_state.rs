@@ -280,11 +280,15 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
             // RV64F move instructions
             Instr::FclassS(args) => run_f_x_instr!(self, instr, args, run_fclass_s),
+            Instr::Flw(args) => run_load_instr!(self, instr, args, run_flw),
+            Instr::Fsw(args) => run_store_instr!(self, instr, args, run_fsw),
             Instr::FmvXW(args) => run_f_x_instr!(self, instr, args, run_fmv_x_w),
             Instr::FmvWX(args) => run_f_x_instr!(self, instr, args, run_fmv_w_x),
 
             // RV64D move instructions
             Instr::FclassD(args) => run_f_x_instr!(self, instr, args, run_fclass_d),
+            Instr::Fld(args) => run_load_instr!(self, instr, args, run_fld),
+            Instr::Fsd(args) => run_store_instr!(self, instr, args, run_fsd),
             Instr::FmvXD(args) => run_f_x_instr!(self, instr, args, run_fmv_x_d),
             Instr::FmvDX(args) => run_f_x_instr!(self, instr, args, run_fmv_d_x),
 

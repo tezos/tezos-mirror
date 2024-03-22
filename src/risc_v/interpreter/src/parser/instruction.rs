@@ -77,6 +77,20 @@ pub struct XRegToFRegArgs {
     pub rs1: XRegister,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FStoreArgs {
+    pub rs1: XRegister,
+    pub rs2: FRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FLoadArgs {
+    pub rs1: XRegister,
+    pub rd: FRegister,
+    pub imm: i64,
+}
+
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
@@ -164,11 +178,15 @@ pub enum Instr {
 
     // RV64F instructions
     FclassS(FRegToXRegArgs),
+    Flw(FLoadArgs),
+    Fsw(FStoreArgs),
     FmvXW(FRegToXRegArgs),
     FmvWX(XRegToFRegArgs),
 
     // RV64D instructions
     FclassD(FRegToXRegArgs),
+    Fld(FLoadArgs),
+    Fsd(FStoreArgs),
     FmvXD(FRegToXRegArgs),
     FmvDX(XRegToFRegArgs),
 
@@ -273,9 +291,13 @@ impl Instr {
             | FmvXW(_)
             | FmvWX(_)
             | FclassS(_)
+            | Flw(_)
+            | Fsw(_)
             | FmvXD(_)
             | FmvDX(_)
             | FclassD(_)
+            | Fld(_)
+            | Fsd(_)
             | Csrrw(_)
             | Csrrs(_)
             | Csrrc(_)
@@ -514,11 +536,15 @@ impl fmt::Display for Instr {
 
             // RV64F instructions
             FclassS(args) => f_s1_instr!(f, "fclass.s", args),
+            Flw(args) => i_instr_load!(f, "flw", args),
+            Fsw(args) => s_instr!(f, "fsw", args),
             FmvXW(args) => f_s1_instr!(f, "fmv.x.w", args),
             FmvWX(args) => f_s1_instr!(f, "fmv.w.x", args),
 
             // RV64D instructions
             FclassD(args) => f_s1_instr!(f, "fclass.d", args),
+            Fld(args) => i_instr_load!(f, "fld", args),
+            Fsd(args) => s_instr!(f, "fsd", args),
             FmvXD(args) => f_s1_instr!(f, "fmv.x.d", args),
             FmvDX(args) => f_s1_instr!(f, "fmv.d.x", args),
 
