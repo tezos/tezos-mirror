@@ -99,11 +99,28 @@ end) : Services_backend_sig.Backend = struct
     Tezos_crypto.Hashed.Smart_rollup_address.to_string Ctxt.smart_rollup_address
 end
 
-let on_new_blueprint next_blueprint_number (blueprint : Blueprint_types.t) =
+let on_new_blueprint next_blueprint_number
+    ({delayed_transactions; blueprint} : Blueprint_types.with_events) =
+  let open Lwt_result_syntax in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
-    Evm_context.apply_blueprint blueprint.timestamp blueprint.payload
+    let events =
+      List.map
+        (fun delayed_transaction ->
+          Ethereum_types.Evm_events.New_delayed_transaction delayed_transaction)
+        delayed_transactions
+    in
+    let* () = Evm_context.apply_evm_events events in
+    let delayed_transactions =
+      List.map
+        (fun Ethereum_types.Delayed_transaction.{hash; _} -> hash)
+        delayed_transactions
+    in
+    Evm_context.apply_blueprint
+      blueprint.timestamp
+      blueprint.payload
+      delayed_transactions
   else failwith "Received a blueprint with an unexpected number."
 
 module Make (Ctxt : sig
