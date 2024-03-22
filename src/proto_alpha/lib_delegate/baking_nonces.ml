@@ -229,38 +229,97 @@ let remove_all nonces nonces_to_remove =
     nonces_to_remove
     nonces
 
-let may_create_detailed_nonces_file (wallet : #Client_context.wallet)
-    ~(legacy_location : [`Legacy_nonce] Baking_files.location)
-    ~(stateful_location : [`Stateful_nonce] Baking_files.location) =
-  let open Lwt_result_syntax in
-  let legacy_location = Baking_files.filename legacy_location in
-  if not override_legacy_nonces_flag then
+let is_outdated constants committed_cycle current_cycle =
+  let {Constants.parametric = {consensus_rights_delay; _}; _} = constants in
+  Int32.sub (Cycle.to_int32 current_cycle) (Cycle.to_int32 committed_cycle)
+  > Int32.of_int consensus_rights_delay
+
+(** [try_migrate_legacy_nonces] makes a best effort to migrate nonces in the legacy format
+    to new format. Legacy nonces that cannot be migrated are dropped. No updates to the legacy
+    file are made *)
+let try_migrate_legacy_nonces state =
+  let {cctxt; chain; legacy_location; stateful_location; constants; _} =
+    state
+  in
+  let migrate () =
+    let open Lwt_result_syntax in
+    let legacy_location = Baking_files.filename legacy_location in
     let* legacy_nonces =
-      wallet#load legacy_location ~default:legacy_empty legacy_encoding
+      cctxt#load legacy_location ~default:legacy_empty legacy_encoding
     in
-    let detailed_nonces =
-      Block_hash.Map.fold
-        (fun block_hash nonce acc ->
-          let data =
-            {
-              nonce;
-              nonce_hash = Nonce.hash nonce;
-              block_hash;
-              cycle = None;
-              level = None;
-              round = None;
-              nonce_state = None;
-            }
+    let new_location = Baking_files.filename stateful_location in
+    let* nonces = cctxt#load new_location ~default:empty encoding in
+    let* {cycle = current_cycle; _} =
+      Plugin.RPC.current_level cctxt (chain, `Head 0)
+    in
+    let*! nonces, failed_migration =
+      Block_hash.Map.fold_s
+        (fun block_hash nonce (existing_nonces, failed_migration) ->
+          let*! updated_nonces =
+            if Nonce_hash.Map.mem (Nonce.hash nonce) existing_nonces then
+              (* Current nonce already exists in the new format, no migration needed. *)
+              return existing_nonces
+            else
+              let* {cycle = nonce_cycle; level = nonce_level; _} =
+                Plugin.RPC.current_level cctxt (chain, `Hash (block_hash, 0))
+              in
+              match is_outdated constants nonce_cycle current_cycle with
+              | true ->
+                  let*! () = Events.(emit outdated_nonce block_hash) in
+                  return existing_nonces
+              | false -> (
+                  let* nonce_info =
+                    Alpha_services.Nonce.get cctxt (chain, `Head 0) nonce_level
+                  in
+                  match nonce_info with
+                  | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
+                      (* If a nonce is found locally but revelation not in context,
+                         assume that it is [Committed] and not already [Revealed].
+                         In the case that it is already in mempool, the mempool
+                         will reject the operation. *)
+                      let data =
+                        {
+                          nonce;
+                          nonce_hash = Nonce.hash nonce;
+                          block_hash;
+                          cycle = Some nonce_cycle;
+                          level = Some nonce_level;
+                          round = None;
+                          nonce_state = Some Committed;
+                        }
+                      in
+                      return
+                        (Nonce_hash.Map.add
+                           data.nonce_hash
+                           data
+                           existing_nonces)
+                  | Missing _nonce_hash ->
+                      let*! () = Events.(emit unexpected_nonce block_hash) in
+                      return existing_nonces
+                  | Revealed _nonce_hash ->
+                      let*! () = Events.(emit revealed_nonce block_hash) in
+                      return existing_nonces
+                  | Forgotten -> return existing_nonces)
           in
-          Nonce_hash.Map.add data.nonce_hash data acc)
+          Lwt.return
+            (match updated_nonces with
+            | Ok updated_nonces -> (updated_nonces, failed_migration)
+            | Error _ -> (existing_nonces, block_hash :: failed_migration)))
         legacy_nonces
-        empty
+        (nonces, [])
     in
-    wallet#write
-      (Baking_files.filename stateful_location)
-      detailed_nonces
-      encoding
-  else return_unit
+    let+ () =
+      cctxt#write (Baking_files.filename stateful_location) nonces encoding
+    in
+    failed_migration
+  in
+  let open Lwt_syntax in
+  let* res = migrate () in
+  match res with
+  | Ok [] -> Events.(emit success_migrate_nonces ())
+  | Ok failed_migration ->
+      Events.(emit ignore_failed_nonce_migration failed_migration)
+  | Error _ -> Lwt.return_unit
 
 (** [get_outdated_nonces state nonces currnet_cycle] returns an (orphans, outdated) 
     pair of lists of nonces (paired with their block hashes); "orphans" are nonces
@@ -530,13 +589,10 @@ let reveal_potential_nonces state new_proposal =
 
 (* We suppose that the block stream is cloned by the caller *)
 let start_revelation_worker cctxt config chain_id constants block_stream =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let legacy_location = Baking_files.resolve_location ~chain_id `Legacy_nonce in
   let stateful_location =
     Baking_files.resolve_location ~chain_id `Stateful_nonce
-  in
-  let*! _ =
-    may_create_detailed_nonces_file cctxt ~legacy_location ~stateful_location
   in
   let chain = `Hash chain_id in
   let canceler = Lwt_canceler.create () in
@@ -552,11 +608,12 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
       last_predecessor = Block_hash.zero;
     }
   in
+  let* () = try_migrate_legacy_nonces state in
   let rec worker_loop () =
     Lwt_canceler.on_cancel canceler (fun () ->
         should_shutdown := true ;
         Lwt.return_unit) ;
-    let*! new_proposal = Lwt_stream.get block_stream in
+    let* new_proposal = Lwt_stream.get block_stream in
     match new_proposal with
     | None ->
         (* The head stream closed meaning that the connection
@@ -565,15 +622,15 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
     | Some new_proposal ->
         if !should_shutdown then return_unit
         else
-          let* () = reveal_potential_nonces state new_proposal in
+          let* _ = reveal_potential_nonces state new_proposal in
           worker_loop ()
   in
   Lwt.dont_wait
     (fun () ->
       Lwt.finalize
         (fun () ->
-          let*! () = Events.(emit revelation_worker_started ()) in
-          let*! _ = worker_loop () in
+          let* () = Events.(emit revelation_worker_started ()) in
+          let* () = worker_loop () in
           (* never ending loop *) Lwt.return_unit)
         (fun () -> (* TODO *) Lwt.return_unit))
     (fun _exn -> ()) ;
