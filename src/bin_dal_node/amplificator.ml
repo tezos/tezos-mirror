@@ -5,23 +5,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id f =
+let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id
+    ~on_error ~on_exception (f : unit -> unit tzresult Lwt.t) =
   let open Lwt_result_syntax in
   let open Types.Slot_id.Set in
+  let aquire_lock () =
+    ready_ctxt.ongoing_amplifications <-
+      add slot_id ready_ctxt.ongoing_amplifications
+  in
+  let release_lock () =
+    ready_ctxt.ongoing_amplifications <-
+      remove slot_id ready_ctxt.ongoing_amplifications
+  in
   if mem slot_id ready_ctxt.ongoing_amplifications then return_unit
   else
+    let () = aquire_lock () in
     let () =
-      ready_ctxt.ongoing_amplifications <-
-        add slot_id ready_ctxt.ongoing_amplifications
+      Lwt.dont_wait
+        (fun () ->
+          let*! res = f () in
+          let () = release_lock () in
+          match res with
+          | Ok () -> Lwt_syntax.return_unit
+          | Error err -> on_error err)
+        (fun exn ->
+          let () = release_lock () in
+          on_exception exn)
     in
-    Lwt.catch f (fun exn ->
-        ready_ctxt.ongoing_amplifications <-
-          remove slot_id ready_ctxt.ongoing_amplifications ;
-        (* Silently catch Unix errors to let the DAL node survive in
-           these cases. *)
-        match exn with
-        | Unix.Unix_error _ -> return_unit
-        | exn -> Lwt.reraise exn)
+    return_unit
 
 let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
     commitment ~published_level ~slot_index gs_worker node_ctxt =
@@ -53,7 +64,16 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
       then return_unit
       else
         (* We have enough shards to reconstruct the whole slot. *)
-        with_amplification_lock ready_ctxt slot_id @@ fun () ->
+        with_amplification_lock
+          ready_ctxt
+          slot_id
+          ~on_error:
+            Event.(
+              fun err ->
+                emit reconstruct_error (published_level, slot_index, err))
+          ~on_exception:(function
+            | Unix.Unix_error _ -> () | exn -> Lwt.reraise exn)
+        @@ fun () ->
         (* Wait a random delay between 1 and 2 seconds before starting
            the reconstruction; this is to give some slack to receive
            all the shards so that the reconstruction is not needed, and

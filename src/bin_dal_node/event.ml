@@ -330,3 +330,17 @@ let reconstruct_no_missing_shard =
     ("level", Data_encoding.int32)
     ~pp2:Format.pp_print_int
     ("slot_index", Data_encoding.int31)
+
+let reconstruct_error =
+  declare_3
+    ~section
+    ~name:"reconstruct_error"
+    ~msg:
+      "For the level {level} and slot index {slot_index}, unexpected error \
+       during reconstruction: {error}."
+    ~level:Error
+    ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
+    ("level", Data_encoding.int32)
+    ~pp2:Format.pp_print_int
+    ("slot_index", Data_encoding.int31)
+    ("error", Error_monad.trace_encoding)
