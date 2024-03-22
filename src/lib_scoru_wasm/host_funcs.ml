@@ -670,7 +670,7 @@ module Aux = struct
     let alternate_write_debug_impl ~f ~memory ~src ~num_bytes =
       let open Lwt.Syntax in
       let* result = read_mem_for_debug ~memory ~src ~num_bytes in
-      f result
+      Lwt.catch (fun () -> f result) (fun _exn -> Lwt_syntax.return_unit)
 
     let write_debug ~implem =
       match implem with
