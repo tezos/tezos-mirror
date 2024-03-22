@@ -1122,6 +1122,7 @@ version = "0.0.0"
 dependencies = [
  "cbindgen",
  "risc-v-interpreter",
+ "softfloat-sys",
 ]
 
 [[package]]
@@ -1469,6 +1470,7 @@ dependencies = [
  "paste",
  "proptest",
  "rand 0.8.5",
+ "softfloat-sys",
  "softfloat-wrapper",
  "strum 0.26.1",
  "thiserror",

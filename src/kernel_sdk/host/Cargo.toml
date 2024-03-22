@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -12,6 +12,9 @@ repository = "https://gitlab.com/tezos/tezos.git"
 description = "Safe Runtime trait for Tezos Smart Rollups host functions."
 keywords = ["tezos", "smart", "rollup"]
 categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
+
+[lib]
+path = "src/lib.rs"
 
 [dependencies.tezos-smart-rollup-core]
 path = "../core"

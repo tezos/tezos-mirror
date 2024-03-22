@@ -9,5 +9,8 @@ crate-type = ["staticlib", "rlib"]
 [dependencies.risc-v-interpreter]
 path = "../interpreter"
 
+[dependencies.softfloat-sys]
+workspace = true
+
 [build-dependencies]
 cbindgen = "*"

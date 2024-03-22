@@ -1,5 +1,5 @@
+# SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
-# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -13,6 +13,9 @@ repository = "https://gitlab.com/tezos/tezos.git"
 description = "Low-level host function definitions & constants for Tezos Smart Rollups."
 keywords = ["tezos", "smart", "rollup"]
 categories = ["no-std", "no-std::no-alloc", "api-bindings", "wasm"]
+
+[lib]
+path = "src/lib.rs"
 
 [dependencies.mockall]
 version = "0.11.0"

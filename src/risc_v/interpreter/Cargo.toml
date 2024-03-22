@@ -19,6 +19,9 @@ features = ["derive"]
 [dependencies.kernel-loader]
 path = "../kernel_loader"
 
+[dependencies.softfloat-sys]
+workspace = true
+
 [dev-dependencies]
 goblin = "0.7.1"
 hex = "0.4.3"

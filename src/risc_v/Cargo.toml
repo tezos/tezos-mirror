@@ -10,5 +10,8 @@ members = [
 ]
 exclude = ["jstz", "dummy_kernel", "tests"]
 
+[workspace.dependencies]
+softfloat-sys = { git = "https://gitlab.com/trili/softfloat-sys" }
+
 [patch.crates-io]
 softfloat-sys = { git = "https://gitlab.com/trili/softfloat-sys" }

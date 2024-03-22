@@ -8,3 +8,6 @@ repository = "https://gitlab.com/tezos/tezos.git"
 description = "Low-level constants for Tezos Smart Rollups"
 keywords = ["tezos", "smart", "rollup"]
 categories = ["no-std", "no-std::no-alloc"]
+
+[lib]
+path = "src/lib.rs"
