@@ -293,11 +293,16 @@ impl<'a> DebuggerApp<'a> {
             "   PC: ".into(),
             format!("{:x}", self.interpreter.read_pc()).fg(ORANGE),
         ]);
+        let mode_line = Line::from(vec![
+            "   Mode: ".into(),
+            format!("{:?}", self.interpreter.read_mode()).fg(BLUE),
+        ]);
         let status_text = match &self.status {
             InterpreterResult::Running(steps) => vec![
                 Line::from(vec!["   Running".bold().fg(GREEN)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                 pc_line,
+                mode_line,
             ],
             InterpreterResult::Exit { code, steps } => {
                 let color = if *code == 0 { YELLOW } else { RED };
@@ -351,7 +356,7 @@ impl Widget for &mut DebuggerApp<'_> {
 
         let rhs_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Fill(1), Constraint::Length(5)]);
+            .constraints(vec![Constraint::Fill(1), Constraint::Length(6)]);
         let [registers_area, status_area] = rhs_layout.areas(rhs_area);
 
         let registers_layout = Layout::default()

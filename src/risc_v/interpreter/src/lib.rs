@@ -155,6 +155,10 @@ impl<'a> Interpreter<'a> {
     pub fn read_pc(&self) -> u64 {
         self.machine_state.hart.pc.read()
     }
+
+    pub fn read_mode(&self) -> mode::Mode {
+        self.machine_state.hart.mode.read()
+    }
 }
 
 /// Debugger-specific functions
