@@ -156,6 +156,11 @@ pub enum Instr {
     Divu(RTypeArgs),
     Divw(RTypeArgs),
     Divuw(RTypeArgs),
+    Mul(RTypeArgs),
+    Mulh(RTypeArgs),
+    Mulhsu(RTypeArgs),
+    Mulhu(RTypeArgs),
+    Mulw(RTypeArgs),
 
     // RV64F instructions
     FclassS(FRegToXRegArgs),
@@ -260,6 +265,11 @@ impl Instr {
             | Divu(_)
             | Divw(_)
             | Divuw(_)
+            | Mul(_)
+            | Mulh(_)
+            | Mulhsu(_)
+            | Mulhu(_)
+            | Mulw(_)
             | FmvXW(_)
             | FmvWX(_)
             | FclassS(_)
@@ -496,6 +506,11 @@ impl fmt::Display for Instr {
             Divu(args) => r_instr!(f, "divu", args),
             Divw(args) => r_instr!(f, "divw", args),
             Divuw(args) => r_instr!(f, "divuw", args),
+            Mul(args) => r_instr!(f, "mul", args),
+            Mulh(args) => r_instr!(f, "mulh", args),
+            Mulhsu(args) => r_instr!(f, "mulhsu", args),
+            Mulhu(args) => r_instr!(f, "mulhu", args),
+            Mulw(args) => r_instr!(f, "mulw", args),
 
             // RV64F instructions
             FclassS(args) => f_s1_instr!(f, "fclass.s", args),

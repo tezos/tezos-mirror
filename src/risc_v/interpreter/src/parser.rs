@@ -304,6 +304,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         OP_ARITH => match funct3(instr) {
             F3_0 => match funct7(instr) {
                 F7_0 => r_instr!(Add, instr),
+                F7_1 => r_instr!(Mul, instr),
                 F7_20 => r_instr!(Sub, instr),
                 _ => Unknown { instr },
             },
@@ -324,6 +325,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             },
             F3_1 => match funct7(instr) {
                 F7_0 => r_instr!(Sll, instr),
+                F7_1 => r_instr!(Mulh, instr),
                 _ => Unknown { instr },
             },
             F3_5 => match funct7(instr) {
@@ -335,11 +337,13 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
 
             F3_2 => match funct7(instr) {
                 F7_0 => r_instr!(Slt, instr),
+                F7_1 => r_instr!(Mulhsu, instr),
                 _ => Unknown { instr },
             },
 
             F3_3 => match funct7(instr) {
                 F7_0 => r_instr!(Sltu, instr),
+                F7_1 => r_instr!(Mulhu, instr),
                 _ => Unknown { instr },
             },
 
@@ -348,6 +352,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         OP_ARITH_W => match funct3(instr) {
             F3_0 => match funct7(instr) {
                 F7_0 => r_instr!(Addw, instr),
+                F7_1 => r_instr!(Mulw, instr),
                 F7_20 => r_instr!(Subw, instr),
                 _ => Unknown { instr },
             },

@@ -84,6 +84,19 @@ where
 
         self.write(rd, result as i32 as u64);
     }
+
+    /// `MULW` R-type instruction
+    ///
+    /// Multiply the lower 32 bits of val(rs1) with the lower 32 bits of val(rs2)
+    /// and store the result in `rd`.
+    pub fn run_mulw(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let rval1 = self.read(rs1) as i32;
+        let rval2 = self.read(rs2) as i32;
+
+        let result = rval1.wrapping_mul(rval2);
+
+        self.write(rd, result as i64 as u64);
+    }
 }
 
 #[cfg(test)]
