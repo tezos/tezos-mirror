@@ -194,15 +194,15 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
     (List.length attestations) ;
   return (num_published, num_attested)
 
-(* This scenario starts a L1 node and a DAL node on the given testnet (Dailynet
-   or Weeklynet), and it publishes slots for a number of levels and a number of
+(* This scenario starts a L1 node and a DAL node on the given testnet (currently
+   Weeklynet), and it publishes slots for a number of levels and a number of
    slot producers (both given as arguments to the test). At the end of the test,
    the average number of published respectively attested slots are shown (with
    Log.info).
 
    To run the test, one can use:
 
-   dune exec src/bin_testnet_scenarios/main.exe -- dal dailynet simple -a load -a save -a num_accounts=5 -a levels=10 -i
+   dune exec src/bin_testnet_scenarios/main.exe -- dal weeklynet simple -a load -a save -a num_accounts=5 -a levels=10 -i
 
    Use the arguments:
    - `load`: to load an existing data-dir saved (with `save`, see next) in a previous run of the script
@@ -309,7 +309,7 @@ let originate_rollup client rollup_node rollup_alias =
 
    To run the test, one can use:
 
-   dune exec src/bin_testnet_scenarios/main.exe -- dal dailynet rollup -a load -a save -a num_accounts=5 -a levels=10 -a originate -i
+   dune exec src/bin_testnet_scenarios/main.exe -- dal weeklynet rollup -a load -a save -a num_accounts=5 -a levels=10 -a originate -i
 
    The additional `originate` argument is used to specify whether the rollup
    should be re-originated (if given) or not (if missing).
@@ -556,7 +556,7 @@ let run_scenario network kind scenario =
   let network_url = Format.sprintf "https://teztnets.com/%s" network_name in
   let network_arg = Node.Network network_url in
   let network_baker =
-    (* a bootstrap delegate for both Dailynet and Weeklynet *)
+    (* a bootstrap delegate for Weeklynet *)
     "tz1foXHgRzdYdaLgX6XhpZGxbBv42LZ6ubvE"
   in
 
@@ -610,7 +610,5 @@ let run_scenario network kind scenario =
   save ~restart:false
 
 let register () =
-  run_scenario Dailynet `Simple scenario_without_rollup_node ;
   run_scenario Weeklynet `Simple scenario_without_rollup_node ;
-  run_scenario Dailynet `With_rollup scenario_with_rollup_node ;
   run_scenario Weeklynet `With_rollup scenario_with_rollup_node
