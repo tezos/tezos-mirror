@@ -87,7 +87,7 @@ let () =
       str;
       bls12_381;
       tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-      Etherlink.tezt_risc_v_sandbox;
+      Octez.tezt_risc_v_sandbox;
       tezt_tx_kernel;
       data_encoding;
       octez_base;

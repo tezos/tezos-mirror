@@ -7953,6 +7953,16 @@ let _octez_scoru_wasm_regressions =
 let tezos_time_measurement =
   external_lib ~opam:"" "tezos-time-measurement" V.True
 
+let tezt_risc_v_sandbox =
+  private_lib
+    "tezt_risc_v_sandbox"
+    ~path:"tezt/lib_risc_v_sandbox"
+    ~opam:"tezt-risc-v-sandbox"
+    ~synopsis:"Test framework for RISC-V sandbox"
+    ~bisect_ppx:No
+    ~deps:[tezt_wrapper |> open_ |> open_ ~m:"Base"; tezt_tezos]
+    ~release_status:Unreleased
+
 let _tezt_long_tests =
   private_exe
     "main"
