@@ -150,7 +150,6 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
             |> Errors.to_tzresult
           in
           let* (_ : unit option) =
-            let with_proof = true in
             (let* slot =
                Slot_manager.get_commitment_slot slot_store cryptobox commitment
              in
@@ -179,18 +178,16 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
                    commitment
                    shards)
              in
-             if with_proof then
-               let*? precomputation =
-                 match shards_proofs_precomputation with
-                 | None -> Error (`Other [Slot_manager.No_prover_SRS])
-                 | Some precomputation -> Ok precomputation
-               in
-               let shard_proofs =
-                 Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
-               in
-               Store.save_shard_proofs slot_store commitment shard_proofs
-               |> return
-             else return_unit)
+             let*? precomputation =
+               match shards_proofs_precomputation with
+               | None -> Error (`Other [Slot_manager.No_prover_SRS])
+               | Some precomputation -> Ok precomputation
+             in
+             let shard_proofs =
+               Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
+             in
+             Store.save_shard_proofs slot_store commitment shard_proofs
+             |> return)
             |> Errors.to_option_tzresult
           in
           let* () =
