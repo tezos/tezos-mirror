@@ -412,7 +412,6 @@ let test_sequencer_too_ahead =
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* () = Sc_rollup_node.terminate sc_rollup_node in
-  let* () = Evm_node.terminate proxy in
   let* () =
     repeat (max_blueprints_ahead * 2) (fun () ->
         let*@ _ = Rpc.produce_block sequencer in
@@ -424,10 +423,9 @@ let test_sequencer_too_ahead =
   let*@ block_number = Rpc.block_number sequencer in
   Check.((block_number = 6l) int32)
     ~error_msg:"The sequencer should have been locked" ;
-  let* () = Evm_node.terminate sequencer in
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-  let* () = Evm_node.run sequencer in
-  let* () = Evm_node.run proxy in
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address []
+  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
+  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired proxy in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* _ =
     repeat 2 (fun () ->
@@ -508,7 +506,7 @@ let test_resilient_to_rollup_node_disconnect =
   in
 
   (* Kill the rollup node *)
-  let* () = Sc_rollup_node.kill sc_rollup_node in
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
 
   (* The sequencer node should keep producing blocks, enough so that
      it cannot catchup in one go. *)
@@ -533,11 +531,10 @@ let test_resilient_to_rollup_node_disconnect =
   (* Kill the sequencer node, restart the rollup node, restart the sequencer to
      reestablish the connection *)
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node in
-
-  let* () = Evm_node.terminate sequencer in
-  let* () = Evm_node.run sequencer in
-  let* () = Evm_node.run observer in
+  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node
+  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
+  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired observer
+  and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired proxy in
 
   (* Produce enough blocks in advance to ensure the sequencer node will catch
      up at the end. *)

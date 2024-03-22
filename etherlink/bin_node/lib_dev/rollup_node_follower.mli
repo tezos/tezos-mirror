@@ -5,5 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start ~rollup_node_endpoint] starts the rollup node follower. *)
+(** [start ~rollup_node_endpoint] starts the rollup node
+    follower. *)
 val start : rollup_node_endpoint:Uri.t -> unit

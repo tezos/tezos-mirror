@@ -29,72 +29,158 @@ let advertize_blueprints_publisher rollup_node_endpoint finalized_level =
       return_unit
   | None -> return_unit
 
-let process_new_block ~rollup_node_endpoint block =
+let process_new_block ~rollup_node_endpoint ~finalized_level =
   let open Lwt_result_syntax in
-  let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
   let* () = Evm_events_follower.new_rollup_block finalized_level in
   let* () =
     advertize_blueprints_publisher rollup_node_endpoint finalized_level
   in
-  let* () = Tx_pool.pop_and_inject_transactions_lazy () in
-  return_unit
+  Tx_pool.pop_and_inject_transactions_lazy ()
 
-let rec process_rollup_node_stream ~stream ~rollup_node_endpoint =
+type error += Connection_lost | Connection_timeout
+
+(** [process_finalized_level ~oldest_rollup_node_known_l1_level
+    ~finalized_level ~rollup_node_endpoint] process the rollup node
+    block level [finalized_level] iff it's known by the rollup node
+    (i.e. superior to [oldest_rollup_node_known_l1_level].
+
+    This is necessary for the very beginning of the rollup life, when
+    the evm node is started at the same moment at the origination of
+    the rollup, and so `finalized_level` is < origination level. *)
+let process_finalized_level ~oldest_rollup_node_known_l1_level ~finalized_level
+    ~rollup_node_endpoint =
   let open Lwt_result_syntax in
-  let*! new_head = Lwt_stream.get stream in
-  match new_head with
-  | None ->
-      let*! () = Rollup_node_follower_events.connection_lost () in
-      (* In following commit we we'll try to recover the connection *)
-      Lwt_exit.exit_and_raise 1
-  | Some block ->
-      let*! () =
-        Rollup_node_follower_events.new_block
-          Sc_rollup_block.(block.header.level)
+  if oldest_rollup_node_known_l1_level <= finalized_level then
+    process_new_block ~finalized_level ~rollup_node_endpoint
+  else return_unit
+
+let reconnection_delay = 5.0
+
+let min_timeout = 10.
+
+let timeout_factor = 10.
+
+type rollup_node_connection = {
+  close : unit -> unit;  (** stream closing function *)
+  stream : Sc_rollup_block.t Lwt_stream.t;
+      (** current rollup node block stream *)
+  rollup_node_endpoint : Uri.t;  (** endpoint used to reconnect to the node *)
+  timeout : Float.t;
+      (** expected time to receive a l2 block from the rollup node. is
+          recalculated at each received block. *)
+}
+
+(** [timeout] is updated to reflect reality of how long we should with
+    the next block or assume the connection is failing/hanging. *)
+let update_timeout ~elapsed ~connection =
+  let new_timeout = elapsed *. timeout_factor in
+  if new_timeout < min_timeout then connection
+  else {connection with timeout = new_timeout}
+
+let sleep_before_reconnection ~factor =
+  let open Lwt_syntax in
+  if factor = 0 then return_unit
+  else
+    (* randomised the sleep time to not DoS the rollup node if
+       multiple evm node are connected to the same rollup node *)
+    let fcount = float_of_int (factor - 1) in
+    (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
+    let delay = reconnection_delay *. (1.5 ** fcount) in
+    let delay = min delay 3600. in
+    let randomization_factor = 0.5 (* 50% *) in
+    let delay =
+      delay
+      +. Random.float (delay *. 2. *. randomization_factor)
+      -. (delay *. randomization_factor)
+    in
+    let* () = Rollup_node_follower_events.trying_reconnection delay in
+    Lwt_unix.sleep delay
+
+(**[connect_to_stream ?count ~rollup_node_endpoint ()] try to connect
+   to the stream of rollup node block. If [count] is superior to [0]
+   then sleep some time with [sleep_before_reconnection] before trying
+   to reconnect.
+
+    [count] is the number of time we tried to reconnect in a row. *)
+let[@tailrec] rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
+  let open Lwt_result_syntax in
+  let*! () = sleep_before_reconnection ~factor:count in
+  let*! res = Rollup_services.make_streamed_call ~rollup_node_endpoint in
+  match res with
+  | Ok (stream, close) ->
+      let*! () = Rollup_node_follower_events.connection_acquired () in
+      return {close; stream; rollup_node_endpoint; timeout = 300.}
+  | Error _e ->
+      (connect_to_stream [@tailcall])
+        ~count:(count + 1)
+        ~rollup_node_endpoint
+        ()
+
+(** [next_block ~connection] returns the next block found in
+    [connection.stream].
+
+    - If the connection drops then it tries to reconnect the stream
+    using [connect_to_stream].
+
+    - If the connection timeout (takes more than [connection.timeout])
+    or if the connection fails then reconnect with [connect_to_stream]
+    and try to fetch [next_block] with that new stream.*)
+let[@tailrec] rec next_block ~connection =
+  let open Lwt_result_syntax in
+  let get_promise () =
+    let*! res = Lwt_stream.get connection.stream in
+    match res with None -> tzfail Connection_lost | Some block -> return block
+  in
+  let timeout_promise timeout =
+    let*! () = Lwt_unix.sleep timeout in
+    tzfail Connection_timeout
+  in
+  let*! get_or_timeout =
+    Lwt.pick [get_promise (); timeout_promise connection.timeout]
+  in
+  match get_or_timeout with
+  | Ok block -> return (block, connection)
+  | Error [Connection_lost] | Error [Connection_timeout] ->
+      connection.close () ;
+      let* connection =
+        connect_to_stream
+          ~count:1
+          ~rollup_node_endpoint:connection.rollup_node_endpoint
+          ()
       in
-      let* () = process_new_block ~rollup_node_endpoint block in
-      process_rollup_node_stream ~stream ~rollup_node_endpoint
+      (next_block [@tailcall]) ~connection
+  | Error errs -> fail errs
 
-let wait_first_valid_level_then_process ~rollup_node_endpoint ~stream =
+(** [loop_on_rollup_node_stream ~proxy
+    ~oldest_rollup_node_known_l1_level ~connection] main loop to
+    process the block. get the current rollup node block from
+    [next_block] *)
+let[@tailrec] rec loop_on_rollup_node_stream ~oldest_rollup_node_known_l1_level
+    ~connection =
   let open Lwt_result_syntax in
-  let* first_rollup_node_known_l1_level =
-    Rollup_services.oldest_known_l1_level rollup_node_endpoint
+  let start_time = Unix.gettimeofday () in
+  let* block, connection = next_block ~connection in
+  let elapsed = Unix.gettimeofday () -. start_time in
+  let connection = update_timeout ~elapsed ~connection in
+  let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
+  let* () =
+    process_finalized_level
+      ~oldest_rollup_node_known_l1_level
+      ~rollup_node_endpoint:connection.rollup_node_endpoint
+      ~finalized_level
   in
-  let rec aux () =
-    let*! new_head = Lwt_stream.get stream in
-    match new_head with
-    | None ->
-        let*! () = Rollup_node_follower_events.connection_lost () in
-        (* In following commit we we'll try to recover the connection *)
-        Lwt_exit.exit_and_raise 1
-    | Some block ->
-        let finalized_level =
-          Sc_rollup_block.(Int32.(sub block.header.level 2l))
-        in
-        if first_rollup_node_known_l1_level <= finalized_level then
-          let* () = process_new_block ~rollup_node_endpoint block in
-          process_rollup_node_stream ~stream ~rollup_node_endpoint
-        else aux ()
-  in
-  aux ()
+  (loop_on_rollup_node_stream [@tailcall])
+    ~oldest_rollup_node_known_l1_level
+    ~connection
 
 let start ~rollup_node_endpoint =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
-  let* res =
-    let* res = Rollup_services.make_streamed_call ~rollup_node_endpoint in
-    match res with
-    | Ok (stream, close) ->
-        let* res =
-          wait_first_valid_level_then_process ~rollup_node_endpoint ~stream
-        in
-        close () ;
-        return res
-    | Error errs ->
-        Lwt.fail_with (Format.asprintf "%a" Error_monad.pp_print_trace errs)
+  Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
+  let* oldest_rollup_node_known_l1_level =
+    Rollup_services.oldest_known_l1_level rollup_node_endpoint
   in
-  match res with
-  | Ok () -> return_unit
-  | Error errs ->
-      Lwt.fail_with (Format.asprintf "%a" Error_monad.pp_print_trace errs)
+  let* connection = connect_to_stream ~rollup_node_endpoint () in
+  loop_on_rollup_node_stream ~oldest_rollup_node_known_l1_level ~connection

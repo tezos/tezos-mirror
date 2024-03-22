@@ -115,6 +115,8 @@ val wait_for_pending_upgrade : t -> (string * string) Lwt.t
 
 val wait_for_successful_upgrade : t -> (string * int) Lwt.t
 
+val wait_for_rollup_node_follower_connection_acquired : t -> unit Lwt.t
+
 (** [init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server with {!create}
     and runs it with {!run}. *)
