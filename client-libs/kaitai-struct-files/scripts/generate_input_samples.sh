@@ -65,6 +65,20 @@ store_invalid_inputs() {
   store_inputs "$2" "$input_dir"
 }
 
+store_valid_empty_input() {
+  escaped_encoding_id="$1"
+  input_dir="$INPUT_DIR/valid/$escaped_encoding_id"
+  mkdir -p "$input_dir"
+  touch "$input_dir/empty.hex"
+}
+
+store_invalid_empty_input() {
+  escaped_encoding_id="$1"
+  input_dir="$INPUT_DIR/invalid/$escaped_encoding_id"
+  mkdir -p "$input_dir"
+  touch "$input_dir/empty.hex"
+}
+
 # GENERATING INPUT SAMPLES FOR 'ground.uint8':
 
 # test uint8 should be in 0-255 range.
@@ -256,3 +270,180 @@ store_valid_inputs "ground__int64" "$valid_inputs"
 
 # Generating invalid input samples inside `INPUT_DIR/invalid/ground_int31/`.
 store_invalid_inputs "ground__int64" "$invalid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.float':
+
+valid_inputs="$(
+  octez-codec encode ground.float from 1
+  octez-codec encode ground.float from 130984703219.09842
+  octez-codec encode ground.float from 9007199254740993
+  octez-codec encode ground.float from 0
+  octez-codec encode ground.float from -23.3
+)"
+
+# TODO: https://gitlab.com/tezos/tezos/-/issues/6730
+#       `.ksy` files for ground encodings should throw an error when too many
+#        bytes are provided for the input.
+invalid_inputs="$(
+  # Running 'octez-codec decode ground.float from 000000080000000000000000'
+  # should fail. Float should decode at max 8 bytes.
+  # octez-codec encode ground.bytes from \"0000000000000000\"
+)"
+
+# Generating valid input samples inside `INPUT_DIR/valid/ground__float/`.
+store_valid_inputs "ground__float" "$valid_inputs"
+
+# Generating invalid input samples inside `INPUT_DIR/invalid/ground_float/`.
+store_invalid_inputs "ground__float" "$invalid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.empty':
+
+# Generating valid empty input sample: `INPUT_DIR/valid/ground_empty/empty.hex`.
+store_valid_empty_input "ground__empty"
+
+# TODO: https://gitlab.com/tezos/tezos/-/issues/6730
+#       `.ksy` files for ground encodings should throw an error when too many
+#        bytes are provided for the input.
+invalid_inputs="$(
+  # Running 'octez-codec decode ground.empty from 000000080000000000000000'
+  # should fail. Empty expects 0 bytes.
+  # octez-codec encode ground.bytes from \"0000000000000000\"
+)"
+
+# Generating invalid input samples inside `INPUT_DIR/invalid/ground_empty/`.
+store_invalid_inputs "ground__empty" "$invalid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.null':
+
+# Generating valid null input sample: `INPUT_DIR/valid/ground_null/empty.hex`.
+store_valid_empty_input "ground__null"
+
+# TODO: https://gitlab.com/tezos/tezos/-/issues/6730
+#       `.ksy` files for ground encodings should throw an error when too many
+#        bytes are provided for the input.
+invalid_inputs="$(
+  # Running 'octez-codec decode ground.null from 000000080000000000000000'
+  # should fail. Null expects 0 bytes.
+  # octez-codec encode ground.bytes from \"0000000000000000\"
+)"
+
+# Generating invalid input samples inside `INPUT_DIR/invalid/ground_null/`.
+store_invalid_inputs "ground__null" "$invalid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.unit':
+
+# Generating valid unit input sample: `INPUT_DIR/valid/ground_unit/empty.hex`.
+store_valid_empty_input "ground__unit"
+
+# TODO: https://gitlab.com/tezos/tezos/-/issues/6730
+#       `.ksy` files for ground encodings should throw an error when too many
+#        bytes are provided for the input.
+invalid_inputs="$(
+  # Running 'octez-codec decode ground.unit from 000000080000000000000000'
+  # should fail. Unit expects 0 bytes.
+  # octez-codec encode ground.bytes from \"0000000000000000\"
+)"
+
+# Generating invalid input samples inside `INPUT_DIR/invalid/ground_unit/`.
+store_invalid_inputs "ground__unit" "$invalid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.bytes':
+
+valid_inputs="$(
+  octez-codec encode ground.bytes from \"f1010101\"
+  octez-codec encode ground.bytes from \"f101010190283147283149732098147098321742319847132098473219847123084723104987321098471324\"
+)"
+
+# Generating valid input samples inside `INPUT_DIR/valid/ground__bytes/`.
+store_valid_inputs "ground__bytes" "$valid_inputs"
+
+# Generating invalid empty bytes input sample: `INPUT_DIR/invalid/ground_bytes/empty.hex`.
+store_invalid_empty_input "ground__bytes" "$valid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.string':
+
+valid_inputs="$(
+  octez-codec encode ground.string from \"f1010101\"
+  octez-codec encode ground.string from \"f101010190283147283149732098147098321742319847132098473219847123084723104987321098471324\"
+  octez-codec encode ground.string from "\"This is a test\""
+)"
+
+# Generating valid input samples inside `INPUT_DIR/valid/ground__string/`.
+store_valid_inputs "ground__string" "$valid_inputs"
+
+# Generating invalid empty string input sample: `INPUT_DIR/invalid/ground_string/empty.hex`.
+store_invalid_empty_input "ground__string" "$valid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.N':
+
+valid_inputs="$(
+  octez-codec encode ground.N from "\"0\""
+  octez-codec encode ground.N from "\"1\""
+  octez-codec encode ground.N from "\"8321740983217598321750983217509832175098321750983217509832175098321750329875098321750239873210\""
+)"
+
+invalid_inputs="$(
+  # Running 'octez-codec decode ground.N from 000000080000000000000000'
+  # should fail.
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/6730
+  #        ground.N parses invalid input. Likely the problem is as with other
+  #        ground encodings in this issue (?).
+  # octez-codec encode ground.bytes from "\"0000000000000000\""
+)"
+
+# Generating valid input samples inside `INPUT_DIR/valid/ground__n/`.
+store_valid_inputs "ground__n" "$valid_inputs"
+
+# Generating invalid input sample: `INPUT_DIR/invalid/ground__n/`.
+store_invalid_inputs "ground__n" "$invalid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.Z':
+
+valid_inputs="$(
+  octez-codec encode ground.Z from "\"0\""
+  octez-codec encode ground.Z from "\"1\""
+  octez-codec encode ground.Z from "\"-1\""
+  octez-codec encode ground.Z from "\"8321740983217598321750983217509832175098321750983217509832175098321750329875098321750239873210\""
+  octez-codec encode ground.Z from "\"-927459832175983217598321750983217509832175321\""
+)"
+
+invalid_inputs="$(
+  # Running 'octez-codec decode ground.Z from 000000080000000000000000'
+  # should fail.
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/6730
+  #        ground.Z parses invalid input. Likely the problem is as with other
+  #        ground encodings in this issue (?).
+  # octez-codec encode ground.bytes from "\"0000000000000000\""
+)"
+
+# Generating valid input samples inside `INPUT_DIR/valid/ground__z/`.
+store_valid_inputs "ground__z" "$valid_inputs"
+
+# Generating invalid input samples: `INPUT_DIR/invalid/ground__z/`.
+store_invalid_inputs "ground__z" "$invalid_inputs"
+
+# GENERATING INPUT SAMPLES FOR 'ground.bool':
+
+valid_inputs="$(
+  # "00" is false
+  octez-codec encode ground.uint8 from 0
+  # "0a" is true
+  octez-codec encode ground.uint8 from 10
+  # "ff" is true
+  octez-codec encode ground.uint8 from 255
+)"
+
+invalid_inputs="$(
+  # Anything else that is not in "00".."ff" hex range should fail.
+  # TODO: https://gitlab.com/tezos/tezos/-/issues/6730
+  #       `.ksy` files for ground encodings should throw an error when too many
+  #        bytes are provided for the input.
+  # octez-codec encode ground.int16 from -23421
+  # octez-codec encode ground.bytes from "\"0000000000000000\""
+)"
+
+# Generating valid input samples inside `INPUT_DIR/valid/ground__bool/`.
+store_valid_inputs "ground__bool" "$valid_inputs"
+
+# Generating invalid input samples: `INPUT_DIR/invalid/ground__bool/`.
+store_invalid_inputs "ground__bool" "$invalid_inputs"
