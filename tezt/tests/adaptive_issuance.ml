@@ -1380,7 +1380,106 @@ let test_staking =
   assert (unstaked_finalizable_balance = 0) ;
   unit
 
+let check_rpc_error client ?msg rpc =
+  let*? process = Client.RPC.spawn client @@ rpc in
+  Process.check_error ?msg process
+
+let check_rpc_ok client rpc =
+  let*? process = Client.RPC.spawn client @@ rpc in
+  Process.check process
+
+let test_fix_delegated_balance =
+  Protocol.register_test
+    ~__FILE__
+    ~supports:Protocol.(From_protocol (number Paris))
+    ~title:"Test protocol fix for delegated balance rpc"
+    ~tags:["rpc"; "delegated_balance"]
+  @@ fun protocol ->
+  let* _proto_hash, endpoint, client, _node =
+    init
+      ~overrides:
+        ((["adaptive_issuance_force_activation"], `Bool true)
+        :: default_overrides)
+      protocol
+  in
+  let stake_amount = Tez.of_int 6_000 in
+  let delegate = "bootstrap1" in
+  log_step 1 "Preparing delegator accounts" ;
+  let* delegator = Client.gen_and_show_keys client in
+  let* delegator2 = Client.gen_and_show_keys client in
+
+  let transfer_to dlgtor amount =
+    Client.spawn_transfer
+      ~burn_cap:Tez.one
+      ~amount
+      ~giver:Constant.bootstrap3.alias
+      ~receiver:dlgtor.Account.alias
+      client
+  in
+
+  let* () = bake_n ~endpoint ~protocol client 1 in
+  let* () = transfer_to delegator (Tez.of_int 1_000_000) |> Process.check in
+  let* () = bake_n ~endpoint ~protocol client 1 in
+  (* Let's make sure that delegator2 delegates less than 6_000 tez *)
+  let* () = transfer_to delegator2 (Tez.of_int 1_000) |> Process.check in
+  let* () = bake_n ~endpoint ~protocol client 1 in
+
+  log_step 2 "Preparing delegate account" ;
+  let*! () = Client.set_delegate ~src:delegator.alias ~delegate client in
+  let* () = bake_n ~endpoint ~protocol client 1 in
+  let set_delegate_parameters =
+    Client.spawn_set_delegate_parameters ~delegate ~limit:"5" ~edge:"0.5" client
+  in
+  let* () = bake_n ~endpoint ~protocol client 2 in
+  let* () = set_delegate_parameters |> Process.check in
+
+  log_step 3 "Delegator delegates to delegate" ;
+  let* delegated = Client.get_delegate ~src:delegator.alias client in
+  (match delegated with
+  | None -> Test.fail "No delegate found"
+  | Some d -> Log.info "Delegated: %s" d) ;
+
+  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
+  log_step 4 "Wait for delegate to accept staking" ;
+  let* _ = Helpers.bake_n_cycles bake 3 client in
+
+  log_step 5 "Delegator stakes" ;
+  let stake = Client.spawn_stake stake_amount ~staker:delegator.alias client in
+  let* () = bake_n ~endpoint ~protocol client 2 in
+  let* () = Process.check ~expect_failure:false stake in
+
+  log_step 6 "Delegator delegates to itself" ;
+  let*! () =
+    Client.set_delegate ~src:delegator.alias ~delegate:delegator.alias client
+  in
+  let* () = bake_n ~endpoint ~protocol client 2 in
+
+  let*! () =
+    Client.set_delegate ~src:delegator2.alias ~delegate:delegator.alias client
+  in
+  let* () = bake_n ~endpoint ~protocol client 2 in
+
+  let* delegated = Client.get_delegate ~src:delegator.alias client in
+  (match delegated with
+  | None -> Test.fail "No delegate found"
+  | Some d -> Log.info "Delegated: %s" d) ;
+
+  log_step 7 "RPC calls should fail" ;
+  let* () =
+    check_rpc_error
+      client
+      (RPC.get_chain_block_context_delegate_delegated_balance
+         delegator.public_key_hash)
+  in
+  let* () =
+    check_rpc_error
+      client
+      (RPC.get_chain_block_context_delegate delegator.public_key_hash)
+  in
+  Lwt.return_unit
+
 let register ~protocols =
   test_AI_activation_bypass_vote protocols ;
   test_AI_activation protocols ;
-  test_staking protocols
+  test_staking protocols ;
+  test_fix_delegated_balance protocols
