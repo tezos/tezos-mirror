@@ -42,6 +42,13 @@ type t = {
 let blueprint_watcher : Blueprint_types.with_events Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
+let session_to_head_info session =
+  {
+    evm_state = session.evm_state;
+    next_blueprint_number = session.next_blueprint_number;
+    current_block_hash = session.current_block_hash;
+  }
+
 module Types = struct
   type state = t
 
@@ -74,7 +81,6 @@ module Request = struct
       }
         -> (unit, tztrace) t
     | Last_produce_blueprint : (Blueprint_types.t, tztrace) t
-    | Head_info : (head, tztrace) t
     | Blueprint : {
         level : Ethereum_types.quantity;
       }
@@ -131,12 +137,6 @@ module Request = struct
           (function View Last_produce_blueprint -> Some () | _ -> None)
           (fun () -> View Last_produce_blueprint);
         case
-          (Tag 3)
-          ~title:"Head_info"
-          (obj1 (req "request" (constant "head_info")))
-          (function View Head_info -> Some () | _ -> None)
-          (fun () -> View Head_info);
-        case
           (Tag 4)
           ~title:"Blueprint"
           (obj2
@@ -181,6 +181,8 @@ module Request = struct
   let pp ppf view =
     Data_encoding.Json.pp ppf @@ Data_encoding.Json.construct encoding view
 end
+
+let head_info, head_info_waker = Lwt.task ()
 
 let init_status, init_status_waker = Lwt.task ()
 
@@ -487,6 +489,7 @@ module State = struct
 
   let on_new_head ctxt ~applied_upgrade evm_state context block_hash
       blueprint_with_events =
+    let open Lwt_syntax in
     let (Qty level) = ctxt.session.next_blueprint_number in
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context ;
@@ -494,6 +497,8 @@ module State = struct
     ctxt.session.current_block_hash <- block_hash ;
     Lwt_watcher.notify blueprint_watcher blueprint_with_events ;
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
+    let* head_info in
+    head_info := session_to_head_info ctxt.session ;
     Blueprint_events.blueprint_applied (level, block_hash)
 
   let apply_blueprint ctxt timestamp payload delayed_transactions =
@@ -775,6 +780,8 @@ module Handlers = struct
            ~destination:ctxt.smart_rollup_address
            () ) ;
     Lwt.wakeup init_status_waker status ;
+    let first_head = ref (session_to_head_info ctxt.session) in
+    Lwt.wakeup head_info_waker first_head ;
     return ctxt
 
   let on_request :
@@ -792,14 +799,6 @@ module Handlers = struct
     | Last_produce_blueprint ->
         let ctxt = Worker.state self in
         State.last_produced_blueprint ctxt
-    | Head_info ->
-        let ctxt = Worker.state self in
-        return
-          {
-            next_blueprint_number = ctxt.session.next_blueprint_number;
-            current_block_hash = ctxt.session.current_block_hash;
-            evm_state = ctxt.session.evm_state;
-          }
     | Blueprint {level} ->
         let ctxt = Worker.state self in
         State.blueprint_with_events ctxt level
@@ -913,11 +912,14 @@ let apply_blueprint timestamp payload delayed_transactions =
 
 let last_produced_blueprint () = worker_wait_for_request Last_produce_blueprint
 
-let head_info () = worker_wait_for_request Head_info
+let head_info () =
+  let open Lwt_syntax in
+  let+ head_info in
+  !head_info
 
 let execute_and_inspect ?wasm_entrypoint input =
   let open Lwt_result_syntax in
-  let* {evm_state; _} = head_info () in
+  let*! {evm_state; _} = head_info () in
   let*! data_dir, config = execution_config in
   Evm_state.execute_and_inspect
     ~data_dir
@@ -928,7 +930,7 @@ let execute_and_inspect ?wasm_entrypoint input =
 
 let inspect path =
   let open Lwt_result_syntax in
-  let* {evm_state; _} = head_info () in
+  let*! {evm_state; _} = head_info () in
   let*! res = Evm_state.inspect evm_state path in
   return res
 
