@@ -19,6 +19,7 @@ type parameters = {
   preimages : string;
   preimages_endpoint : Uri.t option;
   smart_rollup_address : string;
+  fail_on_missing_blueprint : bool;
 }
 
 type session_state = {
@@ -37,6 +38,7 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
+  fail_on_missing_blueprint : bool;
 }
 
 let blueprint_watcher : Blueprint_types.with_events Lwt_watcher.input =
@@ -308,12 +310,17 @@ module State = struct
               tzfail
                 (Node_error.Diverged
                    (number, expected_block_hash, Some found_block_hash))
-        | None ->
+        | None when ctxt.fail_on_missing_blueprint ->
             let*! () =
-              Evm_events_follower_events.missing_block
+              Evm_events_follower_events.missing_blueprint
                 (number, expected_block_hash)
             in
-            tzfail (Node_error.Diverged (number, expected_block_hash, None)))
+            tzfail (Node_error.Diverged (number, expected_block_hash, None))
+        | None ->
+            let*! () =
+              Evm_events_follower_events.rollup_node_ahead (Qty number)
+            in
+            return (evm_state, on_success))
     | New_delayed_transaction delayed_transaction ->
         let*! data_dir, config = execution_config in
         let* evm_state =
@@ -531,8 +538,8 @@ module State = struct
     in
     return_unit
 
-  let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-      ~smart_rollup_address () =
+  let init ?kernel_path ~fail_on_missing_blueprint ~data_dir ~preimages
+      ~preimages_endpoint ~smart_rollup_address () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -590,6 +597,7 @@ module State = struct
             evm_state;
           };
         store;
+        fail_on_missing_blueprint;
       }
     in
 
@@ -771,6 +779,7 @@ module Handlers = struct
         preimages : string;
         preimages_endpoint : Uri.t option;
         smart_rollup_address : string;
+        fail_on_missing_blueprint;
       } =
     let open Lwt_result_syntax in
     let* ctxt, status =
@@ -780,6 +789,7 @@ module Handlers = struct
         ~preimages
         ~preimages_endpoint
         ~smart_rollup_address
+        ~fail_on_missing_blueprint
         ()
     in
     Lwt.wakeup execution_config_waker
@@ -893,7 +903,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ~smart_rollup_address () =
+    ~smart_rollup_address ~fail_on_missing_blueprint () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -905,6 +915,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
         preimages;
         preimages_endpoint;
         smart_rollup_address;
+        fail_on_missing_blueprint;
       }
       (module Handlers)
   in

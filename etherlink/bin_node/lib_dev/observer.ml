@@ -226,6 +226,7 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
+      ~fail_on_missing_blueprint:false
       ()
   in
 

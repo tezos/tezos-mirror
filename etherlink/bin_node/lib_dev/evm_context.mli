@@ -26,6 +26,7 @@ val start :
   preimages:string ->
   preimages_endpoint:Uri.t option ->
   smart_rollup_address:string ->
+  fail_on_missing_blueprint:bool ->
   unit ->
   init_status tzresult Lwt.t
 
