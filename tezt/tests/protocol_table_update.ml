@@ -199,7 +199,7 @@ let test_branch_switch ~migrate_from ~migrate_to =
   let* () = Client.bake_for_and_wait client2 in
   let* _ = Node.wait_for_level node2 2 in
   let* () = Node.terminate node2 in
-  let () = Node.Config_file.update node2 uau in
+  let* () = Node.Config_file.update node2 uau in
   let* () = Node.run node2 [Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node2 in
   (* The block is invalid but is still accepted. *)

@@ -235,7 +235,7 @@ module Maintenance = struct
       Node.add_peer node peer ;
       let* () = Node.identity_generate node in
       let* () = Node.config_init node [] in
-      Node.Config_file.update node patch_config ;
+      let* () = Node.Config_file.update node patch_config in
       return node
     in
     let run_node node params =
@@ -397,7 +397,11 @@ module Swap = struct
   let run_node ?patch_config node =
     let* () = Node.identity_generate node in
     let* () = Node.config_init node [] in
-    Option.iter (Node.Config_file.update node) patch_config ;
+    let* () =
+      match patch_config with
+      | None -> Lwt.return_unit
+      | Some config -> Node.Config_file.update node config
+    in
     let* () = Node.run node [] in
     Node.wait_for_ready node
 
@@ -700,7 +704,7 @@ module Known_Points_GC = struct
     let node = Node.create [Connections 0] in
     let* () = Node.identity_generate node in
     let* () = Node.config_init node [] in
-    let () =
+    let* () =
       Node.Config_file.update
         node
         (JSON.update
@@ -825,19 +829,21 @@ module Connect_handler = struct
       let node = Node.create ~net_port:port (Connections 1 :: peer_arg) in
       let* () = Node.identity_generate node in
       let* () = Node.config_init node [] in
-      Option.iter
-        (fun name ->
-          Node.Config_file.update node (fun json ->
-              (* Loads a full unsugared "ghostnet" configuration,
-                 so that we can update the chain_name separately
-                 without depending on a network alias. *)
-              Node.Config_file.set_ghostnet_sandbox_network () json
-              |> JSON.update
-                   "network"
-                   (JSON.put
-                      ( "chain_name",
-                        JSON.annotate ~origin:__LOC__ (`String name) ))))
-        chain_name ;
+      let* () =
+        match chain_name with
+        | None -> Lwt.return_unit
+        | Some name ->
+            Node.Config_file.update node (fun json ->
+                (* Loads a full unsugared "ghostnet" configuration,
+                   so that we can update the chain_name separately
+                   without depending on a network alias. *)
+                Node.Config_file.set_ghostnet_sandbox_network () json
+                |> JSON.update
+                     "network"
+                     (JSON.put
+                        ( "chain_name",
+                          JSON.annotate ~origin:__LOC__ (`String name) )))
+      in
       return node
     in
     let run_node node = Node.run ~event_level:`Debug node [] in
@@ -1323,7 +1329,7 @@ module Peer_discovery = struct
     let node = Node.create ?name [] in
     let* () = Node.identity_generate node in
     let* () = Node.config_init node [] in
-    Node.Config_file.update node patch_maintenance_idle_time ;
+    let* () = Node.Config_file.update node patch_maintenance_idle_time in
     return node
 
   let run_node node =
@@ -1416,7 +1422,7 @@ module Peer_discovery = struct
            ( "disable_peer_discovery",
              JSON.parse ~origin:__LOC__ (Bool.to_string true) ))
     in
-    Node.Config_file.update center patch_center_config ;
+    let* () = Node.Config_file.update center patch_center_config in
     let _ = fail_on_bootstrap_received node1 in
     let _ = fail_on_bootstrap_received node2 in
     let _ = fail_on_advertise_received node1 in

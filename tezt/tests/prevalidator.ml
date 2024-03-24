@@ -3628,7 +3628,9 @@ let force_operation_injection =
              ];
          ]
   in
-  Node.Config_file.update node1 (JSON.update "rpc" (JSON.put ("acl", acl))) ;
+  let* () =
+    Node.Config_file.update node1 (JSON.update "rpc" (JSON.put ("acl", acl)))
+  in
   let* () = Node.identity_generate node1 in
   let* () = Node.run node1 [Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node1 in

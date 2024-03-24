@@ -315,11 +315,32 @@ let config_show node =
 module Config_file = struct
   let filename node = sf "%s/config.json" @@ data_dir node
 
-  let read node = JSON.parse_file (filename node)
+  let read node =
+    match node.persistent_state.runner with
+    | None -> Lwt.return (JSON.parse_file (filename node))
+    | Some runner ->
+        let* content =
+          Process.spawn ~runner "cat" [filename node]
+          |> Process.check_and_read_stdout
+        in
+        JSON.parse ~origin:"Node.config_file.read" content |> Lwt.return
 
-  let write node config = JSON.encode_to_file (filename node) config
+  let write node config =
+    match node.persistent_state.runner with
+    | None -> Lwt.return (JSON.encode_to_file (filename node) config)
+    | Some runner ->
+        let content = JSON.encode config in
+        let cmd =
+          Runner.Shell.(
+            redirect_stdout (cmd [] "echo" [content]) (filename node))
+        in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run cmd args
 
-  let update node update = read node |> update |> write node
+  let update node update =
+    let* config = read node in
+    let config = update config in
+    write node config
 
   let set_prevalidator ?(operations_request_timeout = 10.)
       ?(max_refused_operations = 1000) ?(operations_batch_size = 50) old_config
@@ -882,9 +903,9 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
 
 let run ?patch_config ?on_terminate ?event_level ?event_sections_levels node
     arguments =
-  let () =
+  let* () =
     match patch_config with
-    | None -> ()
+    | None -> Lwt.return_unit
     | Some patch -> Config_file.update node patch
   in
   let arguments = runlike_command_arguments node "run" arguments in

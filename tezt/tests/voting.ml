@@ -1151,11 +1151,13 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
   Log.info
     "Restart the node with a protocol override configuration for %s"
     test_proto_hash ;
-  Node.Config_file.(
-    update
-      node
-      (set_sandbox_network_with_user_activated_overrides
-         [(test_proto_hash, to_protocol_hash)])) ;
+  let* () =
+    Node.Config_file.(
+      update
+        node
+        (set_sandbox_network_with_user_activated_overrides
+           [(test_proto_hash, to_protocol_hash)]))
+  in
   let* () = Node.terminate node in
   let* () = Node.run node node_arguments in
   let* () = Node.wait_for_ready node in

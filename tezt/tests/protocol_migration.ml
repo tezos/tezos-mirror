@@ -300,7 +300,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   Log.info "Reconstruct full node3" ;
   let node3 = Node.create ~name:"node3" node_params in
   let* () = Node.config_init node3 node_params in
-  Node.Config_file.update node3 patch_config ;
+  let* () = Node.Config_file.update node3 patch_config in
   let* () = Node.snapshot_import node3 file_full in
   let* () = Node.reconstruct node3 in
   let* () = Node.run node3 node_params in

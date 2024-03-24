@@ -316,16 +316,16 @@ module Config_file : sig
   (** Node configuration files. *)
 
   (** Read the configuration file ([config.json]) of a node. *)
-  val read : t -> JSON.t
+  val read : t -> JSON.t Lwt.t
 
   (** Write the configuration file of a node, replacing the existing one. *)
-  val write : t -> JSON.t -> unit
+  val write : t -> JSON.t -> unit Lwt.t
 
   (** Update the configuration file of a node. If the node is already
      running, it needs to be restarted manually.
 
       Example: [Node.Config_file.update node (JSON.put ("p2p", new_p2p_config))] *)
-  val update : t -> (JSON.t -> JSON.t) -> unit
+  val update : t -> (JSON.t -> JSON.t) -> unit Lwt.t
 
   (** Set the network config to a sandbox with the given user
       activated upgrades. *)

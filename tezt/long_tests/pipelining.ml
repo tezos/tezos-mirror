@@ -160,9 +160,11 @@ let bake_for ?(keys = []) ?(wait_for_flush = false) ~empty ~protocol node client
 let init_node () =
   let node = Node.create Node.[Synchronisation_threshold 0; Connections 2] in
   let* () = Node.config_init node [] in
-  Node.Config_file.update
-    node
-    (Node.Config_file.set_prevalidator ~operations_request_timeout:100.) ;
+  let* () =
+    Node.Config_file.update
+      node
+      (Node.Config_file.set_prevalidator ~operations_request_timeout:100.)
+  in
   let* () =
     Node.run
       ~event_sections_levels:
