@@ -203,9 +203,9 @@ let wait_for_disconnection node ~peer_id =
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
-    ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
-    ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
+let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
+    ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
+    ?rpc_port ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -228,6 +228,7 @@ let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
   in
   let dal_node =
     create
+      ?runner
       ~path
       ~name
       ?color
@@ -247,10 +248,11 @@ let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
   dal_node
 
 (* TODO: have rpc_addr here, like for others. *)
-let create ?(path = Uses.path Constant.octez_dal_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr
-    ?public_addr ?metrics_addr ~node () =
+let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
+    ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
+    ?listen_addr ?public_addr ?metrics_addr ~node () =
   create_from_endpoint
+    ?runner
     ~path
     ?name
     ?color
