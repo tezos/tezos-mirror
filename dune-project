@@ -5,6 +5,7 @@
 (using menhir 2.1)
 (package (name bls12-381))
 (package (name gitlab_ci))
+(package (name in_house_irmin_tests)(allow_empty))
 (package (name internal-devtools))
 (package (name internal-devtools_proto-context-du))
 (package (name kaitai))
