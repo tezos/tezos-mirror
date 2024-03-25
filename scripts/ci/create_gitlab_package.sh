@@ -14,15 +14,16 @@ set -eu
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
-gitlab_octez_deb_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_deb_package_name}/${gitlab_package_version}"
-gitlab_octez_rpm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rpm_package_name}/${gitlab_package_version}"
+gitlab_octez_debian_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_debian_package_name}/${gitlab_package_version}"
+gitlab_octez_fedora_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_fedora_package_name}/${gitlab_package_version}"
+gitlab_octez_rockylinux_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rockylinux_package_name}/${gitlab_package_version}"
 gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
   remote_file="${2}"
   url="${3-${gitlab_octez_package_url}}"
-  echo "Upload to ${gitlab_octez_package_url}/${remote_file}"
+  echo "Upload to ${url}/${remote_file}"
 
   i=0
   max_attempts=10
@@ -71,17 +72,21 @@ for architecture in ${architectures}; do
 done
 
 echo "Upload debian packages"
-
-# Loop over debian packages
-for package in ${deb_packages}; do
-  gitlab_upload "${package}" "${package}" "${gitlab_octez_deb_package_url}"
+for package in ${debian_packages}; do
+  package_name="$(basename "${package}")"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_debian_package_url}"
 done
 
-echo "Upload rpm packages"
+echo "Upload Fedora packages"
+for package in ${fedora_packages}; do
+  package_name="$(basename "${package}")"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_fedora_package_url}"
+done
 
-# Loop over rpm packages
-for package in ${rpm_packages}; do
-  gitlab_upload "./${package}" "${package}" "${gitlab_octez_rpm_package_url}"
+echo "Upload Rocky Linux packages"
+for package in ${rockylinux_packages}; do
+  package_name="$(basename "${package}")"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_rockylinux_package_url}"
 done
 
 # Source code archives automatically published in a GitLab release do not have a static checksum,

@@ -28,6 +28,8 @@ oc.build:dpkg:amd64:
   - make build-deps
   - eval $(opam env)
   - make $TARGET
+  - mkdir $DISTRIBUTION
+  - mv octez-*.* $DISTRIBUTION/
   variables:
     TARGET: dpkg
     OCTEZ_PKGMAINTAINER: nomadic-labs
@@ -37,5 +39,9 @@ oc.build:dpkg:amd64:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*.deb
+    - $DISTRIBUTION/octez-*.deb
     when: on_success
+  parallel:
+    matrix:
+    - DISTRIBUTION:
+      - debian:bookworm

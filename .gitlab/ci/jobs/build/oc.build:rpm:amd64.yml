@@ -10,12 +10,7 @@ oc.build:rpm:amd64:
   dependencies: []
   before_script:
   - . ./scripts/version.sh
-  - dnf update -y
-  - dnf install -y libev-devel gmp-devel hidapi-devel libffi-devel zlib-devel libpq-devel
-    m4 perl git pkg-config rpmdevtools python3-devel python3-setuptools wget opam
-    rsync which cargo autoconf mock systemd systemd-rpm-macros cmake python3-wheel
-    python3-tox-current-env gcc-c++ protobuf-compiler protobuf-devel sqlite-devel
-    jq
+  - .gitlab/ci/jobs/build/bin_packages_rpm.sh
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh
@@ -27,6 +22,8 @@ oc.build:rpm:amd64:
   - make build-deps
   - eval $(opam env)
   - make $TARGET
+  - mkdir $DISTRIBUTION
+  - mv octez-*.* $DISTRIBUTION/
   variables:
     TARGET: rpm
     OCTEZ_PKGMAINTAINER: nomadic-labs
@@ -36,5 +33,10 @@ oc.build:rpm:amd64:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*.rpm
+    - $DISTRIBUTION/octez-*.rpm
     when: on_success
+  parallel:
+    matrix:
+    - DISTRIBUTION:
+      - fedora:39
+      - rockylinux:9.3

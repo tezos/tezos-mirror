@@ -11,8 +11,11 @@ src_dir=$(dirname "$scripts_dir")
 script_inputs_dir="$src_dir/script-inputs"
 
 binaries="$(cat "$script_inputs_dir/released-executables")"
-deb_packages="$(find . -maxdepth 1 -name octez-\*.deb)"
-rpm_packages="$(find . -maxdepth 1 -name octez-\*.rpm)"
+
+# these variables are used in the script scripts/ci/create_gitlab_package.sh
+debian_packages="$(find debian:bookworm/ -maxdepth 1 -name octez-\*.deb)"
+fedora_packages="$(find fedora:39/ -maxdepth 1 -name octez-\*.rpm)"
+rockylinux_packages="$(find rockylinux:9.3/ -maxdepth 1 -name octez-\*.rpm)"
 
 octez_source_content="$script_inputs_dir/octez-source-content"
 
@@ -52,8 +55,9 @@ fi
 ### Compute GitLab generic package names
 
 gitlab_octez_binaries_package_name="octez-binaries-${gitlab_release_no_v}"
-gitlab_octez_deb_package_name="octez-debian-${gitlab_release_no_v}"
-gitlab_octez_rpm_package_name="octez-redhat-${gitlab_release_no_v}"
+gitlab_octez_debian_package_name="octez-debian-${gitlab_release_no_v}"
+gitlab_octez_fedora_package_name="octez-fedora-${gitlab_release_no_v}"
+gitlab_octez_rockylinux_package_name="octez-rockylinux-${gitlab_release_no_v}"
 gitlab_octez_source_package_name="octez-source-${gitlab_release_no_v}"
 
 # X.Y or X.Y-rcZ

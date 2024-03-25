@@ -93,6 +93,43 @@ type service = {name : string}
 
 type need = {job : string; optional : bool}
 
+(** A matrix parallel job configuration.
+
+    The matrix type allows to express how to run a job multiple times in
+    parallel in a single pipeline, but with different variable values for each
+    instance of the job. For example, a value of
+
+    [[
+      ("A", ["v1"; "v2"]);
+      ("B"; ["v3"; "v4"]))
+    ]]
+
+    can be used to generate the following GitLab YAML:
+
+    {{
+    parallel:
+      matrix:
+        - A: ["v1","v2"]
+          B: ["v3", "v4"]
+    }}
+
+    This will run 4 jobs with the associated variables [( v1,v3 ; v1,v4 ; v2;v3 ; v2;v4 )].
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#parallelmatrix}parallel:matrix} in the
+    GitLab YAML keyword reference for more information. *)
+type matrix = (string * string list) list list
+
+(** Parallelism configuration of a job.
+
+    - [Vector n] will create [n] copies of the job.
+    - [Matrix envs] will create one job per element in the
+      cartesian product of the variable values domains for each
+      environment. See {!matrix} for more details.
+
+    See {{:https://docs.gitlab.com/ee/ci/yaml/#parallel}parallel} in the GitLab
+    YAML keyword reference for more information. *)
+type parallel = Vector of int | Matrix of matrix
+
 type job = {
   name : string;
       (** Note that [name] does not translate to a field in a job, but
@@ -125,7 +162,7 @@ type job = {
           job's artifacts
           ({{:https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportscoverage_report}ref}). *)
   retry : int option;
-  parallel : int option;
+  parallel : parallel option;
 }
 
 type workflow = {rules : workflow_rule list; name : string option}
