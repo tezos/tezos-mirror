@@ -108,6 +108,7 @@ let register_old_protocol_migration_tests () =
    Then we could remove the [~protocols] argument from all register functions. *)
 let register_protocol_tests_that_use_supports_correctly () =
   let protocols = Protocol.all in
+  Adaptive_issuance.register ~protocols ;
   Bad_annot.register ~protocols ;
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;
@@ -224,7 +225,6 @@ let register_protocol_tests_that_use_supports_correctly () =
    those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
    Some do not. Those that do not are declared here. *)
 let register_protocol_specific_because_regression_tests () =
-  Adaptive_issuance.register ~protocols:[Alpha] ;
   Dal.register ~protocols:[Alpha]
 
 let () =
