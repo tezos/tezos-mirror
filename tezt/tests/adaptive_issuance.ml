@@ -1390,11 +1390,7 @@ let test_staking =
   in
 
   let*! () =
-    Client.set_delegate
-      ~expect_failure:true
-      ~src:staker1.alias
-      ~delegate:"bootstrap3"
-      client_1
+    Client.set_delegate ~src:staker1.alias ~delegate:"bootstrap3" client_1
   in
   let* () =
     repeat 2 (fun () ->
