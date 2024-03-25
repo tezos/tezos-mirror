@@ -10,6 +10,7 @@ type init_status = Loaded | Created
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   next_blueprint_number : Ethereum_types.quantity;
+  evm_state : Evm_state.t;
 }
 
 (** [start ~data_dir ~preimages ~preimages_endpoint ~smart_rollup_address ()]

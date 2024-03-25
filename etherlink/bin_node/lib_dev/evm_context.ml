@@ -10,6 +10,7 @@ type init_status = Loaded | Created
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   next_blueprint_number : Ethereum_types.quantity;
+  evm_state : Evm_state.t;
 }
 
 type parameters = {
@@ -25,6 +26,7 @@ type session_state = {
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
   mutable pending_upgrade : Ethereum_types.Upgrade.t option;
+  mutable evm_state : Evm_state.t;
 }
 
 type t = {
@@ -76,7 +78,6 @@ module Request = struct
       }
         -> (unit, tztrace) t
     | Last_produce_blueprint : (Blueprint_types.t, tztrace) t
-    | Evm_state : (Evm_state.t, tztrace) t
     | Head_info : (head, tztrace) t
     | Blueprint : {
         level : Ethereum_types.quantity;
@@ -146,18 +147,12 @@ module Request = struct
           (fun () -> View Last_produce_blueprint);
         case
           (Tag 4)
-          ~title:"Evm_state"
-          (obj1 (req "request" (constant "evm_state")))
-          (function View Evm_state -> Some () | _ -> None)
-          (fun () -> View Evm_state);
-        case
-          (Tag 5)
           ~title:"Head_info"
           (obj1 (req "request" (constant "head_info")))
           (function View Head_info -> Some () | _ -> None)
           (fun () -> View Head_info);
         case
-          (Tag 6)
+          (Tag 5)
           ~title:"Blueprint"
           (obj2
              (req "request" (constant "blueprint"))
@@ -165,7 +160,7 @@ module Request = struct
           (function View (Blueprint {level}) -> Some ((), level) | _ -> None)
           (fun ((), level) -> View (Blueprint {level}));
         case
-          (Tag 7)
+          (Tag 6)
           ~title:"Blueprints_range"
           (obj3
              (req "request" (constant "Blueprints_range"))
@@ -176,13 +171,13 @@ module Request = struct
             | _ -> None)
           (fun ((), from, to_) -> View (Blueprints_range {from; to_}));
         case
-          (Tag 8)
+          (Tag 7)
           ~title:"Last_known_L1_level"
           (obj1 (req "request" (constant "last_known_l1_level")))
           (function View Last_known_L1_level -> Some () | _ -> None)
           (fun () -> View Last_known_L1_level);
         case
-          (Tag 9)
+          (Tag 8)
           ~title:"New_last_known_L1_level"
           (obj2
              (req "request" (constant "new_last_known_l1_level"))
@@ -191,7 +186,7 @@ module Request = struct
             | View (New_last_known_L1_level l) -> Some ((), l) | _ -> None)
           (fun ((), l) -> View (New_last_known_L1_level l));
         case
-          (Tag 10)
+          (Tag 9)
           ~title:"Delayed_inbox_hashes"
           (obj1 (req "request" (constant "Delayed_inbox_hashes")))
           (function View Delayed_inbox_hashes -> Some () | _ -> None)
@@ -236,37 +231,32 @@ module State = struct
             Ethereum_types.genesis_parent_hash,
             Created )
 
-  let commit_next_head (ctxt : t) evm_state =
+  let commit store context evm_state number =
     let open Lwt_result_syntax in
-    let*! context = Irmin_context.PVMState.set ctxt.session.context evm_state in
+    let*! context = Irmin_context.PVMState.set context evm_state in
     let*! checkpoint = Irmin_context.commit context in
-    let* () =
-      Evm_store.Context_hashes.store
-        ctxt.store
-        ctxt.session.next_blueprint_number
-        checkpoint
-    in
+    let* () = Evm_store.Context_hashes.store store number checkpoint in
     return context
+
+  let commit_next_head (ctxt : t) evm_state =
+    commit
+      ctxt.store
+      ctxt.session.context
+      evm_state
+      ctxt.session.next_blueprint_number
 
   let replace_current_commit (ctxt : t) evm_state =
-    let open Lwt_result_syntax in
     let (Qty next) = ctxt.session.next_blueprint_number in
-    let*! context = Irmin_context.PVMState.set ctxt.session.context evm_state in
-    let*! checkpoint = Irmin_context.commit context in
-    let* () =
-      Evm_store.Context_hashes.store ctxt.store (Qty Z.(pred next)) checkpoint
-    in
-    return context
-
-  let evm_state ctxt = Irmin_context.PVMState.get ctxt.session.context
+    commit ctxt.store ctxt.session.context evm_state (Qty Z.(pred next))
 
   let inspect ctxt path =
     let open Lwt_syntax in
-    let* evm_state = evm_state ctxt in
-    let* res = Evm_state.inspect evm_state path in
+    let* res = Evm_state.inspect ctxt.session.evm_state path in
     return res
 
-  let on_modified_head ctxt context = ctxt.session.context <- context
+  let on_modified_head ctxt evm_state context =
+    ctxt.session.evm_state <- evm_state ;
+    ctxt.session.context <- context
 
   let apply_evm_event_unsafe on_success ctxt evm_state event =
     let open Lwt_result_syntax in
@@ -355,9 +345,8 @@ module State = struct
 
   let apply_evm_events ~finalized_level (ctxt : t) events =
     let open Lwt_result_syntax in
-    let* context, on_success =
+    let* context, evm_state, on_success =
       with_store_transaction ctxt @@ fun ctxt ->
-      let*! evm_state = evm_state ctxt in
       let* on_success, ctxt, evm_state =
         List.fold_left_es
           (fun (on_success, ctxt, evm_state) event ->
@@ -365,16 +354,16 @@ module State = struct
               apply_evm_event_unsafe on_success ctxt evm_state event
             in
             return (on_success, ctxt, evm_state))
-          (ignore, ctxt, evm_state)
+          (ignore, ctxt, ctxt.session.evm_state)
           events
       in
       let* _ =
         Evm_store.L1_latest_known_level.store ctxt.store finalized_level
       in
       let* ctxt = replace_current_commit ctxt evm_state in
-      return (ctxt, on_success)
+      return (ctxt, evm_state, on_success)
     in
-    on_modified_head ctxt context ;
+    on_modified_head ctxt evm_state context ;
     on_success ctxt.session ;
     return_unit
 
@@ -453,12 +442,11 @@ module State = struct
   let apply_blueprint_store_unsafe ctxt timestamp payload =
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction ctxt.store ;
-    let*! evm_state = evm_state ctxt in
     let*! data_dir, config = execution_config in
     let (Qty next) = ctxt.session.next_blueprint_number in
 
     let* try_apply =
-      Evm_state.apply_blueprint ~data_dir ~config evm_state payload
+      Evm_state.apply_blueprint ~data_dir ~config ctxt.session.evm_state payload
     in
 
     match try_apply with
@@ -477,15 +465,17 @@ module State = struct
         in
 
         let* context = commit_next_head ctxt evm_state in
-        return (context, current_block_hash, applied_upgrade)
+        return (evm_state, context, current_block_hash, applied_upgrade)
     | Apply_success _ (* Produced a block, but not of the expected height *)
     | Apply_failure (* Did not produce a block *) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-  let on_new_head ctxt ~applied_upgrade timestamp context block_hash payload =
+  let on_new_head ctxt ~applied_upgrade evm_state timestamp context block_hash
+      payload =
     let (Qty level) = ctxt.session.next_blueprint_number in
+    ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
     ctxt.session.current_block_hash <- block_hash ;
@@ -498,7 +488,7 @@ module State = struct
   let apply_sequencer_blueprint (ctxt : t) timestamp
       (blueprint : Sequencer_blueprint.t) =
     let open Lwt_result_syntax in
-    let* context, current_block_hash, applied_upgrade =
+    let* evm_state, context, current_block_hash, applied_upgrade =
       with_store_transaction ctxt @@ fun ctxt ->
       let* current_block_hash =
         apply_blueprint_store_unsafe ctxt timestamp blueprint
@@ -509,6 +499,7 @@ module State = struct
       on_new_head
         ctxt
         ~applied_upgrade
+        evm_state
         timestamp
         context
         current_block_hash
@@ -518,7 +509,7 @@ module State = struct
 
   let apply_blueprint ctxt timestamp payload =
     let open Lwt_result_syntax in
-    let* context, current_block_hash, applied_upgrade =
+    let* evm_state, context, current_block_hash, applied_upgrade =
       with_store_transaction ctxt @@ fun ctxt ->
       apply_blueprint_store_unsafe ctxt timestamp payload
     in
@@ -526,6 +517,7 @@ module State = struct
       on_new_head
         ctxt
         ~applied_upgrade
+        evm_state
         timestamp
         context
         current_block_hash
@@ -536,6 +528,9 @@ module State = struct
   let init ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       ~smart_rollup_address () =
     let open Lwt_result_syntax in
+    let*! () =
+      Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
+    in
     let* index =
       Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
     in
@@ -550,6 +545,29 @@ module State = struct
     let* pending_upgrade =
       Evm_store.Kernel_upgrades.find_latest_pending store
     in
+
+    let* evm_state, context =
+      match kernel_path with
+      | Some kernel ->
+          if init_status = Loaded then
+            let*! () = Events.ignored_kernel_arg () in
+            let*! evm_state = Irmin_context.PVMState.get context in
+            return (evm_state, context)
+          else
+            let* evm_state = Evm_state.init ~kernel in
+            let (Qty next) = next_blueprint_number in
+            let* context = commit store context evm_state (Qty Z.(pred next)) in
+            return (evm_state, context)
+      | None ->
+          if init_status = Loaded then
+            let*! evm_state = Irmin_context.PVMState.get context in
+            return (evm_state, context)
+          else
+            failwith
+              "Cannot compute the initial EVM state without the path to the \
+               initial kernel"
+    in
+
     let ctxt =
       {
         index;
@@ -558,30 +576,15 @@ module State = struct
         preimages_endpoint;
         smart_rollup_address = destination;
         session =
-          {context; next_blueprint_number; current_block_hash; pending_upgrade};
+          {
+            context;
+            next_blueprint_number;
+            current_block_hash;
+            pending_upgrade;
+            evm_state;
+          };
         store;
       }
-    in
-    let*! () =
-      Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
-    in
-    let* () =
-      match kernel_path with
-      | Some kernel ->
-          if init_status = Loaded then
-            let*! () = Events.ignored_kernel_arg () in
-            return_unit
-          else
-            let* evm_state = Evm_state.init ~kernel in
-            let* context = replace_current_commit ctxt evm_state in
-            on_modified_head ctxt context ;
-            return_unit
-      | None ->
-          if init_status = Loaded then return_unit
-          else
-            failwith
-              "Cannot compute the initial EVM state without the path to the \
-               initial kernel"
     in
 
     let*! () =
@@ -785,16 +788,13 @@ module Handlers = struct
     | Last_produce_blueprint ->
         let ctxt = Worker.state self in
         State.last_produced_blueprint ctxt
-    | Evm_state ->
-        let ctxt = Worker.state self in
-        let*! evm_state = State.evm_state ctxt in
-        return evm_state
     | Head_info ->
         let ctxt = Worker.state self in
         return
           {
             next_blueprint_number = ctxt.session.next_blueprint_number;
             current_block_hash = ctxt.session.current_block_hash;
+            evm_state = ctxt.session.evm_state;
           }
     | Blueprint {level} ->
         let ctxt = Worker.state self in
@@ -810,8 +810,7 @@ module Handlers = struct
         Evm_store.L1_latest_known_level.store ctxt.store l
     | Delayed_inbox_hashes ->
         let ctxt = Worker.state self in
-        let*! evm_state = State.evm_state ctxt in
-        let*! hashes = State.delayed_inbox_hashes evm_state in
+        let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
         return hashes
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
@@ -912,17 +911,11 @@ let apply_sequencer_blueprint timestamp blueprint =
 
 let last_produced_blueprint () = worker_wait_for_request Last_produce_blueprint
 
-let evm_state () = worker_wait_for_request Evm_state
-
-let inspect path =
-  let open Lwt_result_syntax in
-  let* evm_state = evm_state () in
-  let*! res = Evm_state.inspect evm_state path in
-  return res
+let head_info () = worker_wait_for_request Head_info
 
 let execute_and_inspect ?wasm_entrypoint input =
   let open Lwt_result_syntax in
-  let* evm_state = evm_state () in
+  let* {evm_state; _} = head_info () in
   let*! data_dir, config = execution_config in
   Evm_state.execute_and_inspect
     ~data_dir
@@ -931,7 +924,11 @@ let execute_and_inspect ?wasm_entrypoint input =
     ~input
     evm_state
 
-let head_info () = worker_wait_for_request Head_info
+let inspect path =
+  let open Lwt_result_syntax in
+  let* {evm_state; _} = head_info () in
+  let*! res = Evm_state.inspect evm_state path in
+  return res
 
 let blueprints_watcher () = Lwt_watcher.create_stream blueprint_watcher
 
