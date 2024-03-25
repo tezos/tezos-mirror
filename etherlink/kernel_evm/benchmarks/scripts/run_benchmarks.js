@@ -352,7 +352,7 @@ function build_benchmark_scenario(benchmark_script, inbox) {
     }
 }
 
-function log_benchmark_result(benchmark_name, data) {
+function log_benchmark_result({ benchmark_name, options }, data) {
     rows = [];
 
     console.log(`Number of transactions: ${data.tx_status.length}`)
@@ -361,6 +361,7 @@ function log_benchmark_result(benchmark_name, data) {
         let status = data.tx_status[j];
         let row = {
             benchmark_name,
+            options,
             signature_verification_ticks: data.signature_verification_ticks?.[j],
             hashing_ticks: data.hashing_ticks?.[j],
             status,
@@ -407,6 +408,7 @@ function log_benchmark_result(benchmark_name, data) {
     for (var j = 0; j < data.kernel_run_ticks?.length; j++) {
         rows.push({
             benchmark_name: benchmark_name + "(run)",
+            options,
             interpreter_init_ticks: data.interpreter_init_ticks?.[j],
             interpreter_decode_ticks: data.interpreter_decode_ticks?.[j],
             stage_one_ticks: data.stage_one_ticks?.[j],
@@ -435,6 +437,7 @@ function log_benchmark_result(benchmark_name, data) {
     // row concerning all runs
     rows.push({
         benchmark_name: benchmark_name + "(all)",
+        options,
         inbox_size: data.inbox_size,
         nb_tx: data.tx_status.length,
         nb_msg: data.nb_msg,
@@ -448,6 +451,7 @@ function log_benchmark_result(benchmark_name, data) {
     for (let i = 0; i < data.bip_size.length; i++) {
         rows.push({
             benchmark_name: benchmark_name + "(bip)",
+            options,
             next_bip_ticks: data.next_bip_ticks?.[i],
             bip_size: data.bip_size?.[i],
             chunks_in_bip: data.chunks_in_bip?.[i],
@@ -513,10 +517,18 @@ function get_headers(array, seed) {
 }
 
 function initialize_headers(output, benchmark_log) {
-    let headers = get_headers(benchmark_log, ["benchmark_name", "status", "tx_type", "reason"]);
+    let headers = get_headers(benchmark_log, ["benchmark_name", "options", "status", "tx_type", "reason"]);
     let benchmark_csv_config = { columns: headers }
     fs.writeFileSync(output, csv.stringify([], { header: true, ...benchmark_csv_config }));
     return benchmark_csv_config;
+}
+
+function split_name_and_options(path) {
+    const parts = path.split("/");
+    const benchmark_name = parts[parts.length - 1].split(".")[0];
+    const i = path.indexOf(' ');
+    if (i === -1) return { benchmark_name, options: '' };
+    else return { benchmark_name, options: path.substring(i + 1) }
 }
 
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
@@ -546,8 +558,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     let benchmark_csv_config = Object();
     for (var i = 0; i < benchmark_scripts.length; i++) {
         var benchmark_script = benchmark_scripts[i];
-        var parts = benchmark_script.split("/");
-        var benchmark_name = parts[parts.length - 1].split(".")[0];
+        let bench_info = split_name_and_options(benchmark_script);
         console.log(`Benchmarking ${benchmark_script} (mode: ${MODE})`);
         fs.appendFileSync(logs, `=================================================\nBenchmarking ${benchmark_script}\n`)
         build_benchmark_scenario(benchmark_script,inbox);
@@ -557,7 +568,7 @@ async function run_all_benchmarks(benchmark_scripts) {
         fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config))
         fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
 
-        let opcodes_dump = opcodes_dump_filename_csv(benchmark_name, time);
+        let opcodes_dump = opcodes_dump_filename_csv(bench_info.benchmark_name, time);
         console.log(`Dumped opcodes in ${opcodes_dump}`);
         dump_bench_opcode(opcodes_dump, run_benchmark_result.opcodes, all_opcodes_dump, i == 0);
         add_dump(all_opcodes_dump, opcodes_dump, i == 0)
