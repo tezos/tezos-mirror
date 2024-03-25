@@ -1,4 +1,4 @@
-oc.script:test_release_versions:
+oc.script:test_octez_release_versions:
   extends: .test_template
   before_script:
     - ./scripts/ci/take_ownership.sh
