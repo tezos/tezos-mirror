@@ -2230,8 +2230,9 @@ let test_sequencer_can_catch_up_on_event =
   let* _json = Evm_node.wait_for_evm_event ~check Blueprint_applied sequencer
   and* _json_observer =
     Evm_node.wait_for_evm_event ~check Blueprint_applied observer
-  and* () = Evm_node.run sequencer
   and* () =
+    let* () = Evm_node.run sequencer in
+    (* need to wait for the sequencer to start before starting the observer *)
     Evm_node.run observer
     (* terminated because connection
        dropped *)
