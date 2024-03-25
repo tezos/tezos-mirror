@@ -1391,7 +1391,7 @@ let check_rpc_ok client rpc =
 let test_fix_delegated_balance =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol (number Paris + 1))
+    ~supports:Protocol.(From_protocol (number Paris))
     ~title:"Test protocol fix for delegated balance rpc"
     ~tags:["rpc"; "delegated_balance"]
   @@ fun protocol ->
