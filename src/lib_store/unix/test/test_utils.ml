@@ -559,6 +559,39 @@ let make_raw_block_list ?min_lpbl ?constants ?max_operations_ttl ?(kind = `Full)
   let blk = List.hd l |> WithExceptions.Option.get ~loc:__LOC__ in
   Lwt.return (List.rev l, blk)
 
+let make_operation ?(fee = Tezos_protocol_alpha.Protocol.Alpha_context.Tez.zero)
+    ?(gas_limit =
+      Tezos_protocol_alpha.Protocol.Alpha_context.Gas.Arith.integral_of_int_exn
+        100_000) ?(storage_limit = Z.zero) ~source_pkh ~source_sk ~counter
+    ~branch operation =
+  let open Tezos_protocol_alpha.Protocol.Alpha_context in
+  let branch = Store.Block.hash branch in
+  let shell, contents =
+    let contents =
+      Single
+        (Manager_operation
+           {
+             source = source_pkh;
+             fee;
+             counter;
+             operation;
+             gas_limit;
+             storage_limit;
+           })
+    in
+    ({Tezos_base.Operation.branch}, contents)
+  in
+  let b =
+    Data_encoding.Binary.to_bytes_exn
+      Operation.unsigned_encoding
+      (shell, Contents_list contents)
+  in
+  let signature =
+    Signature.sign ~watermark:Signature.Generic_operation source_sk b
+  in
+  Operation.pack
+    {Operation.shell; protocol_data = {contents; signature = Some signature}}
+
 let incr_fitness b =
   match b with
   | [] ->
