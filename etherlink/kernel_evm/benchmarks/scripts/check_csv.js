@@ -14,10 +14,9 @@ let { parse } = require('csv-parse')
 var args = process.argv.slice(2)
 
 const cast_value = function(value, context) {
-    if (context.header) return value
-    if (context.column === 'benchmark_name') return value
-    if (context.column === 'status') return value
-    return parseInt(value)
+    let n = parseInt(value)
+    if (isNaN(n)) return value;
+    else return n;
 }
 
 function list_files(arg) {
