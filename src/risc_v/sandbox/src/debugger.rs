@@ -15,7 +15,7 @@ use risc_v_interpreter::{
     machine_state::{mode::Mode, registers},
     Interpreter, InterpreterResult,
 };
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod errors;
 mod tui;
@@ -33,6 +33,7 @@ const MAX_STEPS: usize = 1_000_000;
 struct Instruction<'a> {
     address: u64,
     text: &'a str,
+    jump: Option<(u64, &'a str)>,
 }
 
 struct ProgramView<'a> {
@@ -40,6 +41,7 @@ struct ProgramView<'a> {
     instructions: Vec<Instruction<'a>>,
     next_instr: usize,
     breakpoints: HashSet<u64>,
+    symbols: HashMap<u64, &'a str>,
 }
 
 pub struct DebuggerApp<'a> {
@@ -69,14 +71,38 @@ macro_rules! fregister_line {
     };
 }
 
+impl<'a> Instruction<'a> {
+    fn new(address: u64, text: &'a str, symbols: &HashMap<u64, &'a str>) -> Self {
+        let jump = match text
+            .split(' ')
+            .next()
+            .expect("Unexpected instruction format")
+        {
+            "jal" | "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" => {
+                text.split(',').last().map(|jump_address| {
+                    let addr = address.wrapping_add(jump_address.parse::<i64>().unwrap() as u64);
+                    symbols.get(&addr).map(|&label| (addr, label))
+                })
+            }
+            _ => None,
+        };
+        Self {
+            address,
+            text,
+            jump: jump.flatten(),
+        }
+    }
+}
+
 impl<'a> DebuggerApp<'a> {
     pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
         let mut backend = Interpreter::create_backend();
         let (mut interpreter, prog) =
             Interpreter::new_with_parsed_program(&mut backend, contents, None, exit_mode)?;
+        let symbols = kernel_loader::get_elf_symbols(contents)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
-        DebuggerApp::new(&mut interpreter, fname, &prog).run_debugger(terminal)?;
+        DebuggerApp::new(&mut interpreter, fname, &prog, symbols).run_debugger(terminal)?;
         tui::restore()?;
         Ok(())
     }
@@ -85,6 +111,7 @@ impl<'a> DebuggerApp<'a> {
         interpreter: &'a mut Interpreter<'a>,
         title: &'a str,
         program: &'a BTreeMap<u64, String>,
+        symbols: HashMap<u64, &'a str>,
     ) -> Self {
         Self {
             title,
@@ -92,11 +119,9 @@ impl<'a> DebuggerApp<'a> {
             program: ProgramView::with_items(
                 program
                     .iter()
-                    .map(|x| Instruction {
-                        address: *x.0,
-                        text: x.1,
-                    })
+                    .map(|x| Instruction::new(*x.0, x.1, &symbols))
                     .collect::<Vec<Instruction>>(),
+                symbols,
             ),
             status: InterpreterResult::Running(0),
         }
@@ -173,17 +198,18 @@ impl<'a> DebuggerApp<'a> {
             .map(|(i, instr)| {
                 instr.to_list_item(
                     i == self.program.next_instr,
+                    i == self
+                        .program
+                        .state
+                        .selected()
+                        .unwrap_or(self.program.next_instr),
                     self.program.breakpoints.contains(&instr.address),
+                    self.program.symbols.get(&instr.address).copied(),
                 )
             })
             .collect();
 
-        let list = List::new(instructions).block(block).highlight_style(
-            Style::default()
-                .add_modifier(Modifier::BOLD)
-                .add_modifier(Modifier::REVERSED)
-                .fg(SELECTED_STYLE_FG),
-        );
+        let list = List::new(instructions).block(block);
         StatefulWidget::render(list, area, buf, &mut self.program.state)
     }
 
@@ -372,13 +398,24 @@ impl Widget for &mut DebuggerApp<'_> {
     }
 }
 
-impl Instruction<'_> {
-    fn to_list_item(&self, next: bool, breakpoint: bool) -> ListItem {
+impl<'a> Instruction<'a> {
+    fn to_list_item(
+        &self,
+        next: bool,
+        selected: bool,
+        breakpoint: bool,
+        symbol: Option<&'a str>,
+    ) -> ListItem {
         let color = if next {
             Style::default()
                 .add_modifier(Modifier::BOLD)
                 .add_modifier(Modifier::REVERSED)
                 .fg(NEXT_STYLE_FG)
+        } else if selected {
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .add_modifier(Modifier::REVERSED)
+                .fg(SELECTED_STYLE_FG)
         } else {
             Style::default()
         };
@@ -396,17 +433,41 @@ impl Instruction<'_> {
             line.push(" ".into());
         }
         line.pop();
-        ListItem::new(Line::from(line).style(color))
+
+        // If the instruction is a jump address and it points to a known symbol,
+        // display the address and the symbol
+        if let Some((address, label)) = self.jump {
+            line.push(format!(" # {:x} ({})", address, label).into())
+        }
+
+        // If the address of the instruction is also the address of a known symbol,
+        // display the symbol
+        match symbol {
+            Some(name) => {
+                let mut symbol_line = Vec::new();
+                symbol_line.push(format!(" {}", name).into());
+                ListItem::new(vec![
+                    Line::from(""),
+                    Line::from(symbol_line),
+                    Line::from(line).style(color),
+                ])
+            }
+            None => ListItem::new(Line::from(line).style(color)),
+        }
     }
 }
 
-impl ProgramView<'_> {
-    fn with_items(instructions: Vec<Instruction<'_>>) -> ProgramView<'_> {
+impl<'a> ProgramView<'a> {
+    fn with_items(
+        instructions: Vec<Instruction<'a>>,
+        symbols: HashMap<u64, &'a str>,
+    ) -> ProgramView<'a> {
         ProgramView {
             state: ListState::default().with_selected(Some(0)),
             instructions,
             next_instr: 0,
             breakpoints: HashSet::new(),
+            symbols,
         }
     }
 

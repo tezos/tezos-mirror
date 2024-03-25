@@ -1,9 +1,11 @@
 use derive_more::{Error, From};
 use goblin::{
+    elf,
     elf::header::{ET_DYN, ET_EXEC},
     elf::program_header::{ProgramHeader, PT_LOAD},
     elf::Elf,
 };
+use std::collections::HashMap;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
 #[derive(Debug, From, Error, derive_more::Display)]
@@ -142,6 +144,21 @@ pub fn load_elf(mem: &mut impl Memory, start: u64, contents: &[u8]) -> Result<Lo
         ET_DYN => load_elf_reloc(mem, start, &elf, contents),
         t => todo!("ELF type {t} is not yet supported"),
     }
+}
+
+pub fn get_elf_symbols(contents: &[u8]) -> Result<HashMap<u64, &str>, Error> {
+    let mut symbols = HashMap::new();
+    let elf = Elf::parse(contents)?;
+    for symbol in elf.syms.iter() {
+        let name = elf.strtab.get_at(symbol.st_name).expect("Symbol not found");
+        if !name.is_empty()
+            && u32::try_from(symbol.st_shndx).expect("Symbol not valid address")
+                != elf::section_header::SHN_UNDEF
+        {
+            symbols.insert(symbol.st_value, name);
+        }
+    }
+    Ok(symbols)
 }
 
 impl Memory for rvemu::bus::Bus {
