@@ -101,10 +101,12 @@ pub mod constants {
     pub const TRANSACTION_OVERHEAD_COEF: u64 = 880;
     pub const TRANSFERT_OBJ_SIZE: u64 = 347;
 
-    /// Those values are completely arbitrary and do not reflect reality
-    pub const TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE: u64 = TICKS_FOR_CRYPTO;
-    pub const TICKS_FOR_INBOX_READ_PER_BYTE: u64 = 1000;
-    pub const TICKS_PER_BYTE_FOR_CHUNK_STORE: u64 = 1000;
+    /// The number of ticks to parse a blueprint chunk
+    pub const TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE: u64 = 27_000_000;
+    pub const TICKS_FOR_BLUEPRINT_INTERCEPT: u64 = 25_000_000;
+
+    /// The number of ticks to parse a transaction from the delayed bridge
+    pub const TICKS_FOR_DELAYED_MESSAGES: u64 = 1_380_000;
 
     /// Number of ticks used to parse deposits
     pub const TICKS_PER_DEPOSIT_PARSING: u64 = 1_500_000;
@@ -194,24 +196,6 @@ pub fn ticks_of_register(receipt_size: u64, obj_size: u64, bloom_size: u64) -> u
         .saturating_add(bloom_ticks)
 }
 
-pub fn ticks_of_blueprint_chunk(chunk_size: u64) -> u64 {
-    let reading_ticks =
-        constants::TICKS_FOR_INBOX_READ_PER_BYTE.saturating_mul(chunk_size);
-    let storing_ticks =
-        constants::TICKS_PER_BYTE_FOR_CHUNK_STORE.saturating_mul(chunk_size);
-    constants::TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE
-        .saturating_add(reading_ticks)
-        .saturating_add(storing_ticks)
-}
-
-pub fn ticks_of_delayed_input(input_size: u64) -> u64 {
-    let reading_ticks =
-        constants::TICKS_FOR_INBOX_READ_PER_BYTE.saturating_mul(input_size);
-    let storing_ticks =
-        constants::TICKS_PER_BYTE_FOR_CHUNK_STORE.saturating_mul(input_size);
-    reading_ticks.saturating_add(storing_ticks)
-}
-
 pub fn maximum_ticks_for_sequencer_chunk() -> u64 {
-    ticks_of_blueprint_chunk(4096)
+    constants::TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE
 }

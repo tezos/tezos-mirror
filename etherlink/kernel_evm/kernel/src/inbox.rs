@@ -20,7 +20,7 @@ use crate::storage::{
     remove_chunked_transaction, remove_sequencer, store_l1_level,
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
-use crate::tick_model::constants::MAX_ALLOWED_TICKS;
+use crate::tick_model::constants::{MAX_ALLOWED_TICKS, TICKS_FOR_BLUEPRINT_INTERCEPT};
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::upgrade::*;
 use crate::Error;
@@ -570,7 +570,7 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
-        allocated_ticks: MAX_ALLOWED_TICKS,
+        allocated_ticks: MAX_ALLOWED_TICKS.saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of

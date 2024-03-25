@@ -7,8 +7,10 @@
 
 use crate::configuration::TezosContracts;
 use crate::delayed_inbox::DelayedInbox;
-use crate::tick_model::constants::TICKS_PER_DEPOSIT_PARSING;
-use crate::tick_model::{ticks_of_blueprint_chunk, ticks_of_delayed_input};
+use crate::tick_model::constants::{
+    TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE, TICKS_FOR_DELAYED_MESSAGES,
+    TICKS_PER_DEPOSIT_PARSING,
+};
 use crate::{
     inbox::{Deposit, Transaction, TransactionContent},
     sequencer_blueprint::{SequencerBlueprint, UnsignedSequencerBlueprint},
@@ -284,7 +286,7 @@ impl SequencerInput {
         // 32bits.
         context.allocated_ticks = context
             .allocated_ticks
-            .saturating_sub(ticks_of_blueprint_chunk(bytes.len() as u64));
+            .saturating_sub(TICKS_FOR_BLUEPRINT_CHUNK_SIGNATURE);
 
         // Parse the sequencer blueprint
         let seq_blueprint: SequencerBlueprint =
@@ -336,7 +338,7 @@ impl Parsable for SequencerInput {
     ) -> InputResult<Self> {
         context.allocated_ticks = context
             .allocated_ticks
-            .saturating_sub(ticks_of_delayed_input(bytes.len() as u64));
+            .saturating_sub(TICKS_FOR_DELAYED_MESSAGES);
 
         if context.delayed_bridge.as_ref() != source.as_ref() {
             return InputResult::Unparsable;
