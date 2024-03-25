@@ -61,9 +61,17 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
       (* The cryptobox is not yet available so we cannot reconstruct
          slots yet. *)
       return_unit
+  | Ready {shards_proofs_precomputation = None; _} ->
+      (* The prover SRS is not loaded so we cannot reconstruct slots
+         yet. *)
+      return_unit
   | Ready
-      ({cryptobox; shards_proofs_precomputation; proto_parameters; _} as
-      ready_ctxt) ->
+      ({
+         cryptobox;
+         shards_proofs_precomputation = Some precomputation;
+         proto_parameters;
+         _;
+       } as ready_ctxt) ->
       let dal_parameters = Cryptobox.parameters cryptobox in
       let number_of_shards = dal_parameters.number_of_shards in
       let redundancy_factor = dal_parameters.redundancy_factor in
@@ -177,11 +185,6 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
                    slot_store.shards_watcher
                    commitment
                    shards)
-             in
-             let*? precomputation =
-               match shards_proofs_precomputation with
-               | None -> Error (`Other [Slot_manager.No_prover_SRS])
-               | Some precomputation -> Ok precomputation
              in
              let shard_proofs =
                Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
