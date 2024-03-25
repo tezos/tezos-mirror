@@ -40,7 +40,8 @@ type 'a t = {
   cors_headers : string list;
   log_filter : log_filter_config;
   mode : 'a;
-  max_active_connections : int;
+  max_active_connections :
+    Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
 }
 
 let default_filter_config =
@@ -60,7 +61,8 @@ let default_cors_origins = []
 
 let default_cors_headers = []
 
-let default_max_active_connections = 100
+let default_max_active_connections =
+  Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.default
 
 let default_proxy = {rollup_node_endpoint = Uri.empty}
 
@@ -219,7 +221,10 @@ let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
        (dft "cors_headers" (list string) default_cors_headers)
        (dft "log_filter" log_filter_config_encoding default_filter_config)
        (req "mode" mode_encoding)
-       (dft "max_active_connections" int31 default_max_active_connections))
+       (dft
+          "max_active_connections"
+          Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.encoding
+          default_max_active_connections))
 
 let save ~force ~data_dir encoding config =
   let open Lwt_result_syntax in

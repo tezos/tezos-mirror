@@ -51,7 +51,8 @@ type 'a t = {
   cors_headers : string list;
   log_filter : log_filter_config;
   mode : 'a;
-  max_active_connections : int;
+  max_active_connections :
+    Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)

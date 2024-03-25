@@ -305,8 +305,49 @@ module Acl = struct
     Internal_for_test.resolve_domain_names resolve
 end
 
-let launch ?host server ?conn_closed ?callback ?(max_active_connections = 100)
-    mode =
+module Max_active_rpc_connections = struct
+  type t = Unlimited | Limited of int
+
+  let default = Limited 100
+
+  let encoding =
+    let open Data_encoding in
+    def
+      "max_active_rpc_connections"
+      ~title:"max_active_rpc_connections"
+      ~description:"The maximum alowed number of RPC connections"
+      (union
+         ~tag_size:`Uint8
+         [
+           case
+             ~title:"unlimited"
+             ~description:
+               "There is not limit of the number of RPC connections allowed."
+             (Tag 0)
+             (constant "unlimited")
+             (function Unlimited -> Some () | _ -> None)
+             (fun () -> Unlimited);
+           case
+             ~title:"limited"
+             ~description:
+               "The number of maximum RPC connections allowed is limited to \
+                the given integer's value."
+             (Tag 1)
+             int31
+             (function Limited i -> Some i | _ -> None)
+             (fun i -> Limited i);
+         ])
+
+  let pp_parameter ppf = function
+    | Unlimited -> Format.fprintf ppf "unlimited"
+    | Limited limit -> Format.fprintf ppf "%l" limit
+end
+
+let launch ?host server ?conn_closed ?callback
+    ?(max_active_connections = Max_active_rpc_connections.default) mode =
   (* TODO: backport max_active_connections in resto *)
-  Conduit_lwt_unix.set_max_active max_active_connections ;
+  (match max_active_connections with
+  | Unlimited -> ()
+  | Limited max_active_connections ->
+      Conduit_lwt_unix.set_max_active max_active_connections) ;
   launch ?host server ?conn_closed ?callback mode
