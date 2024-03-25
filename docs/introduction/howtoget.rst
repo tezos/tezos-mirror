@@ -99,7 +99,7 @@ The documentation for these packages, originally developed by Chris Pinnock,
 can be found here: https://chrispinnock.com/tezos/packages/
 
 Ubuntu and Debian Octez packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Ubuntu or Debian, you can install packages with Octez binaries
 using ``dpkg`` or ``apt``. Currently it supports the two latest LTS releases
@@ -113,7 +113,7 @@ For example using dpkg::
      dpkg -i octez-client_19.1-1_arm64.deb
 
 Fedora Octez packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Octez binaries
 using ``rpm`` or ``dnf``. Currently it supports the latest LTS release for
