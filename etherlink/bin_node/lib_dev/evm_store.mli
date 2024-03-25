@@ -61,6 +61,14 @@ module Kernel_upgrades : sig
   val record_apply : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+module Delayed_transactions : sig
+  val store :
+    t ->
+    Ethereum_types.quantity ->
+    Ethereum_types.Delayed_transaction.t ->
+    unit tzresult Lwt.t
+end
+
 module L1_latest_known_level : sig
   val store : t -> int32 -> unit tzresult Lwt.t
 

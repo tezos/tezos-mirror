@@ -341,6 +341,12 @@ module State = struct
                     (Delayed_transaction.to_rlp delayed_transaction));
             ]
         in
+        let* () =
+          Evm_store.Delayed_transactions.store
+            ctxt.store
+            ctxt.session.next_blueprint_number
+            delayed_transaction
+        in
         return (evm_state, on_success)
 
   let apply_evm_events ~finalized_level (ctxt : t) events =
