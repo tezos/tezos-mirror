@@ -479,7 +479,7 @@ module Contract = struct
 end
 
 module Delegate = struct
-  type info = Delegate_services.info = {
+  type info = Plugin.RPC.Delegates.info = {
     full_balance : Tez.t;
     current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;

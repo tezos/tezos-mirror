@@ -53,36 +53,9 @@ type consensus_keys_info = {
   pendings : (Cycle.t * consensus_key) list;
 }
 
-type info = {
-  full_balance : Tez.t;  (** Balance + Frozen balance *)
-  current_frozen_deposits : Tez.t;
-  frozen_deposits : Tez.t;
-  staking_balance : Tez.t;
-  frozen_deposits_limit : Tez.t option;
-  delegated_contracts : Contract.t list;
-  delegated_balance : Tez.t;
-  min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
-  total_delegated_stake : Tez.t;
-  staking_denominator : Staking_pseudotoken.t;
-  deactivated : bool;
-  grace_period : Cycle.t;
-  pending_denunciations : bool;
-  voting_info : Vote.delegate_info;
-  active_consensus_key : Signature.Public_key_hash.t;
-  pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
-}
-
 type deposit_per_cycle = {cycle : Cycle.t; deposit : Tez.t}
 
 val deposit_per_cycle_encoding : deposit_per_cycle Data_encoding.t
-
-val info_encoding : info Data_encoding.t
-
-val info :
-  'a #RPC_context.simple ->
-  'a ->
-  Signature.Public_key_hash.t ->
-  info shell_tzresult Lwt.t
 
 val full_balance :
   'a #RPC_context.simple ->
@@ -125,12 +98,6 @@ val delegated_contracts :
   'a ->
   Signature.Public_key_hash.t ->
   Contract.t list shell_tzresult Lwt.t
-
-val delegated_balance :
-  'a #RPC_context.simple ->
-  'a ->
-  Signature.Public_key_hash.t ->
-  Tez.t shell_tzresult Lwt.t
 
 val total_delegated_stake :
   'a #RPC_context.simple -> 'a -> public_key_hash -> Tez.t shell_tzresult Lwt.t
