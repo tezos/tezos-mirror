@@ -9,6 +9,7 @@ type parameters = {
   cctxt : Client_context.wallet;
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
+  maximum_number_of_chunks : int;
 }
 
 module Types = struct
@@ -75,9 +76,13 @@ let get_hashes ~transactions ~delayed_transactions =
   return (delayed_transactions @ hashes)
 
 let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
-    =
+    ~maximum_number_of_chunks =
   let open Lwt_result_syntax in
-  let* tx_pool_response = Tx_pool.pop_transactions () in
+  let maximum_cumulative_size =
+    Sequencer_blueprint.maximum_usable_space_in_blueprint
+      maximum_number_of_chunks
+  in
+  let* tx_pool_response = Tx_pool.pop_transactions ~maximum_cumulative_size in
   match tx_pool_response with
   | Transactions transactions ->
       let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
@@ -132,13 +137,21 @@ module Handlers = struct
     match request with
     | Request.Produce_block (timestamp, force) ->
         protect @@ fun () ->
-        let {cctxt; smart_rollup_address; sequencer_key} = state in
+        let {
+          cctxt;
+          smart_rollup_address;
+          sequencer_key;
+          maximum_number_of_chunks;
+        } =
+          state
+        in
         produce_block
           ~cctxt
           ~smart_rollup_address
           ~sequencer_key
           ~force
           ~timestamp
+          ~maximum_number_of_chunks
 
   type launch_error = error trace
 

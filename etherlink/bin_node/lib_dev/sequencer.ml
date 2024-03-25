@@ -242,7 +242,12 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   in
   let* () =
     Block_producer.start
-      {cctxt; smart_rollup_address; sequencer_key = sequencer}
+      {
+        cctxt;
+        smart_rollup_address;
+        sequencer_key = sequencer;
+        maximum_number_of_chunks = configuration.mode.max_number_of_chunks;
+      }
   in
   let* () =
     Evm_events_follower.start

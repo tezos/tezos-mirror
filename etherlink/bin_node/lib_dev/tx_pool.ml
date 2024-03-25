@@ -147,7 +147,7 @@ module Request = struct
     | Add_transaction :
         string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | Pop_transactions : (popped_transactions, tztrace) t
+    | Pop_transactions : int -> (popped_transactions, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
@@ -173,9 +173,15 @@ module Request = struct
         case
           (Tag 1)
           ~title:"Pop_transactions"
-          (obj1 (req "request" (constant "pop_transactions")))
-          (function View Pop_transactions -> Some () | _ -> None)
-          (fun () -> View Pop_transactions);
+          (obj2
+             (req "request" (constant "pop_transactions"))
+             (req "maximum_cumulatize_size" int31))
+          (function
+            | View (Pop_transactions maximum_cumulative_size) ->
+                Some ((), maximum_cumulative_size)
+            | _ -> None)
+          (fun ((), maximum_cumulative_size) ->
+            View (Pop_transactions maximum_cumulative_size));
         case
           (Tag 2)
           ~title:"Pop_and_inject_transactions"
@@ -203,7 +209,11 @@ module Request = struct
           ppf
           "Add tx [%s] to tx-pool"
           (Hex.of_string tx_raw |> Hex.show)
-    | Pop_transactions -> Format.fprintf ppf "Popping transactions"
+    | Pop_transactions maximum_cumulative_size ->
+        Format.fprintf
+          ppf
+          "Popping transactions of maximum cumulative size %d bytes"
+          maximum_cumulative_size
     | Pop_and_inject_transactions ->
         Format.fprintf ppf "Popping and injecting transactions"
     | Lock_transactions -> Format.fprintf ppf "Locking the transactions"
@@ -251,7 +261,7 @@ let can_prepay ~balance ~gas_price ~gas_limit =
 let can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas =
   gas_price >= base_fee_per_gas
 
-let pop_transactions state =
+let pop_transactions state ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let Types.
         {
@@ -292,24 +302,40 @@ let pop_transactions state =
                pool)
            pool
     in
-    (* Select transaction with nonce equal to user's nonce and that
-       can be prepaid.
+    (* Select transaction with nonce equal to user's nonce, that can be prepaid
+       and selects a sum of transactions that wouldn't go above the size limit
+       of the blueprint.
        Also removes the transactions from the pool. *)
-    let txs, pool =
+    let txs, pool, _ =
       addr_with_nonces
       |> List.fold_left
-           (fun (txs, pool) (pkey, _, current_nonce) ->
+           (fun (txs, pool, cumulative_size) (pkey, _, current_nonce) ->
+             (* This mutable counter is purely local and used only for the
+                partition. *)
+             let accumulated_size = ref cumulative_size in
              let selected, pool =
                Pool.partition
                  pkey
-                 (fun nonce {gas_price; _} ->
-                   nonce = current_nonce
-                   && can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas)
+                 (fun nonce {gas_price; raw_tx; _} ->
+                   let check_nonce = nonce = current_nonce in
+                   let can_fit =
+                     !accumulated_size + String.length raw_tx
+                     <= maximum_cumulative_size
+                   in
+                   let can_pay =
+                     can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas
+                   in
+                   let selected = check_nonce && can_pay && can_fit in
+                   (* If the transaction is selected, this means it will fit *)
+                   if selected then
+                     accumulated_size :=
+                       !accumulated_size + String.length raw_tx ;
+                   selected)
                  pool
              in
              let txs = List.append txs selected in
-             (txs, pool))
-           ([], pool)
+             (txs, pool, !accumulated_size))
+           ([], pool, 0)
     in
     (* Sorting transactions by index.
        First tx in the pool is the first tx to be sent to the batcher. *)
@@ -331,7 +357,15 @@ let pop_and_inject_transactions state =
       failwith
         "Internal error: the sequencer is not supposed to use this function"
   | Observer | Proxy _ -> (
-      let* res = pop_transactions state in
+      (* We over approximate the number of transactions to pop in proxy and
+         observer mode to the maximum size an L1 block can hold. If the proxy
+         sends more, they won't be applied at the next level. For the observer,
+         it prevents spamming the sequencer. *)
+      let maximum_cumulative_size =
+        Sequencer_blueprint.maximum_usable_space_in_blueprint
+          Sequencer_blueprint.maximum_chunks_per_l1_level
+      in
+      let* res = pop_transactions state ~maximum_cumulative_size in
       match res with
       | Locked -> return_unit
       | Transactions txs ->
@@ -391,7 +425,8 @@ module Handlers = struct
         let* res = on_normal_transaction state transaction in
         let* () = observer_self_inject_request w in
         return res
-    | Request.Pop_transactions -> protect @@ fun () -> pop_transactions state
+    | Request.Pop_transactions maximum_cumulative_size ->
+        protect @@ fun () -> pop_transactions state ~maximum_cumulative_size
     | Request.Pop_and_inject_transactions ->
         protect @@ fun () -> pop_and_inject_transactions state
     | Request.Lock_transactions ->
@@ -490,10 +525,12 @@ let nonce pkey =
   in
   return next_nonce
 
-let pop_transactions () =
+let pop_transactions ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Pop_transactions
+  Worker.Queue.push_request_and_wait
+    worker
+    (Request.Pop_transactions maximum_cumulative_size)
   |> handle_request_error
 
 let pop_and_inject_transactions () =

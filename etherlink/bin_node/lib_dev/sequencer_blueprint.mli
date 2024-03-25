@@ -23,3 +23,11 @@ val create :
   delayed_transactions:Ethereum_types.hash list ->
   transactions:string list ->
   t tzresult Lwt.t
+
+(** [maximum_usable_size_in_blueprint chunks_count] returns the available space
+    for transactions in a blueprint composed of [chunks_count] chunks. *)
+val maximum_usable_space_in_blueprint : int -> int
+
+(* [maximum_chunks_per_l1_level] is the maximum number of chunks a L1 block can
+   hold at once. *)
+val maximum_chunks_per_l1_level : int
