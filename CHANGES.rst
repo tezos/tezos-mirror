@@ -195,6 +195,9 @@ Smart Rollup node
   secure`` to choose the secure set of RPCs even for localhost, *e.g.*, for use
   behind a proxy. (MR :gl:`!12323`)
 
+- Fix issue with catching up on rollup originated in previous protocol with an
+  empty rollup node. (MR :gl:`!12565`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
