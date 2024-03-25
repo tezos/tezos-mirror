@@ -366,10 +366,10 @@ let () =
   List.iter
     (add_dep_to_profile "octez-dev-deps")
     [
-      external_lib "merlin" V.True;
+      external_lib "merlin" V.(at_least "4.14");
       external_lib "odoc" V.True;
       external_lib "ocp-indent" V.True;
-      external_lib "ocaml-lsp-server" V.(at_least "1.16.2");
+      external_lib "ocaml-lsp-server" V.(at_least "1.17.0");
       external_lib "merge-fmt" V.True;
       external_lib "js_of_ocaml-lwt" V.(at_least "5.2.0");
     ]
