@@ -104,7 +104,9 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
             ~parent_hash:head_info.current_block_hash
             ~number:head_info.next_blueprint_number
         in
-        let* () = Evm_context.apply_sequencer_blueprint timestamp blueprint in
+        let* () =
+          Evm_context.apply_blueprint timestamp blueprint delayed_transactions
+        in
         let (Qty number) = head_info.next_blueprint_number in
         let* () = Blueprints_publisher.publish number blueprint in
         let*! () =

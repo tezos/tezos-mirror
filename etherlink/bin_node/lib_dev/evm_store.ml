@@ -359,6 +359,14 @@ module Q = struct
     let insert =
       (t3 level root_hash delayed_transaction ->. unit)
       @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
+
+    let select_at_level =
+      (level ->* delayed_transaction)
+      @@ {|SELECT payload FROM delayed_transactions WHERE ? = injected_before|}
+
+    let select_at_hash =
+      (root_hash ->? delayed_transaction)
+      @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
   end
 
   module L1_latest_level = struct
@@ -559,6 +567,14 @@ module Delayed_transactions = struct
       conn
       Q.Delayed_transactions.insert
       (next_blueprint_number, delayed_transaction.hash, delayed_transaction)
+
+  let at_level store blueprint_number =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Delayed_transactions.select_at_level blueprint_number
+
+  let at_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Delayed_transactions.select_at_hash hash
 end
 
 module L1_latest_known_level = struct

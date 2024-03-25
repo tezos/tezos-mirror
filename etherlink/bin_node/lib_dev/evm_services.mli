@@ -14,7 +14,7 @@ val get_smart_rollup_address :
 val get_blueprint :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
-  Blueprint_types.t tzresult Lwt.t
+  Blueprint_types.with_events tzresult Lwt.t
 
 val register :
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
@@ -24,4 +24,4 @@ val register :
 val monitor_blueprints :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
-  Blueprint_types.t Lwt_stream.t Lwt.t
+  Blueprint_types.with_events Lwt_stream.t Lwt.t

@@ -39,7 +39,7 @@ type t = {
   session : session_state;
 }
 
-let blueprint_watcher : Blueprint_types.t Lwt_watcher.input =
+let blueprint_watcher : Blueprint_types.with_events Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
 module Types = struct
@@ -63,18 +63,14 @@ end
 module Request = struct
   type (_, _) t =
     | Apply_evm_events : {
-        finalized_level : int32;
+        finalized_level : int32 option;
         events : Ethereum_types.Evm_events.t list;
       }
         -> (unit, tztrace) t
     | Apply_blueprint : {
         timestamp : Time.Protocol.t;
         payload : Blueprint_types.payload;
-      }
-        -> (unit, tztrace) t
-    | Apply_sequencer_blueprint : {
-        timestamp : Time.Protocol.t;
-        blueprint : Sequencer_blueprint.t;
+        delayed_transactions : Ethereum_types.hash list;
       }
         -> (unit, tztrace) t
     | Last_produce_blueprint : (Blueprint_types.t, tztrace) t
@@ -82,7 +78,7 @@ module Request = struct
     | Blueprint : {
         level : Ethereum_types.quantity;
       }
-        -> (Blueprint_types.t option, tztrace) t
+        -> (Blueprint_types.with_events option, tztrace) t
     | Blueprints_range : {
         from : Ethereum_types.quantity;
         to_ : Ethereum_types.quantity;
@@ -105,7 +101,7 @@ module Request = struct
           ~title:"Apply_evm_events"
           (obj3
              (req "request" (constant "apply_evm_events"))
-             (req "finalized_level" int32)
+             (opt "finalized_level" int32)
              (req "events" (list Ethereum_types.Evm_events.encoding)))
           (function
             | View (Apply_evm_events {finalized_level; events}) ->
@@ -116,43 +112,32 @@ module Request = struct
         case
           (Tag 1)
           ~title:"Apply_blueprint"
-          (obj3
+          (obj4
              (req "request" (constant "apply_blueprint"))
              (req "timestamp" Time.Protocol.encoding)
-             (req "payload" Blueprint_types.payload_encoding))
+             (req "payload" Blueprint_types.payload_encoding)
+             (req "delayed_transactions" (list Ethereum_types.hash_encoding)))
           (function
-            | View (Apply_blueprint {timestamp; payload}) ->
-                Some ((), timestamp, payload)
+            | View (Apply_blueprint {timestamp; payload; delayed_transactions})
+              ->
+                Some ((), timestamp, payload, delayed_transactions)
             | _ -> None)
-          (fun ((), timestamp, payload) ->
-            View (Apply_blueprint {timestamp; payload}));
+          (fun ((), timestamp, payload, delayed_transactions) ->
+            View (Apply_blueprint {timestamp; payload; delayed_transactions}));
         case
           (Tag 2)
-          ~title:"Apply_sequencer_blueprint"
-          (obj3
-             (req "request" (constant "apply_sequencer_blueprint"))
-             (req "timestamp" Time.Protocol.encoding)
-             (req "blueprint" Blueprint_types.payload_encoding))
-          (function
-            | View (Apply_sequencer_blueprint {timestamp; blueprint}) ->
-                Some ((), timestamp, blueprint)
-            | _ -> None)
-          (fun ((), timestamp, blueprint) ->
-            View (Apply_sequencer_blueprint {timestamp; blueprint}));
-        case
-          (Tag 3)
           ~title:"Last_produce_blueprint"
           (obj1 (req "request" (constant "last_produce_blueprint")))
           (function View Last_produce_blueprint -> Some () | _ -> None)
           (fun () -> View Last_produce_blueprint);
         case
-          (Tag 4)
+          (Tag 3)
           ~title:"Head_info"
           (obj1 (req "request" (constant "head_info")))
           (function View Head_info -> Some () | _ -> None)
           (fun () -> View Head_info);
         case
-          (Tag 5)
+          (Tag 4)
           ~title:"Blueprint"
           (obj2
              (req "request" (constant "blueprint"))
@@ -160,7 +145,7 @@ module Request = struct
           (function View (Blueprint {level}) -> Some ((), level) | _ -> None)
           (fun ((), level) -> View (Blueprint {level}));
         case
-          (Tag 6)
+          (Tag 5)
           ~title:"Blueprints_range"
           (obj3
              (req "request" (constant "Blueprints_range"))
@@ -171,13 +156,13 @@ module Request = struct
             | _ -> None)
           (fun ((), from, to_) -> View (Blueprints_range {from; to_}));
         case
-          (Tag 7)
+          (Tag 6)
           ~title:"Last_known_L1_level"
           (obj1 (req "request" (constant "last_known_l1_level")))
           (function View Last_known_L1_level -> Some () | _ -> None)
           (fun () -> View Last_known_L1_level);
         case
-          (Tag 8)
+          (Tag 7)
           ~title:"New_last_known_L1_level"
           (obj2
              (req "request" (constant "new_last_known_l1_level"))
@@ -186,7 +171,7 @@ module Request = struct
             | View (New_last_known_L1_level l) -> Some ((), l) | _ -> None)
           (fun ((), l) -> View (New_last_known_L1_level l));
         case
-          (Tag 9)
+          (Tag 8)
           ~title:"Delayed_inbox_hashes"
           (obj1 (req "request" (constant "Delayed_inbox_hashes")))
           (function View Delayed_inbox_hashes -> Some () | _ -> None)
@@ -349,7 +334,7 @@ module State = struct
         in
         return (evm_state, on_success)
 
-  let apply_evm_events ~finalized_level (ctxt : t) events =
+  let apply_evm_events ?finalized_level (ctxt : t) events =
     let open Lwt_result_syntax in
     let* context, evm_state, on_success =
       with_store_transaction ctxt @@ fun ctxt ->
@@ -364,7 +349,9 @@ module State = struct
           events
       in
       let* _ =
-        Evm_store.L1_latest_known_level.store ctxt.store finalized_level
+        Option.map_es
+          (Evm_store.L1_latest_known_level.store ctxt.store)
+          finalized_level
       in
       let* ctxt = replace_current_commit ctxt evm_state in
       return (ctxt, evm_state, on_success)
@@ -437,15 +424,15 @@ module State = struct
         return_true
     | None -> return_false
 
-  (** [apply_blueprint_store_unsafe ctxt payload] applies the blueprint [payload]
-    on the head of [ctxt], and commit the resulting state to Irmin and the
-    node’s store.
+  (** [apply_blueprint_store_unsafe ctxt payload delayed_transactions] applies
+      the blueprint [payload] on the head of [ctxt], and commit the resulting
+      state to Irmin and the node’s store.
 
-    However, it does not modifies [ctxt] to make it aware of the new state.
-    This is because [apply_blueprint_store_unsafe] is expected to be called
-    within a SQL transaction to make sure the node’s store is not left in an
-    inconsistent state in case of error. *)
-  let apply_blueprint_store_unsafe ctxt timestamp payload =
+      However, it does not modifies [ctxt] to make it aware of the new state.
+      This is because [apply_blueprint_store_unsafe] is expected to be called
+      within a SQL transaction to make sure the node’s store is not left in an
+      inconsistent state in case of error. *)
+  let apply_blueprint_store_unsafe ctxt timestamp payload delayed_transactions =
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction ctxt.store ;
     let*! data_dir, config = execution_config in
@@ -470,64 +457,67 @@ module State = struct
           check_upgrade ctxt evm_state root_hash_candidate
         in
 
+        let* delayed_transactions =
+          List.map_es
+            (fun hash ->
+              let* delayed_transaction =
+                Evm_store.Delayed_transactions.at_hash ctxt.store hash
+              in
+              match delayed_transaction with
+              | None ->
+                  failwith
+                    "Delayed transaction %a is missing from store"
+                    Ethereum_types.pp_hash
+                    hash
+              | Some delayed_transaction -> return delayed_transaction)
+            delayed_transactions
+        in
         let* context = commit_next_head ctxt evm_state in
-        return (evm_state, context, current_block_hash, applied_upgrade)
+        return
+          ( evm_state,
+            context,
+            current_block_hash,
+            applied_upgrade,
+            delayed_transactions )
     | Apply_success _ (* Produced a block, but not of the expected height *)
     | Apply_failure (* Did not produce a block *) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
-  let on_new_head ctxt ~applied_upgrade evm_state timestamp context block_hash
-      payload =
+  let on_new_head ctxt ~applied_upgrade evm_state context block_hash
+      blueprint_with_events =
     let (Qty level) = ctxt.session.next_blueprint_number in
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context ;
     ctxt.session.next_blueprint_number <- Qty (Z.succ level) ;
     ctxt.session.current_block_hash <- block_hash ;
-    Lwt_watcher.notify
-      blueprint_watcher
-      {number = Qty level; timestamp; payload} ;
+    Lwt_watcher.notify blueprint_watcher blueprint_with_events ;
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     Blueprint_events.blueprint_applied (level, block_hash)
 
-  let apply_sequencer_blueprint (ctxt : t) timestamp
-      (blueprint : Sequencer_blueprint.t) =
+  let apply_blueprint ctxt timestamp payload delayed_transactions =
     let open Lwt_result_syntax in
-    let* evm_state, context, current_block_hash, applied_upgrade =
+    let* ( evm_state,
+           context,
+           current_block_hash,
+           applied_upgrade,
+           delayed_transactions ) =
       with_store_transaction ctxt @@ fun ctxt ->
-      let* current_block_hash =
-        apply_blueprint_store_unsafe ctxt timestamp blueprint
-      in
-      return current_block_hash
+      apply_blueprint_store_unsafe ctxt timestamp payload delayed_transactions
     in
     let*! () =
       on_new_head
         ctxt
         ~applied_upgrade
         evm_state
-        timestamp
         context
         current_block_hash
-        blueprint
-    in
-    return_unit
-
-  let apply_blueprint ctxt timestamp payload =
-    let open Lwt_result_syntax in
-    let* evm_state, context, current_block_hash, applied_upgrade =
-      with_store_transaction ctxt @@ fun ctxt ->
-      apply_blueprint_store_unsafe ctxt timestamp payload
-    in
-    let*! () =
-      on_new_head
-        ctxt
-        ~applied_upgrade
-        evm_state
-        timestamp
-        context
-        current_block_hash
-        payload
+        {
+          delayed_transactions;
+          blueprint =
+            {number = ctxt.session.next_blueprint_number; timestamp; payload};
+        }
     in
     return_unit
 
@@ -734,6 +724,17 @@ module State = struct
         keys
     in
     return hashes
+
+  let blueprint_with_events ctxt level =
+    let open Lwt_result_syntax in
+    let* blueprint = Evm_store.Blueprints.find ctxt.store level in
+    match blueprint with
+    | None -> return None
+    | Some blueprint ->
+        let* delayed_transactions =
+          Evm_store.Delayed_transactions.at_level ctxt.store level
+        in
+        return_some Blueprint_types.{delayed_transactions; blueprint}
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -784,13 +785,10 @@ module Handlers = struct
     match request with
     | Apply_evm_events {finalized_level; events} ->
         let ctxt = Worker.state self in
-        State.apply_evm_events ~finalized_level ctxt events
-    | Apply_blueprint {timestamp; payload} ->
+        State.apply_evm_events ?finalized_level ctxt events
+    | Apply_blueprint {timestamp; payload; delayed_transactions} ->
         let ctxt = Worker.state self in
-        State.apply_blueprint ctxt timestamp payload
-    | Apply_sequencer_blueprint {timestamp; blueprint} ->
-        let ctxt = Worker.state self in
-        State.apply_sequencer_blueprint ctxt timestamp blueprint
+        State.apply_blueprint ctxt timestamp payload delayed_transactions
     | Last_produce_blueprint ->
         let ctxt = Worker.state self in
         State.last_produced_blueprint ctxt
@@ -804,7 +802,7 @@ module Handlers = struct
           }
     | Blueprint {level} ->
         let ctxt = Worker.state self in
-        Evm_store.Blueprints.find ctxt.store level
+        State.blueprint_with_events ctxt level
     | Blueprints_range {from; to_} ->
         let ctxt = Worker.state self in
         Evm_store.Blueprints.find_range ctxt.store ~from ~to_
@@ -906,14 +904,12 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
 
 let init_from_rollup_node = State.init_from_rollup_node
 
-let apply_evm_events ~finalized_level events =
+let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
-let apply_blueprint timestamp payload =
-  worker_wait_for_request (Apply_blueprint {timestamp; payload})
-
-let apply_sequencer_blueprint timestamp blueprint =
-  worker_wait_for_request (Apply_sequencer_blueprint {timestamp; blueprint})
+let apply_blueprint timestamp payload delayed_transactions =
+  worker_wait_for_request
+    (Apply_blueprint {timestamp; payload; delayed_transactions})
 
 let last_produced_blueprint () = worker_wait_for_request Last_produce_blueprint
 

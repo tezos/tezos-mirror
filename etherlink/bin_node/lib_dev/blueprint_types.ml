@@ -13,6 +13,11 @@ type t = {
   payload : payload;
 }
 
+type with_events = {
+  delayed_transactions : Ethereum_types.Delayed_transaction.t list;
+  blueprint : t;
+}
+
 let payload_encoding =
   let open Data_encoding in
   list
@@ -30,3 +35,14 @@ let encoding =
        (req "number" n)
        (req "timestamp" Time.Protocol.encoding)
        (req "payload" payload_encoding))
+
+let with_events_encoding =
+  let open Data_encoding in
+  conv
+    (fun {delayed_transactions; blueprint} -> (delayed_transactions, blueprint))
+    (fun (delayed_transactions, blueprint) -> {delayed_transactions; blueprint})
+    (obj2
+       (req
+          "delayed_transactions"
+          (list Ethereum_types.Delayed_transaction.encoding))
+       (req "blueprint" encoding))

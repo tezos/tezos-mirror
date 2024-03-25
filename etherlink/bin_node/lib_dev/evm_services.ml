@@ -20,7 +20,7 @@ let get_blueprint_service =
   Service.get_service
     ~description:"Fetch the contents of a blueprint"
     ~query:Query.empty
-    ~output:Blueprint_types.encoding
+    ~output:Blueprint_types.with_events_encoding
     Path.(evm_services_root / "blueprint" /: Arg.uint63)
 
 let blueprint_watcher_service =
@@ -31,7 +31,7 @@ let blueprint_watcher_service =
   Service.get_service
     ~description:"Watch for new blueprints"
     ~query:level_query
-    ~output:Blueprint_types.encoding
+    ~output:Blueprint_types.with_events_encoding
     Path.(evm_services_root / "blueprints")
 
 let create_blueprint_watcher_service from_level =

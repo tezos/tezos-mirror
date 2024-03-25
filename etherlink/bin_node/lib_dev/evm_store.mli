@@ -67,6 +67,16 @@ module Delayed_transactions : sig
     Ethereum_types.quantity ->
     Ethereum_types.Delayed_transaction.t ->
     unit tzresult Lwt.t
+
+  val at_level :
+    t ->
+    Ethereum_types.quantity ->
+    Ethereum_types.Delayed_transaction.t list tzresult Lwt.t
+
+  val at_hash :
+    t ->
+    Ethereum_types.hash ->
+    Ethereum_types.Delayed_transaction.t option tzresult Lwt.t
 end
 
 module L1_latest_known_level : sig

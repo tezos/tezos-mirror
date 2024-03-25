@@ -39,9 +39,12 @@ val init_from_rollup_node :
 
 (** [apply_evm_events ~finalized_level events] applies all the
     events [events] on the local context. The events are performed in a
-    transactional context. *)
+    transactional context.
+
+    Stores [finalized_level] with {!new_last_known_l1_level} if provided.
+*)
 val apply_evm_events :
-  finalized_level:int32 ->
+  ?finalized_level:int32 ->
   Ethereum_types.Evm_events.t list ->
   unit tzresult Lwt.t
 
@@ -63,24 +66,23 @@ val execute_and_inspect :
     create the current head of the chain. *)
 val last_produced_blueprint : unit -> Blueprint_types.t tzresult Lwt.t
 
-(** [apply_blueprint ctxt blueprint] applies [blueprint] in the freshest EVM
-    state stored under [ctxt]. It commits the result if the blueprint produces
-    the expected block. *)
+(** [apply_blueprint timestamp payload delayed_transactions] applies
+    [payload] in the freshest EVM state stored under [ctxt] at
+    timestamp [timestamp], forwards the {!Blueprint_types.with_events}.
+    It commits the result if the blueprint produces the expected block. *)
 val apply_blueprint :
-  Time.Protocol.t -> Blueprint_types.payload -> unit tzresult Lwt.t
-
-(** Same as {!apply_blueprint}, but additionally publish the blueprint if it is
-    correct. *)
-val apply_sequencer_blueprint :
-  Time.Protocol.t -> Sequencer_blueprint.t -> unit tzresult Lwt.t
+  Time.Protocol.t ->
+  Blueprint_types.payload ->
+  Ethereum_types.hash list ->
+  unit tzresult Lwt.t
 
 val head_info : unit -> head tzresult Lwt.t
 
 val blueprints_watcher :
-  unit -> Blueprint_types.t Lwt_stream.t * Lwt_watcher.stopper
+  unit -> Blueprint_types.with_events Lwt_stream.t * Lwt_watcher.stopper
 
 val blueprint :
-  Ethereum_types.quantity -> Blueprint_types.t option tzresult Lwt.t
+  Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t
 
 val blueprints_range :
   Ethereum_types.quantity ->
