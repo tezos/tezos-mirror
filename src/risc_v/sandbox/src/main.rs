@@ -50,7 +50,15 @@ fn debug(opts: Options) -> Result<(), Box<dyn Error>> {
         .to_str()
         .ok_or("File name cannot be converted to string")?;
     let contents = std::fs::read(path)?;
-    Ok(debugger::DebuggerApp::launch(fname, &contents)?)
+    Ok(debugger::DebuggerApp::launch(
+        fname,
+        &contents,
+        match opts.posix_exit_mode {
+            cli::ExitMode::User => Mode::User,
+            cli::ExitMode::Supervisor => Mode::Supervisor,
+            cli::ExitMode::Machine => Mode::Machine,
+        },
+    )?)
 }
 
 fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {

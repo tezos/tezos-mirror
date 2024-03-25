@@ -70,10 +70,10 @@ macro_rules! fregister_line {
 }
 
 impl<'a> DebuggerApp<'a> {
-    pub fn launch(fname: &str, contents: &[u8]) -> Result<()> {
+    pub fn launch(fname: &str, contents: &[u8], exit_mode: Mode) -> Result<()> {
         let mut backend = Interpreter::create_backend();
         let (mut interpreter, prog) =
-            Interpreter::new_with_parsed_program(&mut backend, contents, None, Mode::User)?;
+            Interpreter::new_with_parsed_program(&mut backend, contents, None, exit_mode)?;
         errors::install_hooks()?;
         let terminal = tui::init()?;
         DebuggerApp::new(&mut interpreter, fname, &prog).run_debugger(terminal)?;

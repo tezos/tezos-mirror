@@ -67,16 +67,14 @@ impl<'a> Interpreter<'a> {
         InMemoryBackend::<StateLayout>::new().0
     }
 
-    fn init(
+    fn bind_states(
         backend: &'a mut InMemoryBackend<StateLayout>,
-        mode: mode::Mode,
     ) -> (
         PosixState<SliceManager<'a>>,
         MachineState<M1G, SliceManager<'a>>,
     ) {
         let alloc = backend.allocate(StateLayout::placed().into_location());
-        let mut posix_state = PosixState::bind(alloc.0);
-        posix_state.set_exit_mode(mode);
+        let posix_state = PosixState::bind(alloc.0);
         let machine_state = MachineState::<M1G, SliceManager<'a>>::bind(alloc.1);
         (posix_state, machine_state)
     }
@@ -89,7 +87,8 @@ impl<'a> Interpreter<'a> {
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<Self, InterpreterError> {
-        let (posix_state, mut machine_state) = Self::init(backend, mode);
+        let (mut posix_state, mut machine_state) = Self::bind_states(backend);
+        posix_state.set_exit_mode(mode);
         let elf_program = Program::<M1G>::from_elf(program)?;
         machine_state.setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
         Ok(Self {
@@ -172,7 +171,8 @@ impl<'a> Interpreter<'a> {
         initrd: Option<&[u8]>,
         mode: mode::Mode,
     ) -> Result<(Self, BTreeMap<u64, String>), InterpreterError> {
-        let (posix_state, mut machine_state) = Self::init(backend, mode);
+        let (mut posix_state, mut machine_state) = Self::bind_states(backend);
+        posix_state.set_exit_mode(mode);
         let elf_program = Program::<M1G>::from_elf(program)?;
         machine_state.setup_boot(&elf_program, initrd, mode::Mode::Machine)?;
         Ok((
