@@ -76,3 +76,8 @@ and then installing them with your package tool manager.
    particular regarding the home directory for the ``tezos`` user.
 
 For more details, see :ref:`the installation instructions <installing_binaries>`.
+
+Changelog
+---------
+
+- `Version 20.0~rc1 <../CHANGES.html#version-20-0-rc1>`_
