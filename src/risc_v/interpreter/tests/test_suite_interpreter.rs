@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 //
 // SPDX-License-Identifier: MIT
 
@@ -131,7 +132,7 @@ test_case!(#[ignore], test_suite_rv64ud_p_fcvt, "rv64ud-p-fcvt");
 test_case!(#[ignore], test_suite_rv64ud_p_fcvt_w, "rv64ud-p-fcvt_w");
 test_case!(#[ignore], test_suite_rv64ud_p_fdiv, "rv64ud-p-fdiv");
 test_case!(#[ignore], test_suite_rv64ud_p_fmadd, "rv64ud-p-fmadd");
-test_case!(#[ignore], test_suite_rv64ud_p_fmin, "rv64ud-p-fmin");
+test_case!(test_suite_rv64ud_p_fmin, "rv64ud-p-fmin");
 test_case!(test_suite_rv64ud_p_ldst, "rv64ud-p-ldst");
 test_case!(#[ignore], test_suite_rv64ud_p_move, "rv64ud-p-move");
 test_case!(#[ignore], test_suite_rv64ud_p_recoding, "rv64ud-p-recoding");
@@ -157,7 +158,7 @@ test_case!(#[ignore], test_suite_rv64uf_p_fcvt, "rv64uf-p-fcvt");
 test_case!(#[ignore], test_suite_rv64uf_p_fcvt_w, "rv64uf-p-fcvt_w");
 test_case!(#[ignore], test_suite_rv64uf_p_fdiv, "rv64uf-p-fdiv");
 test_case!(#[ignore], test_suite_rv64uf_p_fmadd, "rv64uf-p-fmadd");
-test_case!(#[ignore], test_suite_rv64uf_p_fmin, "rv64uf-p-fmin");
+test_case!(test_suite_rv64uf_p_fmin, "rv64uf-p-fmin");
 test_case!(test_suite_rv64uf_p_ldst, "rv64uf-p-ldst");
 test_case!(#[ignore], test_suite_rv64uf_p_move, "rv64uf-p-move");
 test_case!(#[ignore], test_suite_rv64uf_p_recoding, "rv64uf-p-recoding");

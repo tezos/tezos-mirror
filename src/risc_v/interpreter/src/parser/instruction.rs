@@ -85,6 +85,13 @@ pub struct FCmpArgs {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FRArgs {
+    pub rs1: FRegister,
+    pub rs2: FRegister,
+    pub rd: FRegister,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct FStoreArgs {
     pub rs1: XRegister,
     pub rs2: FRegister,
@@ -210,6 +217,8 @@ pub enum Instr {
     Feqs(FCmpArgs),
     Fles(FCmpArgs),
     Flts(FCmpArgs),
+    Fmins(FRArgs),
+    Fmaxs(FRArgs),
     Flw(FLoadArgs),
     Fsw(FStoreArgs),
     FmvXW(FRegToXRegArgs),
@@ -220,6 +229,8 @@ pub enum Instr {
     Feqd(FCmpArgs),
     Fled(FCmpArgs),
     Fltd(FCmpArgs),
+    Fmind(FRArgs),
+    Fmaxd(FRArgs),
     Fld(FLoadArgs),
     Fsd(FStoreArgs),
     FmvXD(FRegToXRegArgs),
@@ -338,6 +349,8 @@ impl Instr {
             | Feqs(_)
             | Fles(_)
             | Flts(_)
+            | Fmins(_)
+            | Fmaxs(_)
             | Flw(_)
             | Fsw(_)
             | FmvXD(_)
@@ -346,6 +359,8 @@ impl Instr {
             | Feqd(_)
             | Fled(_)
             | Fltd(_)
+            | Fmind(_)
+            | Fmaxd(_)
             | Fld(_)
             | Fsd(_)
             | Csrrw(_)
@@ -605,6 +620,8 @@ impl fmt::Display for Instr {
             Feqs(args) => r_instr!(f, "feq.s", args),
             Fles(args) => r_instr!(f, "fle.s", args),
             Flts(args) => r_instr!(f, "flt.s", args),
+            Fmins(args) => r_instr!(f, "fmin.s", args),
+            Fmaxs(args) => r_instr!(f, "fmax.s", args),
             Flw(args) => i_instr_load!(f, "flw", args),
             Fsw(args) => s_instr!(f, "fsw", args),
             FmvXW(args) => f_s1_instr!(f, "fmv.x.w", args),
@@ -615,6 +632,8 @@ impl fmt::Display for Instr {
             Feqd(args) => r_instr!(f, "feq.d", args),
             Fled(args) => r_instr!(f, "fle.d", args),
             Fltd(args) => r_instr!(f, "flt.d", args),
+            Fmind(args) => r_instr!(f, "fmin.d", args),
+            Fmaxd(args) => r_instr!(f, "fmax.d", args),
             Fld(args) => i_instr_load!(f, "fld", args),
             Fsd(args) => s_instr!(f, "fsd", args),
             FmvXD(args) => f_s1_instr!(f, "fmv.x.d", args),

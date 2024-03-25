@@ -12,19 +12,27 @@ use crate::{
     },
     state_backend as backend,
 };
-use rustc_apfloat::Float;
+use rustc_apfloat::{ieee::Double, ieee::Single, Float};
 
-pub trait FloatExt: Float + Into<FValue>
+pub trait FloatExt: Float + Into<FValue> + Copy
 where
     FValue: Into<Self>,
 {
+    /// The canonical NaN has a positive sign and all
+    /// significand bits clear expect the MSB (the quiet bit).
+    fn canonical_nan() -> Self;
 }
 
-impl<F> FloatExt for F
-where
-    F: Float + Into<FValue>,
-    FValue: Into<Self>,
-{
+impl FloatExt for Single {
+    fn canonical_nan() -> Self {
+        Self::from_bits(0x7fc00000_u32 as u128)
+    }
+}
+
+impl FloatExt for Double {
+    fn canonical_nan() -> Self {
+        Self::from_bits(0x7ff8000000000000_u64 as u128)
+    }
 }
 
 impl<M> HartState<M>
@@ -40,7 +48,7 @@ where
     /// Exactly one bit in `rd` will be set, all other bits are cleared.
     ///
     /// Does not set the floating-point exception flags.
-    pub fn run_fclass<F: FloatExt>(&mut self, rs1: FRegister, rd: XRegister)
+    pub(super) fn run_fclass<F: FloatExt>(&mut self, rs1: FRegister, rd: XRegister)
     where
         FValue: Into<F>,
     {
@@ -72,7 +80,7 @@ where
     /// if either input is a signalling NaN.
     ///
     /// If either input is `NaN`, the result is `0`.
-    pub fn run_feq<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
+    pub(super) fn run_feq<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
     where
         FValue: Into<F>,
     {
@@ -94,7 +102,7 @@ where
     ///
     /// If either input is `NaN`, the result is `0`, and the invalid operation exception
     /// flag is set.
-    pub fn run_flt<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
+    pub(super) fn run_flt<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
     where
         FValue: Into<F>,
     {
@@ -116,7 +124,7 @@ where
     ///
     /// If either input is `NaN`, the result is `0`, and the invalid operation exception
     /// flag is set.
-    pub fn run_fle<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
+    pub(super) fn run_fle<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
     where
         FValue: Into<F>,
     {
@@ -130,6 +138,65 @@ where
         let res = if rval1 <= rval2 { 1 } else { 0 };
 
         self.xregisters.write(rd, res);
+    }
+
+    /// `FMIN.*` instruction.
+    ///
+    /// Writes the smaller of `rs1`, `rs2` to `rd`. **NB** `-0.0 < +0.0`.
+    ///
+    /// If both inputs are NaNs, the result is the canonical NaN. If only one is a NaN,
+    /// the result is the non-NaN operand.
+    ///
+    /// Signaling NaNs set the invalid operation exception flag.
+    pub(super) fn run_fmin<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
+    where
+        FValue: Into<F>,
+    {
+        self.min_max(rs1, rs2, rd, F::minimum)
+    }
+
+    /// `FMAX.*` instruction.
+    ///
+    /// Writes the larger of `rs1`, `rs2` to `rd`. **NB** `-0.0 < +0.0`.
+    ///
+    /// If both inputs are NaNs, the result is the canonical NaN. If only one is a NaN,
+    /// the result is the non-NaN operand.
+    ///
+    /// Signaling NaNs set the invalid operation exception flag.
+    pub(super) fn run_fmax<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
+    where
+        FValue: Into<F>,
+    {
+        self.min_max(rs1, rs2, rd, F::maximum)
+    }
+
+    fn min_max<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+        cmp: fn(F, F) -> F,
+    ) where
+        FValue: Into<F>,
+    {
+        let rval1: F = self.fregisters.read(rs1).into();
+        let rval2: F = self.fregisters.read(rs2).into();
+
+        let rval1_nan = rval1.is_nan();
+        let rval2_nan = rval2.is_nan();
+
+        let res = match (rval1_nan, rval2_nan) {
+            (true, true) => F::canonical_nan(),
+            (true, false) => rval2,
+            (false, true) => rval1,
+            (false, false) => cmp(rval1, rval2),
+        };
+
+        if (rval1_nan || rval2_nan) && (rval1.is_signaling() || rval2.is_signaling()) {
+            self.csregisters.set_exception_flag(Fflag::NV);
+        }
+
+        self.fregisters.write(rd, res.into());
     }
 }
 
