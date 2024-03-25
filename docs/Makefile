@@ -53,14 +53,11 @@ html: octez-gen docexes-gen
 	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-accuser.html:
 	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/octez-smart-rollup-node.html:
-	@../octez-smart-rollup-node-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
-	 $(PROTOCOLS:%=%/octez-accuser.html) \
-	 $(PROTOCOLS:%=%/octez-smart-rollup-node.html)
+	 $(PROTOCOLS:%=%/octez-accuser.html)
 	# generic
 	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
 	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
