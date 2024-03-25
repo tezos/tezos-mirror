@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod common_memory;
 mod float;
 pub mod rv32i;
 pub mod rv32m;
