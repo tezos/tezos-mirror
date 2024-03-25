@@ -75,17 +75,17 @@
 
       const gen_idx = (start, end) => {
           let arr = [];
-          for(let i = start; i <= end; i++) {
-              arr.push(i);
-          }
+          for(let i = start; i <= end; i++) { arr.push(i); }
           return arr;
       }
 
-      // Length of the chart.
+
+      // Start cycle and max cycle
+      const start_cycle = 0
       const max_cycle = 100
 
       // Array whose values correspond to the cycles, starting from 0 to max_cycle.
-      const idx = gen_idx(0, max_cycle);
+      const idx = gen_idx(start_cycle, max_cycle);
 
       // Array used to mask values before the AI activation cycle.
       const idx_mask = Array(config.chain.ai_activation_cycle).fill(null);
