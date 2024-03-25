@@ -194,7 +194,7 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   let config : Cryptobox.Config.t =
     {
       activated = true;
-      use_mock_srs_for_testing = Some dal_parameters.cryptobox;
+      use_mock_srs_for_testing = true;
       bootstrap_peers = dal_bootstrap_peers;
     }
   in
@@ -1913,11 +1913,7 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
   (* We update the configuration because by default on sandbox mode,
      DAL is not activated. *)
   let config : Cryptobox.Config.t =
-    {
-      activated = true;
-      use_mock_srs_for_testing = Some parameters.cryptobox;
-      bootstrap_peers = [];
-    }
+    {activated = true; use_mock_srs_for_testing = true; bootstrap_peers = []}
   in
   Node.Config_file.update
     node2
@@ -5565,7 +5561,7 @@ let dal_crypto_benchmark () =
             {
               activated = true;
               bootstrap_peers = [];
-              use_mock_srs_for_testing = None;
+              use_mock_srs_for_testing = false;
             }
       in
       Log.info "SRS loaded." ;

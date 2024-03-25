@@ -40,8 +40,8 @@ type t = {
   activated : bool;
       (** [true] if the DAL is activated. This may have
           an impact on the loading time of the node. *)
-  use_mock_srs_for_testing : parameters option;
-      (** If [None], the srs is read from the srs files.
+  use_mock_srs_for_testing : bool;
+      (** If [false], the srs is read from the srs files.
           This is the value expected for production. For testing
           purposes, we may want to compute the srs instead but this is
           not secure. In this case, the size of a slot, page, the
@@ -54,5 +54,5 @@ type t = {
 val encoding : t Data_encoding.t
 
 (** The default configuration is
-    [{activated = false; use_mock_srs_for_testing = None}]. *)
+    [{activated = false; use_mock_srs_for_testing = false}]. *)
 val default : t
