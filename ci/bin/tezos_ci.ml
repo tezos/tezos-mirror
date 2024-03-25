@@ -281,6 +281,10 @@ end
 
 type arch = Amd64 | Arm64
 
+let arch_to_string = function Amd64 -> "x86_64" | Arm64 -> "arm64"
+
+let arch_to_string_alt = function Amd64 -> "amd64" | Arm64 -> "arm64"
+
 type dependency =
   | Job of tezos_job
   | Optional of tezos_job

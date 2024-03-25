@@ -503,29 +503,21 @@ Adding tests to the CI
 
 When adding a new test that should be run in the CI (which should be
 the case for most automatic tests), you need to make sure that it is
-properly specified in the :src:`.gitlab-ci.yml` file. The procedure
-for doing this depends on the type of test you've added:
+properly configured. The procedure for doing this depends on the type
+of test you've added:
 
 Tezt integration and regression tests
   New Tezt tests will be included automatically in the CI.
-  To rebalance the Tezt batches, run (from the root of the Octez repository):
-  ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest & QCheck)
-  Any non-protocol tests located in a folder named ``src/**/test/`` will be
-  picked up automatically by the CI. No intervention is necessary.
-
-  Protocol tests must be added to :src:`.gitlab/ci/jobs/test/oc.unit.yml` under the
-  protocol that they are testing. For example, to run a new protocol test for
-  ``proto_XXX_YYYYYYYY``, add the corresponding
-  ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``
-  ``make`` invocation.
+  Any tests located in a folder named ``src/**/test/`` that are
+  executed through ``dune runtest`` will be picked up automatically by
+  the CI. No intervention is necessary.
 
 Other
   For other types of tests, you need to manually modify the
-  :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
-  Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
-  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_.
+  CI configuration. Please refer to the CI configuration's README
+  (:src:`ci/README.md`) for more information.
 
 Test coverage in merge requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

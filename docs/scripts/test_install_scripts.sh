@@ -10,7 +10,7 @@
 # - by the CI to check them on a regular basis (e.g. every day)
 #
 # Therefore, mind keeping in sync the list of scenarios with both the Makefile
-# and the CI (file .gitlab/ci/test/install-octez.yml).
+# and the CI (file .gitlab/ci/jobs/test/install_octez.yml).
 
 # Ubuntu Focal Fossa 20.04 LTS:
 UBUNTU_FOCAL=public.ecr.aws/lts/ubuntu:20.04_stable
