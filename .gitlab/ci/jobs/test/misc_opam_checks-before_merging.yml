@@ -17,8 +17,7 @@ misc_opam_checks:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   before_script:
   - . ./scripts/version.sh

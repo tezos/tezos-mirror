@@ -31,8 +31,7 @@ opam:prepare:
     start_in: 1 minute
   - when: never
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   before_script:
   - eval $(opam env)

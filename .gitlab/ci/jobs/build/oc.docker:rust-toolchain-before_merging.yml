@@ -23,8 +23,7 @@ oc.docker:rust-toolchain:
   - when: manual
     allow_failure: true
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   before_script: []
   script:

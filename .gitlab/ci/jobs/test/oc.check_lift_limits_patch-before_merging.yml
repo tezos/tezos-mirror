@@ -14,8 +14,7 @@ oc.check_lift_limits_patch:
     - .gitlab-ci.yml
     when: on_success
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   before_script:
   - . ./scripts/version.sh

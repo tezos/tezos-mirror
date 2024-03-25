@@ -17,8 +17,7 @@ oc.build_x86_64-released:
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   before_script:
   - ./scripts/ci/take_ownership.sh

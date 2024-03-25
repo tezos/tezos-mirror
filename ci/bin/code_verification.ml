@@ -433,8 +433,7 @@ let jobs pipeline_type =
             ]
           |> job_external
         in
-        (* TODO: the dependency on job_trigger does not have to be optional *)
-        ([job_trigger], Dependent [Optional job_trigger])
+        ([job_trigger], Dependent [Job job_trigger])
   in
   let sanity =
     let job_sanity_ci : tezos_job =
@@ -708,7 +707,7 @@ let jobs pipeline_type =
           "git -C _opam-repo-for-release add packages";
           "git -C _opam-repo-for-release commit -m \"tezos packages\"";
         ]
-      |> job_external_once
+      |> job_external_split
     in
     let (jobs_opam_packages : tezos_job list) =
       read_opam_packages

@@ -20,8 +20,7 @@ oc.misc_checks:
     - .gitlab/**/*
     when: on_success
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   before_script:
   - ./scripts/ci/take_ownership.sh

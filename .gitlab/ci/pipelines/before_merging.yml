@@ -7,7 +7,7 @@ include:
   - .gitlab/ci/jobs/sanity/docker:hadolint-before_merging.yml
 
   # Stage: package
-  - .gitlab/ci/jobs/packaging/opam:prepare.yml
+  - .gitlab/ci/jobs/packaging/opam:prepare-before_merging.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
   - .gitlab/ci/jobs/packaging/debian_repository.yml
 

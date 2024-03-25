@@ -16,8 +16,7 @@ oc.semgrep:
     - .gitlab-ci.yml
     when: on_success
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   script:
   - echo "OCaml code linting. For information on how to reproduce locally, check out
