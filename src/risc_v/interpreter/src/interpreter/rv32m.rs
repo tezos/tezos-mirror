@@ -83,6 +83,60 @@ where
 
         self.write(rd, result);
     }
+
+    /// `MUL` R-type instruction
+    ///
+    /// Multiply val(rs1) with val(rs2) and store the lower 64 bits of the result
+    /// in register `rd`.
+    pub fn run_mul(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let rval1 = self.read(rs1) as i64;
+        let rval2 = self.read(rs2) as i64;
+
+        let result = rval1.wrapping_mul(rval2);
+
+        self.write(rd, result as u64);
+    }
+
+    /// `MULH` R-type instruction
+    ///
+    /// Multiply val(rs1) with val(rs2) and store the upper 64 bits of the result
+    /// in register `rd`.
+    pub fn run_mulh(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let rval1 = self.read(rs1) as i64 as i128;
+        let rval2 = self.read(rs2) as i64 as i128;
+
+        let result = rval1.wrapping_mul(rval2);
+
+        self.write(rd, (result >> 64) as i64 as u64);
+    }
+
+    /// `MULHSU` R-type instruction
+    ///
+    /// Multiply val(rs1) with val(rs2) and store the upper 64 bits of the result
+    /// in register `rd`. val(rs1) is treated as a _signed integer_, while val(rs2)
+    /// is treated as an _unsigned integer_.
+    pub fn run_mulhsu(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let rval1 = self.read(rs1) as i64 as i128 as u128;
+        let rval2 = self.read(rs2) as u128;
+
+        let result = rval1.wrapping_mul(rval2);
+
+        self.write(rd, (result >> 64) as u64);
+    }
+
+    /// `MULHU` R-type instruction
+    ///
+    /// Multiply val(rs1) with val(rs2) and store the upper 64 bits of the result
+    /// in register `rd`. Both val(rs1) and val(rs2) are treated as
+    /// _unsigned integers_.
+    pub fn run_mulhu(&mut self, rs1: XRegister, rs2: XRegister, rd: XRegister) {
+        let rval1 = self.read(rs1) as u128;
+        let rval2 = self.read(rs2) as u128;
+
+        let result = rval1.wrapping_mul(rval2);
+
+        self.write(rd, (result >> 64) as u64);
+    }
 }
 
 #[cfg(test)]

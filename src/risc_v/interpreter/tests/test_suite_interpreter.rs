@@ -868,32 +868,11 @@ test_case!(test_suite_rv64um_p_div, "rv64um-p-div", Mode::User);
 test_case!(test_suite_rv64um_p_divu, "rv64um-p-divu", Mode::User);
 test_case!(test_suite_rv64um_p_divuw, "rv64um-p-divuw", Mode::User);
 test_case!(test_suite_rv64um_p_divw, "rv64um-p-divw", Mode::User);
-
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_mul,
-    "rv64um-p-mul"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_mulh,
-    "rv64um-p-mulh"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_mulhsu,
-    "rv64um-p-mulhsu"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_mulhu,
-    "rv64um-p-mulhu"
-);
-test_case!(
-    #[ignore]
-    test_suite_rv64um_p_mulw,
-    "rv64um-p-mulw"
-);
+test_case!(test_suite_rv64um_p_mul, "rv64um-p-mul", Mode::User);
+test_case!(test_suite_rv64um_p_mulh, "rv64um-p-mulh", Mode::User);
+test_case!(test_suite_rv64um_p_mulhsu, "rv64um-p-mulhsu", Mode::User);
+test_case!(test_suite_rv64um_p_mulhu, "rv64um-p-mulhu", Mode::User);
+test_case!(test_suite_rv64um_p_mulw, "rv64um-p-mulw", Mode::User);
 test_case!(test_suite_rv64um_p_rem, "rv64um-p-rem", Mode::User);
 test_case!(test_suite_rv64um_p_remu, "rv64um-p-remu", Mode::User);
 test_case!(test_suite_rv64um_p_remuw, "rv64um-p-remuw", Mode::User);
