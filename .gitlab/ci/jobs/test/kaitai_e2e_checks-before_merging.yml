@@ -8,6 +8,7 @@ kaitai_e2e_checks:
   - gcp
   rules:
   - changes:
+    - scripts/ci/**/*
     - images/**/*
     - src/**/*
     - client-libs/*kaitai*/**/*
