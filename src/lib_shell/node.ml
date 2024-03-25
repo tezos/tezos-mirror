@@ -273,24 +273,29 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess ~version
       in
       let main_chain_store = Store.main_chain_store store in
       let* validator_process =
-        init validator_environment (Internal main_chain_store)
+        init (Internal (validator_environment, main_chain_store))
       in
       return (validator_process, store)
     else
       let* validator_process =
         init
-          validator_environment
           (External
              {
-               data_dir;
-               readonly = false;
-               genesis;
-               context_root;
-               protocol_root;
+               parameters =
+                 {
+                   data_dir;
+                   readonly = false;
+                   genesis;
+                   context_root;
+                   protocol_root;
+                   sandbox_parameters;
+                   dal_config;
+                   user_activated_upgrades;
+                   user_activated_protocol_overrides;
+                   operation_metadata_size_limit;
+                   internal_events;
+                 };
                process_path = Sys.executable_name;
-               sandbox_parameters;
-               dal_config;
-               internal_events;
              })
       in
       let commit_genesis ~chain_id =

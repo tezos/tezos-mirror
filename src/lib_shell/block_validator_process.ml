@@ -32,17 +32,10 @@ type validator_environment = {
 }
 
 type validator_kind =
-  | Internal : Store.Chain.chain_store -> validator_kind
+  | Internal : validator_environment * Store.Chain.chain_store -> validator_kind
   | External : {
-      genesis : Genesis.t;
-      readonly : bool;
-      data_dir : string;
-      context_root : string;
-      protocol_root : string;
+      parameters : External_validation.parameters;
       process_path : string;
-      sandbox_parameters : Data_encoding.json option;
-      dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-      internal_events : Tezos_base.Internal_event_config.t;
     }
       -> validator_kind
 
@@ -581,20 +574,10 @@ module External_validator_process = struct
   type process_status = Uninitialized | Running of validator_process | Exiting
 
   type t = {
-    genesis : Genesis.t;
-    readonly : bool;
-    data_dir : string;
-    context_root : string;
-    protocol_root : string;
-    user_activated_upgrades : User_activated.upgrades;
-    user_activated_protocol_overrides : User_activated.protocol_overrides;
-    operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
+    parameters : External_validation.parameters;
     process_path : string;
     mutable validator_process : process_status;
     lock : Lwt_mutex.t;
-    sandbox_parameters : Data_encoding.json option;
-    dal_config : Tezos_crypto_dal.Cryptobox.Config.t;
-    internal_events : Tezos_base.Internal_event_config.t;
   }
 
   let kind = External_process
@@ -656,24 +639,11 @@ module External_validator_process = struct
   *)
   let process_init vp process_input process_output =
     let open Lwt_result_syntax in
-    let parameters =
-      {
-        External_validation.context_root = vp.context_root;
-        protocol_root = vp.protocol_root;
-        sandbox_parameters = vp.sandbox_parameters;
-        genesis = vp.genesis;
-        user_activated_upgrades = vp.user_activated_upgrades;
-        user_activated_protocol_overrides = vp.user_activated_protocol_overrides;
-        operation_metadata_size_limit = vp.operation_metadata_size_limit;
-        dal_config = vp.dal_config;
-        internal_events = vp.internal_events;
-      }
-    in
     let*! () =
       External_validation.send
         process_input
         External_validation.parameters_encoding
-        parameters
+        vp.parameters
     in
     let* () =
       External_validation.recv
@@ -694,10 +664,7 @@ module External_validator_process = struct
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one validation process per socket *)
     let socket_dir = get_temporary_socket_dir () in
-    let args =
-      ["octez-validator"; "--socket-dir"; socket_dir]
-      @ match vp.readonly with true -> ["--readonly"] | false -> []
-    in
+    let args = ["octez-validator"; "--socket-dir"; socket_dir] in
     let env = Unix.environment () in
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/4837
 
@@ -893,33 +860,14 @@ module External_validator_process = struct
      Note that it is important to have [init] as a blocking promise as
      the external validator must initialize the context (in RW) before
      the node tries to open it (in RO).*)
-  let init
-      ({
-         user_activated_upgrades;
-         user_activated_protocol_overrides;
-         operation_metadata_size_limit;
-         _;
-       } :
-        validator_environment) ~genesis ~data_dir ~readonly ~context_root
-      ~protocol_root ~process_path ~sandbox_parameters ~dal_config
-      ~internal_events =
+  let init parameters ~process_path =
     let open Lwt_result_syntax in
     let validator =
       {
-        data_dir;
-        readonly;
-        genesis;
-        context_root;
-        protocol_root;
-        user_activated_upgrades;
-        user_activated_protocol_overrides;
-        operation_metadata_size_limit;
+        parameters;
         process_path;
         validator_process = Uninitialized;
         lock = Lwt_mutex.create ();
-        sandbox_parameters;
-        dal_config;
-        internal_events;
       }
     in
     let* (_ :
@@ -1088,10 +1036,10 @@ module External_validator_process = struct
     | Uninitialized | Exiting -> Lwt.return_unit
 end
 
-let init validator_environment validator_kind =
+let init validator_kind =
   let open Lwt_result_syntax in
   match validator_kind with
-  | Internal chain_store ->
+  | Internal (validator_environment, chain_store) ->
       let* (validator : 'a) =
         Internal_validator_process.init validator_environment chain_store
       in
@@ -1099,30 +1047,9 @@ let init validator_environment validator_kind =
         (module Internal_validator_process)
       in
       return (E {validator_process; validator})
-  | External
-      {
-        genesis;
-        readonly;
-        data_dir;
-        context_root;
-        protocol_root;
-        process_path;
-        sandbox_parameters;
-        dal_config;
-        internal_events;
-      } ->
+  | External {parameters; process_path} ->
       let* (validator : 'b) =
-        External_validator_process.init
-          validator_environment
-          ~genesis
-          ~data_dir
-          ~readonly
-          ~context_root
-          ~protocol_root
-          ~process_path
-          ~sandbox_parameters
-          ~dal_config
-          ~internal_events
+        External_validator_process.init parameters ~process_path
       in
       let validator_process : (module S with type t = 'b) =
         (module External_validator_process)
