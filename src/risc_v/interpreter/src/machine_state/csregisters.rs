@@ -4,8 +4,8 @@
 
 #![allow(non_upper_case_globals)]
 
-mod fields;
-mod satp;
+pub mod fields;
+pub mod satp;
 pub mod xstatus;
 
 use self::satp::{SvLength, TranslationAlgorithm};
