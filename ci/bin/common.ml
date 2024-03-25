@@ -386,6 +386,18 @@ let changeset_semgrep_files =
     ".gitlab-ci.yml";
   ]
 
+(* We only need to run the [oc.script:snapshot_alpha_and_link] job if
+   protocol Alpha or if the scripts changed. *)
+let changeset_script_snapshot_alpha_and_link =
+  [
+    "src/proto_alpha/**/*";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+    "scripts/snapshot_alpha_and_link.sh";
+    "scripts/snapshot_alpha.sh";
+    "scripts/user_activated_upgrade.sh";
+  ]
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.

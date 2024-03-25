@@ -394,9 +394,13 @@ let jobs pipeline_type =
   in
   (* Stages *)
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
-  let trigger, dependencies_needs_trigger =
+  let trigger_stage, make_dependencies =
     match pipeline_type with
-    | Schedule_extended_test -> ([], Staged [])
+    | Schedule_extended_test ->
+        let make_dependencies ~before_merging:_ ~schedule_extended_test =
+          schedule_extended_test ()
+        in
+        ([], make_dependencies)
     | Before_merging ->
         (* Define the [trigger] job
 
@@ -433,7 +437,17 @@ let jobs pipeline_type =
             ]
           |> job_external
         in
-        ([job_trigger], Dependent [Job job_trigger])
+        let make_dependencies ~before_merging ~schedule_extended_test:_ =
+          before_merging job_trigger
+        in
+        ([job_trigger], make_dependencies)
+  in
+  (* Short-cut for jobs that has no dependencies except [job_trigger]
+     on [Before_merging] pipelines. *)
+  let dependencies_needs_trigger =
+    make_dependencies
+      ~before_merging:(fun job_trigger -> Dependent [Job job_trigger])
+      ~schedule_extended_test:(fun () -> Staged [])
   in
   let sanity =
     let job_sanity_ci : tezos_job =
@@ -718,6 +732,22 @@ let jobs pipeline_type =
     in
     job_opam_prepare :: jobs_opam_packages
   in
+  (* Dependencies for jobs that should run immediately after jobs
+     [job_build_x86_64] in [Before_merging] if they are present
+     (otherwise, they run immediately after [job_trigger]). In
+     [Scheduled_extended_test] we are not in a hurry and we let them
+     be [Staged []]. *)
+  let order_after_build =
+    make_dependencies
+      ~before_merging:(fun job_trigger ->
+        Dependent
+          (Job job_trigger
+          :: [
+               Optional job_build_x86_64_release;
+               Optional job_build_x86_64_exp_dev_extra;
+             ]))
+      ~schedule_extended_test:(fun () -> Staged [])
+  in
   let test =
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
@@ -890,6 +920,24 @@ let jobs pipeline_type =
         ["dune build gen_genesis.exe"]
       |> job_external_split
     in
+    let job_oc_script_snapshot_alpha_and_link : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.script:snapshot_alpha_and_link"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~dependencies:order_after_build
+          (* Since the above dependencies are only for ordering, we do not set [dependent] *)
+        ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh"]
+      |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -899,6 +947,7 @@ let jobs pipeline_type =
       job_semgrep;
       job_oc_integration_compiler_rejections;
       job_oc_script_test_gen_genesis;
+      job_oc_script_snapshot_alpha_and_link;
     ]
     @ jobs_unit
     @
@@ -989,5 +1038,5 @@ let jobs pipeline_type =
      (using {!job_external} or {!jobs_external}) and included by hand
      in the files [.gitlab/ci/pipelines/before_merging.yml] and
      [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
-  ignore (trigger @ sanity @ build @ packaging @ test @ doc @ manual) ;
+  ignore (trigger_stage @ sanity @ build @ packaging @ test @ doc @ manual) ;
   []

@@ -45,7 +45,7 @@ include:
   - .gitlab/ci/jobs/test/oc.semgrep-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.unit-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml
+  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.script:test-gen-genesis-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions.yml
   - .gitlab/ci/jobs/test/oc.script:b58_prefix.yml

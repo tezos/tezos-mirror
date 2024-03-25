@@ -195,7 +195,6 @@ let () =
     | ".gitlab/ci/jobs/shared/templates.yml" | ".gitlab/ci/jobs/test/common.yml"
     | ".gitlab/ci/jobs/test/install_octez.yml"
     | ".gitlab/ci/jobs/test/oc.script:b58_prefix.yml"
-    | ".gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml"
     | ".gitlab/ci/jobs/test/oc.script:test_octez_release_versions.yml"
     | ".gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml"
     | ".gitlab/ci/jobs/test/test_etherlink_kernel-before_merging.yml"

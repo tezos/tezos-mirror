@@ -39,7 +39,7 @@ include:
   - .gitlab/ci/jobs/test/oc.semgrep-before_merging.yml
   - .gitlab/ci/jobs/test/oc.unit-before_merging.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections-before_merging.yml
-  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml
+  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link-before_merging.yml
   - .gitlab/ci/jobs/test/oc.script:test-gen-genesis-before_merging.yml
   - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions.yml
   - .gitlab/ci/jobs/test/oc.script:b58_prefix.yml
