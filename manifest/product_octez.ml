@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
+(* Copyright (c) 2022-2024 TriliTech <contact@trili.tech>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -535,7 +535,9 @@ let octez_rpc =
 let octez_risc_v_pvm =
   let base_name = "octez_risc_v_pvm" in
   let archive_file = Format.sprintf "lib%s.a" base_name in
-  let archive_output_file = Format.sprintf "target/release/%s" archive_file in
+  let archive_output_file =
+    Format.sprintf "../target/release/%s" archive_file
+  in
   let header_file = Format.sprintf "%s.h" base_name in
   let armerge =
     let open Dune in
@@ -579,20 +581,24 @@ let octez_risc_v_pvm =
       [S "targets"; S archive_file; S header_file];
       [
         S "deps";
-        [S "source_tree"; S "src"];
-        [S "file"; S "build.rs"];
         [S "file"; S "Cargo.toml"];
+        [S "file"; S "build.rs"];
+        [S "source_tree"; S "src"];
         [S "file"; S "../Cargo.lock"];
+        [S "file"; S "../Cargo.toml"];
         (* For the local dependent crates, these patterns only include files
          * directly contained in the crate's directory, as well as the [src]
          * directory, excluding all other directories in order to avoid
          * copying any build artifacts. *)
-        [S "glob_files"; S "../interpreter/*"];
-        [S "source_tree"; S "../interpreter/src"];
-        [S "glob_files"; S "../machine_state/*"];
-        [S "source_tree"; S "../machine_state/src"];
-        [S "glob_files"; S "../kernel_loader/*"];
-        [S "source_tree"; S "../kernel_loader/src"];
+        [S "source_tree"; S "../kernel_loader"];
+        [S "source_tree"; S "../interpreter"];
+        (* We have to include all the locally mentioned Cargo.toml files
+         * within the workspace (including transitively). *)
+        [S "file"; S "../sandbox/Cargo.toml"];
+        [S "file"; S "../../kernel_sdk/constants/Cargo.toml"];
+        [S "file"; S "../../kernel_sdk/core/Cargo.toml"];
+        [S "file"; S "../../kernel_sdk/host/Cargo.toml"];
+        [S "file"; S "../../kernel_sdk/encoding/Cargo.toml"];
         extra_dep;
       ];
       [S "enabled_if"; enable_if];
@@ -602,7 +608,8 @@ let octez_risc_v_pvm =
           S "no-infer";
           [
             S "progn";
-            of_atom_list ["run"; "cargo"; "build"; "--release"];
+            of_atom_list
+              ["run"; "cargo"; "build"; "--release"; "-p"; "octez-risc-v-pvm"];
             transform archive_output_file archive_file;
           ];
         ];

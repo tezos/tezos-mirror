@@ -3,6 +3,10 @@ name = "risc-v-sandbox"
 version = "0.0.0"
 edition = "2021"
 
+[[bin]]
+name = "risc-v-sandbox"
+path = "src/main.rs"
+
 [dependencies]
 goblin = "0.7.1"
 derive_more = "0.99.17"
