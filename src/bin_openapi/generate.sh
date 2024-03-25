@@ -17,9 +17,9 @@ tezos_client=./octez-client
 smart_rollup_node=./octez-smart-rollup-node
 
 # Protocol configuration.
-protocol_hash=ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH
-protocol_parameters=src/proto_018_Proxford/parameters/sandbox-parameters.json
-protocol_name=oxford
+protocol_hash=PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5
+protocol_parameters=src/proto_019_PtParisA/parameters/sandbox-parameters.json
+protocol_name=paris
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"

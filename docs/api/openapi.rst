@@ -74,6 +74,19 @@ and specific to the Oxford protocol can be found at:
 
 - `oxford-mempool-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
 
+Paris RPCs
+-----------
+
+The OpenAPI specifications for RPCs which are specific to the Paris A (``PtParisA``)
+protocol can be found at:
+
+- `paris-openapi-rc.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-openapi-rc.json>`_
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Paris protocol can be found at:
+
+- `paris-mempool-openapi-rc.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-mempool-openapi-rc.json>`_
+
 Smart Rollup Node
 ~~~~~~~~~~~~~~~~~
 
