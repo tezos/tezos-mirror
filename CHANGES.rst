@@ -129,6 +129,11 @@ Baker
 - Fixed situations where the baker would stall when a signing request
   hanged. (MR :gl:`!12353`)
 
+- Introduced two new nonces files (``<chain_id>_stateful_nonces`` and 
+  ``<chain_id>_orphaned_nonces``). Each nonce is registered with a state
+  for optimising the nonce lookup, reducing the number of rpc calls
+  required to calculate nonce revelations. (MR :gl:`!12517`)
+
 Accuser
 -------
 
