@@ -15,6 +15,7 @@ set -eu
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
 gitlab_octez_debian_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_debian_package_name}/${gitlab_package_version}"
+gitlab_octez_ubuntu_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_package_name}/${gitlab_package_version}"
 gitlab_octez_fedora_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_fedora_package_name}/${gitlab_package_version}"
 gitlab_octez_rockylinux_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rockylinux_package_name}/${gitlab_package_version}"
 gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
@@ -75,6 +76,12 @@ echo "Upload debian packages"
 for package in ${debian_packages}; do
   package_name="$(basename "${package}")"
   gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_debian_package_url}"
+done
+
+echo "Upload Ubuntu packages"
+for package in ${ubuntu_packages}; do
+  package_name="$(basename "${package}")"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_package_url}"
 done
 
 echo "Upload Fedora packages"

@@ -45,3 +45,4 @@ oc.build:dpkg:amd64:
     matrix:
     - DISTRIBUTION:
       - debian:bookworm
+      - ubuntu:focal

@@ -120,6 +120,7 @@ oc.build:dpkg:amd64:
     matrix:
     - DISTRIBUTION:
       - debian:bookworm
+      - ubuntu:focal
 
 oc.build:rpm:amd64:
   image: fedora:39
