@@ -13,7 +13,7 @@ use std::array::TryFromSliceError;
 
 use libsecp256k1::{recover, Message, RecoveryId, Signature};
 use primitive_types::{H160, H256, U256};
-use rlp::{DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
+use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpIterator, RlpStream};
 use sha3::{Digest, Keccak256};
 use thiserror::Error;
 
@@ -600,6 +600,20 @@ pub fn string_to_sk_and_address_unsafe(
     let mut value: [u8; 20] = [0u8; 20];
     value.copy_from_slice(&kec[12..]);
     (sk, value.into())
+}
+
+impl Encodable for EthereumTransactionCommon {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        let eth_bytes = self.to_bytes();
+        stream.encoder().encode_value(&eth_bytes)
+    }
+}
+
+impl Decodable for EthereumTransactionCommon {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        let bytes: Vec<u8> = decoder.as_val()?;
+        EthereumTransactionCommon::from_bytes(&bytes)
+    }
 }
 
 // cargo test ethereum::signatures::test --features testing
