@@ -51,8 +51,9 @@ let root = 0l
 let succ = Int32.succ
 
 let add l i =
-  assert (Compare.Int.(i >= 0)) ;
-  Int32.add l (Int32.of_int i)
+  let x = Int32.add l (Int32.of_int i) in
+  assert (Compare.Int32.(x >= 0l)) ;
+  x
 
 let sub l i =
   assert (Compare.Int.(i >= 0)) ;
