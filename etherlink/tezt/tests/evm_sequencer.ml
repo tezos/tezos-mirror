@@ -132,7 +132,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
 let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels
+    ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(sequencer = Constant.bootstrap1) ?(kernel = Constant.WASM.evm_kernel)
     ?da_fee ?minimum_base_fee_per_gas ?preimages_dir protocol =
@@ -199,6 +199,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
         max_blueprints_ahead;
         max_blueprints_catchup;
         catchup_cooldown;
+        max_number_of_chunks;
         devmode;
         wallet_dir = Some (Client.base_dir client);
       }

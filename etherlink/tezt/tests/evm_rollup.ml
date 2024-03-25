@@ -478,6 +478,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
                max_blueprints_ahead = None;
                max_blueprints_catchup = None;
                catchup_cooldown = None;
+               max_number_of_chunks = None;
                devmode;
                wallet_dir = Some (Client.base_dir client);
              })
@@ -4587,6 +4588,7 @@ let test_migrate_proxy_to_sequencer_future =
           max_blueprints_ahead = None;
           max_blueprints_catchup = None;
           catchup_cooldown = None;
+          max_number_of_chunks = None;
           devmode = true;
           wallet_dir = Some (Client.base_dir client);
         }
@@ -4748,6 +4750,7 @@ let test_migrate_proxy_to_sequencer_past =
           max_blueprints_ahead = None;
           max_blueprints_catchup = None;
           catchup_cooldown = None;
+          max_number_of_chunks = None;
           devmode = true;
           wallet_dir = Some (Client.base_dir client);
         }

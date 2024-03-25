@@ -475,6 +475,13 @@ let time_between_blocks_arg =
     ~placeholder:"10."
     Params.time_between_blocks
 
+let max_number_of_chunks_arg =
+  Tezos_clic.arg
+    ~long:"max-number-of-chunks"
+    ~doc:"Maximum number of chunks per blueprint."
+    ~placeholder:"10."
+    Params.int
+
 let keep_alive_arg =
   Tezos_clic.switch
     ~doc:
@@ -655,7 +662,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args18
+    (args19
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -672,6 +679,7 @@ let sequencer_command =
        maximum_blueprints_ahead_arg
        maximum_blueprints_catchup_arg
        catchup_cooldown_arg
+       max_number_of_chunks_arg
        devmode_arg
        wallet_dir_arg)
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
@@ -699,6 +707,7 @@ let sequencer_command =
            max_blueprints_ahead,
            max_blueprints_catchup,
            catchup_cooldown,
+           max_number_of_chunks,
            devmode,
            wallet_dir )
          rollup_node_endpoint
@@ -747,6 +756,7 @@ let sequencer_command =
           ?preimages
           ?preimages_endpoint
           ?time_between_blocks
+          ?max_number_of_chunks
           ~sequencer:sequencer_pkh
           ()
       in

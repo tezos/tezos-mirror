@@ -22,6 +22,7 @@ type sequencer = {
   preimages : string;
   preimages_endpoint : Uri.t option;
   time_between_blocks : time_between_blocks;
+  max_number_of_chunks : int;
   private_rpc_port : int option;
   sequencer : Signature.public_key_hash;
 }
@@ -74,6 +75,16 @@ let default_evm_node_endpoint = Uri.empty
 
 let default_time_between_blocks = Time_between_blocks 5.
 
+let hard_maximum_number_of_chunks =
+  (* The kernel doesn't accept blueprints whose cumulated chunk size is higher
+     than 512kb. *)
+  let max_cumulated_chunks_size = 512 * 1024 in
+  (* External message size *)
+  let chunk_size = 4095 in
+  max_cumulated_chunks_size / chunk_size
+
+let default_max_number_of_chunks = hard_maximum_number_of_chunks
+
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
   conv
@@ -114,6 +125,7 @@ let encoding_sequencer =
            preimages_endpoint;
            rollup_node_endpoint;
            time_between_blocks;
+           max_number_of_chunks;
            private_rpc_port;
            sequencer;
          } ->
@@ -121,12 +133,14 @@ let encoding_sequencer =
         preimages_endpoint,
         Uri.to_string rollup_node_endpoint,
         time_between_blocks,
+        max_number_of_chunks,
         private_rpc_port,
         sequencer ))
     (fun ( preimages,
            preimages_endpoint,
            rollup_node_endpoint,
            time_between_blocks,
+           max_number_of_chunks,
            private_rpc_port,
            sequencer ) ->
       {
@@ -134,10 +148,11 @@ let encoding_sequencer =
         preimages_endpoint;
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
         time_between_blocks;
+        max_number_of_chunks;
         private_rpc_port;
         sequencer;
       })
-    (obj6
+    (obj7
        (dft "preimages" string default_preimages)
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
        (dft
@@ -148,6 +163,7 @@ let encoding_sequencer =
           "time_between_blocks"
           encoding_time_between_blocks
           default_time_between_blocks)
+       (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
        (opt
           "private-rpc-port"
           ~description:"RPC port for private server"
@@ -296,7 +312,8 @@ module Cli = struct
 
   let create_sequencer ?private_rpc_port ~devmode ?rpc_addr ?rpc_port
       ?cors_origins ?cors_headers ?log_filter ?rollup_node_endpoint ?preimages
-      ?preimages_endpoint ?time_between_blocks ~sequencer =
+      ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks ~sequencer
+      =
     let mode =
       {
         rollup_node_endpoint =
@@ -307,6 +324,10 @@ module Cli = struct
         preimages_endpoint;
         time_between_blocks =
           Option.value ~default:default_time_between_blocks time_between_blocks;
+        max_number_of_chunks =
+          Option.value
+            ~default:default_max_number_of_chunks
+            max_number_of_chunks;
         private_rpc_port;
         sequencer;
       }
@@ -375,7 +396,7 @@ module Cli = struct
   let patch_sequencer_configuration_from_args ?private_rpc_port ~devmode
       ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?log_filter
       ?rollup_node_endpoint ?preimages ?preimages_endpoint ?time_between_blocks
-      configuration ~sequencer =
+      ?max_number_of_chunks configuration ~sequencer =
     let mode =
       {
         rollup_node_endpoint =
@@ -389,6 +410,10 @@ module Cli = struct
           Option.value
             ~default:configuration.mode.time_between_blocks
             time_between_blocks;
+        max_number_of_chunks =
+          Option.value
+            ~default:default_max_number_of_chunks
+            max_number_of_chunks;
         private_rpc_port;
         sequencer;
       }
@@ -495,7 +520,7 @@ module Cli = struct
   let create_or_read_sequencer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
       ?private_rpc_port ?cors_origins ?cors_headers ?log_filter
       ?rollup_node_endpoint ?preimages ?preimages_endpoint ?time_between_blocks
-      ~sequencer () =
+      ?max_number_of_chunks ~sequencer () =
     create_or_read_config
       ~data_dir
       ~devmode
@@ -512,6 +537,7 @@ module Cli = struct
            ?preimages
            ?preimages_endpoint
            ?time_between_blocks
+           ?max_number_of_chunks
            ~sequencer)
       ~create:
         (create_sequencer
@@ -519,6 +545,7 @@ module Cli = struct
            ?preimages
            ?preimages_endpoint
            ?time_between_blocks
+           ?max_number_of_chunks
            ~sequencer)
       ()
 
