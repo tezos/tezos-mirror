@@ -300,6 +300,21 @@ async function analyze_profiler_output(path) {
     results.block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
     results.block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
     results.next_bip_ticks = await get_ticks(path, "next_bip_from_blueprint");
+
+    let nb_runs = results.kernel_run_ticks?.length;
+    let nb_transactions = results.run_transaction_ticks?.length;
+    let nb_blocks = results.block_finalize?.length;
+    check(nb_runs, results.interpreter_init_ticks?.length, "Error in nb of interpreter init ticks $?")
+    check(nb_runs, results.interpreter_decode_ticks?.length, "Error in nb of interpreter decode ticks $?")
+    check(nb_transactions, results.signature_verification_ticks?.length, "Error in nb of signatures ticks $?")
+    check(nb_transactions, results.hashing_ticks?.length, "Error in nb of hash ticks $?")
+    check(nb_transactions, results.store_transaction_object_ticks?.length, "Error in nb of stored tx ticks $?")
+    check(nb_transactions, results.store_receipt_ticks?.length, "Error in nb of receipts ticks $?")
+    check(nb_transactions, results.logs_to_bloom?.length, "Error in nb of bloom ticks $?")
+    // last bp reading should be empty and lead to no block
+    check(nb_blocks + 1, results.next_bip_ticks?.length, "Error in nb of bp reading ticks $?")
+    check(results.block_in_progress_store?.length, results.block_in_progress_read?.length, "not as many bip read as store $?")
+
     return results;
 }
 
@@ -317,7 +332,7 @@ async function run_benchmark(path, logs) {
             }
         });
     }
-    if(!FAST_MODE) check(run_profiler_result.bip_size.length, profiler_output_analysis_result.next_bip_ticks?.length, "Pb with nb of ticks of next bip $?");
+    if (!FAST_MODE) check(profiler_output_analysis_result.next_bip_ticks?.length, run_profiler_result.bip_size.length, "Pb with nb of blueprint size $?");
     return {
         inbox_size,
         ...profiler_output_analysis_result,
