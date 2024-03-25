@@ -10,14 +10,18 @@ use tezos_ethereum::rlp_helpers::{
     self, append_timestamp, append_u16_le, append_u256_le, decode_field_u16_le,
     decode_field_u256_le, decode_timestamp,
 };
+use tezos_smart_rollup::types::Timestamp;
 
-use crate::{blueprint::Blueprint, delayed_inbox::Hash};
+use crate::delayed_inbox::Hash;
 
 #[derive(Debug, Clone)]
 pub struct BlueprintWithDelayedHashes {
     pub parent_hash: H256,
     pub delayed_hashes: Vec<Hash>,
-    pub blueprint: Blueprint,
+    // We are using `Vec<u8>` for the transaction instead of `EthereumTransactionCommon`
+    // to avoid decoding then re-encoding to compute the hash.
+    pub transactions: Vec<Vec<u8>>,
+    pub timestamp: Timestamp,
 }
 
 impl Encodable for BlueprintWithDelayedHashes {
@@ -25,16 +29,13 @@ impl Encodable for BlueprintWithDelayedHashes {
         let BlueprintWithDelayedHashes {
             parent_hash,
             delayed_hashes,
-            blueprint:
-                Blueprint {
-                    transactions,
-                    timestamp,
-                },
+            transactions,
+            timestamp,
         } = self;
         stream.begin_list(4);
         rlp_helpers::append_h256(stream, *parent_hash);
         stream.append_list(delayed_hashes);
-        stream.append_list(transactions);
+        stream.append_list::<Vec<u8>, _>(transactions);
         append_timestamp(stream, *timestamp);
     }
 }
@@ -60,10 +61,8 @@ impl Decodable for BlueprintWithDelayedHashes {
         Ok(Self {
             delayed_hashes,
             parent_hash,
-            blueprint: Blueprint {
-                transactions,
-                timestamp,
-            },
+            transactions,
+            timestamp,
         })
     }
 }

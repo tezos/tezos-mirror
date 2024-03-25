@@ -5,6 +5,7 @@
 use crate::blueprint::Blueprint;
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
+use crate::inbox::{Transaction, TransactionContent};
 use crate::sequencer_blueprint::{BlueprintWithDelayedHashes, SequencerBlueprint};
 use crate::storage::{
     self, read_current_block_number, read_rlp, store_read_slice, store_rlp,
@@ -12,7 +13,9 @@ use crate::storage::{
 use crate::{delayed_inbox, DelayedInbox};
 use primitive_types::{H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
+use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
+use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
@@ -20,8 +23,6 @@ use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
-
-const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
 /// The store representation of a blueprint.
 /// It's designed to support storing sequencer blueprints,
@@ -184,7 +185,6 @@ pub enum BlueprintValidity {
     InvalidParentHash,
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
-    UnexpectedDeposit,
 }
 
 /// Check that the parent hash of the [blueprint_with_hashes] is equal
@@ -220,22 +220,24 @@ fn fetch_delayed_txs<Host: Runtime>(
         }
     }
 
-    let evm_node_exec_flag = host.store_has(&EVM_NODE_FLAG)?.is_some();
+    let transactions_with_hashes = blueprint_with_hashes
+        .transactions
+        .into_iter()
+        .map(|tx_common| {
+            let tx_hash = Keccak256::digest(&tx_common).into();
+            let tx_common = EthereumTransactionCommon::from_bytes(&tx_common)?;
 
-    if !evm_node_exec_flag
-        && blueprint_with_hashes
-            .blueprint
-            .transactions
-            .iter()
-            .any(|txn| txn.is_delayed())
-    {
-        return Ok(BlueprintValidity::UnexpectedDeposit);
-    }
+            Ok(Transaction {
+                tx_hash,
+                content: TransactionContent::Ethereum(tx_common),
+            })
+        })
+        .collect::<anyhow::Result<Vec<Transaction>>>()?;
 
-    delayed_txs.extend(blueprint_with_hashes.blueprint.transactions);
+    delayed_txs.extend(transactions_with_hashes);
     Ok(BlueprintValidity::Valid(Blueprint {
         transactions: delayed_txs,
-        timestamp: blueprint_with_hashes.blueprint.timestamp,
+        timestamp: blueprint_with_hashes.timestamp,
     }))
 }
 
@@ -385,11 +387,6 @@ mod tests {
             },
         };
 
-        // Create empty blueprint with an invalid delayed hash
-        let empty_blueprint = Blueprint {
-            timestamp: Timestamp::from(42),
-            transactions: vec![],
-        };
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);
         let dummy_parent_hash = H256::from_slice(
             &hex::decode(
@@ -402,7 +399,8 @@ mod tests {
             BlueprintWithDelayedHashes {
                 delayed_hashes: vec![dummy_tx_hash],
                 parent_hash: dummy_parent_hash,
-                blueprint: empty_blueprint.clone(),
+                timestamp: Timestamp::from(42),
+                transactions: vec![],
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_hash);
@@ -463,7 +461,8 @@ mod tests {
             BlueprintWithDelayedHashes {
                 delayed_hashes: vec![],
                 parent_hash: H256::zero(),
-                blueprint: empty_blueprint,
+                timestamp: Timestamp::from(42),
+                transactions: vec![],
             };
         let blueprint_with_hashes_bytes =
             rlp::Encodable::rlp_bytes(&blueprint_with_invalid_parent_hash);
