@@ -62,8 +62,8 @@ for ``List.map``
        'a list ->
        ('b list, 'trace list) result Lwt.t
 
-Check out `the online documentation of
-Lwtreslib <../api/odoc/_html/tezos-lwt-result-stdlib/Tezos_lwt_result_stdlib/Lwtreslib/index.html>`__
+Check out :package-api:`the online documentation of
+Lwtreslib <octez-libs/tezos_lwt_result_stdlib.html>`
 for a description of the semantic and naming convention.
 
 In addition to shadowing existing modules, ``Lwtreslib`` also exports

@@ -14,7 +14,7 @@ depends: [
   "merlin" { >= "4.14" }
   "ocaml-lsp-server" { >= "1.17.0" }
   "ocp-indent"
-  "odoc"
+  "odoc" { >= "2.2.0" & < "2.3.0" }
   "utop" { >= "2.8" }
 ]
 build: []

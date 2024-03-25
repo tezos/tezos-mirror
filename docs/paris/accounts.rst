@@ -61,7 +61,7 @@ Addresses that start with the ``tz3`` prefix are hashes of P-256 public keys and
 signatures must be produced by using the `EcDSA signature scheme
 <https://en.wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm>`_
 with the `P-256 curve
-<http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf>`_, also known as
+<https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-186.pdf>`_, also known as
 Secp256r1. This is one of the curves for EcDSA recommended by NIST. It is also
 often the only cryptographic scheme supported by HSMs (Hardware Security
 Modules) of cloud providers.

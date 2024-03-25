@@ -367,7 +367,9 @@ let () =
     (add_dep_to_profile "octez-dev-deps")
     [
       external_lib "merlin" V.(at_least "4.14");
-      external_lib "odoc" V.True;
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7085
+         remove constraint on odoc version when odoc bug is solved *)
+      external_lib "odoc" V.(at_least "2.2.0" && less_than "2.3.0");
       external_lib "ocp-indent" V.True;
       external_lib "ocaml-lsp-server" V.(at_least "1.17.0");
       external_lib "merge-fmt" V.True;
