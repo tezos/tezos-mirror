@@ -4,6 +4,9 @@
 
 //! Auto-generated contract bindings.
 
+#[rustfmt::skip]
+#[allow(clippy::useless_conversion)]
+#[allow(clippy::module_inception)]
 mod erc20;
 
 pub use erc20::ERC20;

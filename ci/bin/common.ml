@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -483,6 +484,15 @@ let changeset_test_etherlink_kernel =
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
     @ make ["etherlink.mk"; "etherlink/**/*.rs"; "src/kernel_sdk/**/*"])
+
+let changeset_test_etherlink_firehose =
+  Changeset.(
+    changeset_base @ changeset_images
+    @ make
+        [
+          "etherlink/firehose/**/*";
+          "etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*";
+        ])
 
 let changeset_test_risc_v_kernels =
   Changeset.(

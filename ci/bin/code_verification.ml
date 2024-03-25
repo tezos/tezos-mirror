@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -1596,6 +1597,13 @@ let jobs pipeline_type =
           ~changes:changeset_test_etherlink_kernel
           ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
       in
+      let job_test_etherlink_firehose : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_etherlink_firehose"
+          ~changes:changeset_test_etherlink_firehose
+          ["make -C etherlink/firehose check"]
+      in
       let job_test_risc_v_kernels : tezos_job =
         make_job_kernel
           ~__POS__
@@ -1624,6 +1632,7 @@ let jobs pipeline_type =
       [
         job_test_kernels;
         job_test_etherlink_kernel;
+        job_test_etherlink_firehose;
         job_test_risc_v_kernels;
         job_test_evm_compatibility;
       ]

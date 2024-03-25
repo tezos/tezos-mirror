@@ -146,7 +146,7 @@ impl<'a> Setup<'a> {
             total_transfers += 1.0;
             let tps = total_transfers / Instant::now().duration_since(start_time).as_secs_f32();
 
-            print!("\rTPS {tps}\t\tfailed {total_failed}/{total_transfers} succeeded | gas_price: {gas_price:?}\t\t\t");
+            print!("\rTPS {tps}\t\tfailed {total_failed}/{total_transfers} total | gas_price: {gas_price:?}\t\t\t");
 
             queue_transfer!(worker);
         }
@@ -271,10 +271,10 @@ impl<'a> Setup<'a> {
         let balance = self.balance_erc20(controller.address()).await?;
 
         if balance < amount {
-            self.mint_erc20(&controller, amount - balance).await?;
+            self.mint_erc20(controller, amount - balance).await?;
         }
 
-        let receipt = self.transfer_erc20(&controller, amount, to).await?;
+        let receipt = self.transfer_erc20(controller, amount, to).await?;
 
         println!(
             "Transferred {amount} ERC20 tokens to {to:?} | hash: {:?}",
@@ -296,7 +296,7 @@ impl<'a> Setup<'a> {
 
         let receipt = self
             .client
-            .send(&account, Some(contract_address), None, data)
+            .send(account, Some(contract_address), None, data)
             .await?;
 
         let balance = self.balance_erc20(account.address()).await?;
@@ -327,7 +327,7 @@ impl<'a> Setup<'a> {
 
         let receipt = self
             .client
-            .send(&account, Some(contract_address), None, data)
+            .send(account, Some(contract_address), None, data)
             .await?;
 
         Ok(receipt)

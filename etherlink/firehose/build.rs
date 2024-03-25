@@ -10,10 +10,10 @@
 use anyhow::{anyhow, Result};
 use ethers::contract::Abigen;
 
-const ABI: &'static str = include_str!("../tezt/tests/evm_kernel_inputs/erc20tok.abi");
-const BIN: &'static str = include_str!("../tezt/tests/evm_kernel_inputs/erc20tok.bin");
+const ABI: &str = include_str!("../tezt/tests/evm_kernel_inputs/erc20tok.abi");
+const BIN: &str = include_str!("../tezt/tests/evm_kernel_inputs/erc20tok.bin");
 
-const CONTRACT_DIR: &'static str = "src/contracts";
+const CONTRACT_DIR: &str = "src/contracts";
 
 fn main() -> Result<()> {
     // Create the contract dir

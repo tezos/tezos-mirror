@@ -62,3 +62,15 @@ As an example:
 $ firehose transfer --amount 1.2 gwei --to 0x63Ec92990F469bC0DD03516E0d32Ee9A4D8Ff214
 0x63ec…f214 funded with 1 | hash: 0x9ef484b4ce9b8223040cde139b582cfcfb55f29cce89fb8f4017c30ef2fbed90
 ```
+
+## Stress-testing
+
+Firehose can perform stress-test scenarios, with the `flood` subcommand. The parameter `--workers` adjusts the number
+of concurrent transfers that will be attempted, and will continue until the program is exited.
+
+Both `xtz` and `erc20` transfers are currently supported.
+
+*NB* the setup step can be slightly flaky, you may need to re-attempt multiple times to get to the point of the
+stress-test occuring.
+
+For more information, see `firehose flood --help`.

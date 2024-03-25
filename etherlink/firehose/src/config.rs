@@ -155,9 +155,9 @@ pub struct Account {
     sk: SecretKey<Secp256k1>,
 }
 
-impl Into<LocalWallet> for Account {
-    fn into(self) -> LocalWallet {
-        LocalWallet::from(self.sk.clone())
+impl From<Account> for LocalWallet {
+    fn from(val: Account) -> Self {
+        LocalWallet::from(val.sk.clone())
     }
 }
 
