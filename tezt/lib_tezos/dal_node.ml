@@ -34,6 +34,7 @@ module Parameters = struct
     metrics_addr : string;
     l1_node_endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
+    runner : Runner.t option;
   }
 
   type session_state = {mutable ready : bool}
@@ -77,7 +78,11 @@ let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
 let spawn_command dal_node =
-  Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
+  Process.spawn
+    ?runner:dal_node.persistent_state.runner
+    ~name:dal_node.name
+    ~color:dal_node.color
+    dal_node.path
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
@@ -242,6 +247,7 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
         metrics_addr;
         pending_ready = [];
         l1_node_endpoint;
+        runner;
       }
   in
   on_event dal_node (handle_event dal_node) ;
@@ -296,7 +302,14 @@ let do_runlike_command ?env ?(event_level = `Debug) node arguments =
      * [make_arguments] seems incomplete
      * refactoring possible in [spawn_config_init] *)
   let arguments = arguments @ make_arguments node in
-  run ?env ~event_level node {ready = false} arguments ~on_terminate
+  run
+    ?runner:node.persistent_state.runner
+    ?env
+    ~event_level
+    node
+    {ready = false}
+    arguments
+    ~on_terminate
 
 let run ?env ?event_level node =
   do_runlike_command
