@@ -264,7 +264,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
   return proof
 
 let make_dissection plugin (node_ctxt : _ Node_context.t) ~start_state
-    ~start_chunk ~our_stop_chunk ~default_number_of_sections ~last_level =
+    ~start_chunk ~our_stop_chunk ~default_number_of_sections
+    ~commitment_period_tick_offset ~last_level =
   let open Lwt_result_syntax in
   let module PVM = (val Pvm.of_kind node_ctxt.kind) in
   let state_of_tick ?start_state tick =
@@ -272,7 +273,7 @@ let make_dissection plugin (node_ctxt : _ Node_context.t) ~start_state
       plugin
       node_ctxt
       ?start_state
-      ~tick:(Sc_rollup.Tick.to_z tick)
+      ~tick:(Z.add (Sc_rollup.Tick.to_z tick) commitment_period_tick_offset)
       last_level
   in
   let state_hash_of_eval_state Pvm_plugin_sig.{state_hash; _} =

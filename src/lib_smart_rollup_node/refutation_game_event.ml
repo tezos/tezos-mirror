@@ -75,12 +75,22 @@ module Simple = struct
       ~msg:
         "Computed dissection against {opponent} between ticks {start_tick} and \
          {end_tick}: {dissection}"
-      ~level:Debug
+      ~level:Notice
       ("opponent", Signature.Public_key_hash.encoding)
       ("start_tick", Data_encoding.z)
       ("end_tick", Data_encoding.z)
       ( "dissection",
         Data_encoding.list Octez_smart_rollup.Game.dissection_chunk_encoding )
+      ~pp4:(fun ppf d ->
+        Format.fprintf
+          ppf
+          "%a"
+          Data_encoding.Json.pp
+          Data_encoding.Json.(
+            construct
+              (Data_encoding.list
+                 Octez_smart_rollup.Game.dissection_chunk_encoding)
+              d))
 
   module Worker (ARG : sig
     val section : string list

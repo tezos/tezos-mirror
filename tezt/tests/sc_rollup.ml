@@ -2962,6 +2962,12 @@ let test_refutation protocols ~kind =
               ~final_level:80
               ~empty_levels:[4; 5]
               ~priority:`Priority_honest );
+          ( "pvm_proof_second_period",
+            refutation_scenario_parameters
+              ~loser_modes:["15 2 5"]
+              (inputs_for 18)
+              ~final_level:80
+              ~priority:`Priority_honest );
           ( "timeout",
             refutation_scenario_parameters
               ~loser_modes:["5 2 1"]
@@ -3053,6 +3059,13 @@ let test_refutation protocols ~kind =
             refutation_scenario_parameters
               ~loser_modes:["7 7 22_010_000_000"]
               (inputs_for 10)
+              ~final_level:80
+              ~priority:`Priority_loser );
+          (* Conflict in second commitment period *)
+          ( "pvm_proof_second_period",
+            refutation_scenario_parameters
+              ~loser_modes:["15 7 11_000_001_000"]
+              (inputs_for 16)
               ~final_level:80
               ~priority:`Priority_loser );
           ( "parallel_games_0",

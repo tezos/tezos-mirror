@@ -207,10 +207,12 @@ module type REFUTATION_GAME_HELPERS = sig
   val generate_proof :
     Node_context.rw -> Game.t -> Context.pvmstate -> string tzresult Lwt.t
 
-  (** [make_dissection plugin node_ctxt ~start_state ~start_chunk ~our_stop_chunk
-    ~default_number_of_sections ~last_level] computes a dissection from between
-    [start_chunk] and [our_stop_chunk] at level [last_level]. This dissection
-    has [default_number_of_sections] if there are enough ticks. *)
+  (** [make_dissection plugin node_ctxt ~start_state ~start_chunk
+      ~our_stop_chunk ~default_number_of_sections ~commitment_period_tick_offset
+      ~last_level] computes a dissection from between [start_chunk] and
+      [our_stop_chunk] at level [last_level]. [commitment_period_tick_offset] is
+      the tick offset of the commitment period for the conflict/dissection. This
+      dissection has [default_number_of_sections] if there are enough ticks. *)
   val make_dissection :
     (module PARTIAL) ->
     Node_context.rw ->
@@ -218,6 +220,7 @@ module type REFUTATION_GAME_HELPERS = sig
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->
     default_number_of_sections:int ->
+    commitment_period_tick_offset:Z.t ->
     last_level:int32 ->
     Game.dissection_chunk trace tzresult Lwt.t
 
