@@ -160,6 +160,14 @@ macro_rules! run_f_x_instr {
     }};
 }
 
+/// Runs a F/D instruction over the hart state, touching both F & X regisers.
+macro_rules! run_f_cmp_instr {
+    ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
+        $state.hart.$run_fn($args.rs1, $args.rs2, $args.rd);
+        Ok(Add($instr.width()))
+    }};
+}
+
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
@@ -278,15 +286,21 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Mulhu(args) => run_r_type_instr!(self, instr, args, run_mulhu),
             Instr::Mulw(args) => run_r_type_instr!(self, instr, args, run_mulw),
 
-            // RV64F move instructions
+            // RV64F instructions
             Instr::FclassS(args) => run_f_x_instr!(self, instr, args, run_fclass_s),
+            Instr::Feqs(args) => run_f_cmp_instr!(self, instr, args, run_feq_s),
+            Instr::Fles(args) => run_f_cmp_instr!(self, instr, args, run_fle_s),
+            Instr::Flts(args) => run_f_cmp_instr!(self, instr, args, run_flt_s),
             Instr::Flw(args) => run_load_instr!(self, instr, args, run_flw),
             Instr::Fsw(args) => run_store_instr!(self, instr, args, run_fsw),
             Instr::FmvXW(args) => run_f_x_instr!(self, instr, args, run_fmv_x_w),
             Instr::FmvWX(args) => run_f_x_instr!(self, instr, args, run_fmv_w_x),
 
-            // RV64D move instructions
+            // RV64D instructions
             Instr::FclassD(args) => run_f_x_instr!(self, instr, args, run_fclass_d),
+            Instr::Feqd(args) => run_f_cmp_instr!(self, instr, args, run_feq_d),
+            Instr::Fled(args) => run_f_cmp_instr!(self, instr, args, run_fle_d),
+            Instr::Fltd(args) => run_f_cmp_instr!(self, instr, args, run_flt_d),
             Instr::Fld(args) => run_load_instr!(self, instr, args, run_fld),
             Instr::Fsd(args) => run_store_instr!(self, instr, args, run_fsd),
             Instr::FmvXD(args) => run_f_x_instr!(self, instr, args, run_fmv_x_d),

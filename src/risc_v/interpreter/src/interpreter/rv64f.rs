@@ -44,6 +44,27 @@ where
         self.run_fclass::<Single>(rs1, rd);
     }
 
+    /// `FEQ.S` R-type instruction.
+    ///
+    /// See [Self::run_feq].
+    pub fn run_feq_s(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+        self.run_feq::<Single>(rs1, rs2, rd);
+    }
+
+    /// `FLE.S` R-type instruction.
+    ///
+    /// See [Self::run_fle].
+    pub fn run_fle_s(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+        self.run_fle::<Single>(rs1, rs2, rd);
+    }
+
+    /// `FLT.S` R-type instruction.
+    ///
+    /// See [Self::run_flt].
+    pub fn run_flt_s(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+        self.run_flt::<Single>(rs1, rs2, rd);
+    }
+
     /// `FMV.X.W` F-type instruction
     ///
     /// Moves the single-precision value in floating-point register `rs1`
