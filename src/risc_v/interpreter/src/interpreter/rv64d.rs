@@ -9,15 +9,38 @@
 use crate::{
     machine_state::{
         hart_state::HartState,
-        registers::{FRegister, XRegister},
+        registers::{FRegister, FValue, XRegister},
     },
     state_backend as backend,
 };
+
+use softfloat_wrapper::{Float, F64};
+
+impl From<F64> for FValue {
+    fn from(f: F64) -> Self {
+        f.to_bits().into()
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<F64> for FValue {
+    fn into(self) -> F64 {
+        let val = self.into();
+        F64::from_bits(val)
+    }
+}
 
 impl<M> HartState<M>
 where
     M: backend::Manager,
 {
+    /// `FCLASS.D` D-type instruction.
+    ///
+    /// See [Self::run_fclass].
+    pub fn run_fclass_d(&mut self, rs1: FRegister, rd: XRegister) {
+        self.run_fclass::<F64>(rs1, rd);
+    }
+
     /// `FMV.D.X` D-type instruction
     ///
     /// Moves the single-precision value encoded in IEEE 754-2008 standard

@@ -329,11 +329,7 @@ test_case!(
     test_suite_rv64ud_p_fadd,
     "rv64ud-p-fadd"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64ud_p_fclass,
-    "rv64ud-p-fclass"
-);
+test_case!(test_suite_rv64ud_p_fclass, "rv64ud-p-fclass", Mode::User);
 test_case!(
     #[ignore]
     test_suite_rv64ud_p_fcmp,
@@ -451,11 +447,7 @@ test_case!(
     test_suite_rv64uf_p_fadd,
     "rv64uf-p-fadd"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64uf_p_fclass,
-    "rv64uf-p-fclass"
-);
+test_case!(test_suite_rv64uf_p_fclass, "rv64uf-p-fclass", Mode::User);
 test_case!(
     #[ignore]
     test_suite_rv64uf_p_fcmp,

@@ -286,6 +286,7 @@ const FMT_S: u32 = 0b0;
 const FMT_D: u32 = 0b01;
 
 const RM_0: u32 = 0b0;
+const RM_1: u32 = 0b1;
 
 const RS1_0: u32 = 0b0;
 const RS2_0: u32 = 0b0;
@@ -491,22 +492,30 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         // F/D-type instructions
         OP_FP => match fmt(instr) {
             FMT_S => match (funct5(instr), rm(instr), rs2_bits(instr)) {
-                (F5_28, RM_0, RS2_0) => FmvXW(FmvToIArgs {
+                (F5_28, RM_0, RS2_0) => FmvXW(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
                 }),
-                (F5_30, RM_0, RS2_0) => FmvWX(FmvToFArgs {
+                (F5_28, RM_1, RS2_0) => FclassS(FRegToXRegArgs {
+                    rd: rd(instr),
+                    rs1: rs1_f(instr),
+                }),
+                (F5_30, RM_0, RS2_0) => FmvWX(XRegToFRegArgs {
                     rd: rd_f(instr),
                     rs1: rs1(instr),
                 }),
                 _ => Unknown { instr },
             },
             FMT_D => match (funct5(instr), rm(instr), rs2_bits(instr)) {
-                (F5_28, RM_0, RS2_0) => FmvXD(FmvToIArgs {
+                (F5_28, RM_0, RS2_0) => FmvXD(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
                 }),
-                (F5_30, RM_0, RS2_0) => FmvDX(FmvToFArgs {
+                (F5_28, RM_1, RS2_0) => FclassD(FRegToXRegArgs {
+                    rd: rd(instr),
+                    rs1: rs1_f(instr),
+                }),
+                (F5_30, RM_0, RS2_0) => FmvDX(XRegToFRegArgs {
                     rd: rd_f(instr),
                     rs1: rs1(instr),
                 }),
