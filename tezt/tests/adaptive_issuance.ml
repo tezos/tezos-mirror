@@ -1378,6 +1378,34 @@ let test_staking =
   in
   Log.info "Unstaked finalizable balance: %d" unstaked_finalizable_balance ;
   assert (unstaked_finalizable_balance = 0) ;
+  let* () =
+    repeat 2 (fun () ->
+        Client.bake_for_and_wait
+          ~endpoint
+          ~protocol
+          ~minimal_timestamp:true
+          ~keys:[Constant.bootstrap1.alias]
+          client_1
+          ~ai_vote:On)
+  in
+
+  let*! () =
+    Client.set_delegate
+      ~expect_failure:true
+      ~src:staker1.alias
+      ~delegate:"bootstrap3"
+      client_1
+  in
+  let* () =
+    repeat 2 (fun () ->
+        Client.bake_for_and_wait
+          ~endpoint
+          ~protocol
+          ~minimal_timestamp:true
+          ~keys:[Constant.bootstrap1.alias]
+          client_1
+          ~ai_vote:On)
+  in
   unit
 
 let check_rpc_error client ?msg rpc =
