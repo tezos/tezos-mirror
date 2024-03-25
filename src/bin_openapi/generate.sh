@@ -48,7 +48,7 @@ version=$(dune exec octez-version -- --full-with-commit)
 $tezos_node config init --data-dir $data_dir \
   --network sandbox \
   --expected-pow 0 \
-  --local-rpc-addr localhost:$rpc_port \
+  --rpc-addr localhost:$rpc_port \
   --no-bootstrap-peer \
   --synchronisation-threshold 0
 $tezos_node identity generate --data-dir $data_dir
