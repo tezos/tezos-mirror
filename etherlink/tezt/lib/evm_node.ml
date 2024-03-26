@@ -482,12 +482,34 @@ let run_args evm_node =
   mode_args @ shared_args
 
 let run ?(wait = true) ?(extra_arguments = []) evm_node =
+  let on_terminate _status =
+    (* Cancel all event listeners. *)
+    trigger_ready evm_node None ;
+    let pending_blueprint_injected =
+      evm_node.persistent_state.pending_blueprint_injected
+    in
+    evm_node.persistent_state.pending_blueprint_injected <- Per_level_map.empty ;
+    Per_level_map.iter
+      (fun _ pending_list ->
+        List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
+      pending_blueprint_injected ;
+    let pending_blueprint_applied =
+      evm_node.persistent_state.pending_blueprint_applied
+    in
+    evm_node.persistent_state.pending_blueprint_applied <- Per_level_map.empty ;
+    Per_level_map.iter
+      (fun _ pending_list ->
+        List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
+      pending_blueprint_applied ;
+    unit
+  in
   let* () =
     run
       ~event_level:`Debug
       evm_node
       {ready = false}
       (run_args evm_node @ extra_arguments)
+      ~on_terminate
   in
   let* () = if wait then wait_for_ready evm_node else unit in
   unit
