@@ -40,6 +40,31 @@
           <th class="border">Baking reward bonus per slot</th>
           <th class="border">Seed nonce revelation tip</th>
           <th class="border">Vdf revelation tip</th>
+
+          <th class="border">Baking power</th>
+
+          <th class="border">Number of blocks</th>
+          <th class="border">Number of attestations</th>
+
+          <th class="border">Rewards from baking fixed portion</th>
+          <th class="border">Rewards from baking bonus</th>
+          <th class="border">Rewards from attestations</th>
+          <th class="border">Rewards from nonce revelations</th>
+          <th class="border">Rewards from vdf revelations</th>
+
+          <th class="border">Rewards from own staking</th>
+          <th class="border">Rewards from third party staking</th>
+          <th class="border">Rewards from edge of baking over staking</th>
+          <th class="border">Rewards from delegating</th>
+
+          <th class="border">Total rewards</th>
+
+          <th class="border">Own staked balance</th>
+          <th class="border">Third party staked balance</th>
+
+          <th class="border">Own spendable balance</th>
+          <th class="border">Third party delegated balance</th>
+
         </tr>
       </thead>
       <tbody id="report"></tbody>
@@ -278,6 +303,7 @@
                   },
                   onDragEnd: function(e, datasetIndex, index, value) {
                     tableBody.innerHTML = "";
+                    delegate.clear();
                     gen_report();
                   },
                 },
@@ -367,6 +393,35 @@
           new_cell(simulator.baking_reward_bonus_per_slot(cycle));
           new_cell(simulator.seed_nonce_revelation_tip(cycle));
           new_cell(simulator.vdf_revelation_tip(cycle));
+
+          const { baking_power } = delegate.baking_power(cycle);
+
+          new_cell(baking_power.toDecimal(5));
+
+          const estimated_rewards = delegate.estimated_rewards(cycle);
+
+          new_cell(estimated_rewards.estimated_number_of_blocks_baked);
+          new_cell(estimated_rewards.estimated_number_of_attestations);
+
+          new_cell(estimated_rewards.estimated_rewards_for_fixed_portion_baking);
+          new_cell(estimated_rewards.estimated_rewards_for_baking_bonus);
+          new_cell(estimated_rewards.estimated_rewards_for_attestations);
+          new_cell(estimated_rewards.estimated_rewards_for_nonce_revelation);
+          new_cell(estimated_rewards.estimated_rewards_for_vdf_revelation);
+
+          new_cell(estimated_rewards.estimated_rewards_from_own_staking);
+          new_cell(estimated_rewards.estimated_rewards_from_third_party_staking);
+          new_cell(estimated_rewards.estimated_rewards_from_delegating);
+
+          new_cell(estimated_rewards.estimated_rewards_from_edge_of_baking_over_staking);
+
+          new_cell(estimated_rewards.estimated_total_rewards);
+
+          new_cell(delegate.estimated_own_staked_balance(cycle));
+          new_cell(delegate.estimated_third_party_staked_balance(cycle));
+
+          new_cell(delegate.estimated_own_spendable_balance(cycle));
+          new_cell(delegate.third_party_delegated_balance(cycle));
 
           tableBody.appendChild(new_row);
         });
