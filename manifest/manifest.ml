@@ -1190,7 +1190,7 @@ module Target = struct
      name for [public_name] stanzas in [dune] and the name in [.opam] files. *)
   type full_name = {internal_name : string; public_name : string}
 
-  type preprocessor_dep = File of string
+  type preprocessor_dep = File of string | Glob_files of string
 
   type release_status = Unreleased | Experimental | Released | Auto_opam
 
@@ -2722,7 +2722,11 @@ let generate_dune (internal : Target.internal) =
     List.map make_preprocessors internal.preprocess
   in
   let preprocessor_deps =
-    let make_pp_dep (Target.File filename) = Dune.file filename in
+    let make_pp_dep = function
+      | Target.File filename -> Dune.file filename
+      | Glob_files glob -> Dune.glob_files glob
+    in
+
     List.map make_pp_dep internal.preprocessor_deps
   in
   let modules =
@@ -4401,11 +4405,12 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
            file_has_changed
            (List.map (fun file -> tezt_target_dir // file) dep_files)
       || List.exists
-           file_has_changed
-           (List.map
-              (fun (File file : Target.preprocessor_dep) ->
-                tezt_target_dir // file)
-              preprocessor_deps)
+           (function
+             | (File file : Target.preprocessor_dep) ->
+                 file_has_changed (tezt_target_dir // file)
+             | (Glob_files glob : Target.preprocessor_dep) ->
+                 glob_has_changed ~rec_:false tezt_target_dir glob)
+           preprocessor_deps
       || List.exists (glob_has_changed ~rec_:false tezt_target_dir) dep_globs
       || List.exists (glob_has_changed ~rec_:true tezt_target_dir) dep_globs_rec
     then (
