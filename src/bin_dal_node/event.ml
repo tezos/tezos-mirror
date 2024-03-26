@@ -271,20 +271,76 @@ let saving_profiles_failed =
     ~level:Error
     ("error", Error_monad.trace_encoding)
 
+let reconstruct_starting_in =
+  declare_3
+    ~section
+    ~name:"reconstruct_starting_in"
+    ~msg:
+      "For the level {level} and slot index {slot_index}, enough shards have \
+       been received to reconstruct the slot. If the remaining shards are not \
+       received in {delay} seconds, they will be reconstructed."
+    ~level:Info
+    ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
+    ("level", Data_encoding.int32)
+    ~pp2:Format.pp_print_int
+    ("slot_index", Data_encoding.int31)
+    ~pp3:Format.pp_print_float
+    ("delay", Data_encoding.float)
+
 let reconstruct_started =
-  declare_1
+  declare_4
     ~section
     ~name:"reconstruct_started"
-    ~msg:"slot reconstruction for commitment {commitment} started"
+    ~msg:
+      "For the level {level} and slot index {slot_index}, \
+       {number_of_received_shards} out of {number_of_shards} shards were \
+       received, starting a reconstruction of the missing shards."
     ~level:Notice
-    ~pp1:Cryptobox.Commitment.pp_short
-    ("commitment", Cryptobox.Commitment.encoding)
+    ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
+    ("level", Data_encoding.int32)
+    ~pp2:Format.pp_print_int
+    ("slot_index", Data_encoding.int31)
+    ~pp3:Format.pp_print_int
+    ("number_of_received_shards", Data_encoding.int31)
+    ~pp4:Format.pp_print_int
+    ("number_of_shards", Data_encoding.int31)
 
 let reconstruct_finished =
-  declare_1
+  declare_2
     ~section
     ~name:"reconstruct_finished"
-    ~msg:"slot reconstruction for commitment {commitment} finished"
+    ~msg:
+      "For the level {level} and slot index {slot_index}, missing shards have \
+       been successfully reconstructed."
     ~level:Notice
-    ~pp1:Cryptobox.Commitment.pp_short
-    ("commitment", Cryptobox.Commitment.encoding)
+    ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
+    ("level", Data_encoding.int32)
+    ~pp2:Format.pp_print_int
+    ("slot_index", Data_encoding.int31)
+
+let reconstruct_no_missing_shard =
+  declare_2
+    ~section
+    ~name:"reconstruct_no_missing_shard"
+    ~msg:
+      "For the level {level}, all shards for slot index {slot_index} were \
+       received. The planned reconstruction has been cancelled."
+    ~level:Info
+    ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
+    ("level", Data_encoding.int32)
+    ~pp2:Format.pp_print_int
+    ("slot_index", Data_encoding.int31)
+
+let reconstruct_error =
+  declare_3
+    ~section
+    ~name:"reconstruct_error"
+    ~msg:
+      "For the level {level} and slot index {slot_index}, unexpected error \
+       during reconstruction: {error}."
+    ~level:Error
+    ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
+    ("level", Data_encoding.int32)
+    ~pp2:Format.pp_print_int
+    ("slot_index", Data_encoding.int31)
+    ("error", Error_monad.trace_encoding)
