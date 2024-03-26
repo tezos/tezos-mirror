@@ -479,6 +479,8 @@ export class Simulator {
 /**
  * Delegate.
  * @typedef {Object} Delegate
+ * @property {function():null} clear - clear delegate cache, useful when the simulator values change
+ * and the delegate's estimated rewards need to be computed again.
  */
 
 /**
@@ -510,11 +512,47 @@ export class Delegate {
   #storage_own_spendable_balance = [0];
   #storage_third_party_delegated_balance = [0];
 
+  #storage_own_staked_balance_mask = [];
+  #storage_third_party_staked_balance_mask = [];
+  #storage_own_spendable_balance_mask = [];
+
   constructor(simulator, config) {
     this.simulator = simulator;
     this.config = config;
   }
 
+  clear() {
+    this.#storage_cache_size = -1;
+    this.#storage_own_staked_balance = [0];
+    this.#storage_third_party_staked_balance = [0];
+    this.#storage_own_spendable_balance = [0];
+    this.#storage_third_party_delegated_balance = [0];
+  }
+
+  #own_staked_balance(cycle) {
+    return (
+      this.#storage_own_staked_balance_mask[cycle] ??
+      this.#storage_own_staked_balance[cycle]
+    );
+  }
+
+  #third_party_staked_balance(cycle) {
+    return (
+      this.#storage_third_party_staked_balance_mask[cycle] ??
+      this.#storage_third_party_staked_balance[cycle]
+    );
+  }
+
+  #own_spendable_balance(cycle) {
+    return (
+      this.#storage_own_spendable_balance_mask[cycle] ??
+      this.#storage_own_spendable_balance[cycle]
+    );
+  }
+
+  #third_party_delegated_balance(cycle) {
+    return this.#storage_third_party_delegated_balance[cycle];
+  }
 }
 
 export { total_frozen_stake_storage } from "./total_frozen_stake_storage";
