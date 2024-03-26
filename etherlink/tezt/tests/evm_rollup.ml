@@ -270,16 +270,44 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-
   (* Originates the bridge. *)
   let* bridge =
     Client.originate_contract
       ~alias:"evm-bridge"
       ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
+      ~src:Constant.bootstrap2.public_key_hash
       ~init:(sf "Pair %S None" exchanger)
       ~prg:(bridge_path ())
+      ~burn_cap:Tez.one
+      client
+  (* Originates the administrator contract. *)
+  and* admin_contract =
+    Client.originate_contract
+      ~alias:"evm-admin"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap3.public_key_hash
+      ~init:(sf "%S" admin.Account.public_key_hash)
+      ~prg:(admin_path ())
+      ~burn_cap:Tez.one
+      client
+  (* Originates the governance contract (using the administrator contract). *)
+  and* kernel_governance =
+    Client.originate_contract
+      ~alias:"kernel-governance"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap4.public_key_hash
+      ~init:(sf "%S" admin.Account.public_key_hash)
+      ~prg:(admin_path ())
+      ~burn_cap:Tez.one
+      client
+  (* Originates the governance contract (using the administrator contract). *)
+  and* kernel_security_governance =
+    Client.originate_contract
+      ~alias:"security-governance"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "%S" admin.Account.public_key_hash)
+      ~prg:(admin_path ())
       ~burn_cap:Tez.one
       client
   in
@@ -303,46 +331,6 @@ let setup_l1_contracts ~admin ?sequencer_admin client =
         return (Some sequencer_admin)
     | None -> return None
   in
-
-  (* Originates the administrator contract. *)
-  let* admin_contract =
-    Client.originate_contract
-      ~alias:"evm-admin"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
-      ~init:(sf "%S" admin.Account.public_key_hash)
-      ~prg:(admin_path ())
-      ~burn_cap:Tez.one
-      client
-  in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-
-  (* Originates the governance contract (using the administrator contract). *)
-  let* kernel_governance =
-    Client.originate_contract
-      ~alias:"kernel-governance"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
-      ~init:(sf "%S" admin.Account.public_key_hash)
-      ~prg:(admin_path ())
-      ~burn_cap:Tez.one
-      client
-  in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-
-  (* Originates the governance contract (using the administrator contract). *)
-  let* kernel_security_governance =
-    Client.originate_contract
-      ~alias:"security-governance"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap1.public_key_hash
-      ~init:(sf "%S" admin.Account.public_key_hash)
-      ~prg:(admin_path ())
-      ~burn_cap:Tez.one
-      client
-  in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-
   return
     {
       exchanger;
