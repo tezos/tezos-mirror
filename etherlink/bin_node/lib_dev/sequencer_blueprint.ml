@@ -41,13 +41,9 @@ let max_chunk_size =
   - blueprint_tag_size - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
-let encode_transaction hash raw =
+let encode_transaction raw =
   let open Rlp in
-  List
-    [
-      Value (Bytes.of_string hash);
-      List [Value (Bytes.of_string "\001"); Value (Bytes.of_string raw)];
-    ]
+  Value (Bytes.of_string raw)
 
 let make_blueprint_chunks ~timestamp ~transactions
     ~(delayed_transactions : Ethereum_types.hash list) ~parent_hash =
@@ -59,13 +55,7 @@ let make_blueprint_chunks ~timestamp ~transactions
          delayed_transactions)
   in
   let messages =
-    let m =
-      List.map
-        (fun transaction ->
-          let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
-          encode_transaction tx_hash_str transaction)
-        transactions
-    in
+    let m = List.map encode_transaction transactions in
     List m
   in
   let timestamp = Value (Ethereum_types.timestamp_to_bytes timestamp) in

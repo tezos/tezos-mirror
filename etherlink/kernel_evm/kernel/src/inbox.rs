@@ -86,8 +86,7 @@ impl Encodable for TransactionContent {
         match &self {
             TransactionContent::Ethereum(eth) => {
                 stream.append(&ETHEREUM_TX_TAG);
-                let eth_bytes = eth.to_bytes();
-                stream.append(&eth_bytes);
+                eth.rlp_append(stream)
             }
             TransactionContent::Deposit(dep) => {
                 stream.append(&DEPOSIT_TX_TAG);
@@ -95,8 +94,7 @@ impl Encodable for TransactionContent {
             }
             TransactionContent::EthereumDelayed(eth) => {
                 stream.append(&ETHEREUM_DELAYED_TX_TAG);
-                let eth_bytes = eth.to_bytes();
-                stream.append(&eth_bytes);
+                eth.rlp_append(stream)
             }
         }
     }
@@ -118,13 +116,11 @@ impl Decodable for TransactionContent {
                 Ok(Self::Deposit(deposit))
             }
             ETHEREUM_TX_TAG => {
-                let bytes: Vec<u8> = tx.as_val()?;
-                let eth = EthereumTransactionCommon::from_bytes(&bytes)?;
+                let eth = EthereumTransactionCommon::decode(&tx)?;
                 Ok(Self::Ethereum(eth))
             }
             ETHEREUM_DELAYED_TX_TAG => {
-                let bytes: Vec<u8> = tx.as_val()?;
-                let eth = EthereumTransactionCommon::from_bytes(&bytes)?;
+                let eth = EthereumTransactionCommon::decode(&tx)?;
                 Ok(Self::EthereumDelayed(eth))
             }
             _ => Err(DecoderError::Custom("Unknown transaction tag.")),
