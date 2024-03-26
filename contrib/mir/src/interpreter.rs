@@ -11,7 +11,9 @@
 use checked::Checked;
 use cryptoxide::hashing::{blake2b_256, keccak256, sha256, sha3_256, sha512};
 use num_bigint::{BigInt, BigUint, Sign};
-use num_traits::{Signed, Zero};
+use num_integer::Integer;
+use num_traits::{Signed, ToPrimitive, Zero};
+use std::ops::{Shl, Shr};
 use std::rc::Rc;
 use tezos_crypto_rs::blake2b::digest as blake2bdigest;
 use typed_arena::Arena;
@@ -34,9 +36,15 @@ pub enum InterpretError<'a> {
     /// When performing mutez arithmetic, an overflow occurred.
     #[error("mutez overflow")]
     MutezOverflow,
+    /// During a type conversion, a negative mutez was found.
+    #[error("negative mutez")]
+    NegativeMutez,
     /// Interpreter reached a `FAILWITH` instruction.
     #[error("failed with: {1:?} of type {0:?}")]
     FailedWith(Type, TypedValue<'a>),
+    /// Encountered an argument outside of the bounds defined in the documentation
+    #[error("Argument out of bounds")]
+    ArgOutOfBounds,
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
@@ -216,6 +224,60 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::ADD_BLS_G2)?;
                 stack.push(V::new_bls12381_g2(o1.as_ref() + o2.as_ref()));
             }
+            overloads::Add::IntTimestamp => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Timestamp);
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                stack.push(V::Timestamp(o1 + o2));
+            }
+            overloads::Add::TimestampInt => {
+                let o1 = pop!(V::Timestamp);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::add_num(&o1, &o2)?)?;
+                stack.push(V::Timestamp(o1 + o2));
+            }
+        },
+        I::Sub(overload) => match overload {
+            overloads::Sub::IntInt => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = o1 - o2;
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::NatNat => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = BigInt::from(o1) - BigInt::from(o2);
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::IntNat => {
+                let o1 = pop!(V::Int);
+                let o2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = o1 - BigInt::from(o2);
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::NatInt => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                let diff = BigInt::from(o1) - o2;
+                stack.push(V::Int(diff));
+            }
+            overloads::Sub::TimestampInt => {
+                let o1 = pop!(V::Timestamp);
+                let o2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                stack.push(V::Timestamp(o1 - o2));
+            }
+            overloads::Sub::TimestampTimestamp => {
+                let o1 = pop!(V::Timestamp);
+                let o2 = pop!(V::Timestamp);
+                ctx.gas.consume(interpret_cost::sub_num(&o1, &o2)?)?;
+                stack.push(V::Int(o1 - o2));
+            }
         },
         I::Mul(overload) => match overload {
             overloads::Mul::NatNat => {
@@ -307,6 +369,158 @@ fn interpret_one<'a>(
                 stack.push(V::Bls12381Fr(x1 * x2));
             }
         },
+        I::EDiv(overload) => match overload {
+            overloads::EDiv::NatNat => {
+                let x1 = pop!(V::Nat);
+                let x2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::ediv_nat(&x1, &x2)?)?;
+                if x2 == BigUint::zero() {
+                    stack.push(V::Option(None));
+                } else {
+                    let (quotient, remainder) = BigUint::div_rem(&x1, &x2);
+                    stack.push(V::new_option(Some(V::new_pair(
+                        V::Nat(quotient),
+                        V::Nat(remainder),
+                    ))));
+                }
+            }
+            overloads::EDiv::NatInt => {
+                let x1 = pop!(V::Nat);
+                let x2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::ediv_int(&x1, &x2)?)?;
+                if x2 == BigInt::zero() {
+                    stack.push(V::Option(None));
+                } else {
+                    let (quotient, remainder) = BigUint::div_rem(&x1, &x2.magnitude());
+                    if x2.sign() == Sign::Plus {
+                        stack.push(V::new_option(Some(V::new_pair(
+                            V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
+                            V::Nat(remainder),
+                        ))));
+                    } else {
+                        stack.push(V::new_option(Some(V::new_pair(
+                            V::Int(BigInt::from_biguint(Sign::Minus, quotient)),
+                            V::Nat(remainder),
+                        ))));
+                    }
+                }
+            }
+            overloads::EDiv::IntNat => {
+                let x1 = pop!(V::Int);
+                let x2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::ediv_int(&x1, &x2)?)?;
+                if x2 == BigUint::zero() {
+                    stack.push(V::Option(None));
+                } else {
+                    let (quotient, remainder) = BigUint::div_rem(&x1.magnitude(), &x2);
+                    if x1.sign() != Sign::Minus {
+                        stack.push(V::new_option(Some(V::new_pair(
+                            V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
+                            V::Nat(remainder),
+                        ))));
+                    } else {
+                        stack.push(V::new_option(Some(if remainder > BigUint::zero() {
+                            V::new_pair(
+                                V::Int(BigInt::from_biguint(Sign::Minus, quotient) - 1),
+                                V::Nat(x2 - remainder),
+                            )
+                        } else {
+                            V::new_pair(
+                                V::Int(BigInt::from_biguint(Sign::Minus, quotient)),
+                                V::Nat(remainder),
+                            )
+                        })));
+                    }
+                }
+            }
+            overloads::EDiv::IntInt => {
+                let x1 = pop!(V::Int);
+                let x2 = pop!(V::Int);
+                ctx.gas.consume(interpret_cost::ediv_int(&x1, &x2)?)?;
+                if x2.sign() == Sign::NoSign {
+                    stack.push(V::Option(None));
+                } else {
+                    let (quotient, remainder) = BigUint::div_rem(&x1.magnitude(), &x2.magnitude());
+                    match (x1.sign(), x2.sign()) {
+                        (Sign::Minus, Sign::Minus) => {
+                            stack.push(V::new_option(Some(if remainder > BigUint::zero() {
+                                V::new_pair(
+                                    V::Int(BigInt::from_biguint(Sign::Plus, quotient) + 1),
+                                    V::Nat(x2.magnitude() - remainder),
+                                )
+                            } else {
+                                V::new_pair(
+                                    V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
+                                    V::Nat(remainder),
+                                )
+                            })));
+                        }
+                        (Sign::Minus, Sign::Plus) => {
+                            stack.push(V::new_option(Some(if remainder > BigUint::zero() {
+                                V::new_pair(
+                                    V::Int(BigInt::from_biguint(Sign::Minus, quotient) - 1),
+                                    V::Nat(x2.magnitude() - remainder),
+                                )
+                            } else {
+                                V::new_pair(
+                                    V::Int(BigInt::from_biguint(Sign::Minus, quotient)),
+                                    V::Nat(remainder),
+                                )
+                            })));
+                        }
+                        (_, Sign::Plus) => {
+                            stack.push(V::new_option(Some(V::new_pair(
+                                V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
+                                V::Nat(remainder),
+                            ))));
+                        }
+                        (_, Sign::Minus) => {
+                            stack.push(V::new_option(Some(V::new_pair(
+                                V::Int(BigInt::from_biguint(Sign::Minus, quotient)),
+                                V::Nat(remainder),
+                            ))));
+                        }
+                        _ => stack.push(V::Option(None)),
+                    }
+                }
+            }
+            overloads::EDiv::MutezNat => {
+                let x1 = pop!(V::Mutez);
+                let x2 = pop!(V::Nat);
+                ctx.gas.consume(interpret_cost::EDIV_TEZ_NAT)?;
+                if x2 == BigUint::zero() {
+                    stack.push(V::Option(None));
+                } else {
+                    let x2_i64 = x2.to_i64();
+                    match x2_i64 {
+                        Some(x2_i64) => {
+                            let (quotient, remainder) = Integer::div_rem(&x1, &x2_i64);
+                            stack.push(V::new_option(Some(V::new_pair(
+                                V::Mutez(quotient),
+                                V::Mutez(remainder),
+                            ))));
+                        }
+                        _ => {
+                            stack.push(V::new_option(Some(V::new_pair(V::Mutez(0), V::Mutez(x1)))));
+                        }
+                    }
+                }
+            }
+            overloads::EDiv::MutezMutez => {
+                let x1 = pop!(V::Mutez);
+                let x2 = pop!(V::Mutez);
+                ctx.gas.consume(interpret_cost::EDIV_TEZ_TEZ)?;
+                if x2 == 0 {
+                    stack.push(V::Option(None));
+                } else {
+                    let (quotient, remainder) = Integer::div_rem(&x1, &x2);
+                    stack.push(V::new_option(Some(V::new_pair(
+                        V::Nat(BigUint::try_from(quotient).unwrap()), // cannot fail because `x1` and `x2` are of Mutez type and thus non-negative
+                        V::Mutez(remainder),
+                    ))));
+                }
+            }
+        },
         I::Neg(overload) => match overload {
             overloads::Neg::Nat => {
                 let v = pop!(V::Nat);
@@ -332,6 +546,98 @@ fn interpret_one<'a>(
                 ctx.gas.consume(interpret_cost::NEG_FR)?;
                 let v = irrefutable_match!(&mut stack[0]; V::Bls12381Fr);
                 *v = -(v as &bls::Fr);
+            }
+        },
+        I::Lsl(overload) => match overload {
+            overloads::Lsl::Nat => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(256u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas.consume(interpret_cost::lsl_nat(&o1)?)?;
+                stack.push(V::Nat(o1.shl(o2_usize)));
+            }
+            overloads::Lsl::Bytes => {
+                let o1 = pop!(V::Bytes);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(64000u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas
+                    .consume(interpret_cost::lsl_bytes(&o1, &o2_usize)?)?;
+
+                let byte_shifts = o2_usize / 8;
+                let bit_shifts = o2_usize % 8;
+
+                let left_pad = bit_shifts > 0;
+                let mut result: Vec<u8> =
+                    vec![0; o1.len() + byte_shifts + if left_pad { 1 } else { 0 }];
+                let mut carry = 0u8;
+
+                for (i, &byte) in o1.iter().enumerate().rev() {
+                    result[i + if left_pad { 1 } else { 0 }] = (byte << bit_shifts) | carry;
+                    if left_pad {
+                        carry = byte >> (8 - bit_shifts);
+                    }
+                }
+
+                if left_pad {
+                    result[0] = carry;
+                }
+
+                stack.push(V::Bytes(result));
+            }
+        },
+        I::Lsr(overload) => match overload {
+            overloads::Lsr::Nat => {
+                let o1 = pop!(V::Nat);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(256u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas.consume(interpret_cost::lsr_nat(&o1)?)?;
+                stack.push(V::Nat(o1.shr(o2_usize)));
+            }
+            overloads::Lsr::Bytes => {
+                let o1 = pop!(V::Bytes);
+                let o2 = pop!(V::Nat);
+
+                if o2 > BigUint::from(64000u16) {
+                    return Err(InterpretError::ArgOutOfBounds);
+                }
+
+                let o2_usize = o2.to_usize().unwrap();
+                ctx.gas
+                    .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
+
+                let byte_shifts = o2_usize / 8;
+                let bit_shifts = o2_usize % 8;
+
+                let need_carry = bit_shifts > 0;
+                let mut result: Vec<u8> = vec![0; o1.len() - byte_shifts];
+                let mut carry = 0u8;
+
+                for (i, byte) in o1.iter().enumerate() {
+                    if i >= o1.len() - byte_shifts {
+                        break;
+                    }
+                    result[i] = (byte >> bit_shifts) | carry;
+                    if need_carry {
+                        carry = byte << (8 - bit_shifts);
+                    }
+                }
+
+                stack.push(V::Bytes(result));
             }
         },
         I::SubMutez => {
@@ -1456,6 +1762,7 @@ mod interpreter_tests {
     use crate::ast::or::Or::Left;
     use crate::bls;
     use crate::gas::Gas;
+    use chrono::DateTime;
     use num_bigint::BigUint;
     use Instruction::*;
     use Option::None;
@@ -1491,6 +1798,93 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         assert!(interpret_one(&Add(overloads::Add::NatNat), &mut ctx, &mut stack).is_ok());
         assert_eq!(stack, expected_stack);
+    }
+
+    mod sub {
+        use super::*;
+
+        #[track_caller]
+        fn test_sub(
+            overload: overloads::Sub,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Sub(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        macro_rules! test {
+            ($name:ident, $overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $name() {
+                    test_sub(overloads::Sub::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        test!(
+            NatNatPos,
+            NatNat,
+            V::nat(54263),
+            V::nat(5034),
+            V::int(49229),
+        );
+
+        test!(
+            NatNatNeg,
+            NatNat,
+            V::nat(5034),
+            V::nat(54263),
+            V::int(-49229),
+        );
+
+        test!(NatNatZero, NatNat, V::nat(43872), V::nat(43872), V::int(0),);
+
+        test!(
+            NatPosInt,
+            NatInt,
+            V::nat(99131),
+            V::int(11012),
+            V::int(88119),
+        );
+
+        test!(
+            NatNegInt,
+            NatInt,
+            V::nat(99131),
+            V::int(-11012),
+            V::int(110143),
+        );
+
+        test!(
+            PosIntNat,
+            IntNat,
+            V::int(11012),
+            V::nat(99131),
+            V::int(-88119),
+        );
+
+        test!(
+            NegIntNat,
+            IntNat,
+            V::int(-11012),
+            V::nat(99131),
+            V::int(-110143),
+        );
+
+        test!(NegIntNegInt, IntInt, V::int(-10), V::int(-30), V::int(20),);
+
+        test!(NegIntPosInt, IntInt, V::int(-10), V::int(30), V::int(-40),);
+
+        test!(PosIntNegInt, IntInt, V::int(10), V::int(-30), V::int(40),);
+
+        test!(PosIntPosInt, IntInt, V::int(10), V::int(30), V::int(-20),);
     }
 
     #[test]
@@ -1566,6 +1960,87 @@ mod interpreter_tests {
             ),
             Err(InterpretError::MutezOverflow)
         );
+    }
+
+    #[test]
+    fn test_add_timestamp_int() {
+        let str_o1: &str = "1979-02-21T17:13:37+01:00";
+        let int_o1 = DateTime::parse_from_rfc3339(str_o1)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_result: &str = "2000-02-21T17:14:37+01:00";
+        let int_result = DateTime::parse_from_rfc3339(str_result)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Int("662688060".parse().unwrap()), V::Timestamp(int_o1),];
+        let expected_stack = stk![V::Timestamp(int_result)];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Add(overloads::Add::TimestampInt), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_add_int_timestamp() {
+        let str_o2: &str = "1972-02-23T19:31:04+01:00";
+        let int_o2 = DateTime::parse_from_rfc3339(str_o2)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_result: &str = "1973-01-30T03:08:24+01:00";
+        let int_result = DateTime::parse_from_rfc3339(str_result)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Timestamp(int_o2), V::Int("29489840".parse().unwrap()),];
+        let expected_stack = stk![V::Timestamp(int_result)];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Add(overloads::Add::IntTimestamp), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_sub_timestamp_int() {
+        let str_o1: &str = "2000-02-21T17:14:37+01:00";
+        let int_o1 = DateTime::parse_from_rfc3339(str_o1)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_result: &str = "1979-02-21T17:13:37+01:00";
+        let int_result = DateTime::parse_from_rfc3339(str_result)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Int("662688060".parse().unwrap()), V::Timestamp(int_o1),];
+        let expected_stack = stk![V::Timestamp(int_result)];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(&Sub(overloads::Sub::TimestampInt), &mut ctx, &mut stack).is_ok());
+        assert_eq!(stack, expected_stack);
+    }
+
+    #[test]
+    fn test_sub_timestamp_timestamp() {
+        let str_o1: &str = "1973-01-30T03:08:24+01:00";
+        let int_o1 = DateTime::parse_from_rfc3339(str_o1)
+            .unwrap()
+            .timestamp()
+            .into();
+        let str_o2: &str = "1972-02-23T19:31:04+01:00";
+        let int_o2 = DateTime::parse_from_rfc3339(str_o2)
+            .unwrap()
+            .timestamp()
+            .into();
+        let mut stack = stk![V::Timestamp(int_o2), V::Timestamp(int_o1),];
+        let expected_stack = stk![V::Int("29489840".parse().unwrap())];
+        let mut ctx = Ctx::default();
+        assert!(interpret_one(
+            &Sub(overloads::Sub::TimestampTimestamp),
+            &mut ctx,
+            &mut stack
+        )
+        .is_ok());
+        assert_eq!(stack, expected_stack);
     }
 
     mod logic {
@@ -5353,6 +5828,347 @@ mod interpreter_tests {
         }
     }
 
+    mod ediv {
+        use super::*;
+
+        #[track_caller]
+        fn test_ediv(
+            overload: overloads::EDiv,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&EDiv(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        macro_rules! test {
+            ($name:ident, $overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $name() {
+                    test_ediv(overloads::EDiv::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        test!(
+            IntIntPosPosHigherExact,
+            IntInt,
+            V::int(35),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(5), V::nat(0)))),
+        );
+
+        test!(
+            IntIntPosPosHigher,
+            IntInt,
+            V::int(23),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(3), V::nat(2)))),
+        );
+
+        test!(
+            IntIntPosPosLower,
+            IntInt,
+            V::int(4),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(4)))),
+        );
+
+        test!(
+            IntIntNegPosHigherExact,
+            IntInt,
+            V::int(-35),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(-5), V::nat(0)))),
+        );
+
+        test!(
+            IntIntNegPosHigher,
+            IntInt,
+            V::int(-23),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(-4), V::nat(5)))),
+        );
+
+        test!(
+            IntIntNegPosLower,
+            IntInt,
+            V::int(-4),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(-1), V::nat(3)))),
+        );
+
+        test!(
+            IntIntPosNegHigherExact,
+            IntInt,
+            V::int(35),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(-5), V::nat(0)))),
+        );
+
+        test!(
+            IntIntPosNegHigher,
+            IntInt,
+            V::int(23),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(-3), V::nat(2)))),
+        );
+
+        test!(
+            IntIntPosNegLower,
+            IntInt,
+            V::int(4),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(4)))),
+        );
+
+        test!(
+            IntIntNegNegHigherExact,
+            IntInt,
+            V::int(-35),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(5), V::nat(0)))),
+        );
+
+        test!(
+            IntIntNegNegHigher,
+            IntInt,
+            V::int(-23),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(4), V::nat(5)))),
+        );
+
+        test!(
+            IntIntNegNegLower,
+            IntInt,
+            V::int(-4),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(1), V::nat(3)))),
+        );
+
+        test!(
+            IntIntZeroNeg,
+            IntInt,
+            V::int(0),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(0)))),
+        );
+
+        test!(
+            IntIntZeroPos,
+            IntInt,
+            V::int(0),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(0)))),
+        );
+
+        test!(
+            IntNatPosPosHigherExact,
+            IntNat,
+            V::int(35),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::int(5), V::nat(0)))),
+        );
+
+        test!(
+            IntNatPosPosHigher,
+            IntNat,
+            V::int(23),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::int(3), V::nat(2)))),
+        );
+
+        test!(
+            IntNatPosPosLower,
+            IntNat,
+            V::int(4),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(4)))),
+        );
+
+        test!(
+            IntNatNegPosHigherExact,
+            IntNat,
+            V::int(-35),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::int(-5), V::nat(0)))),
+        );
+
+        test!(
+            IntNatNegPosHigher,
+            IntNat,
+            V::int(-23),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::int(-4), V::nat(5)))),
+        );
+
+        test!(
+            IntNatNegPosLower,
+            IntNat,
+            V::int(-4),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::int(-1), V::nat(3)))),
+        );
+
+        test!(
+            IntNatZeroPos,
+            IntNat,
+            V::int(0),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(0)))),
+        );
+
+        test!(
+            NatIntPosPosHigherExact,
+            NatInt,
+            V::nat(35),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(5), V::nat(0)))),
+        );
+
+        test!(
+            NatIntPosPosHigher,
+            NatInt,
+            V::nat(23),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(3), V::nat(2)))),
+        );
+
+        test!(
+            NatIntPosPosLower,
+            NatInt,
+            V::nat(4),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(4)))),
+        );
+
+        test!(
+            NatIntPosNegHigherExact,
+            NatInt,
+            V::nat(35),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(-5), V::nat(0)))),
+        );
+
+        test!(
+            NatIntPosNegHigher,
+            NatInt,
+            V::nat(23),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(-3), V::nat(2)))),
+        );
+
+        test!(
+            NatIntPosNegLower,
+            NatInt,
+            V::nat(4),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(4)))),
+        );
+
+        test!(
+            NatIntZeroPos,
+            NatInt,
+            V::nat(0),
+            V::int(7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(0)))),
+        );
+
+        test!(
+            NatIntZeroNeg,
+            NatInt,
+            V::nat(0),
+            V::int(-7),
+            V::new_option(Some(V::new_pair(V::int(0), V::nat(0)))),
+        );
+
+        test!(
+            NatNatPosPosHigherExact,
+            NatNat,
+            V::nat(35),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::nat(5), V::nat(0)))),
+        );
+
+        test!(
+            NatNatPosPosHigher,
+            NatNat,
+            V::nat(23),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::nat(3), V::nat(2)))),
+        );
+
+        test!(
+            NatNatPosPosLower,
+            NatNat,
+            V::nat(4),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::nat(0), V::nat(4)))),
+        );
+
+        test!(
+            NatNatZeroPos,
+            NatNat,
+            V::nat(0),
+            V::nat(7),
+            V::new_option(Some(V::new_pair(V::nat(0), V::nat(0)))),
+        );
+
+        test!(
+            IntIntNegDivZero,
+            IntInt,
+            V::int(-4),
+            V::int(0),
+            V::Option(None),
+        );
+
+        test!(
+            IntIntPosDivZero,
+            IntInt,
+            V::int(4),
+            V::int(0),
+            V::Option(None),
+        );
+
+        test!(
+            NatIntPosDivZero,
+            NatInt,
+            V::nat(4),
+            V::int(0),
+            V::Option(None),
+        );
+
+        test!(
+            IntNatPosDivZero,
+            IntNat,
+            V::int(4),
+            V::nat(0),
+            V::Option(None),
+        );
+
+        test!(
+            IntNatNegDivZero,
+            IntNat,
+            V::int(-4),
+            V::nat(0),
+            V::Option(None),
+        );
+
+        test!(
+            NatNatPosDivZero,
+            NatNat,
+            V::nat(4),
+            V::nat(0),
+            V::Option(None),
+        );
+    }
+
     mod neg {
         use super::*;
 
@@ -5416,6 +6232,144 @@ mod interpreter_tests {
             test!(Int, V::int(0), V::int(0));
             test!(Nat, V::nat(0), V::int(0));
         }
+    }
+
+    mod lsl {
+        use super::*;
+
+        #[track_caller]
+        fn test_lsl(
+            overload: overloads::Lsl,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Lsl(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        macro_rules! test {
+            ($name:ident, $overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $name() {
+                    test_lsl(overloads::Lsl::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        test!(
+            Case1,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(0),
+            V::Bytes(hex::decode("06").unwrap()),
+        );
+
+        test!(
+            Case2,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("000c").unwrap()),
+        );
+
+        test!(
+            Case3,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(8),
+            V::Bytes(hex::decode("0600").unwrap()),
+        );
+
+        test!(
+            Case4,
+            Bytes,
+            V::Bytes(hex::decode("0006").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("00000c").unwrap()),
+        );
+    }
+
+    mod lsr {
+        use super::*;
+
+        #[track_caller]
+        fn test_lsr(
+            overload: overloads::Lsr,
+            input1: TypedValue,
+            input2: TypedValue,
+            output: TypedValue,
+        ) {
+            let mut stack = stk![input2, input1];
+            let ctx = &mut Ctx::default();
+            assert_eq!(interpret_one(&Lsr(overload), ctx, &mut stack), Ok(()));
+            assert_eq!(stack, stk![output]);
+            // assert some gas is consumed, exact values are subject to change
+            assert!(Ctx::default().gas.milligas() > ctx.gas.milligas());
+        }
+
+        macro_rules! test {
+            ($name:ident, $overload:ident, $i1:expr, $i2:expr, $out:expr $(,)*) => {
+                #[test]
+                #[allow(non_snake_case)]
+                fn $name() {
+                    test_lsr(overloads::Lsr::$overload, $i1, $i2, $out);
+                }
+            };
+        }
+
+        test!(
+            Case1,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("03").unwrap()),
+        );
+
+        test!(
+            Case2,
+            Bytes,
+            V::Bytes(hex::decode("06").unwrap()),
+            V::nat(8),
+            V::Bytes(hex::decode("").unwrap()),
+        );
+
+        test!(
+            Case3,
+            Bytes,
+            V::Bytes(hex::decode("0006").unwrap()),
+            V::nat(1),
+            V::Bytes(hex::decode("0003").unwrap()),
+        );
+
+        test!(
+            Case4,
+            Bytes,
+            V::Bytes(hex::decode("0006").unwrap()),
+            V::nat(8),
+            V::Bytes(hex::decode("00").unwrap()),
+        );
+
+        test!(
+            Case5,
+            Bytes,
+            V::Bytes(hex::decode("001234").unwrap()),
+            V::nat(0),
+            V::Bytes(hex::decode("001234").unwrap()),
+        );
+
+        test!(
+            Case6,
+            Bytes,
+            V::Bytes(hex::decode("001234").unwrap()),
+            V::nat(30),
+            V::Bytes(hex::decode("").unwrap()),
+        );
     }
 
     #[test]

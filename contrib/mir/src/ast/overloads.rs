@@ -21,6 +21,18 @@ pub enum Add {
     Bls12381G1,
     Bls12381G2,
     Bls12381Fr,
+    TimestampInt,
+    IntTimestamp,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Sub {
+    NatNat,
+    NatInt,
+    IntNat,
+    IntInt,
+    TimestampInt,
+    TimestampTimestamp,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -78,12 +90,34 @@ pub enum Mul {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum EDiv {
+    NatNat,
+    NatInt,
+    IntNat,
+    IntInt,
+    MutezNat,
+    MutezMutez,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Neg {
     Nat,
     Int,
     Bls12381G1,
     Bls12381G2,
     Bls12381Fr,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Lsl {
+    Nat,
+    Bytes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Lsr {
+    Nat,
+    Bytes,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

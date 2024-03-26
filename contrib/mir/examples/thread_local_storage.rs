@@ -37,7 +37,9 @@ fn run_contract(parameter: Micheline) {
             let (_, new_storage) = contract_typechecked
                 .interpret(&mut ctx, &parser.arena, parameter, storage)
                 .unwrap();
-            let TypedValue::Nat(storage_nat) = &new_storage else { unreachable!() };
+            let TypedValue::Nat(storage_nat) = &new_storage else {
+                unreachable!()
+            };
             println!("{storage_nat}");
             new_storage
                 .into_micheline_optimized_legacy(&Arena::new())

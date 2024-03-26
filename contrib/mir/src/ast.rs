@@ -527,8 +527,12 @@ impl<'a> TypedValue<'a> {
 #[allow(missing_docs)]
 pub enum Instruction<'a> {
     Add(overloads::Add),
+    Sub(overloads::Sub),
     Mul(overloads::Mul),
+    EDiv(overloads::EDiv),
     Neg(overloads::Neg),
+    Lsl(overloads::Lsl),
+    Lsr(overloads::Lsr),
     SubMutez,
     Dip(Option<u16>, Vec<Self>),
     Drop(Option<u16>),
