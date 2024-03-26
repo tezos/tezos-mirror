@@ -152,6 +152,7 @@ const safe_get = (array, cycle) => {
  * @param {number} config.proto.consensus_rights_delay.
  * @param {number} config.proto.consensus_threshold.
  * @param {number} config.proto.max_bonus.
+ * @param {number} config.proto.max_limit_of_staking_over_baking.
  * @param {Object} config.chain - Data concerning the chain state.
  * @param {number} config.chain.ai_activation_cycle - Adaptive Issuance activation cycle.
  * @param {array(number)} config.chain.total_supply.
