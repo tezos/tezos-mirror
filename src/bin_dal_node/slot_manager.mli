@@ -90,6 +90,19 @@ val add_commitment_shards :
   with_proof:bool ->
   (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
 
+(** This function publishes the given shards and their proofs. *)
+val publish_proved_shards :
+  published_level:int32 ->
+  slot_index:int ->
+  level_committee:
+    (level:int32 ->
+    Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
+  Dal_plugin.proto_parameters ->
+  (Cryptobox.commitment * int * Cryptobox.share tzresult) Seq_s.t ->
+  Cryptobox.shard_proof array ->
+  Gossipsub.Worker.t ->
+  unit tzresult Lwt.t
+
 (** This function publishes the shards of a commitment that is waiting for
     attestion on L1 if this node has those shards on disk and their proofs in
     memory. *)
