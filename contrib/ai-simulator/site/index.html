@@ -22,6 +22,7 @@
 
           <th class="border">Total supply</th>
           <th class="border">Total frozen stake</th>
+          <th class="border">Total delegated</th>
 
           <th class="border">Staked ratio</th>
           <th class="border">Min. ratio</th>
@@ -48,7 +49,9 @@
       Chart.defaults.borderColor = '#454347';
       Chart.defaults.backgroundColor = 'transparent';
 
-      import {Simulator, total_supply_storage, total_frozen_stake_storage} from './app.js';
+      import {Simulator, Delegate,
+              total_supply_storage, total_frozen_stake_storage, total_delegated_storage}
+      from './app.js';
 
       const config = {
           proto: {
@@ -70,6 +73,7 @@
               ai_activation_cycle: 17,
               total_frozen_stake: total_frozen_stake_storage,
               total_supply: total_supply_storage,
+              total_delegated: total_delegated_storage,
           },
       };
 
@@ -116,6 +120,13 @@
                       borderColor: 'rgb(75, 192, 92)',
                       yAxisID: 'y1',
                       data: simulator.config.chain.total_frozen_stake.map(mutez_to_tez),
+                      order: 2,
+                  },
+                  {
+                      label: 'Total delegated',
+                      borderColor: 'rgb(128, 0, 128)',
+                      yAxisID: 'y1',
+                      data: simulator.config.chain.total_delegated.map(mutez_to_tez),
                       order: 2,
                   },
                   {
@@ -243,7 +254,7 @@
                     simulator.set_staked_ratio_at(index, value);
                     window.chart.data.datasets[1].data =
                         simulator.config.chain.total_frozen_stake.map(mutez_to_tez);
-                    window.chart.data.datasets[5].data =
+                    window.chart.data.datasets[6].data =
                         idx_mask.concat(idx_ai.map((i) =>
                             simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4)));
                   },
@@ -312,6 +323,7 @@
 
           new_cell(config.chain.total_supply[cycle]);
           new_cell(config.chain.total_frozen_stake[cycle]);
+          new_cell(config.chain.total_delegated[cycle]);
 
           new_cell(simulator.staked_ratio_for_next_cycle(cycle).toDecimal(3));
 
