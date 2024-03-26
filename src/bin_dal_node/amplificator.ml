@@ -59,8 +59,9 @@ let proved_shards_encoding =
   let shards_proofs_encoding = array Cryptobox.shard_proof_encoding in
   obj2 (req "shards" shards_encoding) (req "proofs" shards_proofs_encoding)
 
-let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
-    commitment ~published_level ~slot_index gs_worker node_ctxt =
+let try_amplification (shard_store : Store.Shards.t)
+    (slot_store : Store.node_store) commitment ~published_level ~slot_index
+    gs_worker node_ctxt =
   let open Lwt_result_syntax in
   match Node_context.get_status node_ctxt with
   | Starting ->
