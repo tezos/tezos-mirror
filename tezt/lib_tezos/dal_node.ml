@@ -338,6 +338,8 @@ let as_rpc_endpoint (t : t) =
   let scheme = "http" in
   Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
 
+let runner (t : t) = t.persistent_state.runner
+
 module Agent = struct
   let create ?(path = Uses.path Constant.octez_dal_node |> Filename.basename)
       ?name ~node agent =

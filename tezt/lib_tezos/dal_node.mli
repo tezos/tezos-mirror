@@ -181,6 +181,8 @@ val wait_for_connections : t -> int -> unit Lwt.t
     ["disconnected.v0"] event from the given peer id. *)
 val wait_for_disconnection : t -> peer_id:string -> unit Lwt.t
 
+val runner : t -> Runner.t option
+
 module Agent : sig
   (* Function below are similar to their counter-part in the main module of this
      file except it takes an agent in parameter. This is to avoid silly mistakes
@@ -192,4 +194,3 @@ module Agent : sig
 
   val create : ?path:string -> ?name:string -> node:Node.t -> Agent.t -> t Lwt.t
 end
-
