@@ -481,6 +481,18 @@ export class Simulator {
  * @typedef {Object} Delegate
  * @property {function():null} clear - clear delegate cache, useful when the simulator values change
  * and the delegate's estimated rewards need to be computed again.
+ * @property {function(number, number):null} set_own_spendable_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's own spendable delegated balance to this value
+ * for the given cycle.
+ * @property {function(number, number):null} set_third_party_delegated_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's third party delegated balance to this value for the given
+ * cycle.
+ * @property {function(number, number):null} set_own_staked_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's own staked balance to this value for the given
+ * cycle.
+ * @property {function(number, number):null} set_third_party_staked_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's third party staked balance to this value for the given
+ * cycle.
  */
 
 /**
@@ -552,6 +564,31 @@ export class Delegate {
 
   #third_party_delegated_balance(cycle) {
     return this.#storage_third_party_delegated_balance[cycle];
+  }
+
+  // The storage_cache_size is used to register what are the values
+  // still valid or the ones that need to be recomputed. Hence, for any change
+  // that occurs at a certain level we need to recompute each data above this level.
+  // This is why we we take the minimal value here
+
+  set_own_spendable_balance(cycle, value) {
+    this.#storage_own_spendable_balance_mask[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  set_third_party_delegated_balance(cycle, value) {
+    this.#storage_third_party_delegated_balance[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  set_own_staked_balance(cycle, value) {
+    this.#storage_own_staked_balance_mask[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  set_third_party_staked_balance(cycle, value) {
+    this.#storage_third_party_staked_balance_mask[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
   }
 }
 
