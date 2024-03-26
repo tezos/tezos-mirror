@@ -11,7 +11,7 @@ use crate::{
     },
     state_backend as backend,
 };
-use softfloat_wrapper::Float;
+use rustc_apfloat::Float;
 
 pub trait FloatExt: Float + Into<FValue>
 where
@@ -45,16 +45,18 @@ where
     {
         let rval: F = self.fregisters.read(rs1).into();
 
+        let is_neg = rval.is_negative();
+
         let res: u64 = match rval {
-            _ if rval.is_negative_infinity() => 1,
-            _ if rval.is_negative_normal() => 1 << 1,
-            _ if rval.is_negative_subnormal() => 1 << 2,
-            _ if rval.is_negative_zero() => 1 << 3,
-            _ if rval.is_positive_zero() => 1 << 4,
-            _ if rval.is_positive_subnormal() => 1 << 5,
-            _ if rval.is_positive_normal() => 1 << 6,
-            _ if rval.is_positive_infinity() => 1 << 7,
-            _ if rval.is_signaling_nan() => 1 << 8,
+            _ if rval.is_neg_infinity() => 1,
+            _ if is_neg && rval.is_normal() => 1 << 1,
+            _ if is_neg && rval.is_denormal() => 1 << 2,
+            _ if rval.is_neg_zero() => 1 << 3,
+            _ if rval.is_pos_zero() => 1 << 4,
+            _ if rval.is_denormal() => 1 << 5,
+            _ if rval.is_normal() => 1 << 6,
+            _ if rval.is_pos_infinity() => 1 << 7,
+            _ if rval.is_signaling() => 1 << 8,
             _ => 1 << 9,
         };
 

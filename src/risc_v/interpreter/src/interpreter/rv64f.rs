@@ -13,20 +13,20 @@ use crate::{
     },
     state_backend as backend,
 };
-use softfloat_wrapper::{Float, F32};
+use rustc_apfloat::{ieee::Single, Float};
 
-impl From<F32> for FValue {
-    fn from(f: F32) -> Self {
+impl From<Single> for FValue {
+    fn from(f: Single) -> Self {
         let val = f.to_bits();
-        f32_to_fvalue(val)
+        f32_to_fvalue(val as u32)
     }
 }
 
 #[allow(clippy::from_over_into)]
-impl Into<F32> for FValue {
-    fn into(self) -> F32 {
+impl Into<Single> for FValue {
+    fn into(self) -> Single {
         let val: u64 = self.into();
-        F32::from_bits(val as u32)
+        Single::from_bits(val as u32 as u128)
     }
 }
 
@@ -38,7 +38,7 @@ where
     ///
     /// See [Self::run_fclass].
     pub fn run_fclass_s(&mut self, rs1: FRegister, rd: XRegister) {
-        self.run_fclass::<F32>(rs1, rd);
+        self.run_fclass::<Single>(rs1, rd);
     }
 
     /// `FMV.X.W` F-type instruction
@@ -91,7 +91,8 @@ mod tests {
         },
     };
     use proptest::prelude::*;
-    use softfloat_wrapper::{Float, F32, F64};
+
+    use rustc_apfloat::{ieee::Double, ieee::Single, Float};
 
     backend_test!(test_fmv_f, F, {
         proptest!(|(
@@ -111,19 +112,19 @@ mod tests {
             let read: u64 = state.fregisters.read(rs1_f).into();
             assert_eq!(f, read as u32, "Expected bits to be moved to fregister");
 
-            let f_64 = F64::from_bits(read);
-            assert!(f_64.is_nan() && !f_64.is_signaling_nan());
+            let f_64 = Double::from_bits(read as u128);
+            assert!(f_64.is_nan() && !f_64.is_signaling());
 
             state.run_fmv_x_w(rs1_f, rs2);
 
             let read = state.xregisters.read(rs2);
             assert_eq!(f, read as u32, "Expected bits to be moved to xregister");
 
-            let f_32 = F32::from_bits(f);
-            if f_32.sign() == 0 {
-                assert_eq!(read, f as u64, "Expected no sign byte to be extended");
-            } else {
+            let f_32 = Single::from_bits(f as u128);
+            if f_32.is_negative() {
                 assert_eq!(read, (f as u64) | 0xffffffff00000000, "Expected sign byte to be extended");
+            } else {
+                assert_eq!(read, f as u64, "Expected no sign byte to be extended");
             }
         });
     });

@@ -14,19 +14,19 @@ use crate::{
     state_backend as backend,
 };
 
-use softfloat_wrapper::{Float, F64};
+use rustc_apfloat::{ieee::Double, Float};
 
-impl From<F64> for FValue {
-    fn from(f: F64) -> Self {
-        f.to_bits().into()
+impl From<Double> for FValue {
+    fn from(f: Double) -> Self {
+        (f.to_bits() as u64).into()
     }
 }
 
 #[allow(clippy::from_over_into)]
-impl Into<F64> for FValue {
-    fn into(self) -> F64 {
-        let val = self.into();
-        F64::from_bits(val)
+impl Into<Double> for FValue {
+    fn into(self) -> Double {
+        let val: u64 = self.into();
+        Double::from_bits(val as u128)
     }
 }
 
@@ -38,7 +38,7 @@ where
     ///
     /// See [Self::run_fclass].
     pub fn run_fclass_d(&mut self, rs1: FRegister, rd: XRegister) {
-        self.run_fclass::<F64>(rs1, rd);
+        self.run_fclass::<Double>(rs1, rd);
     }
 
     /// `FMV.D.X` D-type instruction
