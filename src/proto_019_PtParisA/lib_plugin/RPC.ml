@@ -3110,21 +3110,49 @@ module Sc_rollup = struct
     RPC_context.make_call1 S.ticket_balance ctxt block sc_rollup () key
 end
 
+type Environment.Error_monad.error +=
+  | Published_slot_headers_not_initialized of Raw_level.t
+
+let () =
+  Environment.Error_monad.register_error_kind
+    `Permanent
+    ~id:"published_slot_headers_not_initialized"
+    ~title:"The published slot headers bucket not initialized in the context"
+    ~description:
+      "The published slot headers bucket is not initialized in the context"
+    ~pp:(fun ppf level ->
+      Format.fprintf
+        ppf
+        "The published slot headers bucket is not initialized in the context \
+         at level %a"
+        Raw_level.pp
+        level)
+    Data_encoding.(obj1 (req "level" Raw_level.encoding))
+    (function
+      | Published_slot_headers_not_initialized level -> Some level | _ -> None)
+    (fun level -> Published_slot_headers_not_initialized level)
+
 module Dal = struct
   let path : RPC_context.t RPC_path.context =
     RPC_path.(open_root / "context" / "dal")
 
   module S = struct
-    let dal_confirmed_slot_headers_history =
+    let dal_commitments_history =
       let output = Data_encoding.option Dal.Slots_history.encoding in
       let query = RPC_query.(seal @@ query ()) in
       RPC_service.get_service
         ~description:
-          "Returns the value of the DAL confirmed slots history skip list if \
-           DAL is enabled, or [None] otherwise."
+          "Returns the (currently last) DAL skip list cell if DAL is enabled, \
+           or [None] otherwise."
         ~output
         ~query
-        RPC_path.(path / "confirmed_slot_headers_history")
+        RPC_path.(path / "commitments_history")
+
+    let level_query =
+      RPC_query.(
+        query (fun level -> level)
+        |+ opt_field "level" Raw_level.rpc_arg (fun t -> t)
+        |> seal)
 
     type shards_query = {
       level : Raw_level.t option;
@@ -3163,21 +3191,29 @@ module Dal = struct
         ~query:shards_query
         ~output:(Data_encoding.list shards_assignment_encoding)
         RPC_path.(path / "shards")
+
+    let published_slot_headers =
+      let output = Data_encoding.(list Dal.Slot.Header.encoding) in
+      RPC_service.get_service
+        ~description:"Get the published slots headers for the given level"
+        ~query:level_query
+        ~output
+        RPC_path.(path / "published_slot_headers")
   end
 
-  let register_dal_confirmed_slot_headers_history () =
+  let register_dal_commitments_history () =
     let open Lwt_result_syntax in
     Registration.register0
       ~chunked:false
-      S.dal_confirmed_slot_headers_history
+      S.dal_commitments_history
       (fun ctxt () () ->
         if (Constants.parametric ctxt).dal.feature_enable then
           let+ result = Dal.Slots_storage.get_slot_headers_history ctxt in
           Option.some result
         else return_none)
 
-  let dal_confirmed_slots_history ctxt block =
-    RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
+  let dal_commitments_history ctxt block =
+    RPC_context.make_call0 S.dal_commitments_history ctxt block () ()
 
   let dal_shards ctxt block ?level ?(delegates = []) () =
     RPC_context.make_call0 S.shards ctxt block {level; delegates} ()
@@ -3205,9 +3241,25 @@ module Dal = struct
       []
     |> return
 
+  let dal_published_slot_headers ctxt block ?level () =
+    RPC_context.make_call0 S.published_slot_headers ctxt block level ()
+
+  let register_published_slot_headers () =
+    let open Lwt_result_syntax in
+    Registration.register0 ~chunked:true S.published_slot_headers
+    @@ fun ctxt level () ->
+    let level = Option.value level ~default:(Level.current ctxt).level in
+    let* result = Dal.Slot.find_slot_headers ctxt level in
+    match result with
+    | Some l -> return l
+    | None ->
+        Environment.Error_monad.tzfail
+        @@ Published_slot_headers_not_initialized level
+
   let register () =
-    register_dal_confirmed_slot_headers_history () ;
-    register_shards ()
+    register_dal_commitments_history () ;
+    register_shards () ;
+    register_published_slot_headers ()
 end
 
 module Forge = struct

@@ -218,14 +218,14 @@ let register_protocol_tests_that_use_supports_correctly () =
   Tx_sc_rollup.register ~protocols ;
   Dac.register ~protocols ;
   Timelock.register ~protocols ;
-  Tzt_regression.register ~protocols
+  Tzt_regression.register ~protocols ;
+  Dal.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as
    those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
    Some do not. Those that do not are declared here. *)
-let register_protocol_specific_because_regression_tests () =
-  Dal.register ~protocols:[Alpha]
+let register_protocol_specific_because_regression_tests () = ()
 
 let () =
   register_protocol_independent_tests () ;
