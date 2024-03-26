@@ -4145,6 +4145,299 @@ module Validators = struct
       ()
 end
 
+module Delegates = struct
+  let min_delegated_in_current_cycle_encoding =
+    let open Data_encoding in
+    conv
+      (fun (min_delegated, anchor) -> (min_delegated, anchor))
+      (fun (min_delegated, anchor) -> (min_delegated, anchor))
+      (obj2 (req "amount" Tez.encoding) (opt "level" Level_repr.encoding))
+
+  type info = {
+    full_balance : Tez.t;
+    current_frozen_deposits : Tez.t;
+    frozen_deposits : Tez.t;
+    staking_balance : Tez.t;
+    frozen_deposits_limit : Tez.t option;
+    delegated_contracts : Alpha_context.Contract.t list;
+    delegated_balance : Tez.t;
+    min_delegated_in_current_cycle : Tez.t * Level_repr.t option;
+    total_delegated_stake : Tez.t;
+    staking_denominator : Staking_pseudotoken.t;
+    deactivated : bool;
+    grace_period : Cycle.t;
+    pending_denunciations : bool;
+    voting_info : Vote.delegate_info;
+    active_consensus_key : Signature.Public_key_hash.t;
+    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+  }
+
+  let info_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             full_balance;
+             current_frozen_deposits;
+             frozen_deposits;
+             staking_balance;
+             frozen_deposits_limit;
+             delegated_contracts;
+             delegated_balance;
+             min_delegated_in_current_cycle;
+             total_delegated_stake;
+             staking_denominator;
+             deactivated;
+             grace_period;
+             pending_denunciations;
+             voting_info;
+             active_consensus_key;
+             pending_consensus_keys;
+           } ->
+        ( ( full_balance,
+            current_frozen_deposits,
+            frozen_deposits,
+            staking_balance,
+            frozen_deposits_limit,
+            delegated_contracts,
+            delegated_balance,
+            min_delegated_in_current_cycle,
+            deactivated,
+            grace_period ),
+          ( (pending_denunciations, total_delegated_stake, staking_denominator),
+            (voting_info, (active_consensus_key, pending_consensus_keys)) ) ))
+      (fun ( ( full_balance,
+               current_frozen_deposits,
+               frozen_deposits,
+               staking_balance,
+               frozen_deposits_limit,
+               delegated_contracts,
+               delegated_balance,
+               min_delegated_in_current_cycle,
+               deactivated,
+               grace_period ),
+             ( ( pending_denunciations,
+                 total_delegated_stake,
+                 staking_denominator ),
+               (voting_info, (active_consensus_key, pending_consensus_keys)) )
+           ) ->
+        {
+          full_balance;
+          current_frozen_deposits;
+          frozen_deposits;
+          staking_balance;
+          frozen_deposits_limit;
+          delegated_contracts;
+          delegated_balance;
+          min_delegated_in_current_cycle;
+          total_delegated_stake;
+          staking_denominator;
+          deactivated;
+          grace_period;
+          pending_denunciations;
+          voting_info;
+          active_consensus_key;
+          pending_consensus_keys;
+        })
+      (merge_objs
+         (obj10
+            (req "full_balance" Tez.encoding)
+            (req "current_frozen_deposits" Tez.encoding)
+            (req "frozen_deposits" Tez.encoding)
+            (req "staking_balance" Tez.encoding)
+            (opt "frozen_deposits_limit" Tez.encoding)
+            (req "delegated_contracts" (list Alpha_context.Contract.encoding))
+            (req "delegated_balance" Tez.encoding)
+            (req
+               "min_delegated_in_current_cycle"
+               min_delegated_in_current_cycle_encoding)
+            (req "deactivated" bool)
+            (req "grace_period" Cycle.encoding))
+         (merge_objs
+            (obj3
+               (req "pending_denunciations" bool)
+               (req "total_delegated_stake" Tez.encoding)
+               (req "staking_denominator" Staking_pseudotoken.For_RPC.encoding))
+            (merge_objs
+               Vote.delegate_info_encoding
+               (obj2
+                  (req
+                     "active_consensus_key"
+                     Signature.Public_key_hash.encoding)
+                  (dft
+                     "pending_consensus_keys"
+                     (list
+                        (obj2
+                           (req "cycle" Cycle.encoding)
+                           (req "pkh" Signature.Public_key_hash.encoding)))
+                     [])))))
+
+  let check_delegate_registered ctxt pkh =
+    let open Lwt_result_syntax in
+    let*! result = Delegate.registered ctxt pkh in
+    if result then return_unit
+    else Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
+
+  module S = struct
+    let path =
+      RPC_path.(
+        open_root / "context" / "delegates" /: Signature.Public_key_hash.rpc_arg)
+
+    let info =
+      RPC_service.get_service
+        ~description:"Everything about a delegate."
+        ~query:RPC_query.empty
+        ~output:info_encoding
+        path
+
+    let delegated_balance =
+      RPC_service.get_service
+        ~description:
+          "Returns the sum (in mutez) of all balances of all the contracts \
+           that delegate to a given delegate. This excludes the delegate's own \
+           balance, its frozen deposits and its frozen bonds."
+        ~query:RPC_query.empty
+        ~output:Tez.encoding
+        RPC_path.(path / "delegated_balance")
+
+    let min_delegated_in_current_cycle =
+      RPC_service.get_service
+        ~description:
+          "Returns the minimum of delegated tez (in mutez) over the current \
+           cycle and the block level where this value was last updated (Level \
+           is `None` when decoding values from protocol O)."
+        ~query:RPC_query.empty
+        ~output:min_delegated_in_current_cycle_encoding
+        RPC_path.(path / "min_delegated_in_current_cycle")
+  end
+
+  let unstake_requests ctxt pkh =
+    let open Lwt_result_syntax in
+    let* result = Unstake_requests.prepare_finalize_unstake ctxt pkh in
+    match result with
+    | None -> return_none
+    | Some {finalizable; unfinalizable} ->
+        let* unfinalizable =
+          Unstake_requests.For_RPC
+          .apply_slash_to_unstaked_unfinalizable_stored_requests
+            ctxt
+            unfinalizable
+        in
+        return_some Unstake_requests.{finalizable; unfinalizable}
+
+  let delegated_balance ctxt pkh =
+    let open Lwt_result_syntax in
+    let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
+    let* unstake_requests = unstake_requests ctxt (Implicit pkh) in
+    let* unstake_requests_to_other_delegates =
+      match unstake_requests with
+      | None -> return Tez.zero
+      | Some {finalizable; unfinalizable} ->
+          let* finalizable_sum =
+            List.fold_left_es
+              (fun acc (delegate, _, (amount : Tez.t)) ->
+                if Signature.Public_key_hash.(delegate <> pkh) then
+                  Lwt.return Tez.(acc +? amount)
+                else return acc)
+              Tez.zero
+              finalizable
+          in
+          let* unfinalizable_sum =
+            if Signature.Public_key_hash.(unfinalizable.delegate <> pkh) then
+              List.fold_left_es
+                (fun acc (_, (amount : Tez.t)) ->
+                  Lwt.return Tez.(acc +? amount))
+                Tez.zero
+                unfinalizable.requests
+            else return Tez.zero
+          in
+          Lwt.return Tez.(finalizable_sum +? unfinalizable_sum)
+    in
+    let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
+    let*? self_staking_balance =
+      Tez.(full_balance -? unstake_requests_to_other_delegates)
+    in
+    let*? sum = Tez.(staking_balance -? self_staking_balance) in
+    return sum
+
+  let info ctxt pkh =
+    let open Lwt_result_syntax in
+    let* () = check_delegate_registered ctxt pkh in
+    let* full_balance = Delegate.For_RPC.full_balance ctxt pkh in
+    let* current_frozen_deposits = Delegate.current_frozen_deposits ctxt pkh in
+    let* frozen_deposits = Delegate.initial_frozen_deposits ctxt pkh in
+    let* staking_balance = Delegate.For_RPC.staking_balance ctxt pkh in
+    let* frozen_deposits_limit = Delegate.frozen_deposits_limit ctxt pkh in
+    let*! delegated_contracts = Delegate.delegated_contracts ctxt pkh in
+    let* delegated_balance = delegated_balance ctxt pkh in
+    let* min_delegated_in_current_cycle =
+      Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh
+    in
+    let* total_delegated_stake =
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_staked_tez
+        ctxt
+        ~delegate:pkh
+    in
+    let* staking_denominator =
+      Staking_pseudotokens.For_RPC.get_frozen_deposits_pseudotokens
+        ctxt
+        ~delegate:pkh
+    in
+    let* deactivated = Delegate.deactivated ctxt pkh in
+    let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
+    let*! pending_denunciations =
+      Delegate.For_RPC.has_pending_denunciations ctxt pkh
+    in
+    let* voting_info = Vote.get_delegate_info ctxt pkh in
+    let* consensus_key = Delegate.Consensus_key.active_pubkey ctxt pkh in
+    let+ pendings = Delegate.Consensus_key.pending_updates ctxt pkh in
+    let pending_consensus_keys =
+      List.map (fun (cycle, pkh, _) -> (cycle, pkh)) pendings
+    in
+    {
+      full_balance;
+      current_frozen_deposits;
+      frozen_deposits;
+      staking_balance;
+      frozen_deposits_limit;
+      delegated_contracts;
+      delegated_balance;
+      min_delegated_in_current_cycle;
+      total_delegated_stake;
+      staking_denominator;
+      deactivated;
+      grace_period;
+      pending_denunciations;
+      voting_info;
+      active_consensus_key = consensus_key.consensus_pkh;
+      pending_consensus_keys;
+    }
+
+  let register () =
+    let open Lwt_result_syntax in
+    Registration.register1 ~chunked:false S.info (fun ctxt pkh () () ->
+        info ctxt pkh) ;
+    Registration.register1
+      ~chunked:false
+      S.delegated_balance
+      (fun ctxt pkh () () ->
+        let* () = check_delegate_registered ctxt pkh in
+        delegated_balance ctxt pkh) ;
+    Registration.register1
+      ~chunked:false
+      S.min_delegated_in_current_cycle
+      (fun ctxt pkh () () ->
+        let* () = check_delegate_registered ctxt pkh in
+        Delegate.For_RPC.min_delegated_in_current_cycle ctxt pkh)
+
+  let delegated_balance ctxt block pkh =
+    RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
+
+  let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
+
+  let min_delegated_in_current_cycle_encoding ctxt block pkh =
+    RPC_context.make_call1 S.min_delegated_in_current_cycle ctxt block pkh () ()
+end
+
 module Staking = struct
   let path =
     RPC_path.(
@@ -4198,12 +4491,6 @@ module Staking = struct
       return @@ Some (delegator_pkh, staked_balance)
     else return_none
 
-  let check_delegate_registered ctxt pkh =
-    let open Lwt_result_syntax in
-    let*! result = Delegate.registered ctxt pkh in
-    if result then return_unit
-    else Environment.Error_monad.tzfail (Delegate_services.Not_registered pkh)
-
   let check_is_forbidden ctxt pkh =
     let open Lwt_result_syntax in
     return @@ Delegate.is_forbidden_delegate ctxt pkh
@@ -4213,7 +4500,7 @@ module Staking = struct
         check_is_forbidden ctxt pkh) ;
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
         let open Lwt_result_syntax in
-        let* () = check_delegate_registered ctxt pkh in
+        let* () = Delegates.check_delegate_registered ctxt pkh in
         let*! delegators = Delegate.delegated_contracts ctxt pkh in
         List.filter_map_es
           (fun delegator_contract ->
@@ -4291,6 +4578,7 @@ let register () =
   Sc_rollup.register () ;
   Dal.register () ;
   Staking.register () ;
+  Delegates.register () ;
   Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
       if q.offset < 0l then Environment.Error_monad.tzfail Negative_level_offset
       else
