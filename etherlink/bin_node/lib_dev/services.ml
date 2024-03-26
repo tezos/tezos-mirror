@@ -121,22 +121,26 @@ let build :
     JSONRPC.value Lwt.t =
  fun (module Method) ~f parameters ->
   let open Lwt_syntax in
-  let decoded = Option.map (decode (module Method)) parameters in
-  let+ v = f decoded in
-  match v with
-  | Error err ->
-      let message = Format.asprintf "%a" pp_print_trace err in
-      Error JSONRPC.{code = -32000; message; data = None}
-  | Ok value -> (
-      match value with
-      | Left output -> Ok (encode (module Method) output)
-      | Right (message, data) ->
-          let data =
-            Option.map
-              (Data_encoding.Json.construct Ethereum_types.hash_encoding)
-              data
-          in
-          Error JSONRPC.{code = -32000; message; data})
+  Lwt.catch
+    (fun () ->
+      let decoded = Option.map (decode (module Method)) parameters in
+      let+ v = f decoded in
+      match v with
+      | Error err ->
+          let message = Format.asprintf "%a" pp_print_trace err in
+          Error JSONRPC.{code = -32000; message; data = None}
+      | Ok value -> (
+          match value with
+          | Left output -> Ok (encode (module Method) output)
+          | Right (message, data) ->
+              let data =
+                Option.map
+                  (Data_encoding.Json.construct Ethereum_types.hash_encoding)
+                  data
+              in
+              Error JSONRPC.{code = -32000; message; data}))
+    (fun exn ->
+      Lwt.return_error @@ Rpc_errors.invalid_request @@ Printexc.to_string exn)
 
 let rpc_ok result = Lwt_result_syntax.return (Either.Left result)
 
@@ -158,24 +162,9 @@ let dispatch_request (config : Configuration.t)
   let open Ethereum_types in
   let*! value =
     match map_method_name method_ with
-    | Unknown ->
-        Lwt.return
-          (Error
-             JSONRPC.
-               {
-                 code = -3200;
-                 message = "Method not found";
-                 data = Some (`String method_);
-               })
+    | Unknown -> Lwt.return @@ Error (Rpc_errors.method_not_found method_)
     | Unsupported ->
-        Lwt.return
-          (Error
-             JSONRPC.
-               {
-                 code = -3200;
-                 message = "Method not supported";
-                 data = Some (`String method_);
-               })
+        Lwt.return @@ Error (Rpc_errors.method_not_supported method_)
     (* Ethereum JSON-RPC API methods we support *)
     | Method (Accounts.Method, module_) ->
         let f (_ : unit option) = rpc_ok [] in
@@ -337,6 +326,7 @@ let dispatch_request (config : Configuration.t)
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
               rpc_error reason
         in
+
         build_with_input ~f module_ parameters
     | Method (Eth_call.Method, module_) ->
         let f (call, _) =
