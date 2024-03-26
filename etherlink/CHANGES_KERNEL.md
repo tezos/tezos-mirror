@@ -10,10 +10,6 @@
 
 ### Internal
 
-## Version d689a9dcfa16169aa0dbce1944e920093223c671t (Security Upgrade)
-
-### Bug fixes
-
 ## Version 0a81ce76b3d4f57d8c5194bcb9418f9294fd2be1
 
 ### Features
