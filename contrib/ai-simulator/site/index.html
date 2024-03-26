@@ -104,6 +104,23 @@
       // Creation of the simulator.
       const simulator = new Simulator(config);
 
+      // Creation of a delegate.
+      const delegate_config = {
+        delegate_registration_cycle: 10,
+        delegate_policy: {
+          limit_of_staking_over_baking: 3,
+          edge_of_baking_over_staking: 0.01,
+        },
+      };
+
+      const delegate = new Delegate(simulator, delegate_config);
+
+      delegate.set_own_staked_balance(9, 10_000_000_000)
+      delegate.set_third_party_staked_balance(9, 20_000_000_000)
+
+      delegate.set_own_spendable_balance(9, 20_000_000_000);
+      delegate.set_third_party_delegated_balance(9, 30_000_000_000);
+
       const chart_config = {
           type: 'line',
           data: {
