@@ -5,6 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [with_amplification_lock ready_ctxt slot_id ~on_error f] returns
+    nothing if the amplification lock for [slot_id] is already taken,
+    otherwise it aquires the lock and starts the [f ()] promise
+    without waiting for its resolution.
+
+    The promise can either succeed, return an error, or raise an
+    exception. In any case, the amplification lock is released after
+    the completion of the promise.
+
+    If the promise returns an error, the error is passed to the
+    [on_error] handler after the release of the lock.
+
+    If the promise raises an exception, it is turned into an error
+    using [Error_monad.fail_with_exn] and passed to the [on_error]
+    handler after the release of the lock. *)
 let with_amplification_lock (ready_ctxt : Node_context.ready_ctxt) slot_id
     ~on_error (f : unit -> unit tzresult Lwt.t) =
   let open Lwt_result_syntax in
