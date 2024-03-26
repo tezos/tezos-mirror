@@ -555,6 +555,10 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
       last_predecessor = Block_hash.zero;
     }
   in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7110
+     Enshrine `stateful_hash_nonces` as the main nonce file
+     format.
+  *)
   let* () = try_migrate_legacy_nonces state in
   let rec worker_loop () =
     Lwt_canceler.on_cancel canceler (fun () ->
