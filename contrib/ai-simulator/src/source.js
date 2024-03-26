@@ -121,6 +121,8 @@ const safe_get = (array, cycle) => {
  * @property {function(number, number):null} set_staked_ratio_at - Takes a cycle and
  * a ratio as arguments. Sets the frozen balance by applying the ratio to the total supply
  * of the given cycle. The ratio is clipped between 0 and 1.
+ * @property {function(number):bigInt} total_supply - Takes a cycle and
+ * returns the total supply (in mutez) available on the chain
  */
 
 /**
@@ -159,6 +161,10 @@ export class Simulator {
 
   constructor(config) {
     this.config = config;
+  }
+
+  total_supply(cycle) {
+    return bigInt(this.config.chain.total_supply[cycle]);
   }
 
   #compute_extremum(cycle, initial_value, final_value) {
