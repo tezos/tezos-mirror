@@ -340,6 +340,18 @@ let as_rpc_endpoint (t : t) =
 
 let runner (t : t) = t.persistent_state.runner
 
+let point node =
+  let address = Runner.address node.persistent_state.runner in
+  let net_port =
+    String.split_on_char ':' node.persistent_state.listen_addr
+    |> Fun.flip List.nth 1
+  in
+  (address, net_port)
+
+let point_str node =
+  let addr, port = point node in
+  addr ^ ":" ^ port
+
 module Agent = struct
   let create ?(path = Uses.path Constant.octez_dal_node |> Filename.basename)
       ?name ~node agent =

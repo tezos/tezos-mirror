@@ -183,6 +183,8 @@ val wait_for_disconnection : t -> peer_id:string -> unit Lwt.t
 
 val runner : t -> Runner.t option
 
+val point_str : t -> string
+
 module Agent : sig
   (* Function below are similar to their counter-part in the main module of this
      file except it takes an agent in parameter. This is to avoid silly mistakes
