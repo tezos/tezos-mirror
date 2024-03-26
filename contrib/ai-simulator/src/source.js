@@ -530,6 +530,14 @@ export class Simulator {
  * @typedef {Object} Delegate
  * @property {function():null} clear - clear delegate cache, useful when the simulator values change
  * and the delegate's estimated rewards need to be computed again.
+ * @property {function(number):bigInt} estimated_own_staked_balance - Takes a cycle as argument
+ * and returns the delegate's estimated own staked balance for the given cycle.
+ * @property {function(number):bigInt} estimated_third_party_staked_balance - Takes a cycle as argument
+ * and returns the delegate's estimated third party staked balance for the given cycle.
+ * @property {function(number):bigInt} estimated_own_spendable_balance - Takes a cycle as argument
+ * and returns the delegate's estimated own spendable balance for the given cycle.
+ * @property {function(number):bigInt} third_party_delegated_balance - Takes a cycle as argument
+ * and returns the delegate's third party delegated balance for the given cycle.
  * @property {function(number):EstimatedRewards} estimated_rewards - Takes a cycle as argument
  * and returns the delegate's estimated rewards for this cycle.
  * @property {function(number):BakingPower} baking_power -
@@ -916,6 +924,26 @@ export class Delegate {
       this.#compute_new_balances(i);
       this.#storage_cache_size++;
     }
+  }
+
+  estimated_own_staked_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#own_staked_balance(cycle);
+  }
+
+  estimated_third_party_staked_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#third_party_staked_balance(cycle);
+  }
+
+  estimated_own_spendable_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#own_spendable_balance(cycle);
+  }
+
+  third_party_delegated_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#third_party_delegated_balance(cycle);
   }
 }
 
