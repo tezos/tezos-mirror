@@ -445,20 +445,6 @@ module Migrations = struct
     with_connection store @@ fun conn ->
     let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
     Db.exec conn Q.Migrations.register_migration (id, M.name)
-
-  let assume_old_store store =
-    let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* () = Db.exec conn Q.Migrations.create_table () in
-    Db.exec conn Q.Migrations.register_migration (0, Q.Migrations.V0.name)
-
-  let check_V0 store =
-    let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* publishable = Db.find conn Q.table_exists "publishable_blueprints" in
-    let* executable = Db.find conn Q.table_exists "executable_blueprints" in
-    let* context_hashes = Db.find conn Q.table_exists "context_hashes" in
-    return (publishable && executable && context_hashes)
 end
 
 let init ~data_dir =
@@ -478,18 +464,7 @@ let init ~data_dir =
         let* table_exists = Migrations.table_exists store in
         let* () =
           when_ (not table_exists) (fun () ->
-              (* The database already exists, but the migrations table does not.
-                 This probably means it was created before the introduction of
-                 the migration system. We check that the three initial tables are
-                 there and if so, we assume the first migration is applied moving
-                 forward, with a warning. *)
-              let* old_db = Migrations.check_V0 store in
-              if old_db then
-                let* () = Migrations.assume_old_store store in
-                let*! () = Evm_store_events.assume_old_store () in
-                return_unit
-              else
-                failwith "A store already exists, but its content is incorrect.")
+              failwith "A store already exists, but its content is incorrect.")
         in
         return_unit
     in
