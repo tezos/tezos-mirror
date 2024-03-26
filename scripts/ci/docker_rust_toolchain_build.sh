@@ -55,7 +55,7 @@ image_name="${image_base}:${image_tag}"
 echo "rust_toolchain_image_tag=$image_tag" > rust_toolchain_image_tag.env
 
 # Build image unless it already exists in the registry.
-if docker manifest inspect "${image_name}" > /dev/null; then
+if [ -z "${RUST_TOOLCHAIN_ALWAYS_REBUILD:-}" ] && docker manifest inspect "${image_name}" > /dev/null; then
   echo "Image ${image_name} already exists in the registry, do nothing."
   exit 0
 fi

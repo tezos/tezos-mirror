@@ -6,10 +6,7 @@ oc.docker:arm64:
   stage: manual
   tags:
   - gcp_arm64
-  needs:
-  - oc.docker:rust-toolchain
-  dependencies:
-  - oc.docker:rust-toolchain
+  dependencies: []
   allow_failure: true
   before_script:
   - ./scripts/ci/docker_initialize.sh
@@ -23,4 +20,5 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    rust_toolchain_image_tag: is-never-pulled
   when: manual
