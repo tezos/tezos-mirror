@@ -12,6 +12,51 @@ type parameters = {
   maximum_number_of_chunks : int;
 }
 
+(* The size of a delayed transaction is overapproximated to the maximum size
+   of an inbox message, as chunks are not supported in the delayed bridge. *)
+let maximum_delayed_transaction_size = 4096
+
+(*
+   The legacy transactions are as follows:
+  -----------------------------
+  | Nonce    | Up to 32 bytes |
+  -----------------------------
+  | GasPrice | Up to 32 bytes |
+  -----------------------------
+  | GasLimit | Up to 32 bytes |
+  -----------------------------
+  | To       | 20 bytes addr  |
+  -----------------------------
+  | Value    | Up to 32 bytes |
+  -----------------------------
+  | Data     | 0 - unlimited  |
+  -----------------------------
+  | V        | 1 (usually)    |
+  -----------------------------
+  | R        | 32 bytes       |
+  -----------------------------
+  | S        | 32 bytes       |
+  -----------------------------
+
+   where `up to` start at 0, and encoded as the empty byte for the 0 value
+   according to RLP specification.
+*)
+let minimum_ethereum_transaction_size =
+  Rlp.(
+    List
+      [
+        Value Bytes.empty;
+        Value Bytes.empty;
+        Value Bytes.empty;
+        Value (Bytes.make 20 '\000');
+        Value Bytes.empty;
+        Value Bytes.empty;
+        Value Bytes.empty;
+        Value (Bytes.make 32 '\000');
+        Value (Bytes.make 32 '\000');
+      ]
+    |> encode |> Bytes.length)
+
 module Types = struct
   type nonrec parameters = parameters
 
@@ -75,20 +120,44 @@ let get_hashes ~transactions ~delayed_transactions =
   in
   return (delayed_transactions @ hashes)
 
-let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
-    ~maximum_number_of_chunks =
+let take_delayed_transactions maximum_number_of_chunks =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       maximum_number_of_chunks
   in
+  let maximum_delayed_transactions =
+    maximum_cumulative_size / maximum_delayed_transaction_size
+  in
+  let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
+  let delayed_transactions =
+    List.take_n maximum_delayed_transactions delayed_transactions
+  in
+  let remaining_cumulative_size =
+    maximum_cumulative_size - (List.length delayed_transactions * 4096)
+  in
+  return (delayed_transactions, remaining_cumulative_size)
+
+let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
+    ~maximum_number_of_chunks =
+  let open Lwt_result_syntax in
   let* is_locked = Tx_pool.is_locked () in
   if is_locked then
     let*! () = Block_producer_events.production_locked () in
     return 0
   else
-    let* transactions = Tx_pool.pop_transactions ~maximum_cumulative_size in
-    let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
+    let* delayed_transactions, remaining_cumulative_size =
+      take_delayed_transactions maximum_number_of_chunks
+    in
+    let* transactions =
+      (* Low key optimization to avoid even checking the txpool if there is not
+         enough space for the smallest transaction. *)
+      if remaining_cumulative_size <= minimum_ethereum_transaction_size then
+        return []
+      else
+        Tx_pool.pop_transactions
+          ~maximum_cumulative_size:remaining_cumulative_size
+    in
     let n = List.length transactions + List.length delayed_transactions in
     if force || n > 0 then
       let*! head_info = Evm_context.head_info () in
