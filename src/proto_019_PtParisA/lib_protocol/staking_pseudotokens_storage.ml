@@ -445,6 +445,14 @@ let request_unstake ctxt ~delegator ~delegate requested_amount =
       assert (
         Staking_pseudotoken_repr.(
           delegate_balances.frozen_deposits_pseudotokens <> zero)) ;
+
+      let*? max_to_request =
+        tez_of
+          ~rounding:`Down
+          delegate_balances
+          delegator_balances.pseudotoken_balance
+      in
+      let requested_amount = Tez_repr.min max_to_request requested_amount in
       let*? requested_pseudotokens =
         pseudotokens_of ~rounding:`Up delegate_balances requested_amount
       in
