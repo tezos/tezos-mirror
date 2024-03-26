@@ -187,7 +187,7 @@ let validate_new_head w hash (header : Block_header.t) =
   | `Ok -> (
       let*! () = Events.(emit requesting_new_head_validation) block_received in
       let*! v =
-        Block_validator.validate
+        Block_validator.precheck_and_apply
           ~notify_new_block:pv.parameters.notify_new_block
           ~precheck_and_notify:true
           pv.parameters.block_validator
@@ -202,7 +202,7 @@ let validate_new_head w hash (header : Block_header.t) =
              or, at least, by a worker termination which will close the
              connection. *)
           Lwt.return_error errs
-      | Invalid_after_precheck _errs ->
+      | Unapplicable_after_precheck _errs ->
           let*! () =
             Events.(emit ignoring_prechecked_invalid_block) block_received
           in

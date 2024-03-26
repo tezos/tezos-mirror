@@ -490,7 +490,7 @@ let rec validation_worker_loop pipeline =
     let* () =
       protect ~canceler:pipeline.canceler (fun () ->
           let*! r =
-            Block_validator.validate
+            Block_validator.precheck_and_apply
               ~canceler:pipeline.canceler
               ~notify_new_block:pipeline.notify_new_block
               ~precheck_and_notify:false
@@ -501,7 +501,7 @@ let rec validation_worker_loop pipeline =
               operations
           in
           match r with
-          | Block_validator.Invalid errs | Invalid_after_precheck errs ->
+          | Block_validator.Invalid errs | Unapplicable_after_precheck errs ->
               (* Cancel the pipeline if a block is invalid *)
               Lwt.return_error errs
           | Valid -> return_unit)

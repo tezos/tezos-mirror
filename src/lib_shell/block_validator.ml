@@ -543,10 +543,10 @@ let shutdown = Worker.shutdown
 
 type block_validity =
   | Valid
-  | Invalid_after_precheck of error trace
+  | Unapplicable_after_precheck of error trace
   | Invalid of error trace
 
-let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
+let precheck_and_apply w ?canceler ?peer ?(notify_new_block = fun _ -> ())
     ?(precheck_and_notify = false) chain_db hash (header : Block_header.t)
     operations =
   let open Lwt_syntax in
@@ -581,7 +581,7 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
       | Ok (Prechecked_and_applied | Already_committed | Outdated_block) ->
           return Valid
       | Ok (Application_error_after_precheck errs) ->
-          return (Invalid_after_precheck errs)
+          return (Unapplicable_after_precheck errs)
       | Ok (Precheck_failed errs)
       | Ok (Application_error errs)
       | Error (Request_error errs) ->
