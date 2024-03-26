@@ -376,13 +376,10 @@ export class Simulator {
   }
 
   #reward_from_constants(cycle, weight, d = 1) {
-    const coeff = this.reward_coeff(cycle);
+    const coeff = bigRat(this.reward_coeff(cycle));
     const rewards = this.#tez_from_weights(weight);
-    const coeff_rat = bigRat(coeff);
-    const num = coeff_rat.numerator;
-    const den = coeff_rat.denominator;
     const base_rewards = rewards.divide(d);
-    return base_rewards.multiply(num).divide(den);
+    return base_rewards.multiply(coeff.numerator).divide(coeff.denominator);
   }
 
   baking_reward_fixed_portion(cycle) {
