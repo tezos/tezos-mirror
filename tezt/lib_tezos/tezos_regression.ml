@@ -52,6 +52,9 @@ let replace_variables string =
       ("/127.0.0.1:\\d{4,5}/", "/[HOST]:[PORT]/");
       ("/\\[::1\\]:\\d{4,5}/", "/[HOST]:[PORT]/");
       ("sandbox/src/main.rs:\\d+:\\d+:", "sandbox/src/main.rs:[LOCATION]:");
+      ("      +\\d{1,3}\\.\\d{3}ms +\\d{1,3}% +\\+\\d{1,3}\\.\\d{3}ms", "[PROFILER_MS]");
+      ("      +\\+?\\d{1,3}\\.\\d{3}ms *\\d*%?", "[PROFILER_MS]");
+      ("20\\d{2}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}", "[TIMESTAMP]");
     ]
   in
   List.fold_left
