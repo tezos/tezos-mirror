@@ -28,6 +28,12 @@
 (** DAL Node state *)
 type t
 
+(** Period for the shards to be kept in the storage
+    [Full] : never delete
+    [Auto] : period depending on the node profile
+    [Custom (i)] : keeps the shards during [i] blocks *)
+type history_mode = Full | Auto | Custom of int
+
 (** Creates a DAL node *)
 
 val create :
@@ -136,6 +142,7 @@ val init_config :
   ?producer_profiles:int list ->
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
+  ?history_mode:history_mode ->
   t ->
   unit Lwt.t
 

@@ -35,7 +35,7 @@ let merge
         metrics_addr;
         profiles;
         peers;
-        history_mode
+        history_mode;
       } configuration =
   let profiles =
     match profiles with

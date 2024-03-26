@@ -44,6 +44,8 @@ module Parameters = struct
   let default_colors = Log.Color.[|FG.gray; FG.magenta; FG.yellow; FG.green|]
 end
 
+type history_mode = Full | Auto | Custom of int
+
 open Parameters
 include Daemon.Make (Parameters)
 
@@ -86,7 +88,8 @@ let spawn_command dal_node =
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
-    ?(observer_profiles = []) ?(bootstrap_profile = false) dal_node =
+    ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
+    dal_node =
   spawn_command dal_node @@ List.filter_map Fun.id
   @@ [
        Some "config";
@@ -121,7 +124,13 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
         Some "--producer-profiles";
         Some (String.concat "," (List.map string_of_int producer_profiles));
       ])
-  @ if bootstrap_profile then [Some "--bootstrap-profile"] else [None]
+  @ (if bootstrap_profile then [Some "--bootstrap-profile"] else [None])
+  @
+  match history_mode with
+  | None -> []
+  | Some Full -> [Some "--history-mode"; Some "full"]
+  | Some Auto -> [Some "--history-mode"; Some "auto"]
+  | Some (Custom i) -> [Some "--history-mode"; Some (string_of_int i)]
 
 module Config_file = struct
   let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
@@ -134,7 +143,7 @@ module Config_file = struct
 end
 
 let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
-    ?observer_profiles ?bootstrap_profile dal_node =
+    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
   let process =
     spawn_config_init
       ?expected_pow
@@ -143,6 +152,7 @@ let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
       ?producer_profiles
       ?observer_profiles
       ?bootstrap_profile
+      ?history_mode
       dal_node
   in
   Process.check process
