@@ -146,13 +146,12 @@ oc.docker:amd64:
     - .gitlab/**/*
     - .gitlab-ci.yml
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
-  dependencies:
-  - oc.docker:rust-toolchain
-  before_script:
-  - ./scripts/ci/docker_initialize.sh
+  dependencies: []
+  before_script: []
   script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  - source rust_toolchain_image_tag.env
+  - export rust_toolchain_image_tag
   - ./scripts/ci/docker_release.sh
   services:
   - docker:${DOCKER_VERSION}-dind
@@ -162,6 +161,7 @@ oc.docker:amd64:
     DOCKER_BUILD_TARGET: with-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    RUST_TOOLCHAIN_ALWAYS_REBUILD: "true"
 
 oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
@@ -188,10 +188,7 @@ oc.docker:arm64:
     - .gitlab/**/*
     - .gitlab-ci.yml
     when: on_success
-  needs:
-  - oc.docker:rust-toolchain
-  dependencies:
-  - oc.docker:rust-toolchain
+  dependencies: []
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -204,6 +201,7 @@ oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    rust_toolchain_image_tag: is-never-pulled
 
 oc.unified_coverage:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}

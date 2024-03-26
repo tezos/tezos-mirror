@@ -903,20 +903,10 @@ let jobs pipeline_type =
     match pipeline_type with
     | Before_merging ->
         let job_docker_amd64_test_manual : Tezos_ci.tezos_job =
-          job_docker_build
-            ~__POS__
-            ~external_:true
-            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
-            ~arch:Amd64
-            Test_manual
+          job_docker_build ~__POS__ ~external_:true ~arch:Amd64 Test_manual
         in
         let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
-          job_docker_build
-            ~__POS__
-            ~external_:true
-            ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
-            ~arch:Arm64
-            Test_manual
+          job_docker_build ~__POS__ ~external_:true ~arch:Arm64 Test_manual
         in
         let job_build_dpkg_amd64_manual =
           job_build_bin_package

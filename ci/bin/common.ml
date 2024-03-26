@@ -506,12 +506,18 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
     | Release | Experimental -> true
     | Test | Test_manual -> false
   in
+  (* Whether to include evm artifacts.
+     Including these artifacts requires building the rust-toolchain image. *)
+  let with_evm_artifacts =
+    match (arch, docker_build_type) with
+    | Amd64, (Test_manual | Experimental) -> true
+    | _ -> false
+  in
   let variables =
     [
       ( "DOCKER_BUILD_TARGET",
-        match (arch, docker_build_type) with
-        | Amd64, (Test_manual | Experimental) -> "with-evm-artifacts"
-        | _ -> "without-evm-artifacts" );
+        if with_evm_artifacts then "with-evm-artifacts"
+        else "without-evm-artifacts" );
       ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
       ( "EXECUTABLE_FILES",
         match docker_build_type with
@@ -520,6 +526,25 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
             "script-inputs/released-executables \
              script-inputs/experimental-executables" );
     ]
+    @
+    if with_evm_artifacts then
+      [
+        (* Always rebuild the rust-toolchain image before
+           building the Octez Docker image. *)
+        ("RUST_TOOLCHAIN_ALWAYS_REBUILD", "true");
+      ]
+    else
+      [
+        (* We have to set [rust_toolchain_image_tag] to some value.
+
+           If we're not using the rust-toolchain image, then point the
+           its tag to somewhere that shouldn't point to an image.
+           Note that since [with_evm_artifacts] is false, the
+           [DOCKER_BUILD_TARGET] is [without-evm-artifacts] and so the
+           [layer2-builder] stage of [build.Dockerfile] is never built. Hence,
+           build will not attempt to pull the [rust-toolchain] image. *)
+        ("rust_toolchain_image_tag", "is-never-pulled");
+      ]
   in
   let stage, when_, (allow_failure : allow_failure_job option) =
     match docker_build_type with
@@ -534,19 +559,35 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
     | Test -> "test"
     | Test_manual -> "test_manual"
   in
+  let script =
+    (if with_evm_artifacts then
+     [
+       "./scripts/ci/docker_rust_toolchain_build.sh";
+       (* Read the value of [rust_toolchain_image_tag] and make it
+          available to [./scripts/ci/docker_release.sh]. *)
+       "source rust_toolchain_image_tag.env";
+       "export rust_toolchain_image_tag";
+     ]
+    else [])
+    @ ["./scripts/ci/docker_release.sh"]
+  in
   let job =
     job_docker_authenticated
       ?when_
       ?allow_failure
       ?rules
       ?dependencies
+        (* Docker initialization will always be performed in
+           [docker_rust_toolchain_build.sh] if [with_evm_artifacts]
+           since then [RUST_TOOLCHAIN_ALWAYS_REBUILD] is [true]. *)
+      ~skip_docker_initialization:with_evm_artifacts
       ~ci_docker_hub
       ~__POS__
       ~stage
       ~arch
       ~name
       ~variables
-      ["./scripts/ci/docker_release.sh"]
+      script
   in
   if external_ then job_external ~directory:"build" ~filename_suffix job
   else job

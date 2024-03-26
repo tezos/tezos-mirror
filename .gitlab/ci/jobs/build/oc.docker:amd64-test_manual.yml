@@ -6,14 +6,13 @@ oc.docker:amd64:
   stage: manual
   tags:
   - gcp
-  needs:
-  - oc.docker:rust-toolchain
-  dependencies:
-  - oc.docker:rust-toolchain
+  dependencies: []
   allow_failure: true
-  before_script:
-  - ./scripts/ci/docker_initialize.sh
+  before_script: []
   script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  - source rust_toolchain_image_tag.env
+  - export rust_toolchain_image_tag
   - ./scripts/ci/docker_release.sh
   services:
   - docker:${DOCKER_VERSION}-dind
@@ -23,4 +22,5 @@ oc.docker:amd64:
     DOCKER_BUILD_TARGET: with-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    RUST_TOOLCHAIN_ALWAYS_REBUILD: "true"
   when: manual
