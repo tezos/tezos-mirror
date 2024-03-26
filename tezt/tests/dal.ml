@@ -5046,6 +5046,129 @@ module Amplification = struct
       ~error_msg:
         "Commitment published at unexpected level: expected: %R, actual: %L" ;
     unit
+
+  (* A simpler test in which a slot producer is directly connected to
+     an observer node and sends all shards. *)
+  let test_amplification_without_lost_shards _protocol dal_parameters _cryptobox
+      node client dal_bootstrap =
+    (* In this test we have three DAL nodes:
+       - a bootstrap one to connect the other two (producer and observer),
+       - a slot producer on slot 0,
+       - an observer on slot 0.
+
+       We check that when the slot producer publishes a slot, the
+       observer performs an amplification. *)
+    let index = 0 in
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let num_slots = dal_parameters.Dal.Parameters.number_of_slots in
+    let peers = [Dal_node.listen_addr dal_bootstrap] in
+    let peer_id dal_node = Dal_node.read_identity dal_node in
+
+    (* Check that the dal node passed as argument to this test function
+       is a running bootstrap DAL node. If not, this means that we
+       forgot to register the test with ~bootstrap_profile:true *)
+    let* () =
+      check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap
+    in
+    Log.info "Bootstrap DAL node is running" ;
+
+    let producer = Dal_node.create ~name:"producer" ~node () in
+    let* () = Dal_node.init_config ~producer_profiles:[index] ~peers producer in
+    let* () = Dal_node.run ~wait_ready:true producer in
+    let producer_peer_id = peer_id producer in
+    let* () =
+      check_profiles
+        ~__LOC__
+        producer
+        ~expected:Dal_RPC.(Operator [Producer index])
+    in
+    Log.info "Slot producer DAL node is running" ;
+
+    let observer = Dal_node.create ~name:"observer" ~node () in
+    let* () = Dal_node.init_config ~observer_profiles:[index] ~peers observer in
+    let* () = Dal_node.run ~wait_ready:true observer in
+    let observer_peer_id = peer_id observer in
+    let* () =
+      check_profiles
+        ~__LOC__
+        observer
+        ~expected:Dal_RPC.(Operator [Observer index])
+    in
+    Log.info "Observer DAL node is running" ;
+
+    let all_pkhs =
+      Account.Bootstrap.keys |> Array.to_list
+      |> List.map (fun account -> account.Account.public_key_hash)
+    in
+
+    (* The connections between the slot producer and the observer have
+       no reason to be grafted on other slot indices than the one they
+       are both subscribed to, so we instruct
+       [check_events_with_topic] to skip all events but the one for
+       [index]. *)
+    let already_seen_slots =
+      Array.init num_slots (fun slot_index -> slot_index <> index)
+    in
+    (* Wait for a GRAFT message between the observer and the producer,
+       in any direction. *)
+    let check_graft pkh =
+      let graft_from_observer =
+        check_events_with_topic
+          ~event_with_topic:(Graft observer_peer_id)
+          producer
+          ~num_slots
+          ~already_seen_slots
+          pkh
+      in
+      let graft_from_producer =
+        check_events_with_topic
+          ~event_with_topic:(Graft producer_peer_id)
+          observer
+          ~num_slots
+          ~already_seen_slots
+          pkh
+      in
+      Lwt.pick [graft_from_observer; graft_from_producer]
+    in
+    let check_graft_promises = List.map check_graft all_pkhs in
+    Log.info "Waiting for grafting of the observer - producer connection" ;
+
+    (* We need to bake some blocks until the L1 node notifies the DAL
+       nodes that some L1 block is final so that the topic pkhs are
+       known. *)
+    let* () = bake_for ~count:3 client in
+    let* () = Lwt.join check_graft_promises in
+    Log.info "Observer - producer connection grafted" ;
+
+    (* Produce and publish a slot *)
+    let source = Constant.bootstrap1 in
+    let slot_content = "content" in
+    let wait_slot commitment =
+      Log.info "Waiting for reconstruction to start" ;
+      let* () =
+        Dal_node.wait_for observer "reconstruct_started.v0" (fun event ->
+            let actual_commitment = JSON.(event |> as_string) in
+            if commitment = actual_commitment then Some () else None)
+      in
+      Log.info "Waiting for reconstruction to finish" ;
+      let* () =
+        Dal_node.wait_for observer "reconstruct_finished.v0" (fun event ->
+            if JSON.(event |> as_string) = commitment then Some () else None)
+      in
+      unit
+    in
+    let* _publication_level, _commitment =
+      publish_store_and_wait_slot
+        node
+        client
+        producer
+        source
+        ~index
+        ~wait_slot
+        ~number_of_extra_blocks_to_bake:2
+      @@ Helpers.make_slot ~slot_size slot_content
+    in
+    unit
 end
 
 module Tx_kernel_e2e = struct
@@ -5945,6 +6068,12 @@ let register ~protocols =
     ~number_of_slots:1
     "banned attesters receive their shards thanks to amplification"
     Amplification.test_amplification
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["amplification"; "simple"]
+    ~bootstrap_profile:true
+    "observer triggers amplification (without lost shards)"
+    Amplification.test_amplification_without_lost_shards
     protocols ;
 
   (* Tests with all nodes *)
