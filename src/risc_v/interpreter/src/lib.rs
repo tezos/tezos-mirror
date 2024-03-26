@@ -97,7 +97,15 @@ impl<'a> Interpreter<'a> {
         })
     }
 
-    fn handle_step_result(&mut self, mut result: StepManyResult, max: usize) -> InterpreterResult {
+    fn handle_step_result<F>(
+        &mut self,
+        mut result: StepManyResult,
+        max: usize,
+        should_continue: F,
+    ) -> InterpreterResult
+    where
+        F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
+    {
         match result.exception {
             Some(exc) => match self.posix_state.handle_call(&mut self.machine_state, exc) {
                 exec_env::EcallOutcome::Fatal => Exception(exc, result.steps),
@@ -112,7 +120,7 @@ impl<'a> Interpreter<'a> {
                             steps: result.steps,
                         }
                     } else if continue_eval && steps_left > 0 {
-                        self.run_accum(result.steps, steps_left)
+                        self.run_accum(result.steps, steps_left, should_continue)
                     } else {
                         Running(result.steps)
                     }
@@ -124,23 +132,31 @@ impl<'a> Interpreter<'a> {
     }
 
     pub fn run(&mut self, max: usize) -> InterpreterResult {
-        self.run_accum(0, max)
+        self.run_accum(0, max, |_| true)
     }
 
     /// This function only exists to make the funneling of [steps_done]
     /// tail-recursive.
-    fn run_accum(&mut self, steps_done: usize, max: usize) -> InterpreterResult {
-        let mut result = self.machine_state.step_many(max, |_| true);
-        result.steps = result.steps.saturating_add(steps_done);
-        self.handle_step_result(result, max)
-    }
-
-    pub fn step_many<F>(&mut self, max: usize, should_continue: F) -> InterpreterResult
+    fn run_accum<F>(
+        &mut self,
+        steps_done: usize,
+        max: usize,
+        mut should_continue: F,
+    ) -> InterpreterResult
     where
         F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
     {
-        let result = self.machine_state.step_many(max, should_continue);
-        self.handle_step_result(result, max)
+        let mut result = self.machine_state.step_many(max, &mut should_continue);
+        result.steps = result.steps.saturating_add(steps_done);
+        self.handle_step_result(result, max, should_continue)
+    }
+
+    pub fn step_many<F>(&mut self, max: usize, mut should_continue: F) -> InterpreterResult
+    where
+        F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
+    {
+        let result = self.machine_state.step_many(max, &mut should_continue);
+        self.handle_step_result(result, max, should_continue)
     }
 
     pub fn read_xregister(&self, reg: XRegister) -> u64 {
