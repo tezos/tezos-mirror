@@ -115,8 +115,6 @@ type parameters = {
   mode : mode;
 }
 
-type popped_transactions = Locked | Transactions of string list
-
 module Types = struct
   type state = {
     rollup_node : (module Services_backend_sig.S);
@@ -147,7 +145,7 @@ module Request = struct
     | Add_transaction :
         string
         -> ((Ethereum_types.hash, string) result, tztrace) t
-    | Pop_transactions : int -> (popped_transactions, tztrace) t
+    | Pop_transactions : int -> (string list, tztrace) t
     | Pop_and_inject_transactions : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
@@ -280,7 +278,7 @@ let pop_transactions state ~maximum_cumulative_size =
         } =
     state
   in
-  if locked then return Locked
+  if locked then return []
   else
     (* Get all the addresses in the tx-pool. *)
     let addresses = Pool.addresses pool in
@@ -355,7 +353,7 @@ let pop_transactions state ~maximum_cumulative_size =
     in
     (* update the pool *)
     state.pool <- pool ;
-    return (Transactions txs)
+    return txs
 
 let pop_and_inject_transactions state =
   let open Lwt_result_syntax in
@@ -364,7 +362,7 @@ let pop_and_inject_transactions state =
   | Sequencer ->
       failwith
         "Internal error: the sequencer is not supposed to use this function"
-  | Observer | Proxy _ -> (
+  | Observer | Proxy _ ->
       (* We over approximate the number of transactions to pop in proxy and
          observer mode to the maximum size an L1 block can hold. If the proxy
          sends more, they won't be applied at the next level. For the observer,
@@ -373,34 +371,29 @@ let pop_and_inject_transactions state =
         Sequencer_blueprint.maximum_usable_space_in_blueprint
           Sequencer_blueprint.maximum_chunks_per_l1_level
       in
-      let* res = pop_transactions state ~maximum_cumulative_size in
-      match res with
-      | Locked -> return_unit
-      | Transactions txs ->
-          if not (List.is_empty txs) then
-            let (module Rollup_node : Services_backend_sig.S) =
-              state.rollup_node
+      let* txs = pop_transactions state ~maximum_cumulative_size in
+      if not (List.is_empty txs) then
+        let (module Rollup_node : Services_backend_sig.S) = state.rollup_node in
+        let*! hashes =
+          Rollup_node.inject_raw_transactions
+          (* The timestamp is ignored in observer and proxy mode, it's just for
+             compatibility with sequencer mode. *)
+            ~timestamp:(Helpers.now ())
+            ~smart_rollup_address:state.smart_rollup_address
+            ~transactions:txs
+        in
+        match hashes with
+        | Error trace ->
+            let*! () = Tx_pool_events.transaction_injection_failed trace in
+            return_unit
+        | Ok hashes ->
+            let*! () =
+              List.iter_s
+                (fun hash -> Tx_pool_events.transaction_injected ~hash)
+                hashes
             in
-            let*! hashes =
-              Rollup_node.inject_raw_transactions
-              (* The timestamp is ignored in observer and proxy mode, it's just for
-                 compatibility with sequencer mode. *)
-                ~timestamp:(Helpers.now ())
-                ~smart_rollup_address:state.smart_rollup_address
-                ~transactions:txs
-            in
-            match hashes with
-            | Error trace ->
-                let*! () = Tx_pool_events.transaction_injection_failed trace in
-                return_unit
-            | Ok hashes ->
-                let*! () =
-                  List.iter_s
-                    (fun hash -> Tx_pool_events.transaction_injected ~hash)
-                    hashes
-                in
-                return_unit
-          else return_unit)
+            return_unit
+      else return_unit
 
 let lock_transactions state = state.Types.locked <- true
 

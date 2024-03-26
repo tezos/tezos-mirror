@@ -82,48 +82,46 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       maximum_number_of_chunks
   in
-  let* tx_pool_response = Tx_pool.pop_transactions ~maximum_cumulative_size in
-  match tx_pool_response with
-  | Transactions transactions ->
-      let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
-      let n = List.length transactions + List.length delayed_transactions in
-      if force || n > 0 then
-        let*! head_info = Evm_context.head_info () in
+  let* is_locked = Tx_pool.is_locked () in
+  if is_locked then
+    let*! () = Block_producer_events.production_locked () in
+    return 0
+  else
+    let* transactions = Tx_pool.pop_transactions ~maximum_cumulative_size in
+    let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
+    let n = List.length transactions + List.length delayed_transactions in
+    if force || n > 0 then
+      let*! head_info = Evm_context.head_info () in
+      Helpers.with_timing
+        (Blueprint_events.blueprint_production head_info.next_blueprint_number)
+      @@ fun () ->
+      let*? hashes = get_hashes ~transactions ~delayed_transactions in
+      let* blueprint =
         Helpers.with_timing
-          (Blueprint_events.blueprint_production
-             head_info.next_blueprint_number)
+          (Blueprint_events.blueprint_proposal head_info.next_blueprint_number)
         @@ fun () ->
-        let*? hashes = get_hashes ~transactions ~delayed_transactions in
-        let* blueprint =
-          Helpers.with_timing
-            (Blueprint_events.blueprint_proposal
-               head_info.next_blueprint_number)
-          @@ fun () ->
-          Sequencer_blueprint.create
-            ~sequencer_key
-            ~cctxt
-            ~timestamp
-            ~smart_rollup_address
-            ~transactions
-            ~delayed_transactions
-            ~parent_hash:head_info.current_block_hash
-            ~number:head_info.next_blueprint_number
-        in
-        let* () =
-          Evm_context.apply_blueprint timestamp blueprint delayed_transactions
-        in
-        let (Qty number) = head_info.next_blueprint_number in
-        let* () = Blueprints_publisher.publish number blueprint in
-        let*! () =
-          List.iter_p
-            (fun hash -> Block_producer_events.transaction_selected ~hash)
-            hashes
-        in
-        return n
-      else return 0
-  | Locked ->
-      let*! () = Block_producer_events.production_locked () in
-      return 0
+        Sequencer_blueprint.create
+          ~sequencer_key
+          ~cctxt
+          ~timestamp
+          ~smart_rollup_address
+          ~transactions
+          ~delayed_transactions
+          ~parent_hash:head_info.current_block_hash
+          ~number:head_info.next_blueprint_number
+      in
+      let* () =
+        Evm_context.apply_blueprint timestamp blueprint delayed_transactions
+      in
+      let (Qty number) = head_info.next_blueprint_number in
+      let* () = Blueprints_publisher.publish number blueprint in
+      let*! () =
+        List.iter_p
+          (fun hash -> Block_producer_events.transaction_selected ~hash)
+          hashes
+      in
+      return n
+    else return 0
 
 module Handlers = struct
   type self = worker

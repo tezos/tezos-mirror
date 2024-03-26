@@ -13,8 +13,6 @@ type parameters = {
   mode : mode;
 }
 
-type popped_transactions = Locked | Transactions of string list
-
 (** [start parameters] starts the tx-pool *)
 val start : parameters -> unit tzresult Lwt.t
 
@@ -32,7 +30,7 @@ val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
 
 (** [pop_transactions maximum_cumulative_size] pops as much valid transactions
     as possible from the pool, until their cumulative size exceeds
-    `maximum_cumulative_size`. *)
+    `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
 val pop_transactions : maximum_cumulative_size:int -> string list tzresult Lwt.t
 
 (** [pop_and_inject_transactions ()] pops the valid transactions from
