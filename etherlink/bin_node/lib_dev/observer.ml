@@ -198,7 +198,7 @@ let main_loop ~evm_node_endpoint =
     | None -> return_unit
   in
 
-  let* head = Evm_context.head_info () in
+  let*! head = Evm_context.head_info () in
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6876
      Should be resilient to errors from the EVM node endpoint *)

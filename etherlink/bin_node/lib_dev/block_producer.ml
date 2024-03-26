@@ -83,7 +83,7 @@ let produce_block ~cctxt ~smart_rollup_address ~sequencer_key ~force ~timestamp
       let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
       let n = List.length transactions + List.length delayed_transactions in
       if force || n > 0 then
-        let* head_info = Evm_context.head_info () in
+        let*! head_info = Evm_context.head_info () in
         Helpers.with_timing
           (Blueprint_events.blueprint_production
              head_info.next_blueprint_number)

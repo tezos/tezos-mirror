@@ -198,7 +198,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~smart_rollup_address
       ()
   in
-  let* head = Evm_context.head_info () in
+  let*! head = Evm_context.head_info () in
   let (Qty next_blueprint_number) = head.next_blueprint_number in
   let* () =
     Blueprints_publisher.start

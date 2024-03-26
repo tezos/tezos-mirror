@@ -76,7 +76,7 @@ val apply_blueprint :
   Ethereum_types.hash list ->
   unit tzresult Lwt.t
 
-val head_info : unit -> head tzresult Lwt.t
+val head_info : unit -> head Lwt.t
 
 val blueprints_watcher :
   unit -> Blueprint_types.with_events Lwt_stream.t * Lwt_watcher.stopper
