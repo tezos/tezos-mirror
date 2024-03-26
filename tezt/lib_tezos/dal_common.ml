@@ -395,6 +395,9 @@ module Dal_RPC = struct
     make ~query_string GET ["p2p"; "gossipsub"; "topics"; "peers"] (fun json ->
         JSON.(json |> as_list |> List.map as_topic_and_peers))
 
+  let get_gossipsub_connections () =
+    make ~query_string:[] GET ["p2p"; "gossipsub"; "connections"] (fun x -> x)
+
   type peer_score = {peer : string; score : float}
 
   let get_scores () =
