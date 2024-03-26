@@ -53,6 +53,10 @@ RUN curl -L "https://github.com/hermit-os/rust-std-hermit/releases/download/1.73
 RUN cargo +stable install taplo-cli --version 0.8.1 && \
     taplo --version
 
+# Install cargo-audit
+RUN cargo +stable install --locked cargo-audit --version 0.20.0 && \
+    cargo audit --version
+
 # install wabt: https://packages.debian.org/source/sid/wabt
 # Install a version of binutils which supports RISC-V and put symlink in PATH
 # hadolint ignore=DL3008
