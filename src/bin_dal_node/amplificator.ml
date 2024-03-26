@@ -64,6 +64,10 @@ let amplify (shard_store : Store.Shards.t) (slot_store : Store.node_store)
   | Ready {shards_proofs_precomputation = None; _} ->
       (* The prover SRS is not loaded so we cannot reconstruct slots
          yet. *)
+      let*! () =
+        Event.(
+          emit reconstruct_missing_prover_srs (published_level, slot_index))
+      in
       return_unit
   | Ready
       ({
