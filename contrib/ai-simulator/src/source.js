@@ -503,6 +503,12 @@ export class Simulator {
  * @return {Delegate}. A delegate.
  */
 export class Delegate {
+  #storage_cache_size = -1;
+
+  #storage_own_staked_balance = [0];
+  #storage_third_party_staked_balance = [0];
+  #storage_own_spendable_balance = [0];
+  #storage_third_party_delegated_balance = [0];
 
   constructor(simulator, config) {
     this.simulator = simulator;
