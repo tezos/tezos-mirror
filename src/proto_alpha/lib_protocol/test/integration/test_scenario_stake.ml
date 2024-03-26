@@ -48,7 +48,7 @@ let init_staker_delegate_or_external =
                ~funder:"delegate"
                (Amount (Tez.of_mutez 2_000_000_000_000L))
          --> set_delegate "staker" (Some "delegate"))
-  --> wait_delegate_parameters_activation --> next_cycle
+  --> wait_delegate_parameters_activation
 
 let stake_init =
   stake "staker" Half
@@ -153,7 +153,7 @@ let shorter_roundtrip_for_baker =
         "staker2"
         ~funder:"faucet"
         (Amount (Tez.of_mutez 200_000_000_000L))
-  --> wait_delegate_parameters_activation --> next_cycle
+  --> wait_delegate_parameters_activation
   --> set_delegate "staker1" (Some "delegate")
   --> set_delegate "staker2" (Some "delegate")
   --> stake "staker1" Half --> stake "staker2" Half
@@ -228,7 +228,9 @@ let shorter_roundtrip_for_baker =
 let scenario_finalize =
   init_staker_delegate_or_external --> stake "staker" Half --> next_cycle
   --> unstake "staker" Half
-  --> wait_n_cycles_f (unstake_wait ++ 2)
+  --> wait_n_cycles_f unstake_wait
+  --> (Tag "minimal wait after unstake" --> Empty
+      |+ Tag "wait longer after unstake" --> wait_n_cycles 2)
   --> assert_failure
         (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
   --> (Tag "finalize with finalize" --> finalize_unstake "staker"
@@ -299,6 +301,7 @@ let odd_behavior =
   in
   loop 20 one_cycle
 
+(* Test changing delegates while having staked funds. *)
 let change_delegate =
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
@@ -313,14 +316,38 @@ let change_delegate =
         "staker"
         ~funder:"delegate1"
         (Amount (Tez.of_mutez 2_000_000_000_000L))
+  --> snapshot_balances "init" ["staker"]
   --> set_delegate "staker" (Some "delegate1")
-  --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
-  --> next_cycle
+  --> wait_delegate_parameters_activation --> stake "staker" Half
+  --> snapshot_balances "after_stake" ["staker"]
+  (* Changing delegates. This also unstakes all staked funds. *)
   --> set_delegate "staker" (Some "delegate2")
-  --> next_cycle
+  (* Can't stake: "A contract tries to stake to its delegate while
+     having unstake requests to a previous delegate that cannot be
+     finalized yet. Try again in a later cycle (no more than
+     consensus_rights_delay + max_slashing_period)." *)
   --> assert_failure (stake "staker" Half)
-  --> wait_n_cycles_f (unstake_wait ++ 1)
-  --> stake "staker" Half
+  --> wait_n_cycles_f (unstake_wait -- 1) (* Still can't stake. *)
+  --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+  --> assert_failure (stake "staker" Half)
+  --> next_cycle
+  (* The unstake request from changing delegates is now finalizable. *)
+  --> assert_failure
+        (check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> assert_success
+        (* Can directly stake again, which automatically finalizes,
+           even though the finalizable unstaked request is about a
+           previous delegate. *)
+        (stake "staker" Half
+        --> check_balance_field "staker" `Unstaked_finalizable Tez.zero)
+  --> (* Explicitly finalize, so that we can check that the balances
+         are identical to the beginning. This proves that changing
+         delegates has indeed unstaked all staked funds. *)
+  finalize "staker"
+  --> check_snapshot_balances "init"
+  --> check_balance_field "staker" `Unstaked_finalizable Tez.zero
+  --> (* Staking again is also possible. *) stake "staker" Half
+  --> check_snapshot_balances "after_stake"
 
 let unset_delegate =
   let init_params =
@@ -339,7 +366,7 @@ let unset_delegate =
         ~funder:"delegate"
         (Amount (Tez.of_mutez 2_000_000L))
   --> set_delegate "staker" (Some "delegate")
-  --> wait_delegate_parameters_activation --> next_cycle --> stake "staker" Half
+  --> wait_delegate_parameters_activation --> stake "staker" Half
   --> unstake "staker" All --> next_cycle --> set_delegate "staker" None
   --> next_cycle
   --> transfer "staker" "dummy" All
@@ -378,16 +405,17 @@ let forbid_costaking =
         (Amount (Tez.of_mutez 2_000_000_000_000L))
   --> set_delegate "staker" (Some "delegate")
   --> wait_cycle_until (`And (`AI_activation, `delegate_parameters_activation))
-  --> next_cycle
   (* try stake in normal conditions *)
   --> stake "staker" amount
   (* Change delegate parameters to forbid staking *)
   --> set_delegate_params "delegate" no_costake_params
   (* The changes are not immediate *)
   --> stake "staker" amount
-  (* The parameters change is applied exactly
-     [delegate_parameters_activation_delay] after the request *)
-  --> wait_delegate_parameters_activation
+  (* The parameters change is applied after at least
+     [delegate_parameters_activation_delay] full cycles have passed,
+     that is, exactly [delegate_parameters_activation_delay + 1]
+     cycles after the request. *)
+  --> wait_cycle_until `right_before_delegate_parameters_activation
   (* Not yet... *)
   --> stake "staker" amount
   --> next_cycle
@@ -401,7 +429,7 @@ let forbid_costaking =
   --> finalize_unstake "staker"
   (* Can authorize stake again *)
   --> set_delegate_params "delegate" init_params
-  --> wait_delegate_parameters_activation
+  --> wait_cycle_until `right_before_delegate_parameters_activation
   (* Not yet... *)
   --> assert_failure (stake "staker" amount)
   --> next_cycle
@@ -435,7 +463,7 @@ let test_deactivation =
         "staker2"
         ~funder:"faucet"
         (Amount (Tez.of_mutez 200_000_000_000L))
-  --> wait_delegate_parameters_activation --> next_cycle
+  --> wait_delegate_parameters_activation
   --> set_delegate "staker1" (Some "delegate")
   --> set_delegate "staker2" (Some "delegate")
   --> stake "staker1" Half --> stake "staker2" Half --> next_cycle
