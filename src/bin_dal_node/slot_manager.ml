@@ -189,6 +189,67 @@ let shards_to_attesters committee =
 (** This function publishes the shards of a commitment that is waiting for
     attestion on L1 if this node has those shards on disk and their proofs in
     memory. *)
+let publish_proved_shards ~published_level ~slot_index ~level_committee
+    proto_parameters shards shard_proofs gs_worker =
+  let open Lwt_result_syntax in
+  let attestation_level =
+    Int32.(
+      pred
+      @@ add
+           published_level
+           (of_int proto_parameters.Dal_plugin.attestation_lag))
+  in
+  let* committee = level_committee ~level:attestation_level in
+  let attester_of_shard = shards_to_attesters committee in
+  shards
+  |> Seq_s.iter_ep (function
+         | _, _, Error [Stored_data.Missing_stored_data s] ->
+             let*! () =
+               Event.(
+                 emit loading_shard_data_failed ("Missing stored data " ^ s))
+             in
+             return_unit
+         | _, _, Error err ->
+             let*! () =
+               Event.(
+                 emit
+                   loading_shard_data_failed
+                   (Format.asprintf "%a" pp_print_trace err))
+             in
+             return_unit
+         | commitment, shard_index, Ok share -> (
+             match
+               (attester_of_shard shard_index, get_opt shard_proofs shard_index)
+             with
+             | None, _ ->
+                 failwith
+                   "Invariant broken: no attester found for shard %d"
+                   shard_index
+             | _, None ->
+                 failwith
+                   "Invariant broken: no shard proof found for shard %d"
+                   shard_index
+             | Some pkh, Some shard_proof ->
+                 let message = Types.Message.{share; shard_proof} in
+                 let topic = Types.Topic.{slot_index; pkh} in
+                 let message_id =
+                   Types.Message_id.
+                     {
+                       commitment;
+                       level = published_level;
+                       slot_index;
+                       shard_index;
+                       pkh;
+                     }
+                 in
+                 Gossipsub.Worker.(
+                   Publish_message {message; topic; message_id}
+                   |> app_input gs_worker) ;
+                 return_unit))
+
+(** This function publishes the shards of a commitment that is waiting for
+    attestion on L1 if this node has those shards on disk and their proofs in
+    memory. *)
 let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
     cryptobox proto_parameters commitment published_level slot_index =
   let open Lwt_result_syntax in
@@ -211,62 +272,21 @@ let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
           [shards_proofs_cache_size] is set properly. *)
       return_unit
   | Some shard_proofs ->
-      let attestation_level =
-        Int32.(
-          pred
-          @@ add
-               published_level
-               (of_int proto_parameters.Dal_plugin.attestation_lag))
-      in
-      let* committee = level_committee ~level:attestation_level in
-      let attester_of_shard = shards_to_attesters committee in
       let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
-      Store.Shards.read_all node_store.shard_store commitment ~number_of_shards
-      |> Seq_s.iter_ep (function
-             | _, _, Error [Stored_data.Missing_stored_data s] ->
-                 let*! () =
-                   Event.(
-                     emit loading_shard_data_failed ("Missing stored data " ^ s))
-                 in
-                 return_unit
-             | _, _, Error err ->
-                 let*! () =
-                   Event.(
-                     emit
-                       loading_shard_data_failed
-                       (Format.asprintf "%a" pp_print_trace err))
-                 in
-                 return_unit
-             | commitment, shard_index, Ok share -> (
-                 match
-                   ( attester_of_shard shard_index,
-                     get_opt shard_proofs shard_index )
-                 with
-                 | None, _ ->
-                     failwith
-                       "Invariant broken: no attester found for shard %d"
-                       shard_index
-                 | _, None ->
-                     failwith
-                       "Invariant broken: no shard proof found for shard %d"
-                       shard_index
-                 | Some pkh, Some shard_proof ->
-                     let message = Types.Message.{share; shard_proof} in
-                     let topic = Types.Topic.{slot_index; pkh} in
-                     let message_id =
-                       Types.Message_id.
-                         {
-                           commitment;
-                           level = published_level;
-                           slot_index;
-                           shard_index;
-                           pkh;
-                         }
-                     in
-                     Gossipsub.Worker.(
-                       Publish_message {message; topic; message_id}
-                       |> app_input gs_worker) ;
-                     return_unit))
+      let shards =
+        Store.Shards.read_all
+          node_store.shard_store
+          commitment
+          ~number_of_shards
+      in
+      publish_proved_shards
+        ~published_level
+        ~slot_index
+        ~level_committee
+        proto_parameters
+        shards
+        shard_proofs
+        gs_worker
 
 let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
   Store.Legacy.add_slot_headers
