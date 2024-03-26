@@ -235,8 +235,9 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       sc_rollup_node;
     }
 
-let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
-    ~sc_rollup_node ~client ~l1_contracts ~sc_rollup_address raw_tx =
+let send_raw_transaction_to_delayed_inbox ?(wait_for_next_level = true)
+    ?(amount = Tez.one) ?expect_failure ~sc_rollup_node ~client ~l1_contracts
+    ~sc_rollup_address ?(sender = Constant.bootstrap2) raw_tx =
   let expected_hash =
     `Hex raw_tx |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
     |> Hex.of_bytes |> Hex.show
@@ -245,14 +246,18 @@ let send_raw_transaction_to_delayed_inbox ?(amount = Tez.one) ?expect_failure
     Client.transfer
       ~arg:(sf "Pair %S 0x%s" sc_rollup_address raw_tx)
       ~amount
-      ~giver:Constant.bootstrap2.public_key_hash
+      ~giver:sender.public_key_hash
       ~receiver:l1_contracts.delayed_transaction_bridge
       ~burn_cap:Tez.one
       ?expect_failure
       client
   in
-  let* () = Client.bake_for_and_wait ~keys:[] client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* () =
+    if wait_for_next_level then
+      let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+      unit
+    else unit
+  in
   Lwt.return expected_hash
 
 let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
@@ -2316,6 +2321,179 @@ let test_stage_one_reboot =
        was expected." ;
   unit
 
+let test_blueprint_is_limited_in_size =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "blueprint"; "limit"]
+    ~title:
+      "Checks the sequencer doesn't produce blueprint bigger than the given \
+       maximum number of chunks"
+    ~uses
+  @@ fun protocol ->
+  let* {sc_rollup_node; client; sequencer; _} =
+    setup_sequencer
+      ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      ~max_number_of_chunks:2
+      ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+      protocol
+  in
+  let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
+  let* requests, hashes =
+    Helpers.batch_n_transactions ~evm_node:sequencer txs
+  in
+  (* Each transaction is about 114 bytes, hence 100 * 114 = 11400 bytes, which
+     will fit in two blueprints of two chunks each. *)
+  let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  let first_hash = List.hd hashes in
+  let* level_of_first_transaction =
+    let*@ receipt = Rpc.get_transaction_receipt ~tx_hash:first_hash sequencer in
+    match receipt with
+    | None -> Test.fail "Delayed transaction hasn't be included"
+    | Some receipt -> return receipt.blockNumber
+  in
+  let*@ block_with_first_transaction =
+    Rpc.get_block_by_number
+      ~block:(Int32.to_string level_of_first_transaction)
+      sequencer
+  in
+  (* The block containing the first transaction of the batch cannot contain the
+     100 transactions of the batch, as it doesn't fit in two chunks. *)
+  let block_size_of_first_transaction =
+    match block_with_first_transaction.Block.transactions with
+    | Block.Empty -> Test.fail "Expected a non empty block"
+    | Block.Full _ ->
+        Test.fail "Block is supposed to contain only transaction hashes"
+    | Block.Hash hashes ->
+        Check.((List.length hashes < List.length requests) int)
+          ~error_msg:"Expected less than %R transactions in the block, got %L" ;
+        List.length hashes
+  in
+
+  let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  (* It's not clear the first transaction of the batch is applied in the first
+     blueprint or the second, as it depends how the tx_pool sorts the
+     transactions (by caller address). We need to check that either the previous
+     block or the next block contains transactions, which puts in evidence that
+     the batch has been splitted into two consecutive blueprints.
+  *)
+  let check_block_size block_number =
+    let*@ block =
+      Rpc.get_block_by_number ~block:(Int32.to_string block_number) sequencer
+    in
+    match block.Block.transactions with
+    | Block.Empty -> return 0
+    | Block.Full _ ->
+        Test.fail "Block is supposed to contain only transaction hashes"
+    | Block.Hash hashes -> return (List.length hashes)
+  in
+  let* next_block_size =
+    check_block_size (Int32.succ level_of_first_transaction)
+  in
+  let* previous_block_size =
+    check_block_size (Int32.pred level_of_first_transaction)
+  in
+  if next_block_size = 0 && previous_block_size = 0 then
+    Test.fail
+      "The sequencer didn't apply the 100 transactions in two consecutive \
+       blueprints" ;
+  Check.(
+    (block_size_of_first_transaction + previous_block_size + next_block_size
+    = List.length hashes)
+      int
+      ~error_msg:
+        "Not all the transactions have been injected, only %L, while %R was \
+         expected.") ;
+  unit
+
+let test_blueprint_limit_with_delayed_inbox =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "blueprint"; "limit"; "delayed"]
+    ~title:
+      "Checks the sequencer doesn't produce blueprint bigger than the given \
+       maximum number of chunks and count delayed transactions size in the \
+       blueprint"
+    ~uses
+  @@ fun protocol ->
+  let* {sc_rollup_node; client; sequencer; sc_rollup_address; l1_contracts; _} =
+    setup_sequencer
+      ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      ~max_number_of_chunks:2
+      ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+      ~devmode:true
+      protocol
+  in
+  let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
+  (* The first 3 transactions will be sent to the delayed inbox *)
+  let delayed_txs, direct_txs = Tezos_base.TzPervasives.TzList.split_n 3 txs in
+  let send_to_delayed_inbox (sender, raw_tx) =
+    send_raw_transaction_to_delayed_inbox
+      ~wait_for_next_level:false
+      ~sender
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~client
+      ~l1_contracts
+      raw_tx
+  in
+  let* delayed_hashes =
+    Lwt_list.map_s send_to_delayed_inbox
+    @@ List.combine
+         [Constant.bootstrap2; Constant.bootstrap3; Constant.bootstrap4]
+         delayed_txs
+  in
+  (* Ensures the transactions are added to the rollup delayed inbox and picked
+     by the sequencer *)
+  let* () =
+    repeat 4 (fun () ->
+        let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _requests, _hashes =
+    Helpers.batch_n_transactions ~evm_node:sequencer direct_txs
+  in
+  (* Due to the overapproximation of 4096 bytes per delayed transactions, there
+     should be only a single delayed transaction per blueprints with 2 chunks. *)
+  let* _ = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  let* _ = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  let* _ = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
+  (* Checks the delayed transactions and at least the first transaction from the
+     batch have been applied *)
+  let* block_numbers =
+    Lwt_list.map_s
+      (fun tx_hash ->
+        let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+        match receipt with
+        | None -> Test.fail "Delayed transaction hasn't be included"
+        | Some receipt -> return receipt.blockNumber)
+      delayed_hashes
+  in
+  let check_block_contains_delayed_transaction_and_transactions
+      (delayed_hash, block_number) =
+    let*@ block =
+      Rpc.get_block_by_number ~block:(Int32.to_string block_number) sequencer
+    in
+    match block.Block.transactions with
+    | Block.Empty -> Test.fail "Block shouldn't be empty"
+    | Block.Full _ ->
+        Test.fail "Block is supposed to contain only transaction hashes"
+    | Block.Hash hashes ->
+        if not (List.mem ("0x" ^ delayed_hash) hashes && 2 < List.length hashes)
+        then
+          Test.fail
+            "The delayed transaction %s hasn't been included in the expected \
+             block along other transactions from the pool"
+            delayed_hash ;
+        unit
+  in
+  Lwt_list.iter_s check_block_contains_delayed_transaction_and_transactions
+  @@ List.combine delayed_hashes block_numbers
+
 let protocols = Protocol.all
 
 let () =
@@ -2349,4 +2527,6 @@ let () =
   test_sequencer_upgrade protocols ;
   test_sequencer_diverge protocols ;
   test_sequencer_can_catch_up_on_event protocols ;
-  test_stage_one_reboot protocols
+  test_stage_one_reboot protocols ;
+  test_blueprint_is_limited_in_size protocols ;
+  test_blueprint_limit_with_delayed_inbox protocols
