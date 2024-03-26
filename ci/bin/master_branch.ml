@@ -22,7 +22,11 @@ open Tezos_ci
 
 let jobs =
   let job_docker_rust_toolchain =
-    job_docker_rust_toolchain ~__POS__ ~rules:[job_rule ~when_:Always ()] ()
+    job_docker_rust_toolchain
+      ~__POS__ (* Always rebuild on master to reduce risk of tampering *)
+      ~always_rebuild:true
+      ~rules:[job_rule ~when_:Always ()]
+      ()
   in
   let rules_octez_docker_changes_or_master =
     [

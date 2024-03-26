@@ -457,10 +457,16 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]
 
-let job_docker_rust_toolchain ?rules ?dependencies ~__POS__ () =
+let job_docker_rust_toolchain ?(always_rebuild = false) ?rules ?dependencies
+    ~__POS__ () =
+  let variables =
+    if always_rebuild then Some [("RUST_TOOLCHAIN_ALWAYS_REBUILD", "true")]
+    else None
+  in
   job_docker_authenticated
     ?rules
     ?dependencies
+    ?variables
     ~__POS__
     ~skip_docker_initialization:true
     ~stage:Stages.build

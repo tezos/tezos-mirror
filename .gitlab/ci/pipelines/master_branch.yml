@@ -17,6 +17,7 @@ oc.docker:rust-toolchain:
   variables:
     DOCKER_VERSION: 24.0.6
     CI_DOCKER_HUB: "false"
+    RUST_TOOLCHAIN_ALWAYS_REBUILD: "true"
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
