@@ -493,6 +493,8 @@ export class Simulator {
  * @property {function(number, number):null} set_third_party_staked_balance - Takes a cycle and an amount
  * (in mutez) as arguments, and sets the delegate's third party staked balance to this value for the given
  * cycle.
+ * @property {function(number):boolean} is_activated - Takes a cycle as argument
+ * and returns true if the delegate is activated for this cycle, false otherwise.
  */
 
 /**
@@ -518,6 +520,7 @@ export class Simulator {
  */
 export class Delegate {
   #storage_cache_size = -1;
+  #registration_cycle = null;
 
   #storage_own_staked_balance = [0];
   #storage_third_party_staked_balance = [0];
@@ -589,6 +592,17 @@ export class Delegate {
   set_third_party_staked_balance(cycle, value) {
     this.#storage_third_party_staked_balance_mask[cycle] = value;
     this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  is_activated(cycle) {
+    /* Once registered a new delegate must wait CONSENSUS_RIGHTS_DELAY + 1 cycles
+       for its rights to be considered. */
+    const activation_cycle =
+      this.config.delegate_registration_cycle +
+      this.simulator.config.proto.consensus_rights_delay +
+      1;
+
+    return activation_cycle <= cycle;
   }
 }
 
