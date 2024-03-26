@@ -78,6 +78,37 @@ let _evm_node_sequencer_protobuf =
     ~deps:[ocaml_protoc_compiler]
     ~dune:protobuf_rules
 
+let evm_node_migrations =
+  octez_evm_node_lib
+    "evm_node_migrations"
+    ~path:"etherlink/bin_node/migrations"
+    ~synopsis:"SQL migrations for the EVM node store"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
 let evm_node_lib_prod =
   octez_evm_node_lib
     "evm_node_lib_prod"
@@ -111,6 +142,7 @@ let evm_node_lib_prod =
         octez_scoru_wasm_debugger_lib |> open_;
         octez_layer2_store |> open_;
         octez_smart_rollup_lib |> open_;
+        evm_node_migrations;
       ]
 
 let evm_node_lib_dev_encoding =
@@ -156,6 +188,7 @@ let evm_node_lib_dev =
         octez_scoru_wasm_debugger_lib |> open_;
         octez_layer2_store |> open_;
         octez_smart_rollup_lib |> open_;
+        evm_node_migrations;
       ]
 
 let _octez_evm_node_tests =

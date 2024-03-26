@@ -78,6 +78,8 @@ let conf_libev = opam_only "conf-libev" V.True
 
 let conf_rust = opam_only "conf-rust" V.True
 
+let crunch = opam_only "crunch" V.(at_least "3.3.0")
+
 let ctypes = external_lib ~js_compatible:true "ctypes" V.(at_least "0.18.0")
 
 let ctypes_foreign =
