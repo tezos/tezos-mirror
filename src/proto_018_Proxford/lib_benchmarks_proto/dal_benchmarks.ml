@@ -133,7 +133,7 @@ module Publish_slot_header : Benchmark.S = struct
            ~find_srs_files:(Fun.const (Ok ("", "")))
            {
              activated = true;
-             use_mock_srs_for_testing = Some config;
+             use_mock_srs_for_testing = true;
              bootstrap_peers = [];
            }
       |> function

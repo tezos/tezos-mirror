@@ -473,22 +473,9 @@ module Start_octez_node = struct
       dal_cryptobox_parameters;
     }
 
-  let config_dal_srs node dal_cryptobox_parameters =
-    let p = dal_cryptobox_parameters in
-    let dal_cryptobox : Tezos_crypto_dal.Cryptobox.parameters =
-      {
-        slot_size = int_of_string p.slot_size;
-        page_size = int_of_string p.page_size;
-        redundancy_factor = int_of_string p.redundancy_factor;
-        number_of_shards = int_of_string p.number_of_shards;
-      }
-    in
+  let config_dal_srs node _dal_cryptobox_parameters =
     let config : Tezos_crypto_dal_octez_dal_config.Dal_config.t =
-      {
-        activated = true;
-        use_mock_srs_for_testing = Some dal_cryptobox;
-        bootstrap_peers = [];
-      }
+      {activated = true; use_mock_srs_for_testing = true; bootstrap_peers = []}
     in
     Node.Config_file.update
       node

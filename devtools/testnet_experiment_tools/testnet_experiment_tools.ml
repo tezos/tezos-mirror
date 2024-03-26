@@ -267,7 +267,7 @@ module Local = struct
           dal_config =
             {
               activated = false;
-              use_mock_srs_for_testing = None;
+              use_mock_srs_for_testing = false;
               bootstrap_peers = [];
             };
           genesis_parameters =

@@ -785,7 +785,7 @@ module Test = struct
 
   let find_trusted_setup_files () =
     let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = None; bootstrap_peers = []}
+      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
     in
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
@@ -798,7 +798,7 @@ module Test = struct
 
   let find_trusted_setup_files_failure () =
     let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = None; bootstrap_peers = []}
+      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
     in
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")

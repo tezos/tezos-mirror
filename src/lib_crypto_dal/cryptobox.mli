@@ -578,7 +578,7 @@ end
 module Config : sig
   type t = Dal_config.t = {
     activated : bool;
-    use_mock_srs_for_testing : parameters option;
+    use_mock_srs_for_testing : bool;
     bootstrap_peers : string list;
   }
 
@@ -591,7 +591,7 @@ module Config : sig
      files [find_trusted_setup_files] and the optional log2 of the SRS size
      [srs_size_log2].
 
-      When [config.use_mock_srs_for_testing = None],
+      When [config.use_mock_srs_for_testing = false],
      [init_dal] loads [initialisation_parameters] from the files at the
      paths provided by [find_trusted_setup_files ()]. It is important that
      every time the primitives above are used, they are used with the very

@@ -1204,7 +1204,7 @@ end
 module Config = struct
   type t = Dal_config.t = {
     activated : bool;
-    use_mock_srs_for_testing : parameters option;
+    use_mock_srs_for_testing : bool;
     bootstrap_peers : string list;
   }
 
@@ -1215,10 +1215,8 @@ module Config = struct
   let init_verifier_dal dal_config =
     let open Result_syntax in
     if dal_config.activated then
-      let* initialisation_parameters =
-        match dal_config.use_mock_srs_for_testing with
-        | Some _parameters -> return (Verifier {is_fake = true})
-        | None -> return (Verifier {is_fake = false})
+      let initialisation_parameters =
+        Verifier {is_fake = dal_config.use_mock_srs_for_testing}
       in
       load_parameters initialisation_parameters
     else return_unit
@@ -1227,18 +1225,17 @@ module Config = struct
     let open Lwt_result_syntax in
     if dal_config.activated then
       let* initialisation_parameters =
-        match dal_config.use_mock_srs_for_testing with
-        | Some _parameters ->
-            return (Internal_for_tests.parameters_initialisation ())
-        | None ->
-            let*? srs_g1_path, srs_g2_path = find_srs_files () in
-            let* srs_g1, srs_g2 =
-              initialisation_parameters_from_files
-                ~srs_g1_path
-                ~srs_g2_path
-                ~srs_size:(1 lsl srs_size_log2)
-            in
-            return (Prover {is_fake = false; srs_g1; srs_g2})
+        if dal_config.use_mock_srs_for_testing then
+          return (Internal_for_tests.parameters_initialisation ())
+        else
+          let*? srs_g1_path, srs_g2_path = find_srs_files () in
+          let* srs_g1, srs_g2 =
+            initialisation_parameters_from_files
+              ~srs_g1_path
+              ~srs_g2_path
+              ~srs_size:(1 lsl srs_size_log2)
+          in
+          return (Prover {is_fake = false; srs_g1; srs_g2})
       in
       Lwt.return (load_parameters initialisation_parameters)
     else return_unit
