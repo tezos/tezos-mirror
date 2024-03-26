@@ -123,6 +123,8 @@ const safe_get = (array, cycle) => {
  * of the given cycle. The ratio is clipped between 0 and 1.
  * @property {function(number):bigInt} total_supply - Takes a cycle and
  * returns the total supply (in mutez) available on the chain
+ * @property {function(number):bigInt} total_staked_balance - Takes a cycle and
+ * returns the total stake (in mutez) frozen on the chain.
  */
 
 /**
@@ -165,6 +167,10 @@ export class Simulator {
 
   total_supply(cycle) {
     return bigInt(this.config.chain.total_supply[cycle]);
+  }
+
+  total_staked_balance(cycle) {
+    return bigInt(this.config.chain.total_frozen_stake[cycle]);
   }
 
   #compute_extremum(cycle, initial_value, final_value) {
