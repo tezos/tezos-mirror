@@ -160,42 +160,42 @@ let handle_blueprint_applied_event (evm_node : t) {name; value; timestamp = _} =
          | None -> value |> as_int (* in prod *))
   else ()
 
-let check_event ?timeout evm_node name promise =
-  let promise = Lwt.map Result.ok promise in
-  let* result =
-    match timeout with
-    | None -> promise
-    | Some timeout ->
-        Lwt.pick
-          [
-            promise;
-            (let* () = Lwt_unix.sleep timeout in
-             Lwt.return_error ());
-          ]
+let resolve_or_timeout ?(timeout = 30.) evm_node ~name promise =
+  let res = ref None in
+  let promise =
+    let* result = promise in
+    res := Some result ;
+    unit
   in
-  match result with
-  | Ok (Some x) -> return x
-  | Ok None ->
-      raise
-        (Terminated_before_event
-           {daemon = evm_node.name; event = name; where = None})
-  | Error () ->
-      Format.ksprintf
-        failwith
-        "Timeout waiting for event %s of %s"
-        name
-        evm_node.name
+  let* () = Lwt.pick [promise; Lwt_unix.sleep timeout] in
+  match !res with
+  | Some v -> return v
+  | None -> Test.fail "Timeout waiting for %s of %s" name evm_node.name
 
-let wait_for_ready evm_node =
+let wait_for_event ?timeout evm_node ~event f =
+  resolve_or_timeout ?timeout evm_node ~name:event @@ wait_for evm_node event f
+
+let raise_terminated_when_none ?where evm_node ~event promise =
+  let* res = promise in
+  match res with
+  | Some x -> return x
+  | None ->
+      raise (Terminated_before_event {daemon = evm_node.name; event; where})
+
+let wait_for_event_listener ?timeout evm_node ~event promise =
+  resolve_or_timeout ?timeout evm_node ~name:event
+  @@ raise_terminated_when_none evm_node ~event promise
+
+let wait_for_ready ?timeout evm_node =
   match evm_node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       let promise, resolver = Lwt.task () in
       evm_node.persistent_state.pending_ready <-
         resolver :: evm_node.persistent_state.pending_ready ;
-      check_event evm_node event_ready_name promise
+      wait_for_event_listener ?timeout evm_node ~event:event_ready_name promise
 
-let wait_for_blueprint_injected ~timeout evm_node level =
+let wait_for_blueprint_injected ?timeout evm_node level =
   match evm_node.status with
   | Running {session_state = {ready = true; _}; _} when is_sequencer evm_node ->
       let current_level = evm_node.persistent_state.last_injected_level in
@@ -207,13 +207,17 @@ let wait_for_blueprint_injected ~timeout evm_node level =
             level
             (fun pending -> Some (resolver :: Option.value ~default:[] pending))
             evm_node.persistent_state.pending_blueprint_injected ;
-        check_event ~timeout evm_node event_blueprint_injected_name promise
+        wait_for_event_listener
+          ?timeout
+          evm_node
+          ~event:event_blueprint_injected_name
+          promise
   | Running {session_state = {ready = true; _}; _} ->
       failwith "EVM node is not a sequencer"
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
-let wait_for_blueprint_applied ~timeout evm_node level =
+let wait_for_blueprint_applied ?timeout evm_node level =
   match evm_node.status with
   | Running {session_state = {ready = true; _}; _}
     when can_apply_blueprint evm_node ->
@@ -226,31 +230,48 @@ let wait_for_blueprint_applied ~timeout evm_node level =
             level
             (fun pending -> Some (resolver :: Option.value ~default:[] pending))
             evm_node.persistent_state.pending_blueprint_applied ;
-        check_event ~timeout evm_node event_blueprint_applied_name promise
+        wait_for_event_listener
+          ?timeout
+          evm_node
+          ~event:event_blueprint_applied_name
+          promise
   | Running {session_state = {ready = true; _}; _} ->
       failwith "EVM node cannot produce blueprints"
   | Not_running | Running {session_state = {ready = false; _}; _} ->
       failwith "EVM node is not ready"
 
-let wait_for_pending_upgrade evm_node =
-  wait_for
-    evm_node
-    "pending_upgrade.v0"
-    JSON.(
-      fun json ->
-        let root_hash = json |-> "root_hash" |> as_string in
-        let timestamp = json |-> "timestamp" |> as_string in
-        Some (root_hash, timestamp))
+let wait_for_pending_upgrade ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"pending_upgrade.v0"
+  @@ JSON.(
+       fun json ->
+         let root_hash = json |-> "root_hash" |> as_string in
+         let timestamp = json |-> "timestamp" |> as_string in
+         Some (root_hash, timestamp))
 
-let wait_for_successful_upgrade evm_node =
-  wait_for
+let wait_for_successful_upgrade ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"applied_upgrade.v0"
+  @@ JSON.(
+       fun json ->
+         let root_hash = json |-> "root_hash" |> as_string in
+         let level = json |-> "level" |> as_int in
+         Some (root_hash, level))
+
+let wait_for_block_producer_locked ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"block_producer_locked.v0"
+  @@ Fun.const (Some ())
+
+let wait_for_block_producer_tx_injected ?timeout evm_node =
+  wait_for_event
+    ?timeout
     evm_node
-    "applied_upgrade.v0"
-    JSON.(
-      fun json ->
-        let root_hash = json |-> "root_hash" |> as_string in
-        let level = json |-> "level" |> as_int in
-        Some (root_hash, level))
+    ~event:"block_producer_transaction_injected.v0"
+  @@ fun json ->
+  let hash = JSON.(json |> as_string) in
+  Some hash
+
+let wait_for_retrying_connect ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"retrying_connect.v0"
+  @@ Fun.const (Some ())
 
 type delayed_transaction_kind = Deposit | Transaction
 
@@ -259,11 +280,12 @@ let delayed_transaction_kind_of_string = function
   | "deposit" -> Deposit
   | s -> Test.fail "%s is neither a transaction or deposit" s
 
-let wait_for_rollup_node_follower_connection_acquired evm_node =
-  wait_for
+let wait_for_rollup_node_follower_connection_acquired ?timeout evm_node =
+  wait_for_event
+    ?timeout
     evm_node
-    "rollup_node_follower_connection_acquired.v0"
-    (Fun.const (Some ()))
+    ~event:"rollup_node_follower_connection_acquired.v0"
+  @@ Fun.const (Some ())
 
 type 'a evm_event_kind =
   | Kernel_upgrade : (string * Client.Time.t) evm_event_kind
@@ -323,15 +345,14 @@ let parse_evm_event_kind : type a. a evm_event_kind -> JSON.t -> a option =
             ~__LOC__
             "invalid json for the evm event kind new delayed transaction")
 
-let wait_for_evm_event event ?(check = parse_evm_event_kind event) evm_node =
-  wait_for
-    evm_node
-    "evm_events_new_event.v0"
-    JSON.(
-      fun json ->
-        let found_event_kind = json |-> "kind" |> as_string in
-        let expected_event_kind = string_of_evm_event_kind event in
-        if expected_event_kind = found_event_kind then check json else None)
+let wait_for_evm_event ?timeout event ?(check = parse_evm_event_kind event)
+    evm_node =
+  wait_for_event ?timeout evm_node ~event:"evm_events_new_event.v0"
+  @@ JSON.(
+       fun json ->
+         let found_event_kind = json |-> "kind" |> as_string in
+         let expected_event_kind = string_of_evm_event_kind event in
+         if expected_event_kind = found_event_kind then check json else None)
 
 let wait_for_shutdown_event evm_node =
   wait_for evm_node "shutting_down.v0" @@ fun json ->

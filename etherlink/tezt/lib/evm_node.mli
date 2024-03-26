@@ -101,21 +101,28 @@ val initial_kernel : t -> string
 val run : ?wait:bool -> ?extra_arguments:string list -> t -> unit Lwt.t
 
 (** [wait_for_ready evm_node] waits until [evm_node] is ready. *)
-val wait_for_ready : t -> unit Lwt.t
+val wait_for_ready : ?timeout:float -> t -> unit Lwt.t
 
 (** [wait_for_blueprint_applied ~timeout evm_node level] waits until
     [evm_node] has applied a blueprint locally for level [level]. *)
-val wait_for_blueprint_applied : timeout:float -> t -> int -> unit Lwt.t
+val wait_for_blueprint_applied : ?timeout:float -> t -> int -> unit Lwt.t
 
 (** [wait_for_blueprint_injected ~timeout evm_node level] waits until
     [evm_node] has injected a blueprint for level [level] to its rollup node. *)
-val wait_for_blueprint_injected : timeout:float -> t -> int -> unit Lwt.t
+val wait_for_blueprint_injected : ?timeout:float -> t -> int -> unit Lwt.t
 
-val wait_for_pending_upgrade : t -> (string * string) Lwt.t
+val wait_for_pending_upgrade : ?timeout:float -> t -> (string * string) Lwt.t
 
-val wait_for_successful_upgrade : t -> (string * int) Lwt.t
+val wait_for_successful_upgrade : ?timeout:float -> t -> (string * int) Lwt.t
 
-val wait_for_rollup_node_follower_connection_acquired : t -> unit Lwt.t
+val wait_for_block_producer_locked : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_block_producer_tx_injected : ?timeout:float -> t -> string Lwt.t
+
+val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_rollup_node_follower_connection_acquired :
+  ?timeout:float -> t -> unit Lwt.t
 
 (** [init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     rollup_node_endpoint] creates an EVM node server with {!create}
@@ -154,7 +161,11 @@ type 'a evm_event_kind =
     [evm_events_new_event.v0] using {!wait_for} where the event kind
     is equal to [event_kind] (e.g. "sequencer_upgrade"). *)
 val wait_for_evm_event :
-  'a evm_event_kind -> ?check:(JSON.t -> 'a option) -> t -> 'a Lwt.t
+  ?timeout:float ->
+  'a evm_event_kind ->
+  ?check:(JSON.t -> 'a option) ->
+  t ->
+  'a Lwt.t
 
 (** [wait_for_diverged evm_node] waits for the event
     [evm_events_follower_diverged.v0] using {!wait_for} and return the

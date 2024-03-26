@@ -416,10 +416,7 @@ let test_sequencer_too_ahead =
     repeat (max_blueprints_ahead * 2) (fun () ->
         let*@ _ = Rpc.produce_block sequencer in
         unit)
-  and* () =
-    Evm_node.wait_for sequencer "block_producer_locked.v0" (fun _json ->
-        Some ())
-  in
+  and* () = Evm_node.wait_for_block_producer_locked sequencer in
   let*@ block_number = Rpc.block_number sequencer in
   Check.((block_number = 6l) int32)
     ~error_msg:"The sequencer should have been locked" ;
@@ -780,12 +777,7 @@ let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
     ~client =
   let event_watcher =
     let added = Evm_node.wait_for_evm_event New_delayed_transaction sequencer in
-    let injected =
-      Evm_node.wait_for sequencer "block_producer_transaction_injected.v0"
-      @@ fun json ->
-      let hash = JSON.(json |> as_string) in
-      Some hash
-    in
+    let injected = Evm_node.wait_for_block_producer_tx_injected sequencer in
     let* (_transaction_kind, added_hash), injected_hash =
       Lwt.both added injected
     in
