@@ -52,3 +52,6 @@ val lock_transactions : unit -> unit tzresult Lwt.t
 (** [unlock_transactions] unlocks the transactions if it was locked by
     {!lock_transactions}. *)
 val unlock_transactions : unit -> unit tzresult Lwt.t
+
+(** [is_locked] checks if the pools is locked. *)
+val is_locked : unit -> bool tzresult Lwt.t

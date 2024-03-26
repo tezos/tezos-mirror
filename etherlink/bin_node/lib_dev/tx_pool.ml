@@ -151,6 +151,7 @@ module Request = struct
     | Pop_and_inject_transactions : (unit, tztrace) t
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
+    | Is_locked : (bool, tztrace) t
 
   type view = View : _ t -> view
 
@@ -200,6 +201,12 @@ module Request = struct
           (obj1 (req "request" (constant "unlock_transactions")))
           (function View Unlock_transactions -> Some () | _ -> None)
           (fun () -> View Unlock_transactions);
+        case
+          (Tag 5)
+          ~title:"Is_locked"
+          (obj1 (req "request" (constant "is_locked")))
+          (function View Is_locked -> Some () | _ -> None)
+          (fun () -> View Is_locked);
       ]
 
   let pp ppf (View r) =
@@ -218,6 +225,7 @@ module Request = struct
         Format.fprintf ppf "Popping and injecting transactions"
     | Lock_transactions -> Format.fprintf ppf "Locking the transactions"
     | Unlock_transactions -> Format.fprintf ppf "Unlocking the transactions"
+    | Is_locked -> Format.fprintf ppf "Checking if the tx pool is locked"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -398,6 +406,8 @@ let lock_transactions state = state.Types.locked <- true
 
 let unlock_transactions state = state.Types.locked <- false
 
+let is_locked state = state.Types.locked
+
 module Handlers = struct
   type self = worker
 
@@ -432,6 +442,7 @@ module Handlers = struct
     | Request.Lock_transactions ->
         protect @@ fun () -> return (lock_transactions state)
     | Request.Unlock_transactions -> return (unlock_transactions state)
+    | Request.Is_locked -> protect @@ fun () -> return (is_locked state)
 
   type launch_error = error trace
 
@@ -557,4 +568,10 @@ let unlock_transactions () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait worker Request.Unlock_transactions
+  |> handle_request_error
+
+let is_locked () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Request.Is_locked
   |> handle_request_error
