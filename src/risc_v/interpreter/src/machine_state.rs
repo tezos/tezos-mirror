@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -168,6 +169,16 @@ macro_rules! run_f_cmp_instr {
     }};
 }
 
+/// Runs an atomic instruction
+/// Similar to R-type instructions, additionally passing the `rl` and `aq` bits
+macro_rules! run_amo_instr {
+    ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
+        $state
+            .$run_fn($args.rs1, $args.rs2, $args.rd, $args.rl, $args.aq)
+            .map(|_| Add($instr.width()))
+    }};
+}
+
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
@@ -270,6 +281,16 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             // RV64I jump instructions
             Instr::Jal(args) => Ok(Set(self.hart.run_jal(args.imm, args.rd))),
             Instr::Jalr(args) => Ok(Set(self.hart.run_jalr(args.imm, args.rs1, args.rd))),
+
+            Instr::Amoswapw(args) => run_amo_instr!(self, instr, args, run_amoswapw),
+            Instr::Amoaddw(args) => run_amo_instr!(self, instr, args, run_amoaddw),
+            Instr::Amoxorw(args) => run_amo_instr!(self, instr, args, run_amoxorw),
+            Instr::Amoandw(args) => run_amo_instr!(self, instr, args, run_amoandw),
+            Instr::Amoorw(args) => run_amo_instr!(self, instr, args, run_amoorw),
+            Instr::Amominw(args) => run_amo_instr!(self, instr, args, run_amominw),
+            Instr::Amomaxw(args) => run_amo_instr!(self, instr, args, run_amomaxw),
+            Instr::Amominuw(args) => run_amo_instr!(self, instr, args, run_amominuw),
+            Instr::Amomaxuw(args) => run_amo_instr!(self, instr, args, run_amomaxuw),
 
             // RV64M multiplication and division instructions
             Instr::Rem(args) => run_r_type_instr!(self, instr, args, run_rem),

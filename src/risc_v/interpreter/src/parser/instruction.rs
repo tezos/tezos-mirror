@@ -98,6 +98,17 @@ pub struct FLoadArgs {
     pub imm: i64,
 }
 
+// R-type instructions with 2 additional bits which specify memory ordering
+// constraints as viewed by other RISC-V harts
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct AmoArgs {
+    pub rd: XRegister,
+    pub rs1: XRegister,
+    pub rs2: XRegister,
+    pub aq: bool,
+    pub rl: bool,
+}
+
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
@@ -167,6 +178,17 @@ pub enum Instr {
     // RV64I jump instructions
     Jal(UJTypeArgs),
     Jalr(ITypeArgs),
+
+    // RV64A R-type atomic instructions
+    Amoswapw(AmoArgs),
+    Amoaddw(AmoArgs),
+    Amoxorw(AmoArgs),
+    Amoandw(AmoArgs),
+    Amoorw(AmoArgs),
+    Amominw(AmoArgs),
+    Amomaxw(AmoArgs),
+    Amominuw(AmoArgs),
+    Amomaxuw(AmoArgs),
 
     // RV64M division instructions
     Rem(RTypeArgs),
@@ -288,6 +310,15 @@ impl Instr {
             | Auipc(_)
             | Jal(_)
             | Jalr(_)
+            | Amoswapw(_)
+            | Amoaddw(_)
+            | Amoxorw(_)
+            | Amoandw(_)
+            | Amoorw(_)
+            | Amominw(_)
+            | Amomaxw(_)
+            | Amominuw(_)
+            | Amomaxuw(_)
             | Rem(_)
             | Remu(_)
             | Remw(_)
@@ -394,6 +425,12 @@ macro_rules! f_s1_instr {
 macro_rules! fence_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {},{}", $op, $args.pred, $args.succ)
+    };
+}
+
+macro_rules! amo_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{},({})", $op, $args.rd, $args.rs2, $args.rs1)
     };
 }
 
@@ -537,6 +574,16 @@ impl fmt::Display for Instr {
             // RV64I jump instructions
             Jal(args) => u_instr!(f, "jal", args),
             Jalr(args) => i_instr_load!(f, "jalr", args),
+
+            Amoswapw(args) => amo_instr!(f, "amoswap.w", args),
+            Amoaddw(args) => amo_instr!(f, "amoadd.w", args),
+            Amoxorw(args) => amo_instr!(f, "amoxor.w", args),
+            Amoandw(args) => amo_instr!(f, "amoand.w", args),
+            Amoorw(args) => amo_instr!(f, "amoor.w", args),
+            Amominw(args) => amo_instr!(f, "amomin.w", args),
+            Amomaxw(args) => amo_instr!(f, "amomax.w", args),
+            Amominuw(args) => amo_instr!(f, "amominu.w", args),
+            Amomaxuw(args) => amo_instr!(f, "amomaxu.w", args),
 
             // RV64M multiplication and division instructions
             Rem(args) => r_instr!(f, "rem", args),

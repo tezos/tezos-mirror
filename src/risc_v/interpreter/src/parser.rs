@@ -267,6 +267,18 @@ macro_rules! fence_instr {
     };
 }
 
+macro_rules! amo_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        $enum_variant(instruction::AmoArgs {
+            rd: rd($instr),
+            rs1: rs1($instr),
+            rs2: rs2($instr),
+            aq: bit($instr, 26),
+            rl: bit($instr, 25),
+        })
+    };
+}
+
 macro_rules! csr_instr {
     ($enum_variant:ident, $instr:expr) => {
         match csr($instr) {
@@ -309,6 +321,7 @@ const OP_JALR: u32 = 0b110_0111;
 const OP_FP: u32 = 0b1010011;
 const OP_FP_LOAD: u32 = 0b000_0111;
 const OP_FP_STORE: u32 = 0b010_0111;
+const OP_AMO: u32 = 0b010_1111;
 
 const F3_0: u32 = 0b000;
 const F3_1: u32 = 0b001;
@@ -319,7 +332,14 @@ const F3_5: u32 = 0b101;
 const F3_6: u32 = 0b110;
 const F3_7: u32 = 0b111;
 
-const F5_CMP: u32 = 0b1_0100;
+const F5_0: u32 = 0b0_0000;
+const F5_1: u32 = 0b0_0001;
+const F5_4: u32 = 0b0_0100;
+const F5_8: u32 = 0b0_1000;
+const F5_12: u32 = 0b0_1100;
+const F5_16: u32 = 0b1_0000;
+const F5_20: u32 = 0b1_0100;
+const F5_24: u32 = 0b1_1000;
 const F5_28: u32 = 0b1_1100;
 const F5_30: u32 = 0b1_1110;
 
@@ -524,6 +544,21 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             F3_7 => csri_instr!(Csrrci, instr),
             _ => Unknown { instr },
         },
+        OP_AMO => match funct3(instr) {
+            F3_2 => match funct5(instr) {
+                F5_1 => amo_instr!(Amoswapw, instr),
+                F5_0 => amo_instr!(Amoaddw, instr),
+                F5_4 => amo_instr!(Amoxorw, instr),
+                F5_12 => amo_instr!(Amoandw, instr),
+                F5_8 => amo_instr!(Amoorw, instr),
+                F5_16 => amo_instr!(Amominw, instr),
+                F5_20 => amo_instr!(Amomaxw, instr),
+                F5_24 => amo_instr!(Amominuw, instr),
+                F5_28 => amo_instr!(Amomaxuw, instr),
+                _ => Unknown { instr },
+            },
+            _ => Unknown { instr },
+        },
 
         // S-type instructions
         OP_STORE => match funct3(instr) {
@@ -552,9 +587,9 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         // F/D-type instructions
         OP_FP => match fmt(instr) {
             FMT_S => match (funct5(instr), rm(instr), rs2_bits(instr)) {
-                (F5_CMP, RM_EQ, rs2_bits) => f_cmp_instr!(Feqs, instr, rs2_bits),
-                (F5_CMP, RM_LE, rs2_bits) => f_cmp_instr!(Fles, instr, rs2_bits),
-                (F5_CMP, RM_LT, rs2_bits) => f_cmp_instr!(Flts, instr, rs2_bits),
+                (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqs, instr, rs2_bits),
+                (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fles, instr, rs2_bits),
+                (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Flts, instr, rs2_bits),
                 (F5_28, RM_0, RS2_0) => FmvXW(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
@@ -570,9 +605,9 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 _ => Unknown { instr },
             },
             FMT_D => match (funct5(instr), rm(instr), rs2_bits(instr)) {
-                (F5_CMP, RM_EQ, rs2_bits) => f_cmp_instr!(Feqd, instr, rs2_bits),
-                (F5_CMP, RM_LE, rs2_bits) => f_cmp_instr!(Fled, instr, rs2_bits),
-                (F5_CMP, RM_LT, rs2_bits) => f_cmp_instr!(Fltd, instr, rs2_bits),
+                (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqd, instr, rs2_bits),
+                (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fled, instr, rs2_bits),
+                (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Fltd, instr, rs2_bits),
                 (F5_28, RM_0, RS2_0) => FmvXD(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),

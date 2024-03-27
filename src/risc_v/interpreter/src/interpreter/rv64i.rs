@@ -8,7 +8,7 @@
 
 use crate::{
     machine_state::{
-        bus::{main_memory::MainMemoryLayout, Addressable, OutOfBounds},
+        bus::main_memory::MainMemoryLayout,
         registers::{XRegister, XRegisters},
         MachineState,
     },
@@ -236,18 +236,6 @@ where
     ML: MainMemoryLayout,
     M: backend::Manager,
 {
-    /// Generic read function for loading `mem::size_of<T>` bytes from address val(rs1) + imm
-    pub fn read_from_bus<T: backend::Elem>(
-        &self,
-        imm: i64,
-        rs1: XRegister,
-    ) -> Result<T, Exception> {
-        let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
-        self.bus
-            .read(address)
-            .map_err(|_: OutOfBounds| Exception::LoadAccessFault(address))
-    }
-
     /// `LD` I-type instruction
     ///
     /// Loads a double-word (8 bytes) starting from address given by: val(rs1) + imm
@@ -322,19 +310,6 @@ where
         // u8 as u64 zero-extends to 64 bits
         self.hart.xregisters.write(rs2, value as u64);
         Ok(())
-    }
-
-    /// Generic store-operation for writing `mem::size_of<T>` bytes starting at address val(rs1) + imm
-    pub fn write_to_bus<T: backend::Elem>(
-        &mut self,
-        imm: i64,
-        rs1: XRegister,
-        value: T,
-    ) -> Result<(), Exception> {
-        let address = self.hart.xregisters.read(rs1).wrapping_add(imm as u64);
-        self.bus
-            .write(address, value)
-            .map_err(|_: OutOfBounds| Exception::StoreAccessFault(address))
     }
 
     /// `SD` S-type instruction
