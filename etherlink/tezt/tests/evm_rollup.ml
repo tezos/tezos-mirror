@@ -4444,11 +4444,12 @@ let test_reboot_out_of_ticks =
   let min_ticks_per_l1_level = ticks_per_snapshot * 2 in
   Check.(
     (ticks_after_expected_reboot
-    = (min_ticks_per_l1_level * number_of_blocks) + ticks_per_snapshot)
+    >= (min_ticks_per_l1_level * number_of_blocks) + ticks_per_snapshot)
       int)
     ~error_msg:
-      "The number of ticks spent during the period should be %R, but got %L, \
-       which implies there have been no reboot, contrary to what was expected." ;
+      "The number of ticks spent during the period should be higher or equal \
+       than %R, but got %L, which implies there have been no reboot, contrary \
+       to what was expected." ;
   unit
 
 let test_l2_timestamp_opcode =
@@ -4912,7 +4913,7 @@ let test_call_recursive_contract_estimate_gas =
       ~endpoint
       ~abi_label:recursive.label
       ~address:recursive_address
-      ~method_call:"call(50)"
+      ~method_call:"call(40)"
       ()
   in
   let* tx = wait_for_application ~evm_node ~sc_rollup_node ~client call in

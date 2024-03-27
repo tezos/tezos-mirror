@@ -45,7 +45,7 @@ pub mod constants {
 
     /// Safety margin the kernel enforce to avoid approaching the maximum number
     /// of ticks.
-    pub const SAFETY_MARGIN: u64 = QUEUE_STORING_UPPER_BOUND + 1_000_000_000;
+    pub const SAFETY_MARGIN: u64 = QUEUE_STORING_UPPER_BOUND + 2_000_000_000;
 
     /// The minimum amount of gas for an ethereum transaction.
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
