@@ -14,8 +14,7 @@
   octez-libs.tezos-context.encoding
   octez-libs.stdlib-unix
   octez-libs.test-helpers
-  qcheck-alcotest
-  octez-alcotezt)
+  tezt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -24,8 +23,9 @@
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_test_helpers
-  -open Octez_alcotezt)
- (modules test_lib_irmin_store test_utils))
+  -open Tezt
+  -open Tezt.Base)
+ (modules tezt_main test_lib_irmin_store test_utils))
 
 (executable
  (name main)
@@ -37,7 +37,7 @@
 
 (rule
  (alias runtest)
- (package in_house_irmin_tests)
+ (package tezos_internal_irmin_tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

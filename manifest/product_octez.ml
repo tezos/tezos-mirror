@@ -2710,10 +2710,10 @@ let _octez_context_memory_tests =
 
 let _irmin_tests =
   tezt
-    ["test_lib_irmin_store"; "test_utils"]
-    ~opam:"in_house_irmin_tests"
-    ~synopsis:"In House Irmin tests"
+    ["tezt_main"; "test_lib_irmin_store"; "test_utils"]
     ~path:"irmin/test"
+    ~opam:"tezos_internal_irmin_tests"
+    ~synopsis:"Tezos internal irmin tests"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2724,8 +2724,7 @@ let _irmin_tests =
         octez_context_encoding;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
-        qcheck_alcotest;
-        alcotezt;
+        tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
 (* This binding assumes that librustzcash.a is installed in the system default

@@ -1,3 +1,18 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Testing
+    -------
+    Component:    Irmin
+    Invocation:   dune exec irmin/test/main.exe -- --file test_lib_irmin_store.ml
+    Subject:      This file is the entrypoint of all Irmin Tezt tests. It dispatches to
+            other files.
+*)
+
 include Test_utils
 
 let block2_actions =
@@ -20,7 +35,7 @@ type t = {
   block3b : Context_hash.t;
 }
 
-let wrap_context_init f _ () =
+let wrap_context_init f _ =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
       let root = Filename.concat base_dir "context" in
       let* index = Context.init root in
@@ -61,11 +76,8 @@ let tests : (string * (t -> unit Lwt.t)) list =
   let test name f = (Printf.sprintf "irmin_disk:%s" name, f) in
   [ test "simple" test_simple ]
 
-let tests =
-  List.map
-    (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_context_init f))
-    tests
+let register_test title f =
+  Tezt.Test.register ~__FILE__ ~tags:[ "irmin"; "store" ] ~title @@ f
 
-let () =
-  Lwt_main.run
-    (Alcotest_lwt.run ~__FILE__ "tezos-context" [ ("context", tests) ])
+let register () =
+  List.iter (fun (s, f) -> register_test s (wrap_context_init f)) tests

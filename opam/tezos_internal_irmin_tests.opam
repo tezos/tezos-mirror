@@ -12,12 +12,10 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "octez-libs" {with-test}
-  "qcheck-alcotest" { with-test & >= "0.20" }
-  "octez-alcotezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "In House Irmin tests"
+synopsis: "Tezos internal irmin tests"
