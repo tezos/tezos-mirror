@@ -11,6 +11,7 @@ pub mod csregisters;
 pub mod hart_state;
 pub mod mode;
 pub mod registers;
+pub mod reservation_set;
 
 #[cfg(test)]
 extern crate proptest;
@@ -295,6 +296,9 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Jal(args) => Ok(Set(self.hart.run_jal(args.imm, args.rd))),
             Instr::Jalr(args) => Ok(Set(self.hart.run_jalr(args.imm, args.rs1, args.rd))),
 
+            // RV64A atomic instructions
+            Instr::Lrw(args) => run_amo_instr!(self, instr, args, run_lrw),
+            Instr::Scw(args) => run_amo_instr!(self, instr, args, run_scw),
             Instr::Amoswapw(args) => run_amo_instr!(self, instr, args, run_amoswapw),
             Instr::Amoaddw(args) => run_amo_instr!(self, instr, args, run_amoaddw),
             Instr::Amoxorw(args) => run_amo_instr!(self, instr, args, run_amoxorw),
@@ -304,6 +308,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Amomaxw(args) => run_amo_instr!(self, instr, args, run_amomaxw),
             Instr::Amominuw(args) => run_amo_instr!(self, instr, args, run_amominuw),
             Instr::Amomaxuw(args) => run_amo_instr!(self, instr, args, run_amomaxuw),
+            Instr::Lrd(args) => run_amo_instr!(self, instr, args, run_lrd),
+            Instr::Scd(args) => run_amo_instr!(self, instr, args, run_scd),
 
             // RV64M multiplication and division instructions
             Instr::Rem(args) => run_r_type_instr!(self, instr, args, run_rem),

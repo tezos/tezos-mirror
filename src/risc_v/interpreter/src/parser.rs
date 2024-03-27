@@ -622,6 +622,11 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         },
         OP_AMO => match funct3(instr) {
             F3_2 => match funct5(instr) {
+                F5_2 => match rs2_bits(instr) {
+                    RS2_0 => amo_instr!(Lrw, instr),
+                    _ => Unknown { instr },
+                },
+                F5_3 => amo_instr!(Scw, instr),
                 F5_1 => amo_instr!(Amoswapw, instr),
                 F5_0 => amo_instr!(Amoaddw, instr),
                 F5_4 => amo_instr!(Amoxorw, instr),
@@ -631,6 +636,14 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 F5_20 => amo_instr!(Amomaxw, instr),
                 F5_24 => amo_instr!(Amominuw, instr),
                 F5_28 => amo_instr!(Amomaxuw, instr),
+                _ => Unknown { instr },
+            },
+            F3_3 => match funct5(instr) {
+                F5_2 => match rs2_bits(instr) {
+                    RS2_0 => amo_instr!(Lrd, instr),
+                    _ => Unknown { instr },
+                },
+                F5_3 => amo_instr!(Scd, instr),
                 _ => Unknown { instr },
             },
             _ => Unknown { instr },

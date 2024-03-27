@@ -98,8 +98,10 @@ test_case!(test_suite_rv64mi_p_sd_misaligned, "rv64mi-p-sd-misaligned");
 test_case!(test_suite_rv64mi_p_sh_misaligned, "rv64mi-p-sh-misaligned");
 test_case!(test_suite_rv64mi_p_sw_misaligned, "rv64mi-p-sw-misaligned");
 test_case!(test_suite_rv64mi_p_zicntr, "rv64mi-p-zicntr");
+
 // RV64-MZICBO
 test_case!(#[ignore], test_suite_rv64mzicbo_p_zero, "rv64mzicbo-p-zero");
+
 // RV64-SI
 test_case!(test_suite_rv64si_p_csr, "rv64si-p-csr");
 test_case!(#[ignore], test_suite_rv64si_p_dirty, "rv64si-p-dirty");
@@ -117,8 +119,10 @@ test_case!(
     &[(gp, 1)] // This checks TESTNUM == 1, see scall.S in the riscv test suite
 );
 test_case!(test_suite_rv64si_p_wfi, "rv64si-p-wfi");
+
 // RV64-SSVNAPOT
 test_case!(#[ignore], test_suite_rv64ssvnapot_p_napot, "rv64ssvnapot-p-napot");
+
 // RV64-UA
 test_case!(#[ignore], test_suite_rv64ua_p_amoadd_d, "rv64ua-p-amoadd_d");
 test_case!(test_suite_rv64ua_p_amoadd_w, "rv64ua-p-amoadd_w");
@@ -138,7 +142,7 @@ test_case!(#[ignore], test_suite_rv64ua_p_amoswap_d, "rv64ua-p-amoswap_d");
 test_case!(test_suite_rv64ua_p_amoswap_w, "rv64ua-p-amoswap_w");
 test_case!(#[ignore], test_suite_rv64ua_p_amoxor_d, "rv64ua-p-amoxor_d");
 test_case!(test_suite_rv64ua_p_amoxor_w, "rv64ua-p-amoxor_w");
-test_case!(#[ignore], test_suite_rv64ua_p_lrsc, "rv64ua-p-lrsc");
+test_case!(test_suite_rv64ua_p_lrsc, "rv64ua-p-lrsc");
 
 test_case!(#[ignore], test_suite_rv64ua_v_amoadd_d, "rv64ua-v-amoadd_d");
 test_case!(test_suite_rv64ua_v_amoadd_w, "rv64ua-v-amoadd_w");
@@ -158,11 +162,13 @@ test_case!(#[ignore], test_suite_rv64ua_v_amoswap_d, "rv64ua-v-amoswap_d");
 test_case!(test_suite_rv64ua_v_amoswap_w, "rv64ua-v-amoswap_w");
 test_case!(#[ignore], test_suite_rv64ua_v_amoxor_d, "rv64ua-v-amoxor_d");
 test_case!(test_suite_rv64ua_v_amoxor_w, "rv64ua-v-amoxor_w");
-test_case!(#[ignore], test_suite_rv64ua_v_lrsc, "rv64ua-v-lrsc");
+test_case!(test_suite_rv64ua_v_lrsc, "rv64ua-v-lrsc");
+
 // RV64-UC
 test_case!(#[ignore], test_suite_rv64uc_p_rvc, "rv64uc-p-rvc");
 
 test_case!(#[ignore], test_suite_rv64uc_v_rvc, "rv64uc-v-rvc");
+
 // RV64-UD
 test_case!(test_suite_rv64ud_p_fadd, "rv64ud-p-fadd");
 test_case!(test_suite_rv64ud_p_fclass, "rv64ud-p-fclass");
@@ -189,6 +195,7 @@ test_case!(test_suite_rv64ud_v_ldst, "rv64ud-v-ldst");
 test_case!(test_suite_rv64ud_v_move, "rv64ud-v-move");
 test_case!(#[ignore], test_suite_rv64ud_v_recoding, "rv64ud-v-recoding");
 test_case!(test_suite_rv64ud_v_structural, "rv64ud-v-structural");
+
 // RV64-UF
 test_case!(test_suite_rv64uf_p_fadd, "rv64uf-p-fadd");
 test_case!(test_suite_rv64uf_p_fclass, "rv64uf-p-fclass");
@@ -213,6 +220,7 @@ test_case!(test_suite_rv64uf_v_fmin, "rv64uf-v-fmin");
 test_case!(test_suite_rv64uf_v_ldst, "rv64uf-v-ldst");
 test_case!(test_suite_rv64uf_v_move, "rv64uf-v-move");
 test_case!(#[ignore], test_suite_rv64uf_v_recoding, "rv64uf-v-recoding");
+
 // RV64-UI
 test_case!(test_suite_rv64ui_p_add, "rv64ui-p-add");
 test_case!(test_suite_rv64ui_p_addi, "rv64ui-p-addi");
@@ -319,6 +327,7 @@ test_case!(test_suite_rv64ui_v_subw, "rv64ui-v-subw");
 test_case!(test_suite_rv64ui_v_sw, "rv64ui-v-sw");
 test_case!(test_suite_rv64ui_v_xor, "rv64ui-v-xor");
 test_case!(test_suite_rv64ui_v_xori, "rv64ui-v-xori");
+
 // RV64-UM
 test_case!(test_suite_rv64um_p_div, "rv64um-p-div");
 test_case!(test_suite_rv64um_p_divu, "rv64um-p-divu");
@@ -347,6 +356,7 @@ test_case!(test_suite_rv64um_v_rem, "rv64um-v-rem");
 test_case!(test_suite_rv64um_v_remu, "rv64um-v-remu");
 test_case!(test_suite_rv64um_v_remuw, "rv64um-v-remuw");
 test_case!(test_suite_rv64um_v_remw, "rv64um-v-remw");
+
 // RV64-UZFH
 test_case!(#[ignore], test_suite_rv64uzfh_p_fadd, "rv64uzfh-p-fadd");
 test_case!(#[ignore], test_suite_rv64uzfh_p_fclass, "rv64uzfh-p-fclass");

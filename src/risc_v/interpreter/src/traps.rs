@@ -72,9 +72,9 @@ pub enum Exception {
     InstructionAccessFault(Address),
     IllegalInstruction,
     Breakpoint,
-    /// `InstructionAccessFault(addr)` where `addr` is the faulting load address
+    /// `LoadAccessFault(addr)` where `addr` is the faulting load address
     LoadAccessFault(Address),
-    /// `InstructionAccessFault(addr)` where `addr` is the faulting store address
+    /// `StoreAccessFault(addr)` where `addr` is the faulting store address
     StoreAMOAccessFault(Address),
     EnvCallFromUMode,
     EnvCallFromSMode,
