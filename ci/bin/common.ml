@@ -472,6 +472,12 @@ let changeset_test_liquidity_baking_scripts =
           "scripts/check-liquidity-baking-scripts.sh";
         ])
 
+let changeset_test_kernels =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["kernels.mk"; "src/kernel_*/**/*"])
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.

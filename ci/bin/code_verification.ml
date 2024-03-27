@@ -552,6 +552,8 @@ let jobs pipeline_type =
     | Before_merging -> jobs_external ~path jobs
     | Schedule_extended_test -> jobs
   in
+  (* Common GitLab CI caches *)
+  let cache_kernels = {key = "kernels"; paths = ["cargo/"]} in
   (* Stages *)
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
   let trigger_stage, make_dependencies =
@@ -760,11 +762,7 @@ let jobs pipeline_type =
              "src/risc_v/risc-v-dummy.elf";
              "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
            ])
-      ~cache:
-        [
-          {key = "kernels"; paths = ["cargo/"]};
-          {key = "kernels-sccache"; paths = ["_sccache"]};
-        ]
+      ~cache:[cache_kernels; {key = "kernels-sccache"; paths = ["_sccache"]}]
     |> enable_kernels |> enable_sccache |> job_external_split
   in
   (* Fetch records for Tezt generated on the last merge request pipeline
@@ -1442,6 +1440,29 @@ let jobs pipeline_type =
       ]
       |> jobs_external_split ~path:"test/tezt"
     in
+    let jobs_kernels : tezos_job list =
+      let make_job_kernel ~__POS__ ~name ~changes script =
+        job
+          ~__POS__
+          ~name
+          ~image:Images.rust_toolchain
+          ~stage:Stages.test
+          ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+          ~rules:(make_rules ~dependent:true ~changes ())
+          script
+          ~cache:[cache_kernels]
+        |> enable_kernels
+      in
+      let job_test_kernels : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_kernels"
+          ~changes:changeset_test_kernels
+          ["make -f kernels.mk check"; "make -f kernels.mk test"]
+        |> job_external_split
+      in
+      [job_test_kernels]
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -1458,7 +1479,7 @@ let jobs pipeline_type =
       job_tezt_flaky;
       job_tezt_slow;
     ]
-    @ jobs_unit @ jobs_install_octez @ jobs_tezt
+    @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
     @
     match pipeline_type with
     | Before_merging ->
