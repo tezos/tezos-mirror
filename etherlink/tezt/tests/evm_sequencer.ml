@@ -2629,6 +2629,88 @@ let test_blueprint_limit_with_delayed_inbox =
   Lwt_list.iter_s check_block_contains_delayed_transaction_and_transactions
   @@ List.combine delayed_hashes block_numbers
 
+let test_reset =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "reset"]
+    ~title:"try to reset sequencer and observer state using the command."
+    ~uses
+  @@ fun protocol ->
+  let* {
+         proxy;
+         observer;
+         sequencer;
+         sc_rollup_node;
+         client;
+         sc_rollup_address;
+         _;
+       } =
+    setup_sequencer
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      protocol
+  in
+  let reset_level = 5 in
+  let after_reset_level = 5 in
+  Log.info "Producing %d level then syncing" reset_level ;
+  let* () =
+    repeat reset_level (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  Log.info
+    "Stopping the rollup node, then produce %d more blocks "
+    (reset_level + after_reset_level) ;
+  let* () = Sc_rollup_node.terminate sc_rollup_node in
+  let* () =
+    repeat after_reset_level (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let*@ sequencer_level = Rpc.block_number sequencer in
+  Check.(
+    (sequencer_level = Int32.of_int (reset_level + after_reset_level)) int32)
+    ~error_msg:
+      "The sequencer level %L should be at %R after producing %R blocks" ;
+  Log.info "Stopping sequencer and observer" ;
+  let* () = Evm_node.terminate observer
+  and* () = Evm_node.terminate sequencer in
+
+  Log.info "Reset sequencer and observer state." ;
+  let* () = Evm_node.reset observer ~l2_level:reset_level
+  and* () = Evm_node.reset sequencer ~l2_level:reset_level in
+
+  Log.info "Rerun rollup node, sequencer and observer." ;
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
+  in
+  let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run observer in
+
+  Log.info "Check sequencer and observer is at %d level" reset_level ;
+  let*@ sequencer_level = Rpc.block_number sequencer in
+  let*@ observer_level = Rpc.block_number observer in
+  Check.((sequencer_level = Int32.of_int reset_level) int32)
+    ~error_msg:
+      "The sequencer is at level %L, but should be at the level %R after being \
+       reset." ;
+  Check.((sequencer_level = observer_level) int32)
+    ~error_msg:
+      "The sequencer (currently at level %L) and observer ( currently at level \
+       %R) should be at the same level after both being reset." ;
+  let* () =
+    repeat after_reset_level (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  (* Check sequencer is at the expected level *)
+  let*@ sequencer_level = Rpc.block_number sequencer in
+  Check.(
+    (sequencer_level = Int32.of_int (reset_level + after_reset_level)) int32)
+    ~error_msg:
+      "The sequencer level %L should be at %R after producing blocks after the \
+       reset." ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -2666,4 +2748,5 @@ let () =
   test_sequencer_dont_read_level_twice protocols ;
   test_stage_one_reboot protocols ;
   test_blueprint_is_limited_in_size protocols ;
-  test_blueprint_limit_with_delayed_inbox protocols
+  test_blueprint_limit_with_delayed_inbox protocols ;
+  test_reset protocols

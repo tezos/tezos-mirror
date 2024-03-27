@@ -678,6 +678,13 @@ let transform_dump ~dump_json ~dump_rlp =
   let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
   Process.check process
 
+let reset evm_node ~l2_level =
+  let args =
+    ["reset"; "at"; string_of_int l2_level; "--force"] @ data_dir evm_node
+  in
+  let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
+  Process.check process
+
 let sequencer_upgrade_payload ?(devmode = true) ?client ~public_key
     ~pool_address ~activation_timestamp () =
   let args =

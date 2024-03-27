@@ -252,6 +252,10 @@ val init_from_rollup_node_data_dir :
     stored in [dump_rlp].  *)
 val transform_dump : dump_json:string -> dump_rlp:string -> unit Lwt.t
 
+(** [reset evm_node ~l2_level] reset the store of the [evm_node] to
+    l2_level. *)
+val reset : t -> l2_level:int -> unit Lwt.t
+
 (** [chunk data ?devmode ~rollup_address ?sequencer_key ?timestamp ?parent_hash
     ?number ?client data] generates the valid inputs for the rollup at
     [rollup_address] from the given [data]. If [sequencer_key] is given, the
