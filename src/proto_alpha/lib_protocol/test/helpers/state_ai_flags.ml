@@ -113,7 +113,7 @@ module Autostake = struct
     let open Lwt_result_syntax in
     (* TODO: use Protocol.Constants_storage.tolerated_inactivity_period *)
     let tolerated_inactivity_period =
-      (2 * state.constants.consensus_rights_delay) + 1
+      state.constants.consensus_rights_delay + 1
     in
     if Some name <> delegate then (
       Log.debug
