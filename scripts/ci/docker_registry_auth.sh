@@ -69,8 +69,11 @@ if [ -n "${GCP_REGISTRY:-}" ]; then
   echo "${GCP_ARTIFACT_REGISTRY_TOKEN}" | docker login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
 fi
 
+# shellcheck source=scripts/ci/docker_registry.inc.sh
+. "$current_dir"/docker_registry.inc.sh
+
 # /!\ IMAGE_ARCH_PREFIX can be unset
-docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
+docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | sanitizeTag)
 
 ## Write computed Docker environment variables to sourceable file for other shell scripts
 
