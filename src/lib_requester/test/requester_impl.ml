@@ -117,17 +117,27 @@ end
 module Simple_request (P : PARAMETERS) : sig
   include Requester.REQUEST with type key = P.key and type param = unit
 
+  val initial_delay_val : Time.System.Span.t ref
+
+  val active_peers : P2p_peer.Set.t ref
+
   val registered_requests : (param * P2p_peer.Set.elt * key list) list ref
 
-  val clear_registered_requests : unit -> unit
+  val reinitialize : unit -> unit
 end = struct
   type key = P.key
 
   type param = unit
 
-  let initial_delay = Time.System.Span.of_seconds_exn 0.01
+  let initial_delay_default = Time.System.Span.of_seconds_exn 0.01
 
-  let active (_ : param) = P2p_peer.Set.of_list [P2p_peer.Id.zero]
+  let initial_delay_val = ref initial_delay_default
+
+  let initial_delay = !initial_delay_val
+
+  let active_peers = ref (P2p_peer.Set.of_list [P2p_peer.Id.zero])
+
+  let active (_ : param) = !active_peers
 
   let registered_requests : (param * P2p_peer.Id.t * key list) list ref = ref []
 
@@ -135,7 +145,9 @@ end = struct
     registered_requests := (requester, id, kl) :: !registered_requests ;
     ()
 
-  let clear_registered_requests () = registered_requests := []
+  let reinitialize () =
+    registered_requests := [] ;
+    initial_delay_val := initial_delay_default
 end
 
 (** A helper to avoid having to use the full-fledged [Requester.Make]

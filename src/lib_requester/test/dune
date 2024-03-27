@@ -26,7 +26,7 @@
   -open Tezos_stdlib
   -open Tezos_requester
   -open Octez_alcotezt)
- (modules test_requester test_fuzzing_requester shared))
+ (modules requester_impl test_requester test_fuzzing_requester shared))
 
 (executable
  (name main)
