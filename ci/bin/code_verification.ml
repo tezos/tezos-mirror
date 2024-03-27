@@ -938,6 +938,26 @@ let jobs pipeline_type =
         ["./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh"]
       |> job_external_split
     in
+    let job_oc_script_test_release_versions : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.script:test_octez_release_versions"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~dependencies:
+          (Dependent
+             [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
+          (* Since the above dependencies are only for ordering, we do not set [dependent] *)
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["./scripts/test_octez_release_version.sh"]
+      |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -948,6 +968,7 @@ let jobs pipeline_type =
       job_oc_integration_compiler_rejections;
       job_oc_script_test_gen_genesis;
       job_oc_script_snapshot_alpha_and_link;
+      job_oc_script_test_release_versions;
     ]
     @ jobs_unit
     @
