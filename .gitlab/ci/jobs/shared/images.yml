@@ -9,6 +9,8 @@
   image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
 .image_template__debian_bookworm:
   image: debian:bookworm
+.image_template__debian_bullseye:
+  image: debian:bullseye
 .image_template__debian_dependencies_image:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}
 .image_template__docker:

@@ -1651,7 +1651,49 @@ let jobs pipeline_type =
         [job_commit_titles]
     | Schedule_extended_test -> []
   in
-  let doc = [] in
+  let doc =
+    let jobs_install_python =
+      (* Creates a job that tests installation of the python environment in [image] *)
+      let job_install_python ~__POS__ ~name ~image =
+        job
+          ~__POS__
+          ~name
+          ~image
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules:
+            (make_rules
+               ~changes:
+                 (Changeset.make
+                    ["docs/developer/install-python-debian-ubuntu.sh"])
+               ~manual:Yes
+               ~label:"ci--docs"
+               ())
+          [
+            "./docs/developer/install-python-debian-ubuntu.sh \
+             ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} \
+             ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+          ]
+      in
+      (* The set of python installation test jobs. *)
+      [
+        job_install_python
+          ~__POS__
+          ~name:"oc.install_python_focal"
+          ~image:Images.ubuntu_focal;
+        job_install_python
+          ~__POS__
+          ~name:"oc.install_python_jammy"
+          ~image:Images.ubuntu_jammy;
+        job_install_python
+          ~__POS__
+          ~name:"oc.install_python_bullseye"
+          ~image:Images.debian_bullseye;
+      ]
+      |> jobs_external_split ~path:"doc/oc.install_python"
+    in
+    jobs_install_python
+  in
   let manual =
     match pipeline_type with
     | Before_merging ->

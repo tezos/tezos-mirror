@@ -58,4 +58,4 @@ include:
 
   # Stage: doc
   - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
-  - .gitlab/ci/jobs/doc/oc.install_python.yml
+  - .gitlab/ci/jobs/doc/oc.install_python-scheduled_extended_test.yml
