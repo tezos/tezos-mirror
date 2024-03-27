@@ -172,6 +172,9 @@ module Q = struct
       @@ {|SELECT id, payload FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
+
+    let clear_after =
+      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id > ?|}
   end
 
   module Context_hashes = struct
@@ -186,6 +189,9 @@ module Q = struct
     let get_latest =
       (unit ->? t2 level context_hash)
       @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id DESC LIMIT 1|eos}
+
+    let clear_after =
+      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
   end
 
   module Kernel_upgrades = struct
@@ -206,6 +212,10 @@ module Q = struct
       @@ {|
       UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before = NULL
     |}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM kernel_upgrades WHERE injected_before > ?|}
   end
 
   module Delayed_transactions = struct
@@ -220,6 +230,10 @@ module Q = struct
     let select_at_hash =
       (root_hash ->? delayed_transaction)
       @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
   end
 
   module L1_latest_level = struct
@@ -230,6 +244,10 @@ module Q = struct
     let get =
       (unit ->! t2 level l1_level)
       @@ {|SELECT l2_level, l1_level  FROM l1_latest_level_with_l2_level ORDER BY l2_level DESC LIMIT 1|}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM l1_latest_level_with_l2_level WHERE l2_level > ?|}
   end
 end
 
@@ -355,6 +373,10 @@ module Blueprints = struct
   let find_range store ~from ~to_ =
     with_connection store @@ fun conn ->
     Db.collect_list conn Q.Blueprints.select_range (from, to_)
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blueprints.clear_after l2_level
 end
 
 module Context_hashes = struct
@@ -369,6 +391,10 @@ module Context_hashes = struct
   let find_latest store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Context_hashes.get_latest ()
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Context_hashes.clear_after l2_level
 end
 
 module Kernel_upgrades = struct
@@ -386,6 +412,10 @@ module Kernel_upgrades = struct
   let record_apply store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Kernel_upgrades.record_apply level
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Kernel_upgrades.clear_after l2_level
 end
 
 module Delayed_transactions = struct
@@ -404,6 +434,10 @@ module Delayed_transactions = struct
   let at_hash store hash =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Delayed_transactions.select_at_hash hash
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Delayed_transactions.clear_after l2_level
 end
 
 module L1_latest_known_level = struct
@@ -414,7 +448,20 @@ module L1_latest_known_level = struct
   let find store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.L1_latest_level.get ()
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_latest_level.clear_after l2_level
 end
+
+let reset store ~l2_level =
+  let open Lwt_result_syntax in
+  let* () = Blueprints.clear_after store l2_level in
+  let* () = Context_hashes.clear_after store l2_level in
+  let* () = L1_latest_known_level.clear_after store l2_level in
+  let* () = Kernel_upgrades.clear_after store l2_level in
+  let* () = Delayed_transactions.clear_after store l2_level in
+  return_unit
 
 (* Error registration *)
 let () =

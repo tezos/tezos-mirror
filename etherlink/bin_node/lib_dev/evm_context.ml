@@ -710,6 +710,12 @@ module State = struct
     in
     return_unit
 
+  let reset ~data_dir ~l2_level =
+    let open Lwt_result_syntax in
+    let* store = Evm_store.init ~data_dir in
+    Evm_store.with_transaction store @@ fun store ->
+    Evm_store.reset store ~l2_level
+
   let last_produced_blueprint (ctxt : t) =
     let open Lwt_result_syntax in
     let (Qty next) = ctxt.session.next_blueprint_number in
@@ -910,6 +916,8 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   return init_status
 
 let init_from_rollup_node = State.init_from_rollup_node
+
+let reset = State.reset
 
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})

@@ -37,6 +37,11 @@ val start :
 val init_from_rollup_node :
   data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
 
+(** [reset ~data_dir ~l2_level] reset the sequencer storage to
+    [l2_level]. {b Warning: b} Data will be lost ! *)
+val reset :
+  data_dir:string -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
+
 (** [apply_evm_events ~finalized_level events] applies all the
     events [events] on the local context. The events are performed in a
     transactional context.

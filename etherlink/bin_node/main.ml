@@ -1180,6 +1180,34 @@ let dump_to_rlp =
 
       return_unit)
 
+let reset_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Reset evm node data-dir to a specific block level."
+    (args2
+       data_dir_arg
+       (Tezos_clic.switch
+          ~long:"force"
+          ~short:'f'
+          ~doc:
+            "force suppression of data to reset state of sequencer to a \
+             specified l2 level."
+          ()))
+    (prefixes ["reset"; "at"]
+    @@ Tezos_clic.param
+         ~name:"level"
+         ~desc:"level to reset to state to."
+         (Tezos_clic.parameter (fun () s ->
+              Lwt.return_ok
+              @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
+    @@ stop)
+    (fun (data_dir, force) l2_level () ->
+      if force then Evm_node_lib_dev.Evm_context.reset ~data_dir ~l2_level
+      else
+        failwith
+          "You must provide the `--force` switch in order to use this command \
+           and not accidentally delete data.")
+
 (* List of program commands *)
 let commands =
   [
@@ -1191,6 +1219,7 @@ let commands =
     make_sequencer_upgrade_command;
     init_from_rollup_node_command;
     dump_to_rlp;
+    reset_command;
   ]
 
 let global_options = Tezos_clic.no_options
