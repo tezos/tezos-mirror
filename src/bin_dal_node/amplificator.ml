@@ -160,15 +160,17 @@ let amplify shard_store slot_store node_ctxt cryptobox commitment precomputation
       in
       Store.save_shard_proofs slot_store commitment shard_proofs ;
       let* () =
-        Slot_manager.publish_slot_data
+        Slot_manager.publish_proved_shards
+          ~published_level
+          ~slot_index
           ~level_committee:(Node_context.fetch_committee node_ctxt)
-          slot_store
-          gs_worker
-          cryptobox
           proto_parameters
-          commitment
-          published_level
-          slot_index
+          (shards
+          |> Seq.map (fun Cryptobox.{index; share} ->
+                 (commitment, index, Ok share))
+          |> Seq_s.of_seq)
+          shard_proofs
+          gs_worker
       in
       let*! () =
         Event.(emit reconstruct_finished (published_level, slot_index))
