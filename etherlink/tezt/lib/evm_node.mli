@@ -56,6 +56,7 @@ type mode =
       max_blueprints_ahead : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
+      max_number_of_chunks : int option;
       devmode : bool;  (** --devmode flag. *)
       wallet_dir : string option;  (** --wallet-dir: client directory. *)
     }

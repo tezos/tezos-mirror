@@ -129,3 +129,41 @@ val bake_until_sync :
   client:Client.t ->
   unit ->
   unit Lwt.t
+
+(** [wait_for_transaction_receipt ?count ~evm_node ~transaction_hash ()] takes a
+    transaction_hash and returns only when the receipt is non null, or [count]
+    blocks have passed and the receipt is still not available. *)
+val wait_for_transaction_receipt :
+  ?count:int ->
+  evm_node:Evm_node.t ->
+  transaction_hash:string ->
+  unit ->
+  Transaction.transaction_receipt Lwt.t
+
+(** [wait_for_application ~evm_node ~sc_rollup_node ~client apply] returns only
+    when the `apply` yields, or fails when 10 blocks have passed. *)
+val wait_for_application :
+  evm_node:Evm_node.t ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  client:Client.t ->
+  (unit -> 'a Lwt.t) ->
+  'a Lwt.t
+
+(** [batch_n_transactions ~evm_node raw_transactions] batches [raw_transactions]
+    to the [evm_node] and returns the requests and transaction hashes. *)
+val batch_n_transactions :
+  evm_node:Evm_node.t ->
+  string list ->
+  (Evm_node.request list * string list) Lwt.t
+
+(** [send_n_transactions ~sc_rollup_node ~evm_node ?wait_for_blocks
+    raw_transactions] batches [raw_transactions] to the [evm_node] and waits
+    until the first one is applied in a block and returns, or fails if it isn't
+    applied after [wait_for_blocks] blocks. *)
+val send_n_transactions :
+  sc_rollup_node:Sc_rollup_node.t ->
+  client:Client.t ->
+  evm_node:Evm_node.t ->
+  ?wait_for_blocks:int ->
+  string list ->
+  (Evm_node.request list * Transaction.transaction_receipt * string list) Lwt.t

@@ -44,6 +44,7 @@ type mode =
       max_blueprints_ahead : int option;
       max_blueprints_catchup : int option;
       catchup_cooldown : int option;
+      max_number_of_chunks : int option;
       devmode : bool;
       wallet_dir : string option;
     }
@@ -435,6 +436,7 @@ let run_args evm_node =
           max_blueprints_ahead;
           max_blueprints_catchup;
           catchup_cooldown;
+          max_number_of_chunks;
           devmode;
           wallet_dir;
         } ->
@@ -480,6 +482,10 @@ let run_args evm_node =
             (fun timestamp ->
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
+        @ Cli_arg.optional_arg
+            "max-number-of-chunks"
+            string_of_int
+            max_number_of_chunks
         @ Cli_arg.optional_switch "devmode" devmode
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Observer {preimages_dir; initial_kernel; rollup_node_endpoint} ->

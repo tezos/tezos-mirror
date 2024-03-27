@@ -41,6 +41,11 @@ let max_chunk_size =
   - blueprint_tag_size - blueprint_number_size - nb_chunks_size
   - chunk_index_size - rlp_tags_size - signature_size
 
+let maximum_usable_space_in_blueprint chunks_count =
+  chunks_count * max_chunk_size
+
+let maximum_chunks_per_l1_level = 512 * 1024 / 4096
+
 let encode_transaction raw =
   let open Rlp in
   Value (Bytes.of_string raw)

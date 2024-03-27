@@ -186,78 +186,6 @@ let check_storage_size sc_rollup_node ~address size =
     ~error_msg:"Unexpected storage size, should be %R, but is %L" ;
   unit
 
-(** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
-    transaction_hash and returns only when the receipt is non null, or [count]
-    blocks have passed and the receipt is still not available. *)
-let wait_for_transaction_receipt ?(count = 3) ~evm_node ~transaction_hash () =
-  let rec loop count =
-    let* () = Lwt_unix.sleep 5. in
-    let* receipt =
-      Evm_node.(
-        call_evm_rpc
-          evm_node
-          {
-            method_ = "eth_getTransactionReceipt";
-            parameters = `A [`String transaction_hash];
-          })
-    in
-    if receipt |> Evm_node.extract_result |> JSON.is_null then
-      if count > 0 then loop (count - 1)
-      else Test.fail "Transaction still hasn't been included"
-    else
-      receipt |> Evm_node.extract_result
-      |> Transaction.transaction_receipt_of_json |> return
-  in
-  loop count
-
-let wait_for_application ~evm_node ~sc_rollup_node ~client apply =
-  let max_iteration = 10 in
-  let application_result = apply () in
-  let rec loop current_iteration =
-    let* () = Lwt_unix.sleep 5. in
-    let* () = Helpers.next_evm_level ~evm_node ~sc_rollup_node ~client in
-    if max_iteration < current_iteration then
-      Test.fail
-        "Baked more than %d blocks and the operation's application is still \
-         pending"
-        max_iteration ;
-    if Lwt.state application_result = Lwt.Sleep then loop (current_iteration + 1)
-    else unit
-  in
-  (* Using [Lwt.both] ensures that any exception thrown in [tx_hash] will be
-     thrown by [Lwt.both] as well. *)
-  let* result, () = Lwt.both application_result (loop 0) in
-  return result
-
-(* sending more than ~300 tx could fail, because or curl *)
-let send_n_transactions ~sc_rollup_node ~client ~evm_node ?wait_for_blocks txs =
-  let requests =
-    List.map
-      (fun tx ->
-        Evm_node.
-          {method_ = "eth_sendRawTransaction"; parameters = `A [`String tx]})
-      txs
-  in
-  let* hashes = Evm_node.batch_evm_rpc evm_node requests in
-  let hashes =
-    hashes |> JSON.as_list
-    |> List.map (fun json -> Evm_node.extract_result json |> JSON.as_string)
-  in
-  let first_hash = List.hd hashes in
-  (* Let's wait until one of the transactions is injected into a block, and
-      test this block contains the `n` transactions as expected. *)
-  let* receipt =
-    wait_for_application
-      ~evm_node
-      ~sc_rollup_node
-      ~client
-      (wait_for_transaction_receipt
-         ?count:wait_for_blocks
-         ~evm_node
-         ~transaction_hash:first_hash)
-  in
-  return (requests, receipt, hashes)
-
 let setup_l1_contracts ~admin ?sequencer_admin client =
   (* Originates the exchanger. *)
   let* exchanger =
@@ -478,6 +406,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
                max_blueprints_ahead = None;
                max_blueprints_catchup = None;
                catchup_cooldown = None;
+               max_number_of_chunks = None;
                devmode;
                wallet_dir = Some (Client.base_dir client);
              })
@@ -595,7 +524,7 @@ let deploy ~contract ~sender full_evm_setup =
       ~abi:contract.label
       ~bin:contract.bin
   in
-  wait_for_application ~evm_node ~sc_rollup_node ~client send_deploy
+  Helpers.wait_for_application ~evm_node ~sc_rollup_node ~client send_deploy
 
 type deploy_checks = {
   contract : contract;
@@ -4587,6 +4516,7 @@ let test_migrate_proxy_to_sequencer_future =
           max_blueprints_ahead = None;
           max_blueprints_catchup = None;
           catchup_cooldown = None;
+          max_number_of_chunks = None;
           devmode = true;
           wallet_dir = Some (Client.base_dir client);
         }
@@ -4748,6 +4678,7 @@ let test_migrate_proxy_to_sequencer_past =
           max_blueprints_ahead = None;
           max_blueprints_catchup = None;
           catchup_cooldown = None;
+          max_number_of_chunks = None;
           devmode = true;
           wallet_dir = Some (Client.base_dir client);
         }

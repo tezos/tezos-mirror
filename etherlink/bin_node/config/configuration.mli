@@ -32,6 +32,8 @@ type sequencer = {
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
   time_between_blocks : time_between_blocks;  (** See {!time_between_blocks}. *)
+  max_number_of_chunks : int;
+      (** The maximum number of chunks per blueprints. *)
   private_rpc_port : int option;  (** Port for internal RPC services *)
   sequencer : Signature.public_key_hash;
       (** The key used to sign the blueprints. *)
@@ -108,6 +110,7 @@ module Cli : sig
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?time_between_blocks:time_between_blocks ->
+    ?max_number_of_chunks:int ->
     sequencer:Signature.public_key_hash ->
     unit ->
     sequencer t
@@ -150,6 +153,7 @@ module Cli : sig
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?time_between_blocks:time_between_blocks ->
+    ?max_number_of_chunks:int ->
     sequencer:Signature.public_key_hash ->
     unit ->
     sequencer t tzresult Lwt.t

@@ -13,8 +13,6 @@ type parameters = {
   mode : mode;
 }
 
-type popped_transactions = Locked | Transactions of string list
-
 (** [start parameters] starts the tx-pool *)
 val start : parameters -> unit tzresult Lwt.t
 
@@ -26,15 +24,17 @@ val shutdown : unit -> unit tzresult Lwt.t
 val add : string -> (Ethereum_types.hash, string) result tzresult Lwt.t
 
 (** [nonce address] returns the nonce of the user
-    Returns the first gap in the tx-pool, or the nonce stored on the rollup 
+    Returns the first gap in the tx-pool, or the nonce stored on the rollup
     if no transactions are in the pool. *)
 val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
 
-(** [pop_transactions ()] pops the valid transactions from the pool. *)
-val pop_transactions : unit -> popped_transactions tzresult Lwt.t
+(** [pop_transactions maximum_cumulative_size] pops as much valid transactions
+    as possible from the pool, until their cumulative size exceeds
+    `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
+val pop_transactions : maximum_cumulative_size:int -> string list tzresult Lwt.t
 
 (** [pop_and_inject_transactions ()] pops the valid transactions from
-    the pool using {!pop_transactions }and injects them using
+    the pool using {!pop_transactions} and injects them using
     [inject_raw_transactions] provided by {!parameters.rollup_node}. *)
 val pop_and_inject_transactions : unit -> unit tzresult Lwt.t
 
@@ -50,3 +50,6 @@ val lock_transactions : unit -> unit tzresult Lwt.t
 (** [unlock_transactions] unlocks the transactions if it was locked by
     {!lock_transactions}. *)
 val unlock_transactions : unit -> unit tzresult Lwt.t
+
+(** [is_locked] checks if the pools is locked. *)
+val is_locked : unit -> bool tzresult Lwt.t
