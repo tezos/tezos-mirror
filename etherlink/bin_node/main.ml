@@ -1116,7 +1116,7 @@ let init_from_rollup_node_command =
           ~data_dir
           ~rollup_node_data_dir)
 
-let dump_to_rlp =
+let dump_to_rlp_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
@@ -1218,7 +1218,7 @@ let commands =
     make_upgrade_command;
     make_sequencer_upgrade_command;
     init_from_rollup_node_command;
-    dump_to_rlp;
+    dump_to_rlp_command;
     reset_command;
   ]
 
