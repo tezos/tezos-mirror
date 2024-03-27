@@ -683,6 +683,18 @@ impl CSRegister {
     /// Since extension C is supported, we only make the low bit read-only 0
     const WARL_MASK_XEPC: CSRValue = !1;
 
+    /// FCSR mask
+    const FCSR_MASK: CSRValue = Self::FRM_MASK | Self::FFLAGS_MASK;
+
+    /// FRM mask
+    const FRM_MASK: CSRValue = 0b111 << Self::FRM_SHIFT;
+
+    /// FRM is bits 5..7
+    const FRM_SHIFT: usize = 5;
+
+    /// FFLAGS mask
+    const FFLAGS_MASK: CSRValue = 0b11111;
+
     /// Get the default value for the register.
     fn default_value(&self) -> u64 {
         match self {
@@ -1112,6 +1124,20 @@ impl<M: backend::Manager> CSRegisters<M> {
                 let mie_only = mie & !CSRegister::WARL_MASK_SIP_SIE;
                 (CSRegister::mie, sie_only | mie_only)
             }
+            CSRegister::fcsr => (CSRegister::fcsr, value & CSRegister::FCSR_MASK),
+            CSRegister::frm => {
+                let fcsr = self.registers.read(CSRegister::fcsr as usize);
+                let fcsr = fcsr & !CSRegister::FRM_MASK;
+                (
+                    CSRegister::fcsr,
+                    ((value << CSRegister::FRM_SHIFT) & CSRegister::FRM_MASK) | fcsr,
+                )
+            }
+            CSRegister::fflags => {
+                let fcsr = self.registers.read(CSRegister::fcsr as usize);
+                let fcsr = fcsr & !CSRegister::FFLAGS_MASK;
+                (CSRegister::fcsr, (value & CSRegister::FFLAGS_MASK) | fcsr)
+            }
             _ => (reg, value),
         }
     }
@@ -1133,6 +1159,8 @@ impl<M: backend::Manager> CSRegisters<M> {
                 CSRegister::sstatus => CSRegister::mstatus,
                 CSRegister::sip => CSRegister::mip,
                 CSRegister::sie => CSRegister::mie,
+                CSRegister::fflags => CSRegister::fcsr,
+                CSRegister::frm => CSRegister::fcsr,
                 reg => reg,
             } as usize)
         });
@@ -1142,6 +1170,9 @@ impl<M: backend::Manager> CSRegisters<M> {
             CSRegister::sstatus => xstatus::sstatus_from_mstatus(source_reg_value),
             CSRegister::sip => source_reg_value & CSRegister::WARL_MASK_SIP_SIE,
             CSRegister::sie => source_reg_value & CSRegister::WARL_MASK_SIP_SIE,
+            CSRegister::fcsr => source_reg_value & CSRegister::FCSR_MASK,
+            CSRegister::frm => (source_reg_value & CSRegister::FRM_MASK) >> CSRegister::FRM_SHIFT,
+            CSRegister::fflags => source_reg_value & CSRegister::FFLAGS_MASK,
             _ => source_reg_value,
         }
     }
@@ -1620,5 +1651,36 @@ mod tests {
                 CSRegisters::bind(space);
             csregs.reset();
         });
+    });
+
+    backend_test!(test_fcsr, F, {
+        let mut backend = create_backend!(CSRegistersLayout, F);
+        let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
+
+        // check starting values
+        assert_eq!(0, csrs.read(CSRegister::fcsr));
+        assert_eq!(0, csrs.read(CSRegister::frm));
+        assert_eq!(0, csrs.read(CSRegister::fflags));
+
+        // writing to fcsr is reflected in frm/fflags
+        csrs.write(CSRegister::fcsr, u64::MAX);
+
+        assert_eq!(0xff, csrs.read(CSRegister::fcsr));
+        assert_eq!(0b111, csrs.read(CSRegister::frm));
+        assert_eq!(0b11111, csrs.read(CSRegister::fflags));
+
+        // writing to frm is reflected in fcsr
+        csrs.write(CSRegister::frm, 0b010);
+
+        assert_eq!(0b01011111, csrs.read(CSRegister::fcsr));
+        assert_eq!(0b010, csrs.read(CSRegister::frm));
+        assert_eq!(0b11111, csrs.read(CSRegister::fflags));
+
+        // writing to fflags is reflected in fcsr
+        csrs.write(CSRegister::fflags, 0b01010);
+
+        assert_eq!(0b01001010, csrs.read(CSRegister::fcsr));
+        assert_eq!(0b010, csrs.read(CSRegister::frm));
+        assert_eq!(0b01010, csrs.read(CSRegister::fflags));
     });
 }
