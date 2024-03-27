@@ -71,7 +71,7 @@ depends: [
   "ctypes" {= "0.20.2"}
   "ctypes-foreign" {= "0.18.0"}
   "ctypes_stubs_js" {= "0.1"}
-  "data-encoding" {= "0.7.1"}
+  "data-encoding" {= "1.0.1"}
   "decompress" {= "1.5.3"}
   "digestif" {= "1.2.0"}
   "dmap" {= "0.5"}
@@ -109,8 +109,8 @@ depends: [
   "js_of_ocaml-compiler" {= "5.7.1"}
   "js_of_ocaml-lwt" {= "5.7.1"}
   "js_of_ocaml-ppx" {= "5.7.1"}
-  "json-data-encoding" {= "0.12.1"}
-  "json-data-encoding-bson" {= "0.12.1"}
+  "json-data-encoding" {= "1.0.1"}
+  "json-data-encoding-bson" {= "1.0.1"}
   "jsonm" {= "1.0.2"}
   "jst-config" {= "v0.16.0"}
   "lambda-term" {= "3.3.2"}
