@@ -39,7 +39,7 @@ module Event = struct
       ~section
       ~name:"rollup_node_follower_connection_acquired"
       ~msg:"Rollup node follower connected to the rollup node"
-      ~level:Error
+      ~level:Info
       ()
 
   let connection_lost =
