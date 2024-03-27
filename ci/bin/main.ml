@@ -187,7 +187,6 @@ let () =
   let exclude = function
     | ".gitlab/ci/jobs/coverage/common.yml"
     | ".gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml"
-    | ".gitlab/ci/jobs/doc/documentation:linkcheck.yml"
     | ".gitlab/ci/jobs/shared/images.yml"
     | ".gitlab/ci/jobs/shared/templates.yml" | ".gitlab/ci/jobs/test/common.yml"
     | ".gitlab/ci/pipelines/before_merging.yml"

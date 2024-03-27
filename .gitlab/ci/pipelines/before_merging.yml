@@ -60,5 +60,4 @@ include:
       - if: '$CI_MERGE_REQUEST_LABELS !~ /(?:^|,)ci--no-coverage(?:$|,)/'
 
   # Stage: doc
-  - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
   - .gitlab/ci/jobs/doc/oc.install_python-before_merging.yml

@@ -1784,7 +1784,41 @@ let jobs pipeline_type =
                ["docs/_build/"])
           ["make -C docs -j sphinx"]
       in
-      [job_odoc; job_manuals; job_docgen; job_build_all]
+      let job_documentation_linkcheck : tezos_job =
+        job
+          ~__POS__
+          ~name:"documentation:linkcheck"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:
+            (Dependent
+               [
+                 Artifacts job_manuals;
+                 Artifacts job_docgen;
+                 Artifacts job_build_all;
+               ])
+          ~rules:
+            (make_rules
+               ~dependent:true
+               ~label:"ci--docs"
+               ~manual:(On_changes changeset_octez_docs)
+               ())
+          ~allow_failure:Yes
+          ~before_script:
+            (before_script
+               ~source_version:true
+               ~eval_opam:true
+               ~init_python_venv:true
+               [])
+          ["make -C docs redirectcheck"; "make -C docs linkcheck"]
+      in
+      [
+        job_odoc;
+        job_manuals;
+        job_docgen;
+        job_build_all;
+        job_documentation_linkcheck;
+      ]
       |> jobs_external_split ~path:"doc/documentation"
     in
     jobs_install_python @ jobs_documentation

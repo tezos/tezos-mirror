@@ -57,5 +57,4 @@ include:
   - .gitlab/ci/jobs/test/test_evm_compatibility-scheduled_extended_test.yml
 
   # Stage: doc
-  - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
   - .gitlab/ci/jobs/doc/oc.install_python-scheduled_extended_test.yml

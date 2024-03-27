@@ -146,3 +146,42 @@ documentation:build_all:
     paths:
     - docs/_build/
     expose_as: Documentation - excluding old protocols
+
+documentation:linkcheck:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: manual
+    allow_failure: true
+  needs:
+  - documentation:manuals
+  - documentation:docgen
+  - documentation:build_all
+  dependencies:
+  - documentation:manuals
+  - documentation:docgen
+  - documentation:build_all
+  allow_failure: true
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - make -C docs redirectcheck
+  - make -C docs linkcheck
