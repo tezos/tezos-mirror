@@ -22,7 +22,7 @@ cryptoxide = "0.4"
 num-bigint = "0.3"
 num-integer = "0.1.46"
 num-traits = "0.2"
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false }
 integer-sqrt = "0.1"
 blst = "0.3"
 bitvec = "1.0"
