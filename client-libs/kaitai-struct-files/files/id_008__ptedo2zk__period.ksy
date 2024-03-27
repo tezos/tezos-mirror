@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 008-PtEdo2Zk.period'
 seq:
 - id: id_008__ptedo2zk__period
-  type: s8
+  type: s8be

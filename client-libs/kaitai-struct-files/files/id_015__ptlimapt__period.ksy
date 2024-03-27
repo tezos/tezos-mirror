@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 015-PtLimaPt.period'
 seq:
 - id: id_015__ptlimapt__period
-  type: s8
+  type: s8be

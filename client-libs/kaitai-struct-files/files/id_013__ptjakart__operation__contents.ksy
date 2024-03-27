@@ -17,25 +17,25 @@ types:
     - id: amount_tag
       type: u1
       enum: amount_tag
-    - id: case__0
+    - id: small
       type: u1
-      if: (amount_tag == amount_tag::case__0)
-    - id: case__1
-      type: u2
-      if: (amount_tag == amount_tag::case__1)
-    - id: case__2
-      type: s4
-      if: (amount_tag == amount_tag::case__2)
-    - id: case__3
-      type: s8
-      if: (amount_tag == amount_tag::case__3)
+      if: (amount_tag == amount_tag::small)
+    - id: medium
+      type: u2be
+      if: (amount_tag == amount_tag::medium)
+    - id: biggish
+      type: s4be
+      if: (amount_tag == amount_tag::biggish)
+    - id: bigger
+      type: s8be
+      if: (amount_tag == amount_tag::bigger)
   ballot:
     seq:
     - id: source
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposal
       size: 32
     - id: ballot
@@ -47,7 +47,7 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh1
@@ -60,7 +60,7 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh2
@@ -69,886 +69,451 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
       size: len_bytes_dyn_uint30
-  case__0:
+  case_0:
     seq:
-    - id: case__0_field0
-      type: s2
-    - id: case__0_field1
+    - id: case_0_field0
+      type: s2be
+    - id: case_0_field1
       size: 32
       doc: context_hash
-    - id: case__0_field2
+    - id: case_0_field2
       size: 32
       doc: context_hash
-    - id: case__0_field3
-      type: case__0_field3_0
-  case__0_field3:
+    - id: case_0_field3
+      type: case_0_field3_0
+  case_0_field3:
     seq:
-    - id: case__0_field3_entries
-      type: case__0_field3_entries
+    - id: case_0_field3_entries
+      type: case_0_field3_entries
       repeat: eos
-  case__0_field3_0:
+  case_0_field3_0:
     seq:
-    - id: len_case__0_field3
-      type: u4
+    - id: len_case_0_field3
+      type: u4be
       valid:
         max: 1073741823
-    - id: case__0_field3
-      type: case__0_field3
-      size: len_case__0_field3
-  case__0_field3_entries:
+    - id: case_0_field3
+      type: case_0_field3
+      size: len_case_0_field3
+  case_0_field3_entries:
     seq:
-    - id: case__0_field3_elt_tag
+    - id: case_0_field3_elt_tag
       type: u1
-      enum: case__0_field3_elt_tag
-    - id: case__0
+      enum: case_0_field3_elt_tag
+    - id: inode
       type: u1
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__0)
-    - id: case__8
-      type: case__8
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__8)
-    - id: case__4
-      type: case__4
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__4)
-    - id: case__12
-      type: case__12
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__12)
-    - id: case__1
-      type: u2
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__1)
-    - id: case__9
-      type: case__9
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__9)
-    - id: case__5
-      type: case__5
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__5)
-    - id: case__13
-      type: case__13
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__13)
-    - id: case__2
-      type: s4
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__2)
-    - id: case__10
-      type: case__10
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__10)
-    - id: case__6
-      type: case__6
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__6)
-    - id: case__14
-      type: case__14
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__14)
-    - id: case__3
-      type: s8
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__3)
-    - id: case__11
-      type: case__11
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__11)
-    - id: case__7
-      type: case__7
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__7)
-    - id: case__15
-      type: case__15
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__15)
-    - id: case__129
-      type: case__129_entries
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__130)
-    - id: case__131
-      type: case__131_0
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__131)
-    - id: case__192
-      type: case__192_0
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__192)
-    - id: case__193
-      type: case__193_0
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__193)
-    - id: case__195
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_0
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_1
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: u2be
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_2
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_3
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_4
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: s4be
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_5
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_6
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_7
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: s8be
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_8
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_9
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: inode
+      type: inode_10
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::inode)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_0
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_2
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_3
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
       type: bytes_dyn_uint30
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__195)
-    - id: case__224
-      type: case__224
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__224)
-    - id: case__225
-      type: case__225
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__225)
-    - id: case__226
-      type: case__226
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__226)
-    - id: case__227
-      type: case__227
-      if: (case__0_field3_elt_tag == case__0_field3_elt_tag::case__227)
-  case__1:
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_4
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_5
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_6
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_7
+      if: (case_0_field3_elt_tag == case_0_field3_elt_tag::other_elts)
+  case_1:
     seq:
-    - id: case__1_field0
-      type: s2
-    - id: case__1_field1
+    - id: case_1_field0
+      type: s2be
+    - id: case_1_field1
       size: 32
       doc: context_hash
-    - id: case__1_field2
+    - id: case_1_field2
       size: 32
       doc: context_hash
-    - id: case__1_field3
-      type: case__1_field3_0
-  case__10:
+    - id: case_1_field3
+      type: case_1_field3_0
+  case_1_field3:
     seq:
-    - id: case__10_field0
-      type: s4
-    - id: case__10_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__10_field1_field1'
-  case__11:
-    seq:
-    - id: case__11_field0
-      type: s8
-    - id: case__11_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__11_field1_field1'
-  case__12:
-    seq:
-    - id: case__12_field0
-      type: u1
-    - id: case__12_field1
-      type: case__12_field1
-  case__129_elt_field0:
-    seq:
-    - id: case__129_elt_field0
-      size-eos: true
-  case__129_elt_field0_0:
-    seq:
-    - id: len_case__129_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__129_elt_field0
-      type: case__129_elt_field0
-      size: len_case__129_elt_field0
-  case__129_elt_field1:
-    seq:
-    - id: case__129_elt_field1_tag
-      type: u1
-      enum: case__129_elt_field1_tag
-    - id: case__0
-      size: 32
-      if: (case__129_elt_field1_tag == case__129_elt_field1_tag::case__0)
-    - id: case__1
-      size: 32
-      if: (case__129_elt_field1_tag == case__129_elt_field1_tag::case__1)
-  case__129_entries:
-    seq:
-    - id: case__129_elt_field0
-      type: case__129_elt_field0_0
-    - id: case__129_elt_field1
-      type: case__129_elt_field1
-  case__12_field1:
-    seq:
-    - id: case__12_field1_field0
-      size: 32
-      doc: context_hash
-    - id: case__12_field1_field1
-      size: 32
-      doc: context_hash
-  case__13:
-    seq:
-    - id: case__13_field0
-      type: u2
-    - id: case__13_field1
-      type: case__13_field1
-  case__130_elt_field0:
-    seq:
-    - id: case__130_elt_field0
-      size-eos: true
-  case__130_elt_field0_0:
-    seq:
-    - id: len_case__130_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__130_elt_field0
-      type: case__130_elt_field0
-      size: len_case__130_elt_field0
-  case__130_elt_field1:
-    seq:
-    - id: case__130_elt_field1_tag
-      type: u1
-      enum: case__130_elt_field1_tag
-    - id: case__0
-      size: 32
-      if: (case__130_elt_field1_tag == case__130_elt_field1_tag::case__0)
-    - id: case__1
-      size: 32
-      if: (case__130_elt_field1_tag == case__130_elt_field1_tag::case__1)
-  case__130_entries:
-    seq:
-    - id: case__130_elt_field0
-      type: case__130_elt_field0_0
-    - id: case__130_elt_field1
-      type: case__130_elt_field1
-  case__131:
-    seq:
-    - id: case__131_entries
-      type: case__131_entries
+    - id: case_1_field3_entries
+      type: case_1_field3_entries
       repeat: eos
-  case__131_0:
+  case_1_field3_0:
     seq:
-    - id: len_case__131
-      type: u4
+    - id: len_case_1_field3
+      type: u4be
       valid:
         max: 1073741823
-    - id: case__131
-      type: case__131
-      size: len_case__131
-  case__131_1:
+    - id: case_1_field3
+      type: case_1_field3
+      size: len_case_1_field3
+  case_1_field3_entries:
     seq:
-    - id: len_case__131
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__131
-      type: case__131
-      size: len_case__131
-  case__131_2:
-    seq:
-    - id: len_case__131
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__131
-      type: case__131
-      size: len_case__131
-  case__131_3:
-    seq:
-    - id: len_case__131
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__131
-      type: case__131
-      size: len_case__131
-  case__131_elt_field0:
-    seq:
-    - id: case__131_elt_field0
-      size-eos: true
-  case__131_elt_field0_0:
-    seq:
-    - id: len_case__131_elt_field0
+    - id: case_1_field3_elt_tag
       type: u1
-      valid:
-        max: 255
-    - id: case__131_elt_field0
-      type: case__131_elt_field0
-      size: len_case__131_elt_field0
-  case__131_elt_field1:
-    seq:
-    - id: case__131_elt_field1_tag
+      enum: case_1_field3_elt_tag
+    - id: inode
       type: u1
-      enum: case__131_elt_field1_tag
-    - id: case__0
-      size: 32
-      if: (case__131_elt_field1_tag == case__131_elt_field1_tag::case__0)
-    - id: case__1
-      size: 32
-      if: (case__131_elt_field1_tag == case__131_elt_field1_tag::case__1)
-  case__131_entries:
-    seq:
-    - id: case__131_elt_field0
-      type: case__131_elt_field0_0
-    - id: case__131_elt_field1
-      type: case__131_elt_field1
-  case__13_field1:
-    seq:
-    - id: case__13_field1_field0
-      size: 32
-      doc: context_hash
-    - id: case__13_field1_field1
-      size: 32
-      doc: context_hash
-  case__14:
-    seq:
-    - id: case__14_field0
-      type: s4
-    - id: case__14_field1
-      type: case__14_field1
-  case__14_field1:
-    seq:
-    - id: case__14_field1_field0
-      size: 32
-      doc: context_hash
-    - id: case__14_field1_field1
-      size: 32
-      doc: context_hash
-  case__15:
-    seq:
-    - id: case__15_field0
-      type: s8
-    - id: case__15_field1
-      type: case__15_field1
-  case__15_field1:
-    seq:
-    - id: case__15_field1_field0
-      size: 32
-      doc: context_hash
-    - id: case__15_field1_field1
-      size: 32
-      doc: context_hash
-  case__192:
-    seq:
-    - id: case__192
-      size-eos: true
-  case__192_0:
-    seq:
-    - id: len_case__192
-      type: u1
-      valid:
-        max: 255
-    - id: case__192
-      type: case__192
-      size: len_case__192
-  case__192_1:
-    seq:
-    - id: len_case__192
-      type: u1
-      valid:
-        max: 255
-    - id: case__192
-      type: case__192
-      size: len_case__192
-  case__192_2:
-    seq:
-    - id: len_case__192
-      type: u1
-      valid:
-        max: 255
-    - id: case__192
-      type: case__192
-      size: len_case__192
-  case__192_3:
-    seq:
-    - id: len_case__192
-      type: u1
-      valid:
-        max: 255
-    - id: case__192
-      type: case__192
-      size: len_case__192
-  case__193:
-    seq:
-    - id: case__193
-      size-eos: true
-  case__193_0:
-    seq:
-    - id: len_case__193
-      type: u2
-      valid:
-        max: 65535
-    - id: case__193
-      type: case__193
-      size: len_case__193
-  case__193_1:
-    seq:
-    - id: len_case__193
-      type: u2
-      valid:
-        max: 65535
-    - id: case__193
-      type: case__193
-      size: len_case__193
-  case__193_2:
-    seq:
-    - id: len_case__193
-      type: u2
-      valid:
-        max: 65535
-    - id: case__193
-      type: case__193
-      size: len_case__193
-  case__193_3:
-    seq:
-    - id: len_case__193
-      type: u2
-      valid:
-        max: 65535
-    - id: case__193
-      type: case__193
-      size: len_case__193
-  case__1_field3:
-    seq:
-    - id: case__1_field3_entries
-      type: case__1_field3_entries
-      repeat: eos
-  case__1_field3_0:
-    seq:
-    - id: len_case__1_field3
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__1_field3
-      type: case__1_field3
-      size: len_case__1_field3
-  case__1_field3_entries:
-    seq:
-    - id: case__1_field3_elt_tag
-      type: u1
-      enum: case__1_field3_elt_tag
-    - id: case__0
-      type: u1
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__0)
-    - id: case__8
-      type: case__8
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__8)
-    - id: case__4
-      type: case__4
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__4)
-    - id: case__12
-      type: case__12
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__12)
-    - id: case__1
-      type: u2
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__1)
-    - id: case__9
-      type: case__9
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__9)
-    - id: case__5
-      type: case__5
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__5)
-    - id: case__13
-      type: case__13
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__13)
-    - id: case__2
-      type: s4
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__2)
-    - id: case__10
-      type: case__10
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__10)
-    - id: case__6
-      type: case__6
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__6)
-    - id: case__14
-      type: case__14
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__14)
-    - id: case__3
-      type: s8
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__3)
-    - id: case__11
-      type: case__11
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__11)
-    - id: case__7
-      type: case__7
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__7)
-    - id: case__15
-      type: case__15
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__15)
-    - id: case__129
-      type: case__129_entries
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__130)
-    - id: case__131
-      type: case__131_2
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__131)
-    - id: case__192
-      type: case__192_2
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__192)
-    - id: case__193
-      type: case__193_2
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__193)
-    - id: case__195
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_0
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_1
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: u2be
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_2
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_3
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_4
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: s4be
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_5
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_6
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_7
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: s8be
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_8
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_9
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: inode
+      type: inode_10
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::inode)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_0
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_2
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_3
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
       type: bytes_dyn_uint30
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__195)
-    - id: case__224
-      type: case__224
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__224)
-    - id: case__225
-      type: case__225
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__225)
-    - id: case__226
-      type: case__226
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__226)
-    - id: case__227
-      type: case__227
-      if: (case__1_field3_elt_tag == case__1_field3_elt_tag::case__227)
-  case__2:
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_4
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_5
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_6
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_7
+      if: (case_1_field3_elt_tag == case_1_field3_elt_tag::other_elts)
+  case_2:
     seq:
-    - id: case__2_field0
-      type: s2
-    - id: case__2_field1
+    - id: case_2_field0
+      type: s2be
+    - id: case_2_field1
       size: 32
       doc: context_hash
-    - id: case__2_field2
+    - id: case_2_field2
       size: 32
       doc: context_hash
-    - id: case__2_field3
-      type: case__2_field3_0
-  case__224:
+    - id: case_2_field3
+      type: case_2_field3_0
+  case_2_field3:
     seq:
-    - id: case__224_field0
-      type: u1
-    - id: case__224_field1
-      type: case__224_field1_0
-    - id: case__224_field2
-      size: 32
-      doc: context_hash
-  case__224_field1:
-    seq:
-    - id: case__224_field1
-      size-eos: true
-  case__224_field1_0:
-    seq:
-    - id: len_case__224_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__224_field1
-      type: case__224_field1
-      size: len_case__224_field1
-  case__225:
-    seq:
-    - id: case__225_field0
-      type: u2
-    - id: case__225_field1
-      type: case__225_field1_0
-    - id: case__225_field2
-      size: 32
-      doc: context_hash
-  case__225_field1:
-    seq:
-    - id: case__225_field1
-      size-eos: true
-  case__225_field1_0:
-    seq:
-    - id: len_case__225_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__225_field1
-      type: case__225_field1
-      size: len_case__225_field1
-  case__226:
-    seq:
-    - id: case__226_field0
-      type: s4
-    - id: case__226_field1
-      type: case__226_field1_0
-    - id: case__226_field2
-      size: 32
-      doc: context_hash
-  case__226_field1:
-    seq:
-    - id: case__226_field1
-      size-eos: true
-  case__226_field1_0:
-    seq:
-    - id: len_case__226_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__226_field1
-      type: case__226_field1
-      size: len_case__226_field1
-  case__227:
-    seq:
-    - id: case__227_field0
-      type: s8
-    - id: case__227_field1
-      type: case__227_field1_0
-    - id: case__227_field2
-      size: 32
-      doc: context_hash
-  case__227_field1:
-    seq:
-    - id: case__227_field1
-      size-eos: true
-  case__227_field1_0:
-    seq:
-    - id: len_case__227_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__227_field1
-      type: case__227_field1
-      size: len_case__227_field1
-  case__2_field3:
-    seq:
-    - id: case__2_field3_entries
-      type: case__2_field3_entries
+    - id: case_2_field3_entries
+      type: case_2_field3_entries
       repeat: eos
-  case__2_field3_0:
+  case_2_field3_0:
     seq:
-    - id: len_case__2_field3
-      type: u4
+    - id: len_case_2_field3
+      type: u4be
       valid:
         max: 1073741823
-    - id: case__2_field3
-      type: case__2_field3
-      size: len_case__2_field3
-  case__2_field3_entries:
+    - id: case_2_field3
+      type: case_2_field3
+      size: len_case_2_field3
+  case_2_field3_entries:
     seq:
-    - id: case__2_field3_elt_tag
+    - id: case_2_field3_elt_tag
       type: u1
-      enum: case__2_field3_elt_tag
-    - id: case__0
+      enum: case_2_field3_elt_tag
+    - id: inode
       type: u1
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__0)
-    - id: case__8
-      type: case__8
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__8)
-    - id: case__4
-      type: case__4
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__4)
-    - id: case__12
-      type: case__12
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__12)
-    - id: case__1
-      type: u2
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__1)
-    - id: case__9
-      type: case__9
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__9)
-    - id: case__5
-      type: case__5
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__5)
-    - id: case__13
-      type: case__13
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__13)
-    - id: case__2
-      type: s4
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__2)
-    - id: case__10
-      type: case__10
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__10)
-    - id: case__6
-      type: case__6
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__6)
-    - id: case__14
-      type: case__14
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__14)
-    - id: case__3
-      type: s8
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__3)
-    - id: case__11
-      type: case__11
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__11)
-    - id: case__7
-      type: case__7
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__7)
-    - id: case__15
-      type: case__15
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__15)
-    - id: case__129
-      type: case__129_entries
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__130)
-    - id: case__131
-      type: case__131_1
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__131)
-    - id: case__192
-      type: case__192_1
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__192)
-    - id: case__193
-      type: case__193_1
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__193)
-    - id: case__195
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_0
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_1
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: u2be
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_2
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_3
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_4
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: s4be
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_5
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_6
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_7
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: s8be
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_8
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_9
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: inode
+      type: inode_10
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::inode)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_0
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_2
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_3
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
       type: bytes_dyn_uint30
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__195)
-    - id: case__224
-      type: case__224
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__224)
-    - id: case__225
-      type: case__225
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__225)
-    - id: case__226
-      type: case__226
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__226)
-    - id: case__227
-      type: case__227
-      if: (case__2_field3_elt_tag == case__2_field3_elt_tag::case__227)
-  case__3:
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_4
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_5
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_6
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_7
+      if: (case_2_field3_elt_tag == case_2_field3_elt_tag::other_elts)
+  case_3:
     seq:
-    - id: case__3_field0
-      type: s2
-    - id: case__3_field1
+    - id: case_3_field0
+      type: s2be
+    - id: case_3_field1
       size: 32
       doc: context_hash
-    - id: case__3_field2
+    - id: case_3_field2
       size: 32
       doc: context_hash
-    - id: case__3_field3
-      type: case__3_field3_0
-  case__3_field3:
+    - id: case_3_field3
+      type: case_3_field3_0
+  case_3_field3:
     seq:
-    - id: case__3_field3_entries
-      type: case__3_field3_entries
+    - id: case_3_field3_entries
+      type: case_3_field3_entries
       repeat: eos
-  case__3_field3_0:
+  case_3_field3_0:
     seq:
-    - id: len_case__3_field3
-      type: u4
+    - id: len_case_3_field3
+      type: u4be
       valid:
         max: 1073741823
-    - id: case__3_field3
-      type: case__3_field3
-      size: len_case__3_field3
-  case__3_field3_entries:
+    - id: case_3_field3
+      type: case_3_field3
+      size: len_case_3_field3
+  case_3_field3_entries:
     seq:
-    - id: case__3_field3_elt_tag
+    - id: case_3_field3_elt_tag
       type: u1
-      enum: case__3_field3_elt_tag
-    - id: case__0
+      enum: case_3_field3_elt_tag
+    - id: inode
       type: u1
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__0)
-    - id: case__8
-      type: case__8
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__8)
-    - id: case__4
-      type: case__4
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__4)
-    - id: case__12
-      type: case__12
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__12)
-    - id: case__1
-      type: u2
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__1)
-    - id: case__9
-      type: case__9
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__9)
-    - id: case__5
-      type: case__5
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__5)
-    - id: case__13
-      type: case__13
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__13)
-    - id: case__2
-      type: s4
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__2)
-    - id: case__10
-      type: case__10
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__10)
-    - id: case__6
-      type: case__6
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__6)
-    - id: case__14
-      type: case__14
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__14)
-    - id: case__3
-      type: s8
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__3)
-    - id: case__11
-      type: case__11
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__11)
-    - id: case__7
-      type: case__7
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__7)
-    - id: case__15
-      type: case__15
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__15)
-    - id: case__129
-      type: case__129_entries
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__130)
-    - id: case__131
-      type: case__131_3
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__131)
-    - id: case__192
-      type: case__192_3
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__192)
-    - id: case__193
-      type: case__193_3
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__193)
-    - id: case__195
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_0
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_1
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: u2be
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_2
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_3
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_4
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: s4be
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_5
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_6
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_7
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: s8be
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_8
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_9
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: inode
+      type: inode_10
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::inode)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_entries
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_0
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_2
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_3
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
       type: bytes_dyn_uint30
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__195)
-    - id: case__224
-      type: case__224
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__224)
-    - id: case__225
-      type: case__225
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__225)
-    - id: case__226
-      type: case__226
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__226)
-    - id: case__227
-      type: case__227
-      if: (case__3_field3_elt_tag == case__3_field3_elt_tag::case__227)
-  case__4:
-    seq:
-    - id: case__4_field0
-      type: u1
-    - id: case__4_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__4_field1_field0'
-  case__5:
-    seq:
-    - id: case__5_field0
-      type: u2
-    - id: case__5_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__5_field1_field0'
-  case__6:
-    seq:
-    - id: case__6_field0
-      type: s4
-    - id: case__6_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__6_field1_field0'
-  case__7:
-    seq:
-    - id: case__7_field0
-      type: s8
-    - id: case__7_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__7_field1_field0'
-  case__8:
-    seq:
-    - id: case__8_field0
-      type: u1
-    - id: case__8_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__8_field1_field1'
-  case__9:
-    seq:
-    - id: case__9_field0
-      type: u2
-    - id: case__9_field1
-      size: 32
-      doc: ! 'context_hash
-
-
-        case__9_field1_field1'
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_4
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_5
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_6
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
+    - id: other_elts
+      type: other_elts_7
+      if: (case_3_field3_elt_tag == case_3_field3_elt_tag::other_elts)
   commitment:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: messages
       type: messages_0
     - id: predecessor
@@ -960,13 +525,13 @@ types:
     - id: compressed_state
       size: 32
     - id: inbox_level
-      type: s4
+      type: s4be
     - id: predecessor
       size: 32
     - id: number_of_messages
-      type: s4
+      type: s4be
     - id: number_of_ticks
-      type: s4
+      type: s4be
   delegation:
     seq:
     - id: source
@@ -1019,11 +584,11 @@ types:
   endorsement:
     seq:
     - id: slot
-      type: u2
+      type: u2be
     - id: level
-      type: s4
+      type: s4be
     - id: round
-      type: s4
+      type: s4be
     - id: block_payload_hash
       size: 32
   id_013__ptjakart__block_header__alpha__full_header:
@@ -1043,7 +608,7 @@ types:
     - id: payload_hash
       size: 32
     - id: payload_round
-      type: s4
+      type: s4be
     - id: proof_of_work_nonce
       size: 8
     - id: seed_nonce_hash_tag
@@ -1243,10 +808,122 @@ types:
     seq:
     - id: rollup_hash
       size: 20
+  inode:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field1'
+  inode_0:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field0'
+  inode_1:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1
+  inode_10:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1
+  inode_2:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field1'
+  inode_3:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field0'
+  inode_4:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1
+  inode_5:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field1'
+  inode_6:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field0'
+  inode_7:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1
+  inode_8:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field1'
+  inode_9:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      size: 32
+      doc: ! 'context_hash
+
+
+        inode_field1_field0'
+  inode_field1:
+    seq:
+    - id: inode_field1_field0
+      size: 32
+      doc: context_hash
+    - id: inode_field1_field1
+      size: 32
+      doc: context_hash
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
@@ -1269,7 +946,7 @@ types:
   message_1:
     seq:
     - id: len_message
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message
@@ -1287,7 +964,7 @@ types:
   message_path_0:
     seq:
     - id: len_message_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message_path
@@ -1305,7 +982,7 @@ types:
   message_result_path_0:
     seq:
     - id: len_message_result_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message_result_path
@@ -1323,7 +1000,7 @@ types:
   messages_0:
     seq:
     - id: len_messages
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: messages
@@ -1365,7 +1042,7 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op1
@@ -1378,7 +1055,7 @@ types:
   op1_2:
     seq:
     - id: len_op1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op1
@@ -1391,7 +1068,7 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op2
@@ -1404,7 +1081,7 @@ types:
   op2_2:
     seq:
     - id: len_op2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op2
@@ -1441,6 +1118,121 @@ types:
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: script
       type: id_013__ptjakart__scripted__contracts
+  other_elts:
+    seq:
+    - id: other_elts_entries
+      type: other_elts_entries
+      repeat: eos
+  other_elts_0:
+    seq:
+    - id: len_other_elts
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: other_elts
+      type: other_elts
+      size: len_other_elts
+  other_elts_1:
+    seq:
+    - id: other_elts
+      size-eos: true
+  other_elts_2:
+    seq:
+    - id: len_other_elts
+      type: u1
+      valid:
+        max: 255
+    - id: other_elts
+      type: other_elts_1
+      size: len_other_elts
+  other_elts_3:
+    seq:
+    - id: len_other_elts
+      type: u2be
+      valid:
+        max: 65535
+    - id: other_elts
+      type: other_elts_1
+      size: len_other_elts
+  other_elts_4:
+    seq:
+    - id: other_elts_field0
+      type: u1
+    - id: other_elts_field1
+      type: other_elts_field1_0
+    - id: other_elts_field2
+      size: 32
+      doc: context_hash
+  other_elts_5:
+    seq:
+    - id: other_elts_field0
+      type: u2be
+    - id: other_elts_field1
+      type: other_elts_field1_0
+    - id: other_elts_field2
+      size: 32
+      doc: context_hash
+  other_elts_6:
+    seq:
+    - id: other_elts_field0
+      type: s4be
+    - id: other_elts_field1
+      type: other_elts_field1_0
+    - id: other_elts_field2
+      size: 32
+      doc: context_hash
+  other_elts_7:
+    seq:
+    - id: other_elts_field0
+      type: s8be
+    - id: other_elts_field1
+      type: other_elts_field1_0
+    - id: other_elts_field2
+      size: 32
+      doc: context_hash
+  other_elts_elt_field0:
+    seq:
+    - id: other_elts_elt_field0
+      size-eos: true
+  other_elts_elt_field0_0:
+    seq:
+    - id: len_other_elts_elt_field0
+      type: u1
+      valid:
+        max: 255
+    - id: other_elts_elt_field0
+      type: other_elts_elt_field0
+      size: len_other_elts_elt_field0
+  other_elts_elt_field1:
+    seq:
+    - id: other_elts_elt_field1_tag
+      type: u1
+      enum: other_elts_elt_field1_tag
+    - id: value
+      size: 32
+      if: (other_elts_elt_field1_tag == other_elts_elt_field1_tag::value)
+    - id: node
+      size: 32
+      if: (other_elts_elt_field1_tag == other_elts_elt_field1_tag::node)
+  other_elts_entries:
+    seq:
+    - id: other_elts_elt_field0
+      type: other_elts_elt_field0_0
+    - id: other_elts_elt_field1
+      type: other_elts_elt_field1
+  other_elts_field1:
+    seq:
+    - id: other_elts_field1
+      size-eos: true
+  other_elts_field1_0:
+    seq:
+    - id: len_other_elts_field1
+      type: u1
+      valid:
+        max: 255
+    - id: other_elts_field1
+      type: other_elts_field1
+      size: len_other_elts_field1
   parameters:
     seq:
     - id: entrypoint
@@ -1459,11 +1251,11 @@ types:
   preendorsement:
     seq:
     - id: slot
-      type: u2
+      type: u2be
     - id: level
-      type: s4
+      type: s4be
     - id: round
-      type: s4
+      type: s4be
     - id: block_payload_hash
       size: 32
   previous_message_result:
@@ -1480,7 +1272,7 @@ types:
   previous_message_result_path_0:
     seq:
     - id: len_previous_message_result_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: previous_message_result_path
@@ -1495,18 +1287,18 @@ types:
     - id: proof_tag
       type: u1
       enum: proof_tag
-    - id: case__0
-      type: case__0
-      if: (proof_tag == proof_tag::case__0)
-    - id: case__2
-      type: case__2
-      if: (proof_tag == proof_tag::case__2)
-    - id: case__1
-      type: case__1
-      if: (proof_tag == proof_tag::case__1)
-    - id: case__3
-      type: case__3
-      if: (proof_tag == proof_tag::case__3)
+    - id: case_0
+      type: case_0
+      if: (proof_tag == proof_tag::case_0)
+    - id: case_2
+      type: case_2
+      if: (proof_tag == proof_tag::case_2)
+    - id: case_1
+      type: case_1
+      if: (proof_tag == proof_tag::case_1)
+    - id: case_3
+      type: case_3
+      if: (proof_tag == proof_tag::case_3)
   proposals:
     seq:
     - id: proposals_entries
@@ -1515,7 +1307,7 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: proposals
@@ -1527,7 +1319,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposals
       type: proposals_0
   proposals_entries:
@@ -1674,7 +1466,7 @@ types:
   seed_nonce_revelation:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: nonce
       size: 32
   set_deposits_limit:
@@ -1704,7 +1496,7 @@ types:
   tickets_info_0:
     seq:
     - id: len_tickets_info
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: tickets_info
@@ -1834,7 +1626,7 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: level
-      type: s4
+      type: s4be
     - id: context_hash
       size: 32
     - id: message_index
@@ -1893,7 +1685,7 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: level
-      type: s4
+      type: s4be
     - id: message
       type: message
     - id: message_position
@@ -1974,134 +1766,125 @@ types:
       if: (burn_limit_tag == bool::true)
 enums:
   amount_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
+    0: small
+    1: medium
+    2: biggish
+    3: bigger
   bool:
     0: false
     255: true
-  case__0_field3_elt_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    4: case__4
-    5: case__5
-    6: case__6
-    7: case__7
-    8: case__8
-    9: case__9
-    10: case__10
-    11: case__11
-    12: case__12
-    13: case__13
-    14: case__14
-    15: case__15
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    192: case__192
-    193: case__193
-    195: case__195
-    224: case__224
-    225: case__225
-    226: case__226
-    227: case__227
-  case__129_elt_field1_tag:
-    0: case__0
-    1: case__1
-  case__130_elt_field1_tag:
-    0: case__0
-    1: case__1
-  case__131_elt_field1_tag:
-    0: case__0
-    1: case__1
-  case__1_field3_elt_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    4: case__4
-    5: case__5
-    6: case__6
-    7: case__7
-    8: case__8
-    9: case__9
-    10: case__10
-    11: case__11
-    12: case__12
-    13: case__13
-    14: case__14
-    15: case__15
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    192: case__192
-    193: case__193
-    195: case__195
-    224: case__224
-    225: case__225
-    226: case__226
-    227: case__227
-  case__2_field3_elt_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    4: case__4
-    5: case__5
-    6: case__6
-    7: case__7
-    8: case__8
-    9: case__9
-    10: case__10
-    11: case__11
-    12: case__12
-    13: case__13
-    14: case__14
-    15: case__15
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    192: case__192
-    193: case__193
-    195: case__195
-    224: case__224
-    225: case__225
-    226: case__226
-    227: case__227
-  case__3_field3_elt_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    4: case__4
-    5: case__5
-    6: case__6
-    7: case__7
-    8: case__8
-    9: case__9
-    10: case__10
-    11: case__11
-    12: case__12
-    13: case__13
-    14: case__14
-    15: case__15
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    192: case__192
-    193: case__193
-    195: case__195
-    224: case__224
-    225: case__225
-    226: case__226
-    227: case__227
+  case_0_field3_elt_tag:
+    0: inode
+    1: inode
+    2: inode
+    3: inode
+    4: inode
+    5: inode
+    6: inode
+    7: inode
+    8: inode
+    9: inode
+    10: inode
+    11: inode
+    12: inode
+    13: inode
+    14: inode
+    15: inode
+    128: other_elts
+    129: other_elts
+    130: other_elts
+    131: other_elts
+    192: other_elts
+    193: other_elts
+    195: other_elts
+    224: other_elts
+    225: other_elts
+    226: other_elts
+    227: other_elts
+  case_1_field3_elt_tag:
+    0: inode
+    1: inode
+    2: inode
+    3: inode
+    4: inode
+    5: inode
+    6: inode
+    7: inode
+    8: inode
+    9: inode
+    10: inode
+    11: inode
+    12: inode
+    13: inode
+    14: inode
+    15: inode
+    128: other_elts
+    129: other_elts
+    130: other_elts
+    131: other_elts
+    192: other_elts
+    193: other_elts
+    195: other_elts
+    224: other_elts
+    225: other_elts
+    226: other_elts
+    227: other_elts
+  case_2_field3_elt_tag:
+    0: inode
+    1: inode
+    2: inode
+    3: inode
+    4: inode
+    5: inode
+    6: inode
+    7: inode
+    8: inode
+    9: inode
+    10: inode
+    11: inode
+    12: inode
+    13: inode
+    14: inode
+    15: inode
+    128: other_elts
+    129: other_elts
+    130: other_elts
+    131: other_elts
+    192: other_elts
+    193: other_elts
+    195: other_elts
+    224: other_elts
+    225: other_elts
+    226: other_elts
+    227: other_elts
+  case_3_field3_elt_tag:
+    0: inode
+    1: inode
+    2: inode
+    3: inode
+    4: inode
+    5: inode
+    6: inode
+    7: inode
+    8: inode
+    9: inode
+    10: inode
+    11: inode
+    12: inode
+    13: inode
+    14: inode
+    15: inode
+    128: other_elts
+    129: other_elts
+    130: other_elts
+    131: other_elts
+    192: other_elts
+    193: other_elts
+    195: other_elts
+    224: other_elts
+    225: other_elts
+    226: other_elts
+    227: other_elts
   id_013__ptjakart__contract_id_tag:
     0: implicit
     1: originated
@@ -2155,14 +1938,17 @@ enums:
   message_tag:
     0: batch
     1: deposit
+  other_elts_elt_field1_tag:
+    0: value
+    1: node
   predecessor_tag:
     0: none
     1: some
   proof_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
+    0: case_0
+    1: case_1
+    2: case_2
+    3: case_3
   public_key_hash_tag:
     0: ed25519
     1: secp256k1

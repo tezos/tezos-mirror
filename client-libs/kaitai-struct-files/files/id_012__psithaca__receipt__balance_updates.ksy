@@ -48,7 +48,7 @@ types:
   id_012__psithaca__operation_metadata__alpha__balance_update:
     seq:
     - id: change
-      type: s8
+      type: s8be
   id_012__psithaca__operation_metadata__alpha__balance_updates:
     seq:
     - id: id_012__psithaca__operation_metadata__alpha__balance_updates_entries
@@ -57,7 +57,7 @@ types:
   id_012__psithaca__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_id_012__psithaca__operation_metadata__alpha__balance_updates
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: id_012__psithaca__operation_metadata__alpha__balance_updates
@@ -82,21 +82,21 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: cycle
-      type: s4
+      type: s4be
   legacy_fees:
     seq:
     - id: delegate
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: cycle
-      type: s4
+      type: s4be
   legacy_rewards:
     seq:
     - id: delegate
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: cycle
-      type: s4
+      type: s4be
   lost_endorsing_rewards:
     seq:
     - id: delegate

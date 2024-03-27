@@ -8,7 +8,7 @@ types:
   id_007__psdelph1__block_header__alpha__unsigned_contents:
     seq:
     - id: priority
-      type: u2
+      type: u2be
     - id: proof_of_work_nonce
       size: 8
     - id: seed_nonce_hash_tag

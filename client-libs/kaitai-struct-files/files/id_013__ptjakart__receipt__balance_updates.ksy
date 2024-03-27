@@ -62,7 +62,7 @@ types:
   id_013__ptjakart__operation_metadata__alpha__balance_update:
     seq:
     - id: change
-      type: s8
+      type: s8be
   id_013__ptjakart__operation_metadata__alpha__balance_updates:
     seq:
     - id: id_013__ptjakart__operation_metadata__alpha__balance_updates_entries
@@ -71,7 +71,7 @@ types:
   id_013__ptjakart__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_id_013__ptjakart__operation_metadata__alpha__balance_updates
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: id_013__ptjakart__operation_metadata__alpha__balance_updates

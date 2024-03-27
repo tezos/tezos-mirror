@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 007-PsDELPH1.voting_period'
 seq:
 - id: id_007__psdelph1__voting_period
-  type: s4
+  type: s4be

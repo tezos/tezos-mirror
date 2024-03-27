@@ -20,7 +20,7 @@ types:
     - id: updates
       type: updates_1
     - id: memo_size
-      type: u2
+      type: u2be
   args:
     seq:
     - id: args_entries
@@ -29,7 +29,7 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: args
@@ -49,7 +49,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -62,7 +62,7 @@ types:
   commitments_and_ciphertexts_0:
     seq:
     - id: len_commitments_and_ciphertexts
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: commitments_and_ciphertexts
@@ -197,7 +197,7 @@ types:
   nullifiers_0:
     seq:
     - id: len_nullifiers
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: nullifiers
@@ -268,7 +268,7 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: sequence
@@ -286,7 +286,7 @@ types:
   updates_0:
     seq:
     - id: len_updates
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: updates
@@ -721,7 +721,7 @@ enums:
     10: bytes
 seq:
 - id: len_id_010__ptgranad__lazy_storage_diff
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: id_010__ptgranad__lazy_storage_diff

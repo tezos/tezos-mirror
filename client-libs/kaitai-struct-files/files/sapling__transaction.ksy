@@ -15,7 +15,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -28,7 +28,7 @@ types:
   inputs_0:
     seq:
     - id: len_inputs
-      type: u4
+      type: u4be
       valid:
         max: 1833216
     - id: inputs
@@ -46,7 +46,7 @@ types:
   outputs_0:
     seq:
     - id: len_outputs
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: outputs
@@ -64,7 +64,7 @@ seq:
 - id: binding_sig
   type: sapling__transaction__binding_sig
 - id: balance
-  type: s8
+  type: s8be
 - id: root
   type: sapling__transaction__commitment_hash
 - id: bound_data

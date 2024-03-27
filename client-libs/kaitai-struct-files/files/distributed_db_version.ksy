@@ -7,4 +7,4 @@ doc: ! >-
   Description: A version number for the distributed DB protocol
 seq:
 - id: distributed_db_version
-  type: u2
+  type: u2be

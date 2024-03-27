@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 010-PtGRANAD.cycle'
 seq:
 - id: id_010__ptgranad__cycle
-  type: s4
+  type: s4be

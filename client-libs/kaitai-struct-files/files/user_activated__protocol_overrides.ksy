@@ -19,7 +19,7 @@ types:
       size: 32
 seq:
 - id: len_user_activated__protocol_overrides
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: user_activated__protocol_overrides

@@ -19,5 +19,5 @@ seq:
   type: u1
   enum: bool
 - id: port
-  type: u2
+  type: u2be
   if: (port_tag == bool::true)

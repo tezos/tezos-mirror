@@ -118,12 +118,12 @@ let%expect_test "test objs with opt and dft fields" =
       three:
         seq:
         - id: one
-          type: s8
+          type: s8be
         - id: two_tag
           type: u1
           enum: bool
         - id: two
-          type: u2
+          type: u2be
           if: (two_tag == bool::true)
     enums:
       bool:
@@ -212,7 +212,7 @@ let%expect_test "test nested object translation" =
     bytes_dyn_uint30:
       seq:
       - id: len_bytes_dyn_uint30
-        type: u4
+        type: u4be
         valid:
           max: 1073741823
       - id: bytes_dyn_uint30

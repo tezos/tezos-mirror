@@ -6,4 +6,4 @@ seq:
 - id: address
   size: 20
 - id: origination_level
-  type: s4
+  type: s4be

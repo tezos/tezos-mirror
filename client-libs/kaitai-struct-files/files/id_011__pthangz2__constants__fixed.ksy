@@ -11,7 +11,7 @@ types:
   cache_layout_0:
     seq:
     - id: len_cache_layout
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: cache_layout
@@ -20,11 +20,11 @@ types:
   cache_layout_entries:
     seq:
     - id: cache_layout_elt
-      type: s8
+      type: s8be
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
@@ -48,4 +48,4 @@ seq:
 - id: cache_layout
   type: cache_layout_0
 - id: michelson_maximum_type_size
-  type: u2
+  type: u2be

@@ -38,7 +38,7 @@ enums:
     3: bls
 seq:
 - id: len_alpha__smart_rollup__whitelist
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: alpha__smart_rollup__whitelist

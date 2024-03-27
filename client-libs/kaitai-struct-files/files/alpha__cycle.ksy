@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: alpha.cycle'
 seq:
 - id: alpha__cycle
-  type: s4
+  type: s4be

@@ -14,11 +14,11 @@ types:
   page_id:
     seq:
     - id: published_level
-      type: s4
+      type: s4be
     - id: slot_index
       type: u1
     - id: page_index
-      type: s2
+      type: s2be
 enums:
   alpha__smart_rollup__reveal_tag:
     0: reveal_raw_data

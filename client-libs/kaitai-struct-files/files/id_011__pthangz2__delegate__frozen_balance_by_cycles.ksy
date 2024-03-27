@@ -11,7 +11,7 @@ types:
   id_011__pthangz2__delegate__frozen_balance_by_cycles_entries:
     seq:
     - id: cycle
-      type: s4
+      type: s4be
     - id: deposits
       type: id_011__pthangz2__mutez
     - id: fees
@@ -36,7 +36,7 @@ types:
       type: b7be
 seq:
 - id: len_id_011__pthangz2__delegate__frozen_balance_by_cycles
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: id_011__pthangz2__delegate__frozen_balance_by_cycles

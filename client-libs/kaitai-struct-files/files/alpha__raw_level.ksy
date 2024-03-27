@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: alpha.raw_level'
 seq:
 - id: alpha__raw_level
-  type: s4
+  type: s4be

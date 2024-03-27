@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: alpha.period'
 seq:
 - id: alpha__period
-  type: s8
+  type: s8be

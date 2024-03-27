@@ -11,7 +11,7 @@ types:
   back_pointers_0:
     seq:
     - id: len_back_pointers
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: back_pointers
@@ -26,7 +26,7 @@ types:
     - id: hash
       size: 32
     - id: level
-      type: s4
+      type: s4be
   n:
     seq:
     - id: n
@@ -49,6 +49,6 @@ types:
       type: back_pointers_0
 seq:
 - id: level
-  type: s4
+  type: s4be
 - id: old_levels_messages
   type: old_levels_messages

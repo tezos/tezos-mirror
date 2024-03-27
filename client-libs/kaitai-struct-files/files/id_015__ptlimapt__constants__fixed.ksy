@@ -6,7 +6,7 @@ types:
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
@@ -30,7 +30,7 @@ seq:
 - id: cache_layout_size
   type: u1
 - id: michelson_maximum_type_size
-  type: u2
+  type: u2be
 - id: sc_max_wrapped_proof_binary_size
   type: int31
 - id: sc_rollup_message_size_limit

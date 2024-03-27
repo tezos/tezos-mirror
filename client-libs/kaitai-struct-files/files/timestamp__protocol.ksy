@@ -8,4 +8,4 @@ doc: ! >-
   based.
 seq:
 - id: timestamp__protocol
-  type: s8
+  type: s8be

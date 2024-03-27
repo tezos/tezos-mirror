@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 011-PtHangz2.period'
 seq:
 - id: id_011__pthangz2__period
-  type: s8
+  type: s8be

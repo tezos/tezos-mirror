@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 018-Proxford.raw_level'
 seq:
 - id: id_018__proxford__raw_level
-  type: s4
+  type: s4be

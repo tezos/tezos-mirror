@@ -80,7 +80,7 @@ let%expect_test "test dynamic size list translation" =
         type: u1
   seq:
   - id: len_list_of_uint8
-    type: u4
+    type: u4be
     valid:
       max: 1073741823
   - id: list_of_uint8
@@ -113,7 +113,7 @@ let%expect_test "test dynamic size list with max length" =
         type: u1
   seq:
   - id: len_list_with_length
-    type: u4
+    type: u4be
     valid:
       max: 5
   - id: list_with_length
@@ -138,7 +138,7 @@ let%expect_test "test variable size list with max length" =
     list_with_length_entries:
       seq:
       - id: list_with_length_elt
-        type: s4
+        type: s4be
   seq:
   - id: list_with_length_entries
     type: list_with_length_entries
@@ -159,20 +159,13 @@ let%expect_test "test list with length" =
     endian: be
   doc: ! 'Encoding id: list_with_length'
   types:
-    int31:
-      seq:
-      - id: int31
-        type: s4
-        valid:
-          min: -1073741824
-          max: 1073741823
     list_with_length_entries:
       seq:
       - id: list_with_length_elt
         type: u1
   seq:
   - id: num_list_with_length
-    type: int31
+    type: u4be
     valid:
       max: 1073741823
   - id: list_with_length_entries
@@ -230,7 +223,7 @@ let%expect_test "test list with length" =
         type: u1
   seq:
   - id: num_list_with_length
-    type: u2
+    type: u2be
     valid:
       max: 65535
   - id: list_with_length_entries

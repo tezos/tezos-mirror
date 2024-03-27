@@ -10,7 +10,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -23,7 +23,7 @@ types:
   modules_0:
     seq:
     - id: len_modules
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: modules
@@ -36,7 +36,7 @@ types:
   protocol__environment_version:
     seq:
     - id: protocol__environment_version
-      type: u2
+      type: u2be
 enums:
   bool:
     0: false

@@ -18,7 +18,7 @@ types:
     - id: transition_period
       type: u1
     - id: max_bonus
-      type: s8
+      type: s8be
     - id: growth_rate
       type: growth_rate
     - id: center_dz
@@ -44,7 +44,7 @@ types:
       type: u1
       enum: bool
     - id: number_of_slots
-      type: u2
+      type: u2be
     - id: attestation_lag
       type: u1
     - id: attestation_threshold
@@ -52,11 +52,11 @@ types:
     - id: redundancy_factor
       type: u1
     - id: page_size
-      type: u2
+      type: u2be
     - id: slot_size
       type: int31
     - id: number_of_shards
-      type: u2
+      type: u2be
   growth_rate:
     seq:
     - id: numerator
@@ -66,7 +66,7 @@ types:
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
@@ -111,9 +111,9 @@ types:
   minimal_participation_ratio:
     seq:
     - id: numerator
-      type: u2
+      type: u2be
     - id: denominator
-      type: u2
+      type: u2be
   n:
     seq:
     - id: n
@@ -152,13 +152,13 @@ types:
   smart_rollup_reveal_activation_level:
     seq:
     - id: raw_data
-      type: s4
+      type: s4be
     - id: metadata
-      type: s4
+      type: s4be
     - id: dal_page
-      type: s4
+      type: s4be
     - id: dal_parameters
-      type: s4
+      type: s4be
     - id: dal_attested_slots_validity_lag
       type: int31
   z:
@@ -191,25 +191,25 @@ seq:
 - id: delegate_parameters_activation_delay
   type: u1
 - id: blocks_per_cycle
-  type: s4
+  type: s4be
 - id: blocks_per_commitment
-  type: s4
+  type: s4be
 - id: nonce_revelation_threshold
-  type: s4
+  type: s4be
 - id: cycles_per_voting_period
-  type: s4
+  type: s4be
 - id: hard_gas_limit_per_operation
   type: z
 - id: hard_gas_limit_per_block
   type: z
 - id: proof_of_work_threshold
-  type: s8
+  type: s8be
 - id: minimal_stake
   type: alpha__mutez
 - id: minimal_frozen_stake
   type: alpha__mutez
 - id: vdf_difficulty
-  type: s8
+  type: s8be
 - id: origination_size
   type: int31
 - id: issuance_weights
@@ -219,21 +219,21 @@ seq:
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
-  type: s4
+  type: s4be
 - id: quorum_max
-  type: s4
+  type: s4be
 - id: min_proposal_quorum
-  type: s4
+  type: s4be
 - id: liquidity_baking_subsidy
   type: alpha__mutez
 - id: liquidity_baking_toggle_ema_threshold
-  type: s4
+  type: s4be
 - id: max_operations_time_to_live
-  type: s2
+  type: s2be
 - id: minimal_block_delay
-  type: s8
+  type: s8be
 - id: delay_increment_per_round
-  type: s8
+  type: s8be
 - id: consensus_committee_size
   type: int31
 - id: consensus_threshold
@@ -243,11 +243,11 @@ seq:
 - id: limit_of_delegation_over_baking
   type: u1
 - id: percentage_of_frozen_deposits_slashed_per_double_baking
-  type: u2
+  type: u2be
 - id: percentage_of_frozen_deposits_slashed_per_double_attestation
-  type: u2
+  type: u2be
 - id: max_slashing_per_block
-  type: u2
+  type: u2be
 - id: max_slashing_threshold
   type: int31
 - id: testnet_dictator_tag
@@ -283,9 +283,9 @@ seq:
 - id: smart_rollup_commitment_period_in_blocks
   type: int31
 - id: smart_rollup_max_lookahead_in_blocks
-  type: s4
+  type: s4be
 - id: smart_rollup_max_active_outbox_levels
-  type: s4
+  type: s4be
 - id: smart_rollup_max_outbox_messages_per_level
   type: int31
 - id: smart_rollup_number_of_sections_in_dissection
@@ -318,7 +318,7 @@ seq:
 - id: edge_of_staking_over_delegation
   type: u1
 - id: adaptive_issuance_launch_ema_threshold
-  type: s4
+  type: s4be
 - id: adaptive_rewards_params
   type: adaptive_rewards_params
 - id: adaptive_issuance_activation_vote_enable

@@ -17,18 +17,18 @@ types:
     - id: amount_tag
       type: u1
       enum: amount_tag
-    - id: case__0
+    - id: small
       type: u1
-      if: (amount_tag == amount_tag::case__0)
-    - id: case__1
-      type: u2
-      if: (amount_tag == amount_tag::case__1)
-    - id: case__2
-      type: s4
-      if: (amount_tag == amount_tag::case__2)
-    - id: case__3
-      type: s8
-      if: (amount_tag == amount_tag::case__3)
+      if: (amount_tag == amount_tag::small)
+    - id: medium
+      type: u2be
+      if: (amount_tag == amount_tag::medium)
+    - id: biggish
+      type: s4be
+      if: (amount_tag == amount_tag::biggish)
+    - id: bigger
+      type: s8be
+      if: (amount_tag == amount_tag::bigger)
   args:
     seq:
     - id: args_entries
@@ -37,7 +37,7 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: args
@@ -53,7 +53,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposal
       size: 32
     - id: ballot
@@ -65,7 +65,7 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh1
@@ -78,7 +78,7 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh2
@@ -87,7 +87,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -100,7 +100,7 @@ types:
   circuits_info_0:
     seq:
     - id: len_circuits_info
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: circuits_info
@@ -117,7 +117,7 @@ types:
   commitment:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: messages
       type: messages_0
     - id: predecessor
@@ -129,11 +129,11 @@ types:
     - id: compressed_state
       size: 32
     - id: inbox_level
-      type: s4
+      type: s4be
     - id: predecessor
       size: 32
     - id: number_of_ticks
-      type: s8
+      type: s8be
   contents_entries:
     seq:
     - id: id_016__ptmumbai__operation__alpha__contents
@@ -152,15 +152,15 @@ types:
     - id: attestation
       type: z
     - id: level
-      type: s4
+      type: s4be
   dal_page_id:
     seq:
     - id: published_level
-      type: s4
+      type: s4be
     - id: slot_index
       type: u1
     - id: page_index
-      type: s2
+      type: s2be
   dal_publish_slot_header:
     seq:
     - id: source
@@ -215,7 +215,7 @@ types:
   dissection_0:
     seq:
     - id: len_dissection
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: dissection
@@ -263,11 +263,11 @@ types:
   endorsement:
     seq:
     - id: slot
-      type: u2
+      type: u2be
     - id: level
-      type: s4
+      type: s4be
     - id: round
-      type: s4
+      type: s4be
     - id: block_payload_hash
       size: 32
   id_016__ptmumbai__block_header__alpha__full_header:
@@ -287,7 +287,7 @@ types:
     - id: payload_hash
       size: 32
     - id: payload_round
-      type: s4
+      type: s4be
     - id: proof_of_work_nonce
       size: 8
     - id: seed_nonce_hash_tag
@@ -534,7 +534,7 @@ types:
   inbox__proof:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: message_counter
       type: n
     - id: serialized_proof
@@ -567,7 +567,7 @@ types:
   init_state_0:
     seq:
     - id: len_init_state
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: init_state
@@ -591,7 +591,7 @@ types:
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
@@ -614,7 +614,7 @@ types:
   message_1:
     seq:
     - id: len_message
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message
@@ -632,7 +632,7 @@ types:
   message_path_0:
     seq:
     - id: len_message_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message_path
@@ -650,7 +650,7 @@ types:
   message_result_path_0:
     seq:
     - id: len_message_result_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message_result_path
@@ -668,7 +668,7 @@ types:
   messages_0:
     seq:
     - id: len_messages
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: messages
@@ -755,7 +755,7 @@ types:
   new_state_0:
     seq:
     - id: len_new_state
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: new_state
@@ -777,7 +777,7 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op1
@@ -790,7 +790,7 @@ types:
   op1_2:
     seq:
     - id: len_op1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op1
@@ -803,7 +803,7 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op2
@@ -816,7 +816,7 @@ types:
   op2_2:
     seq:
     - id: len_op2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op2
@@ -825,7 +825,7 @@ types:
   op_0:
     seq:
     - id: len_op
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op
@@ -904,7 +904,7 @@ types:
   payload_0:
     seq:
     - id: len_payload
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: payload
@@ -922,7 +922,7 @@ types:
   pending_pis_0:
     seq:
     - id: len_pending_pis
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: pending_pis
@@ -954,11 +954,11 @@ types:
   preendorsement:
     seq:
     - id: slot
-      type: u2
+      type: u2be
     - id: level
-      type: s4
+      type: s4be
     - id: round
-      type: s4
+      type: s4be
     - id: block_payload_hash
       size: 32
   previous_message_result:
@@ -975,7 +975,7 @@ types:
   previous_message_result_path_0:
     seq:
     - id: len_previous_message_result_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: previous_message_result_path
@@ -1045,7 +1045,7 @@ types:
   private_pis_0:
     seq:
     - id: len_private_pis
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: private_pis
@@ -1081,7 +1081,7 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: u4
+      type: u4be
       valid:
         max: 640
     - id: proposals
@@ -1093,7 +1093,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposals
       type: proposals_0
   proposals_entries:
@@ -1141,7 +1141,7 @@ types:
   raw_data_0:
     seq:
     - id: len_raw_data
-      type: u2
+      type: u2be
       valid:
         max: 4096
     - id: raw_data
@@ -1203,7 +1203,7 @@ types:
   seed_nonce_revelation:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: nonce
       size: 32
   sequence:
@@ -1214,7 +1214,7 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: sequence
@@ -1246,7 +1246,7 @@ types:
   slot_header:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: index
       type: u1
     - id: commitment
@@ -1463,7 +1463,7 @@ types:
   tickets_info_0:
     seq:
     - id: len_tickets_info
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: tickets_info
@@ -1581,7 +1581,7 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: level
-      type: s4
+      type: s4be
     - id: context_hash
       size: 32
     - id: message_index
@@ -1640,7 +1640,7 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: level
-      type: s4
+      type: s4be
     - id: message
       type: message
     - id: message_position
@@ -1815,10 +1815,10 @@ types:
       type: update
 enums:
   amount_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
+    0: small
+    1: medium
+    2: biggish
+    3: bigger
   bool:
     0: false
     255: true

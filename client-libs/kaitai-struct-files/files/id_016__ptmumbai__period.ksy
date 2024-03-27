@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 016-PtMumbai.period'
 seq:
 - id: id_016__ptmumbai__period
-  type: s8
+  type: s8be

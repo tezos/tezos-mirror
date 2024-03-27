@@ -7,4 +7,4 @@ doc: ! >-
   Description: A version number for the context hash computation
 seq:
 - id: context_hash_version
-  type: u2
+  type: u2be

@@ -4,8 +4,8 @@ meta:
 doc: ! 'Encoding id: 015-PtLimaPt.vote.ballots'
 seq:
 - id: yay
-  type: s8
+  type: s8be
 - id: nay
-  type: s8
+  type: s8be
 - id: pass
-  type: s8
+  type: s8be

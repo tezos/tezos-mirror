@@ -14,7 +14,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: rolls
-      type: s4
+      type: s4be
   public_key_hash:
     seq:
     - id: public_key_hash_tag
@@ -36,7 +36,7 @@ enums:
     2: p256
 seq:
 - id: len_id_006__pscartha__vote__listings
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: id_006__pscartha__vote__listings

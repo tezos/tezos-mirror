@@ -13,7 +13,7 @@ types:
         contract hash, a base58 originated contract hash, a base58 originated transaction
         rollup, or a base58 originated smart rollup.
     - id: nonce
-      type: u2
+      type: u2be
     - id: alpha__apply_internal_results__alpha__operation_result_tag
       type: u1
       enum: alpha__apply_internal_results__alpha__operation_result_tag
@@ -78,7 +78,7 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: args
@@ -91,7 +91,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -283,7 +283,7 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: sequence

@@ -14,12 +14,12 @@ types:
   user_activated__upgrades_entries:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: replacement_protocol
       size: 32
 seq:
 - id: len_user_activated__upgrades
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: user_activated__upgrades

@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 009-PsFLoren.period'
 seq:
 - id: id_009__psfloren__period
-  type: s8
+  type: s8be

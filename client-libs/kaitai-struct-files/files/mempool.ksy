@@ -15,7 +15,7 @@ types:
   known_valid_0:
     seq:
     - id: len_known_valid
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: known_valid
@@ -33,7 +33,7 @@ types:
   pending_0:
     seq:
     - id: len_pending
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: pending
@@ -42,7 +42,7 @@ types:
   pending_1:
     seq:
     - id: len_pending
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: pending

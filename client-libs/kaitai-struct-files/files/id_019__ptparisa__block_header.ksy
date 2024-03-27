@@ -22,7 +22,7 @@ types:
     - id: payload_hash
       size: 32
     - id: payload_round
-      type: s4
+      type: s4be
     - id: proof_of_work_nonce
       size: 8
     - id: seed_nonce_hash_tag
@@ -43,15 +43,15 @@ enums:
     0: false
     255: true
   id_019__ptparisa__per_block_votes_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    4: case__4
-    5: case__5
-    6: case__6
-    8: case__8
-    9: case__9
-    10: case__10
+    0: case_0
+    1: case_1
+    2: case_2
+    4: case_4
+    5: case_5
+    6: case_6
+    8: case_8
+    9: case_9
+    10: case_10
 seq:
 - id: id_019__ptparisa__block_header__alpha__full_header
   type: id_019__ptparisa__block_header__alpha__full_header

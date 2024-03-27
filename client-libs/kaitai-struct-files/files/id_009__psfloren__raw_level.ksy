@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 009-PsFLoren.raw_level'
 seq:
 - id: id_009__psfloren__raw_level
-  type: s4
+  type: s4be

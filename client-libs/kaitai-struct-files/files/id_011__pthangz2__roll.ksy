@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 011-PtHangz2.roll'
 seq:
 - id: id_011__pthangz2__roll
-  type: s4
+  type: s4be

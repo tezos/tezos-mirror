@@ -11,7 +11,7 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: args
@@ -24,395 +24,60 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
       size: len_bytes_dyn_uint30
-  case__0:
+  case_0:
     seq:
-    - id: case__0_field0
-      type: u1
-    - id: case__0_field1
-      type: case__0_field1
-  case__0_0:
-    seq:
-    - id: case__0_field0
-      type: u1
-    - id: case__0_field1
-      type: case__0_field1_0
-  case__0_1:
-    seq:
-    - id: case__0_field0
-      type: s2
-    - id: case__0_field1
+    - id: case_0_field0
+      type: s2be
+    - id: case_0_field1
       size: 32
       doc: context_hash
-    - id: case__0_field2
+    - id: case_0_field2
       size: 32
       doc: context_hash
-    - id: case__0_field3
+    - id: case_0_field3
       type: tree_encoding
       doc: tree_encoding
-  case__0_field1:
+  case_1:
     seq:
-    - id: case__0_field1_field0
-      type: inode_tree
-    - id: case__0_field1_field1
-      type: inode_tree
-  case__0_field1_0:
-    seq:
-    - id: case__0_field1_field0
-      type: inode_tree
-      doc: inode_tree
-    - id: case__0_field1_field1
-      type: inode_tree
-  case__1:
-    seq:
-    - id: case__1_field0
-      type: u2
-    - id: case__1_field1
-      type: case__1_field1
-  case__129_elt_field0:
-    seq:
-    - id: case__129_elt_field0
-      size-eos: true
-  case__129_elt_field0_0:
-    seq:
-    - id: len_case__129_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__129_elt_field0
-      type: case__129_elt_field0
-      size: len_case__129_elt_field0
-  case__129_entries:
-    seq:
-    - id: case__129_elt_field0
-      type: case__129_elt_field0_0
-    - id: case__129_elt_field1
-      type: tree_encoding
-  case__130_elt_field0:
-    seq:
-    - id: case__130_elt_field0
-      size-eos: true
-  case__130_elt_field0_0:
-    seq:
-    - id: len_case__130_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__130_elt_field0
-      type: case__130_elt_field0
-      size: len_case__130_elt_field0
-  case__130_entries:
-    seq:
-    - id: case__130_elt_field0
-      type: case__130_elt_field0_0
-    - id: case__130_elt_field1
-      type: tree_encoding
-  case__131:
-    seq:
-    - id: case__131_entries
-      type: case__131_entries
-      repeat: eos
-  case__131_0:
-    seq:
-    - id: len_case__131
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__131
-      type: case__131
-      size: len_case__131
-  case__131_1:
-    seq:
-    - id: len_case__131
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__131
-      type: case__131
-      size: len_case__131
-  case__131_elt_field0:
-    seq:
-    - id: case__131_elt_field0
-      size-eos: true
-  case__131_elt_field0_0:
-    seq:
-    - id: len_case__131_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__131_elt_field0
-      type: case__131_elt_field0
-      size: len_case__131_elt_field0
-  case__131_entries:
-    seq:
-    - id: case__131_elt_field0
-      type: case__131_elt_field0_0
-    - id: case__131_elt_field1
-      type: tree_encoding
-  case__192:
-    seq:
-    - id: case__192
-      size-eos: true
-  case__192_0:
-    seq:
-    - id: len_case__192
-      type: u1
-      valid:
-        max: 255
-    - id: case__192
-      type: case__192
-      size: len_case__192
-  case__193:
-    seq:
-    - id: case__193
-      size-eos: true
-  case__193_0:
-    seq:
-    - id: len_case__193
-      type: u2
-      valid:
-        max: 65535
-    - id: case__193
-      type: case__193
-      size: len_case__193
-  case__1_0:
-    seq:
-    - id: case__1_field0
-      type: s2
-    - id: case__1_field1
+    - id: case_1_field0
+      type: s2be
+    - id: case_1_field1
       size: 32
       doc: context_hash
-    - id: case__1_field2
+    - id: case_1_field2
       size: 32
       doc: context_hash
-    - id: case__1_field3
+    - id: case_1_field3
       type: tree_encoding
-  case__1_field1:
+  case_2:
     seq:
-    - id: case__1_field1_field0
-      type: inode_tree
-    - id: case__1_field1_field1
-      type: inode_tree
-  case__2:
-    seq:
-    - id: case__2_field0
-      type: s4
-    - id: case__2_field1
-      type: case__2_field1
-  case__208:
-    seq:
-    - id: case__208_field0
-      type: u1
-    - id: case__208_field1
-      type: case__208_field1_0
-    - id: case__208_field2
-      type: inode_tree
-  case__208_field1:
-    seq:
-    - id: case__208_field1
-      size-eos: true
-  case__208_field1_0:
-    seq:
-    - id: len_case__208_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__208_field1
-      type: case__208_field1
-      size: len_case__208_field1
-  case__209:
-    seq:
-    - id: case__209_field0
-      type: u2
-    - id: case__209_field1
-      type: case__209_field1_0
-    - id: case__209_field2
-      type: inode_tree
-  case__209_field1:
-    seq:
-    - id: case__209_field1
-      size-eos: true
-  case__209_field1_0:
-    seq:
-    - id: len_case__209_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__209_field1
-      type: case__209_field1
-      size: len_case__209_field1
-  case__210:
-    seq:
-    - id: case__210_field0
-      type: s4
-    - id: case__210_field1
-      type: case__210_field1_0
-    - id: case__210_field2
-      type: inode_tree
-  case__210_field1:
-    seq:
-    - id: case__210_field1
-      size-eos: true
-  case__210_field1_0:
-    seq:
-    - id: len_case__210_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__210_field1
-      type: case__210_field1
-      size: len_case__210_field1
-  case__211:
-    seq:
-    - id: case__211_field0
-      type: s8
-    - id: case__211_field1
-      type: case__211_field1_0
-    - id: case__211_field2
-      type: inode_tree
-  case__211_field1:
-    seq:
-    - id: case__211_field1
-      size-eos: true
-  case__211_field1_0:
-    seq:
-    - id: len_case__211_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__211_field1
-      type: case__211_field1
-      size: len_case__211_field1
-  case__216:
-    seq:
-    - id: case__216_field0
-      type: u1
-    - id: case__216_field1
-      type: case__216_field1_0
-    - id: case__216_field2
-      type: inode_tree
-  case__216_field1:
-    seq:
-    - id: case__216_field1
-      size-eos: true
-  case__216_field1_0:
-    seq:
-    - id: len_case__216_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__216_field1
-      type: case__216_field1
-      size: len_case__216_field1
-  case__217:
-    seq:
-    - id: case__217_field0
-      type: u2
-    - id: case__217_field1
-      type: case__217_field1_0
-    - id: case__217_field2
-      type: inode_tree
-  case__217_field1:
-    seq:
-    - id: case__217_field1
-      size-eos: true
-  case__217_field1_0:
-    seq:
-    - id: len_case__217_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__217_field1
-      type: case__217_field1
-      size: len_case__217_field1
-  case__218:
-    seq:
-    - id: case__218_field0
-      type: s4
-    - id: case__218_field1
-      type: case__218_field1_0
-    - id: case__218_field2
-      type: inode_tree
-  case__218_field1:
-    seq:
-    - id: case__218_field1
-      size-eos: true
-  case__218_field1_0:
-    seq:
-    - id: len_case__218_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__218_field1
-      type: case__218_field1
-      size: len_case__218_field1
-  case__219:
-    seq:
-    - id: case__219_field0
-      type: s8
-    - id: case__219_field1
-      type: case__219_field1_0
-    - id: case__219_field2
-      type: inode_tree
-  case__219_field1:
-    seq:
-    - id: case__219_field1
-      size-eos: true
-  case__219_field1_0:
-    seq:
-    - id: len_case__219_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__219_field1
-      type: case__219_field1
-      size: len_case__219_field1
-  case__2_0:
-    seq:
-    - id: case__2_field0
-      type: s2
-    - id: case__2_field1
+    - id: case_2_field0
+      type: s2be
+    - id: case_2_field1
       size: 32
       doc: context_hash
-    - id: case__2_field2
+    - id: case_2_field2
       size: 32
       doc: context_hash
-    - id: case__2_field3
+    - id: case_2_field3
       type: tree_encoding
-  case__2_field1:
+  case_3:
     seq:
-    - id: case__2_field1_field0
-      type: inode_tree
-    - id: case__2_field1_field1
-      type: inode_tree
-  case__3:
-    seq:
-    - id: case__3_field0
-      type: s8
-    - id: case__3_field1
-      type: case__3_field1
-  case__3_0:
-    seq:
-    - id: case__3_field0
-      type: s2
-    - id: case__3_field1
+    - id: case_3_field0
+      type: s2be
+    - id: case_3_field1
       size: 32
       doc: context_hash
-    - id: case__3_field2
+    - id: case_3_field2
       size: 32
       doc: context_hash
-    - id: case__3_field3
+    - id: case_3_field3
       type: tree_encoding
-  case__3_field1:
-    seq:
-    - id: case__3_field1_field0
-      type: inode_tree
-    - id: case__3_field1_field1
-      type: inode_tree
   id_017__ptnairob__contract_id__originated:
     seq:
     - id: id_017__ptnairob__contract_id__originated_tag
@@ -426,47 +91,114 @@ types:
     - id: id_017__ptnairob__michelson__v1__primitives
       type: u1
       enum: id_017__ptnairob__michelson__v1__primitives
+  inode:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1
+  inode_0:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_0
+  inode_1:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_0
+  inode_2:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_0
+  inode_field1:
+    seq:
+    - id: inode_field1_field0
+      type: inode_tree_3
+      doc: inode_tree
+    - id: inode_field1_field1
+      type: inode_tree
+  inode_field1_0:
+    seq:
+    - id: inode_field1_field0
+      type: inode_tree
+    - id: inode_field1_field1
+      type: inode_tree
   inode_tree:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1
+  inode_tree_0:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1
+  inode_tree_1:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1
+  inode_tree_2:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1
+  inode_tree_3:
     seq:
     - id: inode_tree_tag
       type: u1
       enum: inode_tree_tag
-    - id: case__0
-      type: case__0
-      if: (inode_tree_tag == inode_tree_tag::case__0)
-    - id: case__1
-      type: case__1
-      if: (inode_tree_tag == inode_tree_tag::case__1)
-    - id: case__2
-      type: case__2
-      if: (inode_tree_tag == inode_tree_tag::case__2)
-    - id: case__3
-      type: case__3
-      if: (inode_tree_tag == inode_tree_tag::case__3)
-    - id: case__129
-      type: case__129_entries
-      if: (inode_tree_tag == inode_tree_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (inode_tree_tag == inode_tree_tag::case__130)
-    - id: case__131
-      type: case__131_0
-      if: (inode_tree_tag == inode_tree_tag::case__131)
-    - id: case__192
+    - id: inode_tree
+      type: inode_tree
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_0
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_1
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_2
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_0
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
       size: 32
-      if: (inode_tree_tag == inode_tree_tag::case__192)
-    - id: case__208
-      type: case__208
-      if: (inode_tree_tag == inode_tree_tag::case__208)
-    - id: case__209
-      type: case__209
-      if: (inode_tree_tag == inode_tree_tag::case__209)
-    - id: case__210
-      type: case__210
-      if: (inode_tree_tag == inode_tree_tag::case__210)
-    - id: case__211
-      type: case__211
-      if: (inode_tree_tag == inode_tree_tag::case__211)
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_1
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_2
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_3
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_4
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+  inode_tree_field1:
+    seq:
+    - id: inode_tree_field1_field0
+      type: inode_tree
+    - id: inode_tree_field1_field1
+      type: inode_tree
   message:
     seq:
     - id: message_tag
@@ -535,27 +267,205 @@ types:
     - id: originated_padding
       size: 1
       doc: This field is for padding, ignore
+  other_inode_trees:
+    seq:
+    - id: other_inode_trees_entries
+      type: other_inode_trees_entries
+      repeat: eos
+  other_inode_trees_0:
+    seq:
+    - id: len_other_inode_trees
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: other_inode_trees
+      type: other_inode_trees
+      size: len_other_inode_trees
+  other_inode_trees_1:
+    seq:
+    - id: other_inode_trees_field0
+      type: u1
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_2:
+    seq:
+    - id: other_inode_trees_field0
+      type: u2be
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_3:
+    seq:
+    - id: other_inode_trees_field0
+      type: s4be
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_4:
+    seq:
+    - id: other_inode_trees_field0
+      type: s8be
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_elt_field0:
+    seq:
+    - id: other_inode_trees_elt_field0
+      size-eos: true
+  other_inode_trees_elt_field0_0:
+    seq:
+    - id: len_other_inode_trees_elt_field0
+      type: u1
+      valid:
+        max: 255
+    - id: other_inode_trees_elt_field0
+      type: other_inode_trees_elt_field0
+      size: len_other_inode_trees_elt_field0
+  other_inode_trees_entries:
+    seq:
+    - id: other_inode_trees_elt_field0
+      type: other_inode_trees_elt_field0_0
+    - id: other_inode_trees_elt_field1
+      type: tree_encoding
+  other_inode_trees_field1:
+    seq:
+    - id: other_inode_trees_field1
+      size-eos: true
+  other_inode_trees_field1_0:
+    seq:
+    - id: len_other_inode_trees_field1
+      type: u1
+      valid:
+        max: 255
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1
+      size: len_other_inode_trees_field1
+  other_trees:
+    seq:
+    - id: other_trees_entries
+      type: other_trees_entries
+      repeat: eos
+  other_trees_0:
+    seq:
+    - id: len_other_trees
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: other_trees
+      type: other_trees
+      size: len_other_trees
+  other_trees_1:
+    seq:
+    - id: other_trees
+      size-eos: true
+  other_trees_2:
+    seq:
+    - id: len_other_trees
+      type: u1
+      valid:
+        max: 255
+    - id: other_trees
+      type: other_trees_1
+      size: len_other_trees
+  other_trees_3:
+    seq:
+    - id: len_other_trees
+      type: u2be
+      valid:
+        max: 65535
+    - id: other_trees
+      type: other_trees_1
+      size: len_other_trees
+  other_trees_4:
+    seq:
+    - id: other_trees_field0
+      type: u1
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_5:
+    seq:
+    - id: other_trees_field0
+      type: u2be
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_6:
+    seq:
+    - id: other_trees_field0
+      type: s4be
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_7:
+    seq:
+    - id: other_trees_field0
+      type: s8be
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_elt_field0:
+    seq:
+    - id: other_trees_elt_field0
+      size-eos: true
+  other_trees_elt_field0_0:
+    seq:
+    - id: len_other_trees_elt_field0
+      type: u1
+      valid:
+        max: 255
+    - id: other_trees_elt_field0
+      type: other_trees_elt_field0
+      size: len_other_trees_elt_field0
+  other_trees_entries:
+    seq:
+    - id: other_trees_elt_field0
+      type: other_trees_elt_field0_0
+    - id: other_trees_elt_field1
+      type: tree_encoding
+  other_trees_field1:
+    seq:
+    - id: other_trees_field1
+      size-eos: true
+  other_trees_field1_0:
+    seq:
+    - id: len_other_trees_field1
+      type: u1
+      valid:
+        max: 255
+    - id: other_trees_field1
+      type: other_trees_field1
+      size: len_other_trees_field1
   output_proof:
     seq:
     - id: output_proof_tag
       type: u1
       enum: output_proof_tag
-    - id: case__0
-      type: case__0_1
-      if: (output_proof_tag == output_proof_tag::case__0)
-    - id: case__2
-      type: case__2_0
-      if: (output_proof_tag == output_proof_tag::case__2)
-    - id: case__1
-      type: case__1_0
-      if: (output_proof_tag == output_proof_tag::case__1)
-    - id: case__3
-      type: case__3_0
-      if: (output_proof_tag == output_proof_tag::case__3)
+    - id: case_0
+      type: case_0
+      if: (output_proof_tag == output_proof_tag::case_0)
+    - id: case_2
+      type: case_2
+      if: (output_proof_tag == output_proof_tag::case_2)
+    - id: case_1
+      type: case_1
+      if: (output_proof_tag == output_proof_tag::case_1)
+    - id: case_3
+      type: case_3
+      if: (output_proof_tag == output_proof_tag::case_3)
   output_proof_output:
     seq:
     - id: outbox_level
-      type: s4
+      type: s4be
     - id: message_index
       type: n
     - id: message
@@ -614,7 +524,7 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: sequence
@@ -632,7 +542,7 @@ types:
   transactions_0:
     seq:
     - id: len_transactions
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: transactions
@@ -646,7 +556,7 @@ types:
   transactions_2:
     seq:
     - id: len_transactions
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: transactions
@@ -681,54 +591,54 @@ types:
     - id: tree_encoding_tag
       type: u1
       enum: tree_encoding_tag
-    - id: case__0
-      type: case__0_0
-      if: (tree_encoding_tag == tree_encoding_tag::case__0)
-    - id: case__1
-      type: case__1
-      if: (tree_encoding_tag == tree_encoding_tag::case__1)
-    - id: case__2
-      type: case__2
-      if: (tree_encoding_tag == tree_encoding_tag::case__2)
-    - id: case__3
-      type: case__3
-      if: (tree_encoding_tag == tree_encoding_tag::case__3)
-    - id: case__129
-      type: case__129_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__130)
-    - id: case__131
-      type: case__131_1
-      if: (tree_encoding_tag == tree_encoding_tag::case__131)
-    - id: case__192
-      type: case__192_0
-      if: (tree_encoding_tag == tree_encoding_tag::case__192)
-    - id: case__193
-      type: case__193_0
-      if: (tree_encoding_tag == tree_encoding_tag::case__193)
-    - id: case__195
+    - id: inode
+      type: inode
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_0
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_1
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_2
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_0
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_2
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_3
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
       type: bytes_dyn_uint30
-      if: (tree_encoding_tag == tree_encoding_tag::case__195)
-    - id: case__200
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
       size: 32
-      if: (tree_encoding_tag == tree_encoding_tag::case__200)
-    - id: case__208
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
       size: 32
-      if: (tree_encoding_tag == tree_encoding_tag::case__208)
-    - id: case__216
-      type: case__216
-      if: (tree_encoding_tag == tree_encoding_tag::case__216)
-    - id: case__217
-      type: case__217
-      if: (tree_encoding_tag == tree_encoding_tag::case__217)
-    - id: case__218
-      type: case__218
-      if: (tree_encoding_tag == tree_encoding_tag::case__218)
-    - id: case__219
-      type: case__219
-      if: (tree_encoding_tag == tree_encoding_tag::case__219)
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_4
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_5
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_6
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_7
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
   z:
     seq:
     - id: has_tail
@@ -1140,20 +1050,20 @@ enums:
       id: nat_0
       doc: NAT
   inode_tree_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    192: case__192
-    208: case__208
-    209: case__209
-    210: case__210
-    211: case__211
-    224: case__224
+    0: inode_tree
+    1: inode_tree
+    2: inode_tree
+    3: inode_tree
+    128: other_inode_trees
+    129: other_inode_trees
+    130: other_inode_trees
+    131: other_inode_trees
+    192: other_inode_trees
+    208: other_inode_trees
+    209: other_inode_trees
+    210: other_inode_trees
+    211: other_inode_trees
+    224: other_inode_trees
   message_tag:
     0: atomic_transaction_batch
     1: atomic_transaction_batch_typed
@@ -1184,29 +1094,29 @@ enums:
       doc: Generic primitive (any number of args with or without annotations)
     10: bytes
   output_proof_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
+    0: case_0
+    1: case_1
+    2: case_2
+    3: case_3
   tree_encoding_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    192: case__192
-    193: case__193
-    195: case__195
-    200: case__200
-    208: case__208
-    216: case__216
-    217: case__217
-    218: case__218
-    219: case__219
-    224: case__224
+    0: inode
+    1: inode
+    2: inode
+    3: inode
+    128: other_trees
+    129: other_trees
+    130: other_trees
+    131: other_trees
+    192: other_trees
+    193: other_trees
+    195: other_trees
+    200: other_trees
+    208: other_trees
+    216: other_trees
+    217: other_trees
+    218: other_trees
+    219: other_trees
+    224: other_trees
 seq:
 - id: output_proof
   type: output_proof
