@@ -63,6 +63,15 @@ module Events = struct
       ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
       ("block", Block_header.encoding)
 
+  let preapply_request =
+    declare_1
+      ~section
+      ~level:Info
+      ~name:"preapply_request"
+      ~msg:"preapplying on top of block {hash}"
+      ~pp1:Block_hash.pp
+      ("hash", Block_hash.encoding)
+
   let precheck_request =
     declare_1
       ~section
@@ -113,6 +122,14 @@ module Events = struct
       ~level:Info
       ~name:"context_split_request"
       ~msg:"spliting context"
+      ()
+
+  let reconfigure_event_logging_request =
+    declare_0
+      ~section
+      ~level:Info
+      ~name:"reconfigure_event_logging_request"
+      ~msg:"reconfiguring event logging"
       ()
 
   let termination_request =
@@ -348,6 +365,7 @@ let handle_request :
         predecessor_resulting_context_hash;
         operations;
       } ->
+      let*! () = Events.(emit preapply_request predecessor_hash) in
       let*! block_preapplication_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->
@@ -493,6 +511,7 @@ let handle_request :
       let*! () = Events.(emit termination_request ()) in
       Lwt.return `Stop
   | External_validation.Reconfigure_event_logging config ->
+      let*! () = Events.(emit reconfigure_event_logging_request ()) in
       let*! res =
         Tezos_base_unix.Internal_event_unix.Configuration.reapply config
       in
