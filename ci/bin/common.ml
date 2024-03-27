@@ -406,6 +406,15 @@ let changeset_script_b58_prefix =
     ".gitlab-ci.yml";
   ]
 
+let changeset_test_liquidity_baking_scripts =
+  [
+    "src/**/*";
+    "scripts/ci/test_liquidity_baking_scripts.sh";
+    "scripts/check-liquidity-baking-scripts.sh";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.

@@ -49,7 +49,7 @@ include:
   - .gitlab/ci/jobs/test/oc.script:test-gen-genesis-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.script:b58_prefix-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
+  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/tezt.yml
   - .gitlab/ci/jobs/test/test_kernels.yml
   - .gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml
