@@ -238,6 +238,16 @@ macro_rules! fs_instr {
     };
 }
 
+macro_rules! f_cmp_instr {
+    ($enum_variant:ident, $instr:expr, $rs2_bits:expr) => {
+        $enum_variant(instruction::FCmpArgs {
+            rd: rd($instr),
+            rs1: rs1_f($instr),
+            rs2: parse_fregister($rs2_bits),
+        })
+    };
+}
+
 macro_rules! fence_instr {
     ($enum_variant:ident, $instr:expr) => {
         $enum_variant(instruction::FenceArgs {
@@ -309,6 +319,7 @@ const F3_5: u32 = 0b101;
 const F3_6: u32 = 0b110;
 const F3_7: u32 = 0b111;
 
+const F5_CMP: u32 = 0b1_0100;
 const F5_28: u32 = 0b1_1100;
 const F5_30: u32 = 0b1_1110;
 
@@ -328,6 +339,9 @@ const WIDTH_D: u32 = 0b011;
 
 const RM_0: u32 = 0b0;
 const RM_1: u32 = 0b1;
+const RM_EQ: u32 = 0b10;
+const RM_LT: u32 = RM_1;
+const RM_LE: u32 = RM_0;
 
 const RS1_0: u32 = 0b0;
 const RS2_0: u32 = 0b0;
@@ -538,6 +552,9 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         // F/D-type instructions
         OP_FP => match fmt(instr) {
             FMT_S => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_CMP, RM_EQ, rs2_bits) => f_cmp_instr!(Feqs, instr, rs2_bits),
+                (F5_CMP, RM_LE, rs2_bits) => f_cmp_instr!(Fles, instr, rs2_bits),
+                (F5_CMP, RM_LT, rs2_bits) => f_cmp_instr!(Flts, instr, rs2_bits),
                 (F5_28, RM_0, RS2_0) => FmvXW(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),
@@ -553,6 +570,9 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 _ => Unknown { instr },
             },
             FMT_D => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_CMP, RM_EQ, rs2_bits) => f_cmp_instr!(Feqd, instr, rs2_bits),
+                (F5_CMP, RM_LE, rs2_bits) => f_cmp_instr!(Fled, instr, rs2_bits),
+                (F5_CMP, RM_LT, rs2_bits) => f_cmp_instr!(Fltd, instr, rs2_bits),
                 (F5_28, RM_0, RS2_0) => FmvXD(FRegToXRegArgs {
                     rd: rd(instr),
                     rs1: rs1_f(instr),

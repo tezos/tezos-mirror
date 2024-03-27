@@ -44,6 +44,27 @@ where
         self.run_fclass::<Double>(rs1, rd);
     }
 
+    /// `FEQ.D` R-type instruction.
+    ///
+    /// See [Self::run_feq].
+    pub fn run_feq_d(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+        self.run_feq::<Double>(rs1, rs2, rd);
+    }
+
+    /// `FLE.D` R-type instruction.
+    ///
+    /// See [Self::run_fle].
+    pub fn run_fle_d(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+        self.run_fle::<Double>(rs1, rs2, rd);
+    }
+
+    /// `FLT.D` R-type instruction.
+    ///
+    /// See [Self::run_flt].
+    pub fn run_flt_d(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+        self.run_flt::<Double>(rs1, rs2, rd);
+    }
+
     /// `FMV.D.X` D-type instruction
     ///
     /// Moves the single-precision value encoded in IEEE 754-2008 standard
