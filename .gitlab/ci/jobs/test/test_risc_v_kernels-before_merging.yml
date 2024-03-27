@@ -6,7 +6,6 @@ test_risc_v_kernels:
         # Run if the `rust-toolchain` image is updated
         - images/**/*
         - src/kernel_sdk/**/*
-        - src/risc_v/Makefile
         - src/risc_v/**/*
         - .gitlab/**/*
         - .gitlab-ci.yml
