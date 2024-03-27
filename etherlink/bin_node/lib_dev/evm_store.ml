@@ -152,7 +152,7 @@ module Q = struct
         - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
         - Increment [version]
     *)
-    let version = 5
+    let version = 6
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -224,11 +224,12 @@ module Q = struct
 
   module L1_latest_level = struct
     let insert =
-      (l1_level ->. unit)
-      @@ {eos|REPLACE INTO l1_latest_level (level) VALUES (?)|eos}
+      (t2 level l1_level ->. unit)
+      @@ {|INSERT INTO l1_latest_level_with_l2_level (l2_level, l1_level) VALUES (?, ?)|}
 
     let get =
-      (unit ->! l1_level) @@ {eos|SELECT (level) FROM l1_latest_level|eos}
+      (unit ->! t2 level l1_level)
+      @@ {|SELECT l2_level, l1_level  FROM l1_latest_level_with_l2_level ORDER BY l2_level DESC LIMIT 1|}
   end
 end
 
@@ -406,9 +407,9 @@ module Delayed_transactions = struct
 end
 
 module L1_latest_known_level = struct
-  let store store level =
+  let store store l1_level l2_level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.L1_latest_level.insert level
+    Db.exec conn Q.L1_latest_level.insert (l1_level, l2_level)
 
   let find store =
     with_connection store @@ fun conn ->

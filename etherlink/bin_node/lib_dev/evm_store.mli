@@ -80,7 +80,7 @@ module Delayed_transactions : sig
 end
 
 module L1_latest_known_level : sig
-  val store : t -> int32 -> unit tzresult Lwt.t
+  val store : t -> Ethereum_types.quantity -> int32 -> unit tzresult Lwt.t
 
-  val find : t -> int32 option tzresult Lwt.t
+  val find : t -> (Ethereum_types.quantity * int32) option tzresult Lwt.t
 end
