@@ -79,6 +79,17 @@ module Event = struct
       ~level:Error
       ("level", Data_encoding.n)
       ("expected_hash", Ethereum_types.block_hash_encoding)
+
+  let out_of_sync =
+    declare_2
+      ~section
+      ~name:"evm_events_follower_out_of_sync"
+      ~msg:
+        "Evm node sequencer received finalized level {received} but was \
+         expected {expected}"
+      ~level:Error
+      ("received", Data_encoding.int32)
+      ("expected", Data_encoding.int32)
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -97,3 +108,6 @@ let upstream_blueprint_applied level_hash =
 
 let missing_block divergence =
   Internal_event.Simple.emit Event.missing_block divergence
+
+let out_of_sync ~received ~expected =
+  Internal_event.Simple.emit Event.out_of_sync (received, expected)
