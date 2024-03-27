@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::blueprint_storage::MAXIMUM_NUMBER_OF_CHUNKS;
 use crate::configuration::TezosContracts;
 use crate::delayed_inbox::DelayedInbox;
 use crate::tick_model::constants::{
@@ -294,6 +295,9 @@ impl SequencerInput {
 
         // Creates and encodes the unsigned blueprint:
         let unsigned_seq_blueprint: UnsignedSequencerBlueprint = (&seq_blueprint).into();
+        if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
+            return InputResult::Unparsable;
+        }
         let bytes = unsigned_seq_blueprint.rlp_bytes().to_vec();
         // The sequencer signs the hash of the blueprint.
         let msg = tezos_crypto_rs::blake2b::digest_256(&bytes).unwrap();
