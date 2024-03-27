@@ -1079,6 +1079,9 @@ module Chain = struct
     Shared.use chain_store.chain_state (fun {live_blocks; live_operations; _} ->
         Lwt.return (live_blocks, live_operations))
 
+  (* Computes the set of live blocks/operations for a given
+     block. [update_cache] updates the chain_state's cache, typically
+     on new heads. *)
   let locked_compute_live_blocks_with_cache ~update_cache chain_store
       chain_state block metadata =
     let open Lwt_syntax in
@@ -1094,6 +1097,13 @@ module Chain = struct
                 (Block.predecessor block)
                 (Block.hash current_head)
            && Ringo.Ring.capacity live_data_cache = expected_capacity -> (
+        (* The block candidate is on top of the current head. It
+           corresponds to a new promoted head. We need to move the
+           live data window one stop forward, including that new head
+           and discarding the oldest block of the previous
+           state. Checking the [expected_capacity] allows to force
+           recomputing the livedata as soon as a max_op_ttl changes
+           between blocks. *)
         let most_recent_block = Block.hash block in
         let most_recent_ops =
           Block.all_operation_hashes block
@@ -1120,6 +1130,9 @@ module Chain = struct
             in
             Lwt.return (diffed_new_live_blocks, diffed_new_live_operations))
     | _ when update_cache ->
+        (* The block candidate is not on top of the current head. It is
+           likely to be an alternate head. We recompute the whole live
+           data. We may keep this new state in the cache. *)
         let new_cache = Ringo.Ring.create expected_capacity in
         let* () =
           Chain_traversal.live_blocks_with_ring
@@ -1137,12 +1150,18 @@ module Chain = struct
               (Block_hash.Set.add bh bhs, Operation_hash.Set.union ops opss))
         in
         Lwt.return (live_blocks, live_ops)
-    | _ -> Chain_traversal.live_blocks chain_store block expected_capacity
+    | _ ->
+        (* The block candidate is not on top of the current head. It
+           is likely to be an alternate head. We recompute the whole
+           live data. *)
+        Chain_traversal.live_blocks chain_store block expected_capacity
 
   let locked_compute_live_blocks ?(force = false) ?(update_cache = true)
       chain_store chain_state block metadata =
     let {current_head; live_blocks; live_operations; _} = chain_state in
     if Block.equal current_head block && not force then
+      (* Computing live blocks/operations of the current head. The
+         cache is valid and returned as is. *)
       Lwt.return (live_blocks, live_operations)
     else
       locked_compute_live_blocks_with_cache
