@@ -150,6 +150,8 @@ let begin_test ?(burn_rewards = false) ?(force_attest_all = false)
                 ~liquid
                 ~frozen_deposits
                 ~frozen_rights
+                ~last_active_cycle:
+                  Cycle.(add root constants.consensus_rights_delay)
                 ()
             in
             let account_map = String.Map.add name account account_map in
