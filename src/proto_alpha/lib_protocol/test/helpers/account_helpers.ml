@@ -50,6 +50,7 @@ type account_state = {
           is unmodified if at that time, the account is not a delegate
           or is a deactivated delegate. *)
   slashed_cycles : Cycle.t list;
+  last_active_cycle : Cycle.t;
 }
 
 let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
@@ -58,7 +59,7 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
     ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
-    ?(slashed_cycles = []) () =
+    ?(slashed_cycles = []) ?(last_active_cycle = Cycle.root) () =
   {
     pkh;
     contract;
@@ -73,6 +74,7 @@ let init_account ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     staking_delegate_denominator;
     frozen_rights;
     slashed_cycles;
+    last_active_cycle;
   }
 
 type account_map = account_state String.Map.t
@@ -117,6 +119,7 @@ let balance_of_account account_name (account_map : account_map) =
         staking_delegate_denominator;
         frozen_rights = _;
         slashed_cycles = _;
+        last_active_cycle = _;
       } ->
       let balance =
         {
