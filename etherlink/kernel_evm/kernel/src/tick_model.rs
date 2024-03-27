@@ -51,7 +51,7 @@ pub mod constants {
     pub const BASE_GAS: u64 = crate::CONFIG.gas_transaction_call;
 
     /// Overapproximation of the number of ticks used in kernel initialization
-    pub const KERNEL_INITIALIZATION: u64 = 50_000_000;
+    pub const KERNEL_INITIALIZATION: u64 = 70_000_000;
 
     /// Overapproximation of the number of ticks the kernel uses to initialise and
     /// reload its state.
