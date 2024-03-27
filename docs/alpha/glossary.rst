@@ -118,7 +118,7 @@ _`Account`
     In the context_, each account is associated with a balance (an amount of
     tez available).
 
-    An account can be either an `user account`_ or a `smart contract`_.
+    An account can be either a `user account`_ or a `smart contract`_.
 
 _`Baker`
     When a delegate_ creates a new block_, it is called the baker of this block.

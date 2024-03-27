@@ -2461,8 +2461,8 @@ Syntax of other contracts specifications
 
 The behaviour of the `CONTRACT
 <https://tezos.gitlab.io/michelson-reference/#instr-CONTRACT>`__
-instruction depends on whether or not its input is the address of an
-originated contract accepting the expected type as parameter. To test
+instruction depends on whether or not its input is the address of a
+smart contract accepting the expected type as parameter. To test
 it, the ``other_contract`` toplevel primitive can be used to specify
 which contracts are assumed to be originated and which type they
 accept as parameter.
