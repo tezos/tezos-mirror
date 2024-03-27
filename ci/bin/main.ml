@@ -193,7 +193,6 @@ let () =
     | ".gitlab/ci/jobs/packaging/debian_repository.yml"
     | ".gitlab/ci/jobs/shared/images.yml"
     | ".gitlab/ci/jobs/shared/templates.yml" | ".gitlab/ci/jobs/test/common.yml"
-    | ".gitlab/ci/jobs/test/test_evm_compatibility.yml"
     | ".gitlab/ci/pipelines/before_merging.yml"
     | ".gitlab/ci/pipelines/schedule_extended_test.yml" ->
         true

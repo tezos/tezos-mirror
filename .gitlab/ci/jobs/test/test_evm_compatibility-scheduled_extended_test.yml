@@ -1,0 +1,27 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+test_evm_compatibility:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
+  cache:
+    key: kernels
+    paths:
+    - cargo/
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
+  - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
+  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/
+    -c
+  variables:
+    CC: clang
+    CARGO_HOME: $CI_PROJECT_DIR/cargo
+    NATIVE_TARGET: x86_64-unknown-linux-musl

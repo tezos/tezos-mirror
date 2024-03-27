@@ -1481,7 +1481,27 @@ let jobs pipeline_type =
           ]
         |> job_external_split
       in
-      [job_test_kernels; job_test_etherlink_kernel; job_test_risc_v_kernels]
+      let job_test_evm_compatibility : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_evm_compatibility"
+          ~changes:changeset_test_evm_compatibility
+          [
+            "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
+             evm-evaluation-assessor";
+            "git clone --depth 1 --branch v13 \
+             https://github.com/ethereum/tests ethereum_tests";
+            "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ \
+             --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c";
+          ]
+        |> job_external_split
+      in
+      [
+        job_test_kernels;
+        job_test_etherlink_kernel;
+        job_test_risc_v_kernels;
+        job_test_evm_compatibility;
+      ]
     in
     [
       job_kaitai_checks;

@@ -490,6 +490,17 @@ let changeset_test_risc_v_kernels =
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
     @ make ["src/kernel_sdk/**/*"; "src/risc_v/**/*"])
 
+let changeset_test_evm_compatibility =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make
+        [
+          "etherlink.mk";
+          "etherlink/kernel_evm/evm_execution/**/*";
+          "etherlink/kernel_evm/evm_evaluation/**/*";
+        ])
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.
