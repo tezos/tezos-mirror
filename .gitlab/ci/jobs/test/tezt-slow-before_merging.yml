@@ -50,9 +50,7 @@ tezt-slow:
       /cloud && not (file = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "3"
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
-    name: coverage-files-$CI_JOB_ID
     expire_in: 7 days
     paths:
     - selected_tezts.tsv
@@ -60,7 +58,6 @@ tezt-slow:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
     reports:
       junit: $JUNIT
     when: always

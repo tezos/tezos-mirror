@@ -1332,7 +1332,7 @@ let jobs pipeline_type =
         ~parallel:(Vector 10)
         ~dependencies:tezt_dependencies
         ()
-      |> enable_coverage_output_artifact |> job_external_split
+      |> job_external_split
     in
     [
       job_kaitai_checks;
