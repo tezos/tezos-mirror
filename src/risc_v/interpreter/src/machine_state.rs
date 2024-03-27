@@ -316,6 +316,9 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Fmaxs(args) => run_f_r_instr!(self, instr, args, run_fmax_s),
             Instr::Flw(args) => run_load_instr!(self, instr, args, run_flw),
             Instr::Fsw(args) => run_store_instr!(self, instr, args, run_fsw),
+            Instr::Fsgnjs(args) => run_f_r_instr!(self, instr, args, run_fsgnj_s),
+            Instr::Fsgnjns(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_s),
+            Instr::Fsgnjxs(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_s),
             Instr::FmvXW(args) => run_f_x_instr!(self, instr, args, run_fmv_x_w),
             Instr::FmvWX(args) => run_f_x_instr!(self, instr, args, run_fmv_w_x),
 
@@ -328,6 +331,9 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Fmaxd(args) => run_f_r_instr!(self, instr, args, run_fmax_d),
             Instr::Fld(args) => run_load_instr!(self, instr, args, run_fld),
             Instr::Fsd(args) => run_store_instr!(self, instr, args, run_fsd),
+            Instr::Fsgnjd(args) => run_f_r_instr!(self, instr, args, run_fsgnj_d),
+            Instr::Fsgnjnd(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_d),
+            Instr::Fsgnjxd(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_d),
             Instr::FmvXD(args) => run_f_x_instr!(self, instr, args, run_fmv_x_d),
             Instr::FmvDX(args) => run_f_x_instr!(self, instr, args, run_fmv_d_x),
 

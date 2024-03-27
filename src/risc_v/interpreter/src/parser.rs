@@ -370,7 +370,8 @@ const WIDTH_D: u32 = 0b011;
 
 const RM_0: u32 = 0b0;
 const RM_1: u32 = 0b1;
-const RM_EQ: u32 = 0b10;
+const RM_2: u32 = 0b10;
+const RM_EQ: u32 = RM_2;
 const RM_LT: u32 = RM_1;
 const RM_LE: u32 = RM_0;
 const RM_MIN: u32 = RM_0;
@@ -600,6 +601,9 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         // F/D-type instructions
         OP_FP => match fmt(instr) {
             FMT_S => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_4, RM_0, rs2_bits) => f_r_instr!(Fsgnjs, instr, rs2_bits),
+                (F5_4, RM_1, rs2_bits) => f_r_instr!(Fsgnjns, instr, rs2_bits),
+                (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxs, instr, rs2_bits),
                 (F5_5, RM_MIN, rs2_bits) => f_r_instr!(Fmins, instr, rs2_bits),
                 (F5_5, RM_MAX, rs2_bits) => f_r_instr!(Fmaxs, instr, rs2_bits),
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqs, instr, rs2_bits),
@@ -620,6 +624,9 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 _ => Unknown { instr },
             },
             FMT_D => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_4, RM_0, rs2_bits) => f_r_instr!(Fsgnjd, instr, rs2_bits),
+                (F5_4, RM_1, rs2_bits) => f_r_instr!(Fsgnjnd, instr, rs2_bits),
+                (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxd, instr, rs2_bits),
                 (F5_5, RM_MIN, rs2_bits) => f_r_instr!(Fmind, instr, rs2_bits),
                 (F5_5, RM_MAX, rs2_bits) => f_r_instr!(Fmaxd, instr, rs2_bits),
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqd, instr, rs2_bits),
