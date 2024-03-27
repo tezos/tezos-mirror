@@ -351,6 +351,13 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
     oc_unit_protocol_compiles;
   ]
 
+type install_octez_distribution = Ubuntu_focal | Ubuntu_jammy | Fedora_37
+
+let image_of_distribution = function
+  | Ubuntu_focal -> Images.ubuntu_focal
+  | Ubuntu_jammy -> Images.ubuntu_jammy
+  | Fedora_37 -> Images.fedora_37
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -999,6 +1006,119 @@ let jobs pipeline_type =
         ["./scripts/ci/test_liquidity_baking_scripts.sh"]
       |> job_external_split
     in
+    (* The set of installation test jobs *)
+    let jobs_install_octez : tezos_job list =
+      let changeset_install_jobs =
+        ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
+      in
+      let install_octez_rules =
+        make_rules ~changes:changeset_install_jobs ~manual:true ()
+      in
+      let job_install_bin ~__POS__ ~name ?allow_failure ?(rc = false)
+          distribution =
+        let distribution_string =
+          match distribution with
+          | Ubuntu_focal | Ubuntu_jammy -> "ubuntu"
+          | Fedora_37 -> "fedora"
+        in
+        let script =
+          sf "./docs/introduction/install-bin-%s.sh" distribution_string
+          ^ if rc then " rc" else ""
+        in
+        job
+          ?allow_failure
+          ~__POS__
+          ~name
+          ~image:(image_of_distribution distribution)
+          ~dependencies:dependencies_needs_trigger
+          ~rules:install_octez_rules
+          ~stage:Stages.test
+          [script]
+      in
+      let job_install_opam_focal : tezos_job =
+        job
+          ~__POS__
+          ~name:"oc.install_opam_focal"
+          ~image:Images.opam_ubuntu_focal
+          ~dependencies:dependencies_needs_trigger
+          ~rules:(make_rules ~manual:true ())
+          ~allow_failure:Yes
+          ~stage:Stages.test
+            (* The default behavior of opam is to use `nproc` to determine its level of
+               parallelism. This returns the number of CPU of the "host" CI runner
+               instead of the number of cores a single CI job can reasonably use. *)
+          ~variables:[("OPAMJOBS", "4")]
+          ["./docs/introduction/install-opam.sh"]
+      in
+      let job_compile_sources ~__POS__ ~name ~image ~project ~branch =
+        job
+          ~__POS__
+          ~name
+          ~image
+          ~dependencies:dependencies_needs_trigger
+          ~rules:install_octez_rules
+          ~stage:Stages.test
+          [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
+      in
+      [
+        (* Test installing binary / binary RC distributions in all distributions *)
+        job_install_bin ~__POS__ ~name:"oc.install_bin_fedora_37" Fedora_37;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_rc_fedora_37"
+          ~rc:true
+          Fedora_37;
+        (* The Ubuntu jobs currently fail because the last rc packages can't be installed anymore.
+           See https://gitlab.com/tezos/tezos/-/issues/6902.
+           TODO: https://gitlab.com/tezos/tezos/-/issues/6915
+           This should be removed after the next release candidate. *)
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_ubuntu_focal"
+          ~allow_failure:Yes
+          Ubuntu_focal;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_ubuntu_jammy"
+          ~allow_failure:Yes
+          Ubuntu_jammy;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_rc_ubuntu_focal"
+          ~allow_failure:Yes
+          ~rc:true
+          Ubuntu_focal;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_rc_ubuntu_jammy"
+          ~allow_failure:Yes
+          ~rc:true
+          Ubuntu_jammy;
+        (* Test installing through opam *)
+        job_install_opam_focal;
+        (* Test compiling the [latest-release] branch on Bullseye *)
+        job_compile_sources
+          ~__POS__
+          ~name:"oc.compile_release_sources_bullseye"
+          ~image:Images.opam_debian_bullseye
+          ~project:"tezos/tezos"
+          ~branch:"latest-release";
+        (* Test compiling the [master] branch on Bullseye *)
+        job_compile_sources
+          ~__POS__
+          ~name:"oc.compile_sources_bullseye"
+          ~image:Images.opam_debian_bullseye
+          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+        job_compile_sources
+          ~__POS__
+          ~name:"oc.compile_sources_mantic"
+          ~image:Images.opam_ubuntu_mantic
+          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+      ]
+      |> jobs_external_split ~path:"test/install_octez"
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -1013,7 +1133,7 @@ let jobs pipeline_type =
       job_oc_script_b58_prefix;
       job_oc_test_liquidity_baking_scripts;
     ]
-    @ jobs_unit
+    @ jobs_unit @ jobs_install_octez
     @
     match pipeline_type with
     | Before_merging ->

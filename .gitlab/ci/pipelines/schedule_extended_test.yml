@@ -30,7 +30,7 @@ include:
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/install_octez.yml
+  - .gitlab/ci/jobs/test/install_octez-scheduled_extended_test.yml
   # Flaky tezts
   - .gitlab/ci/jobs/test/tezt-flaky-schedule_extended_test.yml
   # Slow tezts
