@@ -1469,7 +1469,19 @@ let jobs pipeline_type =
           ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
         |> job_external_split
       in
-      [job_test_kernels; job_test_etherlink_kernel]
+      let job_test_risc_v_kernels : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_risc_v_kernels"
+          ~changes:changeset_test_risc_v_kernels
+          [
+            "make -C src/risc_v check";
+            "make -C src/risc_v test";
+            "make -C src/risc_v audit";
+          ]
+        |> job_external_split
+      in
+      [job_test_kernels; job_test_etherlink_kernel; job_test_risc_v_kernels]
     in
     [
       job_kaitai_checks;

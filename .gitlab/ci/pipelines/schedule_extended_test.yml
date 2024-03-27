@@ -53,7 +53,7 @@ include:
   - .gitlab/ci/jobs/test/tezt-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/test_kernels-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/test_etherlink_kernel-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml
+  - .gitlab/ci/jobs/test/test_risc_v_kernels-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/test_evm_compatibility.yml
 
   # Stage: doc

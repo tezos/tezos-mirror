@@ -7,13 +7,7 @@ test_risc_v_kernels:
   tags:
   - gcp
   rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - images/**/*
-    - src/kernel_sdk/**/*
-    - src/risc_v/**/*
-    when: on_success
+  - when: on_success
   needs:
   - oc.docker:rust-toolchain
   dependencies:
