@@ -126,9 +126,9 @@ test_case!(
     "rv64ua-p-amoadd_d"
 );
 test_case!(
-    #[ignore]
     test_suite_rv64ua_p_amoadd_w,
-    "rv64ua-p-amoadd_w"
+    "rv64ua-p-amoadd_w",
+    Mode::User
 );
 test_case!(
     #[ignore]
@@ -136,9 +136,9 @@ test_case!(
     "rv64ua-p-amoand_d"
 );
 test_case!(
-    #[ignore]
     test_suite_rv64ua_p_amoand_w,
-    "rv64ua-p-amoand_w"
+    "rv64ua-p-amoand_w",
+    Mode::User
 );
 test_case!(
     #[ignore]
@@ -146,9 +146,9 @@ test_case!(
     "rv64ua-p-amomax_d"
 );
 test_case!(
-    #[ignore]
     test_suite_rv64ua_p_amomax_w,
-    "rv64ua-p-amomax_w"
+    "rv64ua-p-amomax_w",
+    Mode::User
 );
 test_case!(
     #[ignore]
@@ -185,20 +185,16 @@ test_case!(
     test_suite_rv64ua_p_amoor_d,
     "rv64ua-p-amoor_d"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64ua_p_amoor_w,
-    "rv64ua-p-amoor_w"
-);
+test_case!(test_suite_rv64ua_p_amoor_w, "rv64ua-p-amoor_w", Mode::User);
 test_case!(
     #[ignore]
     test_suite_rv64ua_p_amoswap_d,
     "rv64ua-p-amoswap_d"
 );
 test_case!(
-    #[ignore]
     test_suite_rv64ua_p_amoswap_w,
-    "rv64ua-p-amoswap_w"
+    "rv64ua-p-amoswap_w",
+    Mode::User
 );
 test_case!(
     #[ignore]
@@ -206,9 +202,9 @@ test_case!(
     "rv64ua-p-amoxor_d"
 );
 test_case!(
-    #[ignore]
     test_suite_rv64ua_p_amoxor_w,
-    "rv64ua-p-amoxor_w"
+    "rv64ua-p-amoxor_w",
+    Mode::User
 );
 test_case!(
     #[ignore]
