@@ -43,6 +43,10 @@ type code_verification_pipeline = Before_merging | Schedule_extended_test
      - automatic in scheduled pipelines;
      - conditional in [before_merging] pipelines.
 
+     If a job has non-optional dependencies, then [dependent] must be
+     set to [true] to ensure that we only run the job in case previous
+     jobs succeeded (setting [when: on_success]).
+
      If [label], [changes] and [manual] are omitted, then rules will
      enable the job [On_success] in the [before_merging]
      pipeline. This is safe, but prefer specifying a [changes] clause
