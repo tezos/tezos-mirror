@@ -832,7 +832,7 @@ module External_validator_process = struct
     | Uninitialized -> start_process vp
     | Exiting ->
         let*! () = Events.(emit cannot_start_process ()) in
-        tzfail Block_validator_errors.Cannot_validate_while_shutting_down
+        tzfail Block_validator_errors.Cannot_process_request_while_shutting_down
 
   (* Sends the given request to the external validator. If the request
      failed to be fulfilled, the status of the external validator is
