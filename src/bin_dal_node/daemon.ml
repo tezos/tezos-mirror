@@ -402,7 +402,9 @@ module Handler = struct
        In case of republication of the same commitment, the shards are removed
        too early *)
     List.iter_es
-      (fun commitment -> Store.Shards.remove store.shard_store commitment)
+      (fun commitment ->
+        let*! () = Event.(emit removed_slot_shards commitment) in
+        Store.Shards.remove store.shard_store commitment)
       commitments
 
   (* Monitor heads and store *finalized* published slot headers indexed by block
