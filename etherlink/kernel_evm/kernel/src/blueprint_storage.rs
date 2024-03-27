@@ -17,6 +17,7 @@ use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup_core::MAX_INPUT_MESSAGE_SIZE;
 use tezos_smart_rollup_host::path::*;
 use tezos_smart_rollup_host::runtime::{Runtime, RuntimeError};
 
@@ -177,6 +178,16 @@ pub fn store_immediate_blueprint<Host: Runtime>(
     store_rlp(&store_blueprint, host, &chunk_path)
 }
 
+/// For the tick model we only accept blueprints where cumulative size of chunks
+/// less or equal than 512kB. A chunk weights 4kB, then (512 * 1024) / 4096 =
+/// 128.
+pub const MAXIMUM_NUMBER_OF_CHUNKS: u16 = 128;
+
+const MAXIMUM_SIZE_OF_BLUEPRINT: usize =
+    MAXIMUM_NUMBER_OF_CHUNKS as usize * MAX_INPUT_MESSAGE_SIZE;
+
+const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
+
 /// Possible errors when validating a blueprint
 /// Only used for test, as all errors are handled in the same way
 #[derive(Debug, PartialEq)]
@@ -185,6 +196,7 @@ pub enum BlueprintValidity {
     InvalidParentHash,
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
+    BlueprintTooLarge,
 }
 
 /// Check that the parent hash of the [blueprint_with_hashes] is equal
@@ -210,13 +222,24 @@ fn fetch_delayed_txs<Host: Runtime>(
     host: &mut Host,
     blueprint_with_hashes: BlueprintWithDelayedHashes,
     delayed_inbox: &mut DelayedInbox,
-) -> anyhow::Result<BlueprintValidity> {
+    current_blueprint_size: usize,
+) -> anyhow::Result<(BlueprintValidity, usize)> {
     let mut delayed_txs = vec![];
+    let mut total_size = current_blueprint_size;
     for tx_hash in blueprint_with_hashes.delayed_hashes {
         let tx = delayed_inbox.find_and_remove_transaction(host, tx_hash)?;
+        // This is overestimated, as the transactions cannot be chunked in the
+        // delayed bridge.
+        total_size += MAXIMUM_SIZE_OF_DELAYED_TRANSACTION;
+        // If the size would overflow the 512KB, reject the blueprint
+        if MAXIMUM_SIZE_OF_BLUEPRINT < total_size {
+            return Ok((BlueprintValidity::BlueprintTooLarge, total_size));
+        }
         match tx {
             Some(tx) => delayed_txs.push(tx.0),
-            None => return Ok(BlueprintValidity::DelayedHashMissing(tx_hash)),
+            None => {
+                return Ok((BlueprintValidity::DelayedHashMissing(tx_hash), total_size))
+            }
         }
     }
 
@@ -235,30 +258,55 @@ fn fetch_delayed_txs<Host: Runtime>(
         .collect::<anyhow::Result<Vec<Transaction>>>()?;
 
     delayed_txs.extend(transactions_with_hashes);
-    Ok(BlueprintValidity::Valid(Blueprint {
-        transactions: delayed_txs,
-        timestamp: blueprint_with_hashes.timestamp,
-    }))
+    Ok((
+        BlueprintValidity::Valid(Blueprint {
+            transactions: delayed_txs,
+            timestamp: blueprint_with_hashes.timestamp,
+        }),
+        total_size,
+    ))
 }
 
 fn parse_and_validate_blueprint<Host: Runtime>(
     host: &mut Host,
     bytes: &[u8],
     delayed_inbox: &mut DelayedInbox,
-) -> anyhow::Result<BlueprintValidity> {
+    current_blueprint_size: usize,
+) -> anyhow::Result<(BlueprintValidity, usize)> {
     // Decode
     match rlp::decode(bytes) {
-        Err(e) => Ok(BlueprintValidity::DecoderError(e)),
+        Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
             // Validate parent hash
             if !valid_parent_hash(host, &blueprint_with_hashes) {
-                Ok(BlueprintValidity::InvalidParentHash)
+                Ok((BlueprintValidity::InvalidParentHash, bytes.len()))
             } else {
                 // Fetch delayed transactions
-                fetch_delayed_txs(host, blueprint_with_hashes, delayed_inbox)
+                fetch_delayed_txs(
+                    host,
+                    blueprint_with_hashes,
+                    delayed_inbox,
+                    current_blueprint_size,
+                )
             }
         }
     }
+}
+
+fn invalidate_blueprint<Host: Runtime>(
+    host: &mut Host,
+    blueprint_path: &OwnedPath,
+    error: &BlueprintValidity,
+) -> Result<(), RuntimeError> {
+    log!(
+        host,
+        Info,
+        "Deleting invalid blueprint at path {}, error: {:?}",
+        blueprint_path,
+        error
+    );
+    // Remove invalid blueprint from storage
+    host.store_delete(blueprint_path)
 }
 
 fn read_all_chunks_and_validate<Host: Runtime>(
@@ -266,41 +314,47 @@ fn read_all_chunks_and_validate<Host: Runtime>(
     blueprint_path: &OwnedPath,
     nb_chunks: u16,
     config: &mut Configuration,
-) -> anyhow::Result<Option<Blueprint>> {
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let mut chunks = vec![];
+    let mut size = 0;
+    if nb_chunks > MAXIMUM_NUMBER_OF_CHUNKS {
+        invalidate_blueprint(
+            host,
+            blueprint_path,
+            &BlueprintValidity::BlueprintTooLarge,
+        )?;
+        return Ok((None, 0));
+    };
     for i in 0..nb_chunks {
         let path = blueprint_chunk_path(blueprint_path, i)?;
-        let stored_chunk: StoreBlueprint = read_rlp(host, &path)?;
+        let stored_chunk = read_rlp(host, &path)?;
+        // The tick model is based on the size of the chunk, we overapproximate it.
+        size += MAX_INPUT_MESSAGE_SIZE;
         match stored_chunk {
             StoreBlueprint::InboxBlueprint(blueprint) => {
                 // Special case when there's an inbox blueprint stored.
                 // There must be only one chunk in this case.
-                return Ok(Some(blueprint));
+                return Ok((Some(blueprint), size));
             }
             StoreBlueprint::SequencerChunk(chunk) => chunks.push(chunk),
         }
     }
     match &mut config.mode {
-        ConfigurationMode::Proxy => Ok(None),
+        ConfigurationMode::Proxy => Ok((None, size)),
         ConfigurationMode::Sequencer { delayed_inbox, .. } => {
             let validity = parse_and_validate_blueprint(
                 host,
                 chunks.concat().as_slice(),
                 delayed_inbox,
+                size,
             )?;
-            if let BlueprintValidity::Valid(blueprint) = validity {
-                Ok(Some(blueprint))
+            if let (BlueprintValidity::Valid(blueprint), size_with_delayed_transactions) =
+                validity
+            {
+                Ok((Some(blueprint), size_with_delayed_transactions))
             } else {
-                log!(
-                    host,
-                    Info,
-                    "Deleting invalid blueprint at path {}, error: {:?}",
-                    blueprint_path,
-                    validity
-                );
-                // Remove invalid blueprint from storage
-                host.store_delete(blueprint_path)?;
-                Ok(None)
+                invalidate_blueprint(host, blueprint_path, &validity.0)?;
+                Ok((None, size))
             }
         }
     }
@@ -309,7 +363,7 @@ fn read_all_chunks_and_validate<Host: Runtime>(
 pub fn read_next_blueprint<Host: Runtime>(
     host: &mut Host,
     config: &mut Configuration,
-) -> anyhow::Result<Option<Blueprint>> {
+) -> anyhow::Result<(Option<Blueprint>, usize)> {
     let number = read_next_blueprint_number(host)?;
     let blueprint_path = blueprint_path(number)?;
     let exists = host.store_has(&blueprint_path)?.is_some();
@@ -319,9 +373,9 @@ pub fn read_next_blueprint<Host: Runtime>(
         let available_chunks = n_subkeys as u16 - 1;
         if available_chunks == nb_chunks {
             // All chunks are available
-            let blueprint =
+            let (blueprint, size) =
                 read_all_chunks_and_validate(host, &blueprint_path, nb_chunks, config)?;
-            Ok(blueprint)
+            Ok((blueprint, size))
         } else {
             if available_chunks > nb_chunks {
                 // We are in an inconsistent state (a previous blueprint was submitted with more
@@ -331,10 +385,10 @@ pub fn read_next_blueprint<Host: Runtime>(
                 host.store_delete(&blueprint_path).map_err(Error::from)?;
             }
 
-            Ok(None)
+            Ok((None, 0))
         }
     } else {
-        Ok(None)
+        Ok((None, 0))
     }
 }
 
@@ -425,10 +479,11 @@ mod tests {
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
+            0,
         )
         .expect("Should be able to parse blueprint");
         assert_eq!(
-            validity,
+            validity.0,
             BlueprintValidity::DelayedHashMissing(dummy_tx_hash)
         );
 
@@ -445,7 +500,7 @@ mod tests {
         // isn't in the delayed inbox
         let blueprint = read_next_blueprint(&mut host, &mut config)
             .expect("Reading next blueprint should work");
-        assert!(blueprint.is_none());
+        assert!(blueprint.0.is_none());
 
         // Next number should be 0, as we didn't read one
         let number = read_next_blueprint_number(&host)
@@ -487,9 +542,10 @@ mod tests {
             &mut host,
             blueprint_with_hashes_bytes.as_ref(),
             &mut delayed_inbox,
+            0,
         )
         .expect("Should be able to parse blueprint");
-        assert_eq!(validity, BlueprintValidity::InvalidParentHash);
+        assert_eq!(validity.0, BlueprintValidity::InvalidParentHash);
 
         // Store blueprint
         store_sequencer_blueprint(&mut host, seq_blueprint)
@@ -502,7 +558,7 @@ mod tests {
         // is invalid
         let blueprint = read_next_blueprint(&mut host, &mut config)
             .expect("Reading next blueprint should work");
-        assert!(blueprint.is_none());
+        assert!(blueprint.0.is_none());
 
         // The blueprint 0 should have been removed
         let exists = host.store_has(&blueprint_path).unwrap().is_some();

@@ -248,6 +248,7 @@ mod tests {
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
         {
             Some(Blueprint { transactions, .. }) => assert!(transactions.len() == 1),
             _ => panic!("There should be a blueprint"),
@@ -265,6 +266,7 @@ mod tests {
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
         {
             Some(Blueprint { transactions, .. }) => assert!(transactions.len() == 1),
             _ => panic!("There should be a blueprint"),
@@ -280,6 +282,7 @@ mod tests {
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_some()
         {
             panic!("No blueprint should have been produced")
@@ -297,6 +300,7 @@ mod tests {
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_some()
         {
             panic!("No blueprint should have been produced")
@@ -316,6 +320,7 @@ mod tests {
         store_current_block_number(&mut host, U256::from(9)).unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_none()
         {
             panic!("There should be a blueprint")
@@ -333,6 +338,7 @@ mod tests {
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_some()
         {
             panic!("There shouldn't be a blueprint, the chunk is signed by the wrong key")
@@ -362,6 +368,7 @@ mod tests {
         store_current_block_number(&mut host, U256::from(9)).unwrap();
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_some()
         {
             panic!("The sequencer chunk shouldn't have been injected")
@@ -381,6 +388,7 @@ mod tests {
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_some()
         {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
@@ -404,6 +412,7 @@ mod tests {
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_some()
         {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")
@@ -426,7 +435,7 @@ mod tests {
         fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
-            .expect("Blueprint reading shouldn't fail")
+            .expect("Blueprint reading shouldn't fail").0
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) =>
@@ -451,6 +460,7 @@ mod tests {
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) => assert_eq!(
@@ -479,6 +489,7 @@ mod tests {
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) => assert_eq!(
@@ -505,6 +516,7 @@ mod tests {
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
+            .0
             .is_some()
         {
             panic!("There shouldn't be a blueprint, the transaction comes from the delayed bridge")

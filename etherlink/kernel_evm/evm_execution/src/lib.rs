@@ -1026,7 +1026,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 59271,
+            estimated_ticks_used: 60782,
         }));
 
         assert_eq!(expected_result, result);
@@ -1091,7 +1091,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 65039,
+            estimated_ticks_used: 64708,
         }));
 
         assert_eq!(expected_result, result);
@@ -1533,7 +1533,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 428861740,
+            estimated_ticks_used: 526736689,
         }));
 
         // assert that call succeeds
@@ -1629,7 +1629,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 441347264,
+            estimated_ticks_used: 539221139,
         }));
 
         // assert that call succeeds
@@ -1753,7 +1753,7 @@ mod test {
             logs: vec![log_record1, log_record2],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 1017247,
+            estimated_ticks_used: 4788726,
         }));
 
         assert_eq!(result, expected_result);
@@ -1861,7 +1861,7 @@ mod test {
             logs: vec![log_record1],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 614707,
+            estimated_ticks_used: 2670903,
         }));
 
         assert_eq!(result, expected_result);
@@ -1956,7 +1956,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 4049485,
+            estimated_ticks_used: 24928566,
         }));
 
         assert_eq!(result, expected_result);
@@ -2075,7 +2075,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 9742809485,
+            estimated_ticks_used: 9763688566,
         }));
 
         assert_eq!(result, expected_result);
@@ -2173,7 +2173,7 @@ mod test {
             logs: vec![],
             result: Some(chain_id_bytes.into()),
             withdrawals: vec![],
-            estimated_ticks_used: 224101,
+            estimated_ticks_used: 164159,
         }));
         assert_eq!(result, expected_result);
     }
@@ -2251,7 +2251,7 @@ mod test {
             logs: vec![],
             result: Some(base_fee_per_gas_bytes.into()),
             withdrawals: vec![],
-            estimated_ticks_used: 224101,
+            estimated_ticks_used: 164165,
         }));
         assert_eq!(result, expected_result);
     }
