@@ -42,3 +42,5 @@ let tezos2 = "tezos2"
 let etherlink = "etherlink"
 
 let slow = "slow"
+
+let cloud = "cloud"

@@ -84,3 +84,7 @@ val etherlink : string
 
     This tag should be used for tests that take more than 2 minutes in the CI. *)
 val slow : string
+
+(** [cloud]: tag for tests that depends on the [tezt-cloud] library. Such a test
+  uses VMs deployed onto the cloud. *)
+val cloud : string
