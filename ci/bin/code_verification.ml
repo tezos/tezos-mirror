@@ -958,6 +958,26 @@ let jobs pipeline_type =
         ["./scripts/test_octez_release_version.sh"]
       |> job_external_split
     in
+    let job_oc_script_b58_prefix =
+      job
+        ~__POS__
+        ~name:"oc.script:b58_prefix"
+        ~stage:Stages.test
+          (* Requires Python. Can be changed to a python image, but using
+             the build docker image to keep in sync with the python
+             version used for the tests *)
+        ~image:Images.runtime_build_test_dependencies
+        ~rules:(make_rules ~changes:changeset_script_b58_prefix ())
+        ~dependencies:dependencies_needs_trigger
+        ~before_script:
+          (before_script ~source_version:true ~init_python_venv:true [])
+        [
+          "poetry run pylint scripts/b58_prefix/b58_prefix.py \
+           --disable=missing-docstring --disable=invalid-name";
+          "poetry run pytest scripts/b58_prefix/test_b58_prefix.py";
+        ]
+      |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -969,6 +989,7 @@ let jobs pipeline_type =
       job_oc_script_test_gen_genesis;
       job_oc_script_snapshot_alpha_and_link;
       job_oc_script_test_release_versions;
+      job_oc_script_b58_prefix;
     ]
     @ jobs_unit
     @

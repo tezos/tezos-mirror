@@ -42,7 +42,7 @@ include:
   - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link-before_merging.yml
   - .gitlab/ci/jobs/test/oc.script:test-gen-genesis-before_merging.yml
   - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions-before_merging.yml
-  - .gitlab/ci/jobs/test/oc.script:b58_prefix.yml
+  - .gitlab/ci/jobs/test/oc.script:b58_prefix-before_merging.yml
   - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
   - .gitlab/ci/jobs/test/install_octez.yml
   - .gitlab/ci/jobs/test/tezt.yml

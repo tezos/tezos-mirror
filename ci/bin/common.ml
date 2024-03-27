@@ -398,6 +398,14 @@ let changeset_script_snapshot_alpha_and_link =
     "scripts/user_activated_upgrade.sh";
   ]
 
+let changeset_script_b58_prefix =
+  [
+    "scripts/b58_prefix/b58_prefix.py";
+    "scripts/b58_prefix/test_b58_prefix.py";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.
