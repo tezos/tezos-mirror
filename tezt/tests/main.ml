@@ -173,7 +173,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Operation_size.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
-  Precheck.register ~protocols ;
   Prevalidator.register ~protocols ;
   Protocol_limits.register ~protocols ;
   Proxy.register ~protocols ;
@@ -213,6 +212,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Tickets.register ~protocols ;
   Tzip4_view.register ~protocols ;
   Used_paid_storage_spaces.register ~protocols ;
+  Validate.register ~protocols ;
   Vdf_test.register ~protocols ;
   Views.register ~protocols ;
   Zk_rollup.register ~protocols ;

@@ -26,29 +26,29 @@
 (* Testing
    -------
    Component:    Validation components
-   Invocation:   dune exec tezt/tests/main.exe -- --file "precheck.ml"
-   Subject:      Check the precheck of blocks.
+   Invocation:   dune exec tezt/tests/main.exe -- --file "validate.ml"
+   Subject:      Check the validation of blocks.
 *)
 
 open Lwt.Infix
 
-type state = Prechecked | Validated
+type state = Validated | Applied
 
 let on_validation_event state node Node.{name; value; timestamp = _} =
   match name with
-  | "prechecked_block.v0" -> (
+  | "validated_block.v0" -> (
       let hash = JSON.(value |> as_string) in
       match Hashtbl.find_opt state (node, hash) with
-      | None -> Hashtbl.replace state (node, hash) Prechecked
-      | Some Prechecked -> Test.fail "A block should not be prechecked twice"
-      | Some Validated ->
-          Test.fail "A block should not be prechecked after being validated")
-  | "validation_success.v0" -> (
+      | None -> Hashtbl.replace state (node, hash) Validated
+      | Some Validated -> Test.fail "A block should not be validated twice"
+      | Some Applied ->
+          Test.fail "A block should not be validated after being applied")
+  | "validation_and_application_success.v0" -> (
       let hash = JSON.(value |-> "block" |> as_string) in
       match Hashtbl.find_opt state (node, hash) with
-      | None -> Test.fail "A block should be prechecked before being validated"
-      | Some Prechecked -> Hashtbl.replace state (node, hash) Validated
-      | Some Validated -> Test.fail "A block should not be validated twice")
+      | None -> Test.fail "A block should be validated before being applied"
+      | Some Validated -> Hashtbl.replace state (node, hash) Applied
+      | Some Applied -> Test.fail "A block should not be applied twice")
   | _ -> ()
 
 let wait_for_cluster_at_level cluster level =
@@ -58,11 +58,11 @@ let wait_for_cluster_at_level cluster level =
       Lwt.return_unit)
     cluster
 
-let precheck_block =
+let validate_block =
   Protocol.register_test
     ~__FILE__
-    ~title:"precheck block"
-    ~tags:["node"; "precheck"]
+    ~title:"validate block"
+    ~tags:["node"; "validate"]
   @@ fun protocol ->
   (* Expected topology is :
                N3
@@ -103,11 +103,11 @@ let precheck_block =
         wait_for_cluster_at_level cluster !current_level)
   in
   let validated =
-    Hashtbl.fold (fun _ value b -> value = Validated && b) state true
+    Hashtbl.fold (fun _ value b -> value = Applied && b) state true
   in
   let expected_table_length = (block_to_bake + 1) * List.length cluster in
   if Hashtbl.length state <> expected_table_length || not validated then
-    Test.fail "prechecking of block did not executed as expected"
+    Test.fail "validateing of block did not executed as expected"
   else return ()
 
 let forge_block ?client node ~key ~with_op =
@@ -158,12 +158,12 @@ let forge_block ?client node ~key ~with_op =
   in
   return block_header
 
-let propagate_precheckable_bad_block =
+let propagate_validateable_bad_block =
   let blocks_to_bake = 4 in
   Protocol.register_test
     ~__FILE__
     ~title:"forge fake block"
-    ~tags:["precheck"; "fake_block"; "propagation"; Tag.memory_3k]
+    ~tags:["validate"; "fake_block"; "propagation"; Tag.memory_3k]
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
@@ -238,14 +238,14 @@ let propagate_precheckable_bad_block =
           ("operations", `A (List.init 4 (fun _ -> `A [])));
         ])
   in
-  (* Wait all nodes to precheck the block but fail on validation *)
-  let expect_precheck_failure node =
-    Node.wait_for node "precheck_failure.v0" (fun _ -> Some ())
+  (* Wait all nodes to validate the block but fail on validation *)
+  let expect_validate_failure node =
+    Node.wait_for node "validation_failure.v0" (fun _ -> Some ())
   in
-  let precheck_waiter =
-    (* Post Lima: the precheck is not an over-approximation
-       anymore and cannot even be considered precheckable. *)
-    expect_precheck_failure node_client
+  let validate_waiter =
+    (* Post Lima: the validate is not an over-approximation
+       anymore and cannot even be considered validateable. *)
+    expect_validate_failure node_client
   in
   let p =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
@@ -255,8 +255,8 @@ let propagate_precheckable_bad_block =
     Lwt.pick
       [
         ( Lwt_unix.sleep 30. >>= fun () ->
-          Test.fail "timeout while waiting for precheck" );
-        precheck_waiter;
+          Test.fail "timeout while waiting for validate" );
+        validate_waiter;
       ]
   in
   (* Also check that re-injecting the bad block fails *)
@@ -272,12 +272,12 @@ let propagate_precheckable_bad_block =
   (* activation block + four blocks + the final bake *)
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 
-let propagate_precheckable_bad_block_payload =
+let propagate_validateable_bad_block_payload =
   let blocks_to_bake = 4 in
   Protocol.register_test
     ~__FILE__
     ~title:"forge block with wrong payload"
-    ~tags:["precheck"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
+    ~tags:["validate"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
@@ -359,13 +359,13 @@ let propagate_precheckable_bad_block_payload =
           ("operations", `A (List.init 4 (fun _ -> `A [])));
         ])
   in
-  let expect_precheck_failure node =
-    Node.wait_for node "precheck_failure.v0" (fun _ -> Some ())
+  let expect_validate_failure node =
+    Node.wait_for node "validation_failure.v0" (fun _ -> Some ())
   in
-  let precheck_waiter =
-    (* Post Kathmandu: the precheck is not an over-approximation
-       anymore and cannot even be considered precheckable. *)
-    expect_precheck_failure node_client
+  let validate_waiter =
+    (* Post Kathmandu: the validate is not an over-approximation
+       anymore and cannot even be considered validateable. *)
+    expect_validate_failure node_client
   in
   let p =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
@@ -375,8 +375,8 @@ let propagate_precheckable_bad_block_payload =
     Lwt.pick
       [
         ( Lwt_unix.sleep 10. >>= fun () ->
-          Test.fail "timeout while waiting for precheck" );
-        precheck_waiter;
+          Test.fail "timeout while waiting for validate" );
+        validate_waiter;
       ]
   in
   (* Also check that re-injecting the bad block fails *)
@@ -394,6 +394,6 @@ let propagate_precheckable_bad_block_payload =
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 
 let register ~protocols =
-  precheck_block protocols ;
-  propagate_precheckable_bad_block protocols ;
-  propagate_precheckable_bad_block_payload protocols
+  validate_block protocols ;
+  propagate_validateable_bad_block protocols ;
+  propagate_validateable_bad_block_payload protocols
