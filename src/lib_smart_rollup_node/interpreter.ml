@@ -212,7 +212,14 @@ let memo_state_of_tick_aux plugin node_ctxt ~start_state
     [level]. Otherwise, returns [None].*)
 let state_of_tick plugin node_ctxt ?start_state ~tick level =
   let open Lwt_result_syntax in
-  let* event = Node_context.block_with_tick node_ctxt ~max_level:level tick in
+  let min_level =
+    match start_state with
+    | None -> None
+    | Some s -> Some s.Pvm_plugin_sig.inbox_level
+  in
+  let* event =
+    Node_context.block_with_tick node_ctxt ?min_level ~max_level:level tick
+  in
   match event with
   | None -> return_none
   | Some event ->

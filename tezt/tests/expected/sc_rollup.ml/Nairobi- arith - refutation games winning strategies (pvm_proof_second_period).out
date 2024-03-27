@@ -1,0 +1,158 @@
+
+
+{
+  "opponent": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+  "start_tick": "0",
+  "end_tick": "470",
+  "dissection": [
+    {
+      "state": "srs12BpWKZmJUaEoa9CQd6gqxSxcN5JWHCmTafFKvA2sfa8yugT8QJ",
+      "tick": "0"
+    },
+    {
+      "state": "srs12HcpMVAX3G4CNsGUWt8AkWu59d3VM6jcMtHi8tgvdhqM7vp4k1",
+      "tick": "14"
+    },
+    {
+      "state": "srs12CfKg7uX87geXGoqb8aH34dGuZ8yeiLio8LgpCyTgddSSPBz8R",
+      "tick": "28"
+    },
+    {
+      "state": "srs12yCkZ2jLNhoBsRJz2eLtHUcm7mwYyaqHaGJcT61v7PTFFtiPeE",
+      "tick": "42"
+    },
+    {
+      "state": "srs12Ucx2jWFC5yuqrN6NvXEKzPdrMEJnFzK2t9FrbKvKvN8Gr7Cu2",
+      "tick": "56"
+    },
+    {
+      "state": "srs12wMXEPedWYg8BtGyVzQhiSNfxJkEThtkRYBFJ67ozufxqc2gfD",
+      "tick": "70"
+    },
+    {
+      "state": "srs12ErwrpExBZrJxts1Fhixey8m7rzkgP5F7qRTaZc7RULYgXMrqF",
+      "tick": "84"
+    },
+    {
+      "state": "srs123rxPeXkB2vYnP5ZMXohGC2mVxdCLXn2W68Gi7LP1BFz3Gh86J",
+      "tick": "98"
+    },
+    {
+      "state": "srs11mi22neJk84xn3hmVjfQ8TzjRM2A7Tsswnpm6KmNVgzRPjx8rW",
+      "tick": "112"
+    },
+    {
+      "state": "srs11oG2quvx9BSDASfZF9N8ibNw1B56PbMAPR71oykd1TFhgFsLgw",
+      "tick": "126"
+    },
+    {
+      "state": "srs12pjgS3p1EYsBEAAtzyg6kz3LGoB8WgUduTT6Htrkzt19c6pqwy",
+      "tick": "140"
+    },
+    {
+      "state": "srs122KgtmNRvPMRZzzZMoHR4XBdP5rwLU5KikgRjcjBAW896EqamR",
+      "tick": "154"
+    },
+    {
+      "state": "srs11fBCUCYL71XxKnW2FqgxDitFhZkkombMho1FrQKHzC2Kyn8ddm",
+      "tick": "168"
+    },
+    {
+      "state": "srs138nMxj4uyRUbyjikE4Ntqouzx9Xo1kUTZZrD17ENmPD9wBU7jb",
+      "tick": "182"
+    },
+    {
+      "state": "srs12zx6tNm1G3WPHDJG7t3GCqT6E9TgqkZ1W6of5WiYmVLu3vvwSB",
+      "tick": "196"
+    },
+    {
+      "state": "srs1289u1v6hrjhp7grcAVQTT2DBA8ohnRvehwWmtKpqWwTWC4BrZF",
+      "tick": "210"
+    },
+    {
+      "state": "srs12P4xnPmbSXTTEevhqPr2nsnQWJU85vDPxUvKuAeF3FqfRci6LZ",
+      "tick": "224"
+    },
+    {
+      "state": "srs12Hb6PpnSq2BLUmeGAD94PceNfa1H9NRKfiWxZcaZNmT7hNXizm",
+      "tick": "238"
+    },
+    {
+      "state": "srs11U31UwpAFZNutrrqdunW7bRipcGYeyGLpD9xsqWXrkwRsbudmA",
+      "tick": "252"
+    },
+    {
+      "state": "srs11w4ar8HQEkgo4hvYPPzK9HrutvN5wFgTqrcLm34EPXs9pQxAFZ",
+      "tick": "266"
+    },
+    {
+      "state": "srs13E6kCid52o1RQ31Te68eX2Nca8eEDYcVLk337Xt86hhGCmDReN",
+      "tick": "280"
+    },
+    {
+      "state": "srs11TswqFkYdqNgFtfZZzawGWzSLaGbXrNQnS7YeM48j9jyxbrhVW",
+      "tick": "294"
+    },
+    {
+      "state": "srs13F7zBdXshJHT8emH679ATuCFz8Z3qWikbgP5uD5HDD6eeZxaEc",
+      "tick": "308"
+    },
+    {
+      "state": "srs13DsXVANrSdSpESU98pJHrZxCVocBTuqbaFD4g8QNUauxENpJhd",
+      "tick": "322"
+    },
+    {
+      "state": "srs13MuLPbNELE9Ktnmb31a3XNTjG51VTrFmuCsg7xMFUBaQUr26JA",
+      "tick": "336"
+    },
+    {
+      "state": "srs121rcYdJYtFt4KKxA3e5QmVsutd76zotquG1HjxFEhs2rCaEp36",
+      "tick": "350"
+    },
+    {
+      "state": "srs12CGPVsxnvYLKQzwX9JQ3QUk7CMBpeoxrUcZoDQAkx1cQYkoE5g",
+      "tick": "364"
+    },
+    {
+      "state": "srs11cwmAiZLDotocFLuivAVGbNgsWhstTWNa69fgzXFR4UkA4PgXe",
+      "tick": "378"
+    },
+    {
+      "state": "srs12Sbz3Uk6UQtnN6y9DvzQ3AFFs8ff6WAKsxLJg3tzGxbFBmghVq",
+      "tick": "392"
+    },
+    {
+      "state": "srs12YeVsf3uKu4akUyiez31XoL4dpZWut2DpSs3Xs5hgENLsz9JBe",
+      "tick": "406"
+    },
+    {
+      "state": "srs13KZdvAzs8KoJGKL6W8n8a1ibiVPG1o74RUd59hRW9WnNpPCEA8",
+      "tick": "420"
+    },
+    {
+      "state": "srs12BL3yCG8yWqzbgBdtVb6GdDJdZKDR47vnqECgBPXpK2sNu1E6A",
+      "tick": "434"
+    },
+    {
+      "state": "srs12wmZ3nEwV8RPYSd73zit4pxNUeo6NNevEun9YTLAsKU54W19Je",
+      "tick": "470"
+    }
+  ]
+}
+
+
+{
+  "opponent": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+  "start_tick": "119",
+  "end_tick": "120",
+  "dissection": [
+    {
+      "state": "srs11kTkhhrevyWvFiE5oDvDNypp8QfpJZ3qjpFbVScBGFJdnmpKm7",
+      "tick": "119"
+    },
+    {
+      "state": "srs11zJPKFACsjU6gJg6k5p2d7WTVgLrfJSeUesxjjQ4WEwfSskhQN",
+      "tick": "120"
+    }
+  ]
+}
