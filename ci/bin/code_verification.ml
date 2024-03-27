@@ -1692,7 +1692,102 @@ let jobs pipeline_type =
       ]
       |> jobs_external_split ~path:"doc/oc.install_python"
     in
-    jobs_install_python
+    let jobs_documentation : tezos_job list =
+      let rules =
+        make_rules ~changes:changeset_octez_docs ~label:"ci--docs" ()
+      in
+      let job_odoc =
+        job
+          ~__POS__
+          ~name:"documentation:odoc"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules
+          ~before_script:(before_script ~eval_opam:true [])
+          ~artifacts:
+            (artifacts
+               ~expire_in:(Duration (Hours 1))
+               (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
+               ["docs/_build/api/odoc/"])
+          ["make -C docs odoc-lite"]
+      in
+      let job_manuals =
+        job
+          ~__POS__
+          ~name:"documentation:manuals"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules
+          ~before_script:(before_script ~eval_opam:true [])
+          ~artifacts:
+            (artifacts
+               ~expire_in:(Duration (Weeks 1))
+               [
+                 "docs/*/octez-*.html";
+                 "docs/api/octez-*.txt";
+                 "docs/developer/metrics.csv";
+                 "docs/user/node-config.json";
+               ])
+          ["./.gitlab/ci/jobs/doc/documentation:manuals.sh"]
+      in
+      let job_docgen =
+        job
+          ~__POS__
+          ~name:"documentation:docgen"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules
+          ~before_script:(before_script ~eval_opam:true [])
+          ~artifacts:
+            (artifacts
+               ~expire_in:(Duration (Weeks 1))
+               [
+                 "docs/alpha/rpc.rst";
+                 "docs/shell/rpc.rst";
+                 "docs/user/default-acl.json";
+                 "docs/api/errors.rst";
+                 "docs/shell/p2p_api.rst";
+               ])
+          ["make -C docs -j docexes-gen"]
+      in
+      let doc_build_dependencies =
+        Dependent
+          [Artifacts job_odoc; Artifacts job_manuals; Artifacts job_docgen]
+      in
+      let job_build_all =
+        job
+          ~__POS__
+          ~name:"documentation:build_all"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:doc_build_dependencies
+            (* Warning: the [documentation:linkcheck] job must have at least the same
+               restrictions in the rules as [documentation:build_all], otherwise the CI
+               may complain that [documentation:linkcheck] depends on [documentation:build_all]
+               which does not exist. *)
+          ~rules:
+            (make_rules
+               ~dependent:true
+               ~changes:changeset_octez_docs
+               ~label:"ci--docs"
+               ())
+          ~before_script:
+            (before_script ~eval_opam:true ~init_python_venv:true [])
+          ~artifacts:
+            (artifacts
+               ~expose_as:"Documentation - excluding old protocols"
+               ~expire_in:(Duration (Weeks 1))
+               (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
+               ["docs/_build/"])
+          ["make -C docs -j sphinx"]
+      in
+      [job_odoc; job_manuals; job_docgen; job_build_all]
+      |> jobs_external_split ~path:"doc/documentation"
+    in
+    jobs_install_python @ jobs_documentation
   in
   let manual =
     match pipeline_type with

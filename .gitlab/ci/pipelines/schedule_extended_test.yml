@@ -23,7 +23,7 @@ include:
   # because of absence of certain changes
   - .gitlab/ci/jobs/build/ocaml-check-scheduled_extended_test.yml
   - .gitlab/ci/jobs/build/oc.build:static-x86_64-linux-binaries-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/doc/documentation.yml
+  - .gitlab/ci/jobs/doc/documentation-scheduled_extended_test.yml
 
   # Stage: packaging
   - .gitlab/ci/jobs/packaging/opam:prepare-scheduled_extended_test.yml
