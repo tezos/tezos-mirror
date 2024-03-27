@@ -862,12 +862,15 @@ let perform_sanity_check cctxt ~chain_id =
   let open Lwt_result_syntax in
   let open Baking_errors in
   let prefix_base_dir f = Filename.Infix.(cctxt#get_base_dir // f) in
-  let nonces_location = Baking_files.resolve_location ~chain_id `Nonce in
+  let legacy_location = Baking_files.resolve_location ~chain_id `Legacy_nonce in
+  let stateful_location =
+    Baking_files.resolve_location ~chain_id `Stateful_nonce
+  in
   let* _ =
-    Baking_nonces.load cctxt nonces_location
+    Baking_nonces.load cctxt ~legacy_location ~stateful_location
     |> trace
          (Cannot_load_local_file
-            (prefix_base_dir (Baking_files.filename nonces_location) ^ "s"))
+            (prefix_base_dir (Baking_files.filename legacy_location) ^ "s"))
   in
   let highwatermarks_location =
     Baking_files.resolve_location ~chain_id `Highwatermarks

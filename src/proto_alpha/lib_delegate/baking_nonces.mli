@@ -32,7 +32,8 @@ type state = {
   chain : Chain_services.chain;
   constants : Constants.t;
   config : Baking_configuration.nonce_config;
-  nonces_location : [`Nonce] Baking_files.location;
+  legacy_location : [`Legacy_nonce] Baking_files.location;
+  stateful_location : [`Stateful_nonce] Baking_files.location;
   mutable last_predecessor : Block_hash.t;
 }
 
@@ -48,7 +49,8 @@ type nonces
     returns a data structure containing the stored information. *)
 val load :
   #Client_context.wallet ->
-  [< `Highwatermarks | `Nonce | `State] Baking_files.location ->
+  legacy_location:[`Legacy_nonce] Baking_files.location ->
+  stateful_location:[`Stateful_nonce] Baking_files.location ->
   nonce_data Block_hash.Map.t tzresult Lwt.t
 
 (** [generate_seed_nonce nonce_config delegate level] computes a nonce via a 

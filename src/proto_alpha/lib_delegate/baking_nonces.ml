@@ -33,7 +33,8 @@ type state = {
   chain : Chain_services.chain;
   constants : Constants.t;
   config : Baking_configuration.nonce_config;
-  nonces_location : [`Nonce] Baking_files.location;
+  legacy_location : [`Legacy_nonce] Baking_files.location;
+  stateful_location : [`Stateful_nonce] Baking_files.location;
   mutable last_predecessor : Block_hash.t;
 }
 
@@ -176,11 +177,11 @@ let may_migrate (wallet : Protocol_client_context.full) location =
           return_unit
       | true -> Lwt_utils_unix.copy_file ~src:legacy_file ~dst:current_file)
 
-let get_detailed_nonces_location nonces_location = "stateful_" ^ nonces_location
-
-let load (wallet : #Client_context.wallet) location =
+let load (wallet : #Client_context.wallet)
+    ~(legacy_location : [`Legacy_nonce] Baking_files.location)
+    ~(stateful_location : [`Stateful_nonce] Baking_files.location) =
   let open Lwt_result_syntax in
-  let nonces_location = Baking_files.filename location in
+  let nonces_location = Baking_files.filename legacy_location in
   try
     (* If the flag is set, then we no longer save into a separate file, so we can
        try to load the new data format from the legacy file *)
@@ -189,7 +190,7 @@ let load (wallet : #Client_context.wallet) location =
     else
       (* Otherwise, we must load from the detailed file *)
       wallet#load
-        (get_detailed_nonces_location nonces_location)
+        (Baking_files.filename stateful_location)
         ~default:empty
         encoding
   with _exn ->
@@ -216,23 +217,22 @@ let load (wallet : #Client_context.wallet) location =
          legacy_nonces
          empty
 
-let save (wallet : #Client_context.wallet) location nonces =
+let save (wallet : #Client_context.wallet)
+    ~(legacy_location : [`Legacy_nonce] Baking_files.location)
+    ~(stateful_location : [`Stateful_nonce] Baking_files.location) nonces =
   let open Lwt_result_syntax in
-  let nonces_location = Baking_files.filename location in
+  let legacy_location = Baking_files.filename legacy_location in
   (* If the flag is set, we can overwrite the nonces data in the legacy file *)
   if override_legacy_nonces_flag then
-    wallet#write nonces_location nonces encoding
+    wallet#write legacy_location nonces encoding
     (* Otherwise, we put the detailed data in a specific file, and the legacy data in
        the legacy file. *)
   else
     let* () =
-      wallet#write
-        (get_detailed_nonces_location nonces_location)
-        nonces
-        encoding
+      wallet#write (Baking_files.filename stateful_location) nonces encoding
     in
     let legacy_nonces = Block_hash.Map.map (fun {nonce; _} -> nonce) nonces in
-    wallet#write nonces_location legacy_nonces legacy_encoding
+    wallet#write legacy_location legacy_nonces legacy_encoding
 
 let add nonces hash nonce = Block_hash.Map.add hash nonce nonces
 
@@ -244,12 +244,14 @@ let remove_all nonces nonces_to_remove =
     nonces_to_remove
     nonces
 
-let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
+let may_create_detailed_nonces_file (wallet : #Client_context.wallet)
+    ~(legacy_location : [`Legacy_nonce] Baking_files.location)
+    ~(stateful_location : [`Stateful_nonce] Baking_files.location) =
   let open Lwt_result_syntax in
-  let nonces_location = Baking_files.filename location in
+  let legacy_location = Baking_files.filename legacy_location in
   if not override_legacy_nonces_flag then
     let* legacy_nonces =
-      wallet#load nonces_location ~default:empty legacy_encoding
+      wallet#load legacy_location ~default:empty legacy_encoding
     in
     let detailed_nonces =
       Block_hash.Map.fold
@@ -270,7 +272,7 @@ let may_create_detailed_nonces_file (wallet : #Client_context.wallet) location =
         empty
     in
     wallet#write
-      (get_detailed_nonces_location nonces_location)
+      (Baking_files.filename stateful_location)
       detailed_nonces
       encoding
   else return_unit
@@ -331,7 +333,7 @@ let fill_any_missing_fields (cctxt : #Protocol_client_context.full) chain hash
     fills the [None] fields with the necessary information, then it synchronises the information
     with the [nonces_location] file. *)
 let fill_missing_fields (cctxt : #Protocol_client_context.full) chain
-    nonces_location nonces =
+    ~legacy_location ~stateful_location nonces =
   let open Lwt_result_syntax in
   let* filled_nonces =
     Block_hash.Map.fold_es
@@ -341,14 +343,14 @@ let fill_missing_fields (cctxt : #Protocol_client_context.full) chain
       nonces
       empty
   in
-  let* () = save cctxt nonces_location filled_nonces in
+  let* () = save cctxt ~legacy_location ~stateful_location filled_nonces in
   return filled_nonces
 
 (** [get_unrevealed_nonces state nonces current_cycle] retrieves all the nonces which 
     have been computed for blocks from the previous cycle (w.r.t. [current_cycle]), 
     which have not been yet revealed. *)
-let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
-    current_cycle =
+let get_unrevealed_nonces {cctxt; chain; legacy_location; stateful_location; _}
+    nonces current_cycle =
   let open Lwt_result_syntax in
   match Cycle.pred current_cycle with
   | None ->
@@ -356,7 +358,14 @@ let get_unrevealed_nonces {cctxt; chain; nonces_location; _} nonces
          occurs during genesis. *)
       return_nil
   | Some previous_cycle ->
-      let* nonces = fill_missing_fields cctxt chain nonces_location nonces in
+      let* nonces =
+        fill_missing_fields
+          cctxt
+          chain
+          ~legacy_location
+          ~stateful_location
+          nonces
+      in
       Block_hash.Map.fold_es
         (fun hash {nonce; cycle; level; _} acc ->
           match cycle with
@@ -409,9 +418,12 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
   let open Lwt_result_syntax in
   let*! () = Events.(emit registering_nonce block_hash) in
   (* Register the nonce *)
-  let nonces_location = Baking_files.resolve_location ~chain_id `Nonce in
+  let legacy_location = Baking_files.resolve_location ~chain_id `Legacy_nonce in
+  let stateful_location =
+    Baking_files.resolve_location ~chain_id `Stateful_nonce
+  in
   cctxt#with_lock @@ fun () ->
-  let* nonces = load cctxt nonces_location in
+  let* nonces = load cctxt ~legacy_location ~stateful_location in
   let nonces =
     add
       nonces
@@ -426,7 +438,7 @@ let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
         nonce_state = None;
       }
   in
-  let* () = save cctxt nonces_location nonces in
+  let* () = save cctxt ~legacy_location ~stateful_location nonces in
   return_unit
 
 (** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one 
@@ -469,7 +481,9 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
     revealing the necessary nonces. *)
 let reveal_potential_nonces state new_proposal =
   let open Lwt_result_syntax in
-  let {cctxt; chain; nonces_location; last_predecessor; _} = state in
+  let {cctxt; chain; legacy_location; stateful_location; last_predecessor; _} =
+    state
+  in
   let new_predecessor_hash = new_proposal.Baking_state.predecessor.hash in
   if
     Block_hash.(last_predecessor <> new_predecessor_hash)
@@ -481,7 +495,7 @@ let reveal_potential_nonces state new_proposal =
     let branch = new_predecessor_hash in
     (* improve concurrency *)
     cctxt#with_lock @@ fun () ->
-    let*! nonces = load cctxt nonces_location in
+    let*! nonces = load cctxt ~legacy_location ~stateful_location in
     match nonces with
     | Error err ->
         let*! () = Events.(emit cannot_read_nonces err) in
@@ -522,16 +536,23 @@ let reveal_potential_nonces state new_proposal =
                     nonces
                     (Cycle.to_int32 current_cycle)
                 in
-                let* () = save cctxt nonces_location live_nonces in
+                let* () =
+                  save cctxt ~legacy_location ~stateful_location live_nonces
+                in
                 return_unit)))
   else return_unit
 
 (* We suppose that the block stream is cloned by the caller *)
 let start_revelation_worker cctxt config chain_id constants block_stream =
   let open Lwt_result_syntax in
-  let nonces_location = Baking_files.resolve_location ~chain_id `Nonce in
-  let*! () = may_migrate cctxt nonces_location in
-  let*! _ = may_create_detailed_nonces_file cctxt nonces_location in
+  let legacy_location = Baking_files.resolve_location ~chain_id `Legacy_nonce in
+  let stateful_location =
+    Baking_files.resolve_location ~chain_id `Stateful_nonce
+  in
+  let*! () = may_migrate cctxt legacy_location in
+  let*! _ =
+    may_create_detailed_nonces_file cctxt ~legacy_location ~stateful_location
+  in
   let chain = `Hash chain_id in
   let canceler = Lwt_canceler.create () in
   let should_shutdown = ref false in
@@ -541,7 +562,8 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
       chain;
       constants;
       config;
-      nonces_location;
+      legacy_location;
+      stateful_location;
       last_predecessor = Block_hash.zero;
     }
   in
