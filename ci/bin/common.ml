@@ -478,6 +478,12 @@ let changeset_test_kernels =
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
     @ make ["kernels.mk"; "src/kernel_*/**/*"])
 
+let changeset_test_etherlink_kernel =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["etherlink.mk"; "etherlink/kernel_evm/**/*"; "src/kernel_sdk/**/*"])
+
 (** {2 Job makers} *)
 
 (** Helper to create jobs that uses the Docker daemon.

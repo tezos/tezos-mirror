@@ -7,14 +7,7 @@ test_etherlink_kernel:
   tags:
   - gcp
   rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - etherlink.mk
-    - etherlink/kernel_evm/**/*
-    - images/**/*
-    - src/kernel_sdk/**/*
-    when: on_success
+  - when: on_success
   needs:
   - oc.docker:rust-toolchain
   dependencies:
