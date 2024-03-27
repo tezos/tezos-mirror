@@ -490,9 +490,13 @@ runner parallelism while limiting the number of jobs per
 pipeline. The grain used varies slightly for different types of
 tests:
 
+.. _gitlab_tezt_ci:
+
 Tezt integration and regression tests
-   Tezt tests are grouped in 3 batch jobs. New tests increases the
-   size of the last batch.
+   By default, Tezt tests are grouped in several batch jobs named ``tezt`` and
+   are executed in merge request pipelines. According to the tags attached to them,
+   the tests can be handled differently. The description of these tags can be
+   found in :src:`src/lib_test/tag.mli`.
 
 The OCaml package tests (Alcotest & QCheck)
    The OCaml package tests are regrouped in a set of jobs per protocol package,
@@ -618,3 +622,8 @@ follow this convention:
    directory structure.
 
 4. OCaml comments must be valid ``ocamldoc`` `special comments <https://ocaml.org/manual/ocamldoc.html#s:ocamldoc-comments>`_.
+
+5. If a test takes 2 minutes or more on the CI, it should be tagged as ``slow``
+   (see :ref:`Tezt integration and regression tests<gitlab_tezt_ci>`). Note
+   that tests with tag ``slow`` do not run automatically in the CI of merge
+   requests.
