@@ -38,13 +38,15 @@ The Tezos ledger currently has two types of accounts that can hold
 tokens. Accounts can be used in transactions as senders, to send tokens,
 or as destinations, to receive tokens.
 
-- Implicit account: non-programmable account whose address is
+- User account: non-programmable account whose address is
   the public key hash, prefixed by ``tz`` and one digit.
+  User accounts are sometimes called implicit accounts.
   A transaction to such an address cannot provide data, except :doc:`tickets <./tickets>`.
 - Smart contract: programmable account associated to some Michelson code,
   whose address is a unique hash, prefixed by ``KT1``.
   A transaction to such
   an address can provide data, and can fail for reasons detailed below.
+  Smart contracts are sometimes called originated accounts.
 
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`, which cannot hold tokens but can be the destination of transactions.
@@ -92,7 +94,7 @@ The subset of blockchain operations that can be emitted by Michelson programs as
 
   - Transaction transferring:
 
-    * tokens and optionally tickets to an implicit account, or
+    * tokens and optionally tickets to a user account, or
     * tokens and parameters to a smart contract (or, optionally, to a specified
       entrypoint of a smart contract), or
     * parameters to a smart rollup.
@@ -101,7 +103,7 @@ The subset of blockchain operations that can be emitted by Michelson programs as
     source code, an initial amount of tokens transferred from the
     source, and an initial storage content.
   - Delegation assigning the tokens of the sender account to the stake of
-    an implicit account (without transferring any tokens).
+    a user account (without transferring any tokens).
   - :doc:`Contract event <./event>` delivering live information from a smart
     contract to external applications.
 
@@ -178,7 +180,7 @@ In any case, when a failure happens, either total success or total
 failure is guaranteed. If a transaction (internal or external) fails,
 then the whole sequence fails and all the effects up to the failure
 are reverted. These transactions can still be included in blocks, and
-the transaction fees are given to the implicit account who baked the
+the transaction fees are given to the user account who baked the
 block.
 
 Language semantics
@@ -1493,7 +1495,7 @@ that is only well-typed if the current contract has an entrypoint named ``%entry
     :: 'S   ->   contract 'p : 'S
        where   contract 'p is the type of the entrypoint %entrypoint of the current contract
 
-Implicit accounts are considered to have a single ``default``
+User accounts are considered to have a single ``default``
 entrypoint of type ``Unit``.
 
 JSON syntax
