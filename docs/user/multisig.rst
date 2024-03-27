@@ -174,7 +174,7 @@ limitations:
 - the possible authenticated actions on the contract are:
 
 
-  - transfer without parameter to an implicit account or to a smart
+  - transfer without parameter to a user account or to a smart
     contract with an entrypoint of type ``unit``
   - set the delegate of the contract
   - remove the delegate of the contract

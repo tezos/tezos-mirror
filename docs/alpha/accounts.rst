@@ -23,11 +23,12 @@ User accounts
 From the economic protocol's point of view, user accounts are considered as a particular case
 of smart contracts that always succeed in receiving tokens or tickets,
 and do nothing else.
+Transferring toward a user account succeeds even if the address of the account has never appeared on the chain before.
 This is why user accounts are also called implicit accounts.
 
 Transactions that are signed by the private key corresponding to the public key
 hash, *i.e.* address of the account can spend its tokens. Each
-prefix for addresses denote a different cryptographic signing scheme. They are
+prefix for addresses denotes a different cryptographic signing scheme. They are
 briefly described below from a user point of view.
 
 The sizes of public keys, secret keys and signatures may differ between the

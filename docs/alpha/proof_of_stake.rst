@@ -27,13 +27,13 @@ be predicted too much in advance.
 Delegation and Staking
 ----------------------
 
-A *delegate* is any :ref:`implicit account <def_implicit_account_alpha>` registered as
+A *delegate* is any :ref:`user account <def_implicit_account_alpha>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
 operation emitter (its signer). Note that ``tz4`` accounts cannot be registered
 as delegates.
 
-Any :ref:`account <def_account_alpha>` (implicit account or smart contract) can specify a delegate
+Any :ref:`account <def_account_alpha>` (user account or smart contract) can specify a delegate
 through a delegation operation.  Any account can change or revoke its delegate
 at any time, again through a delegation operation. However, the change only
 becomes effective after ``CONSENSUS_RIGHTS_DELAY + 2`` :ref:`cycles <def_cycle_alpha>`.  The

@@ -24,15 +24,15 @@ If you don't want to deal with the complexity of running your own
 delegate, you can always take part in the protocol by delegating your
 coins to one.
 
-Both implicit accounts and smart contracts can have a
-delegate. Setting or resetting the delegate of an implicit account is
+Both user accounts and smart contracts can have a
+delegate. Setting or resetting the delegate of a user account is
 achieved by the following command:
 
 ::
 
-   octez-client set delegate for <implicit_account> to <delegate>
+   octez-client set delegate for <user_account> to <delegate>
 
-where ``<implicit_account>`` is the address or alias of the implicit
+where ``<user_account>`` is the address or alias of the user
 account to delegate and ``<delegate>`` is the address or alias of the
 delegate (which has to be :ref:`registered<DelegateRegistration>`).
 
@@ -40,7 +40,7 @@ To stop a delegation, the following command can be used:
 
 ::
 
-   octez-client withdraw delegate from <implicit_account>
+   octez-client withdraw delegate from <user_account>
 
 
 
@@ -59,10 +59,10 @@ delegation is by using the ``SET_DELEGATE`` Michelson instruction (see
 details).
 
 
-Notice that only implicit accounts can be delegates, so your delegate
+Notice that only user accounts can be delegates, so your delegate
 must be a *tz* address.
 
-Funds in implicit accounts which are not registered as delegates
+Funds in user accounts which are not registered as delegates
 do not participate in baking.
 
 Note that delegating coins doesn't mean that a delegate can spend
@@ -121,7 +121,7 @@ Register and check your rights
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To run a delegate, you first need to register as one using
-your implicit account::
+your user account::
 
    octez-client register key bob as delegate
 

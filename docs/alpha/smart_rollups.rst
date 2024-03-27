@@ -371,7 +371,7 @@ Glossary
 #. **Refutation period**: When the first commitment for a commitment period is published, a refutation
    period of two weeks starts to allow this commitment to be challenged.
 
-#. **Staker**: An implicit account that has made a deposit on a
+#. **Staker**: A user account that has made a deposit on a
    commitment.
 
 #. **Refutation game**: A process by which the Tezos protocol solves

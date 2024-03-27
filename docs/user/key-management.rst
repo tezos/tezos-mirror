@@ -325,7 +325,7 @@ The delegate will seamlessly keep baking when the transition happens::
 Draining a Manager's Account With its Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This operation immediately transfers all the spendable balance of the ``baker_pkh``’s implicit account into the ``destination_pkh`` implicit account::
+This operation immediately transfers all the spendable balance of the ``baker_pkh``’s user account into the ``destination_pkh`` user account::
 
    octez-client drain delegate <baker_pkh> to <destination_pkh> with <consensus_pkh>
 

@@ -17,7 +17,7 @@ The CPMM maintains a balance of ``a`` tez and ``b`` `tzBTC <https://tzbtc.io/>`_
 To implement this contract, we use a fork of the open source code base used by `version two <https://gitlab.com/dexter2tz/dexter2tz>`_ of the "Dexter" project. The implementation of this contract has been `formally verified <https://gitlab.com/dexter2tz/dexter2tz#audits-and-formal-verification-external-resources>`_ against its functional specification. The contract code is modified in the following way:
 
 1. The fee is set to 0.1% only (the fee in Dexter v2 is set to 0.3%). Rationale: given the subsidy it is not necessary to charge a large fee and better to improve liquidity.
-2. An additional 0.1% of every trade is burned by being transferred to the null implicit account. Rationale: this mechanism offsets inflation from the subsidy. The inflation is exactly balanced at a daily trade volume of 7.2 million tez.
+2. An additional 0.1% of every trade is burned by being transferred to the null user account. Rationale: this mechanism offsets inflation from the subsidy. The inflation is exactly balanced at a daily trade volume of 7.2 million tez.
 3. The ability to set a delegate has been removed. Rationale: the subsidy means there is no need for a baker for that contract and having one would create an imbalance.
 4. The ability to set a manager has been removed. Rationale: the only privilege of the Dexter manager is to set Dexter's delegate so this role is now unnecessary.
 

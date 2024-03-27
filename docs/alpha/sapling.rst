@@ -29,8 +29,8 @@ On the other hand a viewing key can willingly be shared with a third
 party, for example with an auditor for regulatory compliance purposes.
 
 A viewing key can also derive several diversified addresses.
-An address can be used to receive funds, much like the address of an
-implicit account.
+An address can be used to receive funds, much like the address of a
+user account.
 
 Additionally *proving keys* can be used to allow the creation of proofs,
 thus revealing private information, without being able to spend funds.
@@ -309,10 +309,10 @@ Fees issue
 
 The Sapling integration in Tezos exhibits a privacy issue that Z-cash doesn't have. When
 interacting with a shielded pool one interacts with a smart contract
-via a normal transaction and therefore have to pay fees from an
-implicit account.
+via a normal transaction and therefore have to pay fees from a
+user account.
 One could guess that private transactions whose fees are paid by the
-same implicit account are from the same user.
+same user account are from the same user.
 This can be mitigated by making a service that act as a proxy by
 forwarding the user transactions and paying its fees. The user would
 then include in the transaction a shielded output for the service that

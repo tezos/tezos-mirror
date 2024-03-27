@@ -25,7 +25,7 @@ Prerequisites
 To experiment with the commands described in this section, we use
 the `Weeklynet <https://teztnets.com/weeklynet-about>`_.
 In this section, we assume that ``${OPERATOR_ADDR}`` is a valid
-implicit account on Weeklynet owned by the reader.
+user account on Weeklynet owned by the reader.
 
 Notice that you need a specific development version of Octez to
 participate to Weeklynet. This version is either available from
@@ -81,7 +81,7 @@ This can be checked by:
    octez-client bootstrapped
    octez-client rpc get /chains/main/blocks/head/protocols
 
-In case you do not already have an implicit account, you can generate one with:
+In case you do not already have a user account, you can generate one with:
 
 .. code:: sh
 
@@ -1482,7 +1482,7 @@ with the following schema:
   [
     [ { "payload" : <Michelson data>,
         "sender" : <Contract hash of the originated contract for the rollup, optional>,
-        "source" : <Implicit account sending the message, optional>
+        "source" : <User account sending the message, optional>
         "destination" : <Smart rollup address> }
       ..
       // or
