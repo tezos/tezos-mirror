@@ -360,11 +360,7 @@ test_case!(
     test_suite_rv64ud_p_fmin,
     "rv64ud-p-fmin"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64ud_p_ldst,
-    "rv64ud-p-ldst"
-);
+test_case!(test_suite_rv64ud_p_ldst, "rv64ud-p-ldst", Mode::User);
 test_case!(
     #[ignore]
     test_suite_rv64ud_p_move,
@@ -478,11 +474,7 @@ test_case!(
     test_suite_rv64uf_p_fmin,
     "rv64uf-p-fmin"
 );
-test_case!(
-    #[ignore]
-    test_suite_rv64uf_p_ldst,
-    "rv64uf-p-ldst"
-);
+test_case!(test_suite_rv64uf_p_ldst, "rv64uf-p-ldst", Mode::User);
 test_case!(
     #[ignore]
     test_suite_rv64uf_p_move,

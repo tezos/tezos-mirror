@@ -8,10 +8,13 @@
 
 use crate::{
     machine_state::{
+        bus::main_memory::MainMemoryLayout,
         hart_state::HartState,
         registers::{FRegister, FValue, XRegister},
+        MachineState,
     },
     state_backend as backend,
+    traps::Exception,
 };
 use rustc_apfloat::{ieee::Single, Float};
 
@@ -75,6 +78,33 @@ where
     }
 }
 
+impl<ML, M> MachineState<ML, M>
+where
+    ML: MainMemoryLayout,
+    M: backend::Manager,
+{
+    /// `FLW` I-type instruction.
+    ///
+    /// Loads a single-precision floating point value from memory into `rd`.
+    /// It uses the same address format as integer-base ISA.
+    pub fn run_flw(&mut self, imm: i64, rs1: XRegister, rd: FRegister) -> Result<(), Exception> {
+        let val: u32 = self.read_from_bus(imm, rs1)?;
+        let val = f32_to_fvalue(val);
+
+        self.hart.fregisters.write(rd, val);
+        Ok(())
+    }
+
+    /// `FSW` S-type instruction.
+    ///
+    /// Stores a single-precision floating point value into memory from `rs2`.
+    /// It uses the same address format as integer-base ISA.
+    pub fn run_fsw(&mut self, imm: i64, rs1: XRegister, rs2: FRegister) -> Result<(), Exception> {
+        let val: u64 = self.hart.fregisters.read(rs2).into();
+        self.write_to_bus(imm, rs1, val as u32)
+    }
+}
+
 /// The upper 32 bits are set to `1` for any `f32` write.
 #[inline(always)]
 fn f32_to_fvalue(val: u32) -> FValue {
@@ -83,13 +113,18 @@ fn f32_to_fvalue(val: u32) -> FValue {
 
 #[cfg(test)]
 mod tests {
+    use super::f32_to_fvalue;
     use crate::{
         backend_test, create_backend, create_state,
         machine_state::{
+            bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
             hart_state::{HartState, HartStateLayout},
-            registers::{parse_fregister, parse_xregister},
+            registers::{fa1, fa4, parse_fregister, parse_xregister, t0},
+            MachineState, MachineStateLayout,
         },
+        traps::Exception,
     };
+
     use proptest::prelude::*;
 
     use rustc_apfloat::{ieee::Double, ieee::Single, Float};
@@ -126,6 +161,54 @@ mod tests {
             } else {
                 assert_eq!(read, f as u64, "Expected no sign byte to be extended");
             }
+        });
+    });
+
+    backend_test!(test_load_store, F, {
+        proptest!(|(
+            val in any::<f32>().prop_map(f32::to_bits),
+        )|
+        {
+            let mut backend = create_backend!(MachineStateLayout<T1K>, F);
+            let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+
+            let mut perform_test = |offset: u64| -> Result<(), Exception> {
+                // Save test values v_i in registers ai
+                state.hart.fregisters.write(fa1, f32_to_fvalue(val));
+
+                // t0 will hold the "global" offset of all loads / stores we are going to make
+                state.hart.xregisters.write(t0, offset);
+
+                // Perform the stores
+                state.run_fsw(4, t0, fa1)?;
+
+                state.run_flw(4, t0, fa4)?;
+
+                assert_eq!(state.hart.fregisters.read(fa4), f32_to_fvalue(val));
+                Ok(())
+            };
+
+            let invalid_offset = DEVICES_ADDRESS_SPACE_LENGTH - 1024;
+            let aligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 512;
+            let misaligned_offset = DEVICES_ADDRESS_SPACE_LENGTH + 513;
+
+            // Out of bounds loads / stores
+            prop_assert!(perform_test(invalid_offset).is_err_and(|e|
+                matches!(e, Exception::StoreAccessFault(_))
+            ));
+            // Aligned loads / stores
+            prop_assert!(perform_test(aligned_offset).is_ok());
+            // Unaligned loads / stores
+            prop_assert!(perform_test(misaligned_offset).is_ok());
+
+            // Out of bounds loads / stores
+            prop_assert!(perform_test(invalid_offset).is_err_and(|e|
+                matches!(e, Exception::StoreAccessFault(_))
+            ));
+            // Aligned loads / stores
+            prop_assert!(perform_test(aligned_offset).is_ok());
+            // Unaligned loads / stores
+            prop_assert!(perform_test(misaligned_offset).is_ok());
         });
     });
 }

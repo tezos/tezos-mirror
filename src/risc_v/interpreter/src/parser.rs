@@ -80,6 +80,11 @@ fn rs2(instr: u32) -> XRegister {
 }
 
 #[inline(always)]
+fn rs2_f(instr: u32) -> FRegister {
+    parse_fregister(rs2_bits(instr))
+}
+
+#[inline(always)]
 fn imm_11_6(instr: u32) -> u32 {
     bits(instr, 26, 6) << 1
 }
@@ -97,6 +102,12 @@ const rm: fn(u32) -> u32 = funct3;
 #[inline(always)]
 const fn fmt(instr: u32) -> u32 {
     bits(instr, 25, 2)
+}
+
+/// Floating-point width field encoding
+#[inline(always)]
+const fn width(instr: u32) -> u32 {
+    bits(instr, 12, 3)
 }
 
 fn csr(instr: u32) -> Option<CSRegister> {
@@ -143,6 +154,11 @@ fn j_imm(instr: u32) -> i64 {
     let instr_30_21 = (instr & 0b0111_1111_1110_0000_0000_0000_0000_0000) as i32;
     ((instr_31 >> 11) | instr_19_12 | (instr_20 >> 9) | (instr_30_21 >> 20)) as i64
 }
+
+#[allow(non_upper_case_globals)]
+const fl_imm: fn(u32) -> i64 = i_imm;
+#[allow(non_upper_case_globals)]
+const fs_imm: fn(u32) -> i64 = s_imm;
 
 macro_rules! r_instr {
     ($enum_variant:ident, $instr:expr) => {
@@ -198,6 +214,26 @@ macro_rules! j_instr {
         $enum_variant(instruction::UJTypeArgs {
             rd: rd($instr),
             imm: j_imm($instr),
+        })
+    };
+}
+
+macro_rules! fl_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        $enum_variant(instruction::FLoadArgs {
+            rd: rd_f($instr),
+            rs1: rs1($instr),
+            imm: fl_imm($instr),
+        })
+    };
+}
+
+macro_rules! fs_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        $enum_variant(instruction::FStoreArgs {
+            rs1: rs1($instr),
+            rs2: rs2_f($instr),
+            imm: fs_imm($instr),
         })
     };
 }
@@ -261,6 +297,8 @@ const OP_AUIPC: u32 = 0b001_0111;
 const OP_JAL: u32 = 0b110_1111;
 const OP_JALR: u32 = 0b110_0111;
 const OP_FP: u32 = 0b1010011;
+const OP_FP_LOAD: u32 = 0b000_0111;
+const OP_FP_STORE: u32 = 0b010_0111;
 
 const F3_0: u32 = 0b000;
 const F3_1: u32 = 0b001;
@@ -284,6 +322,9 @@ const F7_56: u32 = 0b011_1000;
 
 const FMT_S: u32 = 0b0;
 const FMT_D: u32 = 0b01;
+
+const WIDTH_W: u32 = 0b010;
+const WIDTH_D: u32 = 0b011;
 
 const RM_0: u32 = 0b0;
 const RM_1: u32 = 0b1;
@@ -529,6 +570,17 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
             _ => Unknown { instr },
         },
 
+        // F/D-type load
+        OP_FP_LOAD => match width(instr) {
+            WIDTH_W => fl_instr!(Flw, instr),
+            WIDTH_D => fl_instr!(Fld, instr),
+            _ => Unknown { instr },
+        },
+        OP_FP_STORE => match width(instr) {
+            WIDTH_W => fs_instr!(Fsw, instr),
+            WIDTH_D => fs_instr!(Fsd, instr),
+            _ => Unknown { instr },
+        },
         // Jump instructions
         OP_JAL => j_instr!(Jal, instr),
         OP_JALR => match funct3(instr) {
