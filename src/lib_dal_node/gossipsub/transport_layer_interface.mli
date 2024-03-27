@@ -60,6 +60,10 @@ type p2p_message =
       message_id : Types.Message_id.t;
     }
 
+val p2p_message_encoding : p2p_message Data_encoding.t
+
+val pp_p2p_message : Format.formatter -> p2p_message -> unit
+
 (** A P2P message config is parameterized by the network's name. *)
 val message_config :
   network_name:string -> p2p_message P2p_params.message_config

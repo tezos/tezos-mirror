@@ -5168,8 +5168,8 @@ module Amplification = struct
       in
       Log.info
         "Waiting for reconstruction to be canceled because all shards were \
-         received" ;
-      let* () =
+         received, or for the reconstruction to finish" ;
+      let promise_reconstruction_cancelled =
         Dal_node.wait_for
           observer
           "reconstruct_no_missing_shard.v0"
@@ -5181,7 +5181,17 @@ module Amplification = struct
             then Some ()
             else None)
       in
-      unit
+      let promise_reconstruction_finished =
+        Dal_node.wait_for observer "reconstruct_finished.v0" (fun event ->
+            if
+              JSON.(
+                event |-> "level" |> as_int = publication_level
+                && event |-> "slot_index" |> as_int = index)
+            then Some ()
+            else None)
+      in
+      Lwt.pick
+        [promise_reconstruction_cancelled; promise_reconstruction_finished]
     in
     let* publication_level_bis, _commitment =
       publish_store_and_wait_slot
@@ -5198,6 +5208,7 @@ module Amplification = struct
       ~__LOC__
       Check.int
       ~error_msg:"Unexpected publication level, actual:%L, expected:%R" ;
+
     unit
 end
 
