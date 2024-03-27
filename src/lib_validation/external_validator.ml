@@ -63,6 +63,15 @@ module Events = struct
       ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
       ("block", Block_header.encoding)
 
+  let preapply_request =
+    declare_1
+      ~section
+      ~level:Info
+      ~name:"preapply_request"
+      ~msg:"preapplying on top of block {hash}"
+      ~pp1:Block_hash.pp
+      ("hash", Block_hash.encoding)
+
   let precheck_request =
     declare_1
       ~section
@@ -113,6 +122,14 @@ module Events = struct
       ~level:Info
       ~name:"context_split_request"
       ~msg:"spliting context"
+      ()
+
+  let reconfigure_event_logging_request =
+    declare_0
+      ~section
+      ~level:Info
+      ~name:"reconfigure_event_logging_request"
+      ~msg:"reconfiguring event logging"
       ()
 
   let termination_request =
@@ -251,6 +268,7 @@ let handle_request :
   in
   function
   | Commit_genesis {chain_id} ->
+      let*! () = Events.(emit commit_genesis_request genesis.Genesis.block) in
       let*! commit =
         Error_monad.catch_es (fun () ->
             Context.commit_genesis
@@ -273,6 +291,7 @@ let handle_request :
         should_precheck;
         simulate;
       } ->
+      let*! () = Events.(emit validation_request block_header) in
       let*! block_application_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->
@@ -346,6 +365,7 @@ let handle_request :
         predecessor_resulting_context_hash;
         operations;
       } ->
+      let*! () = Events.(emit preapply_request predecessor_hash) in
       let*! block_preapplication_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->
@@ -403,8 +423,9 @@ let handle_request :
         predecessor_resulting_context_hash;
         header;
         operations;
-        _;
+        hash;
       } ->
+      let*! () = Events.(emit precheck_request hash) in
       let*! block_precheck_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->
@@ -441,6 +462,7 @@ let handle_request :
       continue block_precheck_result cache cached_result
   | External_validation.Fork_test_chain {chain_id; context_hash; forked_header}
     ->
+      let*! () = Events.(emit fork_test_chain_request forked_header) in
       let*! context_opt = Context.checkout context_index context_hash in
       let*! res =
         match context_opt with
@@ -455,6 +477,7 @@ let handle_request :
       continue res cache cached_result
   | External_validation.Context_garbage_collection
       {context_hash; gc_lockfile_path} ->
+      let*! () = Events.(emit context_gc_request context_hash) in
       let*! () = Context.gc context_index context_hash in
       let*! lockfile =
         Lwt_unix.openfile
@@ -480,12 +503,15 @@ let handle_request :
       let () = Lwt.dont_wait gc_waiter (fun _exn -> ()) in
       continue (Ok ()) cache cached_result
   | External_validation.Context_split ->
+      let*! () = Events.(emit context_split_request) () in
       let*! () = Context.split context_index in
       continue (Ok ()) cache cached_result
   | External_validation.Terminate ->
       let*! () = Lwt_io.flush_all () in
+      let*! () = Events.(emit termination_request ()) in
       Lwt.return `Stop
   | External_validation.Reconfigure_event_logging config ->
+      let*! () = Events.(emit reconfigure_event_logging_request ()) in
       let*! res =
         Tezos_base_unix.Internal_event_unix.Configuration.reapply config
       in
