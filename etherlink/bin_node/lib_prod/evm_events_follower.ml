@@ -5,7 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {rollup_node_endpoint : Uri.t; ctxt : Evm_context.t}
+type parameters = {
+  rollup_node_endpoint : Uri.t;
+  filter_event : Ethereum_types.Evm_events.t -> bool;
+}
 
 module StringSet = Set.Make (String)
 
@@ -21,7 +24,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = ["evm_node"; "prod"; "events_follower"; "worker"]
+  let base = ["evm_node"; "dev"; "events_follower"; "worker"]
 
   let pp _ _ = ()
 
@@ -84,7 +87,7 @@ let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
   in
   return event_opt
 
-let on_new_head ({rollup_node_endpoint; ctxt} as state : Types.state)
+let on_new_head ({rollup_node_endpoint; filter_event} as state : Types.state)
     rollup_block_lvl =
   let open Lwt_result_syntax in
   let* nb_of_events_bytes =
@@ -94,7 +97,7 @@ let on_new_head ({rollup_node_endpoint; ctxt} as state : Types.state)
       rollup_node_endpoint
   in
   match nb_of_events_bytes with
-  | None -> return_unit
+  | None -> Evm_context.new_last_known_l1_level rollup_block_lvl
   | Some nb_of_events_bytes ->
       let (Qty nb_of_events) =
         Ethereum_types.decode_number nb_of_events_bytes
@@ -109,8 +112,13 @@ let on_new_head ({rollup_node_endpoint; ctxt} as state : Types.state)
           nb_of_events
           (fetch_event state rollup_block_lvl)
       in
-      let events = List.filter_map Fun.id events in
-      Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl ctxt events
+      let events =
+        List.filter_map
+          (function
+            | Some event when filter_event event -> Some event | _ -> None)
+          events
+      in
+      Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
 
 module Handlers = struct
   type self = worker
@@ -140,12 +148,9 @@ module Handlers = struct
       (r, request_error) Request.t ->
       request_error ->
       unit tzresult Lwt.t =
-   fun _w _ req errs ->
+   fun _w _ _req _errs ->
     let open Lwt_result_syntax in
-    match (req, errs) with
-    | New_rollup_node_block _, [Node_error.Diverged _divergence] ->
-        Lwt_exit.exit_and_raise Node_error.exit_code_when_diverge
-    | _ -> return_unit
+    return_unit
 
   let on_completion _ _ _ _ = Lwt.return_unit
 
@@ -164,8 +169,18 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
-    | Lwt.Sleep -> Error (TzTrace.make No_worker))
+    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+
+let bind_worker f =
+  let open Lwt_result_syntax in
+  let res = Lazy.force worker in
+  match res with
+  | Error [No_worker] ->
+      (* There is no worker, nothing to do *)
+      return_unit
+  | Error errs -> fail errs
+  | Ok w -> f w
 
 let start parameters =
   let open Lwt_result_syntax in
@@ -174,23 +189,17 @@ let start parameters =
   Lwt.wakeup worker_waker worker
 
 let shutdown () =
-  let open Lwt_syntax in
-  let w = Lazy.force worker in
-  match w with
-  | Error _ ->
-      (* There is no events follower, nothing to do *)
-      Lwt.return_unit
-  | Ok w ->
-      let* () = Evm_events_follower_events.shutdown () in
-      Worker.shutdown w
-
-let worker_add_request ~request : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  match Lazy.force worker with
-  | Ok w ->
-      let*! (_pushed : bool) = Worker.Queue.push_request w request in
-      return_unit
-  | Error e -> Lwt.return (Error e)
+  bind_worker @@ fun w ->
+  let*! () = Evm_events_follower_events.shutdown () in
+  let*! () = Worker.shutdown w in
+  return_unit
+
+let worker_add_request ~request =
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! (_pushed : bool) = Worker.Queue.push_request w request in
+  return_unit
 
 let new_rollup_block rollup_level =
   worker_add_request ~request:(New_rollup_node_block rollup_level)

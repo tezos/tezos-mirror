@@ -27,7 +27,7 @@ type error += Rlp_decoding_error of string
 
 let () =
   register_error_kind
-    ~id:"evm-node.prod.rlp-decoding-error"
+    ~id:"evm-node.dev.rlp-decoding-error"
     ~title:"Unable to decode an RLP value"
     ~description:"Unable to decode an RLP value"
     ~pp:(fun ppf msg ->

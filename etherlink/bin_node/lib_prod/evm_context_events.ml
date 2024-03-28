@@ -5,6 +5,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start ~proxy ~rollup_node_endpoint] starts the rollup node
-    follower. In proxy mode does not try to catchup evm event. *)
-val start : proxy:bool -> rollup_node_endpoint:Uri.t -> unit
+include Internal_event.Simple
+
+let section = Events.section @ ["evm_context"]
+
+let ready =
+  declare_0
+    ~section
+    ~name:"evm_context_is_ready"
+    ~msg:"EVM Context worker is ready"
+    ~level:Info
+    ()
+
+let shutdown =
+  declare_0
+    ~section
+    ~name:"evm_context_shutdown"
+    ~msg:"EVM Context worker is shutting down"
+    ~level:Info
+    ()
+
+let ready () = emit ready ()
+
+let shutdown () = emit shutdown ()

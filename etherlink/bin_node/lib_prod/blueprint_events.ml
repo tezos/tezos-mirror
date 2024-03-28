@@ -89,13 +89,15 @@ let invalid_blueprint =
     ~level:Error
     ("level", Data_encoding.n)
 
-let missing_blueprint =
-  declare_1
+let missing_blueprints =
+  declare_3
     ~section
-    ~name:"blueprint_blueprint"
-    ~msg:"Could not fetch the blueprint for level {level}"
+    ~name:"missing_blueprints"
+    ~msg:"Store is missing {count} blueprints in the range [{from}; {to_}]"
     ~level:Error
-    ("level", Data_encoding.n)
+    ("count", Data_encoding.int31)
+    ("from", Data_encoding.n)
+    ("to_", Data_encoding.n)
 
 let publisher_is_ready () = emit publisher_ready ()
 
@@ -111,7 +113,9 @@ let invalid_blueprint_produced level = emit invalid_blueprint level
 
 let catching_up min max = emit blueprint_catchup (min, max)
 
-let missing_blueprint level = emit missing_blueprint level
+let missing_blueprints count Ethereum_types.(Qty from) Ethereum_types.(Qty to_)
+    =
+  emit missing_blueprints (count, from, to_)
 
 let blueprint_proposal Ethereum_types.(Qty level) time =
   emit blueprint_proposal (level, time)

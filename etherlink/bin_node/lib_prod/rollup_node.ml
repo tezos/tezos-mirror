@@ -45,15 +45,11 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module TxEncoder = struct
-    type transactions = {
-      raw : string list;
-      delayed : Ethereum_types.Delayed_transaction.t list;
-    }
+    type transactions = string list
 
     type messages = string list
 
-    let encode_transactions ~smart_rollup_address
-        ~transactions:({raw = transactions; _} : transactions) =
+    let encode_transactions ~smart_rollup_address ~transactions =
       let open Result_syntax in
       let* rev_hashes, messages =
         List.fold_left_e

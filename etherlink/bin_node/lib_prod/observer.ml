@@ -8,27 +8,20 @@
 open Ethereum_types
 
 module MakeBackend (Ctxt : sig
-  val ctxt : Evm_context.t
-
   val evm_node_endpoint : Uri.t
+
+  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
-    let read path =
-      let open Lwt_result_syntax in
-      let*! res = Evm_context.inspect Ctxt.ctxt path in
-      return res
+    let read path = Evm_context.inspect path
   end
 
   module TxEncoder = struct
-    type transactions = {
-      raw : string list;
-      delayed : Ethereum_types.Delayed_transaction.t list;
-    }
+    type transactions = string list
 
     type messages = string list
 
-    let encode_transactions ~smart_rollup_address:_
-        ~(transactions : transactions) =
+    let encode_transactions ~smart_rollup_address:_ ~transactions =
       let open Result_syntax in
       let hashes =
         List.map
@@ -36,9 +29,9 @@ end) : Services_backend_sig.Backend = struct
             let tx_hash_str = Ethereum_types.hash_raw_tx transaction in
             Ethereum_types.(
               Hash Hex.(of_string tx_hash_str |> show |> hex_of_string)))
-          transactions.raw
+          transactions
       in
-      return (hashes, transactions.raw)
+      return (hashes, transactions)
   end
 
   module Publisher = struct
@@ -96,49 +89,181 @@ end) : Services_backend_sig.Backend = struct
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
-      let* raw_insights = Evm_context.execute_and_inspect Ctxt.ctxt ~input in
+      let* raw_insights = Evm_context.execute_and_inspect input in
       match raw_insights with
       | [Some bytes] -> return bytes
       | _ -> Error_monad.failwith "Invalid insights format"
   end
 
   let smart_rollup_address =
-    Tezos_crypto.Hashed.Smart_rollup_address.to_string
-      Ctxt.ctxt.smart_rollup_address
+    Tezos_crypto.Hashed.Smart_rollup_address.to_string Ctxt.smart_rollup_address
 end
 
-let on_new_blueprint (ctxt : Evm_context.t) (blueprint : Blueprint_types.t) =
+let on_new_blueprint next_blueprint_number
+    ({delayed_transactions; blueprint} : Blueprint_types.with_events) =
+  let open Lwt_result_syntax in
   let (Qty level) = blueprint.number in
-  let (Qty number) = ctxt.session.next_blueprint_number in
+  let (Qty number) = next_blueprint_number in
   if Z.(equal level number) then
-    Evm_context.apply_blueprint ctxt blueprint.timestamp blueprint.payload
+    let events =
+      List.map
+        (fun delayed_transaction ->
+          Ethereum_types.Evm_events.New_delayed_transaction delayed_transaction)
+        delayed_transactions
+    in
+    let* () = Evm_context.apply_evm_events events in
+    let delayed_transactions =
+      List.map
+        (fun Ethereum_types.Delayed_transaction.{hash; _} -> hash)
+        delayed_transactions
+    in
+    Evm_context.apply_blueprint
+      blueprint.timestamp
+      blueprint.payload
+      delayed_transactions
   else failwith "Received a blueprint with an unexpected number."
 
-let main (ctxt : Evm_context.t) ~evm_node_endpoint =
+module Make (Ctxt : sig
+  val evm_node_endpoint : Uri.t
+
+  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
+end) : Services_backend_sig.S =
+  Services_backend_sig.Make (MakeBackend (Ctxt))
+
+let callback_log server conn req body =
+  let open Cohttp in
+  let open Lwt_syntax in
+  let uri = req |> Request.uri |> Uri.to_string in
+  let meth = req |> Request.meth |> Code.string_of_method in
+  let* body_str = body |> Cohttp_lwt.Body.to_string in
+  let* () = Events.callback_log ~uri ~meth ~body:body_str in
+  Tezos_rpc_http_server.RPC_server.resto_callback
+    server
+    conn
+    req
+    (Cohttp_lwt.Body.of_string body_str)
+
+let observer_start
+    ({rpc_addr; rpc_port; cors_origins; cors_headers; max_active_connections; _} :
+      Configuration.observer Configuration.t) ~directory =
   let open Lwt_result_syntax in
-  let rec loop stream =
+  let open Tezos_rpc_http_server in
+  let p2p_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string p2p_addr in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.allow_all in
+  let cors =
+    Resto_cohttp.Cors.
+      {allowed_headers = cors_headers; allowed_origins = cors_origins}
+  in
+  let server =
+    RPC_server.init_server
+      ~acl
+      ~cors
+      ~media_types:Media_type.all_media_types
+      directory
+  in
+  let*! () =
+    RPC_server.launch
+      ~max_active_connections
+      ~host
+      server
+      ~callback:(callback_log server)
+      node
+  in
+  let*! () = Events.is_ready ~rpc_addr ~rpc_port in
+  return server
+
+let install_finalizer_observer server =
+  let open Lwt_syntax in
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  let* () = Events.shutdown_node ~exit_status in
+  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
+  let* () = Events.shutdown_rpc_server ~private_:false in
+  Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
+  let* () = Tx_pool.shutdown () in
+  let* () = Evm_events_follower.shutdown () in
+  Evm_context.shutdown ()
+
+let main_loop ~evm_node_endpoint =
+  let open Lwt_result_syntax in
+  let rec loop (Qty next_blueprint_number) stream =
     let*! candidate = Lwt_stream.get stream in
     match candidate with
     | Some blueprint ->
-        let* () = on_new_blueprint ctxt blueprint in
+        let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
         let* _ = Tx_pool.pop_and_inject_transactions () in
-        loop stream
+        loop (Qty (Z.succ next_blueprint_number)) stream
     | None -> return_unit
   in
+
+  let*! head = Evm_context.head_info () in
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6876
      Should be resilient to errors from the EVM node endpoint *)
   let*! blueprints_stream =
     Evm_services.monitor_blueprints
       ~evm_node_endpoint
-      ctxt.session.next_blueprint_number
+      head.next_blueprint_number
   in
 
-  loop blueprints_stream
+  loop head.next_blueprint_number blueprints_stream
 
-module Make (Ctxt : sig
-  val ctxt : Evm_context.t
+let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
+    ~(config : Configuration.observer Configuration.t) () =
+  let open Lwt_result_syntax in
+  let* smart_rollup_address =
+    Evm_services.get_smart_rollup_address ~evm_node_endpoint
+  in
 
-  val evm_node_endpoint : Uri.t
-end) : Services_backend_sig.S =
-  Services_backend_sig.Make (MakeBackend (Ctxt))
+  let* _loaded =
+    Evm_context.start
+      ~data_dir
+      ?kernel_path
+      ~preimages:config.mode.preimages
+      ~preimages_endpoint:config.mode.preimages_endpoint
+      ~smart_rollup_address:
+        (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+           smart_rollup_address)
+      ()
+  in
+
+  let observer_backend =
+    (module Make (struct
+      let smart_rollup_address = smart_rollup_address
+
+      let evm_node_endpoint = evm_node_endpoint
+    end) : Services_backend_sig.S)
+  in
+
+  let* () =
+    Tx_pool.start
+      {
+        rollup_node = observer_backend;
+        smart_rollup_address =
+          Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+            smart_rollup_address;
+        mode = Observer;
+      }
+  in
+
+  let directory =
+    Services.directory config (observer_backend, smart_rollup_address)
+  in
+  let directory = directory |> Evm_services.register smart_rollup_address in
+
+  let* server = observer_start config ~directory in
+
+  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer_observer server in
+  let* () =
+    Evm_events_follower.start
+      {
+        rollup_node_endpoint;
+        filter_event =
+          (function New_delayed_transaction _ -> false | _ -> true);
+      }
+  in
+  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
+
+  main_loop ~evm_node_endpoint

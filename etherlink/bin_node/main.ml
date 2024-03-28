@@ -64,7 +64,7 @@ module Event = struct
       ~level:Notice
       ("exit_status", Data_encoding.int8)
 
-  let event_shutdown_tx_pool =
+  let _event_shutdown_tx_pool =
     Internal_event.Simple.declare_0
       ~section
       ~name:"shutting_down_tx_pool"
@@ -127,8 +127,10 @@ let install_finalizer_prod server =
   let* () = emit Event.event_shutdown_node exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
-  let* () = Evm_node_lib_prod.Tx_pool.shutdown () in
-  emit Event.event_shutdown_tx_pool ()
+  Evm_node_lib_dev.Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
+  let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
+  Evm_node_lib_dev.Evm_context.shutdown ()
 
 let install_finalizer_dev server =
   let open Lwt_syntax in
@@ -611,6 +613,11 @@ let proxy_command =
                 mode = Proxy {rollup_node_endpoint};
               }
           in
+          let () =
+            Evm_node_lib_prod.Rollup_node_follower.start
+              ~proxy:true
+              ~rollup_node_endpoint
+          in
           let* directory = prod_directory config rollup_config in
           let* server = start config ~directory in
           let (_ : Lwt_exit.clean_up_callback_id) =
@@ -863,8 +870,8 @@ let observer_command =
 
 let make_prod_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
-  let open Evm_node_lib_prod in
-  let open Evm_node_lib_prod_encoding in
+  let open Evm_node_lib_dev in
+  let open Evm_node_lib_dev_encoding in
   let transactions =
     List.map
       (fun s -> Ethereum_types.hex_of_string s |> Ethereum_types.hex_to_bytes)
@@ -873,7 +880,7 @@ let make_prod_messages ~kind ~smart_rollup_address data =
   let* messages =
     match kind with
     | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
-        let* Sequencer_blueprint.{to_publish; _} =
+        let* blueprint =
           Sequencer_blueprint.create
             ~cctxt
             ~sequencer_key:sk_uri
@@ -884,7 +891,7 @@ let make_prod_messages ~kind ~smart_rollup_address data =
             ~transactions
             ~delayed_transactions:[]
         in
-        return @@ List.map (fun (`External s) -> s) to_publish
+        return @@ List.map (fun (`External s) -> s) blueprint
     | `Transaction ->
         let*? chunks =
           List.map_e

@@ -25,24 +25,17 @@ val with_transaction : t -> (t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
     @raise Assert_failure *)
 val assert_in_transaction : t -> unit
 
-module Executable_blueprints : sig
+module Blueprints : sig
   val store : t -> Blueprint_types.t -> unit tzresult Lwt.t
 
   val find :
     t -> Ethereum_types.quantity -> Blueprint_types.t option tzresult Lwt.t
-end
 
-module Publishable_blueprints : sig
-  val store :
+  val find_range :
     t ->
-    Ethereum_types.quantity ->
-    Blueprint_types.payload ->
-    unit tzresult Lwt.t
-
-  val find :
-    t ->
-    Ethereum_types.quantity ->
-    Blueprint_types.payload option tzresult Lwt.t
+    from:Ethereum_types.quantity ->
+    to_:Ethereum_types.quantity ->
+    (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
 end
 
 module Context_hashes : sig
@@ -66,6 +59,24 @@ module Kernel_upgrades : sig
   val find_latest_pending : t -> Ethereum_types.Upgrade.t option tzresult Lwt.t
 
   val record_apply : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
+end
+
+module Delayed_transactions : sig
+  val store :
+    t ->
+    Ethereum_types.quantity ->
+    Ethereum_types.Delayed_transaction.t ->
+    unit tzresult Lwt.t
+
+  val at_level :
+    t ->
+    Ethereum_types.quantity ->
+    Ethereum_types.Delayed_transaction.t list tzresult Lwt.t
+
+  val at_hash :
+    t ->
+    Ethereum_types.hash ->
+    Ethereum_types.Delayed_transaction.t option tzresult Lwt.t
 end
 
 module L1_latest_known_level : sig

@@ -7,7 +7,6 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  store : Store.t;
   max_blueprints_lag : int;
   max_blueprints_ahead : int;
   max_blueprints_catchup : int;
@@ -16,7 +15,6 @@ type parameters = {
 }
 
 type state = {
-  store : Store.t;
   rollup_node_endpoint : Uri.t;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
@@ -67,8 +65,6 @@ module Worker = struct
 
   let set_latest_level_confirmed worker level =
     (state worker).latest_level_confirmed <- level
-
-  let blueprint_store worker = (state worker).store
 
   let max_blueprints_lag worker = (state worker).max_blueprints_lag
 
@@ -132,27 +128,29 @@ module Worker = struct
 
     let*! () = Blueprint_events.catching_up lower_bound upper_bound in
 
-    let rec catching_up curr =
-      if Z.Compare.(curr <= upper_bound) then
-        let* payload =
-          Store.Publishable_blueprints.find (blueprint_store worker) (Qty curr)
-        in
-        match payload with
-        | Some payload ->
-            let* () = publish worker payload curr in
-            catching_up Z.(succ curr)
-        | None ->
-            let*! () = Blueprint_events.missing_blueprint curr in
-            Stdlib.failwith
-              Format.(
-                asprintf
-                  "Blueprint for level %a missing from the store"
-                  Z.pp_print
-                  curr)
-      else return_unit
+    let* blueprints =
+      Evm_context.blueprints_range (Qty lower_bound) (Qty upper_bound)
     in
 
-    let* () = catching_up lower_bound in
+    let expected_count = Z.(to_int (sub upper_bound lower_bound)) + 1 in
+    let actual_count = List.length blueprints in
+    let* () =
+      when_ (actual_count < expected_count) (fun () ->
+          let*! () =
+            Blueprint_events.missing_blueprints
+              (expected_count - actual_count)
+              (Qty lower_bound)
+              (Qty upper_bound)
+          in
+          return_unit)
+    in
+
+    let* () =
+      List.iter_es
+        (fun (Ethereum_types.Qty current, payload) ->
+          publish worker payload current)
+        blueprints
+    in
 
     (* We give ourselves a cooldown window Tezos blocks to inject everything *)
     set_cooldown worker (catchup_cooldown worker) ;
@@ -171,7 +169,6 @@ module Handlers = struct
   let on_launch _self ()
       ({
          rollup_node_endpoint;
-         store;
          max_blueprints_lag;
          max_blueprints_ahead;
          max_blueprints_catchup;
@@ -182,7 +179,6 @@ module Handlers = struct
     let open Lwt_result_syntax in
     return
       {
-        store;
         latest_level_confirmed =
           (* Will be set at the correct value once the next L2 block is
              received from the rollup node *)
@@ -239,7 +235,7 @@ let table = Worker.create_table Queue
 let worker_promise, worker_waker = Lwt.task ()
 
 let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
-    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen store =
+    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -247,7 +243,6 @@ let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
       ()
       {
         rollup_node_endpoint;
-        store;
         max_blueprints_lag;
         max_blueprints_ahead;
         max_blueprints_catchup;
@@ -266,12 +261,22 @@ let worker =
   lazy
     (match Lwt.state worker_promise with
     | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Error (TzTrace.make @@ error_of_exn e)
-    | Lwt.Sleep -> Error (TzTrace.make No_worker))
+    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+
+let bind_worker f =
+  let open Lwt_result_syntax in
+  let res = Lazy.force worker in
+  match res with
+  | Error [No_worker] ->
+      (* There is no worker, nothing to do *)
+      return_unit
+  | Error errs -> fail errs
+  | Ok w -> f w
 
 let worker_add_request ~request =
   let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
+  bind_worker @@ fun w ->
   let*! (_pushed : bool) = Worker.Queue.push_request w request in
   return_unit
 
@@ -282,11 +287,8 @@ let new_l2_head rollup_head =
   worker_add_request ~request:(New_l2_head {rollup_head})
 
 let shutdown () =
-  let open Lwt_syntax in
-  match Lazy.force worker with
-  | Error _ ->
-      (* There is no publisher, nothing to do *)
-      Lwt.return_unit
-  | Ok w ->
-      let* () = Blueprint_events.publisher_shutdown () in
-      Worker.shutdown w
+  let open Lwt_result_syntax in
+  bind_worker @@ fun w ->
+  let*! () = Blueprint_events.publisher_shutdown () in
+  let*! () = Worker.shutdown w in
+  return_unit

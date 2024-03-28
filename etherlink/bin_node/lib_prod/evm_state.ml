@@ -32,13 +32,68 @@ module Wasm_utils =
   Wasm_utils.Make (Tezos_tree_encoding.Encodings_util.Make (Bare_context))
 module Wasm = Wasm_debugger.Make (Wasm_utils)
 
-let execute ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint)
-    ~config evm_state inbox =
+let kernel_logs_directory ~data_dir = Filename.concat data_dir "kernel_logs"
+
+let level_prefix = function
+  | Events.Debug -> "[Debug]"
+  | Info -> "[Info]"
+  | Error -> "[Error]"
+  | Fatal -> "[Fatal]"
+
+let event_kernel_log ~kind ~msg =
+  let is_level ~level msg =
+    let prefix = level_prefix level in
+    String.remove_prefix ~prefix msg |> Option.map (fun msg -> (level, msg))
+  in
+  let level_and_msg =
+    Option.either_f (is_level ~level:Debug msg) @@ fun () ->
+    Option.either_f (is_level ~level:Info msg) @@ fun () ->
+    Option.either_f (is_level ~level:Error msg) @@ fun () ->
+    is_level ~level:Fatal msg
+  in
+  Option.iter_s
+    (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
+    level_and_msg
+
+let execute ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
+    ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
+    evm_state inbox =
   let open Lwt_result_syntax in
+  let path = Filename.concat (kernel_logs_directory ~data_dir) log_file in
   let inbox = List.map (function `Input s -> s) inbox in
   let inbox = List.to_seq [inbox] in
+  let messages = ref [] in
+  let write_debug =
+    Tezos_scoru_wasm.Builtins.Printer
+      (fun msg ->
+        messages := msg :: !messages ;
+        event_kernel_log ~kind ~msg)
+  in
   let* evm_state, _, _, _ =
-    Wasm.Commands.eval ~wasm_entrypoint 0l inbox config Inbox evm_state
+    Wasm.Commands.eval
+      ~write_debug
+      ~wasm_entrypoint
+      0l
+      inbox
+      config
+      Inbox
+      evm_state
+  in
+  (* The messages are accumulated during the execution and stored
+     atomatically at the end to preserve their order. *)
+  let*! () =
+    Lwt_io.with_file
+      ~flags:Unix.[O_WRONLY; O_CREAT; O_APPEND]
+      ~perm:0o644
+      ~mode:Output
+      path
+    @@ fun chan ->
+    Lwt_io.atomic
+      (fun chan ->
+        let msgs = List.rev !messages in
+        let*! () = List.iter_s (Lwt_io.write chan) msgs in
+        Lwt_io.flush chan)
+      chan
   in
   return evm_state
 
@@ -61,6 +116,13 @@ let inspect evm_state key =
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
   let* value = Wasm.Commands.find_key_in_durable evm_state key in
   Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
+
+let subkeys evm_state key =
+  let open Lwt_syntax in
+  let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
+  let* durable = Wasm_utils.wrap_as_durable_storage evm_state in
+  let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
+  Tezos_scoru_wasm.Durable.list durable key
 
 let current_block_height evm_state =
   let open Lwt_syntax in
@@ -87,8 +149,10 @@ let current_block_hash evm_state =
   | Some h -> return (decode_block_hash h)
   | None -> return genesis_parent_hash
 
-let execute_and_inspect ?wasm_entrypoint ~config
-    ~input:Simulation.Encodings.{messages; insight_requests; _} ctxt =
+let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
+    ~input:
+      Simulation.Encodings.
+        {messages; insight_requests; log_kernel_debug_file; _} ctxt =
   let open Lwt_result_syntax in
   let keys =
     List.map
@@ -101,7 +165,16 @@ let execute_and_inspect ?wasm_entrypoint ~config
   in
   (* Messages from simulation requests are already valid inputs. *)
   let messages = List.map (fun s -> `Input s) messages in
-  let* evm_state = execute ?wasm_entrypoint ~config ctxt messages in
+  let* evm_state =
+    execute
+      ~kind:Simulation
+      ?log_file:log_kernel_debug_file
+      ~data_dir
+      ?wasm_entrypoint
+      ~config
+      ctxt
+      messages
+  in
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
 
@@ -109,7 +182,8 @@ type apply_result =
   | Apply_success of t * block_height * block_hash
   | Apply_failure
 
-let apply_blueprint ~config evm_state (blueprint : Blueprint_types.payload) =
+let apply_blueprint ~data_dir ~config evm_state
+    (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
     List.map
@@ -119,6 +193,7 @@ let apply_blueprint ~config evm_state (blueprint : Blueprint_types.payload) =
   let*! (Block_height before_height) = current_block_height evm_state in
   let* evm_state =
     execute
+      ~data_dir
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~config
       evm_state

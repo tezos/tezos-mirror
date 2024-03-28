@@ -7,7 +7,7 @@
 
 include Internal_event.Simple
 
-let section = ["evm_node"; "prod"]
+let section = ["evm_node"; "dev"]
 
 let received_upgrade =
   declare_1
@@ -110,6 +110,40 @@ let event_callback_log =
     ("method", Data_encoding.string)
     ("body", Data_encoding.string)
 
+type kernel_log_kind = Application | Simulation
+
+type kernel_log_level = Debug | Info | Error | Fatal
+
+let kernel_log_kind_to_string = function
+  | Application -> "application"
+  | Simulation -> "simulation"
+
+let event_kernel_log kind level =
+  Internal_event.Simple.declare_1
+    ~section:(section @ ["kernel"; kernel_log_kind_to_string kind])
+    ~name:
+      (Format.sprintf "kernel_log_%s" (Internal_event.Level.to_string level))
+    ~msg:"{msg}"
+    ~pp1:(fun fmt msg -> Format.pp_print_string fmt (String.trim msg))
+    ~level
+    ("msg", Data_encoding.string)
+
+let event_kernel_log_application_debug = event_kernel_log Application Debug
+
+let event_kernel_log_simulation_debug = event_kernel_log Simulation Debug
+
+let event_kernel_log_application_info = event_kernel_log Application Notice
+
+let event_kernel_log_simulation_info = event_kernel_log Simulation Info
+
+let event_kernel_log_application_error = event_kernel_log Application Error
+
+let event_kernel_log_simulation_error = event_kernel_log Simulation Error
+
+let event_kernel_log_application_fatal = event_kernel_log Application Fatal
+
+let event_kernel_log_simulation_fatal = event_kernel_log Simulation Fatal
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Ethereum_types.Upgrade.t) =
@@ -136,3 +170,14 @@ let shutdown_rpc_server ~private_ =
 let shutdown_node ~exit_status = emit event_shutdown_node exit_status
 
 let callback_log ~uri ~meth ~body = emit event_callback_log (uri, meth, body)
+
+let event_kernel_log ~level ~kind ~msg =
+  match (level, kind) with
+  | Debug, Application -> emit event_kernel_log_application_debug msg
+  | Debug, Simulation -> emit event_kernel_log_simulation_debug msg
+  | Info, Application -> emit event_kernel_log_application_info msg
+  | Info, Simulation -> emit event_kernel_log_simulation_info msg
+  | Error, Application -> emit event_kernel_log_application_error msg
+  | Error, Simulation -> emit event_kernel_log_simulation_error msg
+  | Fatal, Application -> emit event_kernel_log_application_fatal msg
+  | Fatal, Simulation -> emit event_kernel_log_simulation_fatal msg
