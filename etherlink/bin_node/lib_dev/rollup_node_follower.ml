@@ -197,12 +197,12 @@ let[@tailrec] rec catchup_and_next_block ~proxy ~catchup_event ~connection =
 
     get the current rollup node block with [catchup_and_next_block], process it
     with [process_finalized_level] then loop over. *)
-let[@tailrec] rec loop_on_rollup_node_stream ~proxy
+let[@tailrec] rec loop_on_rollup_node_stream ~catchup_event ~proxy
     ~oldest_rollup_node_known_l1_level ~connection =
   let open Lwt_result_syntax in
   let start_time = Unix.gettimeofday () in
   let* block, connection =
-    catchup_and_next_block ~proxy ~catchup_event:false ~connection
+    catchup_and_next_block ~proxy ~catchup_event ~connection
   in
   let elapsed = Unix.gettimeofday () -. start_time in
   let connection = update_timeout ~elapsed ~connection in
@@ -214,6 +214,7 @@ let[@tailrec] rec loop_on_rollup_node_stream ~proxy
       ~finalized_level
   in
   (loop_on_rollup_node_stream [@tailcall])
+    ~catchup_event:false
     ~proxy
     ~oldest_rollup_node_known_l1_level
     ~connection
@@ -229,6 +230,8 @@ let start ~proxy ~rollup_node_endpoint =
   in
   let* connection = connect_to_stream ~rollup_node_endpoint () in
   loop_on_rollup_node_stream
+  (* when fetching first block it should try to catchup if needed *)
+    ~catchup_event:(not proxy)
     ~proxy
     ~oldest_rollup_node_known_l1_level
     ~connection
