@@ -77,16 +77,13 @@ let header =
 
 |}
 
-let external_files = ref String_set.empty
+let generated_files = ref String_set.empty
 
 let to_file ~filename config =
-  if String_set.mem filename !external_files then
-    failwith
-      "Attempted to write external file %s twice -- perhaps you need to set \
-       filename_suffix when using [job_external]?"
-      filename
+  if String_set.mem filename !generated_files then
+    failwith "Attempted to write file %s twice." filename
   else (
-    external_files := String_set.add filename !external_files ;
+    generated_files := String_set.add filename !generated_files ;
     Gitlab_ci.To_yaml.to_file ~header ~filename config)
 
 let () = Printexc.register_printer @@ function Failure s -> Some s | _ -> None
@@ -466,46 +463,6 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
   in
   {job; source_position = __POS__}
 
-let job_external ?directory ?filename_suffix (tezos_job : tezos_job) : tezos_job
-    =
-  let job = tezos_job.job in
-  let stage =
-    match job.stage with
-    | Some stage -> stage
-    | None ->
-        (* Test is the name of the default stage in GitLab CI *)
-        "test"
-  in
-  let basename =
-    match filename_suffix with
-    | None -> tezos_job.job.name
-    | Some suffix -> job.name ^ "-" ^ suffix
-  in
-  let directory = ".gitlab/ci/jobs" // Option.value ~default:stage directory in
-  if not (Sys.file_exists directory && Sys.is_directory directory) then
-    failwith
-      "[job_external] attempted to write job '%s' to non-existing directory \
-       '%s'"
-      job.name
-      directory ;
-  let filename = (directory // basename) ^ ".yml" in
-  let config = tezos_job_to_config_elements tezos_job in
-  let source_file, source_line, _, _ = tezos_job.source_position in
-  Cli.verbose
-    "%s:%d: generates '%s' in %s"
-    source_file
-    source_line
-    job.name
-    filename ;
-  to_file ~filename config ;
-  tezos_job
-
-let jobs_external ~path (tezos_jobs : tezos_job list) : tezos_job list =
-  let filename = sf ".gitlab/ci/jobs/%s" path in
-  let config = List.map (fun {job; _} -> Gitlab_ci.Types.Job job) tezos_jobs in
-  to_file ~filename config ;
-  tezos_jobs
-
 let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
     (tezos_job : tezos_job) =
   map_job tezos_job @@ fun (job : Gitlab_ci.Types.job) ->
@@ -634,13 +591,13 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
     String_set.filter (fun x -> not (exclude x)) all_files
   in
   let error_generated_and_excluded =
-    String_set.filter exclude !external_files
+    String_set.filter exclude !generated_files
   in
   String_set.iter
     (Cli.error "%s: generated but is excluded")
     error_generated_and_excluded ;
   let error_not_generated =
-    String_set.diff all_non_excluded_files !external_files
+    String_set.diff all_non_excluded_files !generated_files
   in
   String_set.iter
     (fun file ->
