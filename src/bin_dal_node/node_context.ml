@@ -116,15 +116,9 @@ let next_shards_level_to_gc ctxt ~current_level =
       | Starting -> Int32.zero
       | Ready {proto_parameters; _} ->
           let n =
-            let needed_period =
-              proto_parameters.sc_rollup_challenge_window_in_blocks
-              + proto_parameters.commitment_period_in_blocks
-              + proto_parameters.dal_attested_slots_validity_lag
-            in
-            (* We double the period, to give some slack just in case
-               (finalisation period, off by one, attestation_lag, ...).
-               With current mainnet parameters, this total period is 3 months. *)
-            needed_period * 2
+            Profile_manager.get_default_shard_store_period
+              proto_parameters
+              ctxt.profile_ctxt
           in
           Int32.(max zero (sub current_level (of_int n))))
 
