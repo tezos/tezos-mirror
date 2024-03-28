@@ -2231,8 +2231,7 @@ let test_sequencer_can_catch_up_on_event =
     let* () = Evm_node.run sequencer in
     (* need to wait for the sequencer to start before starting the observer *)
     Evm_node.run observer
-    (* terminated because connection
-       dropped *)
+    (* terminated because connection dropped *)
   in
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   unit

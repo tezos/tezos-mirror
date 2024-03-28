@@ -47,12 +47,12 @@ let () =
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.evm_event_follower.rollup_out_of_sync"
-    ~title:"Sequencer out of sync with rollup node."
+    ~title:"Evm node out of sync with rollup node."
     ~description:"Sequencer and the rollup node are out of sync."
     ~pp:(fun ppf (expected, received) ->
       Format.fprintf
         ppf
-        "Evm node sequencer received finalized level %ld but was expected %ld."
+        "Evm node received finalized level %ld but was expected %ld."
         expected
         received)
     Data_encoding.(obj2 (req "expected" int32) (req "received" int32))
