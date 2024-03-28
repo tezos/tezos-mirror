@@ -4,7 +4,6 @@
 
 const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
 const fs = require('fs')
-const fetch = require('./fetch')
 const block_finalization = require('./block_finalization')
 const tx_register = require('./tx_register')
 const tx_overhead = require('./tx_overhead')
@@ -29,7 +28,6 @@ function init_analysis() {
         nb_call: 0,
         nb_transfer: 0,
         kernel_runs: [],
-        fetch_data: [],
         block_finalization: [],
         tx_register: [],
         tx_overhead: [],
@@ -40,10 +38,6 @@ function init_analysis() {
 }
 
 function print_analysis(infos, dir) {
-    console.info(`-------------------------------------------------------`)
-    console.info(`Fetch Analysis`)
-    console.info(`----------------------------------`)
-    let error_fetch = fetch.print_fetch_analysis(infos, dir)
     console.info(`-------------------------------------------------------`)
     console.info(`Block Finalization Analysis`)
     console.info(`----------------------------------`)
@@ -80,7 +74,7 @@ function print_analysis(infos, dir) {
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
-    return error_fetch + error_block_finalization + error_register + error_queue
+    return error_block_finalization + error_register + error_queue
 
 }
 
@@ -97,16 +91,6 @@ function process_bench_record(record, acc) {
         acc.init = Math.max(acc.init, record.interpreter_init_ticks)
     }
     if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
-
-    // Adds info needed for fetch analysis
-    if (!isNaN(record.fetch_blueprint_ticks) && !isNaN(record.nb_tx)) {
-        acc.fetch_data.push({
-            ticks: record.fetch_blueprint_ticks,
-            size: record.inbox_size,
-            nb_tx: record.nb_tx,
-            benchmark_name: record.benchmark_name
-        })
-    }
 
     // Adds infos needed for block finalization analysis
     if (!isNaN(record.inbox_size)) {
