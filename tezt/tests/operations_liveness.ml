@@ -136,10 +136,36 @@ let operation_liveness_reorg =
     Operation.inject ~force:true non_live_op client1
   in
   Log.info "Operation %s injected on a non-liveblock" non_live_op_hash ;
-  (* Creating op targeting a block that is live. *)
   let* block_3_hash =
     Client.RPC.call client1 @@ RPC.get_chain_block_hash ~block:"3" ()
   in
+  let* barely_alive_op =
+    Operation.Manager.(
+      operation
+        ~branch:block_3_hash
+        ~signer:Constant.bootstrap4
+        [make ~source:Constant.bootstrap4 ~fee @@ transfer ~dest ()])
+      client1
+  in
+  let* head_hash =
+    Client.RPC.call client1 @@ RPC.get_chain_block_hash ~block:"head" ()
+  in
+  let* too_alive_op =
+    Operation.Manager.(
+      operation
+        ~branch:head_hash
+        ~signer:Constant.bootstrap5
+        [make ~source:Constant.bootstrap5 ~fee @@ transfer ~dest ()])
+      client1
+  in
+  let* (`OpHash barely_alive_op_hash) =
+    Operation.inject barely_alive_op client1
+  in
+  Log.info "Operation %s injected on a barely live block" barely_alive_op_hash ;
+  let* (`OpHash too_alive_op_hash) = Operation.inject too_alive_op client1 in
+  Log.info "Operation %s injected on a very alive block" too_alive_op_hash ;
+
+  (* Creating op targeting a block that is live. *)
   let* old_live_op =
     Operation.Manager.(
       operation
@@ -151,9 +177,6 @@ let operation_liveness_reorg =
   Log.info "Injecting op targeting a the oldest liveblock" ;
   let* (`OpHash old_live_op_hash) = Operation.inject old_live_op client1 in
   Log.info "Operation %s injected on a liveblock" old_live_op_hash ;
-  let* () =
-    check_mempool ~validated:[non_live_op_hash; old_live_op_hash] client1
-  in
 
   Log.info "Reconnect nodes" ;
   (* Inspect operations after node1 switches to the high fitness
@@ -173,6 +196,12 @@ let operation_liveness_reorg =
   Check.is_false
     (List.mem non_live_op_hash mempool.validated)
     ~error_msg:(sf "%s was found in validated operations" non_live_op_hash) ;
+  Check.is_true
+    (List.mem barely_alive_op_hash mempool.validated)
+    ~error_msg:(sf "%s not found in validated operations" barely_alive_op_hash) ;
+  Check.is_false
+    (List.mem too_alive_op_hash mempool.validated)
+    ~error_msg:(sf "%s was found in validated operations" too_alive_op_hash) ;
 
   Log.info "Injecting op targeting the oldest liveblock" ;
   (* Creating op targeting a block that is live. *)
@@ -248,7 +277,7 @@ let operation_liveness =
         [make ~source ~fee @@ transfer ~dest ()])
       client1
   in
-  Log.info "Injecting op targetting a non-liveblock (expected to fail)" ;
+  Log.info "Injecting op targeting a non-liveblock (expected to fail)" ;
   let* _, _ =
     Operation.inject_and_capture2_stderr
       ~rex:
@@ -270,7 +299,7 @@ let operation_liveness =
         [make ~source ~fee @@ transfer ~dest ()])
       client1
   in
-  Log.info "Injecting op targetting a liveblock" ;
+  Log.info "Injecting op targeting a liveblock" ;
   let* (`OpHash live_op_hash_1) = Operation.inject op client1 in
   let* () = check_mempool ~validated:[live_op_hash_1] client1 in
   Log.info
