@@ -29,7 +29,10 @@ use exec_env::{
     posix::{Posix, PosixState},
     ExecutionEnvironment, ExecutionEnvironmentState,
 };
-use machine_state::registers::{FRegister, FValue};
+use machine_state::{
+    csregisters::{CSRValue, CSRegister},
+    registers::{FRegister, FValue},
+};
 use std::collections::BTreeMap;
 use InterpreterResult::*;
 
@@ -165,6 +168,10 @@ impl<'a> Interpreter<'a> {
 
     pub fn read_fregister(&self, reg: FRegister) -> FValue {
         self.machine_state.hart.fregisters.read(reg)
+    }
+
+    pub fn read_csregister(&self, reg: CSRegister) -> CSRValue {
+        self.machine_state.hart.csregisters.read(reg)
     }
 
     pub fn read_pc(&self) -> u64 {
