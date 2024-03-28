@@ -75,17 +75,17 @@
 
       const gen_idx = (start, end) => {
           let arr = [];
-          for(let i = start; i <= end; i++) {
-              arr.push(i);
-          }
+          for(let i = start; i <= end; i++) { arr.push(i); }
           return arr;
       }
 
-      // Length of the chart.
+
+      // Start cycle and max cycle
+      const start_cycle = 0
       const max_cycle = 100
 
       // Array whose values correspond to the cycles, starting from 0 to max_cycle.
-      const idx = gen_idx(0, max_cycle);
+      const idx = gen_idx(start_cycle, max_cycle);
 
       // Array used to mask values before the AI activation cycle.
       const idx_mask = Array(config.chain.ai_activation_cycle).fill(null);
@@ -287,10 +287,7 @@
       const new_cell_for = (parent, content = null, d = 3) => {
           let el = document.createElement("td");
           el.classList.add("border");
-          if (! (content == null)) {
-            const slice = Math.pow(10, d);
-            el.textContent = Math.trunc(content * slice) / slice;
-          };
+          el.textContent = content;
           parent.appendChild(el);
           return el
       };
@@ -316,25 +313,25 @@
           new_cell(config.chain.total_supply[cycle]);
           new_cell(config.chain.total_frozen_stake[cycle]);
 
-          new_cell(simulator.staked_ratio_for_next_cycle(cycle));
+          new_cell(simulator.staked_ratio_for_next_cycle(cycle).toDecimal(3));
 
           if (simulator.is_ai_activated(cycle)) {
-              new_cell(simulator.minimum_ratio(cycle));
-              new_cell(simulator.maximum_ratio(cycle));
-              new_cell(simulator.static_rate_for_next_cycle(cycle));
-              new_cell(simulator.dynamic_rate_for_next_cycle(cycle));
-              new_cell(simulator.issuance_rate_for_next_cycle(cycle));
+              new_cell(simulator.minimum_ratio(cycle).toDecimal(4));
+              new_cell(simulator.maximum_ratio(cycle).toDecimal(4));
+              new_cell(simulator.static_rate_for_next_cycle(cycle).toDecimal(3));
+              new_cell(simulator.dynamic_rate_for_next_cycle(cycle).toDecimal(3));
+              new_cell(simulator.issuance_rate_for_next_cycle(cycle).toDecimal(3));
           } else {
               new_cell();
               new_cell();
               new_cell();
               new_cell();
               new_cell();
-          };
+          }
 
-          new_cell(simulator.reward_coeff(cycle));
+          new_cell(simulator.reward_coeff(cycle).toDecimal(3));
 
-          new_cell(simulator.current_yearly_rate_value(cycle));
+          new_cell(simulator.current_yearly_rate_value(cycle).toDecimal(3));
           new_cell(simulator.attestation_reward_per_slot(cycle));
           new_cell(simulator.baking_reward_fixed_portion(cycle));
           new_cell(simulator.baking_reward_bonus_per_slot(cycle));
