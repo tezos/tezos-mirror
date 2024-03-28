@@ -15,7 +15,6 @@ function init_sanity() { return [] }
 
 function print(str, filepath) {
     fs.appendFileSync(filepath, `${str} \n`);
-    console.log(str);
 }
 
 // print a summaro of all errors recorded in an accumulator
@@ -24,7 +23,13 @@ function print_summary(sanity_acc, dirname) {
 
     fs.writeFileSync(filepath, '')
     print(`-------------------------------------------------------`, filepath)
+    console.log(`-------------------------------------------------------`)
     print(`Sanity check: ${sanity_acc.length} problems spotted`, filepath)
+    if(sanity_acc.length > 0){
+        console.log(`Sanity check: ${sanity_acc.length} problems spotted (see ${filepath})`)
+    } else {
+        console.log("Sanity check: no problem")
+    }
     for (datum of sanity_acc) {
         print(`${datum.name}: ${datum.type} record ->  ${datum.errors.join(', ')}`, filepath)
     }

@@ -72,6 +72,10 @@ function print_lr(lr, var_name = "size") {
 }
 
 function print_summary_errors(data, compute_error, prefix = "") {
+    if(data.length === 0){
+        console.log(`[WARNING] no data for ${prefix}`)
+        return 0;
+    }
     let max_error_current = 0;
     let nb_error = 0
     for (datum of data) {
@@ -79,6 +83,7 @@ function print_summary_errors(data, compute_error, prefix = "") {
         if (error > 0) nb_error += 1
         if (!isNaN(error)) max_error_current = Math.max(max_error_current, error)
     }
+    console.log(`${prefix} sample size: ${data.length}` )
     console.log(`${prefix} nb of errors: ${nb_error} ; maximum error: ${max_error_current} ticks`)
     return nb_error
 }
