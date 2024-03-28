@@ -98,8 +98,6 @@ dummy_job:
   - echo "This job will never execute"
 
 include:
-- .gitlab/ci/jobs/shared/images.yml
-- .gitlab/ci/jobs/shared/templates.yml
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"

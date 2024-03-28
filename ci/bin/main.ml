@@ -147,26 +147,6 @@ let () =
 let config () =
   (* Split pipelines types into workflow and includes *)
   let workflow, includes = Pipeline.workflow_includes () in
-  (* Write image templates.
-
-     This is a temporary stop-gap and only necessary for jobs that are
-     not define in OCaml. Once all jobs have been migrated, this can
-     be removed. *)
-  let image_templates_include =
-    let filename = ".gitlab/ci/jobs/shared/images.yml" in
-    let image_template (name, image_path) : string * Yaml.value =
-      let name = ".image_template__" ^ name in
-      (name, `O [("image", `String (Image.name image_path))])
-    in
-    let config : Yaml.value = `O (List.map image_template (Image.all ())) in
-    Base.write_yaml ~header:Tezos_ci.header filename config ;
-    {local = filename; rules = []}
-  in
-  let includes =
-    image_templates_include
-    :: {local = ".gitlab/ci/jobs/shared/templates.yml"; rules = []}
-    :: includes
-  in
   Pipeline.write () ;
   [
     Workflow workflow;
@@ -182,18 +162,4 @@ let () =
      If argument --inline-source, then print generation info in yml files. *)
   let filename = ".gitlab-ci.yml" in
   Tezos_ci.to_file ~filename (config ()) ;
-  (* Paths to exclude from generation check. As files are translated
-     to CI-in-OCaml, they should be removed from this function *)
-  let exclude = function
-    | ".gitlab/ci/jobs/coverage/common.yml"
-    | ".gitlab/ci/jobs/shared/images.yml"
-    | ".gitlab/ci/jobs/shared/templates.yml" | ".gitlab/ci/jobs/test/common.yml"
-    | ".gitlab/ci/pipelines/before_merging.yml"
-    | ".gitlab/ci/pipelines/schedule_extended_test.yml" ->
-        true
-    | _ -> false
-  in
-  Tezos_ci.check_files
-    ~remove_extra_files:Cli.config.remove_extra_files
-    ~exclude
-    ()
+  Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files ()
