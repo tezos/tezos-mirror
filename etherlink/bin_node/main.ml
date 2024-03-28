@@ -127,10 +127,10 @@ let install_finalizer_prod server =
   let* () = emit Event.event_shutdown_node exit_status in
   let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
   let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
-  Evm_node_lib_dev.Helpers.unwrap_error_monad @@ fun () ->
+  Evm_node_lib_prod.Helpers.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
-  let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  Evm_node_lib_dev.Evm_context.shutdown ()
+  let* () = Evm_node_lib_prod.Tx_pool.shutdown () in
+  Evm_node_lib_prod.Evm_context.shutdown ()
 
 let install_finalizer_dev server =
   let open Lwt_syntax in

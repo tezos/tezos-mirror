@@ -566,7 +566,7 @@ end
 let () =
   register_error_kind
     `Permanent
-    ~id:"evm_node_dev_caqti_error"
+    ~id:"evm_node_prod_caqti_error"
     ~title:"Error raised by Caqti"
     ~description:"Caqti raised an error while processing a SQL statement"
     ~pp:(fun ppf msg ->

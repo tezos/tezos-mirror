@@ -367,7 +367,7 @@ module State = struct
   let () =
     register_error_kind
       `Permanent
-      ~id:"evm_node_dev_cannot_apply_blueprint"
+      ~id:"evm_node_prod_cannot_apply_blueprint"
       ~title:"Cannot apply a blueprint"
       ~description:
         "The EVM node could not apply a blueprint on top of its local EVM \

@@ -133,7 +133,7 @@ module Name = struct
 
   let encoding = Data_encoding.unit
 
-  let base = ["evm_node"; "tx-pool"; "dev"; "worker"]
+  let base = ["evm_node"; "tx-pool"; "prod"; "worker"]
 
   let pp _ _ = ()
 
