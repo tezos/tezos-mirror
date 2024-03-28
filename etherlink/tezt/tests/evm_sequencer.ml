@@ -2237,6 +2237,73 @@ let test_sequencer_can_catch_up_on_event =
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   unit
 
+let test_sequencer_dont_read_level_twice =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "event"; Tag.slow]
+    ~title:"Evm node don't read the same level twice"
+    ~uses
+  @@ fun protocol ->
+  let* {
+         sc_rollup_node;
+         client;
+         sequencer;
+         proxy;
+         l1_contracts;
+         sc_rollup_address;
+         _;
+       } =
+    setup_sequencer
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      protocol
+  in
+
+  (* We deposit some Tez to the rollup *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount:Tez.(of_int 16)
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:Eth_account.bootstrap_accounts.(1).address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+
+  (* We bake two blocks, so thet the EVM node can process the deposit and
+     create a blueprint with it. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* We expect the deposit to be in this block. *)
+  let* _ = Rpc.produce_block sequencer in
+
+  let*@ block = Rpc.get_block_by_number ~block:Int.(to_string 1) sequencer in
+  let nb_transactions =
+    match block.transactions with
+    | Empty -> 0
+    | Hash l -> List.length l
+    | Full l -> List.length l
+  in
+  Check.((nb_transactions = 1) int)
+    ~error_msg:"Expected one transaction (the deposit), got %L" ;
+
+  (* We kill the sequencer and restart it. As a result, its last known L1 level
+     is still the L1 level of the deposit. *)
+  let* _ = Evm_node.terminate sequencer in
+  let* _ = Evm_node.run sequencer in
+
+  (* We produce some empty blocks. *)
+  let*@ _ = Rpc.produce_block sequencer in
+  let*@ _ = Rpc.produce_block sequencer in
+
+  (* If the logic of the sequencer is correct (i.e., it does not process the
+     deposit twice), then it is possible for the rollup node to apply them. *)
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+
+  unit
+
 let test_stage_one_reboot =
   Protocol.register_test
     ~__FILE__
@@ -2527,6 +2594,7 @@ let () =
   test_sequencer_upgrade protocols ;
   test_sequencer_diverge protocols ;
   test_sequencer_can_catch_up_on_event protocols ;
+  test_sequencer_dont_read_level_twice protocols ;
   test_stage_one_reboot protocols ;
   test_blueprint_is_limited_in_size protocols ;
   test_blueprint_limit_with_delayed_inbox protocols

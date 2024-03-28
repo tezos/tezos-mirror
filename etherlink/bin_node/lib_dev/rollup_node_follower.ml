@@ -130,7 +130,6 @@ let[@tailrec] rec catchup_evm_event ~rollup_node_endpoint ~from ~to_ =
        1]. *)
     let next_l1_level = Int32.succ from in
     let* () = Evm_events_follower.new_rollup_block next_l1_level in
-    let* () = Evm_context.new_last_known_l1_level next_l1_level in
     catchup_evm_event ~rollup_node_endpoint ~from:next_l1_level ~to_
 
 (** [catchup_and_next_block ~proxy ~catchup_event ~connection]

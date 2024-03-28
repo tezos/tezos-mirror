@@ -90,35 +90,53 @@ let fetch_event ({rollup_node_endpoint; _} : Types.state) rollup_block_lvl
 let on_new_head ({rollup_node_endpoint; filter_event} as state : Types.state)
     rollup_block_lvl =
   let open Lwt_result_syntax in
-  let* nb_of_events_bytes =
-    read_from_rollup_node
-      Durable_storage_path.Evm_events.length
-      rollup_block_lvl
-      rollup_node_endpoint
+  let* last_known_l1_block = Evm_context.last_known_l1_level () in
+  let needs_processing =
+    match last_known_l1_block with
+    | None -> `Process
+    | Some last_known_l1_block ->
+        let level_expected = Int32.succ last_known_l1_block in
+        if Int32.equal rollup_block_lvl level_expected then `Process
+        else if Compare.Int32.(rollup_block_lvl < level_expected) then `Ignore
+        else
+          `Exit
+            (Node_error.Out_of_sync
+               {level_received = rollup_block_lvl; level_expected})
   in
-  match nb_of_events_bytes with
-  | None -> Evm_context.new_last_known_l1_level rollup_block_lvl
-  | Some nb_of_events_bytes ->
-      let (Qty nb_of_events) =
-        Ethereum_types.decode_number nb_of_events_bytes
+
+  match needs_processing with
+  | `Ignore -> return_unit
+  | `Process -> (
+      let* nb_of_events_bytes =
+        read_from_rollup_node
+          Durable_storage_path.Evm_events.length
+          rollup_block_lvl
+          rollup_node_endpoint
       in
-      let nb_of_events = Z.to_int nb_of_events in
-      let* events =
-        List.init_ep
-          ~when_negative_length:
-            (error_of_fmt
-               "Internal error: the rollup node advertised a negative length \
-                for the events stream")
-          nb_of_events
-          (fetch_event state rollup_block_lvl)
-      in
-      let events =
-        List.filter_map
-          (function
-            | Some event when filter_event event -> Some event | _ -> None)
-          events
-      in
-      Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events
+      match nb_of_events_bytes with
+      | None -> Evm_context.new_last_known_l1_level rollup_block_lvl
+      | Some nb_of_events_bytes ->
+          let (Qty nb_of_events) =
+            Ethereum_types.decode_number nb_of_events_bytes
+          in
+          let nb_of_events = Z.to_int nb_of_events in
+          let* events =
+            List.init_ep
+              ~when_negative_length:
+                (error_of_fmt
+                   "Internal error: the rollup node advertised a negative \
+                    length for the events stream")
+              nb_of_events
+              (fetch_event state rollup_block_lvl)
+          in
+          let events =
+            List.filter_map
+              (function
+                | Some event when filter_event event -> Some event | _ -> None)
+              events
+          in
+          Evm_context.apply_evm_events ~finalized_level:rollup_block_lvl events)
+  | `Exit err -> fail [err]
 
 module Handlers = struct
   type self = worker
@@ -148,9 +166,18 @@ module Handlers = struct
       (r, request_error) Request.t ->
       request_error ->
       unit tzresult Lwt.t =
-   fun _w _ _req _errs ->
+   fun _w _ req errs ->
     let open Lwt_result_syntax in
-    return_unit
+    match (req, errs) with
+    | ( Request.New_rollup_node_block _,
+        Node_error.Out_of_sync {level_expected; level_received} :: _ ) ->
+        let*! () =
+          Evm_events_follower_events.out_of_sync
+            ~expected:level_expected
+            ~received:level_received
+        in
+        Lwt_exit.exit_and_raise Node_error.exit_code_when_out_of_sync
+    | _ -> return_unit
 
   let on_completion _ _ _ _ = Lwt.return_unit
 
