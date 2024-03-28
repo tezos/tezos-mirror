@@ -55,6 +55,7 @@ impl TickCounter {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub enum ComputationResult {
     RebootNeeded,
     Finished,
@@ -1314,7 +1315,7 @@ mod tests {
             tx_hash: [0; TRANSACTION_HASH_SIZE],
             content: TransactionContent::Ethereum(dummy_eth_transaction_zero()),
         };
-        let transactions = vec![valid_tx.clone()].into();
+        let transactions = vec![valid_tx].into();
 
         // init block in progress
         let mut block_in_progress =
@@ -1323,11 +1324,8 @@ mod tests {
         block_in_progress.estimated_ticks_in_run =
             tick_model::constants::MAX_TICKS - 1000;
 
-        let data_length = valid_tx.data_size();
-        let ticks_for_invalid = tick_model::ticks_of_invalid_transaction(data_length);
-
         // act
-        compute(
+        let result = compute(
             &mut host,
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
@@ -1339,10 +1337,15 @@ mod tests {
             &None,
             None,
         )
-        .expect("Should have computed block");
+        .expect("Should safely ask for a reboot");
 
         // assert
 
+        assert_eq!(
+            result,
+            ComputationResult::RebootNeeded,
+            "Should have asked for a reboot"
+        );
         // block in progress should not have registered any gas or ticks
         assert_eq!(
             block_in_progress.cumulative_gas,
@@ -1351,11 +1354,11 @@ mod tests {
         );
         assert_eq!(
             block_in_progress.estimated_ticks_in_run,
-            tick_model::constants::MAX_TICKS - 1000 + ticks_for_invalid,
+            tick_model::constants::MAX_TICKS - 1000,
             "should not have consumed any tick"
         );
         assert_eq!(
-            block_in_progress.estimated_ticks_in_block, ticks_for_invalid,
+            block_in_progress.estimated_ticks_in_block, 0,
             "should not have consumed any tick"
         );
 
