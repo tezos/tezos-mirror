@@ -92,6 +92,26 @@ fn compute<Host: Runtime>(
         );
 
         let retriable = !is_first_transaction || !is_first_block_of_reboot;
+        if allocated_ticks == 0 {
+            if retriable {
+                log!(
+                    host,
+                    Debug,
+                    "There are not enough ticks left to try the\
+                    transaction, but it will be retried after reboot."
+                );
+                block_in_progress.repush_tx(transaction);
+            } else {
+                log!(
+                    host,
+                    Error,
+                    "Discarded a transaction because it couldn't\
+                    be allocated enough ticks even alone in a kernel run."
+                );
+            }
+            return Ok(ComputationResult::RebootNeeded);
+        }
+
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
         match apply_transaction(
