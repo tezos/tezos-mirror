@@ -33,8 +33,10 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
         };
         // Store the blueprint.
         store_inbox_blueprint(host, blueprint)?;
+        Ok(StageOneStatus::Reboot)
+    } else {
+        Ok(StageOneStatus::Done)
     }
-    Ok(StageOneStatus::Done)
 }
 
 fn fetch_delayed_transactions<Host: Runtime>(
