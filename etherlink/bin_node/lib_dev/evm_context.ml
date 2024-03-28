@@ -623,114 +623,6 @@ module State = struct
 
     return (ctxt, init_status)
 
-  let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
-    let open Lwt_result_syntax in
-    let* Sc_rollup_block.(_, {context; _}) =
-      let open Rollup_node_storage in
-      let* last_finalized_level, levels_to_hashes, l2_blocks =
-        Rollup_node_storage.load ~rollup_node_data_dir ()
-      in
-      let* final_level = Last_finalized_level.read last_finalized_level in
-      let*? final_level =
-        Option.to_result
-          ~none:
-            [
-              error_of_fmt
-                "Rollup node storage is missing the last finalized level";
-            ]
-          final_level
-      in
-      let* final_level_hash =
-        Levels_to_hashes.find levels_to_hashes final_level
-      in
-      let*? final_level_hash =
-        Option.to_result
-          ~none:
-            [
-              error_of_fmt
-                "Rollup node has no block hash for the l1 level %ld"
-                final_level;
-            ]
-          final_level_hash
-      in
-      let* final_l2_block = L2_blocks.read l2_blocks final_level_hash in
-      Lwt.return
-      @@ Option.to_result
-           ~none:
-             [
-               error_of_fmt
-                 "Rollup node has no l2 blocks for the l1 block hash %a"
-                 Block_hash.pp
-                 final_level_hash;
-             ]
-           final_l2_block
-    in
-    let checkpoint =
-      Smart_rollup_context_hash.to_bytes context |> Context_hash.of_bytes_exn
-    in
-    let rollup_node_context_dir =
-      Filename.Infix.(rollup_node_data_dir // "context")
-    in
-    let* rollup_node_index =
-      Irmin_context.load ~cache_size:100_000 Read_only rollup_node_context_dir
-    in
-    let evm_context_dir = store_path ~data_dir in
-    let*! () = Lwt_utils_unix.create_dir evm_context_dir in
-    let* () =
-      Irmin_context.export_snapshot
-        rollup_node_index
-        checkpoint
-        ~path:evm_context_dir
-    in
-    let* evm_node_index =
-      Irmin_context.load ~cache_size:100_000 Read_write evm_context_dir
-    in
-    let*! evm_node_context =
-      Irmin_context.checkout_exn evm_node_index checkpoint
-    in
-    let*! evm_state = Irmin_context.PVMState.get evm_node_context in
-
-    (* Tell the kernel that it is executed by an EVM node *)
-    let*! evm_state = Evm_state.flag_local_exec evm_state in
-    (* We remove the delayed inbox from the EVM state. Its contents will be
-       retrieved by the sequencer by inspecting the evm events. *)
-    let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
-
-    (* For changes made to [evm_state] to take effect, we commit the result *)
-    let*! evm_node_context =
-      Irmin_context.PVMState.set evm_node_context evm_state
-    in
-    let*! checkpoint = Irmin_context.commit evm_node_context in
-
-    (* Assert we can read the current blueprint number *)
-    let* current_blueprint_number =
-      let*! current_blueprint_number_opt =
-        Evm_state.inspect evm_state Durable_storage_path.Block.current_number
-      in
-      match current_blueprint_number_opt with
-      | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
-      | None -> failwith "The blueprint number was not found"
-    in
-
-    (* Assert we can read the current block hash *)
-    let* () =
-      let*! current_block_hash_opt =
-        Evm_state.inspect evm_state Durable_storage_path.Block.current_hash
-      in
-      match current_block_hash_opt with
-      | Some _bytes -> return_unit
-      | None -> failwith "The block hash was not found"
-    in
-    (* Init the store *)
-    let* store = Evm_store.init ~data_dir in
-    let* () =
-      Evm_store.Context_hashes.store
-        store
-        (Qty current_blueprint_number)
-        checkpoint
-    in
-    return_unit
-
   let reset ~data_dir ~l2_level =
     let open Lwt_result_syntax in
     let* store = Evm_store.init ~data_dir in
@@ -948,7 +840,113 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   let*! () = Evm_context_events.ready () in
   return init_status
 
-let init_from_rollup_node = State.init_from_rollup_node
+let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
+  let open Lwt_result_syntax in
+  let* Sc_rollup_block.(_, {context; _}) =
+    let open Rollup_node_storage in
+    let* last_finalized_level, levels_to_hashes, l2_blocks =
+      Rollup_node_storage.load ~rollup_node_data_dir ()
+    in
+    let* final_level = Last_finalized_level.read last_finalized_level in
+    let*? final_level =
+      Option.to_result
+        ~none:
+          [
+            error_of_fmt
+              "Rollup node storage is missing the last finalized level";
+          ]
+        final_level
+    in
+    let* final_level_hash =
+      Levels_to_hashes.find levels_to_hashes final_level
+    in
+    let*? final_level_hash =
+      Option.to_result
+        ~none:
+          [
+            error_of_fmt
+              "Rollup node has no block hash for the l1 level %ld"
+              final_level;
+          ]
+        final_level_hash
+    in
+    let* final_l2_block = L2_blocks.read l2_blocks final_level_hash in
+    Lwt.return
+    @@ Option.to_result
+         ~none:
+           [
+             error_of_fmt
+               "Rollup node has no l2 blocks for the l1 block hash %a"
+               Block_hash.pp
+               final_level_hash;
+           ]
+         final_l2_block
+  in
+  let checkpoint =
+    Smart_rollup_context_hash.to_bytes context |> Context_hash.of_bytes_exn
+  in
+  let rollup_node_context_dir =
+    Filename.Infix.(rollup_node_data_dir // "context")
+  in
+  let* rollup_node_index =
+    Irmin_context.load ~cache_size:100_000 Read_only rollup_node_context_dir
+  in
+  let evm_context_dir = State.store_path ~data_dir in
+  let*! () = Lwt_utils_unix.create_dir evm_context_dir in
+  let* () =
+    Irmin_context.export_snapshot
+      rollup_node_index
+      checkpoint
+      ~path:evm_context_dir
+  in
+  let* evm_node_index =
+    Irmin_context.load ~cache_size:100_000 Read_write evm_context_dir
+  in
+  let*! evm_node_context =
+    Irmin_context.checkout_exn evm_node_index checkpoint
+  in
+  let*! evm_state = Irmin_context.PVMState.get evm_node_context in
+
+  (* Tell the kernel that it is executed by an EVM node *)
+  let*! evm_state = Evm_state.flag_local_exec evm_state in
+  (* We remove the delayed inbox from the EVM state. Its contents will be
+     retrieved by the sequencer by inspecting the evm events. *)
+  let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
+
+  (* For changes made to [evm_state] to take effect, we commit the result *)
+  let*! evm_node_context =
+    Irmin_context.PVMState.set evm_node_context evm_state
+  in
+  let*! checkpoint = Irmin_context.commit evm_node_context in
+
+  (* Assert we can read the current blueprint number *)
+  let* current_blueprint_number =
+    let*! current_blueprint_number_opt =
+      Evm_state.inspect evm_state Durable_storage_path.Block.current_number
+    in
+    match current_blueprint_number_opt with
+    | Some bytes -> return (Bytes.to_string bytes |> Z.of_bits)
+    | None -> failwith "The blueprint number was not found"
+  in
+
+  (* Assert we can read the current block hash *)
+  let* () =
+    let*! current_block_hash_opt =
+      Evm_state.inspect evm_state Durable_storage_path.Block.current_hash
+    in
+    match current_block_hash_opt with
+    | Some _bytes -> return_unit
+    | None -> failwith "The block hash was not found"
+  in
+  (* Init the store *)
+  let* store = Evm_store.init ~data_dir in
+  let* () =
+    Evm_store.Context_hashes.store
+      store
+      (Qty current_blueprint_number)
+      checkpoint
+  in
+  return_unit
 
 let reset = State.reset
 
