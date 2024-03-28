@@ -67,7 +67,7 @@ let sleep10ms profiler =
 let sleep70ms profiler =
   let tag = "sleep70" in
   Profiler.record profiler tag ;
-  Log.info "%s"  tag;
+  Log.info "%s" tag ;
   Unix.sleepf 0.07 ;
   Profiler.stop profiler
 
@@ -115,18 +115,14 @@ let sequences profiler =
   let b_seq = "b_seq" in
   let b_a_seq = "b_a_seq" in
   let b_b_seq = "b_b_seq" in
-  let* () =
-    Profiler.record_s profiler a_seq (fun () -> slp a_seq profiler)
-  in
+  let* () = Profiler.record_s profiler a_seq (fun () -> slp a_seq profiler) in
   let* () =
     Profiler.record_s profiler b_seq (fun () ->
         let* () =
-          Profiler.record_s profiler b_a_seq (fun () ->
-              slp b_a_seq profiler)
+          Profiler.record_s profiler b_a_seq (fun () -> slp b_a_seq profiler)
         in
         let* () =
-          Profiler.record_s profiler b_b_seq (fun () ->
-              slp b_b_seq profiler)
+          Profiler.record_s profiler b_b_seq (fun () -> slp b_b_seq profiler)
         in
         slp b_seq profiler)
   in
@@ -179,8 +175,7 @@ let buggy_aggregates profiler =
   let bug_aggr_b_b = "bug_aggr_b_b" in
 
   let t1 =
-    Profiler.aggregate_s profiler bug_aggr_a (fun () ->
-        slp bug_aggr_a profiler)
+    Profiler.aggregate_s profiler bug_aggr_a (fun () -> slp bug_aggr_a profiler)
   in
   let t2 =
     Profiler.aggregate_s profiler bug_aggr_b (fun () ->
@@ -198,18 +193,16 @@ let spans profiler =
   let inner12 = "inner1/2" in
   let inner21 = "inner2/1" in
   let inner22 = "inner2/2" in
-  let t1 =
-    Profiler.span_s profiler [span1] (fun () -> slp span1 profiler)
-  in
+  let t1 = Profiler.span_s profiler [span1] (fun () -> slp span1 profiler) in
   let t2 =
     Profiler.span_s profiler [span2; inner1] (fun () ->
-        let* () = slp (span2^", "^inner11) profiler in
-        slp (span2^", "^inner12) profiler)
+        let* () = slp (span2 ^ ", " ^ inner11) profiler in
+        slp (span2 ^ ", " ^ inner12) profiler)
   in
   let t3 =
     Profiler.span_s profiler [span2; inner2] (fun () ->
-        let* () = slp (span2^", "^inner21) profiler in
-        slp (span2^", "^inner22) profiler)
+        let* () = slp (span2 ^ ", " ^ inner21) profiler in
+        slp (span2 ^ ", " ^ inner22) profiler)
   in
   Lwt.join [t1; t2; t3]
 
@@ -220,26 +213,18 @@ let sequences_with_mark_and_stamp profiler =
   let b_b_seq = "b_b_seq" in
   let mark = "mark" in
   let stamp = "stamp" in
-  let* () =
-    Profiler.record_s profiler a_seq (fun () -> slp a_seq profiler)
-  in
+  let* () = Profiler.record_s profiler a_seq (fun () -> slp a_seq profiler) in
   let* () =
     Profiler.record_s profiler b_seq (fun () ->
         let* () =
-          Profiler.record_s profiler b_a_seq (fun () ->
-              slp b_a_seq profiler)
+          Profiler.record_s profiler b_a_seq (fun () -> slp b_a_seq profiler)
         in
-        let () =
-          List.iter (fun _ -> Profiler.mark profiler [mark]) (1 -- 10)
-        in
+        let () = List.iter (fun _ -> Profiler.mark profiler [mark]) (1 -- 10) in
         let () = Profiler.stamp profiler stamp in
         let* () =
-          Profiler.record_s profiler b_b_seq (fun () ->
-              slp b_b_seq profiler)
+          Profiler.record_s profiler b_b_seq (fun () -> slp b_b_seq profiler)
         in
-        let () =
-          List.iter (fun _ -> Profiler.mark profiler [mark]) (1 -- 10)
-        in
+        let () = List.iter (fun _ -> Profiler.mark profiler [mark]) (1 -- 10) in
         let () = Profiler.stamp profiler stamp in
         slp b_seq profiler)
   in
