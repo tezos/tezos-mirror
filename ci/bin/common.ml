@@ -627,7 +627,7 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
   let parallel =
     let distributions =
       match target with
-      | Dpkg -> ["debian:bookworm"]
+      | Dpkg -> ["debian:bookworm"; "ubuntu:focal"]
       | Rpm -> ["fedora:39"; "rockylinux:9.3"]
     in
     Matrix [[("DISTRIBUTION", distributions)]]
