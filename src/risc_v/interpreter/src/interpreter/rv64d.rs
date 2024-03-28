@@ -65,6 +65,20 @@ where
         self.run_flt::<Double>(rs1, rs2, rd);
     }
 
+    /// `FMIN.D` R-type instruction.
+    ///
+    /// See [Self::run_fmin].
+    pub fn run_fmin_d(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.run_fmin::<Double>(rs1, rs2, rd);
+    }
+
+    /// `FMAX.D` R-type instruction.
+    ///
+    /// See [Self::run_fmax].
+    pub fn run_fmax_d(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.run_fmax::<Double>(rs1, rs2, rd);
+    }
+
     /// `FMV.D.X` D-type instruction
     ///
     /// Moves the single-precision value encoded in IEEE 754-2008 standard

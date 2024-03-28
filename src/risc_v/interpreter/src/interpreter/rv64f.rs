@@ -65,6 +65,20 @@ where
         self.run_flt::<Single>(rs1, rs2, rd);
     }
 
+    /// `FMIN.S` R-type instruction.
+    ///
+    /// See [Self::run_fmin].
+    pub fn run_fmin_s(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.run_fmin::<Single>(rs1, rs2, rd);
+    }
+
+    /// `FMAX.S` R-type instruction.
+    ///
+    /// See [Self::run_fmax].
+    pub fn run_fmax_s(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.run_fmax::<Single>(rs1, rs2, rd);
+    }
+
     /// `FMV.X.W` F-type instruction
     ///
     /// Moves the single-precision value in floating-point register `rs1`
