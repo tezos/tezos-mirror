@@ -16,6 +16,8 @@ l=$1
 
 batch_size=10
 
+endpoint="https://rpc.weeklynet-2024-03-20.teztnets.com"
+
 for ((i = 0; i <= l; i += batch_size)); do
 
   echo "Launching data request for batch starting with cycle: $i"
@@ -23,21 +25,21 @@ for ((i = 0; i <= l; i += batch_size)); do
   for ((n = i; n < $((i + batch_size)) && n <= l; n++)); do
     block=$((128 * (1 + n)))
 
-    (curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/total_supply > "/tmp/ai-sim-supply/$n.txt" &)
+    (curl -s "$endpoint"/chains/main/blocks/$block/context/total_supply > "/tmp/ai-sim-supply/$n.txt" &)
 
-    (curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/total_frozen_stake > "/tmp/ai-sim-frozen/$n.txt" &)
+    (curl -s "$endpoint"/chains/main/blocks/$block/context/total_frozen_stake > "/tmp/ai-sim-frozen/$n.txt" &)
 
     (
-      public_keys=$(curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/delegates)
+      public_keys=$(curl -s "$endpoint"/chains/main/blocks/$block/context/delegates)
       public_keys=$(echo "$public_keys" | tr -d '[]"')
       public_keys=$(echo "$public_keys" | tr ',' ' ')
 
       sum=0
 
       for pkh in $public_keys; do
-        balance1=$(curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/delegates/"$pkh"/delegated_balance | tr -d '"')
+        balance1=$(curl -s "$endpoint"/chains/main/blocks/$block/context/delegates/"$pkh"/delegated_balance | tr -d '"')
 
-        balance2=$(curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/delegates/"$pkh"/full_balance | tr -d '"')
+        balance2=$(curl -s "$endpoint"/chains/main/blocks/$block/context/delegates/"$pkh"/full_balance | tr -d '"')
 
         balance=$((balance1 + balance2))
 
