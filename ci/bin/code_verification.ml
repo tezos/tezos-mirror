@@ -717,7 +717,7 @@ let jobs pipeline_type =
               ~dependencies:(Dependent [Artifacts job_opam_prepare]))
       |> jobs_external_once ~path:"packaging/opam_package.yml"
     in
-    jobs_opam_packages
+    job_opam_prepare :: jobs_opam_packages
   in
   let test =
     (* check that ksy files are still up-to-date with octez *)
