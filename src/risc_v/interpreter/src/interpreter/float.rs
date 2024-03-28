@@ -6,13 +6,15 @@
 
 use crate::{
     machine_state::{
-        csregisters::{CSRegister, CSRegisters},
+        csregisters::{CSRValue, CSRegister, CSRegisters},
         hart_state::HartState,
         registers::{FRegister, FValue, XRegister},
     },
+    parser::instruction::InstrRoundingMode,
     state_backend as backend,
+    traps::Exception,
 };
-use rustc_apfloat::{ieee::Double, ieee::Single, Float};
+use rustc_apfloat::{ieee::Double, ieee::Single, Float, Round, Status, StatusAnd};
 
 pub trait FloatExt: Float + Into<FValue> + Copy
 where
@@ -21,6 +23,15 @@ where
     /// The canonical NaN has a positive sign and all
     /// significand bits clear expect the MSB (the quiet bit).
     fn canonical_nan() -> Self;
+
+    /// Canonicalise floating-point values to the canonical nan.
+    fn canonicalise(self) -> Self {
+        if self.is_nan() {
+            Self::canonical_nan()
+        } else {
+            self
+        }
+    }
 }
 
 impl FloatExt for Single {
@@ -140,6 +151,78 @@ where
         self.xregisters.write(rd, res);
     }
 
+    /// `FADD.*` instruction.
+    ///
+    /// Adds `rs1` to `rs2`, writing the result in `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fadd<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception>
+    where
+        FValue: Into<F>,
+    {
+        self.f_arith_2(rs1, rs2, rm, rd, F::add_r)
+    }
+
+    /// `FSUB.*` instruction.
+    ///
+    /// Subtracts `rs2` from `rs1`, writing the result in `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fsub<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception>
+    where
+        FValue: Into<F>,
+    {
+        self.f_arith_2(rs1, rs2, rm, rd, F::sub_r)
+    }
+
+    /// `FMUL.*` instruction.
+    ///
+    /// Multiplies `rs1` by `rs2`, writing the result in `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fmul<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception>
+    where
+        FValue: Into<F>,
+    {
+        self.f_arith_2(rs1, rs2, rm, rd, F::mul_r)
+    }
+
+    /// `FDIV.*` instruction.
+    ///
+    /// Divides `rs1` by `rs2`, writing the result in `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fdiv<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception>
+    where
+        FValue: Into<F>,
+    {
+        self.f_arith_2(rs1, rs2, rm, rd, F::div_r)
+    }
+
     /// `FMIN.*` instruction.
     ///
     /// Writes the smaller of `rs1`, `rs2` to `rd`. **NB** `-0.0 < +0.0`.
@@ -203,6 +286,42 @@ where
         self.f_sign_injection(rs1, rs2, rd, |x, y| x ^ y);
     }
 
+    // perform 2-argument floating-point arithmetic
+    fn f_arith_2<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+        f: fn(F, F, Round) -> StatusAnd<F>,
+    ) -> Result<(), Exception>
+    where
+        FValue: Into<F>,
+    {
+        let rval1: F = self.fregisters.read(rs1).into();
+        let rval2: F = self.fregisters.read(rs2).into();
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        let StatusAnd { status, value } = f(rval1, rval2, rm).map(F::canonicalise);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, value.into());
+        Ok(())
+    }
+
+    fn f_rounding_mode(&self, rm: InstrRoundingMode) -> Result<Round, Exception> {
+        let rm = match rm {
+            InstrRoundingMode::Static(rm) => rm,
+            InstrRoundingMode::Dynamic => self.csregisters.read(CSRegister::frm).try_into()?,
+        };
+
+        Ok(rm.into())
+    }
+
     fn f_sign_injection<F: FloatExt>(
         &mut self,
         rs1: FRegister,
@@ -259,6 +378,50 @@ where
     }
 }
 
+/// There are 5 supported rounding modes
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum RoundingMode {
+    /// Round to Nearest, ties to Even
+    RNE,
+    /// Round towards Zero
+    RTZ,
+    /// Round Down (towards -∞)
+    RDN,
+    /// Round Up (towrads +∞)
+    RUP,
+    /// Round to Nearest, ties to Max Magnitude
+    RMM,
+}
+
+impl TryFrom<CSRValue> for RoundingMode {
+    type Error = Exception;
+
+    fn try_from(value: CSRValue) -> Result<Self, Self::Error> {
+        match value {
+            0b000 => Ok(Self::RNE),
+            0b001 => Ok(Self::RTZ),
+            0b010 => Ok(Self::RDN),
+            0b011 => Ok(Self::RUP),
+            0b100 => Ok(Self::RMM),
+            _ => Err(Exception::IllegalInstruction),
+        }
+    }
+}
+
+#[allow(clippy::from_over_into)]
+impl Into<Round> for RoundingMode {
+    fn into(self) -> Round {
+        match self {
+            Self::RNE => Round::NearestTiesToEven,
+            Self::RTZ => Round::TowardZero,
+            Self::RUP => Round::TowardPositive,
+            Self::RDN => Round::TowardNegative,
+            Self::RMM => Round::NearestTiesToAway,
+        }
+    }
+}
+
 #[allow(unused)]
 pub enum Fflag {
     /// Inexact
@@ -276,5 +439,29 @@ pub enum Fflag {
 impl<M: backend::Manager> CSRegisters<M> {
     fn set_exception_flag(&mut self, mask: Fflag) {
         self.set_bits(CSRegister::fflags, 1 << mask as usize);
+    }
+
+    fn set_exception_flag_status(&mut self, status: Status) {
+        let bits = status_to_bits(status);
+        self.set_bits(CSRegister::fflags, bits as u64);
+    }
+}
+
+const fn status_to_bits(status: Status) -> u8 {
+    status.bits().reverse_bits() >> 3
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_status_to_bits() {
+        assert_eq!(0, status_to_bits(Status::OK));
+        assert_eq!(1 << Fflag::NX as usize, status_to_bits(Status::INEXACT));
+        assert_eq!(1 << Fflag::UF as usize, status_to_bits(Status::UNDERFLOW));
+        assert_eq!(1 << Fflag::OF as usize, status_to_bits(Status::OVERFLOW));
+        assert_eq!(1 << Fflag::DZ as usize, status_to_bits(Status::DIV_BY_ZERO));
+        assert_eq!(1 << Fflag::NV as usize, status_to_bits(Status::INVALID_OP));
     }
 }

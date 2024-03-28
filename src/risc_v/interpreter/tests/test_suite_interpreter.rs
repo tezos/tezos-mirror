@@ -125,7 +125,7 @@ test_case!(#[ignore], test_suite_rv64uc_p_rvc, "rv64uc-p-rvc");
 
 test_case!(#[ignore], test_suite_rv64uc_v_rvc, "rv64uc-v-rvc");
 // RV64-UD
-test_case!(#[ignore], test_suite_rv64ud_p_fadd, "rv64ud-p-fadd");
+test_case!(test_suite_rv64ud_p_fadd, "rv64ud-p-fadd");
 test_case!(test_suite_rv64ud_p_fclass, "rv64ud-p-fclass");
 test_case!(test_suite_rv64ud_p_fcmp, "rv64ud-p-fcmp");
 test_case!(#[ignore], test_suite_rv64ud_p_fcvt, "rv64ud-p-fcvt");
@@ -151,7 +151,7 @@ test_case!(#[ignore], test_suite_rv64ud_v_move, "rv64ud-v-move");
 test_case!(#[ignore], test_suite_rv64ud_v_recoding, "rv64ud-v-recoding");
 test_case!(#[ignore], test_suite_rv64ud_v_structural, "rv64ud-v-structural");
 // RV64-UF
-test_case!(#[ignore], test_suite_rv64uf_p_fadd, "rv64uf-p-fadd");
+test_case!(test_suite_rv64uf_p_fadd, "rv64uf-p-fadd");
 test_case!(test_suite_rv64uf_p_fclass, "rv64uf-p-fclass");
 test_case!(test_suite_rv64uf_p_fcmp, "rv64uf-p-fcmp");
 test_case!(#[ignore], test_suite_rv64uf_p_fcvt, "rv64uf-p-fcvt");
