@@ -25,9 +25,11 @@
 
 type _ location
 
+type nonce_types = [`Legacy_nonce | `Stateful_nonce | `Orphaned_nonce]
+
 val resolve_location :
   chain_id:Chain_id.t ->
-  ([< `Highwatermarks | `Nonce | `State] as 'kind) ->
+  ([< `Highwatermarks | `State | nonce_types] as 'kind) ->
   'kind location
 
-val filename : [< `Highwatermarks | `Nonce | `State] location -> string
+val filename : [< `Highwatermarks | `State | nonce_types] location -> string

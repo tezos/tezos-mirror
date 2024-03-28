@@ -1026,6 +1026,54 @@ module Nonces = struct
       ~level:Info
       ~msg:"revelation worker started"
       ()
+
+  let success_migrate_nonces =
+    declare_0
+      ~section
+      ~name:"success_migrate_nonces"
+      ~level:Notice
+      ~msg:"successfully migrated nonces: legacy nonces are safe to delete"
+      ()
+
+  let ignore_failed_nonce_migration =
+    declare_1
+      ~section
+      ~name:"ignore_failed_nonce_migration"
+      ~level:Warning
+      ~msg:
+        "There is not enough block history to complete the migration. Try \
+         starting from an older snapshot or providing more block history. The \
+         nonces from the following blocks will not be migrated:\n\
+         {failed} "
+      ~pp1:(Format.pp_print_list Block_hash.pp)
+      ("failed", Data_encoding.list Block_hash.encoding)
+
+  let outdated_nonce =
+    declare_1
+      ~section
+      ~name:"outdated_nonce"
+      ~level:Info
+      ~msg:"outdated nonce for block {block_hash} is safe to delete"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+
+  let unexpected_nonce =
+    declare_1
+      ~section
+      ~name:"unexpected_nonce"
+      ~level:Info
+      ~msg:"unexpected nonce for block {block_hash} is safe to delete"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
+
+  let revealed_nonce =
+    declare_1
+      ~section
+      ~name:"revealed_nonce"
+      ~level:Info
+      ~msg:"revealed nonce for block {block_hash} is safe to delete"
+      ~pp1:Block_hash.pp
+      ("block_hash", Block_hash.encoding)
 end
 
 module Per_block_votes = struct
