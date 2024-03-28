@@ -840,7 +840,7 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   let*! () = Evm_context_events.ready () in
   return init_status
 
-let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
+let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let open Lwt_result_syntax in
   let* Sc_rollup_block.(_, {context; _}) =
     let open Rollup_node_storage in
@@ -906,7 +906,10 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
     Irmin_context.checkout_exn evm_node_index checkpoint
   in
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
+  return (evm_node_context, evm_state)
 
+let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
+  let open Lwt_result_syntax in
   (* Tell the kernel that it is executed by an EVM node *)
   let*! evm_state = Evm_state.flag_local_exec evm_state in
   (* We remove the delayed inbox from the EVM state. Its contents will be
@@ -914,9 +917,7 @@ let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
 
   (* For changes made to [evm_state] to take effect, we commit the result *)
-  let*! evm_node_context =
-    Irmin_context.PVMState.set evm_node_context evm_state
-  in
+  let*! evm_node_context = Irmin_context.PVMState.set irmin_context evm_state in
   let*! checkpoint = Irmin_context.commit evm_node_context in
 
   (* Assert we can read the current blueprint number *)
@@ -952,6 +953,14 @@ let reset = State.reset
 
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
+
+let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
+  let open Lwt_result_syntax in
+  let* irmin_context, evm_state =
+    init_context_from_rollup_node ~data_dir ~rollup_node_data_dir
+  in
+  let* () = init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context in
+  return_unit
 
 let apply_blueprint timestamp payload delayed_transactions =
   worker_wait_for_request
