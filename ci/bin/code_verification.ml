@@ -373,6 +373,146 @@ let image_of_distribution = function
   | Ubuntu_jammy -> Images.ubuntu_jammy
   | Fedora_37 -> Images.fedora_37
 
+let job_tezt ~__POS__ ?rules ?parallel ?(tags = ["gcp_tezt"]) ~name
+    ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
+    ?(tezt_parallel = 1) ?(tezt_variant = "")
+    ?(before_script = before_script ~source_version:true ~eval_opam:true [])
+    ~dependencies () : tezos_job =
+  let variables =
+    [
+      ("JUNIT", "tezt-junit.xml");
+      ("TEZT_VARIANT", tezt_variant);
+      ("TESTS", Tezt_core.TSL.show tezt_tests);
+      ("TEZT_RETRY", string_of_int tezt_retry);
+      ("TEZT_PARALLEL", string_of_int tezt_parallel);
+    ]
+  in
+  let artifacts =
+    artifacts
+      ~reports:(reports ~junit:"$JUNIT" ())
+      [
+        "selected_tezts.tsv";
+        "tezt.log";
+        "tezt-*.log";
+        "tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json";
+        "$JUNIT";
+      ]
+      (* The record artifacts [tezt-results-$CI_NODE_INDEX.json]
+         should be stored for as long as a given commit on master is
+         expected to be HEAD in order to support auto-balancing. At
+         the time of writing, we have approximately 6 merges per day,
+         so 1 day should more than enough. However, we set it to 3
+         days to keep records over the weekend. The tezt artifacts
+         (including records and coverage) take up roughly 2MB /
+         job. Total artifact storage becomes [N*P*T*W] where [N] is
+         the days of retention (3 atm), [P] the number of pipelines
+         per day (~200 atm), [T] the number of Tezt jobs per pipeline
+         (60) and [W] the artifact size per tezt job (2MB). This makes
+         35GB which is less than 0.5% than our
+         {{:https://gitlab.com/tezos/tezos/-/artifacts}total artifact
+         usage}. *)
+      ~expire_in:(Duration (Days 7))
+      ~when_:Always
+  in
+  let print_variables =
+    [
+      "TESTS";
+      "JUNIT";
+      "CI_NODE_INDEX";
+      "CI_NODE_TOTAL";
+      "TEZT_PARALLEL";
+      "TEZT_VARIANT";
+    ]
+  in
+  let retry = if retry = 0 then None else Some retry in
+  job
+    ~__POS__
+    ~image:Images.runtime_e2etest_dependencies
+    ~name
+    ?parallel
+    ~tags
+    ~stage:Stages.test
+    ?rules
+    ~artifacts
+    ~variables
+    ~dependencies
+    ?retry
+    ~before_script
+    [
+      (* Print [print_variables] in a shell-friendly manner for easier debugging *)
+      "echo \""
+      ^ String.concat
+          " "
+          (List.map (fun var -> sf {|%s=\"${%s}\"|} var var) print_variables)
+      ^ "\"";
+      (* Store the list of tests that have been scheduled for execution for later debugging.
+         It is imperative this this first call to tezt receives any flags passed to the
+         second call that affect test selection.Note that TESTS must be quoted (here and below)
+         since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
+         syntax. *)
+      "./scripts/ci/tezt.sh \"${TESTS}\" --from-record tezt/records --job \
+       ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv";
+      (* For Tezt tests, there are multiple timeouts:
+         - --global-timeout is the internal timeout of Tezt, which only works if tests
+           are cooperative;
+         - the "timeout" command, which we set to send SIGTERM to Tezt 60s after --global-timeout
+           in case tests are not cooperative;
+         - the "timeout" command also sends SIGKILL 60s after having sent SIGTERM in case
+           Tezt is still stuck;
+         - the CI timeout.
+         The use of the "timeout" command is to make sure that Tezt eventually exits,
+         because if the CI timeout is reached, there are no artefacts,
+         and thus no logs to investigate.
+         See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
+      (* TODO: there is no point in providing default values for the
+         expansion of [TEZT_PARALLEL] and [TEZT_RETRY] as they are
+         always set in this job (see the definition of variables
+         above). Remove this once all tezt jobs are translated. *)
+      "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
+       \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
+       --global-timeout 1800 --on-unknown-regression-files fail --junit \
+       ${JUNIT} --from-record tezt/records --job \
+       ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+       tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
+       ${TEZT_PARALLEL:-3} --retry ${TEZT_RETRY:-1}";
+      "if [ -n \"${BISECT_FILE:-}\" ]; then ./scripts/ci/merge_coverage.sh; fi";
+    ]
+
+(** Tezt tag selector string.
+
+    It returns a TSL expression that:
+    - always deselects tags with [ci_disabled];
+    - selects, respectively deselects, the tests with the tags
+      [memory_3k], [memory_4k], [time_sensitive], [slow] or [cloud],
+      depending on the value of the corresponding function
+      argument. These arguments all default to false.
+
+    See [src/lib_test/tag.mli] for a description of the above tags.
+
+    The list of TSL expressions [and_] are appended to the final
+    selector, allowing to modify the selection further. *)
+let tezt_tests ?(memory_3k = false) ?(memory_4k = false)
+    ?(time_sensitive = false) ?(slow = false) ?(cloud = false)
+    (and_ : Tezt_core.TSL_AST.t list) : Tezt_core.TSL_AST.t =
+  let tags =
+    [
+      (false, "ci_disabled");
+      (memory_3k, "memory_3k");
+      (memory_4k, "memory_4k");
+      (time_sensitive, "time_sensitive");
+      (slow, "slow");
+      (cloud, "cloud");
+    ]
+  in
+  let positive, negative = List.partition fst tags in
+  let positive = List.map snd positive in
+  let negative = List.map snd negative in
+  Tezt_core.(
+    TSL.conjunction
+    @@ List.map (fun tag -> TSL_AST.Has_tag tag) positive
+    @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
+    @ and_)
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -1133,6 +1273,37 @@ let jobs pipeline_type =
       ]
       |> jobs_external_split ~path:"test/install_octez"
     in
+    let tezt_dependencies =
+      Dependent
+        [
+          Artifacts job_select_tezts;
+          Artifacts job_build_x86_64_release;
+          Artifacts job_build_x86_64_exp_dev_extra;
+          Artifacts job_build_kernels;
+          Artifacts job_tezt_fetch_records;
+        ]
+    in
+    let job_tezt_flaky : tezos_job =
+      job_tezt
+        ~__POS__
+        ~name:"tezt-flaky"
+        ~tezt_tests:(tezt_tests [Has_tag "flaky"])
+        ~tezt_variant:"-flaky"
+          (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
+             Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
+             '--retry') *)
+        ~retry:2
+        ~tezt_retry:3
+        ~tezt_parallel:1
+        ~dependencies:tezt_dependencies
+        ~rules:
+          (* This job can only be manually triggered when it's
+             artifact dependencies exists, which they do when
+             [changeset_octez] is changed. *)
+          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+        ()
+      |> enable_coverage_output_artifact |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -1146,6 +1317,7 @@ let jobs pipeline_type =
       job_oc_script_test_release_versions;
       job_oc_script_b58_prefix;
       job_oc_test_liquidity_baking_scripts;
+      job_tezt_flaky;
     ]
     @ jobs_unit @ jobs_install_octez
     @
