@@ -169,6 +169,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Node_event_level.register ~protocols ;
   Nonce_seed_revelation.register ~protocols ;
   Normalize.register ~protocols ;
+  Operations_liveness.register ~protocols ;
   Operation_size.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
