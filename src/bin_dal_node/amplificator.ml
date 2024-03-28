@@ -131,15 +131,20 @@ let amplify shard_store slot_store node_ctxt cryptobox commitment precomputation
       let*! () = Lwt_io.close ic_child in
       let*! () = Lwt_io.close oc_child in
       let*! res =
-        let buffer = Bytes.create 4 in
-        let*! () = Lwt_io.read_into_exactly ic_parent buffer 0 4 in
-        let len = Bytes.get_int32_ne buffer 0 |> Int32.to_int in
-        let encoded = Bytes.create len in
-        let*! () = Lwt_io.read_into_exactly ic_parent encoded 0 len in
-        let shards, shard_proofs =
-          Data_encoding.Binary.of_bytes_exn proved_shards_encoding encoded
-        in
-        return (List.to_seq shards, shard_proofs)
+        Lwt.pick
+          [
+            (let*! () = Lwt_unix.sleep Constants.amplification_timeout in
+             tzfail Timeout);
+            (let buffer = Bytes.create 4 in
+             let*! () = Lwt_io.read_into_exactly ic_parent buffer 0 4 in
+             let len = Bytes.get_int32_ne buffer 0 |> Int32.to_int in
+             let encoded = Bytes.create len in
+             let*! () = Lwt_io.read_into_exactly ic_parent encoded 0 len in
+             let shards, shard_proofs =
+               Data_encoding.Binary.of_bytes_exn proved_shards_encoding encoded
+             in
+             return (List.to_seq shards, shard_proofs));
+          ]
       in
       let*! () = Lwt_io.close ic_parent in
       let*! _exit_child =
