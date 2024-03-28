@@ -23,14 +23,14 @@ Prerequisites
 -------------
 
 To experiment with the commands described in this section, we use
-the `Dailynet <https://teztnets.com/dailynet-about>`_.
+the `Weeklynet <https://teztnets.com/weeklynet-about>`_.
 In this section, we assume that ``${OPERATOR_ADDR}`` is a valid
-implicit account on Dailynet owned by the reader.
+implicit account on Weeklynet owned by the reader.
 
 Notice that you need a specific development version of Octez to
-participate to Dailynet. This version is either available from
+participate to Weeklynet. This version is either available from
 docker images or can be compiled from sources. Please refer to the
-`Dailynet <https://teztnets.com/dailynet-about>`_ website
+`Weeklynet <https://teztnets.com/weeklynet-about>`_ website
 for installation details.
 
 An Octez rollup node needs an Octez node to run. It is recommended that the two
@@ -70,7 +70,7 @@ We assume that an Octez node has been launched locally, typically by issuing:
    octez-node run --data-dir "${ONODE_DIR}" --network "${NETWORK}" --rpc-addr 127.0.0.1
 
 in a terminal where ``${NETWORK}`` is of the
-form ``https://teztnets.com/dailynet-YYYY-MM-DD``
+form ``https://teztnets.com/weeklynet-YYYY-MM-DD``
 and ``${ONODE_DIR}`` is a path for the Octez node store, by default ``~/.tezos-node``.
 
 The commands will only work when the node is completely bootstrapped, and therefore the current protocol on the target network is activated.
@@ -93,7 +93,7 @@ Then, the ``${OPERATOR_ADDR}`` can be set to the hash value (``tz1...``) returne
 Finally, you need to check that your balance is greater than 10,000
 tez to make sure that staking is possible. In case your balance is not
 sufficient, you can get test tokens for the ``tz1`` address from :ref:`a faucet <faucet>`,
-after your node gets synchronized with Dailynet.
+after your node gets synchronized with Weeklynet.
 
 
 .. code:: sh
@@ -681,7 +681,7 @@ Triggering the execution of an outbox message
 
 Once an outbox message has been pushed to the outbox by the kernel at
 some level ``${L}``, the user needs to wait for the commitment that
-includes this level to be cemented. On Dailynet, the cementation
+includes this level to be cemented. On Weeklynet, the cementation
 process of a non-disputed commitment is 40 blocks long while on
 Mainnet, it is 2 weeks long.
 
