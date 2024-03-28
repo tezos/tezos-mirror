@@ -369,6 +369,8 @@ let degraded_refutation_loop state (head : Layer1.header) =
   let* () = handle_protocol_migration ~catching_up:false state head in
   let* () = Refutation_coordinator.process (Layer1.head_of_header head) in
   let* () = Publisher.publish_commitments () in
+  (* Continue to produce batches but ignore any error *)
+  let*! (_ : unit tzresult) = Batcher.produce_batches () in
   let*! () = Injector.inject () in
   return_unit
 
