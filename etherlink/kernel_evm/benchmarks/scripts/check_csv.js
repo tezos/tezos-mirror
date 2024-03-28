@@ -46,7 +46,8 @@ async function processFile(filename, { analysis_acc, graph_acc, sanity_acc }) {
             // CSV options if any
             delimiter: ",",
             columns: true,
-            cast: cast_value
+            cast: cast_value,
+            trim: true
         }))
     for await (const record of parser) {
         // Work with each record
