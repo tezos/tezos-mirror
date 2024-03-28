@@ -151,45 +151,78 @@ module Pipeline = struct
     (* Check usage of [needs:] & [depends:] *)
     Fun.flip List.iter jobs @@ fun {job; _} ->
     (* Get the [needs:] / [dependencies:] of job *)
-    let opt_set l = String_set.of_list (Option.value ~default:[] l) in
     let needs =
       (* The mandatory set of needs *)
-      job.needs |> Option.value ~default:[]
-      |> List.filter_map (fun Gitlab_ci.Types.{job; optional} ->
-             if not optional then Some job else None)
-      |> String_set.of_list
+      match job.needs with
+      | Some needs ->
+          Some
+            (needs
+            |> List.filter_map (fun Gitlab_ci.Types.{job; optional} ->
+                   if not optional then Some job else None)
+            |> String_set.of_list)
+      | None -> None
     in
-    let dependencies = opt_set job.dependencies in
+    let dependencies =
+      String_set.of_list (Option.value ~default:[] job.dependencies)
+    in
+    (* Check that jobs in [needs:]/[dependencies:] jobs are defined *)
+    (let dep_needs =
+       String_set.union
+         dependencies
+         (Option.value ~default:String_set.empty needs)
+     in
+     Fun.flip String_set.iter dep_needs @@ fun need ->
+     match Hashtbl.find_opt job_by_name need with
+     | Some _needed_job ->
+         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
+            check rule implication *)
+         ()
+     | None ->
+         failwith
+           "[%s] job '%s' has a need on '%s' which is not defined in this \
+            pipeline."
+           pipeline_name
+           job.name
+           need) ;
     (* Check that dependencies are a subset of needs.
        Note: this is already enforced by the smart constructor {!job}
        defined below. Is it redundant? Nothing enforces the usage of
        this smart constructor at this point.*)
-    String_set.iter
-      (fun dependency ->
-        if not (String_set.mem dependency needs) then
-          failwith
-            "[%s] the job '%s' has a [dependency:] on '%s' which is not \
-             included in it's [need:]"
-            pipeline_name
-            job.name
-            dependency)
-      dependencies ;
-    (* Check that needed jobs (which thus includes dependencies) are defined *)
-    ( Fun.flip String_set.iter needs @@ fun need ->
-      match Hashtbl.find_opt job_by_name need with
-      | Some _needed_job ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
-             check rule implication *)
-          ()
-      | None ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
-             handle optional needs *)
-          failwith
-            "[%s] job '%s' has a need on '%s' which is not defined in this \
-             pipeline."
-            pipeline_name
-            job.name
-            need ) ;
+    (match needs with
+    | Some needs ->
+        String_set.iter
+          (fun dependency ->
+            if not (String_set.mem dependency needs) then
+              failwith
+                "[%s] the job '%s' has a [dependency:] on '%s' which is not \
+                 included in it's [need:]"
+                pipeline_name
+                job.name
+                dependency)
+          dependencies
+    | None ->
+        (* If the job has no needs, then it suffices that the dependency is in
+           an anterior stage. *)
+        let stage_index =
+          let stage_names = Stage.to_string_list () in
+          fun stage_opt ->
+            let stage = Option.value ~default:"test" stage_opt in
+            List.assoc_opt
+              stage
+              (List.combine stage_names (range 1 (List.length stage_names)))
+        in
+        String_set.iter
+          (fun dependency ->
+            (* We use [find] instead of [find_opt] *)
+            let dependency_job = Hashtbl.find job_by_name dependency in
+            if stage_index dependency_job.stage >= stage_index job.stage then
+              failwith
+                "[%s] the job '%s' has a [dependency:] on '%s' which is not in \
+                 a anterior stage."
+                pipeline_name
+                job.name
+                dependency)
+          dependencies) ;
     (* Check that all [dependencies:] are on jobs that produce artifacts *)
     ( Fun.flip String_set.iter dependencies @@ fun dependency ->
       match Hashtbl.find_opt job_by_name dependency with
