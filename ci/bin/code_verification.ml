@@ -39,6 +39,12 @@ open Common
    unconditional variant [schedule_extended_test]. *)
 type code_verification_pipeline = Before_merging | Schedule_extended_test
 
+(** Manual trigger configuration for [make_rules] *)
+type manual =
+  | No  (** Do not add rule for manual trigger. *)
+  | Yes  (** Add rule for manual trigger. *)
+  | On_changes of string list  (** Add manual trigger on certain [changes:] *)
+
 (* [make_rules] makes rules for jobs that are:
      - automatic in scheduled pipelines;
      - conditional in [before_merging] pipelines.
@@ -47,19 +53,24 @@ type code_verification_pipeline = Before_merging | Schedule_extended_test
      set to [true] to ensure that we only run the job in case previous
      jobs succeeded (setting [when: on_success]).
 
+     If [label] is set, add rule that selects the job in
+     [Before_merging] pipelines for merge requests with the given
+     label. Rules for manual triggers can be configured using
+     [manual].
+
      If [label], [changes] and [manual] are omitted, then rules will
      enable the job [On_success] in the [before_merging]
      pipeline. This is safe, but prefer specifying a [changes] clause
      if possible. *)
-let make_rules ?label ?changes ?(manual = false) ?(dependent = false)
-    pipeline_type =
+let make_rules ?label ?changes ?(manual = No) ?(dependent = false) pipeline_type
+    =
   match pipeline_type with
   | Schedule_extended_test ->
       (* The scheduled pipeline always runs all jobs unconditionally
          -- unless they are dependent on a previous, non-trigger job, in the
          pipeline. *)
       [job_rule ~when_:(if dependent then On_success else Always) ()]
-  | Before_merging ->
+  | Before_merging -> (
       (* MR labels can be used to force tests to run. *)
       (match label with
       | Some label ->
@@ -70,7 +81,11 @@ let make_rules ?label ?changes ?(manual = false) ?(dependent = false)
         | None -> []
         | Some changes -> [job_rule ~changes ~when_:On_success ()])
       (* For some tests, it can be relevant to have a manual trigger. *)
-      @ if manual then [job_rule ~when_:Manual ()] else []
+      @
+      match manual with
+      | No -> []
+      | Yes -> [job_rule ~when_:Manual ()]
+      | On_changes changes -> [job_rule ~when_:Manual ~changes ()])
 
 type opam_package_group = Executable | All
 
@@ -496,7 +511,7 @@ let jobs pipeline_type =
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
       ~__POS__
-      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:true ())
+      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:Yes ())
       ~dependencies:dependencies_needs_trigger
       ()
     |> job_external_split
@@ -545,7 +560,7 @@ let jobs pipeline_type =
       ()
     |> job_external_split
   in
-  let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
+  let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
   let job_build_arm64_release : Tezos_ci.tezos_job =
     job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
   in
@@ -1012,7 +1027,7 @@ let jobs pipeline_type =
         ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
       in
       let install_octez_rules =
-        make_rules ~changes:changeset_install_jobs ~manual:true ()
+        make_rules ~changes:changeset_install_jobs ~manual:Yes ()
       in
       let job_install_bin ~__POS__ ~name ?allow_failure ?(rc = false)
           distribution =
@@ -1041,7 +1056,7 @@ let jobs pipeline_type =
           ~name:"oc.install_opam_focal"
           ~image:Images.opam_ubuntu_focal
           ~dependencies:dependencies_needs_trigger
-          ~rules:(make_rules ~manual:true ())
+          ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
           ~stage:Stages.test
             (* The default behavior of opam is to use `nproc` to determine its level of
