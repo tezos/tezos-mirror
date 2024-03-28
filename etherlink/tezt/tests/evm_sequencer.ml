@@ -1001,6 +1001,86 @@ let test_delayed_deposit_is_included =
     ~error_msg:"Expected a bigger balance" ;
   unit
 
+let test_delayed_deposit_from_init_rollup_node =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "delayed_inbox"; "init"]
+    ~title:"Delayed inbox is populated at init from rollup node"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let* {
+         client;
+         l1_contracts;
+         sc_rollup_address;
+         sc_rollup_node;
+         sequencer;
+         proxy;
+         _;
+       } =
+    setup_sequencer
+      ~da_fee:arb_da_fee_for_delayed_inbox
+      ~time_between_blocks:Nothing
+      protocol
+  in
+  let receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB" in
+  let* receiver_balance_prev =
+    Eth_cli.balance ~account:receiver ~endpoint:(Evm_node.endpoint sequencer)
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~sequencer ~proxy ~client () in
+  (* We don't care about this sequencer. *)
+  let* () = Evm_node.terminate sequencer in
+  (* Send the deposit to delayed inbox, no sequencer will be listening to the
+     event. *)
+  let amount = Tez.of_int 16 in
+  let depositor = Constant.bootstrap5 in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount
+      ~l1_contracts
+      ~depositor
+      ~receiver
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Bake an extra block for a finalized deposit. *)
+  let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Run a new sequencer that is initialized from a rollup node that has the
+     delayed deposit in its state. *)
+  let new_sequencer =
+    let mode = Evm_node.mode sequencer in
+    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      new_sequencer
+      sc_rollup_node
+  in
+  let* () = Evm_node.run new_sequencer in
+
+  Log.info "sequencer restarted" ;
+  (* The block will include the delayed deposit. *)
+  let* () =
+    let*@ _lvl = Rpc.produce_block new_sequencer in
+    unit
+  and* _hash = Evm_node.wait_for_block_producer_tx_injected new_sequencer in
+  let* () =
+    bake_until_sync ~sc_rollup_node ~proxy ~sequencer:new_sequencer ~client ()
+  in
+  let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
+  let* receiver_balance_next =
+    Eth_cli.balance
+      ~account:receiver
+      ~endpoint:(Evm_node.endpoint new_sequencer)
+  in
+  Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
+    ~error_msg:"Expected a bigger balance" ;
+  unit
+
 (** test to initialise a sequencer data dir based on a rollup node
         data dir *)
 let test_init_from_rollup_node_data_dir =
@@ -2849,6 +2929,7 @@ let () =
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;
+  test_delayed_deposit_from_init_rollup_node protocols ;
   test_init_from_rollup_node_data_dir protocols ;
   test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;

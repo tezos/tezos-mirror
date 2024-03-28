@@ -251,11 +251,6 @@ module State = struct
     let (Qty next) = ctxt.session.next_blueprint_number in
     commit ctxt.store ctxt.session.context evm_state (Qty Z.(pred next))
 
-  let inspect ctxt path =
-    let open Lwt_syntax in
-    let* res = Evm_state.inspect ctxt.session.evm_state path in
-    return res
-
   let on_modified_head ctxt evm_state context =
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.context <- context
@@ -301,8 +296,8 @@ module State = struct
     | Blueprint_applied {number = Qty number; hash = expected_block_hash} -> (
         let* block_hash_opt =
           let*! bytes =
-            inspect
-              ctxt
+            Evm_state.inspect
+              evm_state
               (Durable_storage_path.Indexes.block_by_number (Nth number))
           in
           return (Option.map decode_block_hash bytes)
@@ -655,6 +650,30 @@ module State = struct
     in
     return hashes
 
+  let delayed_inbox_item evm_state hash =
+    let open Lwt_result_syntax in
+    let*! bytes =
+      Evm_state.inspect
+        evm_state
+        (Durable_storage_path.Delayed_transaction.transaction hash)
+    in
+    let*? bytes =
+      Option.to_result ~none:[error_of_fmt "missing delayed inbox item "] bytes
+    in
+    let*? rlp_item = Rlp.decode bytes in
+    match rlp_item with
+    | Rlp.(List (rlp_item :: _)) ->
+        let*? res =
+          Option.to_result
+            ~none:[error_of_fmt "cannot parse delayed inbox item "]
+          @@ Ethereum_types.Delayed_transaction.of_rlp_content
+               ~transaction_tag:"\x01"
+               hash
+               rlp_item
+        in
+        return res
+    | _ -> failwith "invalid delayed inbox item"
+
   let blueprint_with_events ctxt level =
     let open Lwt_result_syntax in
     let* blueprint = Evm_store.Blueprints.find ctxt.store level in
@@ -842,48 +861,39 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
 
 let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let open Lwt_result_syntax in
-  let* Sc_rollup_block.(_, {context; _}) =
-    let open Rollup_node_storage in
-    let* last_finalized_level, levels_to_hashes, l2_blocks =
-      Rollup_node_storage.load ~rollup_node_data_dir ()
-    in
-    let* final_level = Last_finalized_level.read last_finalized_level in
-    let*? final_level =
-      Option.to_result
-        ~none:
-          [
-            error_of_fmt
-              "Rollup node storage is missing the last finalized level";
-          ]
-        final_level
-    in
-    let* final_level_hash =
-      Levels_to_hashes.find levels_to_hashes final_level
-    in
-    let*? final_level_hash =
-      Option.to_result
-        ~none:
-          [
-            error_of_fmt
-              "Rollup node has no block hash for the l1 level %ld"
-              final_level;
-          ]
-        final_level_hash
-    in
-    let* final_l2_block = L2_blocks.read l2_blocks final_level_hash in
-    Lwt.return
-    @@ Option.to_result
-         ~none:
-           [
-             error_of_fmt
-               "Rollup node has no l2 blocks for the l1 block hash %a"
-               Block_hash.pp
-               final_level_hash;
-           ]
-         final_l2_block
+  let open Rollup_node_storage in
+  let* last_finalized_level, levels_to_hashes, l2_blocks =
+    Rollup_node_storage.load ~rollup_node_data_dir ()
   in
-  let checkpoint =
-    Smart_rollup_context_hash.to_bytes context |> Context_hash.of_bytes_exn
+  let* final_level = Last_finalized_level.read last_finalized_level in
+  let*? final_level =
+    Option.to_result
+      ~none:
+        [error_of_fmt "Rollup node storage is missing the last finalized level"]
+      final_level
+  in
+  let* final_level_hash = Levels_to_hashes.find levels_to_hashes final_level in
+  let*? final_level_hash =
+    Option.to_result
+      ~none:
+        [
+          error_of_fmt
+            "Rollup node has no block hash for the l1 level %ld"
+            final_level;
+        ]
+      final_level_hash
+  in
+  let* final_l2_block = L2_blocks.read l2_blocks final_level_hash in
+  let* checkpoint =
+    match final_l2_block with
+    | Some Sc_rollup_block.(_, {context; _}) ->
+        Smart_rollup_context_hash.to_bytes context
+        |> Context_hash.of_bytes_exn |> return
+    | None ->
+        failwith
+          "Rollup node has no l2 blocks for the l1 block hash %a"
+          Block_hash.pp
+          final_level_hash
   in
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
@@ -906,7 +916,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     Irmin_context.checkout_exn evm_node_index checkpoint
   in
   let*! evm_state = Irmin_context.PVMState.get evm_node_context in
-  return (evm_node_context, evm_state)
+  return (evm_node_context, evm_state, final_level)
 
 let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
   let open Lwt_result_syntax in
@@ -951,16 +961,74 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
 
 let reset = State.reset
 
+let get_evm_events_from_rollup_node_state evm_state =
+  let open Lwt_result_syntax in
+  let* kernel_upgrade =
+    let*! kernel_upgrade_payload =
+      Evm_state.inspect evm_state Durable_storage_path.kernel_upgrade
+    in
+    Option.bind kernel_upgrade_payload Ethereum_types.Upgrade.of_bytes
+    |> Option.map (fun e -> Ethereum_types.Evm_events.Upgrade_event e)
+    |> return
+  in
+
+  let* sequencer_upgrade =
+    let*! sequencer_upgrade_payload =
+      Evm_state.inspect evm_state Durable_storage_path.sequencer_upgrade
+    in
+    Option.bind
+      sequencer_upgrade_payload
+      Ethereum_types.Sequencer_upgrade.of_bytes
+    |> Option.map (fun e -> Ethereum_types.Evm_events.Sequencer_upgrade_event e)
+    |> return
+  in
+
+  let* new_delayed_transactions =
+    let*! hashes = State.delayed_inbox_hashes evm_state in
+    let* events =
+      List.map_es
+        (fun hash ->
+          let* item = State.delayed_inbox_item evm_state hash in
+          return (Ethereum_types.Evm_events.New_delayed_transaction item))
+        hashes
+    in
+    return events
+  in
+
+  return
+  @@ Option.to_list kernel_upgrade
+  @ Option.to_list sequencer_upgrade
+  @ new_delayed_transactions
+
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
 let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let open Lwt_result_syntax in
-  let* irmin_context, evm_state =
+  let* irmin_context, evm_state, finalized_level =
     init_context_from_rollup_node ~data_dir ~rollup_node_data_dir
   in
+  let* evm_events = get_evm_events_from_rollup_node_state evm_state in
   let* () = init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context in
-  return_unit
+  let* smart_rollup_address =
+    let* metadata =
+      Metadata.Versioned.read_metadata_file ~dir:rollup_node_data_dir
+    in
+    match metadata with
+    | None -> failwith "missing metadata in the rollup node data dir"
+    | Some (V0 {rollup_address; _}) | Some (V1 {rollup_address; _}) ->
+        return @@ Address.to_string rollup_address
+  in
+  let* _loaded =
+    start
+      ~data_dir
+      ~preimages:Filename.Infix.(rollup_node_data_dir // "wasm_2_0_0")
+      ~preimages_endpoint:None
+      ~smart_rollup_address
+      ~fail_on_missing_blueprint:false
+      ()
+  in
+  apply_evm_events ~finalized_level evm_events
 
 let apply_blueprint timestamp payload delayed_transactions =
   worker_wait_for_request
