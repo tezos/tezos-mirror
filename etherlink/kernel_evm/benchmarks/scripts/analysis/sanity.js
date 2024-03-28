@@ -37,6 +37,7 @@ function check_bip_record(record, acc) {
     if (isNaN(record.next_bip_ticks)) record_error(acc, `missing blueprint ticks`);
     if (isNaN(record.chunks_in_bip)) record_error(acc, `missing nb chunks`);
     if (isNaN(record.txs_in_bip)) record_error(acc, `missing nb of txs`);
+    if (isNaN(record.bip_size)) record_error(acc, `missing bip_size`);
 }
 
 // record added at the end with information related to whole benchmark
