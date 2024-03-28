@@ -73,6 +73,10 @@ module Local_directory = Make_directory (struct
 end)
 
 let () =
+  Root_directory.register0 Rollup_node_services.Root.health
+  @@ fun _node_ctxt () () -> Lwt_result_syntax.return_unit
+
+let () =
   Global_directory.register0 Rollup_node_services.Global.sc_rollup_address
   @@ fun node_ctxt () () -> Lwt_result.return node_ctxt.config.sc_rollup_address
 
