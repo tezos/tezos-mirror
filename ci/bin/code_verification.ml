@@ -568,20 +568,118 @@ let jobs pipeline_type =
     job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
     |> job_external_split
   in
+  (* Used in [before_merging] and [schedule_extended_tests].
+
+     Fetch records for Tezt generated on the last merge request pipeline
+     on the most recently merged MR and makes them available in artifacts
+     for future merge request pipelines. *)
+  let job_select_tezts : tezos_job =
+    job
+      ~__POS__
+      ~name:"select_tezts"
+        (* We need:
+           - Git (to run git diff)
+           - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
+      ~image:Images.runtime_prebuild_dependencies
+      ~stage:Stages.build
+      ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
+      (script_propagate_exit_code "scripts/ci/select_tezts.sh")
+      ~allow_failure:(With_exit_codes [17])
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Days 3))
+           ~when_:Always
+           ["selected_tezts.tsl"])
+    |> job_external_once
+  in
+  let job_build_kernels : tezos_job =
+    job
+      ~__POS__
+      ~name:"oc.build_kernels"
+      ~image:Images.rust_toolchain
+      ~stage:Stages.build
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+      [
+        "make -f kernels.mk build";
+        "make -f etherlink.mk evm_kernel.wasm";
+        "make -C src/risc_v risc-v-sandbox risc-v-dummy.elf";
+        "make -C src/risc_v/tests/ build";
+      ]
+      ~artifacts:
+        (artifacts
+           ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
+           ~expire_in:(Duration (Days 1))
+           ~when_:On_success
+           [
+             "evm_kernel.wasm";
+             "smart-rollup-installer";
+             "sequenced_kernel.wasm";
+             "tx_kernel.wasm";
+             "tx_kernel_dal.wasm";
+             "dal_echo_kernel.wasm";
+             "src/risc_v/risc-v-sandbox";
+             "src/risc_v/risc-v-dummy.elf";
+             "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
+           ])
+      ~cache:
+        [
+          {key = "kernels"; paths = ["cargo/"]};
+          {key = "kernels-sccache"; paths = ["_sccache"]};
+        ]
+    |> enable_kernels |> enable_sccache |> job_external_split
+  in
+  (* Fetch records for Tezt generated on the last merge request pipeline
+         on the most recently merged MR and makes them available in artifacts
+         for future merge request pipelines. *)
+  let job_tezt_fetch_records : tezos_job =
+    job
+      ~__POS__
+      ~name:"oc.tezt:fetch-records"
+      ~image:Images.runtime_build_dependencies
+      ~stage:Stages.build
+      ~before_script:
+        (before_script
+           ~take_ownership:true
+           ~source_version:true
+           ~eval_opam:true
+           [])
+      ~rules:(make_rules ~changes:changeset_octez ())
+      [
+        "dune exec scripts/ci/update_records/update.exe -- --log-file \
+         tezt-fetch-records.log --from last-successful-schedule-extended-test \
+         --info";
+      ]
+      ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
+        (* Allow failure of this job, since Tezt can use the records
+           stored in the repo as backup for balancing. *)
+      ~allow_failure:Yes
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Hours 4))
+           ~when_:Always
+           [
+             "tezt-fetch-records.log";
+             "tezt/records/*.json";
+             (* Keep broken records for debugging *)
+             "tezt/records/*.json.broken";
+           ])
+    |> job_external_split
+  in
+  let job_static_x86_64_experimental =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Amd64
+        (* Even though not many tests depend on static executables, some
+           of those that do are limiting factors in the total duration
+           of pipelines. So we start this job as early as possible,
+           without waiting for sanity_ci. *)
+      ~dependencies:dependencies_needs_trigger
+      ~rules:(make_rules ~changes:changeset_octez ())
+      ()
+    |> job_external_split
+  in
   let build =
-    let job_static_x86_64_experimental =
-      job_build_static_binaries
-        ~__POS__
-        ~arch:Amd64
-          (* Even though not many tests depend on static executables, some
-             of those that do are limiting factors in the total duration
-             of pipelines. So we start this job as early as possible,
-             without waiting for sanity_ci. *)
-        ~dependencies:dependencies_needs_trigger
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ()
-      |> job_external_split
-    in
     (* TODO: The code is a bit convulted here because these jobs are
        either in the build or in the manual stage depending on the
        pipeline type. However, we can put them in the build stage on
@@ -611,105 +709,6 @@ let jobs pipeline_type =
              [])
         ["dune build @check"]
       |> job_external_split
-    in
-    let job_build_kernels : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.build_kernels"
-        ~image:Images.rust_toolchain
-        ~stage:Stages.build
-        ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
-        ~rules:
-          (make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
-        [
-          "make -f kernels.mk build";
-          "make -f etherlink.mk evm_kernel.wasm";
-          "make -C src/risc_v risc-v-sandbox risc-v-dummy.elf";
-          "make -C src/risc_v/tests/ build";
-        ]
-        ~artifacts:
-          (artifacts
-             ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
-             ~expire_in:(Duration (Days 1))
-             ~when_:On_success
-             [
-               "evm_kernel.wasm";
-               "smart-rollup-installer";
-               "sequenced_kernel.wasm";
-               "tx_kernel.wasm";
-               "tx_kernel_dal.wasm";
-               "dal_echo_kernel.wasm";
-               "src/risc_v/risc-v-sandbox";
-               "src/risc_v/risc-v-dummy.elf";
-               "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
-             ])
-        ~cache:
-          [
-            {key = "kernels"; paths = ["cargo/"]};
-            {key = "kernels-sccache"; paths = ["_sccache"]};
-          ]
-      |> enable_kernels |> enable_sccache |> job_external_split
-    in
-    (* Fetch records for Tezt generated on the last merge request pipeline
-       on the most recently merged MR and makes them available in artifacts
-       for future merge request pipelines. *)
-    let job_tezt_fetch_records : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.tezt:fetch-records"
-        ~image:Images.runtime_build_dependencies
-        ~stage:Stages.build
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ~rules:(make_rules ~changes:changeset_octez ())
-        [
-          "dune exec scripts/ci/update_records/update.exe -- --log-file \
-           tezt-fetch-records.log --from \
-           last-successful-schedule-extended-test --info";
-        ]
-        ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
-          (* Allow failure of this job, since Tezt can use the records
-             stored in the repo as backup for balancing. *)
-        ~allow_failure:Yes
-        ~artifacts:
-          (artifacts
-             ~expire_in:(Duration (Hours 4))
-             ~when_:Always
-             [
-               "tezt-fetch-records.log";
-               "tezt/records/*.json";
-               (* Keep broken records for debugging *)
-               "tezt/records/*.json.broken";
-             ])
-      |> job_external_split
-    in
-    (* Used in [before_merging] and [schedule_extended_tests].
-
-       Fetch records for Tezt generated on the last merge request pipeline
-       on the most recently merged MR and makes them available in artifacts
-       for future merge request pipelines. *)
-    let job_select_tezts : tezos_job =
-      job
-        ~__POS__
-        ~name:"select_tezts"
-          (* We need:
-             - Git (to run git diff)
-             - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
-        ~image:Images.runtime_prebuild_dependencies
-        ~stage:Stages.build
-        ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
-        (script_propagate_exit_code "scripts/ci/select_tezts.sh")
-        ~allow_failure:(With_exit_codes [17])
-        ~artifacts:
-          (artifacts
-             ~expire_in:(Duration (Days 3))
-             ~when_:Always
-             ["selected_tezts.tsl"])
-      |> job_external_once
     in
     [
       job_docker_rust_toolchain;
