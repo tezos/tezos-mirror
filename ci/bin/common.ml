@@ -265,6 +265,7 @@ let enable_kernels =
 
 (** {2 Changesets} *)
 
+(* Only if octez source code has changed *)
 let changeset_octez =
   [
     "src/**/*";
@@ -276,10 +277,13 @@ let changeset_octez =
     "tzt_reference_test_suite/**/*";
   ]
 
+(* Only if octez source code has changed, if the images has changed or
+   if kernels.mk changed. *)
 let changeset_octez_or_kernels =
   ["images/**/*"; "scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"]
   @ changeset_octez
 
+(* Only if documentation has changed *)
 let changeset_octez_docs =
   [
     "scripts/**/*/";
