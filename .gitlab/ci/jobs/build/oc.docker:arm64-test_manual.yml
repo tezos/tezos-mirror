@@ -6,6 +6,7 @@ oc.docker:arm64:
   stage: manual
   tags:
   - gcp_arm64
+  needs: []
   dependencies: []
   allow_failure: true
   before_script:

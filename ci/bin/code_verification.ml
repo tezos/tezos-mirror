@@ -903,11 +903,29 @@ let jobs pipeline_type =
   let manual =
     match pipeline_type with
     | Before_merging ->
+        (* Note: manual jobs in stage [manual] (which is the final
+           stage) in [Before_merging] pipelines should be [Dependent]
+           by default, and in particular [Dependent []] if they have
+           no need for artifacts from other jobs. Making these
+           dependent on [job_trigger] is redundant since they are
+           already manual, and what's more, puts the pipeline in a
+           confusing "pending state" with a yellow "pause" icon on the
+           [manual] stage. *)
         let job_docker_amd64_test_manual : Tezos_ci.tezos_job =
-          job_docker_build ~__POS__ ~external_:true ~arch:Amd64 Test_manual
+          job_docker_build
+            ~__POS__
+            ~external_:true
+            ~arch:Amd64
+            ~dependencies:(Dependent [])
+            Test_manual
         in
         let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
-          job_docker_build ~__POS__ ~external_:true ~arch:Arm64 Test_manual
+          job_docker_build
+            ~__POS__
+            ~external_:true
+            ~arch:Arm64
+            ~dependencies:(Dependent [])
+            Test_manual
         in
         let job_build_dpkg_amd64_manual =
           job_build_bin_package
@@ -916,6 +934,7 @@ let jobs pipeline_type =
             ~target:Dpkg
             ~arch:Tezos_ci.Amd64
             ~rules:[job_rule ~when_:Manual ()]
+            ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
           |> job_external ~directory:"build" ~filename_suffix:"manual"
@@ -923,10 +942,11 @@ let jobs pipeline_type =
         let job_build_rpm_amd64_manual =
           job_build_bin_package
             ~__POS__
-            ~rules:[job_rule ~when_:Manual ()]
             ~name:"oc.build:rpm:amd64"
             ~target:Rpm
             ~arch:Tezos_ci.Amd64
+            ~rules:[job_rule ~when_:Manual ()]
+            ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
           |> job_external ~directory:"build" ~filename_suffix:"manual"

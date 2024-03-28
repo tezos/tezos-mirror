@@ -617,8 +617,8 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
 
 type bin_package_target = Dpkg | Rpm
 
-let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
-    ~target () : tezos_job =
+let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
+    ?(stage = Stages.build) ~arch ~target () : tezos_job =
   let arch_string = arch_to_string_alt arch in
   let target_string = match target with Dpkg -> "dpkg" | Rpm -> "rpm" in
   let image =
@@ -659,12 +659,12 @@ let job_build_bin_package ?rules ~__POS__ ~name ?(stage = Stages.build) ~arch
   in
   job
     ?rules
+    ?dependencies
     ~__POS__
     ~name
     ~arch
     ~image
     ~stage
-    ~dependencies:(Dependent [])
     ~variables:
       [
         ("TARGET", target_string);
@@ -696,6 +696,7 @@ let job_build_dpkg_amd64 : unit -> tezos_job =
     ~name:"oc.build:dpkg:amd64"
     ~target:Dpkg
     ~arch:Amd64
+    ~dependencies:(Dependent [])
 
 let job_build_rpm_amd64 : unit -> tezos_job =
   job_build_bin_package
@@ -703,6 +704,7 @@ let job_build_rpm_amd64 : unit -> tezos_job =
     ~name:"oc.build:rpm:amd64"
     ~target:Rpm
     ~arch:Amd64
+    ~dependencies:(Dependent [])
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     ?dependencies () =
