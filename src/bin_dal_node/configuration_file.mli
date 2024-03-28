@@ -30,7 +30,8 @@ type history_mode =
   | Rolling of {blocks : [`Auto | `Some of int]}
       (** [Rolling {block = `Some n}] keeps the shards for about [n]
           blocks. [Rolling {block = `Auto}] infers the number of
-          blocks depending on the L1 parametric constants. *)
+          blocks depending on the L1 parametric constants and the
+          profile. *)
   | Full  (** [Full] keeps the shards forever *)
 
 type t = {
