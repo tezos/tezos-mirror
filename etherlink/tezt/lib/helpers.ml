@@ -165,13 +165,13 @@ let bake_until_sync ?(timeout = 30.) ~sc_rollup_node ~proxy ~sequencer ~client
     () =
   let open Rpc.Syntax in
   let rec go () =
-    let*@ proxy_level_opt = Rpc.block_number_opt proxy in
+    let* proxy_level_opt = Rpc.block_number_opt proxy in
     let*@ sequencer_level = Rpc.block_number sequencer in
     match proxy_level_opt with
-    | None ->
+    | Error _ | Ok None ->
         let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
         go ()
-    | Some proxy_level ->
+    | Ok (Some proxy_level) ->
         if sequencer_level < proxy_level then
           Test.fail
             ~loc:__LOC__

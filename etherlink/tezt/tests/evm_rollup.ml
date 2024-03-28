@@ -2903,9 +2903,11 @@ let test_cannot_prepayed_leads_to_no_inclusion =
     "0xf86d80843b9aca00825b0494b53dc01974176e5dff2298c5a94343c2585e3c54880de0b6b3a764000080820a96a07a3109107c6bd1d555ce70d6253056bc18996d4aff4d4ea43ff175353f49b2e3a05f9ec9764dc4a3c3ab444debe2c3384070de9014d44732162bb33ee04da187ef"
   in
   let*@? error = Rpc.send_raw_transaction ~raw_tx:raw_transfer evm_node in
+  Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
   Check.(
     ((error.message = "Cannot prepay transaction.") string)
-      ~error_msg:"The transaction should fail") ;
+      ~error_msg:
+        "The transaction should be rejected for not being able to prepay") ;
   unit
 
 let test_cannot_prepayed_with_delay_leads_to_no_injection =
@@ -2970,9 +2972,10 @@ let test_rpc_sendRawTransaction_nonce_too_low =
       (wait_for_transaction_receipt ~evm_node ~transaction_hash)
   in
   let*@? error = Rpc.send_raw_transaction ~raw_tx evm_node in
+  Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
   Check.(
     ((error.message = "Nonce too low.") string)
-      ~error_msg:"The transaction should fail") ;
+      ~error_msg:"The transaction should be rejected for having a too low nonce") ;
   unit
 
 let test_rpc_sendRawTransaction_nonce_too_high =
@@ -2987,7 +2990,8 @@ let test_rpc_sendRawTransaction_nonce_too_high =
   in
   let* result = Rpc.send_raw_transaction ~raw_tx evm_node in
   Check.(
-    ((Result.is_ok result = true) bool) ~error_msg:"The transaction should fail") ;
+    ((Result.is_ok result = true) bool)
+      ~error_msg:"The transaction should succeed") ;
   unit
 
 let test_deposit_before_and_after_migration =
@@ -3115,9 +3119,11 @@ let test_rpc_sendRawTransaction_invalid_chain_id =
     "0xf86a8080831e8480940000000000000000000000000000000000000000888ac7230489e8000080822148a0e09f1fb4920f2e64a274b83d925890dd0b109fdf31f2811a781e918118daf34aa00f425e9a93bd92d710d3d323998b093a8c7d497d2af688c062a8099b076813e8"
   in
   let*@? error = Rpc.send_raw_transaction ~raw_tx evm_node in
+  Check.(((error.code = -32003) int) ~error_msg:"The transaction should fail") ;
   Check.(
     ((error.message = "Invalid chain id.") string)
-      ~error_msg:"The transaction should fail") ;
+      ~error_msg:
+        "The transaction should be rejected for not having the correct chainId") ;
   unit
 
 let test_kernel_upgrade_version_change =
