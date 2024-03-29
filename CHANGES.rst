@@ -203,6 +203,9 @@ Smart Rollup node
 - Fix issue with catching up on rollup originated in previous protocol with an
   empty rollup node. (MR :gl:`!12565`)
 
+- Added new administrative RPCs ``/health``, ``/version``, ``/stats/ocaml_gc``,
+  ``/stats/memory``, and ``/config``. (MR :gl:`!12718`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
