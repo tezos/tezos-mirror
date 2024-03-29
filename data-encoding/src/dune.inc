@@ -4,7 +4,7 @@
    (:standard -noassert))))
 
 (documentation
- (package data-encoding)
+ (package octez-libs)
  (mld_files tutorial))
 
 (rule
