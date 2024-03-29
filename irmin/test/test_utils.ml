@@ -1,3 +1,17 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Testing
+    -------
+    Component:    Irmin
+    Invocation:   dune exec irmin/test/main.exe
+    Subject:      This file is used to declare useful values used by all tests
+*)
+
 module Conf = Tezos_context_encoding.Context_binary.Conf
 module Schema = Tezos_context_encoding.Context.Schema
 module Context = Tezos_context_disk.Context
