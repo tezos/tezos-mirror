@@ -385,6 +385,44 @@ module Encodings = struct
                (req "top_heap_words" int31)
                (req "stack_size" int31))))
 
+  let mem_stat_encoding =
+    let open Memory in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          (Tag 0)
+          (conv
+             (fun {page_size; size; resident; shared; text; lib; data; dt} ->
+               (page_size, size, resident, shared, text, lib, data, dt))
+             (fun (page_size, size, resident, shared, text, lib, data, dt) ->
+               {page_size; size; resident; shared; text; lib; data; dt})
+             (obj8
+                (req "page_size" int31)
+                (req "size" int64)
+                (req "resident" int64)
+                (req "shared" int64)
+                (req "text" int64)
+                (req "lib" int64)
+                (req "data" int64)
+                (req "dt" int64)))
+          ~title:"Linux_proc_statm"
+          (function Statm x -> Some x | _ -> None)
+          (function res -> Statm res);
+        case
+          (Tag 1)
+          (conv
+             (fun {page_size; mem; resident} -> (page_size, mem, resident))
+             (fun (page_size, mem, resident) -> {page_size; mem; resident})
+             (obj3
+                (req "page_size" int31)
+                (req "mem" float)
+                (req "resident" int64)))
+          ~title:"Darwin_ps"
+          (function Ps x -> Some x | _ -> None)
+          (function res -> Ps res);
+      ]
+
   let synchronization_result =
     union
       [
@@ -656,6 +694,13 @@ module Root = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Encodings.ocaml_gc_stat_encoding
       (path / "stats" / "ocaml_gc")
+
+  let memory =
+    Tezos_rpc.Service.get_service
+      ~description:"Gets memory usage stats"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.mem_stat_encoding
+      (path / "stats" / "memory")
 
   let openapi =
     Tezos_rpc.Service.get_service

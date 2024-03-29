@@ -93,6 +93,12 @@ let () =
   @@ fun _node_ctxt () () -> Lwt_result_syntax.return @@ Gc.stat ()
 
 let () =
+  Root_directory.register0 Rollup_node_services.Root.memory
+  @@ fun _node_ctxt () () ->
+  let open Lwt_result_syntax in
+  Sys_info.memory_stats () |> lwt_map_error TzTrace.make
+
+let () =
   Global_directory.register0 Rollup_node_services.Global.sc_rollup_address
   @@ fun node_ctxt () () -> Lwt_result.return node_ctxt.config.sc_rollup_address
 
