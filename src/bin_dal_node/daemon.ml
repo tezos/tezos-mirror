@@ -93,11 +93,21 @@ let init_cryptobox config dal_config
   in
   match Cryptobox.make proto_parameters.cryptobox_parameters with
   | Ok cryptobox ->
-      let shards_proofs_precomputation =
-        if prover_srs then Some (Cryptobox.precompute_shards_proofs cryptobox)
-        else None
-      in
-      return (cryptobox, shards_proofs_precomputation)
+      if prover_srs then
+        match Cryptobox.precompute_shards_proofs cryptobox with
+        | Ok precomputation -> return (cryptobox, Some precomputation)
+        | Error (`Invalid_degree_strictly_less_than_expected {given; expected})
+          ->
+            fail
+              [
+                Cryptobox_initialisation_failed
+                  (Printf.sprintf
+                     "Cryptobox.precompute_shards_proofs: SRS size (= %d) \
+                      smaller than expected (= %d)"
+                     given
+                     expected);
+              ]
+      else return (cryptobox, None)
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
 module Handler = struct

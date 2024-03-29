@@ -920,9 +920,16 @@ module Inner = struct
             in
             return precomputation))
 
-  let precompute_shards_proofs t =
+  let precompute_shards_proofs {kate_amortized; _} =
     (* Precomputes step. 1 of multiple multi-reveals. *)
-    Kate_amortized.preprocess_multiple_multi_reveals t.kate_amortized
+    try Ok (Kate_amortized.preprocess_multiple_multi_reveals kate_amortized)
+    with Kzg.Commitment.SRS_too_short _ ->
+      Error
+        (`Invalid_degree_strictly_less_than_expected
+          {
+            given = Srs_g1.size kate_amortized.srs_g1;
+            expected = kate_amortized.max_polynomial_length;
+          })
 
   let prove_shards t ~precomputation ~polynomial =
     (* Resizing input polynomial [p] to obtain an array of length [t.max_polynomial_length + 1]. *)

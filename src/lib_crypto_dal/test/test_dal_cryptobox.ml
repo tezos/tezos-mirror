@@ -445,7 +445,7 @@ module Test = struct
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
          let* commitment = Cryptobox.commit t polynomial in
          let shards = Cryptobox.shards_from_polynomial t polynomial in
-         let precomputation = Cryptobox.precompute_shards_proofs t in
+         let* precomputation = Cryptobox.precompute_shards_proofs t in
          let shard_proofs =
            Cryptobox.prove_shards t ~polynomial ~precomputation
          in
@@ -488,7 +488,7 @@ module Test = struct
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
          let* commitment = Cryptobox.commit t polynomial in
          let shards = Cryptobox.shards_from_polynomial t polynomial in
-         let precomputation = Cryptobox.precompute_shards_proofs t in
+         let* precomputation = Cryptobox.precompute_shards_proofs t in
          let shard_proofs =
            Cryptobox.prove_shards t ~polynomial ~precomputation
          in
@@ -561,7 +561,7 @@ module Test = struct
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
          let* commitment = Cryptobox.commit t polynomial in
          let shards = Cryptobox.shards_from_polynomial t polynomial in
-         let precomputation = Cryptobox.precompute_shards_proofs t in
+         let* precomputation = Cryptobox.precompute_shards_proofs t in
          let shard_proofs =
            Cryptobox.prove_shards t ~precomputation ~polynomial
          in
@@ -600,7 +600,7 @@ module Test = struct
          let* polynomial = Cryptobox.polynomial_from_slot t params.slot in
          let* commitment = Cryptobox.commit t polynomial in
          let shards = Cryptobox.shards_from_polynomial t polynomial in
-         let precomputation = Cryptobox.precompute_shards_proofs t in
+         let* precomputation = Cryptobox.precompute_shards_proofs t in
          let shard_proofs =
            Cryptobox.prove_shards t ~precomputation ~polynomial
          in
@@ -720,24 +720,29 @@ module Test = struct
              (make params)
          in
          let filename = path "test_precomputation" in
-         let precomputation = Cryptobox.precompute_shards_proofs t in
-         let hash = Cryptobox.hash_precomputation precomputation in
-         let* retrieved_precomputation =
-           Lwt_main.run
-             (let open Error_monad.Lwt_result_syntax in
-             let* () =
-               Cryptobox.save_precompute_shards_proofs precomputation ~filename
+         match Cryptobox.precompute_shards_proofs t with
+         | Ok precomputation ->
+             let hash = Cryptobox.hash_precomputation precomputation in
+             let* retrieved_precomputation =
+               Lwt_main.run
+                 (let open Error_monad.Lwt_result_syntax in
+                 let* () =
+                   Cryptobox.save_precompute_shards_proofs
+                     precomputation
+                     ~filename
+                 in
+                 Cryptobox.load_precompute_shards_proofs
+                   ~hash:(Some hash)
+                   ~filename
+                   ())
              in
-             Cryptobox.load_precompute_shards_proofs
-               ~hash:(Some hash)
-               ~filename
-               ())
-         in
-         Sys.remove filename ;
-         return
-           (Cryptobox.Internal_for_tests.precomputation_equal
-              precomputation
-              retrieved_precomputation))
+             Sys.remove filename ;
+             return
+               (Cryptobox.Internal_for_tests.precomputation_equal
+                  precomputation
+                  retrieved_precomputation)
+         | _ ->
+             Error [Error_monad.error_of_exn (Failure "Precomputation failed")])
         |> function
         | Ok true -> true
         | _ -> false)
@@ -759,22 +764,25 @@ module Test = struct
              (function `Fail s -> [Error_monad.error_of_exn (Failure s)])
              (make params)
          in
-         let precomputation = Cryptobox.precompute_shards_proofs t in
-         let dummy_hash = Tezos_crypto.Blake2B.hash_bytes [] in
-         let* _ =
-           Lwt_main.run
-             (let open Error_monad.Lwt_result_syntax in
-             let* () =
-               Cryptobox.save_precompute_shards_proofs
-                 precomputation
-                 ~filename:!filename
+         match Cryptobox.precompute_shards_proofs t with
+         | Ok precomputation ->
+             let dummy_hash = Tezos_crypto.Blake2B.hash_bytes [] in
+             let* _ =
+               Lwt_main.run
+                 (let open Error_monad.Lwt_result_syntax in
+                 let* () =
+                   Cryptobox.save_precompute_shards_proofs
+                     precomputation
+                     ~filename:!filename
+                 in
+                 Cryptobox.load_precompute_shards_proofs
+                   ~hash:(Some dummy_hash)
+                   ~filename:!filename
+                   ())
              in
-             Cryptobox.load_precompute_shards_proofs
-               ~hash:(Some dummy_hash)
-               ~filename:!filename
-               ())
-         in
-         return filename)
+             return filename
+         | _ ->
+             Error [Error_monad.error_of_exn (Failure "Precomputation failed")])
         |> function
         | Error [Cryptobox.Invalid_precomputation_hash _] ->
             Sys.remove !filename ;

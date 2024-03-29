@@ -5631,7 +5631,7 @@ let dal_crypto_benchmark () =
         let*? dal =
           Profiler.record_f Profiler.main "make" @@ fun () -> make parameters
         in
-        let precomputation =
+        let*? precomputation =
           Profiler.record_f Profiler.main "shard precomputation" @@ fun () ->
           precompute_shards_proofs dal
         in
