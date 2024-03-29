@@ -383,3 +383,6 @@ type transaction = {
 
 (** Converts a list of transactions into a JSON object. *)
 val json_of_output_tx_batch : transaction list -> JSON.u
+
+(** Configure the rollup node to pay more fees for its refute operations. *)
+val prioritize_refute_operations : Sc_rollup_node.t -> unit
