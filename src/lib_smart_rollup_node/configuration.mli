@@ -241,6 +241,12 @@ val default_irmin_cache_size : int
    details such as a timestamp, message content, severity level, etc. *)
 val default_index_buffer_size : int
 
+(** Encoding for configuration. *)
+val encoding : t Data_encoding.t
+
+(** Encoding for configuration without any default value. *)
+val encoding_no_default : t Data_encoding.t
+
 (** [save ~force ~data_dir configuration] writes the [configuration] file in
     [data_dir]. If [force] is [true], existing configurations are
     overwritten. *)

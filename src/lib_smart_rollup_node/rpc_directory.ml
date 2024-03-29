@@ -27,6 +27,22 @@
 
 open Rpc_directory_helpers
 
+(* Add extra services which must live in the rollup node library *)
+module Rollup_node_services = struct
+  include Rollup_node_services
+
+  module Root = struct
+    include Root
+
+    let config =
+      Tezos_rpc.Service.get_service
+        ~description:"Returns the rollup node configuration"
+        ~query:Tezos_rpc.Query.empty
+        ~output:Configuration.encoding_no_default
+        Tezos_rpc.Path.(root / "config")
+  end
+end
+
 let get_head_hash_opt node_ctxt =
   let open Lwt_result_syntax in
   let+ res = Node_context.last_processed_head_opt node_ctxt in
@@ -87,6 +103,13 @@ let () =
   let store_version = Format.asprintf "%a" Store_version.pp Store.version in
   let context_version = Context.Version.(to_string version) in
   return Rollup_node_services.{version; store_version; context_version}
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.config
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let+ history_mode = Node_context.get_history_mode node_ctxt in
+  {node_ctxt.config with history_mode = Some history_mode}
 
 let () =
   Root_directory.register0 Rollup_node_services.Root.ocaml_gc
