@@ -1018,82 +1018,30 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
     | ParisA_019 ->
         let*! c = get_previous_protocol_constants ctxt in
 
-        (* When modifying the line below, be careful that the values are
-           compatible with the encodings exported by the environment did not
-           change. *)
-        let cryptobox_parameters =
-          {
-            Dal.page_size = 3967;
-            slot_size = 126_944;
-            redundancy_factor = 8;
-            number_of_shards = 512;
-          }
-        in
         let dal =
           Constants_parametric_repr.
             {
-              feature_enable = true;
-              incentives_enable = false;
-              number_of_slots = 32;
-              attestation_lag = 8;
-              attestation_threshold = 66;
-              cryptobox_parameters;
+              feature_enable = c.dal.feature_enable;
+              incentives_enable = c.dal.incentives_enable;
+              number_of_slots = c.dal.number_of_slots;
+              attestation_lag = c.dal.attestation_lag;
+              attestation_threshold = c.dal.attestation_threshold;
+              cryptobox_parameters = c.dal.cryptobox_parameters;
             }
-        in
-        (* This test prevents the activation of the protocol if the
-           set of parameters given for the DAL is invalid. *)
-        let*? () =
-          match Dal.make cryptobox_parameters with
-          | Ok _cryptobox -> ok ()
-          | Error (`Fail explanation) ->
-              error (Dal_errors_repr.Dal_cryptobox_error {explanation})
-        in
-        let dal_activation_level =
-          if c.dal.feature_enable then
-            (* if dal was enable in previous protocol, do as if it were always
-               activated *)
-            Raw_level_repr.succ Raw_level_repr.root
-          else
-            (* dal activates at first level of the new protocol. *)
-            Raw_level_repr.of_int32_exn (Int32.succ level)
-        in
-        let dal_attested_slots_validity_lag =
-          (* A rollup node shouldn't import a page of an attested slot whose attested
-             level is too far in the past w.r.t. the current level. Importation window
-             is fixed to 241_920 levels below. It is the number of blocks produced
-             during 28 days (4 weeks) with a block time of 10 seconds. *)
-          241_920
         in
         let reveal_activation_level :
             Constants_parametric_repr.sc_rollup_reveal_activation_level =
-          let ({
-                 raw_data = {blake2B};
-                 metadata;
-                 dal_page = _;
-                 dal_parameters = _;
-               }
-                : Constants_parametric_previous_repr
-                  .sc_rollup_reveal_activation_level) =
-            c.sc_rollup.reveal_activation_level
+          let prev = c.sc_rollup.reveal_activation_level in
+          let raw_data =
+            Constants_parametric_repr.{blake2B = prev.raw_data.blake2B}
           in
           {
-            raw_data = {blake2B};
-            metadata;
-            dal_page = dal_activation_level;
-            dal_parameters = dal_activation_level;
-            (* Warning: the semantics of valid slots needs to be adapted if the
-               value of this parameter is changed in the future.
-               - If it is increased, some attested slots that were outdated with
-                 the old value will become valid again.
-               - If it is decreased, some attested slots that were valid with
-                 the old value will become outdated.
-
-               In both cases, the status of slots before and after the value
-               change is different. So, the behaviour if a valid slot is
-               imported before the value upgrade but a refutation game
-               targetting a page of that slot is started after the upgrade is
-               not the correct/expected one. *)
-            dal_attested_slots_validity_lag;
+            raw_data;
+            metadata = prev.metadata;
+            dal_page = prev.dal_page;
+            dal_parameters = prev.dal_parameters;
+            dal_attested_slots_validity_lag =
+              prev.dal_attested_slots_validity_lag;
           }
         in
         let sc_rollup =
@@ -1135,17 +1083,22 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
         let adaptive_rewards_params =
           Constants_parametric_repr.
             {
-              issuance_ratio_final_min = Q.(0_25 // 100_00);
-              (* 0.25% *)
-              issuance_ratio_final_max = Q.(10 // 100) (* 10% *);
-              issuance_ratio_initial_min = Q.(45 // 1000);
-              (* 4.5% *)
-              issuance_ratio_initial_max = Q.(55 // 1000);
-              (* 5.5% *)
-              initial_period = 10;
-              (* 1 month *)
-              transition_period = 50;
-              (* 5 months *)
+              issuance_ratio_final_min =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_final_min;
+              issuance_ratio_final_max =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_final_max;
+              issuance_ratio_initial_min =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_initial_min;
+              issuance_ratio_initial_max =
+                c.adaptive_issuance.adaptive_rewards_params
+                  .issuance_ratio_initial_max;
+              initial_period =
+                c.adaptive_issuance.adaptive_rewards_params.initial_period;
+              transition_period =
+                c.adaptive_issuance.adaptive_rewards_params.transition_period;
               max_bonus = c.adaptive_issuance.adaptive_rewards_params.max_bonus;
               growth_rate =
                 c.adaptive_issuance.adaptive_rewards_params.growth_rate;
@@ -1162,35 +1115,27 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
                 c.adaptive_issuance.edge_of_staking_over_delegation;
               launch_ema_threshold = c.adaptive_issuance.launch_ema_threshold;
               adaptive_rewards_params;
-              activation_vote_enable = true;
+              activation_vote_enable =
+                c.adaptive_issuance.activation_vote_enable;
               autostaking_enable = c.adaptive_issuance.autostaking_enable;
-              force_activation = false;
-              ns_enable = true;
+              force_activation = c.adaptive_issuance.force_activation;
+              ns_enable = c.adaptive_issuance.ns_enable;
             }
         in
-        let liquidity_baking_subsidy = Tez_repr.(mul_exn one 5) in
-        let (issuance_weights : Constants_parametric_repr.issuance_weights) =
+        let issuance_weights =
           let ({
                  base_total_issued_per_minute;
                  baking_reward_fixed_portion_weight;
                  baking_reward_bonus_weight;
                  attesting_reward_weight;
-                 liquidity_baking_subsidy_weight = _;
                  seed_nonce_revelation_tip_weight;
                  vdf_revelation_tip_weight;
                }
                 : Constants_parametric_previous_repr.issuance_weights) =
             c.issuance_weights
           in
-          let base_total_issued_per_minute =
-            let x =
-              Tez_repr.(
-                sub_opt base_total_issued_per_minute liquidity_baking_subsidy)
-            in
-            match x with None -> assert false | Some x -> x
-          in
           {
-            base_total_issued_per_minute;
+            Constants_parametric_repr.base_total_issued_per_minute;
             baking_reward_fixed_portion_weight;
             baking_reward_bonus_weight;
             attesting_reward_weight;
@@ -1198,11 +1143,13 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             vdf_revelation_tip_weight;
           }
         in
-        let direct_ticket_spending_enable = false in
         let consensus_rights_delay =
-          (* We change the consensus_rights_delay value only for mainnet *)
-          if Compare.Int.(c.preserved_cycles = 5) then 2 else c.preserved_cycles
+          (* Any network should now use 2 cycle for the consensus_rights_delay *)
+          if Compare.Int.(c.consensus_rights_delay >= 2) then 2
+          else c.consensus_rights_delay
         in
+
+        let direct_ticket_spending_enable = false in
         let Constants_repr.Generated.{max_slashing_threshold; _} =
           Constants_repr.Generated.generate
             ~consensus_committee_size:c.consensus_committee_size
@@ -1212,7 +1159,8 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
             {
               consensus_rights_delay;
               blocks_preservation_cycles = 1;
-              delegate_parameters_activation_delay = c.preserved_cycles;
+              delegate_parameters_activation_delay =
+                c.delegate_parameters_activation_delay;
               blocks_per_cycle = c.blocks_per_cycle;
               blocks_per_commitment = c.blocks_per_commitment;
               nonce_revelation_threshold = c.nonce_revelation_threshold;
@@ -1232,7 +1180,7 @@ let prepare_first_block ~level ~timestamp _chain_id ctxt =
               quorum_min = c.quorum_min;
               quorum_max = c.quorum_max;
               min_proposal_quorum = c.min_proposal_quorum;
-              liquidity_baking_subsidy;
+              liquidity_baking_subsidy = c.liquidity_baking_subsidy;
               liquidity_baking_toggle_ema_threshold =
                 c.liquidity_baking_toggle_ema_threshold;
               minimal_block_delay = c.minimal_block_delay;

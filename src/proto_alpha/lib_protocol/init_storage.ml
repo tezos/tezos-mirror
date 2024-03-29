@@ -198,7 +198,7 @@ let cleanup_values_for_protocol_p ctxt
              context."
       | Some c -> c
     in
-    previous_proto_constants.preserved_cycles
+    previous_proto_constants.consensus_rights_delay
   in
   let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in
   let new_cycle =
