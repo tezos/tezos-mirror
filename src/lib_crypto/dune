@@ -9,7 +9,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.stdlib
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.lwt-result-stdlib
   lwt
   octez-libs.hacl

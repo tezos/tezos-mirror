@@ -6,10 +6,10 @@
  (libraries
   crowbar
   alcotest
-  json-data-encoding
-  json-data-encoding-bson))
+  octez-libs.json-data-encoding
+  octez-libs.json-data-encoding-bson))
 
 (rule
  (alias runtest)
- (package json-data-encoding-bson)
+ (package octez-libs)
  (action (run %{dep:./test_bson_relaxation.exe})))

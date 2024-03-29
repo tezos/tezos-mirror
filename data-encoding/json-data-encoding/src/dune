@@ -3,7 +3,7 @@
 
 (library
  (name json_data_encoding_stdlib)
- (public_name json-data-encoding.stdlib)
+ (public_name octez-libs.json-data-encoding.stdlib)
  (libraries
   uri)
  (js_of_ocaml)
@@ -12,11 +12,11 @@
 
 (library
  (name json_data_encoding)
- (public_name json-data-encoding)
+ (public_name octez-libs.json-data-encoding)
  (libraries
   uri
   hex
-  json-data-encoding.stdlib)
+  octez-libs.json-data-encoding.stdlib)
  (js_of_ocaml)
  (wrapped false)
  (flags
@@ -26,11 +26,11 @@
 
 (library
  (name json_data_encoding_bson)
- (public_name json-data-encoding-bson)
+ (public_name octez-libs.json-data-encoding-bson)
  (libraries
-  json-data-encoding
+  octez-libs.json-data-encoding
   ocplib-endian
-  json-data-encoding.stdlib)
+  octez-libs.json-data-encoding.stdlib)
  (js_of_ocaml)
  (wrapped false)
  (flags
@@ -40,11 +40,11 @@
 
 (library
  (name json_data_encoding_browser)
- (public_name json-data-encoding-browser)
+ (public_name octez-libs.json-data-encoding-browser)
  (libraries
-  json-data-encoding
+  octez-libs.json-data-encoding
   js_of_ocaml
-  json-data-encoding.stdlib)
+  octez-libs.json-data-encoding.stdlib)
  (js_of_ocaml)
  (wrapped false)
  (flags

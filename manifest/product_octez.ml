@@ -16,7 +16,10 @@ include Product (struct
   let name = "octez"
 
   (** This source will be used to generate the Octez tarball,
-      This should include everything required to run [make octez]. *)
+      This should include everything required to run [make octez].
+
+      We also include the source of data-encoding. See data-encoding product
+      file for the rationale behind this design decision. *)
   let source =
     [
       "src/";
@@ -34,6 +37,7 @@ include Product (struct
       "brassaia/";
       "rust-toolchain";
     ]
+    @ Product_data_encoding.product_source
 end)
 
 module String_set = Set.Make (String)
@@ -96,6 +100,14 @@ let alcotezt =
 
 (* Container of the registered sublibraries of [octez-libs] *)
 let registered_octez_libs = Sub_lib.make_container ()
+
+(* Back-register the data-encoding library which is currently maintained as its
+   own product but still attached to octez-libs. *)
+let () =
+  Sub_lib.add_doc_link
+    registered_octez_libs
+    ~target:"!module-Data_encoding"
+    ~text:"Data_encoding"
 
 (* Container of the registered sublibraries of [octez-shell-libs] *)
 let registered_octez_shell_libs = Sub_lib.make_container ()

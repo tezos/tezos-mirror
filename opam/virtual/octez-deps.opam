@@ -35,7 +35,6 @@ depends: [
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"
-  "data-encoding" { = "1.0.1" }
   "digestif"
   "dmap"
   "dune-configurator"
@@ -54,7 +53,6 @@ depends: [
   "jingoo"
   "js_of_ocaml" { >= "3.3.0" }
   "js_of_ocaml-compiler"
-  "json-data-encoding" { = "1.0.1" }
   "jsonm"
   "lambda-term" { >= "3.3.1" }
   "ledgerwallet-tezos" { >= "0.4.0" }
@@ -121,7 +119,11 @@ depends: [
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
+  "data-encoding"
   "hacl_x25519"
+  "json_data_encoding"
+  "json_data_encoding_browser"
+  "json_data_encoding_bson"
   "result" { < "1.5" }
 ]
 build: []

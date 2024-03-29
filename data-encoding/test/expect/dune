@@ -3,9 +3,9 @@
 
 (library
  (name data_encoding_expect_tests)
- (package data-encoding)
+ (package octez-libs)
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   zarith
   zarith_stubs_js
   ezjsonm

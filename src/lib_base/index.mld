@@ -53,3 +53,4 @@ It contains the following libraries:
 - {{!module-Tezos_version}Tezos_version}: Version information generated from Git
 - {{!page-tezos_workers}Tezos_workers}: Worker library
 - {{!module-Tezt_wrapper}Tezt_wrapper}
+- {{!module-Data_encoding}Data_encoding}

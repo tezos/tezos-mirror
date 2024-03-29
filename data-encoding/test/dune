@@ -5,19 +5,16 @@
  (name test)
  (modes native js)
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   zarith
   zarith_stubs_js
   alcotest
   js_of_ocaml-compiler)
  (js_of_ocaml))
 
-(rule
- (alias runtest)
- (package data-encoding)
- (action (run %{dep:./test.exe})))
+(rule (alias runtest) (package octez-libs) (action (run %{dep:./test.exe})))
 
 (rule
  (alias runtest_js)
- (package data-encoding)
+ (package octez-libs)
  (action (run node %{dep:./test.bc.js})))

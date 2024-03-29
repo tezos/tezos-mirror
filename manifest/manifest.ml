@@ -2387,9 +2387,16 @@ module Sub_lib = struct
     documentation_type : documentation_entrypoint;
   }
 
-  type container = {mutable content : sub_lib list; product : string}
+  type container = {
+    mutable content : sub_lib list;
+    mutable added_doc : (string * string) list;
+    product : string;
+  }
 
-  let make_container ~product = {content = []; product}
+  let add_doc_link container ~text ~target =
+    container.added_doc <- (target, text) :: container.added_doc
+
+  let make_container ~product = {content = []; added_doc = []; product}
 
   let make_documentation ~package ~public_name ~name ~synopsis = function
     | Some docs when not (docs = Dune.[[S "package"; S package]]) ->
@@ -2431,19 +2438,27 @@ module Sub_lib = struct
     | {documentation_type = Sub_lib; _} ->
         (* In case it's a sub_lib, we don't link anything *) ()
 
+  let pp_added_documentation pp (target, text) =
+    Format.fprintf pp "- {{%s}%s}@." target text
+
   (* Prints all the registered libs of a container package. *)
-  let pp_documentation_of_container ~header fmt {content = registered_libs; _} =
+  let pp_documentation_of_container ~header fmt
+      {content = registered_libs; added_doc; product = _} =
     Format.fprintf
       fmt
-      "%s%a"
+      "%s%a%a"
       header
       (Format.pp_print_list ~pp_sep:(fun _ () -> ()) pp_documentation)
-    @@ List.sort
+      (List.sort
          (fun {name = name1; _} {name = name2; _} ->
            String.compare
              (String.capitalize_ascii name1)
              (String.capitalize_ascii name2))
-         registered_libs
+         registered_libs)
+      (Format.pp_print_list ~pp_sep:(fun _ () -> ()) pp_added_documentation)
+      (List.sort
+         (fun (_, txt1) (_, txt2) -> String.compare txt1 txt2)
+         added_doc)
 
   type maker = ?internal_name:string -> string Target.maker
 

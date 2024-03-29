@@ -10,10 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "data-encoding" { = "1.0.1" }
+  "octez-libs"
   "kaitai-of-data-encoding" { = version }
   "kaitai" { = version }
-  "octez-libs"
   "octez-shell-libs"
   "octez-version"
 ]

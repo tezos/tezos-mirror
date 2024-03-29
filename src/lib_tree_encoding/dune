@@ -9,7 +9,7 @@
   octez-libs.base
   octez-libs.context.sigs
   octez-libs.lwt-result-stdlib
-  data-encoding)
+  octez-libs.data-encoding)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives))

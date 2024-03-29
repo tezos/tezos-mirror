@@ -1221,6 +1221,9 @@ module Sub_lib : sig
   (** Prints all the registered sub-libraries of a package. *)
   val pp_documentation_of_container :
     header:string -> Format.formatter -> container -> unit
+
+  (** Add some link to the documentation generated for the container. *)
+  val add_doc_link : container -> text:string -> target:string -> unit
 end
 
 (** [Product] is a functor which instantiates [maker]s for [target]s. The
@@ -1331,6 +1334,8 @@ end) : sig
       container:Sub_lib.container ->
       package:string ->
       Sub_lib.maker
+
+    val add_doc_link : Sub_lib.container -> text:string -> target:string -> unit
   end
 end
 

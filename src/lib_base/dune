@@ -10,7 +10,7 @@
  (libraries
   octez-libs.stdlib
   octez-libs.crypto
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.error-monad-legacy
   octez-libs.error-monad
   octez-libs.rpc

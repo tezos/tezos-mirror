@@ -14,7 +14,7 @@
   tezos-protocol-alpha.protocol
   qcheck-core
   tezos-time-measurement
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.event-logging
   octez-libs.test-helpers)
  (link_flags
