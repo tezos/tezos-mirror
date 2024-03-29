@@ -55,7 +55,7 @@ impl TryFrom<&Exception> for EnvironException {
             | Exception::IllegalInstruction
             | Exception::InstructionAccessFault(_)
             | Exception::LoadAccessFault(_)
-            | Exception::StoreAccessFault(_)
+            | Exception::StoreAMOAccessFault(_)
             | Exception::InstructionPageFault(_)
             | Exception::LoadPageFault(_)
             | Exception::StoreAMOPageFault(_) => {
@@ -75,7 +75,7 @@ pub enum Exception {
     /// `InstructionAccessFault(addr)` where `addr` is the faulting load address
     LoadAccessFault(Address),
     /// `InstructionAccessFault(addr)` where `addr` is the faulting store address
-    StoreAccessFault(Address),
+    StoreAMOAccessFault(Address),
     EnvCallFromUMode,
     EnvCallFromSMode,
     EnvCallFromMMode,
@@ -166,7 +166,7 @@ impl TrapContext for Exception {
             Exception::IllegalInstruction => 2,
             Exception::Breakpoint => 3,
             Exception::LoadAccessFault(_) => 5,
-            Exception::StoreAccessFault(_) => 7,
+            Exception::StoreAMOAccessFault(_) => 7,
             Exception::EnvCallFromUMode => 8,
             Exception::EnvCallFromSMode => 9,
             Exception::EnvCallFromMMode => 11,
@@ -189,7 +189,7 @@ impl TrapContext for Exception {
             | Exception::EnvCallFromMMode => 0,
             Exception::InstructionAccessFault(addr) => *addr,
             Exception::LoadAccessFault(addr) => *addr,
-            Exception::StoreAccessFault(addr) => *addr,
+            Exception::StoreAMOAccessFault(addr) => *addr,
             Exception::InstructionPageFault(addr) => *addr,
             Exception::LoadPageFault(addr) => *addr,
             Exception::StoreAMOPageFault(addr) => *addr,

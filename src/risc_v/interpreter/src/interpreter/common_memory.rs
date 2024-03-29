@@ -47,7 +47,7 @@ where
 
         self.bus
             .write(address, value)
-            .map_err(|_: OutOfBounds| Exception::StoreAccessFault(address))
+            .map_err(|_: OutOfBounds| Exception::StoreAMOAccessFault(address))
     }
 
     /// Generic store-operation for writing `mem::size_of<T>` bytes starting at address val(rs1) + imm
