@@ -9,7 +9,7 @@ const pdf_utils = require('./pdf_utils')
 const block_finalization = require('./block_finalization')
 const tx_register = require('./tx_register')
 const tx_overhead = require('./tx_overhead')
-const queue = require('./queue')
+const reboot = require('./reboot')
 const stage_one = require('./stage_one')
 const bip_loading = require('./bip_loading')
 const hashing = require('./hashing')
@@ -101,7 +101,8 @@ async function print_analysis({ filename, report, analysis_acc }, dir) {
     console.info(`-------------------------------------------------------`)
     console.info(`Queue read and storage analysis`)
     console.info(`----------------------------------`)
-    let error_queue = queue.print_analysis(infos, dir)
+    doc.addPage()
+    let error_reboot = reboot.print_analysis(infos, dir, doc)
     console.info(`-------------------------------------------------------`)
     console.info(`Transaction Registering Analysis`)
     console.info(`----------------------------------`)
@@ -131,7 +132,7 @@ async function print_analysis({ filename, report, analysis_acc }, dir) {
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
     await savePdfToFile(doc, report);
-    return error_hashing + error_bip_loading + error_stage_one + error_block_finalization + error_register + error_queue
+    return error_hashing + error_bip_loading + error_stage_one + error_block_finalization + error_register + error_reboot
 }
 
 function process_record(record, acc) {
