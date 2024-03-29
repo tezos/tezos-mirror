@@ -431,6 +431,22 @@ the program on an abstract stack representing the input type provided by
 the programmer, and checking that the resulting symbolic stack is
 consistent with the expected result, also provided by the programmer.
 
+.. _type_normalization_alpha:
+
+Type normalization
+~~~~~~~~~~~~~~~~~~
+
+For convenience, Michelson developers can use some compact type notations for types that do not exist in the language implementation.
+These are just shorthands that are expanded into existing types during the so-called "type normalization".
+
+Currently, the only such notation concerns N-ary pairs (also called tuples), which are expanded into "right combs", that is, nested binary pairs with right associativity.
+See `type pair <https://tezos.gitlab.io/michelson-reference/#type-pair>`__ for details.
+
+The node RPC ``/helpers/script/normalize_type`` is available to normalize a given Michelson type (see :doc:`../api/openapi`, within the protocol-dependent RPCs).
+This RPC is intended for tool developers wanting to support the type shorthands in their tools without reimplementing their normalization.
+However, one side effect of this RPC is the stripping of :ref:`annotations <annotations_alpha>`.
+As a consequence, a tool needing to preserve annotations on shorthand data types should implement its own type normalization instead of relying on this RPC.
+
 Side note
 ~~~~~~~~~
 
@@ -801,6 +817,8 @@ of three primitive applications (in no particular order) that provide its
 
 See the next section for a concrete example.
 
+.. _annotations_alpha:
+
 Annotations
 -----------
 
@@ -823,6 +841,8 @@ We distinguish three kinds of annotations:
 - type annotations, written ``:type_annot``,
 - variable annotations, written ``@var_annot``,
 - and field or constructors annotations, written ``%field_annot``.
+
+Note that all annotations are stripped during :ref:`type normalization <type_normalization_alpha>`.
 
 Type annotations
 ~~~~~~~~~~~~~~~~

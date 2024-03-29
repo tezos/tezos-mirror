@@ -991,8 +991,8 @@ let commands () =
     command
       ~group
       ~desc:
-        "Ask the node to normalize a type (annotations removed, combs \
-         flattened)."
+        "Ask the node to normalize a type (remove annotations and flatten \
+         combs)."
       no_options
       (prefixes ["normalize"; "type"]
       @@ param
