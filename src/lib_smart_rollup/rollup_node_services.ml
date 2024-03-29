@@ -295,6 +295,96 @@ module Encodings = struct
          (req "first_available_level" int32)
          (opt "last_context_split_level" int32)
 
+  let ocaml_gc_stat_encoding =
+    let open Gc in
+    conv
+      (fun {
+             minor_words;
+             promoted_words;
+             major_words;
+             minor_collections;
+             major_collections;
+             forced_major_collections;
+             heap_words;
+             heap_chunks;
+             live_words;
+             live_blocks;
+             free_words;
+             free_blocks;
+             largest_free;
+             fragments;
+             compactions;
+             top_heap_words;
+             stack_size;
+           } ->
+        ( ( minor_words,
+            promoted_words,
+            major_words,
+            minor_collections,
+            major_collections,
+            forced_major_collections ),
+          ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
+            ( free_blocks,
+              largest_free,
+              fragments,
+              compactions,
+              top_heap_words,
+              stack_size ) ) ))
+      (fun ( ( minor_words,
+               promoted_words,
+               major_words,
+               minor_collections,
+               major_collections,
+               forced_major_collections ),
+             ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
+               ( free_blocks,
+                 largest_free,
+                 fragments,
+                 compactions,
+                 top_heap_words,
+                 stack_size ) ) ) ->
+        {
+          minor_words;
+          promoted_words;
+          major_words;
+          minor_collections;
+          major_collections;
+          forced_major_collections;
+          heap_words;
+          heap_chunks;
+          live_words;
+          live_blocks;
+          free_words;
+          free_blocks;
+          largest_free;
+          fragments;
+          compactions;
+          top_heap_words;
+          stack_size;
+        })
+      (merge_objs
+         (obj6
+            (req "minor_words" float)
+            (req "promoted_words" float)
+            (req "major_words" float)
+            (req "minor_collections" int31)
+            (req "major_collections" int31)
+            (req "forced_major_collections" int31))
+         (merge_objs
+            (obj5
+               (req "heap_words" int31)
+               (req "heap_chunks" int31)
+               (req "live_words" int31)
+               (req "live_blocks" int31)
+               (req "free_words" int31))
+            (obj6
+               (req "free_blocks" int31)
+               (req "largest_free" int31)
+               (req "fragments" int31)
+               (req "compactions" int31)
+               (req "top_heap_words" int31)
+               (req "stack_size" int31))))
+
   let synchronization_result =
     union
       [
@@ -559,6 +649,13 @@ module Root = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Encodings.version
       (path / "version")
+
+  let ocaml_gc =
+    Tezos_rpc.Service.get_service
+      ~description:"Gets stats from the OCaml Garbage Collector"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.ocaml_gc_stat_encoding
+      (path / "stats" / "ocaml_gc")
 
   let openapi =
     Tezos_rpc.Service.get_service
