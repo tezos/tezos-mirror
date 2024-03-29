@@ -28,36 +28,6 @@
 open Protocol
 open Alpha_context
 
-(** This function computes the inclusion/membership proof of the page
-      identified by [page_id] in the slot whose data are provided in
-      [slot_data]. *)
-let page_membership_proof params page_index slot_data =
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4048
-     Rely on DAL node to compute page membership proof and drop
-     the dal-crypto dependency from the rollup node. *)
-  let proof =
-    let open Result_syntax in
-    (* The computation of the page's proof below can be a bit costly. In fact,
-       it involves initialising a cryptobox environment and some non-trivial
-       crypto processing. *)
-    let* dal = Cryptobox.make params in
-    let* polynomial = Cryptobox.polynomial_from_slot dal slot_data in
-    Cryptobox.prove_page dal polynomial page_index
-  in
-  let open Lwt_result_syntax in
-  match proof with
-  | Ok proof -> return proof
-  | Error e ->
-      failwith
-        "%s"
-        (match e with
-        | `Fail s -> "Fail " ^ s
-        | `Page_index_out_of_range -> "Page_index_out_of_range"
-        | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s
-        | ( `Invalid_degree_strictly_less_than_expected _
-          | `Prover_SRS_not_loaded ) as commit_error ->
-            Cryptobox.string_of_commit_error commit_error)
-
 (** When the PVM is waiting for a Dal page input, this function attempts to
       retrieve the page's content from the store, the data of its slot. Then it
       computes the proof that the page is part of the slot and returns the
@@ -124,7 +94,10 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
           match List.nth_opt pages page_index with
           | Some content ->
               let* page_proof =
-                page_membership_proof dal_params page_index
+                let dal_cctxt =
+                  WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt
+                in
+                Dal_node_client.get_page_proof dal_cctxt page_index
                 @@ Bytes.concat Bytes.empty pages
               in
               return_some (content, page_proof)
@@ -158,18 +131,21 @@ let generate_proof (node_ctxt : _ Node_context.t)
     let+ context = Node_context.checkout_context node_ctxt start_hash in
     Context.index context
   in
-  let* dal_slots_history =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3805 *)
-    return Dal.Slots_history.genesis
+  let dal_slots_history =
+    (* Similarly to what's done for inbox snapshot above. *)
+    Sc_rollup_proto_types.Dal.Slot_history.of_octez game.dal_snapshot
   in
-  let* dal_slots_history_cache_view =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3805 *)
-    let* dal_slots_history_cache =
-      return (Dal.Slots_history.History_cache.empty ~capacity:0L)
+  let get_cell_from_hash hash =
+    (* each time a DAL skip list cell is requested by hash, we retrieve it from the DAL node. *)
+    (* TODO: We may want to have a local cache here. *)
+    let open Lwt_syntax in
+    let dal_cctxt = node_ctxt.dal_cctxt in
+    let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
+    let+ res =
+      Dal_proto_client.get_commitments_history_hash_content dal_cctxt hash
     in
-    Dal.Slots_history.History_cache.view dal_slots_history_cache |> return
+    Result.to_option res
   in
-
   (* We fetch the value of protocol constants at block snapshot level
      where the game started. *)
   let* constants =
@@ -255,11 +231,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
     module Dal_with_history = struct
       let confirmed_slots_history = dal_slots_history
 
-      let get_history ptr =
-        Dal.Slots_history.History_cache.Map.find
-          ptr
-          dal_slots_history_cache_view
-        |> Lwt.return
+      let get_history = get_cell_from_hash
 
       let dal_attestation_lag = dal_attestation_lag
 

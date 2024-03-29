@@ -5940,12 +5940,14 @@ let register ~protocols =
     protocols ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/6967
      Delete the test when not useful for sure. *)
-  scenario_with_layer1_node
-    ~tags:[Tag.ci_disabled]
-    ~dal_enable:false
-    "feature_flag_is_disabled"
-    test_feature_flag
-    protocols ;
+  (*
+     scenario_with_layer1_node
+       ~tags:[Tag.ci_disabled]
+       ~dal_enable:false
+       "feature_flag_is_disabled"
+       test_feature_flag
+       protocols ;
+  *)
   scenario_with_layer1_node
     "one_committee_per_level"
     test_one_committee_per_level
