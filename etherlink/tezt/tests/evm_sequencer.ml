@@ -572,17 +572,13 @@ let test_resilient_to_rollup_node_disconnect =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
   (* Check the consistency again *)
-  let* () =
-    check_head_consistency
-      ~error_msg:
-        "The head should be the same after the outage. Sequencer: {%L}, proxy: \
-         {%R}"
-      ~left:sequencer
-      ~right:proxy
-      ()
-  in
-
-  unit
+  check_head_consistency
+    ~error_msg:
+      "The head should be the same after the outage. Sequencer: {%L}, proxy: \
+       {%R}"
+    ~left:sequencer
+    ~right:proxy
+    ()
 
 let test_can_fetch_blueprint =
   Protocol.register_test

@@ -295,11 +295,11 @@ val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
     race conditions when setting up rollup infrastructure. On open testnets
     like weeklynet and dailynet, this does not happen because of the large
     block time. *)
-val unsafe_wait_sync : ?path_client:string -> ?timeout:float -> t -> int Lwt.t
+val unsafe_wait_sync : ?timeout:float -> t -> int Lwt.t
 
 (** Wait until the layer 1 of the sc node is synchronized with its
     underlying l1 node. *)
-val wait_sync : ?path_client:string -> t -> timeout:float -> int Lwt.t
+val wait_sync : t -> timeout:float -> int Lwt.t
 
 (** [wait_for ?where sc_node event_name filter] waits for the SCORU node
     [sc_node] to emit an event named [name] (usually this is the name the event
