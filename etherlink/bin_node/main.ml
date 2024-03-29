@@ -132,17 +132,6 @@ let install_finalizer_prod server =
   let* () = Evm_node_lib_prod.Tx_pool.shutdown () in
   Evm_node_lib_prod.Evm_context.shutdown ()
 
-let install_finalizer_dev server =
-  let open Lwt_syntax in
-  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  let* () = emit Event.event_shutdown_node exit_status in
-  let* () = Tezos_rpc_http_server.RPC_server.shutdown server in
-  let* () = emit (Event.event_shutdown_rpc_server ~private_:false) () in
-  Evm_node_lib_dev.Helpers.unwrap_error_monad @@ fun () ->
-  let open Lwt_result_syntax in
-  let* () = Evm_node_lib_dev.Tx_pool.shutdown () in
-  Evm_node_lib_dev.Evm_context.shutdown ()
-
 let callback_log server conn req body =
   let open Cohttp in
   let open Lwt_syntax in
@@ -173,31 +162,9 @@ let rollup_node_config_prod ~rollup_node_endpoint ~keep_alive =
   return
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
-let rollup_node_config_dev ~rollup_node_endpoint ~keep_alive =
-  let open Lwt_result_syntax in
-  let open Evm_node_lib_dev in
-  let* smart_rollup_address =
-    fetch_smart_rollup_address
-      ~keep_alive
-      Rollup_services.smart_rollup_address
-      rollup_node_endpoint
-  in
-  let module Rollup_node_rpc = Rollup_node.Make (struct
-    let base = rollup_node_endpoint
-
-    let smart_rollup_address = smart_rollup_address
-  end) in
-  return
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
-
 let prod_directory config rollup_node_config =
   let open Lwt_result_syntax in
   let open Evm_node_lib_prod in
-  return @@ Services.directory config rollup_node_config
-
-let dev_directory config rollup_node_config =
-  let open Lwt_result_syntax in
-  let open Evm_node_lib_dev in
   return @@ Services.directory config rollup_node_config
 
 let start
@@ -625,28 +592,7 @@ let proxy_command =
           in
           return_unit
         else
-          let* ((backend_rpc, smart_rollup_address) as rollup_config) =
-            rollup_node_config_dev ~rollup_node_endpoint ~keep_alive
-          in
-          let* () =
-            Evm_node_lib_dev.Tx_pool.start
-              {
-                rollup_node = backend_rpc;
-                smart_rollup_address;
-                mode = Proxy {rollup_node_endpoint};
-              }
-          in
-          let () =
-            Evm_node_lib_dev.Rollup_node_follower.start
-              ~proxy:true
-              ~rollup_node_endpoint
-          in
-          let* directory = dev_directory config rollup_config in
-          let* server = start config ~directory in
-          let (_ : Lwt_exit.clean_up_callback_id) =
-            install_finalizer_dev server
-          in
-          return_unit
+          Evm_node_lib_dev.Proxy.main config ~keep_alive ~rollup_node_endpoint
       in
       let wait, _resolve = Lwt.wait () in
       let* () = wait in

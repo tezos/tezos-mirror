@@ -110,6 +110,15 @@ let event_callback_log =
     ("method", Data_encoding.string)
     ("body", Data_encoding.string)
 
+let event_retrying_connect =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"retrying_connect"
+    ~msg:"Cannot connect to {endpoint}, retrying in {delay} seconds."
+    ~level:Notice
+    ("endpoint", Data_encoding.string)
+    ("delay", Data_encoding.float)
+
 type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
@@ -181,3 +190,6 @@ let event_kernel_log ~level ~kind ~msg =
   | Error, Simulation -> emit event_kernel_log_simulation_error msg
   | Fatal, Application -> emit event_kernel_log_application_fatal msg
   | Fatal, Simulation -> emit event_kernel_log_simulation_fatal msg
+
+let retrying_connect ~endpoint ~delay =
+  emit event_retrying_connect (Uri.to_string endpoint, delay)
