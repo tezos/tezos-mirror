@@ -990,7 +990,9 @@ let commands () =
             cctxt#error "ill-typed stack");
     command
       ~group
-      ~desc:"Ask the node to normalize a type."
+      ~desc:
+        "Ask the node to normalize a type (remove annotations and flatten \
+         combs)."
       no_options
       (prefixes ["normalize"; "type"]
       @@ param
