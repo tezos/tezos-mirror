@@ -9,7 +9,7 @@
 (* Testing
    -------
    Component:    Smart Optimistic Rollups: Etherlink Sequencer
-   Requirement:  make -f kernels.mk build
+   Requirement:  make -f etherlink.mk build
                  npm install eth-cli
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_sequencer.ml
 *)
