@@ -636,60 +636,6 @@ let get_validated_dal_attestations_in_mempool node for_level =
     validated
   |> return
 
-let test_feature_flag _protocol _parameters _cryptobox node client
-    _bootstrap_key =
-  (* This test ensures the feature flag works:
-
-     - 1. It checks the feature flag is not enabled by default
-
-     - 2. It checks the new operations added by the feature flag
-     cannot be propagated by checking their classification in the
-     mempool. *)
-  let* params = Dal.Parameters.from_client client in
-  let cryptobox = Helpers.make_cryptobox params.cryptobox in
-  let commitment, proof = Dal.Commitment.dummy_commitment cryptobox "coucou" in
-  Check.(
-    (params.feature_enabled = false)
-      bool
-      ~error_msg:"Feature flag for the DAL should be disabled") ;
-  let*? process =
-    Client.RPC.spawn client @@ RPC.get_chain_block_context_dal_shards ()
-  in
-  let* () =
-    Process.check_error
-      ~msg:(rex "Data-availability layer will be enabled in a future proposal")
-      process
-  in
-  (* bake the block at level 2 because we cannot inject an attestation for block 1 *)
-  let* () = bake_for client in
-  let* (`OpHash oph1) =
-    inject_dal_attestation
-      ~force:true
-      ~nb_slots:params.number_of_slots
-      ~signer:Constant.bootstrap1
-      (Slots [])
-      client
-  in
-  let* (`OpHash oph2) =
-    Helpers.publish_commitment ~force:true ~index:0 ~commitment ~proof client
-  in
-  let* mempool = Mempool.get_mempool client in
-  let expected_mempool = Mempool.{empty with refused = [oph1; oph2]} in
-  Check.(
-    (mempool = expected_mempool)
-      Mempool.classified_typ
-      ~error_msg:"Expected mempool: %R. Got: %L. (Order does not matter)") ;
-  let* () = bake_for client in
-  let* block_metadata = Node.RPC.(call node @@ get_chain_block_metadata ()) in
-  if block_metadata.dal_attestation <> None then
-    Test.fail "Did not expect to find \"dal_attestation\"" ;
-  let* bytes =
-    Client.RPC.call client @@ RPC.get_chain_block_context_raw_bytes ()
-  in
-  if not JSON.(bytes |-> "dal" |> is_null) then
-    Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
-  unit
-
 let test_one_committee_per_level _protocol _parameters _cryptobox node _client
     _bootstrap_key =
   let* current_level =
@@ -5945,16 +5891,6 @@ let register ~protocols =
     ~number_of_shards:32
     ~consensus_committee_size:1024
     protocols ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6967
-     Delete the test when not useful for sure. *)
-  (*
-     scenario_with_layer1_node
-       ~tags:[Tag.ci_disabled]
-       ~dal_enable:false
-       "feature_flag_is_disabled"
-       test_feature_flag
-       protocols ;
-  *)
   scenario_with_layer1_node
     "one_committee_per_level"
     test_one_committee_per_level
