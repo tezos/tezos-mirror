@@ -1,5 +1,8 @@
 open Bls
 module FFT = Utils.FFT
+
+exception Srs_too_short = Commitment.SRS_too_short
+
 module Commitment = Commitment.Single_G1
 
 type public_parameters = {
@@ -242,6 +245,14 @@ let preprocess_multiple_multi_reveals t =
        integer less than or equal to the real quotient of x by y". Thus it
        equals [floor (x /. y)]. *)
     let quotient = (t.max_polynomial_length - j) / t.shard_length in
+    if Srs_g1.size t.srs_g1 < t.max_polynomial_length then
+      raise
+      @@ Srs_too_short
+           (Printf.sprintf
+              "Kate_amortized.preprocess: SRS size (= %d) smaller than \
+               expected (= %d)"
+              (Srs_g1.size t.srs_g1)
+              t.max_polynomial_length) ;
     let points =
       G1_carray.init domain_length (fun i ->
           if i < quotient then
