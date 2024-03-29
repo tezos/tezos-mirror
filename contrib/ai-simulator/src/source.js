@@ -421,3 +421,4 @@ export class Simulator {
 
 export { total_frozen_stake_storage } from "./total_frozen_stake_storage";
 export { total_supply_storage } from "./total_supply_storage";
+export { total_delegated_storage } from "./total_delegated_storage";

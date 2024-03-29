@@ -2,12 +2,15 @@
 
 echo "const total_supply_storage = [" > src/total_supply_storage.js
 echo "const total_frozen_stake_storage = [" > src/total_frozen_stake_storage.js
+echo "const total_delegated_storage = [" > src/total_delegated_storage.js
 
 rm -rf "/tmp/ai-sim-supply/"
 rm -rf "/tmp/ai-sim-frozen/"
+rm -rf "/tmp/ai-sim-delegated/"
 
 mkdir -p "/tmp/ai-sim-supply"
 mkdir -p "/tmp/ai-sim-frozen"
+mkdir -p "/tmp/ai-sim-delegated"
 
 l=$1
 
@@ -20,9 +23,29 @@ for ((i = 0; i <= l; i += batch_size)); do
   for ((n = i; n < $((i + batch_size)) && n <= l; n++)); do
     block=$((128 * (1 + n)))
 
-    (curl -s https://rpc.weeklynet-2024-03-13.teztnets.com/chains/main/blocks/$block/context/total_supply > "/tmp/ai-sim-supply/$n.txt" &)
+    (curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/total_supply > "/tmp/ai-sim-supply/$n.txt" &)
 
-    (curl -s https://rpc.weeklynet-2024-03-13.teztnets.com/chains/main/blocks/$block/context/total_frozen_stake > "/tmp/ai-sim-frozen/$n.txt" &)
+    (curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/total_frozen_stake > "/tmp/ai-sim-frozen/$n.txt" &)
+
+    (
+      public_keys=$(curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/delegates)
+      public_keys=$(echo "$public_keys" | tr -d '[]"')
+      public_keys=$(echo "$public_keys" | tr ',' ' ')
+
+      sum=0
+
+      for pkh in $public_keys; do
+        balance1=$(curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/delegates/"$pkh"/delegated_balance | tr -d '"')
+
+        balance2=$(curl -s https://rpc.weeklynet-2024-03-27.teztnets.com/chains/main/blocks/$block/context/delegates/"$pkh"/full_balance | tr -d '"')
+
+        balance=$((balance1 + balance2))
+
+        sum=$((sum + balance))
+      done
+
+      echo "$sum" >> "/tmp/ai-sim-delegated/$n.txt"
+    ) &
   done
 
   for ((n = i; n < $((i + batch_size)) && n <= l; n++)); do
@@ -34,6 +57,9 @@ for ((i = 0; i <= l; i += batch_size)); do
     until [ -s "/tmp/ai-sim-frozen/$n.txt" ]; do
       sleep 0.1
     done
+    until [ -s "/tmp/ai-sim-delegated/$n.txt" ]; do
+      sleep 0.1
+    done
 
     echo -ne "\r"
   done
@@ -43,9 +69,11 @@ for n in $(seq 0 "$l"); do
 
   supply=$(cat "/tmp/ai-sim-supply/$n.txt")
   frozen=$(cat "/tmp/ai-sim-frozen/$n.txt")
+  delegated=$(cat "/tmp/ai-sim-delegated/$n.txt")
 
   echo "$supply," >> src/total_supply_storage.js
   echo "$frozen," >> src/total_frozen_stake_storage.js
+  echo "$delegated," >> src/total_delegated_storage.js
 done
 
 echo "];" >> src/total_supply_storage.js
@@ -54,9 +82,13 @@ echo "export {total_supply_storage};" >> src/total_supply_storage.js
 echo "];" >> src/total_frozen_stake_storage.js
 echo "export {total_frozen_stake_storage};" >> src/total_frozen_stake_storage.js
 
+echo "];" >> src/total_delegated_storage.js
+echo "export {total_delegated_storage};" >> src/total_delegated_storage.js
+
 echo
 
 rm -r "/tmp/ai-sim-supply/"
 rm -r "/tmp/ai-sim-frozen/"
+rm -r "/tmp/ai-sim-delegated/"
 
 echo "Data fetched and stored successfully."
