@@ -2708,6 +2708,25 @@ let _octez_context_memory_tests =
         alcotezt;
       ]
 
+let _irmin_tests =
+  tezt
+    ["tezt_main"; "test_lib_irmin_store"; "test_utils"]
+    ~path:"irmin/test"
+    ~opam:"tezos_internal_irmin_tests"
+    ~synopsis:"Tezos internal irmin tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_context_sigs;
+        octez_context_disk;
+        octez_context_memory;
+        octez_context_encoding;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
 (* This binding assumes that librustzcash.a is installed in the system default
    directories or in: $OPAM_SWITCH_PREFIX/lib
 

@@ -11,7 +11,7 @@ itself is primarily developed and maintained by
 [contributors](https://github.com/mirage/irmin/graphs/contributors)
 from various organizations.
 
-Like Irmin, the code in this directory is under the
+Like Irmin, beside the `test` directory, the code in this directory is under the
 [ISC](https://github.com/mirage/irmin/blob/main/LICENSE.md) license.
 
 
@@ -22,9 +22,12 @@ Like Irmin, the code in this directory is under the
 | `irmin`    | `./lib_irmin` | [`src/irmin`](https://github.com/mirage/irmin/tree/main/src/irmin) |
 | `irmin_pack`    | `./lib_irmin_pack` | [`src/irmin-pack`](https://github.com/mirage/irmin/tree/main/src/irmin-pack) |
 | `ppx_irmin`\*    | `./lib_ppx_irmin` | [`src/ppx_irmin`](https://github.com/mirage/irmin/tree/main/src/ppx_irmin) |
+| `test`\*   | `./test` | NA | 
 
 \*`ppx-irmin` is not directly used by Octez, but it is a dependency of `irmin` and `irmin-pack`.
 
+\*`test` is a directory containing **unforked** tests from built for octez
+purposes that are using the `irmin` libraries.
 
 ## To-do before modifying the code
 
