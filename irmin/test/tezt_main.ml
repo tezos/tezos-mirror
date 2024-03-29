@@ -13,6 +13,4 @@
             other files.
 *)
 
-let () =
-  Test_lib_irmin_store.register ();
-  Tezt.Test.run ()
+let () = Test_lib_irmin_store.register ()
