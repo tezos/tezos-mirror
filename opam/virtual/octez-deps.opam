@@ -30,6 +30,7 @@ depends: [
   "cohttp-lwt-unix" { >= "5.2.0" }
   "conf-libev"
   "conf-rust"
+  "crunch" { >= "3.3.0" }
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"

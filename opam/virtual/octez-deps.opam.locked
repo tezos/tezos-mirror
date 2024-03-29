@@ -64,6 +64,7 @@ depends: [
   "conf-which" {= "1"}
   "conf-zlib" {= "1"}
   "cppo" {= "1.6.9"}
+  "crunch" {= "3.3.1"}
   "csexp" {= "1.5.2"}
   "cstruct" {= "6.2.0"}
   "cstruct-lwt" {= "6.2.0"}

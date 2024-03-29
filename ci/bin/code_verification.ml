@@ -805,6 +805,7 @@ let jobs pipeline_type =
         ([
            "./scripts/ci/lint_misc_check.sh";
            "scripts/check_wasm_pvm_regressions.sh check";
+           "etherlink/scripts/check_evm_store_migrations.sh check";
          ]
         @
         (* The license check only applies to new files (in the sense
