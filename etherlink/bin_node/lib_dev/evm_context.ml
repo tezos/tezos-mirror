@@ -961,7 +961,7 @@ let init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context =
 
 let reset = State.reset
 
-let get_evm_events_from_rollup_node_state evm_state =
+let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let open Lwt_result_syntax in
   let* kernel_upgrade =
     let*! kernel_upgrade_payload =
@@ -984,15 +984,17 @@ let get_evm_events_from_rollup_node_state evm_state =
   in
 
   let* new_delayed_transactions =
-    let*! hashes = State.delayed_inbox_hashes evm_state in
-    let* events =
-      List.map_es
-        (fun hash ->
-          let* item = State.delayed_inbox_item evm_state hash in
-          return (Ethereum_types.Evm_events.New_delayed_transaction item))
-        hashes
-    in
-    return events
+    if omit_delayed_tx_events then return []
+    else
+      let*! hashes = State.delayed_inbox_hashes evm_state in
+      let* events =
+        List.map_es
+          (fun hash ->
+            let* item = State.delayed_inbox_item evm_state hash in
+            return (Ethereum_types.Evm_events.New_delayed_transaction item))
+          hashes
+      in
+      return events
   in
 
   return
@@ -1003,12 +1005,15 @@ let get_evm_events_from_rollup_node_state evm_state =
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
-let init_from_rollup_node ~data_dir ~rollup_node_data_dir =
+let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
+    ~rollup_node_data_dir =
   let open Lwt_result_syntax in
   let* irmin_context, evm_state, finalized_level =
     init_context_from_rollup_node ~data_dir ~rollup_node_data_dir
   in
-  let* evm_events = get_evm_events_from_rollup_node_state evm_state in
+  let* evm_events =
+    get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state
+  in
   let* () = init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context in
   let* smart_rollup_address =
     let* metadata =
