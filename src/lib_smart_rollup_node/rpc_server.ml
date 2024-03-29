@@ -51,6 +51,7 @@ module Acl = struct
               "/local/batcher/**";
               "/admin/**";
               "/stats/**";
+              "/config";
             ];
       }
 
