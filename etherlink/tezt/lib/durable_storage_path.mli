@@ -75,6 +75,9 @@ val ticketer : path
 (** [sequencer] is the path to the sequencer flag. *)
 val sequencer : path
 
+(** [sequencer_pool_address] is the path to the L2 address credited with DA fees. *)
+val sequencer_pool_address : path
+
 (** [kernel_boot_wasm] is the path to the kernel `boot.wasm`. *)
 val kernel_boot_wasm : path
 

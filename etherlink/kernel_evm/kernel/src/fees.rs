@@ -16,7 +16,6 @@
 //! Additionally, we charge a _data-availability_ fee, for each tx posted through L1.
 
 use crate::inbox::TransactionContent;
-use crate::storage::read_sequencer_pool_address;
 
 use evm_execution::account_storage::{account_path, EthereumAccountStorage};
 use evm_execution::handler::ExecutionOutcome;
@@ -150,6 +149,7 @@ impl FeeUpdates {
         host: &mut impl Runtime,
         accounts: &mut EthereumAccountStorage,
         caller: H160,
+        sequencer_pool_address: Option<H160>,
     ) -> Result<(), anyhow::Error> {
         tezos_evm_logging::log!(
             host,
@@ -166,7 +166,7 @@ impl FeeUpdates {
             ));
         }
 
-        let sequencer = match read_sequencer_pool_address(host) {
+        let sequencer = match sequencer_pool_address {
             None => {
                 let burned_fee = self
                     .burn_amount
@@ -287,7 +287,6 @@ fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EthereumError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::store_sequencer_pool_address;
     use evm::{ExitReason, ExitSucceed};
     use evm_execution::{
         account_storage::{account_path, EthereumAccountStorage},
@@ -365,7 +364,8 @@ mod tests {
         };
 
         // Act
-        let result = fee_updates.apply(&mut host, &mut evm_account_storage, address);
+        let result =
+            fee_updates.apply(&mut host, &mut evm_account_storage, address, None);
 
         // Assert
         assert!(result.is_ok());
@@ -384,7 +384,6 @@ mod tests {
         let mut host = MockHost::default();
         let sequencer_address =
             address_from_str("0123456789ABCDEF0123456789ABCDEF01234567");
-        store_sequencer_pool_address(&mut host, sequencer_address).unwrap();
 
         let mut evm_account_storage =
             evm_execution::account_storage::init_account_storage().unwrap();
@@ -413,7 +412,12 @@ mod tests {
         };
 
         // Act
-        let result = fee_updates.apply(&mut host, &mut evm_account_storage, address);
+        let result = fee_updates.apply(
+            &mut host,
+            &mut evm_account_storage,
+            address,
+            Some(sequencer_address),
+        );
 
         // Assert
         assert!(result.is_ok());
@@ -451,7 +455,8 @@ mod tests {
         };
 
         // Act
-        let result = fee_updates.apply(&mut host, &mut evm_account_storage, address);
+        let result =
+            fee_updates.apply(&mut host, &mut evm_account_storage, address, None);
 
         // Assert
         assert!(result.is_err());

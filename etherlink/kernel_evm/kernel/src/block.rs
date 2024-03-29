@@ -27,7 +27,7 @@ use block_in_progress::BlockInProgress;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
 use evm_execution::precompiles;
 use evm_execution::precompiles::PrecompileBTreeMap;
-use primitive_types::{H256, U256};
+use primitive_types::{H160, H256, U256};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
@@ -71,6 +71,7 @@ fn compute<Host: Runtime>(
     accounts_index: &mut IndexableStorage,
     is_first_block_of_reboot: bool,
     ticketer: &Option<ContractKt1Hash>,
+    sequencer_pool_address: Option<H160>,
 ) -> Result<ComputationResult, anyhow::Error> {
     log!(
         host,
@@ -105,6 +106,7 @@ fn compute<Host: Runtime>(
             allocated_ticks,
             retriable,
             ticketer,
+            sequencer_pool_address,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -233,6 +235,7 @@ fn compute_bip<Host: KernelRuntime>(
     tick_counter: &mut TickCounter,
     first_block_of_reboot: &mut bool,
     ticketer: &Option<ContractKt1Hash>,
+    sequencer_pool_address: Option<H160>,
 ) -> anyhow::Result<ComputationResult> {
     let result = compute(
         host,
@@ -244,6 +247,7 @@ fn compute_bip<Host: KernelRuntime>(
         accounts_index,
         *first_block_of_reboot,
         ticketer,
+        sequencer_pool_address,
     )?;
     match result {
         ComputationResult::RebootNeeded => {
@@ -328,6 +332,7 @@ pub fn produce<Host: Runtime>(
     chain_id: U256,
     block_fees: BlockFees,
     config: &mut Configuration,
+    sequencer_pool_address: Option<H160>,
 ) -> Result<ComputationResult, anyhow::Error> {
     let kernel_upgrade = upgrade::read_kernel_upgrade(host)?;
 
@@ -383,6 +388,7 @@ pub fn produce<Host: Runtime>(
                 &mut tick_counter,
                 &mut first_block_of_reboot,
                 &config.tezos_contracts.ticketer,
+                sequencer_pool_address,
             ) {
                 Ok(ComputationResult::Finished) => promote_block(
                     &mut safe_host,
@@ -406,6 +412,8 @@ pub fn produce<Host: Runtime>(
         }
     }
 
+    // Using `safe_host.host` allows to escape from the failsafe storage, which is necessary
+    // because the sequencer pool address is located outside of `/evm/world_state`.
     upgrade::possible_sequencer_upgrade(safe_host.host)?;
 
     // Execute stored blueprints
@@ -461,6 +469,7 @@ pub fn produce<Host: Runtime>(
             &mut tick_counter,
             &mut first_block_of_reboot,
             &config.tezos_contracts.ticketer,
+            sequencer_pool_address,
         ) {
             Ok(ComputationResult::Finished) => {
                 promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?
@@ -718,6 +727,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
     }
@@ -764,6 +774,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -807,6 +818,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -853,6 +865,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
         let receipt = read_transaction_receipt(&mut host, &tx_hash)
@@ -932,6 +945,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -989,6 +1003,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees,
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
         let receipt0 = read_transaction_receipt(&mut host, &tx_hash_0)
@@ -1052,6 +1067,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -1111,6 +1127,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -1145,6 +1162,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -1156,6 +1174,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -1207,6 +1226,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -1297,6 +1317,7 @@ mod tests {
             &mut accounts_index,
             true,
             &None,
+            None,
         )
         .expect("Should have computed block");
 
@@ -1365,6 +1386,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
         assert!(
@@ -1410,6 +1432,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 0);
@@ -1422,6 +1445,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 1);
@@ -1434,6 +1458,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("Empty block should have been produced");
         check_current_block_number(&mut host, 2);
@@ -1564,6 +1589,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("Should have produced");
 
@@ -1637,6 +1663,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("Should have produced");
 
@@ -1730,6 +1757,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             block_fees,
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 
@@ -1795,6 +1823,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("Should have produced");
 
@@ -1814,6 +1843,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("Should have produced");
 
@@ -1899,6 +1929,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
             &mut Configuration::default(),
+            None,
         )
         .expect("The block production failed.");
 

@@ -10,9 +10,9 @@ let default_bootstrap_account_balance = Wei.of_eth_int 9999
 
 let make_config ?kernel_root_hash ?bootstrap_accounts ?ticketer ?administrator
     ?kernel_governance ?kernel_security_governance ?sequencer_governance
-    ?sequencer ?delayed_bridge ?(da_fee_per_byte = Wei.zero)
-    ?minimum_base_fee_per_gas ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    () =
+    ?sequencer ?sequencer_pool_address ?delayed_bridge
+    ?(da_fee_per_byte = Wei.zero) ?minimum_base_fee_per_gas
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels () =
   let open Sc_rollup_helpers.Installer_kernel_config in
   let kernel_root_hash =
     Option.fold
@@ -130,11 +130,23 @@ let make_config ?kernel_root_hash ?bootstrap_accounts ?ticketer ?administrator
       ~none:[]
       minimum_base_fee_per_gas
   in
+  let sequencer_pool_address =
+    match sequencer_pool_address with
+    | Some addr ->
+        let addr =
+          if String.starts_with addr ~prefix:"0x" then
+            let n = String.length addr in
+            String.sub addr 2 (n - 2)
+          else failwith "sequencer pool address should start with 0x"
+        in
+        [Set {value = addr; to_ = Durable_storage_path.sequencer_pool_address}]
+    | None -> []
+  in
   match
     kernel_root_hash @ ticketer @ bootstrap_accounts @ administrator
     @ kernel_governance @ kernel_security_governance @ sequencer_governance
     @ sequencer @ delayed_bridge @ da_fee_per_byte @ minimum_base_fee_per_gas
-    @ delayed_inbox_timeout @ delayed_inbox_min_levels
+    @ delayed_inbox_timeout @ delayed_inbox_min_levels @ sequencer_pool_address
   with
   | [] -> None
   | res -> Some (`Config res)

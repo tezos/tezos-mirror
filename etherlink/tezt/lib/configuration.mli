@@ -19,6 +19,7 @@ val make_config :
   ?kernel_security_governance:string ->
   ?sequencer_governance:string ->
   ?sequencer:string ->
+  ?sequencer_pool_address:string ->
   ?delayed_bridge:string ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->

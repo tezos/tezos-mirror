@@ -10,6 +10,7 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
 use crate::stage_one::fetch;
+use crate::storage::read_sequencer_pool_address;
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
@@ -223,6 +224,7 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     // 2. Fetch the per mode configuration of the kernel. Returns the default
     //    configuration if it fails.
     let mut configuration = fetch_configuration(host);
+    let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
@@ -239,9 +241,14 @@ pub fn main<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let block_fees = retrieve_block_fees(host)?;
     // Start processing blueprints
     log!(host, Debug, "Entering stage two.");
-    if let block::ComputationResult::RebootNeeded =
-        block::produce(host, chain_id, block_fees, &mut configuration)
-            .context("Failed during stage 2")?
+    if let block::ComputationResult::RebootNeeded = block::produce(
+        host,
+        chain_id,
+        block_fees,
+        &mut configuration,
+        sequencer_pool_address,
+    )
+    .context("Failed during stage 2")?
     {
         host.mark_for_reboot()?;
     };
@@ -493,6 +500,7 @@ mod tests {
             DUMMY_CHAIN_ID,
             block_fees,
             &mut Configuration::default(),
+            None,
         )
         .expect("Should have produced");
 
