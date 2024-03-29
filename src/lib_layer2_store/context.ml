@@ -227,4 +227,6 @@ module Version = struct
       int31
 
   let check = function V0 -> Result.return_unit
+
+  let to_string = function V0 -> "0"
 end

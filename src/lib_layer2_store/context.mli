@@ -175,6 +175,9 @@ module Version : sig
   (** [check v] fails if [v] is different from the expected version of the
       context. *)
   val check : t -> unit tzresult
+
+  (** String representation of context version. *)
+  val to_string : t -> string
 end
 
 module Internal_for_tests : sig

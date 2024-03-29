@@ -99,8 +99,25 @@ type sync_result =
       percentage_done : float;
     }
 
+type version = {
+  version : string;
+  store_version : string;
+  context_version : string;
+}
+
 module Encodings = struct
   open Data_encoding
+
+  let version =
+    conv
+      (fun {version; store_version; context_version} ->
+        (version, store_version, context_version))
+      (fun (version, store_version, context_version) ->
+        {version; store_version; context_version})
+    @@ obj3
+         (req "version" string)
+         (req "store_version" string)
+         (req "context_version" string)
 
   let commitment_with_hash =
     obj2
@@ -535,6 +552,13 @@ module Root = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.unit
       (path / "health")
+
+  let version =
+    Tezos_rpc.Service.get_service
+      ~description:"Returns the version information of the rollup node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.version
+      (path / "version")
 
   let openapi =
     Tezos_rpc.Service.get_service

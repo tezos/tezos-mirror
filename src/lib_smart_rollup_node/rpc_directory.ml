@@ -77,6 +77,18 @@ let () =
   @@ fun _node_ctxt () () -> Lwt_result_syntax.return_unit
 
 let () =
+  Root_directory.register0 Rollup_node_services.Root.version
+  @@ fun _node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let version =
+    Tezos_version.Version.to_string
+      Tezos_version_value.Current_git_info.octez_version
+  in
+  let store_version = Format.asprintf "%a" Store_version.pp Store.version in
+  let context_version = Context.Version.(to_string version) in
+  return Rollup_node_services.{version; store_version; context_version}
+
+let () =
   Global_directory.register0 Rollup_node_services.Global.sc_rollup_address
   @@ fun node_ctxt () () -> Lwt_result.return node_ctxt.config.sc_rollup_address
 
