@@ -7447,6 +7447,7 @@ let _octez_codec =
          octez_base_unix;
          octez_client_base_unix |> open_;
          octez_client_base |> open_;
+         octez_node_config;
          octez_clic;
          octez_stdlib_unix |> open_;
          octez_event_logging |> open_;

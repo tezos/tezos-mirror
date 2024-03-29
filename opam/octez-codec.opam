@@ -13,6 +13,7 @@ depends: [
   "data-encoding" { >= "1.0.1" & < "1.1" }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
+  "octez-node-config" { = version }
   "octez-version" { = version }
 ]
 depopts: [
