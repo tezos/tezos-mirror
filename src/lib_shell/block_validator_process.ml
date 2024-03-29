@@ -137,7 +137,19 @@ module Internal_validator_process = struct
         ~section
         ~level:Debug
         ~name:"seq_validation_request"
-        ~msg:"requesting validation of {block} for chain {chain}"
+        ~msg:
+          "requesting validation and application of {block} for chain {chain}"
+        ~pp1:Block_hash.pp
+        ("block", Block_hash.encoding)
+        ~pp2:Chain_id.pp
+        ("chain", Chain_id.encoding)
+
+    let application_request =
+      declare_2
+        ~section
+        ~level:Debug
+        ~name:"seq_application_request"
+        ~msg:"requesting application of {block} for chain {chain}"
         ~pp1:Block_hash.pp
         ("block", Block_hash.encoding)
         ~pp2:Chain_id.pp
@@ -149,6 +161,17 @@ module Internal_validator_process = struct
         ~level:Debug
         ~name:"seq_validation_success"
         ~msg:"block {block} successfully validated in {timespan}"
+        ~pp1:Block_hash.pp
+        ("block", Block_hash.encoding)
+        ~pp2:Time.System.Span.pp_hum
+        ("timespan", Time.System.Span.encoding)
+
+    let application_success =
+      declare_2
+        ~section
+        ~level:Debug
+        ~name:"seq_application_success"
+        ~msg:"block {block} successfully applied in {timespan}"
         ~pp1:Block_hash.pp
         ("block", Block_hash.encoding)
         ~pp2:Time.System.Span.pp_hum
@@ -261,7 +284,11 @@ module Internal_validator_process = struct
     let predecessor_resulting_context_hash =
       env.predecessor_resulting_context_hash
     in
-    let*! () = Events.(emit validation_request (block_hash, env.chain_id)) in
+    let*! () =
+      if should_precheck then
+        Events.(emit validation_request (block_hash, env.chain_id))
+      else Events.(emit application_request (block_hash, env.chain_id))
+    in
     let cache =
       match validator.cache with
       | None -> `Load
@@ -286,7 +313,11 @@ module Internal_validator_process = struct
       Some
         {context_hash = result.validation_store.resulting_context_hash; cache} ;
     validator.preapply_result <- None ;
-    let*! () = Events.(emit validation_success (block_hash, timespan)) in
+    let*! () =
+      if should_precheck then
+        Events.(emit validation_success (block_hash, timespan))
+      else Events.(emit application_success (block_hash, timespan))
+    in
     return result
 
   let preapply_block validator ~chain_id ~timestamp ~protocol_data ~live_blocks
@@ -801,7 +832,7 @@ module External_validator_process = struct
     | Uninitialized -> start_process vp
     | Exiting ->
         let*! () = Events.(emit cannot_start_process ()) in
-        tzfail Block_validator_errors.Cannot_validate_while_shutting_down
+        tzfail Block_validator_errors.Cannot_process_request_while_shutting_down
 
   (* Sends the given request to the external validator. If the request
      failed to be fulfilled, the status of the external validator is
@@ -894,7 +925,7 @@ module External_validator_process = struct
       Store.Block.resulting_context_hash chain_store predecessor
     in
     let request =
-      External_validation.Validate
+      External_validation.Apply
         {
           chain_id;
           block_header;

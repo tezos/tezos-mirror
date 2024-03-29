@@ -41,7 +41,7 @@ type parameters = {
 type never = |
 
 type _ request =
-  | Validate : {
+  | Apply : {
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
@@ -101,10 +101,11 @@ type _ request =
 
 let request_pp : type a. Format.formatter -> a request -> unit =
  fun ppf -> function
-  | Validate {block_header; chain_id; _} ->
+  | Apply {block_header; chain_id; should_precheck; _} ->
       Format.fprintf
         ppf
-        "block validation %a for chain %a"
+        "%s %a for chain %a"
+        (if should_precheck then "precheck and apply block" else "apply block")
         Block_hash.pp_short
         (Block_header.hash block_header)
         Chain_id.pp_short
@@ -208,11 +209,11 @@ let parameters_encoding =
 
 type packed_request = Erequest : _ request -> packed_request
 
-let case_validate tag =
+let case_apply tag =
   let open Data_encoding in
   case
     tag
-    ~title:"validate"
+    ~title:"Apply"
     (obj10
        (req "chain_id" Chain_id.encoding)
        (req "block_header" (dynamic_size Block_header.encoding))
@@ -228,7 +229,7 @@ let case_validate tag =
        (req "simulate" bool))
     (function
       | Erequest
-          (Validate
+          (Apply
             {
               chain_id;
               block_header;
@@ -264,7 +265,7 @@ let case_validate tag =
            should_precheck,
            simulate ) ->
       Erequest
-        (Validate
+        (Apply
            {
              chain_id;
              block_header;
@@ -444,7 +445,7 @@ let request_encoding =
   let open Data_encoding in
   union
     [
-      case_validate (Tag 0);
+      case_apply (Tag 0);
       case
         (Tag 1)
         ~title:"commit_genesis"
@@ -486,7 +487,7 @@ let request_encoding =
     ]
 
 let result_encoding : type a. a request -> a Data_encoding.t = function
-  | Validate _ -> Block_validation.result_encoding
+  | Apply _ -> Block_validation.result_encoding
   | Preapply _ -> Block_validation.preapply_result_encoding
   | Precheck _ -> Data_encoding.unit
   | Commit_genesis _ -> Context_hash.encoding

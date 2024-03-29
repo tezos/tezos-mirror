@@ -60,11 +60,11 @@ let previously_validated =
     ~pp1:Block_hash.pp
     ("hash", Block_hash.encoding)
 
-let validating_block =
+let applying_block =
   declare_1
     ~section
-    ~name:"validating_block"
-    ~msg:"validating block {hash}"
+    ~name:"applying_block"
+    ~msg:"applying block {hash}"
     ~level:Debug
     ~pp1:Block_hash.pp
     ("hash", Block_hash.encoding)
@@ -95,13 +95,13 @@ let preapplication_failure =
     ("worker_status", Worker_types.request_status_encoding)
     ("errors", Error_monad.trace_encoding)
 
-let validation_failure_after_precheck =
+let application_failure_after_precheck =
   declare_3
     ~section
-    ~name:"validation_failure_after_precheck"
+    ~name:"application_failure_after_precheck"
     ~level:Notice
     ~msg:
-      "validation of block {block} failed but precheck succeeded, \
+      "application of block {block} failed but precheck succeeded, \
        {worker_status}: {errors}"
     ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status

@@ -59,7 +59,16 @@ module Events = struct
       ~section
       ~level:Info
       ~name:"validation_request"
-      ~msg:"validating block {block}"
+      ~msg:"prechecking and applying block {block}"
+      ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
+      ("block", Block_header.encoding)
+
+  let application_request =
+    declare_1
+      ~section
+      ~level:Info
+      ~name:"application_request"
+      ~msg:"applying block {block}"
       ~pp1:(fun fmt header -> Block_hash.pp fmt (Block_header.hash header))
       ("block", Block_header.encoding)
 
@@ -278,7 +287,7 @@ let handle_request :
               ~protocol:genesis.protocol)
       in
       continue commit cache None
-  | Validate
+  | Apply
       {
         chain_id;
         block_header;
@@ -291,7 +300,10 @@ let handle_request :
         should_precheck;
         simulate;
       } ->
-      let*! () = Events.(emit validation_request block_header) in
+      let*! () =
+        if should_precheck then Events.(emit validation_request block_header)
+        else Events.(emit application_request block_header)
+      in
       let*! block_application_result =
         let* predecessor_context =
           Error_monad.catch_es (fun () ->

@@ -41,7 +41,7 @@ type parameters = {
 type never = |
 
 type _ request =
-  | Validate : {
+  | Apply : {
       chain_id : Chain_id.t;
       block_header : Block_header.t;
       predecessor_block_header : Block_header.t;
