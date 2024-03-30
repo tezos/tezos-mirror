@@ -3,6 +3,7 @@
   stdenv,
   libiconv,
   pkg-config,
+  darwin,
 }: {
   pick-latest-packages = final: prev:
     prev.repository.select {
@@ -35,6 +36,10 @@
       hardeningDisable =
         (old.hardeningDisable or [])
         ++ ["stackprotector"];
+    });
+
+    caqti = prev.caqti.overrideAttrs (old: {
+      buildInputs = (old.buildInputs or []) ++ [darwin.sigtool];
     });
 
     # This package makes no sense to build on MacOS. Some OPAM package
