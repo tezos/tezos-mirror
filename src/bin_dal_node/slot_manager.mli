@@ -70,7 +70,7 @@ val get_commitment_slot :
   Store.node_store ->
   Cryptobox.t ->
   Cryptobox.commitment ->
-  (slot, [Errors.decoding | Errors.not_found]) result Lwt.t
+  (slot, [> Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof] registers the shards of the slot whose commitment is
@@ -89,6 +89,19 @@ val add_commitment_shards :
   Cryptobox.commitment ->
   with_proof:bool ->
   (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
+
+(** This function publishes the given shards and their proofs. *)
+val publish_proved_shards :
+  published_level:int32 ->
+  slot_index:int ->
+  level_committee:
+    (level:int32 ->
+    Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
+  Dal_plugin.proto_parameters ->
+  (Cryptobox.commitment * int * Cryptobox.share tzresult) Seq_s.t ->
+  Cryptobox.shard_proof array ->
+  Gossipsub.Worker.t ->
+  unit tzresult Lwt.t
 
 (** This function publishes the shards of a commitment that is waiting for
     attestion on L1 if this node has those shards on disk and their proofs in

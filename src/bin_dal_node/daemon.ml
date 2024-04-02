@@ -617,7 +617,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
                  | Types.Observer {slot_index = index} -> index = slot_index
                  | _ -> false)
                profile_list ->
-          Amplificator.amplify
+          Amplificator.try_amplification
             shard_store
             node_store
             commitment
