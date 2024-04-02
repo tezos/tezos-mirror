@@ -27,10 +27,9 @@ impl From<Single> for FValue {
     }
 }
 
-#[allow(clippy::from_over_into)]
-impl Into<Single> for FValue {
-    fn into(self) -> Single {
-        let val: u64 = self.into();
+impl From<FValue> for Single {
+    fn from(f: FValue) -> Self {
+        let val: u64 = f.into();
 
         // Check value correctly NaN boxed:
         // all upper bits must be set to 1
@@ -138,6 +137,62 @@ where
     /// See [Self::run_fmax].
     pub fn run_fmax_s(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
         self.run_fmax::<Single>(rs1, rs2, rd);
+    }
+
+    /// `FMADD.S` instruction.
+    ///
+    /// See [Self::run_fmadd].
+    pub fn run_fmadd_s(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fmadd::<Single>(rs1, rs2, rs3, rm, rd)
+    }
+
+    /// `FMSUB.S` instruction.
+    ///
+    /// See [Self::run_fmsub].
+    pub fn run_fmsub_s(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fmsub::<Single>(rs1, rs2, rs3, rm, rd)
+    }
+
+    /// `FNMSUB.S` instruction.
+    ///
+    /// See [Self::run_fnmsub].
+    pub fn run_fnmsub_s(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fnmsub::<Single>(rs1, rs2, rs3, rm, rd)
+    }
+
+    /// `FNMADD.S` instruction.
+    ///
+    /// See [Self::run_fnmadd].
+    pub fn run_fnmadd_s(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fnmadd::<Single>(rs1, rs2, rs3, rm, rd)
     }
 
     /// `FSGNJ.S` R-type instruction.
