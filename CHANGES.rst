@@ -28,6 +28,10 @@ General
 Node
 ----
 
+- Add an ``source`` argument to ``GET
+  /chains/<chain>/mempool/pending_operations`` which allows operations
+  to be filtered by source. (MR :gl:`!11278`)
+
 Client
 ------
 
