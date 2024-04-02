@@ -248,6 +248,8 @@ module RPC : sig
   val get_topics_peers :
     subscribed:bool -> (topic * string list) list RPC_core.t
 
+  val get_gossipsub_connections : unit -> JSON.t RPC_core.t
+
   type peer_score = {peer : string; score : float}
 
   (** Call RPC "GET /p2p/gossipsub/scores" to list the scores of peers with a
