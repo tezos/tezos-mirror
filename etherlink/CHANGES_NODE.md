@@ -10,6 +10,29 @@
 
 ### Internal
 
+## Version for d517020b58afef0e15c768ee0b5acbda1786cdd8
+
+### Features
+
+- Observers now follows a rollup node. (!12547)
+- Wait for rollup node to reconnect if it's not available. (!12561)
+- Filter out irrelevant events in observer mode. (!12607)
+- Forward delayed transactions to observer nodes. (!12606)
+- Limit the size of blueprints. (!12666)
+
+### Bug fixes
+
+- Store last known level even if there are no events. (!12590)
+
+### Breaking changes
+
+### Internal
+
+- Improve internal storage handling. (!12551,!12516, !12572, !12627)
+- Merge publishable and executable blueprints. (!12571)
+- Store delayed transactions in the EVM Context. (!12605)
+- Reduce verbosity of events. (!12622)
+
 ## Version for 0a81ce76b3d4f57d8c5194bcb9418f9294fd2be1
 
 ### Features
