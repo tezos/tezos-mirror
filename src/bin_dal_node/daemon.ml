@@ -398,7 +398,9 @@ module Handler = struct
           | Ok commitment -> return_some commitment)
         (Seq.ints 0 |> Stdlib.Seq.take number_of_slots |> List.of_seq)
     in
-    (* Check cache probably *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7124
+       In case of republication of the same commitment, the shards are removed
+       too early *)
     List.iter_es
       (fun commitment -> Store.Shards.remove store.shard_store commitment)
       commitments
