@@ -3,18 +3,39 @@
 //
 // SPDX-License-Identifier: MIT
 
-use risc_v_interpreter::{machine_state::mode::Mode, Interpreter, InterpreterResult::*};
+use risc_v_interpreter::{
+    machine_state::{
+        mode::Mode,
+        registers::{gp, XRegister, XValue},
+    },
+    Interpreter,
+    InterpreterResult::*,
+};
 use std::fs;
 
 const TESTS_DIR: &str = "../../../tezt/tests/riscv-tests/generated";
 const MAX_STEPS: usize = 1_000_000;
 
-fn interpret_test(contents: &[u8], exit_mode: Mode) {
+fn check_register_values(interpreter: &Interpreter, check_xregs: &[(XRegister, XValue)]) {
+    let failure = check_xregs
+        .iter()
+        .filter_map(|(xreg, xval)| {
+            let res = interpreter.read_xregister(*xreg);
+            (res != *xval).then(|| format!("\n- check {xreg} == {xval} | got {res}"))
+        })
+        .collect::<String>();
+
+    if !failure.is_empty() {
+        panic!("XRegisters conditions not satisfied: {failure}");
+    };
+}
+
+fn interpret_test_with_check(contents: &[u8], exit_mode: Mode, check_xregs: &[(XRegister, u64)]) {
     let mut backend = Interpreter::create_backend();
     let mut interpreter =
         Interpreter::new(&mut backend, contents, None, exit_mode).expect("Boot failed");
     match interpreter.run(MAX_STEPS) {
-        Exit { code: 0, .. } => (),
+        Exit { code: 0, .. } => check_register_values(&interpreter, check_xregs),
         Exit { code, steps } => {
             panic!("Failed at test case: {} - Steps done: {}", code >> 1, steps)
         }
@@ -26,28 +47,32 @@ fn interpret_test(contents: &[u8], exit_mode: Mode) {
 macro_rules! test_case {
     // Default start & exit mode (Machine & Machine)
     ($(#[$m:meta],)* $name: ident, $path: expr) => {
-        #[test]
-        $(#[$m])*
-        fn $name() {
-            let mode = if $path.contains("rv64u") {
+        test_case!(
+            $(#[$m],)*
+            $name,
+            $path,
+            if $path.contains("rv64u") {
                 Mode::User
             } else if $path.contains("rv64s") {
                 Mode::Supervisor
             } else {
                 Mode::Machine
-            };
-            let contents = fs::read(format!("{}/{}", TESTS_DIR, $path)).expect("Failed to read binary");
-            interpret_test(&contents, mode)
-        }
+            }
+        );
     };
 
-    // Choose exit mode, default start mode (Machine)
+    // Choose exit mode, default start mode (Based on test name)
     ($(#[$m:meta],)* $name: ident, $path: expr, $mode: expr) => {
+        test_case!($(#[$m],)* $name, $path, $mode, &[]);
+    };
+
+    // Choose exit mode, default start mode (based on test name), check xregisters
+    ($(#[$m:meta],)* $name: ident, $path: expr, $mode: expr, $xchecks: expr) => {
         #[test]
         $(#[$m])*
         fn $name() {
             let contents = fs::read(format!("{}/{}", TESTS_DIR, $path)).expect("Failed to read binary");
-            interpret_test(&contents, $mode)
+            interpret_test_with_check(&contents, $mode, $xchecks)
         }
     };
 }
@@ -63,7 +88,12 @@ test_case!(test_suite_rv64mi_p_ma_addr, "rv64mi-p-ma_addr");
 test_case!(#[ignore], test_suite_rv64mi_p_ma_fetch, "rv64mi-p-ma_fetch");
 test_case!(test_suite_rv64mi_p_mcsr, "rv64mi-p-mcsr");
 test_case!(test_suite_rv64mi_p_sbreak, "rv64mi-p-sbreak");
-test_case!(#[ignore], test_suite_rv64mi_p_scall, "rv64mi-p-scall");
+test_case!(
+    test_suite_rv64mi_p_scall,
+    "rv64mi-p-scall",
+    Mode::User,
+    &[(gp, 1)] // This checks TESTNUM == 1, see scall.S in the riscv test suite
+);
 test_case!(test_suite_rv64mi_p_sd_misaligned, "rv64mi-p-sd-misaligned");
 test_case!(test_suite_rv64mi_p_sh_misaligned, "rv64mi-p-sh-misaligned");
 test_case!(test_suite_rv64mi_p_sw_misaligned, "rv64mi-p-sw-misaligned");
@@ -76,7 +106,12 @@ test_case!(#[ignore], test_suite_rv64si_p_dirty, "rv64si-p-dirty");
 test_case!(#[ignore], test_suite_rv64si_p_icache_alias, "rv64si-p-icache-alias");
 test_case!(#[ignore], test_suite_rv64si_p_ma_fetch, "rv64si-p-ma_fetch", Mode::Supervisor);
 test_case!(test_suite_rv64si_p_sbreak, "rv64si-p-sbreak");
-test_case!(test_suite_rv64si_p_scall, "rv64si-p-scall");
+test_case!(
+    test_suite_rv64si_p_scall,
+    "rv64si-p-scall",
+    Mode::Supervisor,
+    &[(gp, 1)] // This checks TESTNUM == 1, see scall.S in the riscv test suite
+);
 test_case!(test_suite_rv64si_p_wfi, "rv64si-p-wfi");
 // RV64-SSVNAPOT
 test_case!(#[ignore], test_suite_rv64ssvnapot_p_napot, "rv64ssvnapot-p-napot");
