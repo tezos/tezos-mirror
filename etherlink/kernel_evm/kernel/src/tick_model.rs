@@ -6,6 +6,8 @@ use tezos_ethereum::transaction::IndexedLog;
 
 use crate::inbox::Transaction;
 
+use self::constants::TICKS_FOR_CRYPTO;
+
 /// Tick model constants
 ///
 /// Some of the following values were estimated using benchmarking, and should
@@ -116,6 +118,7 @@ pub fn estimate_remaining_ticks_for_transaction_execution(
     tx_data_size: u64,
 ) -> u64 {
     constants::MAX_ALLOWED_TICKS
+        .saturating_sub(TICKS_FOR_CRYPTO)
         .saturating_sub(ticks_of_transaction_overhead(tx_data_size))
         .saturating_sub(ticks)
 }
