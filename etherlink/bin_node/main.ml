@@ -645,11 +645,11 @@ let proxy_command =
       let* () = wait in
       return_unit)
 
-let register_wallet ~wallet_dir =
+let register_wallet ?password_filename ~wallet_dir () =
   let wallet_ctxt =
     new Client_context_unix.unix_io_wallet
       ~base_dir:wallet_dir
-      ~password_filename:None
+      ~password_filename
   in
   let () =
     Client_main_run.register_default_signer
@@ -662,7 +662,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args19
+    (args20
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -681,7 +681,8 @@ let sequencer_command =
        catchup_cooldown_arg
        max_number_of_chunks_arg
        devmode_arg
-       wallet_dir_arg)
+       wallet_dir_arg
+       (Client_config.password_filename_arg ()))
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -709,11 +710,12 @@ let sequencer_command =
            catchup_cooldown,
            max_number_of_chunks,
            devmode,
-           wallet_dir )
+           wallet_dir,
+           password_filename )
          rollup_node_endpoint
          sequencer_str
          () ->
-      let wallet_ctxt = register_wallet ~wallet_dir in
+      let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
       let* sequencer =
         Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
       in
@@ -952,7 +954,7 @@ let chunker_command =
     ~desc:
       "Chunk hexadecimal data according to the message representation of the \
        EVM rollup"
-    (args8
+    (args9
        devmode_arg
        rollup_address_arg
        blueprint_mode_arg
@@ -960,7 +962,8 @@ let chunker_command =
        blueprint_number_arg
        parent_hash_arg
        sequencer_key_arg
-       wallet_dir_arg)
+       wallet_dir_arg
+       (Client_config.password_filename_arg ()))
     (prefixes ["chunk"; "data"]
     @@ seq_of_param
     @@ param
@@ -977,7 +980,8 @@ let chunker_command =
            blueprint_number,
            blueprint_parent_hash,
            sequencer_str,
-           wallet_dir )
+           wallet_dir,
+           password_filename )
          data
          () ->
       let* kind =
@@ -987,7 +991,7 @@ let chunker_command =
             | Some k -> Lwt.return k
             | None -> Lwt.fail_with "missing sequencer key"
           in
-          let wallet_ctxt = register_wallet ~wallet_dir in
+          let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
           let+ sequencer_key =
             Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
           in
@@ -1068,7 +1072,7 @@ let make_sequencer_upgrade_command =
          activation_timestamp
          sequencer_str
          () ->
-      let wallet_ctxt = register_wallet ~wallet_dir in
+      let wallet_ctxt = register_wallet ~wallet_dir () in
       let* _pk_uri, sequencer_pk_opt =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
       in
