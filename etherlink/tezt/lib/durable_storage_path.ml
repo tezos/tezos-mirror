@@ -69,6 +69,8 @@ let ticketer = evm "/ticketer"
 
 let sequencer = evm "/sequencer"
 
+let sequencer_pool_address = evm "/sequencer_pool_address"
+
 let kernel_boot_wasm = kernel "/boot.wasm"
 
 let delayed_bridge_path = evm "/delayed_bridge"

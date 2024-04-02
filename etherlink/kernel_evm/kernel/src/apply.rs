@@ -549,6 +549,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     transaction_result: TransactionResult,
     pay_fees: bool,
     ticketer: &Option<ContractKt1Hash>,
+    sequencer_pool_address: Option<H160>,
 ) -> Result<ExecutionInfo, anyhow::Error> {
     let TransactionResult {
         caller,
@@ -572,7 +573,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     }
 
     if pay_fees {
-        fee_updates.apply(host, evm_account_storage, caller)?;
+        fee_updates.apply(host, evm_account_storage, caller, sequencer_pool_address)?;
     }
 
     let object_info = make_object_info(transaction, caller, index, &fee_updates)?;
@@ -608,6 +609,7 @@ pub fn apply_transaction<Host: Runtime>(
     allocated_ticks: u64,
     retriable: bool,
     ticketer: &Option<ContractKt1Hash>,
+    sequencer_pool_address: Option<H160>,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
@@ -649,6 +651,7 @@ pub fn apply_transaction<Host: Runtime>(
                 tx_result,
                 true,
                 ticketer,
+                sequencer_pool_address,
             )?;
             Ok(ExecutionResult::Valid(execution_result))
         }
@@ -666,6 +669,7 @@ pub fn apply_transaction<Host: Runtime>(
                 tx_result,
                 false,
                 ticketer,
+                sequencer_pool_address,
             )?;
             Ok(ExecutionResult::Retriable(execution_result))
         }

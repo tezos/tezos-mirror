@@ -134,8 +134,9 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
-    ?(sequencer = Constant.bootstrap1) ?(kernel = Constant.WASM.evm_kernel)
-    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir protocol =
+    ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
+    ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -162,6 +163,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       ?da_fee_per_byte:da_fee
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
+      ?sequencer_pool_address
       ()
   in
   let config =
@@ -1201,6 +1203,73 @@ let test_observer_forwards_transaction =
 
   match receipt with
   | Some receipt when receipt.status -> unit
+  | Some _ ->
+      Test.fail
+        "transaction receipt received from the sequencer, but transaction \
+         failed"
+  | None ->
+      Test.fail
+        "Missing receipt in the sequencer node for transaction successfully \
+         injected in the observer"
+
+let test_sequencer_is_reimbursed =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "transaction"]
+    ~title:"Sequencer is reimbursed for DA fees"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let tbb = 1. in
+  (* We use an arbitrary address for the pool address, the goal is just to
+     verify its balance increases. *)
+  let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
+  let* {sequencer = sequencer_node; _} =
+    setup_sequencer
+      ~da_fee:Wei.one
+      ~time_between_blocks:(Time_between_blocks tbb)
+      ~sequencer_pool_address
+      protocol
+  in
+
+  let* balance =
+    Eth_cli.balance
+      ~account:sequencer_pool_address
+      ~endpoint:Evm_node.(endpoint sequencer_node)
+  in
+
+  Check.((Wei.zero = balance) Wei.typ)
+    ~error_msg:"Balance of the sequencer address pool should be null" ;
+
+  (* Ensure the sequencer has produced the block. *)
+  let* () =
+    Evm_node.wait_for_blueprint_applied ~timeout:10.0 sequencer_node 1
+  in
+
+  let* txn =
+    Eth_cli.transaction_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~to_public_key:Eth_account.bootstrap_accounts.(2).address
+      ~value:Wei.one
+      ~endpoint:(Evm_node.endpoint sequencer_node)
+      ()
+  in
+
+  let* receipt =
+    Eth_cli.get_receipt ~endpoint:(Evm_node.endpoint sequencer_node) ~tx:txn
+  in
+
+  match receipt with
+  | Some receipt when receipt.status ->
+      let* balance =
+        Eth_cli.balance
+          ~account:sequencer_pool_address
+          ~endpoint:Evm_node.(endpoint sequencer_node)
+      in
+
+      Check.((Wei.zero < balance) Wei.typ)
+        ~error_msg:"Balance of the sequencer address pool should not be null" ;
+      unit
   | Some _ ->
       Test.fail
         "transaction receipt received from the sequencer, but transaction \
@@ -2580,6 +2649,7 @@ let () =
   test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;
   test_observer_forwards_transaction protocols ;
+  test_sequencer_is_reimbursed protocols ;
   test_upgrade_kernel_auto_sync protocols ;
   test_self_upgrade_kernel protocols ;
   test_force_kernel_upgrade protocols ;
