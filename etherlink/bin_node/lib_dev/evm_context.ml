@@ -336,6 +336,10 @@ module State = struct
         in
         return (evm_state, on_success)
 
+  let current_blueprint_number ctxt =
+    let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
+    Ethereum_types.Qty (Z.pred next_blueprint_number)
+
   let apply_evm_events ?finalized_level (ctxt : t) events =
     let open Lwt_result_syntax in
     let* context, evm_state, on_success =
@@ -352,7 +356,9 @@ module State = struct
       in
       let* _ =
         Option.map_es
-          (Evm_store.L1_latest_known_level.store ctxt.store)
+          (fun l1_level ->
+            let l2_level = current_blueprint_number ctxt in
+            Evm_store.L1_latest_known_level.store ctxt.store l2_level l1_level)
           finalized_level
       in
       let* ctxt = replace_current_commit ctxt evm_state in
@@ -704,6 +710,12 @@ module State = struct
     in
     return_unit
 
+  let reset ~data_dir ~l2_level =
+    let open Lwt_result_syntax in
+    let* store = Evm_store.init ~data_dir in
+    Evm_store.with_transaction store @@ fun store ->
+    Evm_store.reset store ~l2_level
+
   let last_produced_blueprint (ctxt : t) =
     let open Lwt_result_syntax in
     let (Qty next) = ctxt.session.next_blueprint_number in
@@ -807,10 +819,12 @@ module Handlers = struct
         Evm_store.Blueprints.find_range ctxt.store ~from ~to_
     | Last_known_L1_level ->
         let ctxt = Worker.state self in
-        Evm_store.L1_latest_known_level.find ctxt.store
-    | New_last_known_L1_level l ->
+        let* level = Evm_store.L1_latest_known_level.find ctxt.store in
+        return @@ Option.map snd level
+    | New_last_known_L1_level l1_level ->
         let ctxt = Worker.state self in
-        Evm_store.L1_latest_known_level.store ctxt.store l
+        let l2_level = State.current_blueprint_number ctxt in
+        Evm_store.L1_latest_known_level.store ctxt.store l2_level l1_level
     | Delayed_inbox_hashes ->
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
@@ -902,6 +916,8 @@ let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   return init_status
 
 let init_from_rollup_node = State.init_from_rollup_node
+
+let reset = State.reset
 
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})

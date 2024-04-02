@@ -29,13 +29,16 @@ val start :
   unit ->
   init_status tzresult Lwt.t
 
-(** [init_from_rollup_node ~data_dir
-    ~rollup_node_data_dir ~inspect_current_blueprint_number]
+(** [init_from_rollup_node ~data_dir ~rollup_node_data_dir]
     initialises the irmin context and metadata of the evm using the
-    latest known evm state of the given rollup
-    node. *)
+    latest known evm state of the given rollup node. *)
 val init_from_rollup_node :
   data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
+
+(** [reset ~data_dir ~l2_level] reset the sequencer storage to
+    [l2_level]. {b Warning: b} Data will be lost ! *)
+val reset :
+  data_dir:string -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
 
 (** [apply_evm_events ~finalized_level events] applies all the
     events [events] on the local context. The events are performed in a
