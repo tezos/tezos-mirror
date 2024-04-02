@@ -103,9 +103,9 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
        Some (metrics_addr dal_node);
        Some "--expected-pow";
        Some (string_of_float expected_pow);
-       Some "--peers";
-       Some (String.concat "," peers);
      ]
+  @ (if peers = [] then [None]
+    else [Some "--peers"; Some (String.concat "," peers)])
   @ (if attester_profiles = [] then [None]
     else
       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
