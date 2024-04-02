@@ -423,7 +423,12 @@ val shards_proofs_precomputation_encoding :
 
 (** [precomputation_shard_proofs t] returns the precomputation used to
    produce shard proofs. *)
-val precompute_shards_proofs : t -> shards_proofs_precomputation
+val precompute_shards_proofs :
+  t ->
+  ( shards_proofs_precomputation,
+    [> `Invalid_degree_strictly_less_than_expected of (int, int) error_container]
+  )
+  Result.t
 
 (** [save_precompute_shards_proofs precomputation ~filename] saves the
    given [precomputation] to disk with the given [filename]. *)
