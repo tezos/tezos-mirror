@@ -1,5 +1,5 @@
 (vendored_dirs vendors)
-(data_only_dirs _opam-repo-for-release)
+(data_only_dirs _opam-repo-for-release data-encoding)
 (env
  (_
   (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
