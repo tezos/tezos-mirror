@@ -34,6 +34,7 @@ module Parameters = struct
     metrics_addr : string;
     l1_node_endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
+    runner : Runner.t option;
   }
 
   type session_state = {mutable ready : bool}
@@ -77,7 +78,11 @@ let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
 let spawn_command dal_node =
-  Process.spawn ~name:dal_node.name ~color:dal_node.color dal_node.path
+  Process.spawn
+    ?runner:dal_node.persistent_state.runner
+    ~name:dal_node.name
+    ~color:dal_node.color
+    dal_node.path
 
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(producer_profiles = [])
@@ -98,9 +103,9 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
        Some (metrics_addr dal_node);
        Some "--expected-pow";
        Some (string_of_float expected_pow);
-       Some "--peers";
-       Some (String.concat "," peers);
      ]
+  @ (if peers = [] then [None]
+    else [Some "--peers"; Some (String.concat "," peers)])
   @ (if attester_profiles = [] then [None]
     else
       [Some "--attester-profiles"; Some (String.concat "," attester_profiles)])
@@ -203,9 +208,9 @@ let wait_for_disconnection node ~peer_id =
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
-    ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
-    ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
+let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
+    ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
+    ?rpc_port ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -228,6 +233,7 @@ let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
   in
   let dal_node =
     create
+      ?runner
       ~path
       ~name
       ?color
@@ -241,16 +247,18 @@ let create_from_endpoint ?(path = Uses.path Constant.octez_dal_node) ?name
         metrics_addr;
         pending_ready = [];
         l1_node_endpoint;
+        runner;
       }
   in
   on_event dal_node (handle_event dal_node) ;
   dal_node
 
 (* TODO: have rpc_addr here, like for others. *)
-let create ?(path = Uses.path Constant.octez_dal_node) ?name ?color ?data_dir
-    ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr
-    ?public_addr ?metrics_addr ~node () =
+let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
+    ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
+    ?listen_addr ?public_addr ?metrics_addr ~node () =
   create_from_endpoint
+    ?runner
     ~path
     ?name
     ?color
@@ -294,7 +302,14 @@ let do_runlike_command ?env ?(event_level = `Debug) node arguments =
      * [make_arguments] seems incomplete
      * refactoring possible in [spawn_config_init] *)
   let arguments = arguments @ make_arguments node in
-  run ?env ~event_level node {ready = false} arguments ~on_terminate
+  run
+    ?runner:node.persistent_state.runner
+    ?env
+    ~event_level
+    node
+    {ready = false}
+    arguments
+    ~on_terminate
 
 let run ?env ?event_level node =
   do_runlike_command

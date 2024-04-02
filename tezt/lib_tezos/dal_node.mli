@@ -31,6 +31,7 @@ type t
 (** Creates a DAL node *)
 
 val create :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
@@ -46,6 +47,7 @@ val create :
   t
 
 val create_from_endpoint :
+  ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
