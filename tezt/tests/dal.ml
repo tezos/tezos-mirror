@@ -237,7 +237,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
     ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) ?smart_rollup_timeout_period_in_blocks f ~protocol =
+    ?(parameters = []) ?smart_rollup_timeout_period_in_blocks
+    ?use_mock_srs_for_testing f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -277,6 +278,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
 
   let* node, client, dal_parameters =
     setup_node
+      ?use_mock_srs_for_testing
       ?custom_constants
       ?additional_bootstrap_accounts
       ?event_sections_levels
@@ -415,7 +417,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
-    ?smart_rollup_timeout_period_in_blocks variant scenario =
+    ?smart_rollup_timeout_period_in_blocks ?use_mock_srs_for_testing variant
+    scenario =
   let description = "Testing DAL rollup and node with L1" in
   test
     ~regression:true
@@ -427,6 +430,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ?use_mock_srs_for_testing
         ~custom_constants
         ?node_arguments
         ?consensus_committee_size
@@ -3824,7 +3828,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
 
 (* Create a DAL node whose DAL parameters are not compatible with those in
    [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
-let make_invalid_dal_node protocol parameters =
+let make_invalid_dal_node ?use_mock_srs_for_testing protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
@@ -3833,7 +3837,7 @@ let make_invalid_dal_node protocol parameters =
       @ redundancy_factor_param (Some (crypto_params.redundancy_factor / 2))
       @ slot_size_param (Some (crypto_params.slot_size / 2))
     in
-    setup_node ~protocol ~parameters ()
+    setup_node ?use_mock_srs_for_testing ~protocol ~parameters ()
   in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
