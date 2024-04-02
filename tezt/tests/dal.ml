@@ -237,7 +237,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
     ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) f ~protocol =
+    ?(parameters = []) ?smart_rollup_timeout_period_in_blocks
+    ?use_mock_srs_for_testing f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -269,10 +270,15 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     @ make_string_parameter
         ["delay_increment_per_round"]
         delay_increment_per_round
+    @ make_int_parameter
+        ["smart_rollup_timeout_period_in_blocks"]
+        smart_rollup_timeout_period_in_blocks
     @ parameters
   in
+
   let* node, client, dal_parameters =
     setup_node
+      ?use_mock_srs_for_testing
       ?custom_constants
       ?additional_bootstrap_accounts
       ?event_sections_levels
@@ -311,9 +317,9 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   let* () = bake_for tezos_client in
   f rollup_address sc_rollup_node
 
-let make_dal_node ?peers ?attester_profiles ?producer_profiles
+let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
     ?bootstrap_profile tezos_node =
-  let dal_node = Dal_node.create ~node:tezos_node () in
+  let dal_node = Dal_node.create ?name ~node:tezos_node () in
   let* () =
     Dal_node.init_config
       ?peers
@@ -410,11 +416,12 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?redundancy_factor ?attestation_lag ?(tags = []) ?(uses = fun _ -> [])
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
-    ?activation_timestamp ?bootstrap_profile ?producer_profiles variant scenario
-    =
+    ?activation_timestamp ?bootstrap_profile ?producer_profiles
+    ?smart_rollup_timeout_period_in_blocks ?use_mock_srs_for_testing
+    ?(regression = true) variant scenario =
   let description = "Testing DAL rollup and node with L1" in
   test
-    ~regression:true
+    ~regression
     ~__FILE__
     ~tags
     ~uses:(fun protocol ->
@@ -423,6 +430,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
+        ?use_mock_srs_for_testing
         ~custom_constants
         ?node_arguments
         ?consensus_committee_size
@@ -436,6 +444,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?minimal_block_delay
         ?delay_increment_per_round
         ?activation_timestamp
+        ?smart_rollup_timeout_period_in_blocks
         ~protocol
         ~dal_enable
       @@ fun parameters _cryptobox node client ->
@@ -3819,7 +3828,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
 
 (* Create a DAL node whose DAL parameters are not compatible with those in
    [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
-let make_invalid_dal_node protocol parameters =
+let make_invalid_dal_node ?use_mock_srs_for_testing protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
@@ -3828,7 +3837,7 @@ let make_invalid_dal_node protocol parameters =
       @ redundancy_factor_param (Some (crypto_params.redundancy_factor / 2))
       @ slot_size_param (Some (crypto_params.slot_size / 2))
     in
-    setup_node ~protocol ~parameters ()
+    setup_node ?use_mock_srs_for_testing ~protocol ~parameters ()
   in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
@@ -5859,6 +5868,205 @@ let scenario_tutorial_dal_baker =
           ~error_msg:"Expecting a non-empty list of topcis") ;
       unit)
 
+module Refutations = struct
+  (**
+     This test provides a scenario where two rollup nodes are initialized, one
+     with a faulty DAL node and the other with a correct one. The test aims to
+     verify the behavior of the rollup nodes and the protocol under these
+     conditions. That is: starting (and finishing) a refutation game involving a
+     DAL import tick.
+
+     The test performs the following steps:
+     - Initializes two DAL nodes, one honest and one faulty.
+     - Initializes two rollup nodes, one for each DAL node.
+     - Prepares and provides the kernel code for both rollup nodes.
+     - Originates the dal_echo_kernel smart rollup.
+     - Publishes DAL slots at indices 0 and 1 of the same level.
+     - Attest the two slots.
+     - Stops the faulty DAL node and alters its shards store to make it return
+       wrong data for the attested shards upon request.
+     - Resumes the faulty DAL node.
+     - Starts the rollup nodes.
+     - Enter an (infinite) loop where we bake and wait for rollup nodes to
+       process the block.
+
+     The function exits when either:
+     - One of the rollup nodes is not able to catch up after 120 seconds, and in this case the test fails, or
+     - The refutation game is lost by the faulty rollup node.
+  *)
+  let scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+      ~refute_operations_priority _protocol parameters _dal_node _sc_rollup_node
+      _sc_rollup_address node client pvm_name =
+    (* Initializing the real SRS. *)
+    Log.info "Downloading SRS files..." ;
+    let* () =
+      Process.run
+        (Base.project_root // "scripts/install_dal_trusted_setup.sh")
+        []
+    in
+    Log.info "SRS files downloaded." ;
+    let faulty_operator_key = Constant.bootstrap4.public_key_hash in
+    let honest_operator_key = Constant.bootstrap5.public_key_hash in
+    (* We have two DAL nodes in producer mode *)
+    let* honest_dal_node =
+      make_dal_node ~name:"dal-honest" ~peers:[] ~producer_profiles:[0; 1] node
+    in
+    let* faulty_dal_node =
+      make_dal_node
+        ~name:"dal-faulty"
+        ~peers:[Dal_node.listen_addr honest_dal_node]
+        ~producer_profiles:[0; 1]
+        node
+    in
+
+    (* We have two Rollup nodes. One per DAL node *)
+    Log.info "Originate the echo kernel." ;
+    let honest_sc_rollup_node =
+      Sc_rollup_node.create
+        ~name:"sc-honest"
+        ~dal_node:honest_dal_node
+        Operator
+        node
+        ~base_dir:(Client.base_dir client)
+        ~default_operator:honest_operator_key
+    in
+    let faulty_sc_rollup_node =
+      Sc_rollup_node.create
+        ~name:"sc-faulty"
+        ~dal_node:faulty_dal_node
+        Operator
+        node
+        ~base_dir:(Client.base_dir client)
+        ~default_operator:faulty_operator_key
+    in
+
+    (* Provide the kernel's code for both rollups *)
+    let* boot_sector =
+      Lwt_list.fold_left_s
+        (fun _boot_sector sc_rollup ->
+          let* {boot_sector; _} =
+            Sc_rollup_helpers.prepare_installer_kernel
+              ~preimages_dir:
+                (Filename.concat (Sc_rollup_node.data_dir sc_rollup) pvm_name)
+              Constant.WASM.dal_echo_kernel
+          in
+          return boot_sector)
+        ""
+        [honest_sc_rollup_node; faulty_sc_rollup_node]
+    in
+
+    (* The kernel is badly written and may ask pages in negative
+       levels. We ensure it is not possible by baking enough
+       blocks. *)
+    let* () =
+      bake_for ~count:parameters.Dal.Parameters.attestation_lag client
+    in
+
+    (* Originate the dal_echo_kernel smart rollup *)
+    let* sc_rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:Tez.(of_int 9999999)
+        ~alias:"dal_echo_kernel"
+        ~src:Constant.bootstrap1.public_key_hash
+        ~kind:pvm_name
+        ~boot_sector
+        ~parameters_ty:"unit"
+        client
+    in
+    let* () = bake_for client in
+
+    (* Publish two slots and indices 0 and 1, respectively *)
+    let publish source index =
+      Helpers.make_slot
+        ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
+        (Format.sprintf "Hello slot %d" index)
+      |> publish_and_store_slot client honest_dal_node source ~index
+    in
+    let* commitment0 = publish Constant.bootstrap1 0 in
+    let* commitment1 = publish Constant.bootstrap2 1 in
+
+    (* Bake sufficiently many blocks to be able to attest. *)
+    let* () = bake_for ~count:parameters.attestation_lag client in
+    let* () =
+      inject_dal_attestations_and_bake
+        node
+        client
+        ~number_of_slots:parameters.number_of_slots
+        (Slots [0; 1])
+    in
+
+    (* Stop the faulty DAL node and alter its shards store. *)
+    let shards_store =
+      Dal_node.data_dir faulty_dal_node ^ "/store/shard_store"
+    in
+
+    let* () = Dal_node.terminate faulty_dal_node in
+    let* () = Dal_node.kill faulty_dal_node in
+
+    (* We published and attested two slots, with commitments [commitment0] and
+       [commitment1] respectively, at the same level above. Below, we alter the
+       shards store of the faulty node by interchanging the content/shards of
+       [commitment0] and [commitment1]. *)
+    let mv_shards from into =
+      sf "mv %s/%s %s/%s" shards_store from shards_store into
+      |> Sys.command |> ignore
+    in
+    mv_shards commitment0 "tmp" ;
+    mv_shards commitment1 commitment0 ;
+    mv_shards "tmp" commitment1 ;
+
+    let* () = Dal_node.run ~wait_ready:true faulty_dal_node in
+
+    (* configure the rollup nodes. *)
+    let* () =
+      Lwt_list.iter_s
+        (fun sc_rollup_node ->
+          let* _name =
+            Sc_rollup_node.config_init
+              ~force:true
+              sc_rollup_node
+              sc_rollup_address
+          in
+          unit)
+        [faulty_sc_rollup_node; honest_sc_rollup_node]
+    in
+    (Sc_rollup_helpers.prioritize_refute_operations
+    @@
+    match refute_operations_priority with
+    | `Honest_first -> honest_sc_rollup_node
+    | `Faulty_first -> faulty_sc_rollup_node) ;
+
+    (* Start the rollup nodes. *)
+    let* () =
+      Lwt_list.iter_s
+        (fun sc_rollup_node ->
+          Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug])
+        [faulty_sc_rollup_node; honest_sc_rollup_node]
+    in
+
+    let rec loop () =
+      let* current_level = Node.get_level node in
+      let target_level = current_level + 1 in
+      let* () = bake_for client in
+      Log.info "Wait for the rollup nodes to catch up at level %d." target_level ;
+      let* () =
+        Lwt_list.iter_p
+          (fun sc_rollup ->
+            let* _level =
+              Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup target_level
+            in
+            unit)
+          [faulty_sc_rollup_node; honest_sc_rollup_node]
+      in
+      loop ()
+    in
+    let (_ : unit Lwt.t) = loop () in
+    Sc_rollup_node.check_error
+      faulty_sc_rollup_node
+      ~exit_code:1
+      ~msg:(rex "lost the refutation game")
+end
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -6112,6 +6320,34 @@ let register ~protocols =
 
   (* Register tutorial test *)
   scenario_tutorial_dal_baker protocols ;
+
+  scenario_with_all_nodes
+    "Refutation where the faulty node timeouts"
+    ~regression:false
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+    ~pvm_name:"wasm_2_0_0"
+    ~commitment_period:5
+    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+       ~refute_operations_priority:`Faulty_first)
+    ~smart_rollup_timeout_period_in_blocks:20
+    ~use_mock_srs_for_testing:false
+    ~tags:[Tag.slow]
+    protocols ;
+
+  scenario_with_all_nodes
+    "Refutation where the honest node makes final move"
+    ~regression:false
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+    ~pvm_name:"wasm_2_0_0"
+    ~commitment_period:5
+    (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
+       ~refute_operations_priority:`Honest_first)
+    ~smart_rollup_timeout_period_in_blocks:20
+    ~use_mock_srs_for_testing:false
+    ~tags:[Tag.slow]
+    protocols ;
 
   (* Register end-to-end tests *)
   register_end_to_end_tests ~protocols ;
