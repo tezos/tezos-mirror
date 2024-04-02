@@ -36,23 +36,19 @@ let blueprint_watcher_service =
 
 let create_blueprint_watcher_service from_level =
   let open Lwt_syntax in
+  let blueprint_stream, stopper = Evm_context.blueprints_watcher () in
+  let shutdown () = Lwt_watcher.shutdown stopper in
   (* input source block creating a stream to observe the events *)
-  let* head_res = Evm_context.last_produced_blueprint () in
-  let (Qty head_level) =
-    match head_res with
-    | Ok head ->
-        let (Qty head_level) = head.number in
-        if Z.(Compare.(head_level < of_int64 from_level)) then
-          Stdlib.failwith "Cannot start watching from a level in the future"
-        else head.number
-    | Error _ ->
-        Stdlib.failwith
-          "Cannot start watching when no blueprint has been produced"
+  let* head_info = Evm_context.head_info () in
+  let (Qty next) = head_info.next_blueprint_number in
+  let head_level = Z.pred next in
+  let* () =
+    if Z.(Compare.(head_level < of_int64 from_level)) then
+      Stdlib.failwith "Cannot start watching from a level in the future"
+    else return_unit
   in
 
   (* generate the next asynchronous event *)
-  let blueprint_stream, stopper = Evm_context.blueprints_watcher () in
-  let shutdown () = Lwt_watcher.shutdown stopper in
   let next =
     let next_level_requested = ref Z.(of_int64 from_level) in
     fun () ->
