@@ -366,6 +366,39 @@ module Handler = struct
           return_unit
     else return_unit
 
+  (* This function removes the shards corresponding to the commitments at level
+     exactly [Node_context.next_shards_level_to_gc ~head_level]. In the future
+     we may want to remove the shards from all preceeding levels, not only this
+     one. Also, removing could be done more efficiently than iterating on all
+     the slots. *)
+  let remove_old_level_shards proto_parameters ctxt head_level =
+    let open Lwt_result_syntax in
+    let oldest_level =
+      Node_context.next_shards_level_to_gc ctxt ~current_level:head_level
+    in
+    let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
+    let store = Node_context.get_store ctxt in
+    let*! commitments =
+      List.filter_map_s
+        (fun slot_index ->
+          let open Lwt_syntax in
+          let* result =
+            Slot_manager.get_commitment_by_published_level_and_index
+              ~level:oldest_level
+              ~slot_index
+              store
+          in
+          match result with
+          | Error `Not_found -> return_none
+          | Error (`Decoding_failed _) -> return_none (* TODO: add a warning *)
+          | Ok commitment -> return_some commitment)
+        (Seq.ints 0 |> Stdlib.Seq.take number_of_slots |> List.of_seq)
+    in
+    (* Check cache probably *)
+    List.iter_es
+      (fun commitment -> Store.Shards.remove store.shard_store commitment)
+      commitments
+
   (* Monitor heads and store *finalized* published slot headers indexed by block
      hash. A slot header is considered finalized when it is in a block with at
      least two other blocks on top of it, as guaranteed by Tenderbake. Note that
@@ -404,35 +437,7 @@ module Handler = struct
                cryptobox
                head_level
                proto_parameters.attestation_lag) ;
-          let oldest_level =
-            Node_context.next_shards_level_to_gc ctxt ~current_level:head_level
-          in
-          let number_of_slots = proto_parameters.number_of_slots in
-          let store = Node_context.get_store ctxt in
-          let*! commitments =
-            List.filter_map_s
-              (fun slot_index ->
-                let open Lwt_syntax in
-                let* result =
-                  Slot_manager.get_commitment_by_published_level_and_index
-                    ~level:oldest_level
-                    ~slot_index
-                    store
-                in
-                match result with
-                | Error `Not_found -> return_none
-                | Error (`Decoding_failed _) ->
-                    return_none (* TODO: add a warning *)
-                | Ok commitment -> return_some commitment)
-              (Seq.ints 0 |> Stdlib.Seq.take number_of_slots |> List.of_seq)
-          in
-          (* Check cache probably *)
-          let* () =
-            List.iter_es
-              (fun commitment ->
-                Store.Shards.remove store.shard_store commitment)
-              commitments
-          in
+          let* () = remove_old_level_shards proto_parameters ctxt head_level in
           let process_block block_level =
             let block = `Level block_level in
             let* block_info =
