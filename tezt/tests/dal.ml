@@ -176,9 +176,10 @@ let slot_size_param slot_size =
 
 (* Some initialization functions to start needed nodes. *)
 
-let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
-    ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
-    ?(node_arguments = []) ?(dal_bootstrap_peers = []) () =
+let setup_node ?(use_mock_srs_for_testing = true) ?(custom_constants = None)
+    ?(additional_bootstrap_accounts = 0) ~parameters ~protocol
+    ?activation_timestamp ?(event_sections_levels = []) ?(node_arguments = [])
+    ?(dal_bootstrap_peers = []) () =
   (* Temporary setup to initialise the node. *)
   let base = Either.right (protocol, custom_constants) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
@@ -195,13 +196,15 @@ let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
   let config : Cryptobox.Config.t =
     {
       activated = true;
-      use_mock_srs_for_testing = true;
+      use_mock_srs_for_testing;
       bootstrap_peers = dal_bootstrap_peers;
     }
   in
-  Node.Config_file.update
-    node
-    (Node.Config_file.set_sandbox_network_with_dal_config config) ;
+  let* () =
+    Node.Config_file.update
+      node
+      (Node.Config_file.set_sandbox_network_with_dal_config config)
+  in
   let* () = Node.run node ~event_sections_levels node_arguments in
   let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint:(Node node) () in
@@ -1928,9 +1931,11 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
   let config : Cryptobox.Config.t =
     {activated = true; use_mock_srs_for_testing = true; bootstrap_peers = []}
   in
-  Node.Config_file.update
-    node2
-    (Node.Config_file.set_sandbox_network_with_dal_config config) ;
+  let* () =
+    Node.Config_file.update
+      node2
+      (Node.Config_file.set_sandbox_network_with_dal_config config)
+  in
   let* () = Node.snapshot_import node2 file in
   unit
 
@@ -1989,10 +1994,12 @@ let test_dal_node_startup =
   assert (Dal_node.is_running_not_ready dal_node) ;
   let* () = Dal_node.terminate dal_node in
   let* () = Node.terminate node in
-  Node.Config_file.update
-    node
-    (Node.Config_file.set_sandbox_network_with_user_activated_overrides
-       [(Protocol.hash previous_protocol, Protocol.hash protocol)]) ;
+  let* () =
+    Node.Config_file.update
+      node
+      (Node.Config_file.set_sandbox_network_with_user_activated_overrides
+         [(Protocol.hash previous_protocol, Protocol.hash protocol)])
+  in
   let* () = Node.run node nodes_args in
   let* () = Node.wait_for_ready node in
   let* () = run_dal dal_node in

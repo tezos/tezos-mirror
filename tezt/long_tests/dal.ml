@@ -103,9 +103,11 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
         | Some peer -> [Dal_node.listen_addr peer]);
     }
   in
-  Node.Config_file.update
-    node
-    (Node.Config_file.set_sandbox_network_with_dal_config config) ;
+  let* () =
+    Node.Config_file.update
+      node
+      (Node.Config_file.set_sandbox_network_with_dal_config config)
+  in
   (* Restart the node to load the new config. *)
   let* () = Node.terminate node in
   let* () =

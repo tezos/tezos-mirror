@@ -511,7 +511,11 @@ module Start_octez_node = struct
         l1_node_args
     in
     let* () = Node.config_init node [] in
-    Option.iter (config_dal_srs node) dal_cryptobox_parameters ;
+    let* () =
+      match dal_cryptobox_parameters with
+      | None -> unit
+      | Some parameters -> config_dal_srs node parameters
+    in
     let* () =
       match snapshot with
       | Some snapshot ->
