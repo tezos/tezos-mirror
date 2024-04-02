@@ -22,7 +22,7 @@ let callback_log server conn req body =
 
 let start
     ({rpc_addr; rpc_port; cors_origins; cors_headers; max_active_connections; _} :
-      Configuration.proxy Configuration.t) ~directory =
+      Configuration.t) ~directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in

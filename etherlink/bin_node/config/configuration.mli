@@ -45,14 +45,16 @@ type observer = {
   preimages_endpoint : Uri.t option;
 }
 
-type 'a t = {
+type t = {
   rpc_addr : string;
   rpc_port : int;
   devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
-  mode : 'a;
+  proxy : proxy option;
+  sequencer : sequencer option;
+  observer : observer option;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
 }
@@ -64,111 +66,73 @@ val default_data_dir : string
     the configuration filename from the [data_dir] *)
 val config_filename : data_dir:string -> string
 
-(** [save_proxy ~force ~data_dir configuration] writes the proxy [configuration] file in
-    [data_dir]. If [force] is [true], existing configurations are
-    overwritten. *)
-val save_proxy : force:bool -> data_dir:string -> proxy t -> unit tzresult Lwt.t
+(** [save ~force ~data_dir configuration] writes the [configuration]
+    file in [data_dir]. If [force] is [true], existing configurations
+    are overwritten. *)
+val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
 
-(** Same as {!save_proxy} but for the sequencer configuration. *)
-val save_sequencer :
-  force:bool -> data_dir:string -> sequencer t -> unit tzresult Lwt.t
+(** [load ~data_dir] loads a proxy configuration stored in [data_dir]. *)
+val load : data_dir:string -> t tzresult Lwt.t
 
-(** Same as {!save_proxy} but for the observer configuration. *)
-val save_observer :
-  force:bool -> data_dir:string -> observer t -> unit tzresult Lwt.t
+(** [proxy_config_exn config] returns the proxy config of [config] or
+    fails *)
+val proxy_config_exn : t -> proxy tzresult
 
-(** [load_proxy ~data_dir] loads a proxy configuration stored in [data_dir]. *)
-val load_proxy : data_dir:string -> proxy t tzresult Lwt.t
+(** [sequencer_config_exn config] returns the sequencer config of
+    [config] or fails *)
+val sequencer_config_exn : t -> sequencer tzresult
 
-(** Same as {!load_proxy} but for the sequencer configuration. *)
-val load_sequencer : data_dir:string -> sequencer t tzresult Lwt.t
+(** [observer_config_exn config] returns the observer config of
+    [config] or fails *)
+val observer_config_exn : t -> observer tzresult
 
-(** Same as {!load_proxy} but for the observer configuration. *)
-val load_observer : data_dir:string -> observer t tzresult Lwt.t
+(** [sequencer_config_dft ()] returns the default sequencer config
+    populated with given value. *)
+val sequencer_config_dft :
+  ?preimages:string ->
+  ?preimages_endpoint:Uri.t ->
+  ?time_between_blocks:time_between_blocks ->
+  ?max_number_of_chunks:int ->
+  ?private_rpc_port:int ->
+  rollup_node_endpoint:Uri.t ->
+  sequencer:Signature.public_key_hash ->
+  unit ->
+  sequencer
+
+(** [observer_config_dft ()] returns the default observer config
+    populated with given value. *)
+val observer_config_dft :
+  ?preimages:string ->
+  ?preimages_endpoint:Uri.t ->
+  evm_node_endpoint:Uri.t ->
+  unit ->
+  observer
 
 module Cli : sig
-  val create_proxy :
+  val create :
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    rollup_node_endpoint:Uri.t ->
+    ?proxy:proxy ->
+    ?sequencer:sequencer ->
+    ?observer:observer ->
     unit ->
-    proxy t
+    t
 
-  val create_sequencer :
-    ?private_rpc_port:int ->
-    devmode:bool ->
-    ?rpc_addr:string ->
-    ?rpc_port:int ->
-    ?cors_origins:string trace ->
-    ?cors_headers:string trace ->
-    ?log_filter:log_filter_config ->
-    ?rollup_node_endpoint:Uri.t ->
-    ?preimages:string ->
-    ?preimages_endpoint:Uri.t ->
-    ?time_between_blocks:time_between_blocks ->
-    ?max_number_of_chunks:int ->
-    sequencer:Signature.public_key_hash ->
-    unit ->
-    sequencer t
-
-  val create_observer :
-    devmode:bool ->
-    ?rpc_addr:string ->
-    ?rpc_port:int ->
-    ?cors_origins:string trace ->
-    ?cors_headers:string trace ->
-    ?log_filter:log_filter_config ->
-    ?evm_node_endpoint:Uri.t ->
-    ?preimages:string ->
-    ?preimages_endpoint:Uri.t ->
-    unit ->
-    observer t
-
-  val create_or_read_proxy_config :
+  val create_or_read_config :
     data_dir:string ->
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
-    ?cors_origins:string trace ->
-    ?cors_headers:string trace ->
+    ?cors_origins:string list ->
+    ?cors_headers:string list ->
     ?log_filter:log_filter_config ->
-    rollup_node_endpoint:Uri.t ->
+    ?proxy:proxy ->
+    ?sequencer:sequencer ->
+    ?observer:observer ->
     unit ->
-    proxy t tzresult Lwt.t
-
-  val create_or_read_sequencer_config :
-    data_dir:string ->
-    devmode:bool ->
-    ?rpc_addr:string ->
-    ?rpc_port:int ->
-    ?private_rpc_port:int ->
-    ?cors_origins:string trace ->
-    ?cors_headers:string trace ->
-    ?log_filter:log_filter_config ->
-    ?rollup_node_endpoint:Uri.t ->
-    ?preimages:string ->
-    ?preimages_endpoint:Uri.t ->
-    ?time_between_blocks:time_between_blocks ->
-    ?max_number_of_chunks:int ->
-    sequencer:Signature.public_key_hash ->
-    unit ->
-    sequencer t tzresult Lwt.t
-
-  val create_or_read_observer_config :
-    data_dir:string ->
-    devmode:bool ->
-    ?rpc_addr:string ->
-    ?rpc_port:int ->
-    ?cors_origins:string trace ->
-    ?cors_headers:string trace ->
-    ?log_filter:log_filter_config ->
-    ?evm_node_endpoint:Uri.t ->
-    ?preimages:string ->
-    ?preimages_endpoint:Uri.t ->
-    unit ->
-    observer t tzresult Lwt.t
+    t tzresult Lwt.t
 end

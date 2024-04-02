@@ -13,6 +13,6 @@ val main :
   rollup_node_endpoint:Uri.t ->
   evm_node_endpoint:Uri.t ->
   data_dir:string ->
-  config:Configuration.observer Configuration.t ->
+  config:Configuration.t ->
   unit ->
   unit tzresult Lwt.t

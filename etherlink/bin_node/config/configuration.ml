@@ -15,8 +15,6 @@ type proxy = {rollup_node_endpoint : Uri.t}
 
 type time_between_blocks = Nothing | Time_between_blocks of float
 
-(** TODO https://gitlab.com/tezos/tezos/-/issues/6811
-    We need to properly handle the secrets in the node. *)
 type sequencer = {
   rollup_node_endpoint : Uri.t;
   preimages : string;
@@ -33,14 +31,16 @@ type observer = {
   preimages_endpoint : Uri.t option;
 }
 
-type 'a t = {
+type t = {
   rpc_addr : string;
   rpc_port : int;
   devmode : bool;
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
-  mode : 'a;
+  proxy : proxy option;
+  sequencer : sequencer option;
+  observer : observer option;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
 }
@@ -69,10 +69,6 @@ let default_proxy = {rollup_node_endpoint = Uri.empty}
 
 let default_preimages = "_evm_installer_preimages"
 
-let default_rollup_node_endpoint = Uri.empty
-
-let default_evm_node_endpoint = Uri.empty
-
 let default_time_between_blocks = Time_between_blocks 5.
 
 let hard_maximum_number_of_chunks =
@@ -84,6 +80,28 @@ let hard_maximum_number_of_chunks =
   max_cumulated_chunks_size / chunk_size
 
 let default_max_number_of_chunks = hard_maximum_number_of_chunks
+
+let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
+    ?max_number_of_chunks ?private_rpc_port ~rollup_node_endpoint ~sequencer ()
+    =
+  {
+    rollup_node_endpoint;
+    preimages = Option.value ~default:default_preimages preimages;
+    preimages_endpoint;
+    time_between_blocks =
+      Option.value ~default:default_time_between_blocks time_between_blocks;
+    max_number_of_chunks =
+      Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
+    private_rpc_port;
+    sequencer;
+  }
+
+let observer_config_dft ?preimages ?preimages_endpoint ~evm_node_endpoint () =
+  {
+    evm_node_endpoint;
+    preimages = Option.value ~default:default_preimages preimages;
+    preimages_endpoint;
+  }
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -97,7 +115,15 @@ let log_filter_config_encoding : log_filter_config Data_encoding.t =
        (dft "max_nb_logs" int31 default_filter_config.max_nb_logs)
        (dft "chunk_size" int31 default_filter_config.chunk_size))
 
-let encoding_proxy =
+let encoding_time_between_blocks : time_between_blocks Data_encoding.t =
+  let open Data_encoding in
+  def "time_between_blocks"
+  @@ conv
+       (function Nothing -> None | Time_between_blocks f -> Some f)
+       (function None -> Nothing | Some f -> Time_between_blocks f)
+       (option float)
+
+let proxy_encoding =
   let open Data_encoding in
   conv
     (fun ({rollup_node_endpoint} : proxy) -> Uri.to_string rollup_node_endpoint)
@@ -109,15 +135,7 @@ let encoding_proxy =
           string
           (Uri.to_string default_proxy.rollup_node_endpoint)))
 
-let encoding_time_between_blocks : time_between_blocks Data_encoding.t =
-  let open Data_encoding in
-  def "time_between_blocks"
-  @@ conv
-       (function Nothing -> None | Time_between_blocks f -> Some f)
-       (function None -> Nothing | Some f -> Time_between_blocks f)
-       (option float)
-
-let encoding_sequencer =
+let sequencer_encoding =
   let open Data_encoding in
   conv
     (fun {
@@ -155,10 +173,7 @@ let encoding_sequencer =
     (obj7
        (dft "preimages" string default_preimages)
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
-       (dft
-          "rollup_node_endpoint"
-          string
-          (Uri.to_string default_rollup_node_endpoint))
+       (req "rollup_node_endpoint" string)
        (dft
           "time_between_blocks"
           encoding_time_between_blocks
@@ -170,7 +185,7 @@ let encoding_sequencer =
           uint16)
        (req "sequencer" Signature.Public_key_hash.encoding))
 
-let encoding_observer =
+let observer_encoding =
   let open Data_encoding in
   conv
     (fun {preimages; preimages_endpoint; evm_node_endpoint} ->
@@ -184,13 +199,9 @@ let encoding_observer =
     (obj3
        (dft "preimages" string default_preimages)
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
-       (dft
-          "evm_node_endpoint"
-          string
-          (Uri.to_string default_evm_node_endpoint)))
+       (req "evm_node_endpoint" string))
 
-let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
- fun mode_encoding ->
+let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {
@@ -200,7 +211,9 @@ let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
            cors_origins;
            cors_headers;
            log_filter;
-           mode;
+           proxy;
+           sequencer;
+           observer;
            max_active_connections;
          } ->
       ( rpc_addr,
@@ -209,7 +222,9 @@ let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
         cors_origins,
         cors_headers,
         log_filter,
-        mode,
+        proxy,
+        sequencer,
+        observer,
         max_active_connections ))
     (fun ( rpc_addr,
            rpc_port,
@@ -217,7 +232,9 @@ let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
            cors_origins,
            cors_headers,
            log_filter,
-           mode,
+           proxy,
+           sequencer,
+           observer,
            max_active_connections ) ->
       {
         rpc_addr;
@@ -226,23 +243,27 @@ let encoding : type a. a Data_encoding.t -> a t Data_encoding.t =
         cors_origins;
         cors_headers;
         log_filter;
-        mode;
+        proxy;
+        sequencer;
+        observer;
         max_active_connections;
       })
-    (obj8
+    (obj10
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
        (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
        (dft "devmode" bool default_devmode)
        (dft "cors_origins" (list string) default_cors_origins)
        (dft "cors_headers" (list string) default_cors_headers)
        (dft "log_filter" log_filter_config_encoding default_filter_config)
-       (req "mode" mode_encoding)
+       (opt "proxy" proxy_encoding)
+       (opt "sequencer" sequencer_encoding)
+       (opt "observer" observer_encoding)
        (dft
           "max_active_connections"
           Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.encoding
           default_max_active_connections))
 
-let save ~force ~data_dir encoding config =
+let save ~force ~data_dir config =
   let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct encoding config in
   let config_file = config_filename ~data_dir in
@@ -255,39 +276,26 @@ let save ~force ~data_dir encoding config =
     let*! () = Lwt_utils_unix.create_dir data_dir in
     Lwt_utils_unix.Json.write_file config_file json
 
-let save_proxy ~force ~data_dir config =
-  let encoding = encoding encoding_proxy in
-  save ~force ~data_dir encoding config
-
-let save_sequencer ~force ~data_dir config =
-  let encoding = encoding encoding_sequencer in
-  save ~force ~data_dir encoding config
-
-let save_observer ~force ~data_dir config =
-  let encoding = encoding encoding_observer in
-  save ~force ~data_dir encoding config
-
-let load ~data_dir encoding =
+let load ~data_dir =
   let open Lwt_result_syntax in
   let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
   let config = Data_encoding.Json.destruct encoding json in
   config
 
-let load_proxy ~data_dir =
-  let encoding = encoding encoding_proxy in
-  load ~data_dir encoding
+let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
-let load_sequencer ~data_dir =
-  let encoding = encoding encoding_sequencer in
-  load ~data_dir encoding
+let proxy_config_exn {proxy; _} =
+  Option.to_result ~none:(error_missing_config ~name:"proxy") proxy
 
-let load_observer ~data_dir =
-  let encoding = encoding encoding_observer in
-  load ~data_dir encoding
+let sequencer_config_exn {sequencer; _} =
+  Option.to_result ~none:(error_missing_config ~name:"sequencer") sequencer
+
+let observer_config_exn {observer; _} =
+  Option.to_result ~none:(error_missing_config ~name:"observer") observer
 
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ~mode () =
+      ?log_filter ?proxy ?sequencer ?observer () =
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -295,73 +303,14 @@ module Cli = struct
       cors_origins = Option.value ~default:default_cors_origins cors_origins;
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter = Option.value ~default:default_filter_config log_filter;
-      mode;
+      proxy;
+      sequencer;
+      observer;
       max_active_connections = default_max_active_connections;
     }
 
-  let create_proxy ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ~rollup_node_endpoint =
-    create
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~mode:{rollup_node_endpoint}
-
-  let create_sequencer ?private_rpc_port ~devmode ?rpc_addr ?rpc_port
-      ?cors_origins ?cors_headers ?log_filter ?rollup_node_endpoint ?preimages
-      ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks ~sequencer
-      =
-    let mode =
-      {
-        rollup_node_endpoint =
-          Option.value
-            ~default:default_rollup_node_endpoint
-            rollup_node_endpoint;
-        preimages = Option.value ~default:default_preimages preimages;
-        preimages_endpoint;
-        time_between_blocks =
-          Option.value ~default:default_time_between_blocks time_between_blocks;
-        max_number_of_chunks =
-          Option.value
-            ~default:default_max_number_of_chunks
-            max_number_of_chunks;
-        private_rpc_port;
-        sequencer;
-      }
-    in
-    create
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~mode
-
-  let create_observer ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ?evm_node_endpoint ?preimages ?preimages_endpoint =
-    let mode =
-      {
-        evm_node_endpoint =
-          Option.value ~default:default_rollup_node_endpoint evm_node_endpoint;
-        preimages = Option.value ~default:default_preimages preimages;
-        preimages_endpoint;
-      }
-    in
-    create
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~mode
-
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ~mode configuration =
+      ?cors_headers ?log_filter ?proxy ?sequencer ?observer configuration =
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -371,90 +320,14 @@ module Cli = struct
       cors_headers =
         Option.value ~default:configuration.cors_headers cors_headers;
       log_filter = Option.value ~default:default_filter_config log_filter;
-      mode;
+      proxy = Option.either configuration.proxy proxy;
+      sequencer = Option.either configuration.sequencer sequencer;
+      observer = Option.either configuration.observer observer;
       max_active_connections = configuration.max_active_connections;
     }
 
-  let patch_proxy_configuration_from_args ~devmode ?rpc_addr ?rpc_port
-      ?cors_origins ?cors_headers ?log_filter ?rollup_node_endpoint
-      configuration =
-    let mode =
-      match rollup_node_endpoint with
-      | Some rollup_node_endpoint -> {rollup_node_endpoint}
-      | None -> configuration.mode
-    in
-    patch_configuration_from_args
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~mode
-      configuration
-
-  let patch_sequencer_configuration_from_args ?private_rpc_port ~devmode
-      ?rpc_addr ?rpc_port ?cors_origins ?cors_headers ?log_filter
-      ?rollup_node_endpoint ?preimages ?preimages_endpoint ?time_between_blocks
-      ?max_number_of_chunks configuration ~sequencer =
-    let mode =
-      {
-        rollup_node_endpoint =
-          Option.value
-            ~default:configuration.mode.rollup_node_endpoint
-            rollup_node_endpoint;
-        preimages = Option.value ~default:configuration.mode.preimages preimages;
-        preimages_endpoint =
-          Option.either preimages_endpoint configuration.mode.preimages_endpoint;
-        time_between_blocks =
-          Option.value
-            ~default:configuration.mode.time_between_blocks
-            time_between_blocks;
-        max_number_of_chunks =
-          Option.value
-            ~default:default_max_number_of_chunks
-            max_number_of_chunks;
-        private_rpc_port;
-        sequencer;
-      }
-    in
-    patch_configuration_from_args
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~mode
-      configuration
-
-  let patch_observer_configuration_from_args ~devmode ?rpc_addr ?rpc_port
-      ?cors_origins ?cors_headers ?log_filter ?evm_node_endpoint ?preimages
-      ?preimages_endpoint configuration =
-    let mode =
-      {
-        evm_node_endpoint =
-          Option.value
-            ~default:configuration.mode.evm_node_endpoint
-            evm_node_endpoint;
-        preimages = Option.value ~default:configuration.mode.preimages preimages;
-        preimages_endpoint =
-          Option.either preimages_endpoint configuration.mode.preimages_endpoint;
-      }
-    in
-    patch_configuration_from_args
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~mode
-      configuration
-
-  let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?private_rpc_port ?cors_origins ?cors_headers ?log_filter ~load
-      ~patch_configuration_from_args ~create () =
+  let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
+      ?cors_headers ?log_filter ?proxy ?sequencer ?observer () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -477,96 +350,31 @@ module Cli = struct
       let* configuration = load ~data_dir in
       let configuration =
         patch_configuration_from_args
-          ?private_rpc_port
           ~devmode
           ?rpc_addr
           ?rpc_port
           ?cors_origins
           ?cors_headers
           ?log_filter
+          ?proxy
+          ?sequencer
+          ?observer
           configuration
       in
       return configuration
     else
       let config =
         create
-          ?private_rpc_port
           ~devmode
           ?rpc_addr
           ?rpc_port
           ?cors_origins
           ?cors_headers
           ?log_filter
+          ?proxy
+          ?sequencer
+          ?observer
           ()
       in
       return config
-
-  let create_or_read_proxy_config ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?cors_origins ?cors_headers ?log_filter ~rollup_node_endpoint () =
-    create_or_read_config
-      ~data_dir
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~load:load_proxy
-      ~patch_configuration_from_args:(fun ?private_rpc_port:_ ->
-        patch_proxy_configuration_from_args ~rollup_node_endpoint)
-      ~create:(fun ?private_rpc_port:_ -> create_proxy ~rollup_node_endpoint)
-      ()
-
-  let create_or_read_sequencer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?private_rpc_port ?cors_origins ?cors_headers ?log_filter
-      ?rollup_node_endpoint ?preimages ?preimages_endpoint ?time_between_blocks
-      ?max_number_of_chunks ~sequencer () =
-    create_or_read_config
-      ~data_dir
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?private_rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~load:load_sequencer
-      ~patch_configuration_from_args:
-        (patch_sequencer_configuration_from_args
-           ?rollup_node_endpoint
-           ?preimages
-           ?preimages_endpoint
-           ?time_between_blocks
-           ?max_number_of_chunks
-           ~sequencer)
-      ~create:
-        (create_sequencer
-           ?rollup_node_endpoint
-           ?preimages
-           ?preimages_endpoint
-           ?time_between_blocks
-           ?max_number_of_chunks
-           ~sequencer)
-      ()
-
-  let create_or_read_observer_config ~data_dir ~devmode ?rpc_addr ?rpc_port
-      ?cors_origins ?cors_headers ?log_filter ?evm_node_endpoint ?preimages
-      ?preimages_endpoint () =
-    create_or_read_config
-      ~data_dir
-      ~devmode
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ?log_filter
-      ~load:load_observer
-      ~patch_configuration_from_args:(fun ?private_rpc_port:_ ->
-        patch_observer_configuration_from_args
-          ?evm_node_endpoint
-          ?preimages
-          ?preimages_endpoint)
-      ~create:(fun ?private_rpc_port:_ ->
-        create_observer ?evm_node_endpoint ?preimages ?preimages_endpoint)
-      ()
 end
