@@ -413,7 +413,7 @@ type modules =
 (** Preprocessor dependencies.
 
     - [File]: becomes a [(preprocessor_deps (file ...))] stanza in the [dune] file. *)
-type preprocessor_dep = File of string
+type preprocessor_dep = File of string | Glob_files of string
 
 (** Target descriptions.
 
