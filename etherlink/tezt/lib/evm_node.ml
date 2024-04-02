@@ -367,12 +367,18 @@ let wait_for_diverged evm_node =
   let found_hash = json |-> "found_hash" |> as_string in
   Some (level, expected_hash, found_hash)
 
-let wait_for_missing_block evm_node =
-  wait_for evm_node "evm_events_follower_missing_block.v0" @@ fun json ->
+let wait_for_missing_blueprint evm_node =
+  wait_for evm_node "evm_events_follower_missing_blueprint.v0" @@ fun json ->
   let open JSON in
   let level = json |-> "level" |> as_int in
   let expected_hash = json |-> "expected_hash" |> as_string in
   Some (level, expected_hash)
+
+let wait_for_rollup_node_ahead evm_node =
+  wait_for evm_node "evm_events_follower_rollup_node_ahead.v0" @@ fun json ->
+  let open JSON in
+  let level = json |> as_int in
+  Some level
 
 let create ?name ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
     ?rpc_port endpoint =

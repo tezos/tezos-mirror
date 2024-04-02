@@ -320,20 +320,15 @@ let test_remove_sequencer =
       ~burn_cap:Tez.one
       client
   in
-  let* missing_block_nb, _hash = Evm_node.wait_for_missing_block sequencer
-  and* () =
-    Lwt.pick
-      [
-        (let* _ = Evm_node.wait_for_missing_block observer in
-         unit);
-        Evm_node.wait_termination observer;
-      ]
+  let* exit_code = Evm_node.wait_for_shutdown_event sequencer
+  and* missing_block_nb = Evm_node.wait_for_rollup_node_ahead observer
   and* () =
     (* Produce L1 blocks to show that only the proxy is progressing *)
     repeat 5 (fun () ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
+  Check.((exit_code = 100) int) ~error_msg:"Expected exit code %R, got %L" ;
   (* Sequencer is at genesis, proxy is at [advance]. *)
   Check.((missing_block_nb = 1) int)
     ~error_msg:"Sequencer should be missing block %L" ;
@@ -2134,41 +2129,42 @@ let test_sequencer_upgrade =
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
-  let* () =
-    Evm_node.init_from_rollup_node_data_dir
-      ~devmode:true
-      new_sequencer
-      sc_rollup_node
-  in
-  let* () = Evm_node.run new_sequencer in
-  let* _divergence = Evm_node.wait_for_missing_block sequencer
-  and* _exit_code = Evm_node.wait_for_shutdown_event sequencer
-  and* _divergence_observer = Evm_node.wait_for_missing_block observer
-  and* _exit_code_observer = Evm_node.wait_for_shutdown_event observer
+  let* _ = Evm_node.wait_for_shutdown_event sequencer
   and* () =
+    let* () =
+      Evm_node.init_from_rollup_node_data_dir
+        ~devmode:true
+        new_sequencer
+        sc_rollup_node
+    in
+    let* () = Evm_node.run new_sequencer in
     let* () =
       repeat (Int32.to_int nb_block) (fun () ->
           let* _ = Rpc.produce_block new_sequencer in
           unit)
     in
-    repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
-  in
-  let previous_proxy_head = proxy_head in
-  let* () =
-    check_head_consistency
-      ~left:proxy
-      ~right:new_sequencer
+    let* () =
+      repeat 5 (fun () ->
+          let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+          unit)
+    in
+    let previous_proxy_head = proxy_head in
+    let* () =
+      check_head_consistency
+        ~left:proxy
+        ~right:new_sequencer
+        ~error_msg:
+          "The head should be the same after blocks produced by the new \
+           sequencer"
+        ()
+    in
+    let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+    Check.(
+      (Int32.add previous_proxy_head.number nb_block = proxy_head.number) int32)
       ~error_msg:
-        "The head should be the same after blocks produced by the new sequencer"
-      ()
+        "The block number should have incremented (previous: %L, current: %R)" ;
+    unit
   in
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.(
-    (Int32.add previous_proxy_head.number nb_block = proxy_head.number) int32)
-    ~error_msg:
-      "The block number should have incremented (previous: %L, current: %R)" ;
   unit
 
 (** this test the situation where a sequencer diverged from it

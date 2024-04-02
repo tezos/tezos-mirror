@@ -196,6 +196,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~preimages:configuration.mode.preimages
       ~preimages_endpoint:configuration.mode.preimages_endpoint
       ~smart_rollup_address
+      ~fail_on_missing_blueprint:true
       ()
   in
   let*! head = Evm_context.head_info () in

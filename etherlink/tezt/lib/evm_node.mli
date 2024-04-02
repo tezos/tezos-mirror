@@ -173,10 +173,16 @@ val wait_for_evm_event :
     diverging blueprint level expected hash, and found hash. *)
 val wait_for_diverged : t -> (int * string * string) Lwt.t
 
-(** [wait_for_missing_block evm_node] waits for the event
-    [evm_events_follower_missing_block.v0] using {!wait_for} and
-    return the missing blueprint level and block hash. *)
-val wait_for_missing_block : t -> (int * string) Lwt.t
+(** [wait_for_missing_blueprint evm_node] waits for the
+    event [evm_events_follower_missing_blueprint.v0] using
+    {!wait_for} and return the missing blueprint level and
+    block hash. *)
+val wait_for_missing_blueprint : t -> (int * string) Lwt.t
+
+(** [wait_for_rollup_node_ahead evm_node] waits for the event
+    [evm_events_follower_rollup_node_ahead.v0] using {!wait_for} and return the
+    missing blueprint level. *)
+val wait_for_rollup_node_ahead : t -> int Lwt.t
 
 (** Waits until a node terminates and return its status. If the node is
     not running, make the test fail. *)
