@@ -390,7 +390,11 @@ module Handler = struct
           in
           match result with
           | Error `Not_found -> return_none
-          | Error (`Decoding_failed _) -> return_none (* TODO: add a warning *)
+          | Error (`Decoding_failed _) ->
+              let*! () =
+                Event.(emit decoding_data_failed Types.Store.Commitment)
+              in
+              return_none
           | Ok commitment -> return_some commitment)
         (Seq.ints 0 |> Stdlib.Seq.take number_of_slots |> List.of_seq)
     in
