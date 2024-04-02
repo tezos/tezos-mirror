@@ -126,10 +126,10 @@ val get_tezos_node_cctxt : t -> Tezos_rpc.Context.generic
 (** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
 val get_neighbors_cctxts : t -> Dal_node_client.cctxt list
 
-(** [get_oldest_stored_shard_level ctxt ~current_level] returns the oldest
+(** [next_shards_level_to_gc ctxt ~current_level] returns the oldest
     level that should have shards stored; during [current_level], shards for
     commitments published at this level will be removed *)
-val get_oldest_stored_shard_level : t -> current_level:int32 -> int32
+val next_shards_level_to_gc : t -> current_level:int32 -> int32
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL

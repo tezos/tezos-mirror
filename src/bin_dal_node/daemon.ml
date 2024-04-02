@@ -405,9 +405,7 @@ module Handler = struct
                head_level
                proto_parameters.attestation_lag) ;
           let oldest_level =
-            Node_context.get_oldest_stored_shard_level
-              ctxt
-              ~current_level:head_level
+            Node_context.next_shards_level_to_gc ctxt ~current_level:head_level
           in
           let number_of_slots = proto_parameters.number_of_slots in
           let store = Node_context.get_store ctxt in
