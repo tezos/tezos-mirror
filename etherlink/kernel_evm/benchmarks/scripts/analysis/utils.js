@@ -22,7 +22,8 @@ module.exports = {
     print_summary_errors,
     print_model,
     predict_linear_model,
-    print_csv
+    print_csv,
+    print_page
 }
 
 function is_transfer(record) {
@@ -90,8 +91,8 @@ function print_summary_errors(data, compute_error, prefix = "", doc = null) {
         if (error > 0) nb_error += 1
         if (!isNaN(error)) max_error_current = Math.max(max_error_current, error)
     }
-    pdfUtils.output_msg(`${prefix} sample size: ${data.length}` , doc)
-    pdfUtils.output_msg(`${prefix} nb of errors: ${nb_error} ; maximum error: ${max_error_current} ticks`, doc)
+    pdfUtils.output_msg(`${prefix}sample size: ${data.length}` , doc)
+    pdfUtils.output_msg(`${prefix}nb of errors: ${nb_error} ; maximum error: ${max_error_current} ticks`, doc)
     return nb_error
 }
 
@@ -110,4 +111,33 @@ function print_csv(dir, name, data_array, columns) {
         header: true,
         columns
     }))
+}
+
+//
+function print_page(data, { fx, fy, model, labels, context }) {
+
+    // dedicated csv file
+    if (!!context.csv_filepath)
+        print_csv(context.dir, context.csv_filepath, data, context.csv_columns);
+
+    // infos model and lr
+    let lr = make_lr(data, fx, fy);
+    pdfUtils.output_msg(`${labels.prefix ?? ""}Current model: ${labels.y ?? "ticks"} = ${print_model(model, labels.x)}`, context.doc)
+    pdfUtils.output_msg(`${labels.prefix ?? ""}Computed LR: ${labels.y ?? "ticks"} = ${print_lr(lr, labels.x)} `, context.doc)
+
+    // graph and summary
+    let dataset = data.map((datum) => { return { x: fx(datum), y: fy(datum) } });
+    let error = print_summary_errors(
+        data,
+        datum => { return fy(datum) - predict_linear_model(model, fx(datum)) },
+        labels.prefix ?? '',
+        context.doc);
+    pdfUtils.draw(context.doc,
+        labels,
+        dataset,
+        model,
+        lr
+    );
+
+    return error;
 }
