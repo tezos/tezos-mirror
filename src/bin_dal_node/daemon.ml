@@ -396,7 +396,7 @@ module Handler = struct
               in
               return_none
           | Ok commitment -> return_some commitment)
-        (Seq.ints 0 |> Stdlib.Seq.take number_of_slots |> List.of_seq)
+        (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7124
        In case of republication of the same commitment, the shards are removed
