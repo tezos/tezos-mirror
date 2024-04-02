@@ -489,7 +489,6 @@ module State = struct
             delayed_transactions )
     | Apply_success _ (* Produced a block, but not of the expected height *)
     | Apply_failure (* Did not produce a block *) ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6826 *)
         let*! () = Blueprint_events.invalid_blueprint_produced next in
         tzfail (Cannot_apply_blueprint {local_state_level = Z.pred next})
 
