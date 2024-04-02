@@ -62,6 +62,31 @@ let check_node_initialization (history_mode : Node.history_mode) :
   in
   if metrics = "" then Test.fail "Unable to read metrics" else return ()
 
+(* This test checks that tests with tag [ci_disabled] do not run in the CI.
+   It happened once when [Test.run] was accidentally called twice.
+   To make sure that the test is selected by Manifezt often enough,
+   it is tagged with some [~uses] that are often selected. *)
+let () =
+  Test.register
+    ~__FILE__
+    ~title:"meta: failing test with tag ci_disabled"
+    ~tags:[Tag.ci_disabled]
+    ~uses:
+      [
+        Constant.octez_node;
+        Constant.octez_client;
+        Constant.octez_dal_node;
+        Constant.octez_dac_node;
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+      ]
+  @@ fun () ->
+  Test.fail
+    "This test is not supposed to be run because it has tag ci_disabled. If it \
+     does run (in the CI), it means that the tag ci_disabled is not working \
+     properly anymore."
+
 let register ~protocols =
   check_node_initialization Archive protocols ;
   check_node_initialization (Full None) protocols ;
