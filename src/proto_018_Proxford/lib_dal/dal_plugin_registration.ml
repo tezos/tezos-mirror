@@ -58,6 +58,9 @@ module Plugin = struct
         cryptobox_parameters;
         sc_rollup_challenge_window_in_blocks =
           parametric.sc_rollup.challenge_window_in_blocks;
+        commitment_period_in_blocks =
+          parametric.sc_rollup.commitment_period_in_blocks;
+        dal_attested_slots_validity_lag = Int.max_int;
       }
 
   let block_info ?chain ?block ~metadata ctxt =

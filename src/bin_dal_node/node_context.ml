@@ -114,13 +114,17 @@ let next_shards_level_to_gc ctxt ~current_level =
   | Rolling {blocks = `Auto} -> (
       match ctxt.status with
       | Starting -> Int32.zero
-      | Ready ready_ctxt ->
+      | Ready {proto_parameters; _} ->
           let n =
-            (* Let's give it 10 blocks of slack just in case
-               (finalisation period, of by one, attestation_lag,
-               ...). *)
-            ready_ctxt.proto_parameters.sc_rollup_challenge_window_in_blocks
-            + 10
+            let needed_period =
+              proto_parameters.sc_rollup_challenge_window_in_blocks
+              + proto_parameters.commitment_period_in_blocks
+              + proto_parameters.dal_attested_slots_validity_lag
+            in
+            (* We double the period, to give some slack just in case
+               (finalisation period, off by one, attestation_lag, ...).
+               With current mainnet parameters, this total period is 3 months. *)
+            needed_period * 2
           in
           Int32.(max zero (sub current_level (of_int n))))
 

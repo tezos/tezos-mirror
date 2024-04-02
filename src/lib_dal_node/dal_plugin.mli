@@ -50,6 +50,8 @@ type proto_parameters = {
   attestation_threshold : int;
   cryptobox_parameters : Tezos_crypto_dal.Cryptobox.Verifier.parameters;
   sc_rollup_challenge_window_in_blocks : int;
+  commitment_period_in_blocks : int;
+  dal_attested_slots_validity_lag : int;
 }
 
 module type T = sig
