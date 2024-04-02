@@ -65,4 +65,4 @@ let encoding : t Data_encoding.t =
   [@@coverage off]
 
 let default =
-  {activated = false; use_mock_srs_for_testing = false; bootstrap_peers = []}
+  {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
