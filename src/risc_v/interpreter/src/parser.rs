@@ -11,6 +11,7 @@ use crate::machine_state::{
 };
 use core::ops::Range;
 use instruction::*;
+use twiddle::Twiddle;
 
 /// Given an instruction encoded as a little-endian `u32`, extract `n` bits
 /// starting at `pos`.
@@ -778,9 +779,76 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
     }
 }
 
-fn parse_compressed_instruction(bytes: u16) -> Instr {
-    // TODO parse a compressed instruction
-    Instr::UnknownCompressed { instr: bytes }
+#[inline(always)]
+const fn c_bits(bytes: u16, pos: usize, n: usize) -> u16 {
+    (bytes >> pos) & (!0 >> (16 - n))
+}
+
+#[inline(always)]
+fn c_rd(instr: u16) -> XRegister {
+    parse_xregister(c_bits(instr, 7, 5) as u32)
+}
+
+#[inline(always)]
+fn c_opcode(instr: u16) -> u16 {
+    c_bits(instr, 0, 2)
+}
+
+#[inline(always)]
+fn c_funct3(instr: u16) -> u16 {
+    c_bits(instr, 13, 3)
+}
+
+fn sign_extend_u16(value: u16, size: usize) -> i64 {
+    assert!(size < 16);
+    let shift = 16 - size;
+    (((value as i16) << shift) >> shift) as i64
+}
+
+#[allow(clippy::reversed_empty_ranges)]
+fn ci_imm(instr: u16) -> i64 {
+    // instr[12] | instr[6:2]
+    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    // Sign-extend the 6-bit value to 64 bits
+    sign_extend_u16(res, 6)
+}
+
+#[allow(clippy::reversed_empty_ranges)]
+fn cj_imm(instr: u16) -> i64 {
+    // instr[12] | instr[8] | instr[10:9] | instr[6] | instr[7] | instr[2] | instr[11] | instr[5:3] | 0
+    let res = instr.bits(12..=12) << 11
+        | instr.bits(8..=8) << 10
+        | instr.bits(10..=9) << 8
+        | instr.bits(6..=6) << 7
+        | instr.bits(7..=7) << 6
+        | instr.bits(2..=2) << 5
+        | instr.bits(11..=11) << 4
+        | instr.bits(5..=3) << 1;
+    sign_extend_u16(res, 12)
+}
+
+const OP_C1: u16 = 0b01;
+
+const C_F3_J: u16 = 0b101;
+const C_F3_ADDI: u16 = 0b000;
+
+fn parse_compressed_instruction(instr: u16) -> Instr {
+    use Instr::*;
+    match c_opcode(instr) {
+        OP_C1 => match c_funct3(instr) {
+            C_F3_J => CJ(CJTypeArgs { imm: cj_imm(instr) }),
+            C_F3_ADDI => match (ci_imm(instr), c_rd(instr)) {
+                // "C.ADDI is only valid when rd != x0 and nzimm != 0.
+                // The code points with rd == x0 encode the C.NOP instruction;
+                // the remaining code points with nzimm == 0 encode HINTs."
+                (_, XRegister::x0) => CNop,
+                (0, _) => UnknownCompressed { instr },
+                (imm, rd_rs1) => CAddi(CITypeArgs { rd_rs1, imm }),
+            },
+            _ => UnknownCompressed { instr },
+        },
+        _ => UnknownCompressed { instr },
+    }
 }
 
 /// Attempt to parse `bytes` into an instruction. If `bytes` encodes a 2-byte

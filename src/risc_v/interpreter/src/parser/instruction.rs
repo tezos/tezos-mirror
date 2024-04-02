@@ -167,6 +167,19 @@ pub struct AmoArgs {
     pub rl: bool,
 }
 
+// Compressed instruction types
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CJTypeArgs {
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CITypeArgs {
+    pub rd_rs1: XRegister,
+    pub imm: i64,
+}
+
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
@@ -332,6 +345,11 @@ pub enum Instr {
     // Supervisor Memory-Management
     SFenceVma { asid: XRegister, vaddr: XRegister },
 
+    // RV64C compressed instructions
+    CAddi(CITypeArgs),
+    CJ(CJTypeArgs),
+    CNop,
+
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
 }
@@ -477,7 +495,7 @@ impl Instr {
             | Unknown { instr: _ } => 4,
 
             // 2 bytes instructions (compressed instructions)
-            UnknownCompressed { instr: _ } => 2,
+            CAddi(_) | CJ(_) | CNop | UnknownCompressed { instr: _ } => 2,
         }
     }
 }
@@ -798,6 +816,11 @@ impl fmt::Display for Instr {
             Wfi => write!(f, "wfi"),
             // Supervisor Memory-Management
             SFenceVma { asid, vaddr } => write!(f, "sfence.vma {vaddr},{asid}"),
+
+            // RV32C compressed instructions
+            CJ(args) => write!(f, "c.j {}", args.imm),
+            CAddi(args) => write!(f, "c.addi {},{}", args.rd_rs1, args.imm),
+            CNop => write!(f, "c.nop"),
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),

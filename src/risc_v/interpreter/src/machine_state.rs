@@ -184,6 +184,13 @@ macro_rules! run_amo_instr {
     }};
 }
 
+macro_rules! run_ci_type_instr {
+    ($state: ident, $instr:ident, $args:ident, $run_fn: ident) => {{
+        $state.hart.xregisters.$run_fn($args.imm, $args.rd_rs1);
+        Ok(ProgramCounterUpdate::Add($instr.width()))
+    }};
+}
+
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
     /// Bind the machine state to the given allocated space.
     pub fn bind(space: backend::AllocatedOf<MachineStateLayout<ML>, M>) -> Self {
@@ -383,6 +390,14 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             // Supervisor Memory-Management
             Instr::SFenceVma { asid, vaddr } => {
                 self.sfence_vma(asid, vaddr)?;
+                Ok(ProgramCounterUpdate::Add(instr.width()))
+            }
+
+            // RV32C compressed instructions
+            Instr::CAddi(args) => run_ci_type_instr!(self, instr, args, run_caddi),
+            Instr::CJ(args) => Ok(Set(self.hart.run_cj(args.imm))),
+            Instr::CNop => {
+                self.run_cnop();
                 Ok(ProgramCounterUpdate::Add(instr.width()))
             }
 

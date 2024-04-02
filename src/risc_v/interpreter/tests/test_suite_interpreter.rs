@@ -85,7 +85,7 @@ test_case!(test_suite_rv64mi_p_ld_misaligned, "rv64mi-p-ld-misaligned");
 test_case!(test_suite_rv64mi_p_lh_misaligned, "rv64mi-p-lh-misaligned");
 test_case!(test_suite_rv64mi_p_lw_misaligned, "rv64mi-p-lw-misaligned");
 test_case!(test_suite_rv64mi_p_ma_addr, "rv64mi-p-ma_addr");
-test_case!(#[ignore], test_suite_rv64mi_p_ma_fetch, "rv64mi-p-ma_fetch");
+test_case!(test_suite_rv64mi_p_ma_fetch, "rv64mi-p-ma_fetch");
 test_case!(test_suite_rv64mi_p_mcsr, "rv64mi-p-mcsr");
 test_case!(test_suite_rv64mi_p_sbreak, "rv64mi-p-sbreak");
 test_case!(
@@ -104,7 +104,11 @@ test_case!(#[ignore], test_suite_rv64mzicbo_p_zero, "rv64mzicbo-p-zero");
 test_case!(test_suite_rv64si_p_csr, "rv64si-p-csr");
 test_case!(#[ignore], test_suite_rv64si_p_dirty, "rv64si-p-dirty");
 test_case!(#[ignore], test_suite_rv64si_p_icache_alias, "rv64si-p-icache-alias");
-test_case!(#[ignore], test_suite_rv64si_p_ma_fetch, "rv64si-p-ma_fetch", Mode::Supervisor);
+test_case!(
+    test_suite_rv64si_p_ma_fetch,
+    "rv64si-p-ma_fetch",
+    Mode::Supervisor
+);
 test_case!(test_suite_rv64si_p_sbreak, "rv64si-p-sbreak");
 test_case!(
     test_suite_rv64si_p_scall,
