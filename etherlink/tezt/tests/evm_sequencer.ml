@@ -2249,7 +2249,7 @@ let test_sequencer_diverge =
 let test_sequencer_can_catch_up_on_event =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "event"; Tag.slow]
+    ~tags:["evm"; "sequencer"; "event"]
     ~title:"Evm node can catchup event from the rollup node"
     ~uses
   @@ fun protocol ->
@@ -2375,7 +2375,7 @@ let test_sequencer_dont_read_level_twice =
 let test_stage_one_reboot =
   Protocol.register_test
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "reboot"]
+    ~tags:["evm"; "sequencer"; "reboot"; Tag.slow]
     ~title:
       "Checks the stage one reboots when reading too much chunks in a single \
        L1 level"
