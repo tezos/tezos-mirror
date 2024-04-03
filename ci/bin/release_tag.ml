@@ -40,12 +40,12 @@ type release_tag_pipeline_type =
   | Beta_release_tag
   | Non_release_tag
 
-(** Create a release tag pipeline of type {!release_tag_pipeline_type}.
+(** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are
     built of the [Test] type and are published to the GitLab registry
     instead of Docker hub. *)
-let jobs ?(test = false) release_tag_pipeline_type =
+let octez_jobs ?(test = false) release_tag_pipeline_type =
   let job_docker_amd64 =
     job_docker_build ~__POS__ ~arch:Amd64 (if test then Test else Release)
   in
@@ -127,3 +127,17 @@ let jobs ?(test = false) release_tag_pipeline_type =
   match (test, release_tag_pipeline_type) with
   | false, Release_tag -> [job_opam_release]
   | _ -> []
+
+(** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
+let etherlink_jobs () =
+  let job_gitlab_release : Tezos_ci.tezos_job =
+    job
+      ~__POS__
+      ~image:Images.ci_release
+      ~stage:Stages.publish_package_gitlab
+      ~interruptible:false
+      ~dependencies:(Dependent [])
+      ~name:"gitlab:publish"
+      ["./scripts/ci/create_gitlab_etherlink_release.sh"]
+  in
+  [job_gitlab_release]
