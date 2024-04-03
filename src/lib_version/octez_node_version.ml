@@ -71,6 +71,18 @@ let additional_info_encoding =
         (obj1 (req "rc_dev" int31))
         (function RC_dev n -> Some n | _ -> None)
         (fun n -> RC_dev n);
+      case
+        (Tag 4)
+        ~title:"Beta"
+        (obj1 (req "beta" int31))
+        (function Beta n -> Some n | _ -> None)
+        (fun n -> Beta n);
+      case
+        (Tag 5)
+        ~title:"Beta_dev"
+        (obj1 (req "beta_dev" int31))
+        (function Beta_dev n -> Some n | _ -> None)
+        (fun n -> Beta_dev n);
     ]
 
 (* The encoding is defined here to keep [Version] "Data_encoding free"*)
