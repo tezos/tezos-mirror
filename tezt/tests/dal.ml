@@ -5261,11 +5261,12 @@ module Garbage_collection = struct
     unit
 
   (* For this test, we create a network of three DAL nodes — 1 slot producer,
-     1 attester, 1 observer (so we can check for each profile).
-     The slot producer will send shards from one slot ; once a node receives
-     it, a request is sent for a received shard, to make sure for reception.
-     Then blocks are baked according to the history_mode of each node. When
-     enough blocks are baked, we check that the nodes have deleted the shard.
+     1 attester, 1 observer (so we can check for each profile). History mode is
+     [Auto].
+     The slot producer will send shards from one slot; once a node receives it,
+     a request is sent for a received shard, to make sure for reception. After
+     25 blocks baked, we check via RPC that attester deleted its shards and the
+     others did not.
   *)
   let test_gc_with_all_profiles _protocol dal_parameters _cryptobox node client
       dal_bootstrap =
@@ -5275,7 +5276,6 @@ module Garbage_collection = struct
           {number_of_slots; cryptobox = {Dal.Cryptobox.slot_size; _}; _} =
       dal_parameters
     in
-    let history_mode = Dal_node.Custom 15 in
 
     (* Note: we don't need to configure and start the DAL bootstrap
        node because it is the node started by the
@@ -5297,11 +5297,7 @@ module Garbage_collection = struct
     let attester = Dal_node.create ~name:"attester" ~node () in
     Dal_node.log_events attester ;
     let* () =
-      Dal_node.init_config
-        ~attester_profiles:[attester_pkh]
-        ~peers
-        attester
-        ~history_mode
+      Dal_node.init_config ~attester_profiles:[attester_pkh] ~peers attester
     in
     let* () = Dal_node.run ~wait_ready:true attester in
     Log.info "attester DAL node ready" ;
@@ -5309,11 +5305,7 @@ module Garbage_collection = struct
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
     Dal_node.log_events slot_producer ;
     let* () =
-      Dal_node.init_config
-        ~producer_profiles:[slot_index]
-        ~peers
-        slot_producer
-        ~history_mode
+      Dal_node.init_config ~producer_profiles:[slot_index] ~peers slot_producer
     in
     (* Promise which will be resolved once the slot producer will be
        connected to all the other DAL nodes (attester + observer
@@ -5327,11 +5319,7 @@ module Garbage_collection = struct
     let observer = Dal_node.create ~name:"observer" ~node () in
     Dal_node.log_events observer ;
     let* () =
-      Dal_node.init_config
-        ~observer_profiles:[slot_index]
-        ~peers
-        observer
-        ~history_mode
+      Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
     in
     let* () = Dal_node.run ~wait_ready:true observer in
 
@@ -5443,36 +5431,25 @@ module Garbage_collection = struct
       @@ Helpers.make_slot ~slot_size "content"
     in
 
-    let wait_remove_shards_observer_promise =
-      Log.info "Waiting for first shard to be removed by the observer" ;
-      wait_remove_shards commitment observer
-    in
-    let wait_remove_shards_producer_promise =
-      Log.info "Waiting for first shard to be removed by the slot producer" ;
-      wait_remove_shards commitment slot_producer
-    in
     let wait_remove_shards_attester_promise =
       Log.info "Waiting for first shard to be removed by the attester" ;
       wait_remove_shards commitment attester
     in
 
     Log.info "All nodes received a shard, waiting for blocks to be baked" ;
-    let* () = bake_for ~count:30 client in
+    let* () = bake_for ~count:25 client in
     Log.info "Blocks baked !" ;
 
-    Log.info "Wait for first shard observer" ;
-    let* () = wait_remove_shards_observer_promise in
-    Log.info "Wait for first shard producer" ;
-    let* () = wait_remove_shards_producer_promise in
     Log.info "Wait for first shard attester" ;
     let* () = wait_remove_shards_attester_promise in
 
-    Log.info "RPC deleted shards observer" ;
-    let* () = get_shard_rpc_failure_expected commitment observer in
-    Log.info "RPC deleted shards producer" ;
-    let* () = get_shard_rpc_failure_expected commitment slot_producer in
-    Log.info "RPC deleted shards attester" ;
+    Log.info "RPC deleted shard attester" ;
     let* () = get_shard_rpc_failure_expected commitment attester in
+
+    Log.info "RPC shard still stored observer" ;
+    let* _shard_observer = get_shard_rpc commitment 0 observer in
+    Log.info "RPC shard still stored producer" ;
+    let* _shard_producer = get_shard_rpc commitment 0 slot_producer in
 
     Log.info "End of test" ;
     unit
