@@ -60,10 +60,20 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~job_docker_arm64
   in
   let job_static_arm64_release =
-    job_build_static_binaries ~__POS__ ~arch:Arm64 ~release:true ()
+    job_build_static_binaries
+      ~__POS__
+      ~product:Octez
+      ~arch:Arm64
+      ~release:true
+      ()
   in
   let job_static_x86_64_release =
-    job_build_static_binaries ~__POS__ ~arch:Amd64 ~release:true ()
+    job_build_static_binaries
+      ~__POS__
+      ~product:Octez
+      ~arch:Amd64
+      ~release:true
+      ()
   in
   let job_gitlab_release ~dependencies : Tezos_ci.tezos_job =
     job
@@ -88,8 +98,8 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~name:"gitlab:publish"
       ["${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"]
   in
-  let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
-  let job_build_rpm_amd64 = job_build_rpm_amd64 () in
+  let job_build_dpkg_amd64 = job_build_dpkg_amd64 Octez in
+  let job_build_rpm_amd64 = job_build_rpm_amd64 Octez in
   let job_gitlab_release_or_publish =
     let dependencies =
       Dependent
@@ -130,14 +140,47 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
 
 (** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
 let etherlink_jobs () =
+  let job_static_arm64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~product:Etherlink
+      ~arch:Arm64
+      ~release:true
+      ()
+  in
+  let job_static_x86_64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~product:Etherlink
+      ~arch:Amd64
+      ~release:true
+      ()
+  in
+  let job_build_dpkg_amd64 = job_build_dpkg_amd64 Etherlink in
+  let job_build_rpm_amd64 = job_build_rpm_amd64 Etherlink in
+  let dependencies =
+    Dependent
+      [
+        Artifacts job_static_x86_64_release;
+        Artifacts job_static_arm64_release;
+        Artifacts job_build_dpkg_amd64;
+        Artifacts job_build_rpm_amd64;
+      ]
+  in
   let job_gitlab_release : Tezos_ci.tezos_job =
     job
       ~__POS__
       ~image:Images.ci_release
       ~stage:Stages.publish_package_gitlab
       ~interruptible:false
-      ~dependencies:(Dependent [])
+      ~dependencies
       ~name:"gitlab:publish"
       ["./scripts/ci/create_gitlab_etherlink_release.sh"]
   in
-  [job_gitlab_release]
+  [
+    job_static_x86_64_release;
+    job_static_arm64_release;
+    job_build_dpkg_amd64;
+    job_build_rpm_amd64;
+    job_gitlab_release;
+  ]

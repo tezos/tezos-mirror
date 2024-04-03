@@ -65,6 +65,7 @@ let jobs =
   let job_static_arm64 =
     job_build_static_binaries
       ~__POS__
+      ~product:Octez
       ~arch:Arm64
       ~rules:[job_rule ~when_:Always ()]
       ()
@@ -72,6 +73,7 @@ let jobs =
   let job_static_x86_64 =
     job_build_static_binaries
       ~__POS__
+      ~product:Octez
       ~arch:Amd64
       ~rules:[job_rule ~when_:Always ()]
       ()
