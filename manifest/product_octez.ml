@@ -2685,7 +2685,7 @@ let octez_context =
 
 let _octez_context_tests =
   tezt
-    ["test_context"; "test_merkle_proof"]
+    ["test_context"; "test_merkle_proof"; "tezt_main"]
     ~path:"src/lib_context/test"
     ~opam:"octez-libs"
     ~deps:
@@ -2698,6 +2698,7 @@ let _octez_context_tests =
         octez_context_encoding;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
         qcheck_alcotest;
         alcotezt;
       ]

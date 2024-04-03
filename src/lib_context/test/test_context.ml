@@ -691,10 +691,7 @@ struct
       test "proof exn" test_proof_exn;
     ]
 
-  let tests =
-    List.map
-      (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_context_init f))
-      tests
+  let tests = List.map (fun (title, f) -> (title, wrap_context_init f ())) tests
 end
 
 module Generic_disk =
@@ -717,9 +714,12 @@ module Generic_memory =
     end)
     (Tezos_context_memory.Context)
 
-let () =
-  Lwt_main.run
-    (Alcotest_lwt.run
-       ~__FILE__
-       "tezos-context"
-       [("context", List.concat [Generic_disk.tests; Generic_memory.tests])])
+let register_test title tags f = Tezt.Test.register ~__FILE__ ~tags ~title @@ f
+
+let register () =
+  List.iter
+    (fun (title, f) -> register_test title ["context"; "disk"] f)
+    Generic_disk.tests ;
+  List.iter
+    (fun (title, f) -> register_test title ["context"; "memory"] f)
+    Generic_memory.tests
