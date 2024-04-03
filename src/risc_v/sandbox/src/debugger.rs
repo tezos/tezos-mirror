@@ -12,7 +12,7 @@ use ratatui::{
     widgets::{block::*, *},
 };
 use risc_v_interpreter::{
-    machine_state::{mode::Mode, registers},
+    machine_state::{csregisters, mode::Mode, registers},
     Interpreter, InterpreterResult,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -25,6 +25,7 @@ const YELLOW: Color = tailwind::YELLOW.c400;
 const RED: Color = tailwind::RED.c500;
 const BLUE: Color = tailwind::BLUE.c400;
 const ORANGE: Color = tailwind::ORANGE.c500;
+const GRAY: Color = tailwind::GRAY.c500;
 const SELECTED_STYLE_FG: Color = BLUE;
 const NEXT_STYLE_FG: Color = GREEN;
 const MAX_STEPS: usize = 1_000_000;
@@ -309,6 +310,71 @@ impl<'a> DebuggerApp<'a> {
             .render(area, buf)
     }
 
+    fn render_fcsr_pane(&mut self, area: Rect, buf: &mut Buffer) {
+        let title = Title::from(" FCSR ".bold());
+        let block = Block::default()
+            .title(title.alignment(Alignment::Left))
+            .borders(Borders::ALL)
+            .border_set(border::THICK);
+
+        use csregisters::*;
+
+        let frm = self.interpreter.read_csregister(CSRegister::frm);
+        let fflags = self.interpreter.read_csregister(CSRegister::fflags);
+
+        fn rounding_mode(rm: u64) -> &'static str {
+            match rm {
+                0b000 => "RNE",
+                0b001 => "RTZ",
+                0b010 => "RDN",
+                0b011 => "RUP",
+                0b100 => "RMM",
+                0b101..=0b111 => "invalid",
+                rm => unreachable!("Rounding mode must only be 3bits, got {rm:b}"),
+            }
+        }
+
+        let flagged = |name: &'static str, bit: usize| {
+            if ((1_u64 << bit) & fflags) == 0 {
+                name.fg(GRAY)
+            } else {
+                name.bold()
+            }
+        };
+
+        let registers_text = Text::from(vec![
+            Line::from(vec![
+                format!(" {0:>6}: ", CSRegister::fcsr).into(),
+                format!(
+                    "0x{:02x}",
+                    self.interpreter.read_csregister(CSRegister::fcsr)
+                )
+                .fg(ORANGE),
+            ]),
+            Line::from(vec![
+                format!(" {0:>6}: ", CSRegister::frm).into(),
+                format!("0x{0:02x} ", frm).fg(ORANGE),
+                format!("0b{0:03b}   ", frm).fg(YELLOW),
+                rounding_mode(frm).bold(),
+            ]),
+            Line::from(vec![
+                format!(" {0:>6}: ", CSRegister::fflags).into(),
+                format!("0x{0:02x} ", fflags).fg(ORANGE),
+                format!("0b{0:05b}", fflags).fg(YELLOW),
+                flagged(" NV", 4),
+                flagged(" DZ", 3),
+                flagged(" OF", 2),
+                flagged(" UF", 1),
+                flagged(" NX", 0),
+            ]),
+        ]);
+
+        Paragraph::new(registers_text)
+            .left_aligned()
+            .block(block)
+            .render(area, buf)
+    }
+
     fn render_status_pane(&mut self, area: Rect, buf: &mut Buffer) {
         let title = Title::from(" Status ".bold());
         let block = Block::default()
@@ -388,11 +454,17 @@ impl Widget for &mut DebuggerApp<'_> {
         let registers_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![Constraint::Fill(1), Constraint::Percentage(50)]);
-        let [xregisters_area, fregisters_area] = registers_layout.areas(registers_area);
+        let [xregisters_area, f_area] = registers_layout.areas(registers_area);
+
+        let f_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Fill(1), Constraint::Length(5)]);
+        let [fregisters_area, fcsr_area] = f_layout.areas(f_area);
 
         self.render_program_pane(program_area, buf);
         self.render_xregisters_pane(xregisters_area, buf);
         self.render_fregisters_pane(fregisters_area, buf);
+        self.render_fcsr_pane(fcsr_area, buf);
         self.render_status_pane(status_area, buf);
         self.render_bottom_bar(outer_layout[1], buf);
     }
