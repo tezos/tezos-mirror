@@ -152,6 +152,7 @@ const safe_get = (array, cycle) => {
  * @param {number} config.proto.consensus_rights_delay.
  * @param {number} config.proto.consensus_threshold.
  * @param {number} config.proto.max_bonus.
+ * @param {number} config.proto.max_limit_of_staking_over_baking.
  * @param {Object} config.chain - Data concerning the chain state.
  * @param {number} config.chain.ai_activation_cycle - Adaptive Issuance activation cycle.
  * @param {array(number)} config.chain.total_supply.
@@ -375,13 +376,10 @@ export class Simulator {
   }
 
   #reward_from_constants(cycle, weight, d = 1) {
-    const coeff = this.reward_coeff(cycle);
+    const coeff = bigRat(this.reward_coeff(cycle));
     const rewards = this.#tez_from_weights(weight);
-    const coeff_rat = bigRat(coeff);
-    const num = coeff_rat.numerator;
-    const den = coeff_rat.denominator;
     const base_rewards = rewards.divide(d);
-    return base_rewards.multiply(num).divide(den);
+    return base_rewards.multiply(coeff.numerator).divide(coeff.denominator);
   }
 
   baking_reward_fixed_portion(cycle) {
@@ -475,6 +473,477 @@ export class Simulator {
 
   issuance_per_cycle(cycle) {
     this.issuance_per_block(cycle) * this.config.proto.blocks_per_cycle;
+  }
+}
+
+/**
+ * Estimated rewards
+ * @typedef {Object} EstimatedRewards
+ * @property {number} estimated_number_of_blocks_baked - Estimated number of blocks baked by the delegate.
+ * @property {number} estimated_number_of_attestations - Estimated number of attestations by the delegate.
+ * @property {number} estimated_rewards_for_fixed_portion_baking - Estimated rewards from the
+ * fixed portion rewards of baked blocks.
+ * @property {number} estimated_rewards_for_baking_bonus - Estimated rewards from the
+ * bonus portion rewards of baked blocks.
+ * @property {number} estimated_rewards_for_attestations - Estimated rewards for attesting.
+ * @property {number} estimated_rewards_for_nonce_revelation - Estimated rewards from the nonce
+ * revelations.
+ * @property {number} estimated_rewards_for_vdf_revelation - Estimated rewards from the vdf
+ * revelations.
+ * @property {number} estimated_rewards_from_own_staking - Delegate's estimated rewards from staking,
+ * calculated by multiplying the overall staking rewards by the ratio of the delegate's own stake
+ * to its total stake.
+ * @property {number} estimated_rewards_from_third_party_staking - Third party stakers estimated rewards
+ * from staking, calculated by multiplying the overall staking rewards by the ratio of the third party's
+ * to the delegate's total stake.
+ * @property {number} estimated_rewards_from_delegating - Estimated rewards produced by the delegate
+ * baking power coming from its delegations.
+ * @property {number} estimated_rewards_from_edge_of_baking_over_staking - Estimated rewards
+ * given by the value of edge_of_baking_over_staking defined in the delegate's policy configuration.
+ * @property {number} estimated_total_rewards - Estimated total rewards.
+ */
+
+/**
+ * Delegate info
+ * @typedef {Object} DelegateInfo
+ * @property {bigInt} considered_staked - The amount of stake considered when computing baking rights.
+ * @property {bigInt} over_staked - The portion of the stake that exceeds the delegate capacity.
+ * @property {bigInt} available_staked - The portion of stake that the delegate can welcome without
+ * being overstaked.
+ * @property {bigInt} considered_delegated - The delegated amount considered when computing baking rights.
+ * @property {bigInt} over_delegated - The portion of the delegated amount that exceeds the
+ * delegate capacity.
+ * @property {bigInt} available_delegated - The portion of stake that the delegate can welcome without
+ * being overdelegated.
+ */
+
+/**
+ * Baking Power
+ * @typedef {Object} BakingPower
+ * @property {bigRat} baking_power - The baking power of a delegate for a given cycle.
+ * @property {number} ratio_for_staking - The ratio of the baking power given by staking.
+ * @property {number} ratio_for_delegating - The ratio of the baking power given by delegating.
+ */
+
+/**
+ * Delegate.
+ * @typedef {Object} Delegate
+ * @property {function():null} clear - clear delegate cache, useful when the simulator values change
+ * and the delegate's estimated rewards need to be computed again.
+ * @property {function(number):bigInt} estimated_own_staked_balance - Takes a cycle as argument
+ * and returns the delegate's estimated own staked balance for the given cycle.
+ * @property {function(number):bigInt} estimated_third_party_staked_balance - Takes a cycle as argument
+ * and returns the delegate's estimated third party staked balance for the given cycle.
+ * @property {function(number):bigInt} estimated_own_spendable_balance - Takes a cycle as argument
+ * and returns the delegate's estimated own spendable balance for the given cycle.
+ * @property {function(number):bigInt} third_party_delegated_balance - Takes a cycle as argument
+ * and returns the delegate's third party delegated balance for the given cycle.
+ * @property {function(number):EstimatedRewards} estimated_rewards - Takes a cycle as argument
+ * and returns the delegate's estimated rewards for this cycle.
+ * @property {function(number):BakingPower} baking_power -
+ * @property {function(number):DelegateInfo} delegate_info -
+ * @property {function(number, number):null} set_own_spendable_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's own spendable delegated balance to this value
+ * for the given cycle.
+ * @property {function(number, number):null} set_third_party_delegated_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's third party delegated balance to this value for the given
+ * cycle.
+ * @property {function(number, number):null} set_own_staked_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's own staked balance to this value for the given
+ * cycle.
+ * @property {function(number, number):null} set_third_party_staked_balance - Takes a cycle and an amount
+ * (in mutez) as arguments, and sets the delegate's third party staked balance to this value for the given
+ * cycle.
+ * @property {function(number):boolean} is_activated - Takes a cycle as argument
+ * and returns true if the delegate is activated for this cycle, false otherwise.
+ */
+
+/**
+ * Delegate creation.
+ *
+ * @constructor
+ * @param {Object} simulator - Simulator.
+ * @param {Object} config - Delegate configuration file.
+ * @param {number} config.delegate_registration_cycle - Cycle at which the delegate registers.
+ * @param {Object} config.delegate_policy.
+ * @param {number} config.delegate_policy.limit_of_staking_over_baking -
+ * Limits the total amount of stake for the source's delegators as a
+ * proportion of the source's own stake. Any amount exceeding this limit
+ * is considered as delegation in the stake of the delegate. The value
+ * should be between 0 and 5 (default 0 if not set).
+ * @param {number} config.delegate_policy.edge_of_baking_over_staking -
+ * The portion of the delegate's stakers rewards that goes to the delegate.
+ * This edge, taken from the staker's rewards, is accrued to the delegate's own
+ * frozen balance. This value must be between 0 and 1 (e.g. 0.05 for the delegate to receive 5%
+ * of the staker's rewards). Default value is 1 (delegate receives all staker's rewards).
+ *
+ * @return {Delegate}. A delegate.
+ */
+export class Delegate {
+  #storage_cache_size = -1;
+  #registration_cycle = null;
+
+  #storage_own_staked_balance = [0];
+  #storage_third_party_staked_balance = [0];
+  #storage_own_spendable_balance = [0];
+  #storage_third_party_delegated_balance = [0];
+
+  #storage_own_staked_balance_mask = [];
+  #storage_third_party_staked_balance_mask = [];
+  #storage_own_spendable_balance_mask = [];
+
+  constructor(simulator, config) {
+    this.simulator = simulator;
+    this.config = config;
+  }
+
+  clear() {
+    this.#storage_cache_size = -1;
+    this.#storage_own_staked_balance = [0];
+    this.#storage_third_party_staked_balance = [0];
+    this.#storage_own_spendable_balance = [0];
+    this.#storage_third_party_delegated_balance = [0];
+  }
+
+  #own_staked_balance(cycle) {
+    return (
+      this.#storage_own_staked_balance_mask[cycle] ??
+      this.#storage_own_staked_balance[cycle]
+    );
+  }
+
+  #third_party_staked_balance(cycle) {
+    return (
+      this.#storage_third_party_staked_balance_mask[cycle] ??
+      this.#storage_third_party_staked_balance[cycle]
+    );
+  }
+
+  #own_spendable_balance(cycle) {
+    return (
+      this.#storage_own_spendable_balance_mask[cycle] ??
+      this.#storage_own_spendable_balance[cycle]
+    );
+  }
+
+  #third_party_delegated_balance(cycle) {
+    return this.#storage_third_party_delegated_balance[cycle];
+  }
+
+  // The storage_cache_size is used to register what are the values
+  // still valid or the ones that need to be recomputed. Hence, for any change
+  // that occurs at a certain level we need to recompute each data above this level.
+  // This is why we we take the minimal value here
+
+  set_own_spendable_balance(cycle, value) {
+    this.#storage_own_spendable_balance_mask[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  set_third_party_delegated_balance(cycle, value) {
+    this.#storage_third_party_delegated_balance[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  set_own_staked_balance(cycle, value) {
+    this.#storage_own_staked_balance_mask[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  set_third_party_staked_balance(cycle, value) {
+    this.#storage_third_party_staked_balance_mask[cycle] = value;
+    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+  }
+
+  is_activated(cycle) {
+    /* Once registered a new delegate must wait CONSENSUS_RIGHTS_DELAY + 1 cycles
+       for its rights to be considered. */
+    const activation_cycle =
+      this.config.delegate_registration_cycle +
+      this.simulator.config.proto.consensus_rights_delay +
+      1;
+
+    return activation_cycle <= cycle;
+  }
+
+  delegate_info(cycle) {
+    if (cycle < 0) {
+      return {
+        own_staked: bigInt.zero,
+        considered_staked: bigInt.zero,
+        over_staked: bigInt.zero,
+        available_staked: bigInt.zero,
+        considered_delegated: bigInt.zero,
+        over_delegated: bigInt.zero,
+        available_delegated: bigInt.zero,
+      };
+    }
+
+    this.#prepare_for(cycle);
+
+    const own_staked = bigInt(this.#own_staked_balance(cycle));
+    const third_party_staked = bigInt(this.#third_party_staked_balance(cycle));
+
+    const considered_limit_of_staking = Math.min(
+      this.config.delegate_policy.limit_of_staking_over_baking,
+      this.simulator.config.proto.max_limit_of_staking_over_baking,
+    );
+
+    const max_third_party_staked = own_staked.times(
+      considered_limit_of_staking,
+    );
+
+    const considered_staked = bigInt.min(
+      own_staked.add(third_party_staked),
+      max_third_party_staked,
+    );
+
+    const stake_diff = max_third_party_staked.minus(third_party_staked);
+
+    const over_staked = stake_diff.isPositive()
+      ? bigInt.zero
+      : stake_diff.negate();
+
+    const available_staked = stake_diff.isPositive() ? stake_diff : bigInt.zero;
+
+    const own_delegated = bigInt(this.#own_spendable_balance(cycle));
+    const third_party_delegated = bigInt(
+      this.#third_party_delegated_balance(cycle),
+    );
+
+    const extended_delegated = own_delegated
+      .add(third_party_delegated)
+      .add(over_staked);
+
+    const max_delegated = considered_staked.times(9);
+
+    const delegated_diff = max_delegated.minus(extended_delegated);
+
+    const over_delegated = delegated_diff.isPositive()
+      ? bigInt.zero
+      : delegated_diff.negate();
+
+    const available_delegated = delegated_diff.isPositive()
+      ? delegated_diff
+      : bigInt.zero;
+
+    const considered_delegated = bigInt.min(max_delegated, extended_delegated);
+
+    return {
+      own_staked,
+      considered_staked,
+      over_staked,
+      available_staked,
+      considered_delegated,
+      over_delegated,
+      available_delegated,
+    };
+  }
+
+  baking_power(cycle) {
+    /* The rights and rewards are set for cycle c + CONSENSUS_RIGHTS_DELAY + 1
+       based on the aforementioned random seed and the current active stake. */
+    const adjusted_cycle =
+      cycle - this.simulator.config.proto.consensus_rights_delay - 1;
+
+    if (adjusted_cycle < 0 || !this.is_activated(cycle)) {
+      return {
+        baking_power: bigRat.zero,
+        ratio_for_staking: bigRat.zero,
+        ratio_for_delegating: bigRat.zero,
+      };
+    }
+
+    const { considered_staked, considered_delegated } =
+      this.delegate_info(adjusted_cycle);
+
+    const total_staked = this.simulator.total_staked_balance(adjusted_cycle);
+
+    const total_delegated =
+      this.simulator.total_delegated_balance(adjusted_cycle);
+
+    const num = considered_staked.times(2).add(considered_delegated);
+
+    const den = total_staked.times(2).add(total_delegated);
+
+    const baking_power = bigRat(num).divide(den);
+
+    const ratio_denum = considered_staked.times(2).add(considered_delegated);
+
+    const ratio_for_staking = ratio_denum.isZero()
+      ? bigRat.zero
+      : bigRat(considered_staked.times(2)).divide(ratio_denum);
+
+    const ratio_for_delegating = ratio_denum.isZero()
+      ? bigRat.zero
+      : bigRat(considered_delegated).divide(ratio_denum);
+
+    return { baking_power, ratio_for_staking, ratio_for_delegating };
+  }
+
+  estimated_rewards(cycle) {
+    const { baking_power, ratio_for_staking, ratio_for_delegating } =
+      this.baking_power(cycle);
+
+    const estimated_number_of_blocks_baked = baking_power
+      .times(this.simulator.config.proto.blocks_per_cycle)
+      .ceil()
+      .valueOf();
+
+    const estimated_rewards_for_fixed_portion_baking =
+      estimated_number_of_blocks_baked *
+      this.simulator.baking_reward_fixed_portion(cycle);
+
+    const bonus_committee_size =
+      this.simulator.config.proto.consensus_committee_size -
+      this.simulator.config.proto.consensus_threshold;
+
+    const estimated_rewards_for_baking_bonus =
+      estimated_number_of_blocks_baked *
+      this.simulator
+        .baking_reward_bonus_per_slot(cycle)
+        .times(bonus_committee_size);
+
+    const estimated_number_of_attestations = baking_power
+      .times(this.simulator.config.proto.consensus_committee_size)
+      .times(this.simulator.config.proto.blocks_per_cycle)
+      .ceil()
+      .valueOf();
+
+    const estimated_rewards_for_attestations =
+      estimated_number_of_attestations *
+      this.simulator.attestation_reward_per_slot(cycle);
+
+    const { baking_power: previous_baking_power } = this.baking_power(
+      cycle - 1,
+    );
+
+    const previous_estimated_number_of_blocks_baked = previous_baking_power
+      .times(this.simulator.config.proto.blocks_per_cycle)
+      .ceil()
+      .valueOf();
+
+    const estimated_rewards_for_nonce_revelation =
+      previous_estimated_number_of_blocks_baked *
+      this.simulator.seed_nonce_revelation_tip(cycle);
+
+    const estimated_rewards_for_vdf_revelation = baking_power.isZero()
+      ? 0
+      : (this.simulator.config.proto.blocks_per_cycle /
+          this.simulator.config.proto.blocks_per_commitment) *
+        this.simulator.vdf_revelation_tip(cycle);
+
+    const estimated_total_rewards =
+      estimated_rewards_for_fixed_portion_baking +
+      estimated_rewards_for_baking_bonus +
+      estimated_rewards_for_attestations +
+      estimated_rewards_for_nonce_revelation +
+      estimated_rewards_for_vdf_revelation;
+
+    const estimated_rewards_from_delegating = Math.ceil(
+      ratio_for_delegating * estimated_total_rewards,
+    );
+
+    const estimated_rewards_from_staking = ratio_for_staking.times(
+      estimated_total_rewards,
+    );
+
+    const estimated_rewards_from_edge_of_baking_over_staking =
+      estimated_rewards_from_staking
+        .times(this.config.delegate_policy.edge_of_baking_over_staking)
+        .ceil()
+        .valueOf();
+
+    const reduced_estimated_rewards_from_staking =
+      estimated_rewards_from_staking.minus(
+        estimated_rewards_from_edge_of_baking_over_staking,
+      );
+
+    const { own_staked, considered_staked } = this.delegate_info(cycle);
+
+    const ratio_own_stake = considered_staked.isZero()
+      ? bigRat.zero
+      : bigRat(own_staked, considered_staked);
+
+    const ratio_third_party_stake = considered_staked.isZero()
+      ? bigRat.zero
+      : bigRat.one.minus(ratio_own_stake);
+
+    const estimated_rewards_from_own_staking = ratio_own_stake
+      .times(reduced_estimated_rewards_from_staking)
+      .ceil()
+      .valueOf();
+
+    const estimated_rewards_from_third_party_staking = ratio_third_party_stake
+      .times(reduced_estimated_rewards_from_staking)
+      .ceil()
+      .valueOf();
+
+    return {
+      estimated_number_of_blocks_baked,
+      estimated_number_of_attestations,
+      estimated_rewards_for_fixed_portion_baking,
+      estimated_rewards_for_baking_bonus,
+      estimated_rewards_for_attestations,
+      estimated_rewards_for_nonce_revelation,
+      estimated_rewards_for_vdf_revelation,
+      estimated_rewards_from_own_staking,
+      estimated_rewards_from_third_party_staking,
+      estimated_rewards_from_delegating,
+      estimated_rewards_from_edge_of_baking_over_staking,
+      estimated_total_rewards,
+    };
+  }
+
+  #compute_new_balances(cycle) {
+    const rewards = this.estimated_rewards(cycle);
+
+    this.#storage_own_staked_balance[cycle + 1] =
+      this.#storage_own_staked_balance_mask[cycle + 1] ??
+      this.#storage_own_staked_balance[cycle] +
+        rewards.estimated_rewards_from_own_staking +
+        rewards.estimated_rewards_from_edge_of_baking_over_staking;
+
+    this.#storage_third_party_staked_balance[cycle + 1] =
+      this.#storage_third_party_staked_balance_mask[cycle + 1] ??
+      this.#storage_third_party_staked_balance[cycle] +
+        rewards.estimated_rewards_from_third_party_staking;
+
+    this.#storage_own_spendable_balance[cycle + 1] =
+      this.#storage_own_spendable_balance_mask[cycle + 1] ??
+      this.#storage_own_spendable_balance[cycle] +
+        rewards.estimated_rewards_from_delegating;
+
+    this.#storage_third_party_delegated_balance[cycle + 1] =
+      this.#storage_third_party_delegated_balance[cycle + 1] ??
+      this.#storage_third_party_delegated_balance[cycle];
+  }
+
+  #prepare_for(cycle) {
+    for (let i = this.#storage_cache_size + 1; i < cycle; i++) {
+      this.#compute_new_balances(i);
+      this.#storage_cache_size++;
+    }
+  }
+
+  estimated_own_staked_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#own_staked_balance(cycle);
+  }
+
+  estimated_third_party_staked_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#third_party_staked_balance(cycle);
+  }
+
+  estimated_own_spendable_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#own_spendable_balance(cycle);
+  }
+
+  third_party_delegated_balance(cycle) {
+    this.#prepare_for(cycle);
+    return this.#third_party_delegated_balance(cycle);
   }
 }
 
