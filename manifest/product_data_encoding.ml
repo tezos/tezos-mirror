@@ -69,8 +69,7 @@ let _json_data_encoding_tests =
     ~path:"data-encoding/json-data-encoding/test"
     ~js_compatible:true
     ~modes:[Native; JS]
-    ~deps:
-      [json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler; conf_npm]
+    ~deps:[json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler]
 
 let json_data_encoding_bson =
   public_lib
@@ -139,14 +138,7 @@ let _data_encoding_tests =
     ~js_compatible:true
     ~modes:[Native; JS]
     ~deps:
-      [
-        data_encoding;
-        zarith;
-        zarith_stubs_js;
-        alcotest;
-        js_of_ocaml_compiler;
-        conf_npm;
-      ]
+      [data_encoding; zarith; zarith_stubs_js; alcotest; js_of_ocaml_compiler]
 
 let _data_encoding_expect_tests =
   private_lib
