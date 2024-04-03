@@ -34,6 +34,14 @@ module Event = struct
       ~level:Notice
       ()
 
+  let connection_acquired =
+    declare_0
+      ~section
+      ~name:"rollup_node_follower_connection_acquired"
+      ~msg:"Rollup node follower connected to the rollup node"
+      ~level:Info
+      ()
+
   let connection_lost =
     declare_0
       ~section
@@ -41,6 +49,15 @@ module Event = struct
       ~msg:"Connection with the rollup node has been lost"
       ~level:Error
       ()
+
+  let trying_reconnection =
+    declare_1
+      ~section
+      ~name:"rollup_node_follower_trying_reconnection"
+      ~msg:
+        "Waiting {duration} sec before trying to reconnect to the rollup node"
+      ~level:Info
+      ("duration", Data_encoding.float)
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -50,3 +67,8 @@ let new_block level = Internal_event.Simple.emit Event.new_block level
 let shutdown = Internal_event.Simple.emit Event.shutdown
 
 let connection_lost = Internal_event.Simple.emit Event.connection_lost
+
+let trying_reconnection duration =
+  Internal_event.Simple.emit Event.trying_reconnection duration
+
+let connection_acquired = Internal_event.Simple.emit Event.connection_acquired

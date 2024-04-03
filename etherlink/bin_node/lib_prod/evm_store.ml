@@ -19,6 +19,9 @@ module Db = struct
 
   let start (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.start ()
 
+  let collect_list (module Db : Caqti_lwt.CONNECTION) req arg =
+    caqti @@ Db.collect_list req arg
+
   let commit (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.commit ()
 
   let rollback (module Db : Caqti_lwt.CONNECTION) = caqti @@ Db.rollback ()
@@ -98,6 +101,20 @@ module Q = struct
       ~decode:(fun (hash, timestamp) ->
         Ok Ethereum_types.Upgrade.{hash; timestamp})
       (t2 root_hash timestamp)
+
+  let delayed_transaction =
+    custom
+      ~encode:(fun payload ->
+        Ok
+          (Data_encoding.Binary.to_string_exn
+             Ethereum_types.Delayed_transaction.encoding
+             payload))
+      ~decode:(fun bytes ->
+        Option.to_result ~none:"Not a valid blueprint payload"
+        @@ Data_encoding.Binary.of_string_opt
+             Ethereum_types.Delayed_transaction.encoding
+             bytes)
+      string
 
   let table_exists =
     (string ->! bool)
@@ -248,28 +265,60 @@ module Q = struct
         ]
     end
 
+    module V5 = struct
+      let name = "create_blueprints_table"
+
+      let up =
+        [
+          migration_step
+            {|
+        CREATE TABLE blueprints (
+          id SERIAL PRIMARY KEY,
+          payload BLOB NOT NULL,
+          timestamp DATETIME NOT NULL
+        )|};
+          migration_step {|
+          DROP TABLE executable_blueprints
+|};
+          migration_step {|
+          DROP TABLE publishable_blueprints
+|};
+          migration_step
+            {|
+        CREATE TABLE delayed_transactions (
+          injected_before INT NOT NULL,
+          hash TEXT NOT NULL,
+          payload TEXT NOT NULL
+        )
+        |};
+        ]
+    end
+
     let all : migration list =
-      [(module V0); (module V1); (module V2); (module V3); (module V4)]
+      [
+        (module V0);
+        (module V1);
+        (module V2);
+        (module V3);
+        (module V4);
+        (module V5);
+      ]
   end
 
-  module Executable_blueprints = struct
+  module Blueprints = struct
     let insert =
       (t3 level timestamp payload ->. unit)
-      @@ {eos|INSERT INTO executable_blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
+      @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
 
     let select =
       (level ->? t2 payload timestamp)
-      @@ {eos|SELECT payload, timestamp FROM executable_blueprints WHERE id = ?|eos}
-  end
+      @@ {eos|SELECT payload, timestamp FROM blueprints WHERE id = ?|eos}
 
-  module Publishable_blueprints = struct
-    let insert =
-      (t2 level payload ->. unit)
-      @@ {eos|INSERT INTO publishable_blueprints (id, payload) VALUES (?, ?)|eos}
-
-    let select =
-      (level ->? payload)
-      @@ {eos|SELECT payload FROM publishable_blueprints WHERE id = ?|eos}
+    let select_range =
+      (t2 level level ->* t2 level payload)
+      @@ {|SELECT id, payload FROM blueprints
+           WHERE ? <= id AND id <= ?
+           ORDER BY id ASC|}
   end
 
   module Context_hashes = struct
@@ -304,6 +353,20 @@ module Q = struct
       @@ {|
       UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before = NULL
     |}
+  end
+
+  module Delayed_transactions = struct
+    let insert =
+      (t3 level root_hash delayed_transaction ->. unit)
+      @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
+
+    let select_at_level =
+      (level ->* delayed_transaction)
+      @@ {|SELECT payload FROM delayed_transactions WHERE ? = injected_before|}
+
+    let select_at_hash =
+      (root_hash ->? delayed_transaction)
+      @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
   end
 
   module L1_latest_level = struct
@@ -370,7 +433,7 @@ module Migrations = struct
         if applied <= known then return (List.drop_n applied all_migrations)
         else
           let*! () =
-            Store_events.migrations_from_the_future ~applied ~known:0
+            Evm_store_events.migrations_from_the_future ~applied ~known:0
           in
           failwith
             "Cannot use a store modified by a more up-to-date version of the \
@@ -382,20 +445,6 @@ module Migrations = struct
     with_connection store @@ fun conn ->
     let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
     Db.exec conn Q.Migrations.register_migration (id, M.name)
-
-  let assume_old_store store =
-    let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* () = Db.exec conn Q.Migrations.create_table () in
-    Db.exec conn Q.Migrations.register_migration (0, Q.Migrations.V0.name)
-
-  let check_V0 store =
-    let open Lwt_result_syntax in
-    with_connection store @@ fun conn ->
-    let* publishable = Db.find conn Q.table_exists "publishable_blueprints" in
-    let* executable = Db.find conn Q.table_exists "executable_blueprints" in
-    let* context_hashes = Db.find conn Q.table_exists "context_hashes" in
-    return (publishable && executable && context_hashes)
 end
 
 let init ~data_dir =
@@ -409,24 +458,13 @@ let init ~data_dir =
     let* () =
       if not exists then
         let* () = Migrations.create_table store in
-        let*! () = Store_events.init_store () in
+        let*! () = Evm_store_events.init_store () in
         return_unit
       else
         let* table_exists = Migrations.table_exists store in
         let* () =
           when_ (not table_exists) (fun () ->
-              (* The database already exists, but the migrations table does not.
-                 This probably means it was created before the introduction of
-                 the migration system. We check that the three initial tables are
-                 there and if so, we assume the first migration is applied moving
-                 forward, with a warning. *)
-              let* old_db = Migrations.check_V0 store in
-              if old_db then
-                let* () = Migrations.assume_old_store store in
-                let*! () = Store_events.assume_old_store () in
-                return_unit
-              else
-                failwith "A store already exists, but its content is incorrect.")
+              failwith "A store already exists, but its content is incorrect.")
         in
         return_unit
     in
@@ -435,7 +473,7 @@ let init ~data_dir =
       List.iter_es
         (fun (i, ((module M : Q.MIGRATION) as mig)) ->
           let* () = Migrations.apply_migration store i mig in
-          let*! () = Store_events.applied_migration M.name in
+          let*! () = Evm_store_events.applied_migration M.name in
           return_unit)
         migrations
     in
@@ -443,32 +481,26 @@ let init ~data_dir =
   in
   return store
 
-module Executable_blueprints = struct
+module Blueprints = struct
   let store store (blueprint : Blueprint_types.t) =
     with_connection store @@ fun conn ->
     Db.exec
       conn
-      Q.Executable_blueprints.insert
+      Q.Blueprints.insert
       (blueprint.number, blueprint.timestamp, blueprint.payload)
 
   let find store number =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    let+ opt = Db.find_opt conn Q.Executable_blueprints.select number in
+    let+ opt = Db.find_opt conn Q.Blueprints.select number in
     match opt with
     | Some (payload, timestamp) ->
         Some Blueprint_types.{payload; timestamp; number}
     | None -> None
-end
 
-module Publishable_blueprints = struct
-  let store store number blueprint =
+  let find_range store ~from ~to_ =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.Publishable_blueprints.insert (number, blueprint)
-
-  let find store number =
-    with_connection store @@ fun conn ->
-    Db.find_opt conn Q.Publishable_blueprints.select number
+    Db.collect_list conn Q.Blueprints.select_range (from, to_)
 end
 
 module Context_hashes = struct
@@ -500,6 +532,24 @@ module Kernel_upgrades = struct
   let record_apply store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Kernel_upgrades.record_apply level
+end
+
+module Delayed_transactions = struct
+  let store store next_blueprint_number
+      (delayed_transaction : Ethereum_types.Delayed_transaction.t) =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.Delayed_transactions.insert
+      (next_blueprint_number, delayed_transaction.hash, delayed_transaction)
+
+  let at_level store blueprint_number =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Delayed_transactions.select_at_level blueprint_number
+
+  let at_hash store hash =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Delayed_transactions.select_at_hash hash
 end
 
 module L1_latest_known_level = struct

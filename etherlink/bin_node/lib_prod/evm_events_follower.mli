@@ -8,14 +8,15 @@
 type parameters = {
   rollup_node_endpoint : Uri.t;
       (** Rollup node endpoint used to monitor kernel events. *)
-  ctxt : Evm_context.t;
+  filter_event : Ethereum_types.Evm_events.t -> bool;
+      (** Filter event the follower applies. *)
 }
 
 (** [start parameters] starts the events follower. *)
 val start : parameters -> unit tzresult Lwt.t
 
 (** [shutdown ()] stops the events follower. *)
-val shutdown : unit -> unit Lwt.t
+val shutdown : unit -> unit tzresult Lwt.t
 
 (** [new_rollup_block rollup_level] tells the worker that a new L2
     head has been published and that the rollup head is now

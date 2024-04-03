@@ -20,7 +20,7 @@ let get_blueprint_service =
   Service.get_service
     ~description:"Fetch the contents of a blueprint"
     ~query:Query.empty
-    ~output:Blueprint_types.encoding
+    ~output:Blueprint_types.with_events_encoding
     Path.(evm_services_root / "blueprint" /: Arg.uint63)
 
 let blueprint_watcher_service =
@@ -31,13 +31,13 @@ let blueprint_watcher_service =
   Service.get_service
     ~description:"Watch for new blueprints"
     ~query:level_query
-    ~output:Blueprint_types.encoding
+    ~output:Blueprint_types.with_events_encoding
     Path.(evm_services_root / "blueprints")
 
-let create_blueprint_watcher_service (ctxt : Evm_context.t) from_level =
+let create_blueprint_watcher_service from_level =
   let open Lwt_syntax in
   (* input source block creating a stream to observe the events *)
-  let* head_res = Evm_context.last_produced_blueprint ctxt in
+  let* head_res = Evm_context.last_produced_blueprint () in
   let (Qty head_level) =
     match head_res with
     | Ok head ->
@@ -51,9 +51,7 @@ let create_blueprint_watcher_service (ctxt : Evm_context.t) from_level =
   in
 
   (* generate the next asynchronous event *)
-  let blueprint_stream, stopper =
-    Lwt_watcher.create_stream ctxt.blueprint_watcher
-  in
+  let blueprint_stream, stopper = Evm_context.blueprints_watcher () in
   let shutdown () = Lwt_watcher.shutdown stopper in
   let next =
     let next_level_requested = ref Z.(of_int64 from_level) in
@@ -61,9 +59,7 @@ let create_blueprint_watcher_service (ctxt : Evm_context.t) from_level =
       if Z.Compare.(!next_level_requested <= head_level) then (
         let current_request = !next_level_requested in
         (next_level_requested := Z.(succ current_request)) ;
-        let* blueprint =
-          Store.Executable_blueprints.find ctxt.store (Qty current_request)
-        in
+        let* blueprint = Evm_context.blueprint (Qty current_request) in
         match blueprint with
         | Ok (Some blueprint) -> return_some blueprint
         | Ok None -> return_none
@@ -74,26 +70,25 @@ let create_blueprint_watcher_service (ctxt : Evm_context.t) from_level =
   in
   Tezos_rpc.Answer.return_stream {next; shutdown}
 
-let register_get_smart_rollup_address_service ctxt dir =
+let register_get_smart_rollup_address_service smart_rollup_address dir =
   Directory.register0 dir get_smart_rollup_address_service (fun () () ->
       let open Lwt_syntax in
-      return_ok ctxt.Evm_context.smart_rollup_address)
+      return_ok smart_rollup_address)
 
-let register_get_blueprint_service (ctxt : Evm_context.t) dir =
+let register_get_blueprint_service dir =
   Directory.opt_register1 dir get_blueprint_service (fun level () () ->
       let open Lwt_result_syntax in
       let number = Ethereum_types.Qty (Z.of_int64 level) in
-      let* blueprint = Store.Executable_blueprints.find ctxt.store number in
+      let* blueprint = Evm_context.blueprint number in
       return blueprint)
 
-let register_blueprint_watcher_service ctxt dir =
+let register_blueprint_watcher_service dir =
   Directory.gen_register0 dir blueprint_watcher_service (fun level () ->
-      create_blueprint_watcher_service ctxt level)
+      create_blueprint_watcher_service level)
 
-let register ctxt dir =
-  register_get_smart_rollup_address_service ctxt dir
-  |> register_get_blueprint_service ctxt
-  |> register_blueprint_watcher_service ctxt
+let register smart_rollup_address dir =
+  register_get_smart_rollup_address_service smart_rollup_address dir
+  |> register_get_blueprint_service |> register_blueprint_watcher_service
 
 let get_smart_rollup_address ~evm_node_endpoint =
   Tezos_rpc_http_client_unix.RPC_client_unix.call_service

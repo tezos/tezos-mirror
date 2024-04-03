@@ -6,20 +6,14 @@
 (*****************************************************************************)
 
 module MakeBackend (Ctxt : sig
-  val ctxt : Evm_context.t
+  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
-    let read path =
-      let open Lwt_result_syntax in
-      let*! res = Evm_context.inspect Ctxt.ctxt path in
-      return res
+    let read path = Evm_context.inspect path
   end
 
   module TxEncoder = struct
-    type transactions = {
-      raw : string list;
-      delayed : Ethereum_types.Delayed_transaction.t list;
-    }
+    type transactions = string list
 
     type messages = transactions
 
@@ -37,19 +31,18 @@ end) : Services_backend_sig.Backend = struct
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
-      let* raw_insights = Evm_context.execute_and_inspect Ctxt.ctxt ~input in
+      let* raw_insights = Evm_context.execute_and_inspect input in
       match raw_insights with
       | [Some bytes] -> return bytes
       | _ -> Error_monad.failwith "Invalid insights format"
   end
 
   let smart_rollup_address =
-    Tezos_crypto.Hashed.Smart_rollup_address.to_string
-      Ctxt.ctxt.smart_rollup_address
+    Tezos_crypto.Hashed.Smart_rollup_address.to_string Ctxt.smart_rollup_address
 end
 
 module Make (Ctxt : sig
-  val ctxt : Evm_context.t
+  val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) =
   Services_backend_sig.Make (MakeBackend (Ctxt))
 
@@ -66,11 +59,11 @@ let install_finalizer_seq server private_server =
         Events.shutdown_rpc_server ~private_:true)
       private_server
   in
+  Helpers.unwrap_error_monad @@ fun () ->
+  let open Lwt_result_syntax in
   let* () = Tx_pool.shutdown () in
-  let* () = Rollup_node_follower.shutdown () in
   let* () = Evm_events_follower.shutdown () in
   let* () = Blueprints_publisher.shutdown () in
-  let* () = Delayed_inbox.shutdown () in
   return_unit
 
 let callback_log server conn req body =
@@ -187,52 +180,6 @@ let loop_sequencer :
   let now = Helpers.now () in
   loop now
 
-let[@tailrec] rec catchup_evm_event ~rollup_node_endpoint store =
-  let open Lwt_result_syntax in
-  let* rollup_node_l1_level =
-    Rollup_services.tezos_level rollup_node_endpoint
-  in
-  let* latest_known_l1_level = Store.L1_latest_known_level.find store in
-  match latest_known_l1_level with
-  | None ->
-      (* sequencer has no value to start from, it must be the initial
-         start or we went from prod to dev. *)
-      let*! () = Store_events.no_l1_latest_level_to_catch_up () in
-      return_unit
-  | Some latest_known_l1_level ->
-      let finalized_level = Int32.(sub rollup_node_l1_level 2l) in
-      if latest_known_l1_level = finalized_level then return_unit
-      else if latest_known_l1_level > finalized_level then
-        tzfail
-          (error_of_fmt
-             "Internal error: The sequencer has processed more l1 level than \
-              the rollup node, it should be impossible. ")
-      else
-        let*! () =
-          Events.catching_up_evm_event
-            ~from:latest_known_l1_level
-            ~to_:finalized_level
-        in
-        catch_evm_event_aux
-          ~rollup_node_endpoint
-          store
-          ~from:latest_known_l1_level
-          ~to_:finalized_level
-
-and[@tailrec] catch_evm_event_aux ~rollup_node_endpoint store ~from ~to_ =
-  let open Lwt_result_syntax in
-  if from = to_ then catchup_evm_event ~rollup_node_endpoint store
-  else if from > to_ then
-    tzfail
-      (error_of_fmt
-         "Internal error: The catchup of evm_event went too far, it should be \
-          impossible.")
-  else
-    let next_l1_level = Int32.succ from in
-    let* () = Evm_events_follower.new_rollup_block next_l1_level in
-    let* () = Store.L1_latest_known_level.store store next_l1_level in
-    catch_evm_event_aux ~rollup_node_endpoint store ~from:next_l1_level ~to_
-
 let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
     ~max_blueprints_ahead ~max_blueprints_catchup ~catchup_cooldown
     ?(genesis_timestamp = Helpers.now ()) ~cctxt ~sequencer
@@ -242,8 +189,8 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address rollup_node_endpoint
   in
-  let* ctxt, loaded =
-    Evm_context.init
+  let* status =
+    Evm_context.start
       ?kernel_path:kernel
       ~data_dir
       ~preimages:configuration.mode.preimages
@@ -251,7 +198,8 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~smart_rollup_address
       ()
   in
-  let (Qty next_blueprint_number) = ctxt.session.next_blueprint_number in
+  let*! head = Evm_context.head_info () in
+  let (Qty next_blueprint_number) = head.next_blueprint_number in
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
@@ -260,10 +208,10 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~max_blueprints_catchup
       ~catchup_cooldown
       ~latest_level_seen:(Z.pred next_blueprint_number)
-      ctxt.store
+      ()
   in
   let* () =
-    if not loaded then
+    if status = Created then
       (* Create the first empty block. *)
       let* genesis =
         Sequencer_blueprint.create
@@ -276,12 +224,17 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
           ~number:Ethereum_types.(Qty Z.zero)
           ~parent_hash:Ethereum_types.genesis_parent_hash
       in
-      Evm_context.apply_and_publish_blueprint ctxt genesis_timestamp genesis
+      let* () = Evm_context.apply_blueprint genesis_timestamp genesis [] in
+      Blueprints_publisher.publish Z.zero genesis
     else return_unit
   in
 
+  let smart_rollup_address_typed =
+    Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
+  in
+
   let module Sequencer = Make (struct
-    let ctxt = ctxt
+    let smart_rollup_address = smart_rollup_address_typed
   end) in
   let* () =
     Tx_pool.start
@@ -289,18 +242,25 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   in
   let* () =
     Block_producer.start
-      {ctxt; cctxt; smart_rollup_address; sequencer_key = sequencer}
+      {
+        cctxt;
+        smart_rollup_address;
+        sequencer_key = sequencer;
+        maximum_number_of_chunks = configuration.mode.max_number_of_chunks;
+      }
   in
   let* () =
-    Delayed_inbox.start {rollup_node_endpoint; delayed_inbox_interval = 1}
+    Evm_events_follower.start
+      {rollup_node_endpoint; filter_event = (fun _ -> true)}
   in
-  let* () = Evm_events_follower.start {rollup_node_endpoint; ctxt} in
-  let* () = catchup_evm_event ~rollup_node_endpoint ctxt.store in
-  let* () = Rollup_node_follower.start {rollup_node_endpoint} in
+  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
+
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in
-  let directory = directory |> Evm_services.register ctxt in
+  let directory =
+    directory |> Evm_services.register smart_rollup_address_typed
+  in
   let private_info =
     Option.map
       (fun private_rpc_port ->
