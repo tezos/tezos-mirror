@@ -34,7 +34,7 @@ const MAX_STEPS: usize = 1_000_000;
 struct Instruction<'a> {
     address: u64,
     text: &'a str,
-    jump: Option<(u64, &'a str)>,
+    jump: Option<(u64, Option<&'a str>)>,
 }
 
 struct ProgramView<'a> {
@@ -82,7 +82,7 @@ impl<'a> Instruction<'a> {
             "jal" | "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" => {
                 text.split(',').last().map(|jump_address| {
                     let addr = address.wrapping_add(jump_address.parse::<i64>().unwrap() as u64);
-                    symbols.get(&addr).map(|&label| (addr, label))
+                    (addr, symbols.get(&addr).copied())
                 })
             }
             _ => None,
@@ -90,7 +90,7 @@ impl<'a> Instruction<'a> {
         Self {
             address,
             text,
-            jump: jump.flatten(),
+            jump,
         }
     }
 }
@@ -509,7 +509,8 @@ impl<'a> Instruction<'a> {
         // If the instruction is a jump address and it points to a known symbol,
         // display the address and the symbol
         if let Some((address, label)) = self.jump {
-            line.push(format!(" # {:x} ({})", address, label).into())
+            let label = label.map(|x| format!("({})", x)).unwrap_or_default();
+            line.push(format!(" # {:x} {}", address, label).into())
         }
 
         // If the address of the instruction is also the address of a known symbol,
