@@ -31,8 +31,8 @@ tezt:
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
     --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL:-3}
-    --retry ${TEZT_RETRY:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
   - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
   variables:
     JUNIT: tezt-junit.xml
@@ -88,8 +88,8 @@ tezt-memory-4k:
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
     --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL:-3}
-    --retry ${TEZT_RETRY:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
   - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
   variables:
     JUNIT: tezt-junit.xml
@@ -145,8 +145,8 @@ tezt-memory-3k:
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
     --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL:-3}
-    --retry ${TEZT_RETRY:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
   - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
   variables:
     JUNIT: tezt-junit.xml
@@ -201,8 +201,8 @@ tezt-time-sensitive:
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
     --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL:-3}
-    --retry ${TEZT_RETRY:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
   - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
   variables:
     JUNIT: tezt-junit.xml
@@ -254,8 +254,8 @@ tezt:static-binaries:
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
     --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL:-3}
-    --retry ${TEZT_RETRY:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
   - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
   variables:
     JUNIT: tezt-junit.xml

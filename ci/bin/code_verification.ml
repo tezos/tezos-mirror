@@ -464,17 +464,13 @@ let job_tezt ~__POS__ ?rules ?parallel ?(tags = ["gcp_tezt"]) ~name
          because if the CI timeout is reached, there are no artefacts,
          and thus no logs to investigate.
          See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
-      (* TODO: there is no point in providing default values for the
-         expansion of [TEZT_PARALLEL] and [TEZT_RETRY] as they are
-         always set in this job (see the definition of variables
-         above). Remove this once all tezt jobs are translated. *)
       "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
        \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
        --global-timeout 1800 --on-unknown-regression-files fail --junit \
        ${JUNIT} --from-record tezt/records --job \
        ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
        tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
-       ${TEZT_PARALLEL:-3} --retry ${TEZT_RETRY:-1}";
+       ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
       "if [ -n \"${BISECT_FILE:-}\" ]; then ./scripts/ci/merge_coverage.sh; fi";
     ]
 
