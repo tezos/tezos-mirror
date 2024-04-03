@@ -36,21 +36,29 @@ evm_installer.wasm:: kernel_sdk evm_kernel.wasm
 ifdef EVM_CONFIG
 	$(eval CONFIG := --setup-file ${EVM_CONFIG})
 endif
+ifeq (${DISPLAY_ROOT_HASH}, true)
+	$(eval DISPLAY_CONFIG := --display-root-hash)
+endif
 	@./smart-rollup-installer get-reveal-installer \
 	--upgrade-to evm_kernel.wasm \
 	--preimages-dir ${EVM_KERNEL_PREIMAGES} \
 	--output $@ \
-	${CONFIG}
+	${CONFIG} \
+	${DISPLAY_CONFIG}
 
 evm_unstripped_installer.wasm:: kernel_sdk evm_kernel_unstripped.wasm
 ifdef EVM_CONFIG
 	$(eval CONFIG := --setup-file ${EVM_CONFIG})
 endif
+ifeq (${DISPLAY_ROOT_HASH}, true)
+	$(eval DISPLAY_CONFIG := --display-root-hash)
+endif
 	@./smart-rollup-installer get-reveal-installer \
 	--upgrade-to evm_kernel_unstripped.wasm \
 	--preimages-dir ${EVM_UNSTRIPPED_KERNEL_PREIMAGES} \
 	--output $@ \
-	${CONFIG}
+	${CONFIG} \
+	${DISPLAY_CONFIG}
 
 evm_benchmark_kernel.wasm::
 	@${MAKE} -f etherlink.mk \
@@ -89,9 +97,10 @@ check: build-dev-deps
 
 .PHONY: clean
 clean:
-	@rm -f ${KERNELS}
+	@$(MAKE) -f kernels.mk clean
+	@rm -f evm_kernel_unstripped.wasm evm_kernel.wasm evm_installer.wasm evm_unstripped_installer.wasm evm_installer.wasm evm_installer_dev.wasm evm_benchmark_kernel.wasm sequencer.wasm
 	@$(MAKE) -C ${EVM_DIR} clean
-	@rm -rf ${EVM_KERNEL_PREIMAGES}
+	@rm -rf ${EVM_KERNEL_PREIMAGES} ${EVM_UNSTRIPPED_KERNEL_PREIMAGES}
 
 sequencer.wasm::
 	@${MAKE} -f etherlink.mk EVM_CONFIG=etherlink/config/sequencer.yaml evm_installer.wasm
