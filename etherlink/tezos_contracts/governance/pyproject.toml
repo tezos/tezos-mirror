@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "etherlink-governance"
+version = "0.1.0"
+description = "TODO"
+authors = ["Maxim Kucherov <mk@baking-bad.org>"]
+readme = "README.md"
+packages = [
+    { include = "tests" },
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+python-dotenv = "^1.0.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+pytezos = "^3.10.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+deploy_contract = "scripts.governance:deploy_contract"

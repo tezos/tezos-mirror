@@ -1,0 +1,7 @@
+{ parameter (or (or (pair %d bytes (ticket (pair nat (option bytes)))) (bytes %a)) (bytes %u)) ;
+  storage bytes ;
+  code { CAR ;
+         IF_LEFT { DROP ; PUSH string "WRONG_ROLLUP_ENTRYPOINT" ; FAILWITH } {} ;
+         NIL operation ;
+         PAIR } }
+
