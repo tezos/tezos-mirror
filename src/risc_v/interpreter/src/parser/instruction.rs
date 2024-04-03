@@ -221,6 +221,9 @@ pub enum Instr {
     Fmaxs(FRArgs),
     Flw(FLoadArgs),
     Fsw(FStoreArgs),
+    Fsgnjs(FRArgs),
+    Fsgnjns(FRArgs),
+    Fsgnjxs(FRArgs),
     FmvXW(FRegToXRegArgs),
     FmvWX(XRegToFRegArgs),
 
@@ -233,6 +236,9 @@ pub enum Instr {
     Fmaxd(FRArgs),
     Fld(FLoadArgs),
     Fsd(FStoreArgs),
+    Fsgnjd(FRArgs),
+    Fsgnjnd(FRArgs),
+    Fsgnjxd(FRArgs),
     FmvXD(FRegToXRegArgs),
     FmvDX(XRegToFRegArgs),
 
@@ -345,6 +351,9 @@ impl Instr {
             | Mulw(_)
             | FmvXW(_)
             | FmvWX(_)
+            | Fsgnjs(_)
+            | Fsgnjns(_)
+            | Fsgnjxs(_)
             | FclassS(_)
             | Feqs(_)
             | Fles(_)
@@ -355,6 +364,9 @@ impl Instr {
             | Fsw(_)
             | FmvXD(_)
             | FmvDX(_)
+            | Fsgnjd(_)
+            | Fsgnjnd(_)
+            | Fsgnjxd(_)
             | FclassD(_)
             | Feqd(_)
             | Fled(_)
@@ -624,6 +636,9 @@ impl fmt::Display for Instr {
             Fmaxs(args) => r_instr!(f, "fmax.s", args),
             Flw(args) => i_instr_load!(f, "flw", args),
             Fsw(args) => s_instr!(f, "fsw", args),
+            Fsgnjs(args) => r_instr!(f, "fsgnj.s", args),
+            Fsgnjns(args) => r_instr!(f, "fsgnjn.s", args),
+            Fsgnjxs(args) => r_instr!(f, "fsgnjx.s", args),
             FmvXW(args) => f_s1_instr!(f, "fmv.x.w", args),
             FmvWX(args) => f_s1_instr!(f, "fmv.w.x", args),
 
@@ -636,6 +651,9 @@ impl fmt::Display for Instr {
             Fmaxd(args) => r_instr!(f, "fmax.d", args),
             Fld(args) => i_instr_load!(f, "fld", args),
             Fsd(args) => s_instr!(f, "fsd", args),
+            Fsgnjd(args) => r_instr!(f, "fsgnj.d", args),
+            Fsgnjnd(args) => r_instr!(f, "fsgnjn.d", args),
+            Fsgnjxd(args) => r_instr!(f, "fsgnjx.d", args),
             FmvXD(args) => f_s1_instr!(f, "fmv.x.d", args),
             FmvDX(args) => f_s1_instr!(f, "fmv.d.x", args),
 

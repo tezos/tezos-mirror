@@ -134,7 +134,7 @@ test_case!(#[ignore], test_suite_rv64ud_p_fdiv, "rv64ud-p-fdiv");
 test_case!(#[ignore], test_suite_rv64ud_p_fmadd, "rv64ud-p-fmadd");
 test_case!(test_suite_rv64ud_p_fmin, "rv64ud-p-fmin");
 test_case!(test_suite_rv64ud_p_ldst, "rv64ud-p-ldst");
-test_case!(#[ignore], test_suite_rv64ud_p_move, "rv64ud-p-move");
+test_case!(test_suite_rv64ud_p_move, "rv64ud-p-move");
 test_case!(#[ignore], test_suite_rv64ud_p_recoding, "rv64ud-p-recoding");
 test_case!(#[ignore], test_suite_rv64ud_p_structural, "rv64ud-p-structural");
 
@@ -160,7 +160,7 @@ test_case!(#[ignore], test_suite_rv64uf_p_fdiv, "rv64uf-p-fdiv");
 test_case!(#[ignore], test_suite_rv64uf_p_fmadd, "rv64uf-p-fmadd");
 test_case!(test_suite_rv64uf_p_fmin, "rv64uf-p-fmin");
 test_case!(test_suite_rv64uf_p_ldst, "rv64uf-p-ldst");
-test_case!(#[ignore], test_suite_rv64uf_p_move, "rv64uf-p-move");
+test_case!(test_suite_rv64uf_p_move, "rv64uf-p-move");
 test_case!(#[ignore], test_suite_rv64uf_p_recoding, "rv64uf-p-recoding");
 
 test_case!(#[ignore], test_suite_rv64uf_v_fadd, "rv64uf-v-fadd");

@@ -87,6 +87,27 @@ where
         self.run_fmax::<Single>(rs1, rs2, rd);
     }
 
+    /// `FSGNJ.S` R-type instruction.
+    ///
+    /// See [Self::run_fsgnj].
+    pub fn run_fsgnj_s(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.run_fsgnj::<Single>(rs1, rs2, rd)
+    }
+
+    /// `FSGNJN.S` R-type instruction.
+    ///
+    /// See [Self::run_fsgnjn].
+    pub fn run_fsgnjn_s(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.run_fsgnjn::<Single>(rs1, rs2, rd)
+    }
+
+    /// `FSGNJX.S` R-type instruction.
+    ///
+    /// See [Self::run_fsgnjx].
+    pub fn run_fsgnjx_s(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.run_fsgnjx::<Single>(rs1, rs2, rd)
+    }
+
     /// `FMV.X.W` F-type instruction
     ///
     /// Moves the single-precision value in floating-point register `rs1`

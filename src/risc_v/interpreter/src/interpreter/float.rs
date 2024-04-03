@@ -170,6 +170,65 @@ where
         self.min_max(rs1, rs2, rd, F::maximum)
     }
 
+    /// `FSGNJ.*` instruction.
+    ///
+    /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
+    /// The sign bit is taken from `rs2`.
+    pub fn run_fsgnj<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
+    where
+        FValue: Into<F>,
+    {
+        self.f_sign_injection(rs1, rs2, rd, |_x, y| y);
+    }
+
+    /// `FSGNJN.*` instruction.
+    ///
+    /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
+    /// The sign bit is taken from the negative of `rs2`.
+    pub fn run_fsgnjn<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
+    where
+        FValue: Into<F>,
+    {
+        self.f_sign_injection(rs1, rs2, rd, |_x, y| !y);
+    }
+
+    /// `FSGNJX.*` instruction.
+    ///
+    /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
+    /// The sign bit is taken from the bitwise XOR of the sign bits from `rs1` & `rs2`.
+    pub fn run_fsgnjx<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
+    where
+        FValue: Into<F>,
+    {
+        self.f_sign_injection(rs1, rs2, rd, |x, y| x ^ y);
+    }
+
+    fn f_sign_injection<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+        pick_sign: fn(bool, bool) -> bool,
+    ) where
+        FValue: Into<F>,
+    {
+        let rval1: F = self.fregisters.read(rs1).into();
+        let rval2: F = self.fregisters.read(rs2).into();
+
+        let sign_bit_1 = rval1.is_negative();
+        let sign_bit_2 = rval2.is_negative();
+
+        let sign_bit = pick_sign(sign_bit_1, sign_bit_2);
+
+        let res = if sign_bit == sign_bit_1 {
+            rval1
+        } else {
+            -rval1
+        };
+
+        self.fregisters.write(rd, res.into());
+    }
+
     fn min_max<F: FloatExt>(
         &mut self,
         rs1: FRegister,
