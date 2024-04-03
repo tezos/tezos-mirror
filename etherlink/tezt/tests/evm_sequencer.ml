@@ -1164,6 +1164,32 @@ let test_observer_applies_blueprint =
 
   unit
 
+let test_observer_applies_blueprint_when_restarted =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "observer"]
+    ~title:"Can restart an Observer node"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let* {sequencer; observer; _} =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+
+  (* We produce a block and check the observer applies it. *)
+  let* _ = Evm_node.wait_for_blueprint_applied observer 1
+  and* _ = Rpc.produce_block sequencer in
+
+  (* We restart the observer *)
+  let* () = Evm_node.terminate observer in
+  let* () = Evm_node.run observer in
+
+  (* We produce a block and check the observer applies it. *)
+  let* _ = Evm_node.wait_for_blueprint_applied observer 2
+  and* _ = Rpc.produce_block sequencer in
+
+  unit
+
 let test_observer_forwards_transaction =
   Protocol.register_test
     ~__FILE__
@@ -2726,6 +2752,7 @@ let () =
   test_init_from_rollup_node_data_dir protocols ;
   test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;
+  test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_forwards_transaction protocols ;
   test_sequencer_is_reimbursed protocols ;
   test_upgrade_kernel_auto_sync protocols ;

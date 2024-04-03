@@ -41,10 +41,9 @@ let create_blueprint_watcher_service from_level =
   (* input source block creating a stream to observe the events *)
   let* head_info = Evm_context.head_info () in
   let (Qty next) = head_info.next_blueprint_number in
-  let head_level = Z.pred next in
   let* () =
-    if Z.(Compare.(head_level < of_int64 from_level)) then
-      Stdlib.failwith "Cannot start watching from a level in the future"
+    if Z.(Compare.(next < of_int64 from_level)) then
+      Stdlib.failwith "Cannot start watching from a level too far in the future"
     else return_unit
   in
 
@@ -52,7 +51,7 @@ let create_blueprint_watcher_service from_level =
   let next =
     let next_level_requested = ref Z.(of_int64 from_level) in
     fun () ->
-      if Z.Compare.(!next_level_requested <= head_level) then (
+      if Z.Compare.(!next_level_requested < next) then (
         let current_request = !next_level_requested in
         (next_level_requested := Z.(succ current_request)) ;
         let* blueprint = Evm_context.blueprint (Qty current_request) in
