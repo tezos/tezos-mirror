@@ -67,7 +67,8 @@ let default_max_active_connections =
 
 let default_proxy = {rollup_node_endpoint = Uri.empty}
 
-let default_preimages = "_evm_installer_preimages"
+let default_preimages =
+  Filename.Infix.(default_data_dir // "_evm_installer_preimages")
 
 let default_time_between_blocks = Time_between_blocks 5.
 
