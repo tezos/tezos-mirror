@@ -50,14 +50,18 @@ cat $EXECUTABLE_FILES |
     chmod +w "octez-binaries/$ARCH/$executable"
   done
 
-echo 'Check octez-client --version'
+# We use an arbitrary executable (the first one) from the list to compute the
+# version
+VERSION_BIN=$(xargs < "$EXECUTABLE_FILES" | cut -d " " -f 1)
+
+echo "Check $VERSION_BIN --version"
 SHA=$(git rev-parse --short=8 HEAD)
-client_version=$("octez-binaries/$ARCH/octez-client" --version | cut -f 1 -d ' ')
+client_version=$("octez-binaries/$ARCH/$VERSION_BIN" --version | cut -f 1 -d ' ')
 if [ "$SHA" != "$client_version" ]; then
-  echo "Unexpected version for octez-client (expected $SHA, found $client_version)"
+  echo "Unexpected version for $VERSION_BIN (expected $SHA, found $client_version)"
   exit 1
 fi
-echo "octez-client --version returned the expected commit hash: $SHA"
+echo "$VERSION_BIN --version returned the expected commit hash: $SHA"
 
 echo "Strip debug symbols and compress binaries (parallelized)"
 # shellcheck disable=SC2046,SC2038
