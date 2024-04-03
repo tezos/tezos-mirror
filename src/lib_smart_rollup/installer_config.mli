@@ -46,3 +46,7 @@ val generate_yaml : t -> Yaml.yaml tzresult
 (** [emit_yaml instrs] generates the YAML representation of [instrs] in textual
     format. *)
 val emit_yaml : t -> string tzresult
+
+(** [to_file instrs ~output] writes the instructions into a file,
+    either in JSON or YAML depending on the extension of [output]. *)
+val to_file : t -> output:string -> unit tzresult Lwt.t

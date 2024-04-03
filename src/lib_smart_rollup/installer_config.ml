@@ -161,3 +161,21 @@ let emit_yaml instrs =
   let open Result_syntax in
   let* yaml = generate_yaml instrs in
   Yaml.yaml_to_string yaml |> map_yaml_err
+
+let to_file instrs ~output =
+  let open Lwt_result_syntax in
+  let*? contents =
+    if
+      Filename.check_suffix output ".yaml"
+      || Filename.check_suffix output ".yml"
+    then emit_yaml instrs
+    else
+      Ok
+        (Data_encoding.Json.construct encoding instrs
+        |> Data_encoding.Json.to_string)
+  in
+  let*! () =
+    Lwt_io.with_file ~mode:Lwt_io.Output output (fun oc ->
+        Lwt_io.write_from_string_exactly oc contents 0 (String.length contents))
+  in
+  return_unit
