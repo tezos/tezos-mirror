@@ -287,7 +287,7 @@ val add_artifacts :
   ?name:string ->
   ?expose_as:string ->
   ?reports:Gitlab_ci.Types.reports ->
-  ?expire_in:Gitlab_ci.Types.time_interval ->
+  ?expire_in:Gitlab_ci.Types.expiration ->
   ?when_:Gitlab_ci.Types.when_artifact ->
   string list ->
   tezos_job ->

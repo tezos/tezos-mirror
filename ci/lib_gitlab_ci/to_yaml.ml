@@ -90,6 +90,10 @@ let enc_time_interval interval =
     | Years 1 -> "1 year"
     | Years x -> string_of_int x ^ " years")
 
+let enc_expiration = function
+  | Duration interval -> enc_time_interval interval
+  | Never -> `String "never"
+
 let enc_job_rule : job_rule -> value =
  fun {changes; if_; variables; when_; allow_failure} ->
   let start_in =
@@ -157,7 +161,7 @@ let enc_artifacts : artifacts -> value =
   obj_flatten
     [
       opt "name" string name;
-      opt "expire_in" enc_time_interval expire_in;
+      opt "expire_in" enc_expiration expire_in;
       opt "paths" strings paths;
       opt "reports" enc_report reports;
       opt "when" enc_when_artifact when_;

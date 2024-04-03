@@ -137,7 +137,8 @@ let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =
         "eval $(opam env)";
         "OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh";
       ]
-    ~artifacts:(artifacts ~expire_in:(Weeks 1) ~when_:Always ["opam_logs/"])
+    ~artifacts:
+      (artifacts ~expire_in:(Duration (Weeks 1)) ~when_:Always ["opam_logs/"])
     ~cache:[{key = "opam-sccache"; paths = ["_build/_sccache"]}]
   |> (* We store caches in [_build] for two reasons: (1) the [_build]
         folder is excluded from opam's rsync. (2) gitlab ci cache
@@ -237,7 +238,7 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
              ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
              ["test_results"]
              ~reports:(reports ~junit:"test_results/*.xml" ())
-             ~expire_in:(Days 1)
+             ~expire_in:(Duration (Days 1))
              ~when_:Always)
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         script
@@ -590,7 +591,7 @@ let jobs pipeline_type =
         ~artifacts:
           (artifacts
              ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
-             ~expire_in:(Days 1)
+             ~expire_in:(Duration (Days 1))
              ~when_:On_success
              [
                "evm_kernel.wasm";
@@ -637,7 +638,7 @@ let jobs pipeline_type =
         ~allow_failure:Yes
         ~artifacts:
           (artifacts
-             ~expire_in:(Hours 4)
+             ~expire_in:(Duration (Hours 4))
              ~when_:Always
              [
                "tezt-fetch-records.log";
@@ -665,7 +666,10 @@ let jobs pipeline_type =
         ["scripts/ci/select_tezts.sh || exit $?"]
         ~allow_failure:(With_exit_codes [17])
         ~artifacts:
-          (artifacts ~expire_in:(Days 3) ~when_:Always ["selected_tezts.tsl"])
+          (artifacts
+             ~expire_in:(Duration (Days 3))
+             ~when_:Always
+             ["selected_tezts.tsl"])
       |> job_external_once
     in
     [
@@ -730,7 +734,7 @@ let jobs pipeline_type =
         ]
         ~artifacts:
           (artifacts
-             ~expire_in:(Hours 1)
+             ~expire_in:(Duration (Hours 1))
              ~when_:On_success
              ["_build/default/client-libs/bin_codec_kaitai/codec.exe"])
       |> job_external_split

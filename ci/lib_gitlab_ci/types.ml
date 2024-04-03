@@ -20,6 +20,8 @@ type time_interval =
   | Months of int
   | Years of int
 
+type expiration = Duration of time_interval | Never
+
 (** Represents values of the [when:] field in job rules. *)
 type when_ = Always | Never | On_success | Manual | Delayed of time_interval
 
@@ -77,7 +79,7 @@ type image = Image of string
 type when_artifact = Always | On_success | On_failure
 
 type artifacts = {
-  expire_in : time_interval option;
+  expire_in : expiration option;
   paths : string list option;
   reports : reports option;
   when_ : when_artifact option;
