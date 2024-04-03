@@ -127,6 +127,10 @@ const safe_get = (array, cycle) => {
  * returns returns the total delegated amount (in mutez) on the chain
  * @property {function(number):bigInt} total_staked_balance - Takes a cycle and
  * returns the total stake (in mutez) frozen on the chain.
+ * @property {function(number):number} issuance_per_block - Takes a cycle and
+ * returns the issuance per block (in mutez) for this cycle.
+ * @property {function(number):number} issuance_per_cycle - Takes a cycle and
+ * returns the issuance (in mutez) for this cycle.
  */
 
 /**
@@ -417,12 +421,12 @@ export class Simulator {
     );
   }
 
-  vdf_revelation_tip = (cycle) => {
+  vdf_revelation_tip(cycle) {
     return this.#reward_from_constants(
       cycle,
       this.config.proto.vdf_tip * this.config.proto.blocks_per_commitment,
     );
-  };
+  }
 
   #current_rewards_per_minute(cycle) {
     return this.reward_coeff(cycle).times(
@@ -435,6 +439,42 @@ export class Simulator {
       .divide(safe_get(this.config.chain.total_supply, cycle))
       .times(min_per_year)
       .times(100);
+  }
+
+  issuance_per_block(cycle) {
+    const baking_reward_fixed_portion = this.baking_reward_fixed_portion(cycle);
+
+    const baking_reward_bonus_per_block = this.#reward_from_constants(
+      cycle,
+      this.config.proto.bonus_baking_rewards,
+    );
+
+    const attestation_rewards_per_block = this.#reward_from_constants(
+      cycle,
+      this.config.proto.attestation_rewards,
+    );
+
+    const vdf_revelation_tip = this.#reward_from_constants(
+      cycle,
+      this.config.proto.vdf_tip,
+    );
+
+    const seed_nonce_revelation_tip = this.#reward_from_constants(
+      cycle,
+      this.config.proto.nonce_revelation_tip,
+    );
+
+    return (
+      baking_reward_fixed_portion +
+      baking_reward_bonus_per_block +
+      attestation_rewards_per_block +
+      vdf_revelation_tip +
+      seed_nonce_revelation_tip
+    );
+  }
+
+  issuance_per_cycle(cycle) {
+    this.issuance_per_block(cycle) * this.config.proto.blocks_per_cycle;
   }
 }
 
