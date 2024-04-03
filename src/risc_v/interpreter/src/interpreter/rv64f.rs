@@ -6,6 +6,7 @@
 //!
 //! Chapter 11 - "F" Standard Extension for Single-Precision Floating-Point
 
+use super::float::FloatExt;
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
@@ -29,7 +30,14 @@ impl From<Single> for FValue {
 impl Into<Single> for FValue {
     fn into(self) -> Single {
         let val: u64 = self.into();
-        Single::from_bits(val as u32 as u128)
+
+        // Check value correctly NaN boxed:
+        // all upper bits must be set to 1
+        if val >> 32 != 0xffffffff {
+            Single::canonical_nan()
+        } else {
+            Single::from_bits(val as u32 as u128)
+        }
     }
 }
 
