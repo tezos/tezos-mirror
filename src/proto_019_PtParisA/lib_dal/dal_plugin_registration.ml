@@ -58,6 +58,13 @@ module Plugin = struct
         attestation_lag;
         attestation_threshold;
         cryptobox_parameters;
+        sc_rollup_challenge_window_in_blocks =
+          parametric.sc_rollup.challenge_window_in_blocks;
+        commitment_period_in_blocks =
+          parametric.sc_rollup.commitment_period_in_blocks;
+        dal_attested_slots_validity_lag =
+          parametric.sc_rollup.reveal_activation_level
+            .dal_attested_slots_validity_lag;
       }
 
   let block_info ?chain ?block ~metadata ctxt =

@@ -25,6 +25,37 @@
 
 type neighbor = {addr : string; port : int}
 
+type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Full
+
+let history_mode_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"rolling"
+        ~description:""
+        (Tag 0)
+        (obj2
+           (req "kind" (Data_encoding.constant "rolling"))
+           (req "blocks" (Data_encoding.option Data_encoding.int31)))
+        (function
+          | Rolling {blocks} -> (
+              match blocks with
+              | `Auto -> Some ((), None)
+              | `Some n -> Some ((), Some n))
+          | Full -> None)
+        (function
+          | (), None -> Rolling {blocks = `Auto}
+          | (), Some n -> Rolling {blocks = `Some n});
+      case
+        ~title:"full"
+        ~description:""
+        (Tag 1)
+        (obj1 (req "kind" (Data_encoding.constant "full")))
+        (function Full -> Some () | _ -> None)
+        (fun () -> Full);
+    ]
+
 type t = {
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
@@ -37,6 +68,7 @@ type t = {
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t;
   profiles : Types.profiles;
+  history_mode : history_mode;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -68,6 +100,8 @@ let default_metrics_port =
 let default_metrics_addr =
   P2p_point.Id.of_string_exn ~default_port:default_metrics_port "0.0.0.0"
 
+let default_history_mode = Rolling {blocks = `Auto}
+
 let default =
   {
     data_dir = default_data_dir;
@@ -80,6 +114,7 @@ let default =
     network_name = default_network_name;
     endpoint = default_endpoint;
     metrics_addr = default_metrics_addr;
+    history_mode = Rolling {blocks = `Auto};
     profiles = Operator [];
   }
 
@@ -118,6 +153,7 @@ let encoding : t Data_encoding.t =
            network_name;
            endpoint;
            metrics_addr;
+           history_mode;
            profiles;
          } ->
       ( ( data_dir,
@@ -130,7 +166,7 @@ let encoding : t Data_encoding.t =
           network_name,
           endpoint,
           metrics_addr ),
-        profiles ))
+        (history_mode, profiles) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -141,7 +177,7 @@ let encoding : t Data_encoding.t =
              network_name,
              endpoint,
              metrics_addr ),
-           profiles ) ->
+           (history_mode, profiles) ) ->
       {
         data_dir;
         rpc_addr;
@@ -153,6 +189,7 @@ let encoding : t Data_encoding.t =
         network_name;
         endpoint;
         metrics_addr;
+        history_mode;
         profiles;
       })
     (merge_objs
@@ -207,7 +244,12 @@ let encoding : t Data_encoding.t =
              ~description:"The point for the DAL node metrics server"
              P2p_point.Id.encoding
              default_metrics_addr))
-       (obj1
+       (obj2
+          (dft
+             "history_mode"
+             ~description:"The history mode for the DAL node"
+             history_mode_encoding
+             default_history_mode)
           (dft
              "profiles"
              ~description:"The Octez DAL node profiles"

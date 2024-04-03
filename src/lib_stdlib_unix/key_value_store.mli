@@ -180,7 +180,7 @@ val values_exist :
     the store. In case of concurrent read/write, this function should
     succeed no matter what. The result of [read/write] depends on
     which function was issued first. For example if the [read] was
-    issued before the [remove_file], it will returns the corresponding
+    issued before the [remove_file], it will return the corresponding
     value that was stored, and then the file will be removed. *)
 val remove_file :
   ('file, 'key, 'value) t ->

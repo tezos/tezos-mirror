@@ -106,6 +106,28 @@ let update_plugin_in_ready ctxt plugin proto =
   | Ready ready_ctxt ->
       ctxt.status <- Ready {ready_ctxt with plugin; plugin_proto = proto}
 
+let next_shards_level_to_gc ctxt ~current_level =
+  match ctxt.config.history_mode with
+  | Full -> Int32.zero
+  | Rolling {blocks = `Some n} ->
+      Int32.(max zero (sub current_level (of_int n)))
+  | Rolling {blocks = `Auto} -> (
+      match ctxt.status with
+      | Starting -> Int32.zero
+      | Ready {proto_parameters; _} ->
+          let n =
+            let needed_period =
+              proto_parameters.sc_rollup_challenge_window_in_blocks
+              + proto_parameters.commitment_period_in_blocks
+              + proto_parameters.dal_attested_slots_validity_lag
+            in
+            (* We double the period, to give some slack just in case
+               (finalisation period, off by one, attestation_lag, ...).
+               With current mainnet parameters, this total period is 3 months. *)
+            needed_period * 2
+          in
+          Int32.(max zero (sub current_level (of_int n))))
+
 type error += Node_not_ready
 
 let () =

@@ -61,6 +61,10 @@ module Shards : sig
   (** [count_values store commitment] returns the number of shards
       which are stored for the given commitment. *)
   val count_values : t -> commitment -> int tzresult Lwt.t
+
+  (** [remove store commitment] removes the shards associated to the given
+      commitment from the store *)
+  val remove : t -> commitment -> unit tzresult Lwt.t
 end
 
 module Shard_proofs_cache : sig
