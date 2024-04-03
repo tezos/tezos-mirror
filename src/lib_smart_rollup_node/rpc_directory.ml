@@ -27,6 +27,22 @@
 
 open Rpc_directory_helpers
 
+(* Add extra services which must live in the rollup node library *)
+module Rollup_node_services = struct
+  include Rollup_node_services
+
+  module Root = struct
+    include Root
+
+    let config =
+      Tezos_rpc.Service.get_service
+        ~description:"Returns the rollup node configuration"
+        ~query:Tezos_rpc.Query.empty
+        ~output:Configuration.encoding_no_default
+        Tezos_rpc.Path.(root / "config")
+  end
+end
+
 let get_head_hash_opt node_ctxt =
   let open Lwt_result_syntax in
   let+ res = Node_context.last_processed_head_opt node_ctxt in
@@ -71,6 +87,39 @@ module Local_directory = Make_directory (struct
   let context_of_prefix node_ctxt () =
     Lwt_result.return (Node_context.readonly node_ctxt)
 end)
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.health
+  @@ fun _node_ctxt () () -> Lwt_result_syntax.return_unit
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.version
+  @@ fun _node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let version =
+    Tezos_version.Version.to_string
+      Tezos_version_value.Current_git_info.octez_version
+  in
+  let store_version = Format.asprintf "%a" Store_version.pp Store.version in
+  let context_version = Context.Version.(to_string version) in
+  return Rollup_node_services.{version; store_version; context_version}
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.config
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let+ history_mode = Node_context.get_history_mode node_ctxt in
+  {node_ctxt.config with history_mode = Some history_mode}
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.ocaml_gc
+  @@ fun _node_ctxt () () -> Lwt_result_syntax.return @@ Gc.stat ()
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.memory
+  @@ fun _node_ctxt () () ->
+  let open Lwt_result_syntax in
+  Sys_info.memory_stats () |> lwt_map_error TzTrace.make
 
 let () =
   Global_directory.register0 Rollup_node_services.Global.sc_rollup_address

@@ -50,6 +50,8 @@ module Acl = struct
               "GET /global/block/*/durable/wasm_2_0_0/subkeys";
               "/local/batcher/**";
               "/admin/**";
+              "/stats/**";
+              "/config";
             ];
       }
 

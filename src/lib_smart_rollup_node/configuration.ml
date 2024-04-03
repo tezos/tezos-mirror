@@ -197,7 +197,7 @@ let default_batcher_min_batch_elements = 10
 
 let default_batcher_min_batch_size = 10
 
-let default_batcher_max_batch_elements = max_int
+let default_batcher_max_batch_elements = (1 lsl 30) - 1
 
 let default_batcher =
   {
@@ -407,8 +407,15 @@ let cors_encoding : Resto_cohttp.Cors.t Data_encoding.t =
        (req "allowed_headers" (list string))
        (req "allowed_origins" (list string))
 
-let encoding : t Data_encoding.t =
+let encoding default_display : t Data_encoding.t =
   let open Data_encoding in
+  let dft =
+    match default_display with
+    | `Hide -> dft
+    | `Show ->
+        fun ?title ?description name enc _default ->
+          req ?title ?description name enc
+  in
   conv
     (fun {
            sc_rollup_address;
@@ -595,6 +602,10 @@ let encoding : t Data_encoding.t =
              (dft "gc-parameters" gc_parameters_encoding default_gc_parameters)
              (opt "history-mode" history_mode_encoding)
              (dft "cors" cors_encoding Resto_cohttp.Cors.default))))
+
+let encoding_no_default = encoding `Show
+
+let encoding = encoding `Hide
 
 (** Maps a mode to their corresponding purposes. The Custom mode
     returns each purposes where it has at least one operation kind

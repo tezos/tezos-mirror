@@ -99,8 +99,25 @@ type sync_result =
       percentage_done : float;
     }
 
+type version = {
+  version : string;
+  store_version : string;
+  context_version : string;
+}
+
 module Encodings = struct
   open Data_encoding
+
+  let version =
+    conv
+      (fun {version; store_version; context_version} ->
+        (version, store_version, context_version))
+      (fun (version, store_version, context_version) ->
+        {version; store_version; context_version})
+    @@ obj3
+         (req "version" string)
+         (req "store_version" string)
+         (req "context_version" string)
 
   let commitment_with_hash =
     obj2
@@ -277,6 +294,134 @@ module Encodings = struct
          (req "last_gc_level" int32)
          (req "first_available_level" int32)
          (opt "last_context_split_level" int32)
+
+  let ocaml_gc_stat_encoding =
+    let open Gc in
+    conv
+      (fun {
+             minor_words;
+             promoted_words;
+             major_words;
+             minor_collections;
+             major_collections;
+             forced_major_collections;
+             heap_words;
+             heap_chunks;
+             live_words;
+             live_blocks;
+             free_words;
+             free_blocks;
+             largest_free;
+             fragments;
+             compactions;
+             top_heap_words;
+             stack_size;
+           } ->
+        ( ( minor_words,
+            promoted_words,
+            major_words,
+            minor_collections,
+            major_collections,
+            forced_major_collections ),
+          ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
+            ( free_blocks,
+              largest_free,
+              fragments,
+              compactions,
+              top_heap_words,
+              stack_size ) ) ))
+      (fun ( ( minor_words,
+               promoted_words,
+               major_words,
+               minor_collections,
+               major_collections,
+               forced_major_collections ),
+             ( (heap_words, heap_chunks, live_words, live_blocks, free_words),
+               ( free_blocks,
+                 largest_free,
+                 fragments,
+                 compactions,
+                 top_heap_words,
+                 stack_size ) ) ) ->
+        {
+          minor_words;
+          promoted_words;
+          major_words;
+          minor_collections;
+          major_collections;
+          forced_major_collections;
+          heap_words;
+          heap_chunks;
+          live_words;
+          live_blocks;
+          free_words;
+          free_blocks;
+          largest_free;
+          fragments;
+          compactions;
+          top_heap_words;
+          stack_size;
+        })
+      (merge_objs
+         (obj6
+            (req "minor_words" float)
+            (req "promoted_words" float)
+            (req "major_words" float)
+            (req "minor_collections" int31)
+            (req "major_collections" int31)
+            (req "forced_major_collections" int31))
+         (merge_objs
+            (obj5
+               (req "heap_words" int31)
+               (req "heap_chunks" int31)
+               (req "live_words" int31)
+               (req "live_blocks" int31)
+               (req "free_words" int31))
+            (obj6
+               (req "free_blocks" int31)
+               (req "largest_free" int31)
+               (req "fragments" int31)
+               (req "compactions" int31)
+               (req "top_heap_words" int31)
+               (req "stack_size" int31))))
+
+  let mem_stat_encoding =
+    let open Memory in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          (Tag 0)
+          (conv
+             (fun {page_size; size; resident; shared; text; lib; data; dt} ->
+               (page_size, size, resident, shared, text, lib, data, dt))
+             (fun (page_size, size, resident, shared, text, lib, data, dt) ->
+               {page_size; size; resident; shared; text; lib; data; dt})
+             (obj8
+                (req "page_size" int31)
+                (req "size" int64)
+                (req "resident" int64)
+                (req "shared" int64)
+                (req "text" int64)
+                (req "lib" int64)
+                (req "data" int64)
+                (req "dt" int64)))
+          ~title:"Linux_proc_statm"
+          (function Statm x -> Some x | _ -> None)
+          (function res -> Statm res);
+        case
+          (Tag 1)
+          (conv
+             (fun {page_size; mem; resident} -> (page_size, mem, resident))
+             (fun (page_size, mem, resident) -> {page_size; mem; resident})
+             (obj3
+                (req "page_size" int31)
+                (req "mem" float)
+                (req "resident" int64)))
+          ~title:"Darwin_ps"
+          (function Ps x -> Some x | _ -> None)
+          (function res -> Ps res);
+      ]
 
   let synchronization_result =
     union
@@ -527,6 +672,35 @@ module Root = struct
 
     let prefix = root
   end)
+
+  let health =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Returns an empty response if the rollup node can answer requests"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.unit
+      (path / "health")
+
+  let version =
+    Tezos_rpc.Service.get_service
+      ~description:"Returns the version information of the rollup node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.version
+      (path / "version")
+
+  let ocaml_gc =
+    Tezos_rpc.Service.get_service
+      ~description:"Gets stats from the OCaml Garbage Collector"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.ocaml_gc_stat_encoding
+      (path / "stats" / "ocaml_gc")
+
+  let memory =
+    Tezos_rpc.Service.get_service
+      ~description:"Gets memory usage stats"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.mem_stat_encoding
+      (path / "stats" / "memory")
 
   let openapi =
     Tezos_rpc.Service.get_service
