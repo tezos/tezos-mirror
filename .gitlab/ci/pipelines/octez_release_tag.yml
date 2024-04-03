@@ -106,6 +106,7 @@ oc.build:dpkg:amd64:
   - mkdir $DISTRIBUTION
   - mv octez-*.* $DISTRIBUTION/
   variables:
+    OCTEZ_PKGNAME: octez
     TARGET: dpkg
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
@@ -146,6 +147,7 @@ oc.build:rpm:amd64:
   - mkdir $DISTRIBUTION
   - mv octez-*.* $DISTRIBUTION/
   variables:
+    OCTEZ_PKGNAME: octez
     TARGET: rpm
     OCTEZ_PKGMAINTAINER: nomadic-labs
     BLST_PORTABLE: "yes"
