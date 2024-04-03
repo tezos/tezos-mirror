@@ -90,7 +90,7 @@ val job :
 
     At least one of [paths] or [reports] must be non-empty. *)
 val artifacts :
-  ?expire_in:time_interval ->
+  ?expire_in:expiration ->
   ?reports:reports ->
   ?when_:when_artifact ->
   ?expose_as:string ->
