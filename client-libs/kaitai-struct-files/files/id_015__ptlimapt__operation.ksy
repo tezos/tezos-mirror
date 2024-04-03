@@ -17,18 +17,18 @@ types:
     - id: amount_tag
       type: u1
       enum: amount_tag
-    - id: case__0
+    - id: small
       type: u1
-      if: (amount_tag == amount_tag::case__0)
-    - id: case__1
-      type: u2
-      if: (amount_tag == amount_tag::case__1)
-    - id: case__2
-      type: s4
-      if: (amount_tag == amount_tag::case__2)
-    - id: case__3
-      type: s8
-      if: (amount_tag == amount_tag::case__3)
+      if: (amount_tag == amount_tag::small)
+    - id: medium
+      type: u2be
+      if: (amount_tag == amount_tag::medium)
+    - id: biggish
+      type: s4be
+      if: (amount_tag == amount_tag::biggish)
+    - id: bigger
+      type: s8be
+      if: (amount_tag == amount_tag::bigger)
   args:
     seq:
     - id: args_entries
@@ -37,7 +37,7 @@ types:
   args_0:
     seq:
     - id: len_args
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: args
@@ -53,7 +53,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposal
       size: 32
     - id: ballot
@@ -65,7 +65,7 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh1
@@ -78,7 +78,7 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh2
@@ -87,2498 +87,72 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
       size: len_bytes_dyn_uint30
-  case__0:
+  case_0:
     seq:
-    - id: case__0_field0
-      type: s2
-    - id: case__0_field1
+    - id: case_0_field0
+      type: s2be
+    - id: case_0_field1
       size: 32
       doc: context_hash
-    - id: case__0_field2
+    - id: case_0_field2
       size: 32
       doc: context_hash
-    - id: case__0_field3
+    - id: case_0_field3
       type: tree_encoding
       doc: tree_encoding
-  case__0_0:
+  case_0_0:
     seq:
-    - id: case__0_field0
-      type: s2
-    - id: case__0_field1
+    - id: case_0_field0
+      type: s2be
+    - id: case_0_field1
       size: 32
       doc: context_hash
-    - id: case__0_field2
+    - id: case_0_field2
       size: 32
       doc: context_hash
-    - id: case__0_field3
+    - id: case_0_field3
       type: tree_encoding
-  case__1:
+  case_1:
     seq:
-    - id: case__1_field0
-      type: s2
-    - id: case__1_field1
+    - id: case_1_field0
+      type: s2be
+    - id: case_1_field1
       size: 32
       doc: context_hash
-    - id: case__1_field2
+    - id: case_1_field2
       size: 32
       doc: context_hash
-    - id: case__1_field3
+    - id: case_1_field3
       type: tree_encoding
-  case__10:
+  case_2:
     seq:
-    - id: case__10_field0
-      type: s4
-    - id: case__10_field1
-      type: case__10_field1_entries
-      repeat: expr
-      repeat-expr: 2
-      doc: case__10_field1_entries
-  case__10_field1_entries:
-    seq:
-    - id: case__10_field1_elt_field0
-      type: u1
-    - id: case__10_field1_elt_field1
-      type: inode_tree
-  case__11:
-    seq:
-    - id: case__11_field0
-      type: s8
-    - id: case__11_field1
-      type: case__11_field1_entries
-      repeat: expr
-      repeat-expr: 2
-      doc: case__11_field1_entries
-  case__11_field1_entries:
-    seq:
-    - id: case__11_field1_elt_field0
-      type: u1
-    - id: case__11_field1_elt_field1
-      type: inode_tree
-  case__12:
-    seq:
-    - id: case__12_field0
-      type: u1
-    - id: case__12_field1
-      type: case__12_field1_entries
-      repeat: expr
-      repeat-expr: 3
-      doc: case__12_field1_entries
-  case__129_elt_field0:
-    seq:
-    - id: case__129_elt_field0
-      size-eos: true
-  case__129_elt_field0_0:
-    seq:
-    - id: len_case__129_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__129_elt_field0
-      type: case__129_elt_field0
-      size: len_case__129_elt_field0
-  case__129_entries:
-    seq:
-    - id: case__129_elt_field0
-      type: case__129_elt_field0_0
-    - id: case__129_elt_field1
-      type: tree_encoding
-  case__12_field1_entries:
-    seq:
-    - id: case__12_field1_elt_field0
-      type: u1
-    - id: case__12_field1_elt_field1
-      type: inode_tree
-  case__13:
-    seq:
-    - id: case__13_field0
-      type: u2
-    - id: case__13_field1
-      type: case__13_field1_entries
-      repeat: expr
-      repeat-expr: 3
-      doc: case__13_field1_entries
-  case__130_elt_field0:
-    seq:
-    - id: case__130_elt_field0
-      size-eos: true
-  case__130_elt_field0_0:
-    seq:
-    - id: len_case__130_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__130_elt_field0
-      type: case__130_elt_field0
-      size: len_case__130_elt_field0
-  case__130_entries:
-    seq:
-    - id: case__130_elt_field0
-      type: case__130_elt_field0_0
-    - id: case__130_elt_field1
-      type: tree_encoding
-  case__131_elt_field0:
-    seq:
-    - id: case__131_elt_field0
-      size-eos: true
-  case__131_elt_field0_0:
-    seq:
-    - id: len_case__131_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__131_elt_field0
-      type: case__131_elt_field0
-      size: len_case__131_elt_field0
-  case__131_entries:
-    seq:
-    - id: case__131_elt_field0
-      type: case__131_elt_field0_0
-    - id: case__131_elt_field1
-      type: tree_encoding
-  case__132_elt_field0:
-    seq:
-    - id: case__132_elt_field0
-      size-eos: true
-  case__132_elt_field0_0:
-    seq:
-    - id: len_case__132_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__132_elt_field0
-      type: case__132_elt_field0
-      size: len_case__132_elt_field0
-  case__132_entries:
-    seq:
-    - id: case__132_elt_field0
-      type: case__132_elt_field0_0
-    - id: case__132_elt_field1
-      type: tree_encoding
-  case__133_elt_field0:
-    seq:
-    - id: case__133_elt_field0
-      size-eos: true
-  case__133_elt_field0_0:
-    seq:
-    - id: len_case__133_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__133_elt_field0
-      type: case__133_elt_field0
-      size: len_case__133_elt_field0
-  case__133_entries:
-    seq:
-    - id: case__133_elt_field0
-      type: case__133_elt_field0_0
-    - id: case__133_elt_field1
-      type: tree_encoding
-  case__134_elt_field0:
-    seq:
-    - id: case__134_elt_field0
-      size-eos: true
-  case__134_elt_field0_0:
-    seq:
-    - id: len_case__134_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__134_elt_field0
-      type: case__134_elt_field0
-      size: len_case__134_elt_field0
-  case__134_entries:
-    seq:
-    - id: case__134_elt_field0
-      type: case__134_elt_field0_0
-    - id: case__134_elt_field1
-      type: tree_encoding
-  case__135_elt_field0:
-    seq:
-    - id: case__135_elt_field0
-      size-eos: true
-  case__135_elt_field0_0:
-    seq:
-    - id: len_case__135_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__135_elt_field0
-      type: case__135_elt_field0
-      size: len_case__135_elt_field0
-  case__135_entries:
-    seq:
-    - id: case__135_elt_field0
-      type: case__135_elt_field0_0
-    - id: case__135_elt_field1
-      type: tree_encoding
-  case__136_elt_field0:
-    seq:
-    - id: case__136_elt_field0
-      size-eos: true
-  case__136_elt_field0_0:
-    seq:
-    - id: len_case__136_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__136_elt_field0
-      type: case__136_elt_field0
-      size: len_case__136_elt_field0
-  case__136_entries:
-    seq:
-    - id: case__136_elt_field0
-      type: case__136_elt_field0_0
-    - id: case__136_elt_field1
-      type: tree_encoding
-  case__137_elt_field0:
-    seq:
-    - id: case__137_elt_field0
-      size-eos: true
-  case__137_elt_field0_0:
-    seq:
-    - id: len_case__137_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__137_elt_field0
-      type: case__137_elt_field0
-      size: len_case__137_elt_field0
-  case__137_entries:
-    seq:
-    - id: case__137_elt_field0
-      type: case__137_elt_field0_0
-    - id: case__137_elt_field1
-      type: tree_encoding
-  case__138_elt_field0:
-    seq:
-    - id: case__138_elt_field0
-      size-eos: true
-  case__138_elt_field0_0:
-    seq:
-    - id: len_case__138_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__138_elt_field0
-      type: case__138_elt_field0
-      size: len_case__138_elt_field0
-  case__138_entries:
-    seq:
-    - id: case__138_elt_field0
-      type: case__138_elt_field0_0
-    - id: case__138_elt_field1
-      type: tree_encoding
-  case__139_elt_field0:
-    seq:
-    - id: case__139_elt_field0
-      size-eos: true
-  case__139_elt_field0_0:
-    seq:
-    - id: len_case__139_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__139_elt_field0
-      type: case__139_elt_field0
-      size: len_case__139_elt_field0
-  case__139_entries:
-    seq:
-    - id: case__139_elt_field0
-      type: case__139_elt_field0_0
-    - id: case__139_elt_field1
-      type: tree_encoding
-  case__13_field1_entries:
-    seq:
-    - id: case__13_field1_elt_field0
-      type: u1
-    - id: case__13_field1_elt_field1
-      type: inode_tree
-  case__14:
-    seq:
-    - id: case__14_field0
-      type: s4
-    - id: case__14_field1
-      type: case__14_field1_entries
-      repeat: expr
-      repeat-expr: 3
-      doc: case__14_field1_entries
-  case__140_elt_field0:
-    seq:
-    - id: case__140_elt_field0
-      size-eos: true
-  case__140_elt_field0_0:
-    seq:
-    - id: len_case__140_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__140_elt_field0
-      type: case__140_elt_field0
-      size: len_case__140_elt_field0
-  case__140_entries:
-    seq:
-    - id: case__140_elt_field0
-      type: case__140_elt_field0_0
-    - id: case__140_elt_field1
-      type: tree_encoding
-  case__141_elt_field0:
-    seq:
-    - id: case__141_elt_field0
-      size-eos: true
-  case__141_elt_field0_0:
-    seq:
-    - id: len_case__141_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__141_elt_field0
-      type: case__141_elt_field0
-      size: len_case__141_elt_field0
-  case__141_entries:
-    seq:
-    - id: case__141_elt_field0
-      type: case__141_elt_field0_0
-    - id: case__141_elt_field1
-      type: tree_encoding
-  case__142_elt_field0:
-    seq:
-    - id: case__142_elt_field0
-      size-eos: true
-  case__142_elt_field0_0:
-    seq:
-    - id: len_case__142_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__142_elt_field0
-      type: case__142_elt_field0
-      size: len_case__142_elt_field0
-  case__142_entries:
-    seq:
-    - id: case__142_elt_field0
-      type: case__142_elt_field0_0
-    - id: case__142_elt_field1
-      type: tree_encoding
-  case__143_elt_field0:
-    seq:
-    - id: case__143_elt_field0
-      size-eos: true
-  case__143_elt_field0_0:
-    seq:
-    - id: len_case__143_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__143_elt_field0
-      type: case__143_elt_field0
-      size: len_case__143_elt_field0
-  case__143_entries:
-    seq:
-    - id: case__143_elt_field0
-      type: case__143_elt_field0_0
-    - id: case__143_elt_field1
-      type: tree_encoding
-  case__144_elt_field0:
-    seq:
-    - id: case__144_elt_field0
-      size-eos: true
-  case__144_elt_field0_0:
-    seq:
-    - id: len_case__144_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__144_elt_field0
-      type: case__144_elt_field0
-      size: len_case__144_elt_field0
-  case__144_entries:
-    seq:
-    - id: case__144_elt_field0
-      type: case__144_elt_field0_0
-    - id: case__144_elt_field1
-      type: tree_encoding
-  case__145_elt_field0:
-    seq:
-    - id: case__145_elt_field0
-      size-eos: true
-  case__145_elt_field0_0:
-    seq:
-    - id: len_case__145_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__145_elt_field0
-      type: case__145_elt_field0
-      size: len_case__145_elt_field0
-  case__145_entries:
-    seq:
-    - id: case__145_elt_field0
-      type: case__145_elt_field0_0
-    - id: case__145_elt_field1
-      type: tree_encoding
-  case__146_elt_field0:
-    seq:
-    - id: case__146_elt_field0
-      size-eos: true
-  case__146_elt_field0_0:
-    seq:
-    - id: len_case__146_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__146_elt_field0
-      type: case__146_elt_field0
-      size: len_case__146_elt_field0
-  case__146_entries:
-    seq:
-    - id: case__146_elt_field0
-      type: case__146_elt_field0_0
-    - id: case__146_elt_field1
-      type: tree_encoding
-  case__147_elt_field0:
-    seq:
-    - id: case__147_elt_field0
-      size-eos: true
-  case__147_elt_field0_0:
-    seq:
-    - id: len_case__147_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__147_elt_field0
-      type: case__147_elt_field0
-      size: len_case__147_elt_field0
-  case__147_entries:
-    seq:
-    - id: case__147_elt_field0
-      type: case__147_elt_field0_0
-    - id: case__147_elt_field1
-      type: tree_encoding
-  case__148_elt_field0:
-    seq:
-    - id: case__148_elt_field0
-      size-eos: true
-  case__148_elt_field0_0:
-    seq:
-    - id: len_case__148_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__148_elt_field0
-      type: case__148_elt_field0
-      size: len_case__148_elt_field0
-  case__148_entries:
-    seq:
-    - id: case__148_elt_field0
-      type: case__148_elt_field0_0
-    - id: case__148_elt_field1
-      type: tree_encoding
-  case__149_elt_field0:
-    seq:
-    - id: case__149_elt_field0
-      size-eos: true
-  case__149_elt_field0_0:
-    seq:
-    - id: len_case__149_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__149_elt_field0
-      type: case__149_elt_field0
-      size: len_case__149_elt_field0
-  case__149_entries:
-    seq:
-    - id: case__149_elt_field0
-      type: case__149_elt_field0_0
-    - id: case__149_elt_field1
-      type: tree_encoding
-  case__14_field1_entries:
-    seq:
-    - id: case__14_field1_elt_field0
-      type: u1
-    - id: case__14_field1_elt_field1
-      type: inode_tree
-  case__15:
-    seq:
-    - id: case__15_field0
-      type: s8
-    - id: case__15_field1
-      type: case__15_field1_entries
-      repeat: expr
-      repeat-expr: 3
-      doc: case__15_field1_entries
-  case__150_elt_field0:
-    seq:
-    - id: case__150_elt_field0
-      size-eos: true
-  case__150_elt_field0_0:
-    seq:
-    - id: len_case__150_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__150_elt_field0
-      type: case__150_elt_field0
-      size: len_case__150_elt_field0
-  case__150_entries:
-    seq:
-    - id: case__150_elt_field0
-      type: case__150_elt_field0_0
-    - id: case__150_elt_field1
-      type: tree_encoding
-  case__151_elt_field0:
-    seq:
-    - id: case__151_elt_field0
-      size-eos: true
-  case__151_elt_field0_0:
-    seq:
-    - id: len_case__151_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__151_elt_field0
-      type: case__151_elt_field0
-      size: len_case__151_elt_field0
-  case__151_entries:
-    seq:
-    - id: case__151_elt_field0
-      type: case__151_elt_field0_0
-    - id: case__151_elt_field1
-      type: tree_encoding
-  case__152_elt_field0:
-    seq:
-    - id: case__152_elt_field0
-      size-eos: true
-  case__152_elt_field0_0:
-    seq:
-    - id: len_case__152_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__152_elt_field0
-      type: case__152_elt_field0
-      size: len_case__152_elt_field0
-  case__152_entries:
-    seq:
-    - id: case__152_elt_field0
-      type: case__152_elt_field0_0
-    - id: case__152_elt_field1
-      type: tree_encoding
-  case__153_elt_field0:
-    seq:
-    - id: case__153_elt_field0
-      size-eos: true
-  case__153_elt_field0_0:
-    seq:
-    - id: len_case__153_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__153_elt_field0
-      type: case__153_elt_field0
-      size: len_case__153_elt_field0
-  case__153_entries:
-    seq:
-    - id: case__153_elt_field0
-      type: case__153_elt_field0_0
-    - id: case__153_elt_field1
-      type: tree_encoding
-  case__154_elt_field0:
-    seq:
-    - id: case__154_elt_field0
-      size-eos: true
-  case__154_elt_field0_0:
-    seq:
-    - id: len_case__154_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__154_elt_field0
-      type: case__154_elt_field0
-      size: len_case__154_elt_field0
-  case__154_entries:
-    seq:
-    - id: case__154_elt_field0
-      type: case__154_elt_field0_0
-    - id: case__154_elt_field1
-      type: tree_encoding
-  case__155_elt_field0:
-    seq:
-    - id: case__155_elt_field0
-      size-eos: true
-  case__155_elt_field0_0:
-    seq:
-    - id: len_case__155_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__155_elt_field0
-      type: case__155_elt_field0
-      size: len_case__155_elt_field0
-  case__155_entries:
-    seq:
-    - id: case__155_elt_field0
-      type: case__155_elt_field0_0
-    - id: case__155_elt_field1
-      type: tree_encoding
-  case__156_elt_field0:
-    seq:
-    - id: case__156_elt_field0
-      size-eos: true
-  case__156_elt_field0_0:
-    seq:
-    - id: len_case__156_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__156_elt_field0
-      type: case__156_elt_field0
-      size: len_case__156_elt_field0
-  case__156_entries:
-    seq:
-    - id: case__156_elt_field0
-      type: case__156_elt_field0_0
-    - id: case__156_elt_field1
-      type: tree_encoding
-  case__157_elt_field0:
-    seq:
-    - id: case__157_elt_field0
-      size-eos: true
-  case__157_elt_field0_0:
-    seq:
-    - id: len_case__157_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__157_elt_field0
-      type: case__157_elt_field0
-      size: len_case__157_elt_field0
-  case__157_entries:
-    seq:
-    - id: case__157_elt_field0
-      type: case__157_elt_field0_0
-    - id: case__157_elt_field1
-      type: tree_encoding
-  case__158_elt_field0:
-    seq:
-    - id: case__158_elt_field0
-      size-eos: true
-  case__158_elt_field0_0:
-    seq:
-    - id: len_case__158_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__158_elt_field0
-      type: case__158_elt_field0
-      size: len_case__158_elt_field0
-  case__158_entries:
-    seq:
-    - id: case__158_elt_field0
-      type: case__158_elt_field0_0
-    - id: case__158_elt_field1
-      type: tree_encoding
-  case__159_elt_field0:
-    seq:
-    - id: case__159_elt_field0
-      size-eos: true
-  case__159_elt_field0_0:
-    seq:
-    - id: len_case__159_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__159_elt_field0
-      type: case__159_elt_field0
-      size: len_case__159_elt_field0
-  case__159_entries:
-    seq:
-    - id: case__159_elt_field0
-      type: case__159_elt_field0_0
-    - id: case__159_elt_field1
-      type: tree_encoding
-  case__15_field1_entries:
-    seq:
-    - id: case__15_field1_elt_field0
-      type: u1
-    - id: case__15_field1_elt_field1
-      type: inode_tree
-  case__16:
-    seq:
-    - id: case__16_field0
-      type: u1
-    - id: case__16_field1
-      type: case__16_field1_entries
-      repeat: expr
-      repeat-expr: 4
-      doc: case__16_field1_entries
-  case__160_elt_field0:
-    seq:
-    - id: case__160_elt_field0
-      size-eos: true
-  case__160_elt_field0_0:
-    seq:
-    - id: len_case__160_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__160_elt_field0
-      type: case__160_elt_field0
-      size: len_case__160_elt_field0
-  case__160_entries:
-    seq:
-    - id: case__160_elt_field0
-      type: case__160_elt_field0_0
-    - id: case__160_elt_field1
-      type: tree_encoding
-  case__161_elt_field0:
-    seq:
-    - id: case__161_elt_field0
-      size-eos: true
-  case__161_elt_field0_0:
-    seq:
-    - id: len_case__161_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__161_elt_field0
-      type: case__161_elt_field0
-      size: len_case__161_elt_field0
-  case__161_entries:
-    seq:
-    - id: case__161_elt_field0
-      type: case__161_elt_field0_0
-    - id: case__161_elt_field1
-      type: tree_encoding
-  case__162_elt_field0:
-    seq:
-    - id: case__162_elt_field0
-      size-eos: true
-  case__162_elt_field0_0:
-    seq:
-    - id: len_case__162_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__162_elt_field0
-      type: case__162_elt_field0
-      size: len_case__162_elt_field0
-  case__162_entries:
-    seq:
-    - id: case__162_elt_field0
-      type: case__162_elt_field0_0
-    - id: case__162_elt_field1
-      type: tree_encoding
-  case__163_elt_field0:
-    seq:
-    - id: case__163_elt_field0
-      size-eos: true
-  case__163_elt_field0_0:
-    seq:
-    - id: len_case__163_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__163_elt_field0
-      type: case__163_elt_field0
-      size: len_case__163_elt_field0
-  case__163_entries:
-    seq:
-    - id: case__163_elt_field0
-      type: case__163_elt_field0_0
-    - id: case__163_elt_field1
-      type: tree_encoding
-  case__164_elt_field0:
-    seq:
-    - id: case__164_elt_field0
-      size-eos: true
-  case__164_elt_field0_0:
-    seq:
-    - id: len_case__164_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__164_elt_field0
-      type: case__164_elt_field0
-      size: len_case__164_elt_field0
-  case__164_entries:
-    seq:
-    - id: case__164_elt_field0
-      type: case__164_elt_field0_0
-    - id: case__164_elt_field1
-      type: tree_encoding
-  case__165_elt_field0:
-    seq:
-    - id: case__165_elt_field0
-      size-eos: true
-  case__165_elt_field0_0:
-    seq:
-    - id: len_case__165_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__165_elt_field0
-      type: case__165_elt_field0
-      size: len_case__165_elt_field0
-  case__165_entries:
-    seq:
-    - id: case__165_elt_field0
-      type: case__165_elt_field0_0
-    - id: case__165_elt_field1
-      type: tree_encoding
-  case__166_elt_field0:
-    seq:
-    - id: case__166_elt_field0
-      size-eos: true
-  case__166_elt_field0_0:
-    seq:
-    - id: len_case__166_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__166_elt_field0
-      type: case__166_elt_field0
-      size: len_case__166_elt_field0
-  case__166_entries:
-    seq:
-    - id: case__166_elt_field0
-      type: case__166_elt_field0_0
-    - id: case__166_elt_field1
-      type: tree_encoding
-  case__167_elt_field0:
-    seq:
-    - id: case__167_elt_field0
-      size-eos: true
-  case__167_elt_field0_0:
-    seq:
-    - id: len_case__167_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__167_elt_field0
-      type: case__167_elt_field0
-      size: len_case__167_elt_field0
-  case__167_entries:
-    seq:
-    - id: case__167_elt_field0
-      type: case__167_elt_field0_0
-    - id: case__167_elt_field1
-      type: tree_encoding
-  case__168_elt_field0:
-    seq:
-    - id: case__168_elt_field0
-      size-eos: true
-  case__168_elt_field0_0:
-    seq:
-    - id: len_case__168_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__168_elt_field0
-      type: case__168_elt_field0
-      size: len_case__168_elt_field0
-  case__168_entries:
-    seq:
-    - id: case__168_elt_field0
-      type: case__168_elt_field0_0
-    - id: case__168_elt_field1
-      type: tree_encoding
-  case__169_elt_field0:
-    seq:
-    - id: case__169_elt_field0
-      size-eos: true
-  case__169_elt_field0_0:
-    seq:
-    - id: len_case__169_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__169_elt_field0
-      type: case__169_elt_field0
-      size: len_case__169_elt_field0
-  case__169_entries:
-    seq:
-    - id: case__169_elt_field0
-      type: case__169_elt_field0_0
-    - id: case__169_elt_field1
-      type: tree_encoding
-  case__16_field1_entries:
-    seq:
-    - id: case__16_field1_elt_field0
-      type: u1
-    - id: case__16_field1_elt_field1
-      type: inode_tree
-  case__17:
-    seq:
-    - id: case__17_field0
-      type: u2
-    - id: case__17_field1
-      type: case__17_field1_entries
-      repeat: expr
-      repeat-expr: 4
-      doc: case__17_field1_entries
-  case__170_elt_field0:
-    seq:
-    - id: case__170_elt_field0
-      size-eos: true
-  case__170_elt_field0_0:
-    seq:
-    - id: len_case__170_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__170_elt_field0
-      type: case__170_elt_field0
-      size: len_case__170_elt_field0
-  case__170_entries:
-    seq:
-    - id: case__170_elt_field0
-      type: case__170_elt_field0_0
-    - id: case__170_elt_field1
-      type: tree_encoding
-  case__171_elt_field0:
-    seq:
-    - id: case__171_elt_field0
-      size-eos: true
-  case__171_elt_field0_0:
-    seq:
-    - id: len_case__171_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__171_elt_field0
-      type: case__171_elt_field0
-      size: len_case__171_elt_field0
-  case__171_entries:
-    seq:
-    - id: case__171_elt_field0
-      type: case__171_elt_field0_0
-    - id: case__171_elt_field1
-      type: tree_encoding
-  case__172_elt_field0:
-    seq:
-    - id: case__172_elt_field0
-      size-eos: true
-  case__172_elt_field0_0:
-    seq:
-    - id: len_case__172_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__172_elt_field0
-      type: case__172_elt_field0
-      size: len_case__172_elt_field0
-  case__172_entries:
-    seq:
-    - id: case__172_elt_field0
-      type: case__172_elt_field0_0
-    - id: case__172_elt_field1
-      type: tree_encoding
-  case__173_elt_field0:
-    seq:
-    - id: case__173_elt_field0
-      size-eos: true
-  case__173_elt_field0_0:
-    seq:
-    - id: len_case__173_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__173_elt_field0
-      type: case__173_elt_field0
-      size: len_case__173_elt_field0
-  case__173_entries:
-    seq:
-    - id: case__173_elt_field0
-      type: case__173_elt_field0_0
-    - id: case__173_elt_field1
-      type: tree_encoding
-  case__174_elt_field0:
-    seq:
-    - id: case__174_elt_field0
-      size-eos: true
-  case__174_elt_field0_0:
-    seq:
-    - id: len_case__174_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__174_elt_field0
-      type: case__174_elt_field0
-      size: len_case__174_elt_field0
-  case__174_entries:
-    seq:
-    - id: case__174_elt_field0
-      type: case__174_elt_field0_0
-    - id: case__174_elt_field1
-      type: tree_encoding
-  case__175_elt_field0:
-    seq:
-    - id: case__175_elt_field0
-      size-eos: true
-  case__175_elt_field0_0:
-    seq:
-    - id: len_case__175_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__175_elt_field0
-      type: case__175_elt_field0
-      size: len_case__175_elt_field0
-  case__175_entries:
-    seq:
-    - id: case__175_elt_field0
-      type: case__175_elt_field0_0
-    - id: case__175_elt_field1
-      type: tree_encoding
-  case__176_elt_field0:
-    seq:
-    - id: case__176_elt_field0
-      size-eos: true
-  case__176_elt_field0_0:
-    seq:
-    - id: len_case__176_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__176_elt_field0
-      type: case__176_elt_field0
-      size: len_case__176_elt_field0
-  case__176_entries:
-    seq:
-    - id: case__176_elt_field0
-      type: case__176_elt_field0_0
-    - id: case__176_elt_field1
-      type: tree_encoding
-  case__177_elt_field0:
-    seq:
-    - id: case__177_elt_field0
-      size-eos: true
-  case__177_elt_field0_0:
-    seq:
-    - id: len_case__177_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__177_elt_field0
-      type: case__177_elt_field0
-      size: len_case__177_elt_field0
-  case__177_entries:
-    seq:
-    - id: case__177_elt_field0
-      type: case__177_elt_field0_0
-    - id: case__177_elt_field1
-      type: tree_encoding
-  case__178_elt_field0:
-    seq:
-    - id: case__178_elt_field0
-      size-eos: true
-  case__178_elt_field0_0:
-    seq:
-    - id: len_case__178_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__178_elt_field0
-      type: case__178_elt_field0
-      size: len_case__178_elt_field0
-  case__178_entries:
-    seq:
-    - id: case__178_elt_field0
-      type: case__178_elt_field0_0
-    - id: case__178_elt_field1
-      type: tree_encoding
-  case__179_elt_field0:
-    seq:
-    - id: case__179_elt_field0
-      size-eos: true
-  case__179_elt_field0_0:
-    seq:
-    - id: len_case__179_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__179_elt_field0
-      type: case__179_elt_field0
-      size: len_case__179_elt_field0
-  case__179_entries:
-    seq:
-    - id: case__179_elt_field0
-      type: case__179_elt_field0_0
-    - id: case__179_elt_field1
-      type: tree_encoding
-  case__17_field1_entries:
-    seq:
-    - id: case__17_field1_elt_field0
-      type: u1
-    - id: case__17_field1_elt_field1
-      type: inode_tree
-  case__18:
-    seq:
-    - id: case__18_field0
-      type: s4
-    - id: case__18_field1
-      type: case__18_field1_entries
-      repeat: expr
-      repeat-expr: 4
-      doc: case__18_field1_entries
-  case__180_elt_field0:
-    seq:
-    - id: case__180_elt_field0
-      size-eos: true
-  case__180_elt_field0_0:
-    seq:
-    - id: len_case__180_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__180_elt_field0
-      type: case__180_elt_field0
-      size: len_case__180_elt_field0
-  case__180_entries:
-    seq:
-    - id: case__180_elt_field0
-      type: case__180_elt_field0_0
-    - id: case__180_elt_field1
-      type: tree_encoding
-  case__181_elt_field0:
-    seq:
-    - id: case__181_elt_field0
-      size-eos: true
-  case__181_elt_field0_0:
-    seq:
-    - id: len_case__181_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__181_elt_field0
-      type: case__181_elt_field0
-      size: len_case__181_elt_field0
-  case__181_entries:
-    seq:
-    - id: case__181_elt_field0
-      type: case__181_elt_field0_0
-    - id: case__181_elt_field1
-      type: tree_encoding
-  case__182_elt_field0:
-    seq:
-    - id: case__182_elt_field0
-      size-eos: true
-  case__182_elt_field0_0:
-    seq:
-    - id: len_case__182_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__182_elt_field0
-      type: case__182_elt_field0
-      size: len_case__182_elt_field0
-  case__182_entries:
-    seq:
-    - id: case__182_elt_field0
-      type: case__182_elt_field0_0
-    - id: case__182_elt_field1
-      type: tree_encoding
-  case__183_elt_field0:
-    seq:
-    - id: case__183_elt_field0
-      size-eos: true
-  case__183_elt_field0_0:
-    seq:
-    - id: len_case__183_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__183_elt_field0
-      type: case__183_elt_field0
-      size: len_case__183_elt_field0
-  case__183_entries:
-    seq:
-    - id: case__183_elt_field0
-      type: case__183_elt_field0_0
-    - id: case__183_elt_field1
-      type: tree_encoding
-  case__184_elt_field0:
-    seq:
-    - id: case__184_elt_field0
-      size-eos: true
-  case__184_elt_field0_0:
-    seq:
-    - id: len_case__184_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__184_elt_field0
-      type: case__184_elt_field0
-      size: len_case__184_elt_field0
-  case__184_entries:
-    seq:
-    - id: case__184_elt_field0
-      type: case__184_elt_field0_0
-    - id: case__184_elt_field1
-      type: tree_encoding
-  case__185_elt_field0:
-    seq:
-    - id: case__185_elt_field0
-      size-eos: true
-  case__185_elt_field0_0:
-    seq:
-    - id: len_case__185_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__185_elt_field0
-      type: case__185_elt_field0
-      size: len_case__185_elt_field0
-  case__185_entries:
-    seq:
-    - id: case__185_elt_field0
-      type: case__185_elt_field0_0
-    - id: case__185_elt_field1
-      type: tree_encoding
-  case__186_elt_field0:
-    seq:
-    - id: case__186_elt_field0
-      size-eos: true
-  case__186_elt_field0_0:
-    seq:
-    - id: len_case__186_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__186_elt_field0
-      type: case__186_elt_field0
-      size: len_case__186_elt_field0
-  case__186_entries:
-    seq:
-    - id: case__186_elt_field0
-      type: case__186_elt_field0_0
-    - id: case__186_elt_field1
-      type: tree_encoding
-  case__187_elt_field0:
-    seq:
-    - id: case__187_elt_field0
-      size-eos: true
-  case__187_elt_field0_0:
-    seq:
-    - id: len_case__187_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__187_elt_field0
-      type: case__187_elt_field0
-      size: len_case__187_elt_field0
-  case__187_entries:
-    seq:
-    - id: case__187_elt_field0
-      type: case__187_elt_field0_0
-    - id: case__187_elt_field1
-      type: tree_encoding
-  case__188_elt_field0:
-    seq:
-    - id: case__188_elt_field0
-      size-eos: true
-  case__188_elt_field0_0:
-    seq:
-    - id: len_case__188_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__188_elt_field0
-      type: case__188_elt_field0
-      size: len_case__188_elt_field0
-  case__188_entries:
-    seq:
-    - id: case__188_elt_field0
-      type: case__188_elt_field0_0
-    - id: case__188_elt_field1
-      type: tree_encoding
-  case__189_elt_field0:
-    seq:
-    - id: case__189_elt_field0
-      size-eos: true
-  case__189_elt_field0_0:
-    seq:
-    - id: len_case__189_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__189_elt_field0
-      type: case__189_elt_field0
-      size: len_case__189_elt_field0
-  case__189_entries:
-    seq:
-    - id: case__189_elt_field0
-      type: case__189_elt_field0_0
-    - id: case__189_elt_field1
-      type: tree_encoding
-  case__18_field1_entries:
-    seq:
-    - id: case__18_field1_elt_field0
-      type: u1
-    - id: case__18_field1_elt_field1
-      type: inode_tree
-  case__19:
-    seq:
-    - id: case__19_field0
-      type: s8
-    - id: case__19_field1
-      type: case__19_field1_entries
-      repeat: expr
-      repeat-expr: 4
-      doc: case__19_field1_entries
-  case__190_elt_field0:
-    seq:
-    - id: case__190_elt_field0
-      size-eos: true
-  case__190_elt_field0_0:
-    seq:
-    - id: len_case__190_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__190_elt_field0
-      type: case__190_elt_field0
-      size: len_case__190_elt_field0
-  case__190_entries:
-    seq:
-    - id: case__190_elt_field0
-      type: case__190_elt_field0_0
-    - id: case__190_elt_field1
-      type: tree_encoding
-  case__191:
-    seq:
-    - id: case__191_entries
-      type: case__191_entries
-      repeat: eos
-  case__191_0:
-    seq:
-    - id: len_case__191
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__191
-      type: case__191
-      size: len_case__191
-  case__191_1:
-    seq:
-    - id: len_case__191
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__191
-      type: case__191
-      size: len_case__191
-  case__191_elt_field0:
-    seq:
-    - id: case__191_elt_field0
-      size-eos: true
-  case__191_elt_field0_0:
-    seq:
-    - id: len_case__191_elt_field0
-      type: u1
-      valid:
-        max: 255
-    - id: case__191_elt_field0
-      type: case__191_elt_field0
-      size: len_case__191_elt_field0
-  case__191_entries:
-    seq:
-    - id: case__191_elt_field0
-      type: case__191_elt_field0_0
-    - id: case__191_elt_field1
-      type: tree_encoding
-  case__192:
-    seq:
-    - id: case__192
-      size-eos: true
-  case__192_0:
-    seq:
-    - id: len_case__192
-      type: u1
-      valid:
-        max: 255
-    - id: case__192
-      type: case__192
-      size: len_case__192
-  case__193:
-    seq:
-    - id: case__193
-      size-eos: true
-  case__193_0:
-    seq:
-    - id: len_case__193
-      type: u2
-      valid:
-        max: 65535
-    - id: case__193
-      type: case__193
-      size: len_case__193
-  case__19_field1_entries:
-    seq:
-    - id: case__19_field1_elt_field0
-      type: u1
-    - id: case__19_field1_elt_field1
-      type: inode_tree
-  case__2:
-    seq:
-    - id: case__2_field0
-      type: s2
-    - id: case__2_field1
+    - id: case_2_field0
+      type: s2be
+    - id: case_2_field1
       size: 32
       doc: context_hash
-    - id: case__2_field2
+    - id: case_2_field2
       size: 32
       doc: context_hash
-    - id: case__2_field3
+    - id: case_2_field3
       type: tree_encoding
-  case__20:
+  case_3:
     seq:
-    - id: case__20_field0
-      type: u1
-    - id: case__20_field1
-      type: case__20_field1_entries
-      repeat: expr
-      repeat-expr: 5
-      doc: case__20_field1_entries
-  case__208:
-    seq:
-    - id: case__208_field0
-      type: u1
-    - id: case__208_field1
-      type: case__208_field1_0
-    - id: case__208_field2
-      type: inode_tree
-  case__208_field1:
-    seq:
-    - id: case__208_field1
-      size-eos: true
-  case__208_field1_0:
-    seq:
-    - id: len_case__208_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__208_field1
-      type: case__208_field1
-      size: len_case__208_field1
-  case__209:
-    seq:
-    - id: case__209_field0
-      type: u2
-    - id: case__209_field1
-      type: case__209_field1_0
-    - id: case__209_field2
-      type: inode_tree
-  case__209_field1:
-    seq:
-    - id: case__209_field1
-      size-eos: true
-  case__209_field1_0:
-    seq:
-    - id: len_case__209_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__209_field1
-      type: case__209_field1
-      size: len_case__209_field1
-  case__20_field1_entries:
-    seq:
-    - id: case__20_field1_elt_field0
-      type: u1
-    - id: case__20_field1_elt_field1
-      type: inode_tree
-  case__21:
-    seq:
-    - id: case__21_field0
-      type: u2
-    - id: case__21_field1
-      type: case__21_field1_entries
-      repeat: expr
-      repeat-expr: 5
-      doc: case__21_field1_entries
-  case__210:
-    seq:
-    - id: case__210_field0
-      type: s4
-    - id: case__210_field1
-      type: case__210_field1_0
-    - id: case__210_field2
-      type: inode_tree
-  case__210_field1:
-    seq:
-    - id: case__210_field1
-      size-eos: true
-  case__210_field1_0:
-    seq:
-    - id: len_case__210_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__210_field1
-      type: case__210_field1
-      size: len_case__210_field1
-  case__211:
-    seq:
-    - id: case__211_field0
-      type: s8
-    - id: case__211_field1
-      type: case__211_field1_0
-    - id: case__211_field2
-      type: inode_tree
-  case__211_field1:
-    seq:
-    - id: case__211_field1
-      size-eos: true
-  case__211_field1_0:
-    seq:
-    - id: len_case__211_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__211_field1
-      type: case__211_field1
-      size: len_case__211_field1
-  case__216:
-    seq:
-    - id: case__216_field0
-      type: u1
-    - id: case__216_field1
-      type: case__216_field1_0
-    - id: case__216_field2
-      type: inode_tree
-  case__216_field1:
-    seq:
-    - id: case__216_field1
-      size-eos: true
-  case__216_field1_0:
-    seq:
-    - id: len_case__216_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__216_field1
-      type: case__216_field1
-      size: len_case__216_field1
-  case__217:
-    seq:
-    - id: case__217_field0
-      type: u2
-    - id: case__217_field1
-      type: case__217_field1_0
-    - id: case__217_field2
-      type: inode_tree
-  case__217_field1:
-    seq:
-    - id: case__217_field1
-      size-eos: true
-  case__217_field1_0:
-    seq:
-    - id: len_case__217_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__217_field1
-      type: case__217_field1
-      size: len_case__217_field1
-  case__218:
-    seq:
-    - id: case__218_field0
-      type: s4
-    - id: case__218_field1
-      type: case__218_field1_0
-    - id: case__218_field2
-      type: inode_tree
-  case__218_field1:
-    seq:
-    - id: case__218_field1
-      size-eos: true
-  case__218_field1_0:
-    seq:
-    - id: len_case__218_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__218_field1
-      type: case__218_field1
-      size: len_case__218_field1
-  case__219:
-    seq:
-    - id: case__219_field0
-      type: s8
-    - id: case__219_field1
-      type: case__219_field1_0
-    - id: case__219_field2
-      type: inode_tree
-  case__219_field1:
-    seq:
-    - id: case__219_field1
-      size-eos: true
-  case__219_field1_0:
-    seq:
-    - id: len_case__219_field1
-      type: u1
-      valid:
-        max: 255
-    - id: case__219_field1
-      type: case__219_field1
-      size: len_case__219_field1
-  case__21_field1_entries:
-    seq:
-    - id: case__21_field1_elt_field0
-      type: u1
-    - id: case__21_field1_elt_field1
-      type: inode_tree
-  case__22:
-    seq:
-    - id: case__22_field0
-      type: s4
-    - id: case__22_field1
-      type: case__22_field1_entries
-      repeat: expr
-      repeat-expr: 5
-      doc: case__22_field1_entries
-  case__22_field1_entries:
-    seq:
-    - id: case__22_field1_elt_field0
-      type: u1
-    - id: case__22_field1_elt_field1
-      type: inode_tree
-  case__23:
-    seq:
-    - id: case__23_field0
-      type: s8
-    - id: case__23_field1
-      type: case__23_field1_entries
-      repeat: expr
-      repeat-expr: 5
-      doc: case__23_field1_entries
-  case__23_field1_entries:
-    seq:
-    - id: case__23_field1_elt_field0
-      type: u1
-    - id: case__23_field1_elt_field1
-      type: inode_tree
-  case__24:
-    seq:
-    - id: case__24_field0
-      type: u1
-    - id: case__24_field1
-      type: case__24_field1_entries
-      repeat: expr
-      repeat-expr: 6
-      doc: case__24_field1_entries
-  case__24_field1_entries:
-    seq:
-    - id: case__24_field1_elt_field0
-      type: u1
-    - id: case__24_field1_elt_field1
-      type: inode_tree
-  case__25:
-    seq:
-    - id: case__25_field0
-      type: u2
-    - id: case__25_field1
-      type: case__25_field1_entries
-      repeat: expr
-      repeat-expr: 6
-      doc: case__25_field1_entries
-  case__25_field1_entries:
-    seq:
-    - id: case__25_field1_elt_field0
-      type: u1
-    - id: case__25_field1_elt_field1
-      type: inode_tree
-  case__26:
-    seq:
-    - id: case__26_field0
-      type: s4
-    - id: case__26_field1
-      type: case__26_field1_entries
-      repeat: expr
-      repeat-expr: 6
-      doc: case__26_field1_entries
-  case__26_field1_entries:
-    seq:
-    - id: case__26_field1_elt_field0
-      type: u1
-    - id: case__26_field1_elt_field1
-      type: inode_tree
-  case__27:
-    seq:
-    - id: case__27_field0
-      type: s8
-    - id: case__27_field1
-      type: case__27_field1_entries
-      repeat: expr
-      repeat-expr: 6
-      doc: case__27_field1_entries
-  case__27_field1_entries:
-    seq:
-    - id: case__27_field1_elt_field0
-      type: u1
-    - id: case__27_field1_elt_field1
-      type: inode_tree
-  case__28:
-    seq:
-    - id: case__28_field0
-      type: u1
-    - id: case__28_field1
-      type: case__28_field1_entries
-      repeat: expr
-      repeat-expr: 7
-      doc: case__28_field1_entries
-  case__28_field1_entries:
-    seq:
-    - id: case__28_field1_elt_field0
-      type: u1
-    - id: case__28_field1_elt_field1
-      type: inode_tree
-  case__29:
-    seq:
-    - id: case__29_field0
-      type: u2
-    - id: case__29_field1
-      type: case__29_field1_entries
-      repeat: expr
-      repeat-expr: 7
-      doc: case__29_field1_entries
-  case__29_field1_entries:
-    seq:
-    - id: case__29_field1_elt_field0
-      type: u1
-    - id: case__29_field1_elt_field1
-      type: inode_tree
-  case__3:
-    seq:
-    - id: case__3_field0
-      type: s2
-    - id: case__3_field1
+    - id: case_3_field0
+      type: s2be
+    - id: case_3_field1
       size: 32
       doc: context_hash
-    - id: case__3_field2
+    - id: case_3_field2
       size: 32
       doc: context_hash
-    - id: case__3_field3
+    - id: case_3_field3
       type: tree_encoding
-  case__30:
-    seq:
-    - id: case__30_field0
-      type: s4
-    - id: case__30_field1
-      type: case__30_field1_entries
-      repeat: expr
-      repeat-expr: 7
-      doc: case__30_field1_entries
-  case__30_field1_entries:
-    seq:
-    - id: case__30_field1_elt_field0
-      type: u1
-    - id: case__30_field1_elt_field1
-      type: inode_tree
-  case__31:
-    seq:
-    - id: case__31_field0
-      type: s8
-    - id: case__31_field1
-      type: case__31_field1_entries
-      repeat: expr
-      repeat-expr: 7
-      doc: case__31_field1_entries
-  case__31_field1_entries:
-    seq:
-    - id: case__31_field1_elt_field0
-      type: u1
-    - id: case__31_field1_elt_field1
-      type: inode_tree
-  case__32:
-    seq:
-    - id: case__32_field0
-      type: u1
-    - id: case__32_field1
-      type: case__32_field1_entries
-      repeat: expr
-      repeat-expr: 8
-      doc: case__32_field1_entries
-  case__32_field1_entries:
-    seq:
-    - id: case__32_field1_elt_field0
-      type: u1
-    - id: case__32_field1_elt_field1
-      type: inode_tree
-  case__33:
-    seq:
-    - id: case__33_field0
-      type: u2
-    - id: case__33_field1
-      type: case__33_field1_entries
-      repeat: expr
-      repeat-expr: 8
-      doc: case__33_field1_entries
-  case__33_field1_entries:
-    seq:
-    - id: case__33_field1_elt_field0
-      type: u1
-    - id: case__33_field1_elt_field1
-      type: inode_tree
-  case__34:
-    seq:
-    - id: case__34_field0
-      type: s4
-    - id: case__34_field1
-      type: case__34_field1_entries
-      repeat: expr
-      repeat-expr: 8
-      doc: case__34_field1_entries
-  case__34_field1_entries:
-    seq:
-    - id: case__34_field1_elt_field0
-      type: u1
-    - id: case__34_field1_elt_field1
-      type: inode_tree
-  case__35:
-    seq:
-    - id: case__35_field0
-      type: s8
-    - id: case__35_field1
-      type: case__35_field1_entries
-      repeat: expr
-      repeat-expr: 8
-      doc: case__35_field1_entries
-  case__35_field1_entries:
-    seq:
-    - id: case__35_field1_elt_field0
-      type: u1
-    - id: case__35_field1_elt_field1
-      type: inode_tree
-  case__36:
-    seq:
-    - id: case__36_field0
-      type: u1
-    - id: case__36_field1
-      type: case__36_field1_entries
-      repeat: expr
-      repeat-expr: 9
-      doc: case__36_field1_entries
-  case__36_field1_entries:
-    seq:
-    - id: case__36_field1_elt_field0
-      type: u1
-    - id: case__36_field1_elt_field1
-      type: inode_tree
-  case__37:
-    seq:
-    - id: case__37_field0
-      type: u2
-    - id: case__37_field1
-      type: case__37_field1_entries
-      repeat: expr
-      repeat-expr: 9
-      doc: case__37_field1_entries
-  case__37_field1_entries:
-    seq:
-    - id: case__37_field1_elt_field0
-      type: u1
-    - id: case__37_field1_elt_field1
-      type: inode_tree
-  case__38:
-    seq:
-    - id: case__38_field0
-      type: s4
-    - id: case__38_field1
-      type: case__38_field1_entries
-      repeat: expr
-      repeat-expr: 9
-      doc: case__38_field1_entries
-  case__38_field1_entries:
-    seq:
-    - id: case__38_field1_elt_field0
-      type: u1
-    - id: case__38_field1_elt_field1
-      type: inode_tree
-  case__39:
-    seq:
-    - id: case__39_field0
-      type: s8
-    - id: case__39_field1
-      type: case__39_field1_entries
-      repeat: expr
-      repeat-expr: 9
-      doc: case__39_field1_entries
-  case__39_field1_entries:
-    seq:
-    - id: case__39_field1_elt_field0
-      type: u1
-    - id: case__39_field1_elt_field1
-      type: inode_tree
-  case__4:
-    seq:
-    - id: case__4_field0
-      type: u1
-    - id: case__4_field1
-      type: case__4_field1_entries
-      repeat: expr
-      repeat-expr: 1
-      doc: case__4_field1_entries
-  case__40:
-    seq:
-    - id: case__40_field0
-      type: u1
-    - id: case__40_field1
-      type: case__40_field1_entries
-      repeat: expr
-      repeat-expr: 10
-      doc: case__40_field1_entries
-  case__40_field1_entries:
-    seq:
-    - id: case__40_field1_elt_field0
-      type: u1
-    - id: case__40_field1_elt_field1
-      type: inode_tree
-  case__41:
-    seq:
-    - id: case__41_field0
-      type: u2
-    - id: case__41_field1
-      type: case__41_field1_entries
-      repeat: expr
-      repeat-expr: 10
-      doc: case__41_field1_entries
-  case__41_field1_entries:
-    seq:
-    - id: case__41_field1_elt_field0
-      type: u1
-    - id: case__41_field1_elt_field1
-      type: inode_tree
-  case__42:
-    seq:
-    - id: case__42_field0
-      type: s4
-    - id: case__42_field1
-      type: case__42_field1_entries
-      repeat: expr
-      repeat-expr: 10
-      doc: case__42_field1_entries
-  case__42_field1_entries:
-    seq:
-    - id: case__42_field1_elt_field0
-      type: u1
-    - id: case__42_field1_elt_field1
-      type: inode_tree
-  case__43:
-    seq:
-    - id: case__43_field0
-      type: s8
-    - id: case__43_field1
-      type: case__43_field1_entries
-      repeat: expr
-      repeat-expr: 10
-      doc: case__43_field1_entries
-  case__43_field1_entries:
-    seq:
-    - id: case__43_field1_elt_field0
-      type: u1
-    - id: case__43_field1_elt_field1
-      type: inode_tree
-  case__44:
-    seq:
-    - id: case__44_field0
-      type: u1
-    - id: case__44_field1
-      type: case__44_field1_entries
-      repeat: expr
-      repeat-expr: 11
-      doc: case__44_field1_entries
-  case__44_field1_entries:
-    seq:
-    - id: case__44_field1_elt_field0
-      type: u1
-    - id: case__44_field1_elt_field1
-      type: inode_tree
-  case__45:
-    seq:
-    - id: case__45_field0
-      type: u2
-    - id: case__45_field1
-      type: case__45_field1_entries
-      repeat: expr
-      repeat-expr: 11
-      doc: case__45_field1_entries
-  case__45_field1_entries:
-    seq:
-    - id: case__45_field1_elt_field0
-      type: u1
-    - id: case__45_field1_elt_field1
-      type: inode_tree
-  case__46:
-    seq:
-    - id: case__46_field0
-      type: s4
-    - id: case__46_field1
-      type: case__46_field1_entries
-      repeat: expr
-      repeat-expr: 11
-      doc: case__46_field1_entries
-  case__46_field1_entries:
-    seq:
-    - id: case__46_field1_elt_field0
-      type: u1
-    - id: case__46_field1_elt_field1
-      type: inode_tree
-  case__47:
-    seq:
-    - id: case__47_field0
-      type: s8
-    - id: case__47_field1
-      type: case__47_field1_entries
-      repeat: expr
-      repeat-expr: 11
-      doc: case__47_field1_entries
-  case__47_field1_entries:
-    seq:
-    - id: case__47_field1_elt_field0
-      type: u1
-    - id: case__47_field1_elt_field1
-      type: inode_tree
-  case__48:
-    seq:
-    - id: case__48_field0
-      type: u1
-    - id: case__48_field1
-      type: case__48_field1_entries
-      repeat: expr
-      repeat-expr: 12
-      doc: case__48_field1_entries
-  case__48_field1_entries:
-    seq:
-    - id: case__48_field1_elt_field0
-      type: u1
-    - id: case__48_field1_elt_field1
-      type: inode_tree
-  case__49:
-    seq:
-    - id: case__49_field0
-      type: u2
-    - id: case__49_field1
-      type: case__49_field1_entries
-      repeat: expr
-      repeat-expr: 12
-      doc: case__49_field1_entries
-  case__49_field1_entries:
-    seq:
-    - id: case__49_field1_elt_field0
-      type: u1
-    - id: case__49_field1_elt_field1
-      type: inode_tree
-  case__4_0:
-    seq:
-    - id: case__4_field0
-      type: u1
-    - id: case__4_field1
-      type: case__4_field1_entries_0
-      repeat: expr
-      repeat-expr: 1
-      doc: case__4_field1_entries
-  case__4_field1_entries:
-    seq:
-    - id: case__4_field1_elt_field0
-      type: u1
-    - id: case__4_field1_elt_field1
-      type: inode_tree
-  case__4_field1_entries_0:
-    seq:
-    - id: case__4_field1_elt_field0
-      type: u1
-    - id: case__4_field1_elt_field1
-      type: inode_tree
-      doc: inode_tree
-  case__5:
-    seq:
-    - id: case__5_field0
-      type: u2
-    - id: case__5_field1
-      type: case__5_field1_entries
-      repeat: expr
-      repeat-expr: 1
-      doc: case__5_field1_entries
-  case__50:
-    seq:
-    - id: case__50_field0
-      type: s4
-    - id: case__50_field1
-      type: case__50_field1_entries
-      repeat: expr
-      repeat-expr: 12
-      doc: case__50_field1_entries
-  case__50_field1_entries:
-    seq:
-    - id: case__50_field1_elt_field0
-      type: u1
-    - id: case__50_field1_elt_field1
-      type: inode_tree
-  case__51:
-    seq:
-    - id: case__51_field0
-      type: s8
-    - id: case__51_field1
-      type: case__51_field1_entries
-      repeat: expr
-      repeat-expr: 12
-      doc: case__51_field1_entries
-  case__51_field1_entries:
-    seq:
-    - id: case__51_field1_elt_field0
-      type: u1
-    - id: case__51_field1_elt_field1
-      type: inode_tree
-  case__52:
-    seq:
-    - id: case__52_field0
-      type: u1
-    - id: case__52_field1
-      type: case__52_field1_entries
-      repeat: expr
-      repeat-expr: 13
-      doc: case__52_field1_entries
-  case__52_field1_entries:
-    seq:
-    - id: case__52_field1_elt_field0
-      type: u1
-    - id: case__52_field1_elt_field1
-      type: inode_tree
-  case__53:
-    seq:
-    - id: case__53_field0
-      type: u2
-    - id: case__53_field1
-      type: case__53_field1_entries
-      repeat: expr
-      repeat-expr: 13
-      doc: case__53_field1_entries
-  case__53_field1_entries:
-    seq:
-    - id: case__53_field1_elt_field0
-      type: u1
-    - id: case__53_field1_elt_field1
-      type: inode_tree
-  case__54:
-    seq:
-    - id: case__54_field0
-      type: s4
-    - id: case__54_field1
-      type: case__54_field1_entries
-      repeat: expr
-      repeat-expr: 13
-      doc: case__54_field1_entries
-  case__54_field1_entries:
-    seq:
-    - id: case__54_field1_elt_field0
-      type: u1
-    - id: case__54_field1_elt_field1
-      type: inode_tree
-  case__55:
-    seq:
-    - id: case__55_field0
-      type: s8
-    - id: case__55_field1
-      type: case__55_field1_entries
-      repeat: expr
-      repeat-expr: 13
-      doc: case__55_field1_entries
-  case__55_field1_entries:
-    seq:
-    - id: case__55_field1_elt_field0
-      type: u1
-    - id: case__55_field1_elt_field1
-      type: inode_tree
-  case__56:
-    seq:
-    - id: case__56_field0
-      type: u1
-    - id: case__56_field1
-      type: case__56_field1_entries
-      repeat: expr
-      repeat-expr: 14
-      doc: case__56_field1_entries
-  case__56_field1_entries:
-    seq:
-    - id: case__56_field1_elt_field0
-      type: u1
-    - id: case__56_field1_elt_field1
-      type: inode_tree
-  case__57:
-    seq:
-    - id: case__57_field0
-      type: u2
-    - id: case__57_field1
-      type: case__57_field1_entries
-      repeat: expr
-      repeat-expr: 14
-      doc: case__57_field1_entries
-  case__57_field1_entries:
-    seq:
-    - id: case__57_field1_elt_field0
-      type: u1
-    - id: case__57_field1_elt_field1
-      type: inode_tree
-  case__58:
-    seq:
-    - id: case__58_field0
-      type: s4
-    - id: case__58_field1
-      type: case__58_field1_entries
-      repeat: expr
-      repeat-expr: 14
-      doc: case__58_field1_entries
-  case__58_field1_entries:
-    seq:
-    - id: case__58_field1_elt_field0
-      type: u1
-    - id: case__58_field1_elt_field1
-      type: inode_tree
-  case__59:
-    seq:
-    - id: case__59_field0
-      type: s8
-    - id: case__59_field1
-      type: case__59_field1_entries
-      repeat: expr
-      repeat-expr: 14
-      doc: case__59_field1_entries
-  case__59_field1_entries:
-    seq:
-    - id: case__59_field1_elt_field0
-      type: u1
-    - id: case__59_field1_elt_field1
-      type: inode_tree
-  case__5_field1_entries:
-    seq:
-    - id: case__5_field1_elt_field0
-      type: u1
-    - id: case__5_field1_elt_field1
-      type: inode_tree
-  case__6:
-    seq:
-    - id: case__6_field0
-      type: s4
-    - id: case__6_field1
-      type: case__6_field1_entries
-      repeat: expr
-      repeat-expr: 1
-      doc: case__6_field1_entries
-  case__60:
-    seq:
-    - id: case__60_field0
-      type: u1
-    - id: case__60_field1
-      type: case__60_field1_0
-  case__60_field1:
-    seq:
-    - id: case__60_field1_entries
-      type: case__60_field1_entries
-      repeat: eos
-  case__60_field1_0:
-    seq:
-    - id: len_case__60_field1
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__60_field1
-      type: case__60_field1
-      size: len_case__60_field1
-  case__60_field1_entries:
-    seq:
-    - id: case__60_field1_elt_field0
-      type: u1
-    - id: case__60_field1_elt_field1
-      type: inode_tree
-  case__61:
-    seq:
-    - id: case__61_field0
-      type: u2
-    - id: case__61_field1
-      type: case__61_field1_0
-  case__61_field1:
-    seq:
-    - id: case__61_field1_entries
-      type: case__61_field1_entries
-      repeat: eos
-  case__61_field1_0:
-    seq:
-    - id: len_case__61_field1
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__61_field1
-      type: case__61_field1
-      size: len_case__61_field1
-  case__61_field1_entries:
-    seq:
-    - id: case__61_field1_elt_field0
-      type: u1
-    - id: case__61_field1_elt_field1
-      type: inode_tree
-  case__62:
-    seq:
-    - id: case__62_field0
-      type: s4
-    - id: case__62_field1
-      type: case__62_field1_0
-  case__62_field1:
-    seq:
-    - id: case__62_field1_entries
-      type: case__62_field1_entries
-      repeat: eos
-  case__62_field1_0:
-    seq:
-    - id: len_case__62_field1
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__62_field1
-      type: case__62_field1
-      size: len_case__62_field1
-  case__62_field1_entries:
-    seq:
-    - id: case__62_field1_elt_field0
-      type: u1
-    - id: case__62_field1_elt_field1
-      type: inode_tree
-  case__63:
-    seq:
-    - id: case__63_field0
-      type: s8
-    - id: case__63_field1
-      type: case__63_field1_0
-  case__63_field1:
-    seq:
-    - id: case__63_field1_entries
-      type: case__63_field1_entries
-      repeat: eos
-  case__63_field1_0:
-    seq:
-    - id: len_case__63_field1
-      type: u4
-      valid:
-        max: 1073741823
-    - id: case__63_field1
-      type: case__63_field1
-      size: len_case__63_field1
-  case__63_field1_entries:
-    seq:
-    - id: case__63_field1_elt_field0
-      type: u1
-    - id: case__63_field1_elt_field1
-      type: inode_tree
-  case__64:
-    seq:
-    - id: case__64_field0
-      type: u1
-    - id: case__64_field1
-      type: case__64_field1_entries
-      repeat: expr
-      repeat-expr: 32
-      doc: case__64_field1_entries
-  case__64_field1_entries:
-    seq:
-    - id: case__64_field1_elt
-      type: inode_tree
-  case__65:
-    seq:
-    - id: case__65_field0
-      type: u2
-    - id: case__65_field1
-      type: case__65_field1_entries
-      repeat: expr
-      repeat-expr: 32
-      doc: case__65_field1_entries
-  case__65_field1_entries:
-    seq:
-    - id: case__65_field1_elt
-      type: inode_tree
-  case__66:
-    seq:
-    - id: case__66_field0
-      type: s4
-    - id: case__66_field1
-      type: case__66_field1_entries
-      repeat: expr
-      repeat-expr: 32
-      doc: case__66_field1_entries
-  case__66_field1_entries:
-    seq:
-    - id: case__66_field1_elt
-      type: inode_tree
-  case__67:
-    seq:
-    - id: case__67_field0
-      type: s8
-    - id: case__67_field1
-      type: case__67_field1_entries
-      repeat: expr
-      repeat-expr: 32
-      doc: case__67_field1_entries
-  case__67_field1_entries:
-    seq:
-    - id: case__67_field1_elt
-      type: inode_tree
-  case__6_field1_entries:
-    seq:
-    - id: case__6_field1_elt_field0
-      type: u1
-    - id: case__6_field1_elt_field1
-      type: inode_tree
-  case__7:
-    seq:
-    - id: case__7_field0
-      type: s8
-    - id: case__7_field1
-      type: case__7_field1_entries
-      repeat: expr
-      repeat-expr: 1
-      doc: case__7_field1_entries
-  case__7_field1_entries:
-    seq:
-    - id: case__7_field1_elt_field0
-      type: u1
-    - id: case__7_field1_elt_field1
-      type: inode_tree
-  case__8:
-    seq:
-    - id: case__8_field0
-      type: u1
-    - id: case__8_field1
-      type: case__8_field1_entries
-      repeat: expr
-      repeat-expr: 2
-      doc: case__8_field1_entries
-  case__8_field1_entries:
-    seq:
-    - id: case__8_field1_elt_field0
-      type: u1
-    - id: case__8_field1_elt_field1
-      type: inode_tree
-  case__9:
-    seq:
-    - id: case__9_field0
-      type: u2
-    - id: case__9_field1
-      type: case__9_field1_entries
-      repeat: expr
-      repeat-expr: 2
-      doc: case__9_field1_entries
-  case__9_field1_entries:
-    seq:
-    - id: case__9_field1_elt_field0
-      type: u1
-    - id: case__9_field1_elt_field1
-      type: inode_tree
   circuits_info:
     seq:
     - id: circuits_info_entries
@@ -2587,7 +161,7 @@ types:
   circuits_info_0:
     seq:
     - id: len_circuits_info
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: circuits_info
@@ -2603,7 +177,7 @@ types:
   commitment:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: messages
       type: messages_0
     - id: predecessor
@@ -2615,11 +189,11 @@ types:
     - id: compressed_state
       size: 32
     - id: inbox_level
-      type: s4
+      type: s4be
     - id: predecessor
       size: 32
     - id: number_of_ticks
-      type: s8
+      type: s8be
   contents_entries:
     seq:
     - id: id_015__ptlimapt__operation__alpha__contents
@@ -2685,7 +259,7 @@ types:
   dissection_0:
     seq:
     - id: len_dissection
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: dissection
@@ -2733,11 +307,11 @@ types:
   endorsement:
     seq:
     - id: slot
-      type: u2
+      type: u2be
     - id: level
-      type: s4
+      type: s4be
     - id: round
-      type: s4
+      type: s4be
     - id: block_payload_hash
       size: 32
   id_015__ptlimapt__block_header__alpha__full_header:
@@ -2757,7 +331,7 @@ types:
     - id: payload_hash
       size: 32
     - id: payload_round
-      type: s4
+      type: s4be
     - id: proof_of_work_nonce
       size: 8
     - id: seed_nonce_hash_tag
@@ -3004,7 +578,7 @@ types:
   inbox__proof:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: message_counter
       type: n
     - id: serialized_proof
@@ -3037,7 +611,7 @@ types:
   init_state_0:
     seq:
     - id: len_init_state
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: init_state
@@ -3047,419 +621,1602 @@ types:
     seq:
     - id: init_state_elt
       size: 32
+  inode:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_field1_entries
+  inode_0:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_field1_entries
+  inode_1:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_field1_entries
+  inode_10:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_field1_entries
+  inode_11:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_field1_entries
+  inode_12:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_field1_entries
+  inode_13:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_0
+  inode_14:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_1
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_field1_entries
+  inode_15:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_field1_entries
+  inode_16:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_field1_entries
+  inode_17:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_field1_entries
+  inode_18:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_field1_entries
+  inode_19:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_field1_entries
+  inode_2:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_field1_entries
+  inode_20:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_field1_entries
+  inode_21:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_field1_entries
+  inode_22:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_field1_entries
+  inode_23:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_field1_entries
+  inode_24:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_field1_entries
+  inode_25:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_field1_entries
+  inode_26:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_field1_entries
+  inode_27:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_field1_entries
+  inode_28:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_field1_entries
+  inode_29:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_0
+  inode_3:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_field1_entries
+  inode_30:
+    seq:
+    - id: inode_field0
+      type: u2be
+    - id: inode_field1
+      type: inode_field1_entries_1
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_field1_entries
+  inode_31:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_field1_entries
+  inode_32:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_field1_entries
+  inode_33:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_field1_entries
+  inode_34:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_field1_entries
+  inode_35:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_field1_entries
+  inode_36:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_field1_entries
+  inode_37:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_field1_entries
+  inode_38:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_field1_entries
+  inode_39:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_field1_entries
+  inode_4:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_field1_entries
+  inode_40:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_field1_entries
+  inode_41:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_field1_entries
+  inode_42:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_field1_entries
+  inode_43:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_field1_entries
+  inode_44:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_field1_entries
+  inode_45:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_0
+  inode_46:
+    seq:
+    - id: inode_field0
+      type: s4be
+    - id: inode_field1
+      type: inode_field1_entries_1
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_field1_entries
+  inode_47:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_field1_entries
+  inode_48:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_field1_entries
+  inode_49:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_field1_entries
+  inode_5:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_field1_entries
+  inode_50:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_field1_entries
+  inode_51:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_field1_entries
+  inode_52:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_field1_entries
+  inode_53:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_field1_entries
+  inode_54:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_field1_entries
+  inode_55:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_field1_entries
+  inode_56:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_field1_entries
+  inode_57:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_field1_entries
+  inode_58:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_field1_entries
+  inode_59:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_field1_entries
+  inode_6:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_field1_entries
+  inode_60:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_field1_entries
+  inode_61:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_0
+  inode_62:
+    seq:
+    - id: inode_field0
+      type: s8be
+    - id: inode_field1
+      type: inode_field1_entries_1
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_field1_entries
+  inode_7:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_field1_entries
+  inode_8:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_field1_entries
+  inode_9:
+    seq:
+    - id: inode_field0
+      type: u1
+    - id: inode_field1
+      type: inode_field1_entries_0
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_field1_entries
+  inode_field1:
+    seq:
+    - id: inode_field1_entries
+      type: inode_field1_entries_0
+      repeat: eos
+  inode_field1_0:
+    seq:
+    - id: len_inode_field1
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: inode_field1
+      type: inode_field1
+      size: len_inode_field1
+  inode_field1_entries:
+    seq:
+    - id: inode_field1_elt_field0
+      type: u1
+    - id: inode_field1_elt_field1
+      type: inode_tree_63
+      doc: inode_tree
+  inode_field1_entries_0:
+    seq:
+    - id: inode_field1_elt_field0
+      type: u1
+    - id: inode_field1_elt_field1
+      type: inode_tree
+  inode_field1_entries_1:
+    seq:
+    - id: inode_field1_elt
+      type: inode_tree
   inode_tree:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_tree_field1_entries
+  inode_tree_0:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_tree_field1_entries
+  inode_tree_1:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_tree_field1_entries
+  inode_tree_10:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_tree_field1_entries
+  inode_tree_11:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_tree_field1_entries
+  inode_tree_12:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_tree_field1_entries
+  inode_tree_13:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_0
+  inode_tree_14:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries_0
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_tree_field1_entries
+  inode_tree_15:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_tree_field1_entries
+  inode_tree_16:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_tree_field1_entries
+  inode_tree_17:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_tree_field1_entries
+  inode_tree_18:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_tree_field1_entries
+  inode_tree_19:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_tree_field1_entries
+  inode_tree_2:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_tree_field1_entries
+  inode_tree_20:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_tree_field1_entries
+  inode_tree_21:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_tree_field1_entries
+  inode_tree_22:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_tree_field1_entries
+  inode_tree_23:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_tree_field1_entries
+  inode_tree_24:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_tree_field1_entries
+  inode_tree_25:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_tree_field1_entries
+  inode_tree_26:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_tree_field1_entries
+  inode_tree_27:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_tree_field1_entries
+  inode_tree_28:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_tree_field1_entries
+  inode_tree_29:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_0
+  inode_tree_3:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_tree_field1_entries
+  inode_tree_30:
+    seq:
+    - id: inode_tree_field0
+      type: u2be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries_0
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_tree_field1_entries
+  inode_tree_31:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_tree_field1_entries
+  inode_tree_32:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_tree_field1_entries
+  inode_tree_33:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_tree_field1_entries
+  inode_tree_34:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_tree_field1_entries
+  inode_tree_35:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_tree_field1_entries
+  inode_tree_36:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_tree_field1_entries
+  inode_tree_37:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_tree_field1_entries
+  inode_tree_38:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_tree_field1_entries
+  inode_tree_39:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_tree_field1_entries
+  inode_tree_4:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_tree_field1_entries
+  inode_tree_40:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_tree_field1_entries
+  inode_tree_41:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_tree_field1_entries
+  inode_tree_42:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_tree_field1_entries
+  inode_tree_43:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_tree_field1_entries
+  inode_tree_44:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_tree_field1_entries
+  inode_tree_45:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_0
+  inode_tree_46:
+    seq:
+    - id: inode_tree_field0
+      type: s4be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries_0
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_tree_field1_entries
+  inode_tree_47:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 1
+      doc: inode_tree_field1_entries
+  inode_tree_48:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 2
+      doc: inode_tree_field1_entries
+  inode_tree_49:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 3
+      doc: inode_tree_field1_entries
+  inode_tree_5:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_tree_field1_entries
+  inode_tree_50:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 4
+      doc: inode_tree_field1_entries
+  inode_tree_51:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 5
+      doc: inode_tree_field1_entries
+  inode_tree_52:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 6
+      doc: inode_tree_field1_entries
+  inode_tree_53:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 7
+      doc: inode_tree_field1_entries
+  inode_tree_54:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_tree_field1_entries
+  inode_tree_55:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_tree_field1_entries
+  inode_tree_56:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_tree_field1_entries
+  inode_tree_57:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_tree_field1_entries
+  inode_tree_58:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 12
+      doc: inode_tree_field1_entries
+  inode_tree_59:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 13
+      doc: inode_tree_field1_entries
+  inode_tree_6:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 8
+      doc: inode_tree_field1_entries
+  inode_tree_60:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 14
+      doc: inode_tree_field1_entries
+  inode_tree_61:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_0
+  inode_tree_62:
+    seq:
+    - id: inode_tree_field0
+      type: s8be
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries_0
+      repeat: expr
+      repeat-expr: 32
+      doc: inode_tree_field1_entries
+  inode_tree_63:
     seq:
     - id: inode_tree_tag
       type: u1
       enum: inode_tree_tag
-    - id: case__0
+    - id: inode_tree
       type: u1
-      if: (inode_tree_tag == inode_tree_tag::case__0)
-    - id: case__4
-      type: case__4
-      if: (inode_tree_tag == inode_tree_tag::case__4)
-    - id: case__8
-      type: case__8
-      if: (inode_tree_tag == inode_tree_tag::case__8)
-    - id: case__12
-      type: case__12
-      if: (inode_tree_tag == inode_tree_tag::case__12)
-    - id: case__16
-      type: case__16
-      if: (inode_tree_tag == inode_tree_tag::case__16)
-    - id: case__20
-      type: case__20
-      if: (inode_tree_tag == inode_tree_tag::case__20)
-    - id: case__24
-      type: case__24
-      if: (inode_tree_tag == inode_tree_tag::case__24)
-    - id: case__28
-      type: case__28
-      if: (inode_tree_tag == inode_tree_tag::case__28)
-    - id: case__32
-      type: case__32
-      if: (inode_tree_tag == inode_tree_tag::case__32)
-    - id: case__36
-      type: case__36
-      if: (inode_tree_tag == inode_tree_tag::case__36)
-    - id: case__40
-      type: case__40
-      if: (inode_tree_tag == inode_tree_tag::case__40)
-    - id: case__44
-      type: case__44
-      if: (inode_tree_tag == inode_tree_tag::case__44)
-    - id: case__48
-      type: case__48
-      if: (inode_tree_tag == inode_tree_tag::case__48)
-    - id: case__52
-      type: case__52
-      if: (inode_tree_tag == inode_tree_tag::case__52)
-    - id: case__56
-      type: case__56
-      if: (inode_tree_tag == inode_tree_tag::case__56)
-    - id: case__60
-      type: case__60
-      if: (inode_tree_tag == inode_tree_tag::case__60)
-    - id: case__64
-      type: case__64
-      if: (inode_tree_tag == inode_tree_tag::case__64)
-    - id: case__1
-      type: u2
-      if: (inode_tree_tag == inode_tree_tag::case__1)
-    - id: case__5
-      type: case__5
-      if: (inode_tree_tag == inode_tree_tag::case__5)
-    - id: case__9
-      type: case__9
-      if: (inode_tree_tag == inode_tree_tag::case__9)
-    - id: case__13
-      type: case__13
-      if: (inode_tree_tag == inode_tree_tag::case__13)
-    - id: case__17
-      type: case__17
-      if: (inode_tree_tag == inode_tree_tag::case__17)
-    - id: case__21
-      type: case__21
-      if: (inode_tree_tag == inode_tree_tag::case__21)
-    - id: case__25
-      type: case__25
-      if: (inode_tree_tag == inode_tree_tag::case__25)
-    - id: case__29
-      type: case__29
-      if: (inode_tree_tag == inode_tree_tag::case__29)
-    - id: case__33
-      type: case__33
-      if: (inode_tree_tag == inode_tree_tag::case__33)
-    - id: case__37
-      type: case__37
-      if: (inode_tree_tag == inode_tree_tag::case__37)
-    - id: case__41
-      type: case__41
-      if: (inode_tree_tag == inode_tree_tag::case__41)
-    - id: case__45
-      type: case__45
-      if: (inode_tree_tag == inode_tree_tag::case__45)
-    - id: case__49
-      type: case__49
-      if: (inode_tree_tag == inode_tree_tag::case__49)
-    - id: case__53
-      type: case__53
-      if: (inode_tree_tag == inode_tree_tag::case__53)
-    - id: case__57
-      type: case__57
-      if: (inode_tree_tag == inode_tree_tag::case__57)
-    - id: case__61
-      type: case__61
-      if: (inode_tree_tag == inode_tree_tag::case__61)
-    - id: case__65
-      type: case__65
-      if: (inode_tree_tag == inode_tree_tag::case__65)
-    - id: case__2
-      type: s4
-      if: (inode_tree_tag == inode_tree_tag::case__2)
-    - id: case__6
-      type: case__6
-      if: (inode_tree_tag == inode_tree_tag::case__6)
-    - id: case__10
-      type: case__10
-      if: (inode_tree_tag == inode_tree_tag::case__10)
-    - id: case__14
-      type: case__14
-      if: (inode_tree_tag == inode_tree_tag::case__14)
-    - id: case__18
-      type: case__18
-      if: (inode_tree_tag == inode_tree_tag::case__18)
-    - id: case__22
-      type: case__22
-      if: (inode_tree_tag == inode_tree_tag::case__22)
-    - id: case__26
-      type: case__26
-      if: (inode_tree_tag == inode_tree_tag::case__26)
-    - id: case__30
-      type: case__30
-      if: (inode_tree_tag == inode_tree_tag::case__30)
-    - id: case__34
-      type: case__34
-      if: (inode_tree_tag == inode_tree_tag::case__34)
-    - id: case__38
-      type: case__38
-      if: (inode_tree_tag == inode_tree_tag::case__38)
-    - id: case__42
-      type: case__42
-      if: (inode_tree_tag == inode_tree_tag::case__42)
-    - id: case__46
-      type: case__46
-      if: (inode_tree_tag == inode_tree_tag::case__46)
-    - id: case__50
-      type: case__50
-      if: (inode_tree_tag == inode_tree_tag::case__50)
-    - id: case__54
-      type: case__54
-      if: (inode_tree_tag == inode_tree_tag::case__54)
-    - id: case__58
-      type: case__58
-      if: (inode_tree_tag == inode_tree_tag::case__58)
-    - id: case__62
-      type: case__62
-      if: (inode_tree_tag == inode_tree_tag::case__62)
-    - id: case__66
-      type: case__66
-      if: (inode_tree_tag == inode_tree_tag::case__66)
-    - id: case__3
-      type: s8
-      if: (inode_tree_tag == inode_tree_tag::case__3)
-    - id: case__7
-      type: case__7
-      if: (inode_tree_tag == inode_tree_tag::case__7)
-    - id: case__11
-      type: case__11
-      if: (inode_tree_tag == inode_tree_tag::case__11)
-    - id: case__15
-      type: case__15
-      if: (inode_tree_tag == inode_tree_tag::case__15)
-    - id: case__19
-      type: case__19
-      if: (inode_tree_tag == inode_tree_tag::case__19)
-    - id: case__23
-      type: case__23
-      if: (inode_tree_tag == inode_tree_tag::case__23)
-    - id: case__27
-      type: case__27
-      if: (inode_tree_tag == inode_tree_tag::case__27)
-    - id: case__31
-      type: case__31
-      if: (inode_tree_tag == inode_tree_tag::case__31)
-    - id: case__35
-      type: case__35
-      if: (inode_tree_tag == inode_tree_tag::case__35)
-    - id: case__39
-      type: case__39
-      if: (inode_tree_tag == inode_tree_tag::case__39)
-    - id: case__43
-      type: case__43
-      if: (inode_tree_tag == inode_tree_tag::case__43)
-    - id: case__47
-      type: case__47
-      if: (inode_tree_tag == inode_tree_tag::case__47)
-    - id: case__51
-      type: case__51
-      if: (inode_tree_tag == inode_tree_tag::case__51)
-    - id: case__55
-      type: case__55
-      if: (inode_tree_tag == inode_tree_tag::case__55)
-    - id: case__59
-      type: case__59
-      if: (inode_tree_tag == inode_tree_tag::case__59)
-    - id: case__63
-      type: case__63
-      if: (inode_tree_tag == inode_tree_tag::case__63)
-    - id: case__67
-      type: case__67
-      if: (inode_tree_tag == inode_tree_tag::case__67)
-    - id: case__129
-      type: case__129_entries
-      if: (inode_tree_tag == inode_tree_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (inode_tree_tag == inode_tree_tag::case__130)
-    - id: case__131
-      type: case__131_entries
-      if: (inode_tree_tag == inode_tree_tag::case__131)
-    - id: case__132
-      type: case__132_entries
-      if: (inode_tree_tag == inode_tree_tag::case__132)
-    - id: case__133
-      type: case__133_entries
-      if: (inode_tree_tag == inode_tree_tag::case__133)
-    - id: case__134
-      type: case__134_entries
-      if: (inode_tree_tag == inode_tree_tag::case__134)
-    - id: case__135
-      type: case__135_entries
-      if: (inode_tree_tag == inode_tree_tag::case__135)
-    - id: case__136
-      type: case__136_entries
-      if: (inode_tree_tag == inode_tree_tag::case__136)
-    - id: case__137
-      type: case__137_entries
-      if: (inode_tree_tag == inode_tree_tag::case__137)
-    - id: case__138
-      type: case__138_entries
-      if: (inode_tree_tag == inode_tree_tag::case__138)
-    - id: case__139
-      type: case__139_entries
-      if: (inode_tree_tag == inode_tree_tag::case__139)
-    - id: case__140
-      type: case__140_entries
-      if: (inode_tree_tag == inode_tree_tag::case__140)
-    - id: case__141
-      type: case__141_entries
-      if: (inode_tree_tag == inode_tree_tag::case__141)
-    - id: case__142
-      type: case__142_entries
-      if: (inode_tree_tag == inode_tree_tag::case__142)
-    - id: case__143
-      type: case__143_entries
-      if: (inode_tree_tag == inode_tree_tag::case__143)
-    - id: case__144
-      type: case__144_entries
-      if: (inode_tree_tag == inode_tree_tag::case__144)
-    - id: case__145
-      type: case__145_entries
-      if: (inode_tree_tag == inode_tree_tag::case__145)
-    - id: case__146
-      type: case__146_entries
-      if: (inode_tree_tag == inode_tree_tag::case__146)
-    - id: case__147
-      type: case__147_entries
-      if: (inode_tree_tag == inode_tree_tag::case__147)
-    - id: case__148
-      type: case__148_entries
-      if: (inode_tree_tag == inode_tree_tag::case__148)
-    - id: case__149
-      type: case__149_entries
-      if: (inode_tree_tag == inode_tree_tag::case__149)
-    - id: case__150
-      type: case__150_entries
-      if: (inode_tree_tag == inode_tree_tag::case__150)
-    - id: case__151
-      type: case__151_entries
-      if: (inode_tree_tag == inode_tree_tag::case__151)
-    - id: case__152
-      type: case__152_entries
-      if: (inode_tree_tag == inode_tree_tag::case__152)
-    - id: case__153
-      type: case__153_entries
-      if: (inode_tree_tag == inode_tree_tag::case__153)
-    - id: case__154
-      type: case__154_entries
-      if: (inode_tree_tag == inode_tree_tag::case__154)
-    - id: case__155
-      type: case__155_entries
-      if: (inode_tree_tag == inode_tree_tag::case__155)
-    - id: case__156
-      type: case__156_entries
-      if: (inode_tree_tag == inode_tree_tag::case__156)
-    - id: case__157
-      type: case__157_entries
-      if: (inode_tree_tag == inode_tree_tag::case__157)
-    - id: case__158
-      type: case__158_entries
-      if: (inode_tree_tag == inode_tree_tag::case__158)
-    - id: case__159
-      type: case__159_entries
-      if: (inode_tree_tag == inode_tree_tag::case__159)
-    - id: case__160
-      type: case__160_entries
-      if: (inode_tree_tag == inode_tree_tag::case__160)
-    - id: case__161
-      type: case__161_entries
-      if: (inode_tree_tag == inode_tree_tag::case__161)
-    - id: case__162
-      type: case__162_entries
-      if: (inode_tree_tag == inode_tree_tag::case__162)
-    - id: case__163
-      type: case__163_entries
-      if: (inode_tree_tag == inode_tree_tag::case__163)
-    - id: case__164
-      type: case__164_entries
-      if: (inode_tree_tag == inode_tree_tag::case__164)
-    - id: case__165
-      type: case__165_entries
-      if: (inode_tree_tag == inode_tree_tag::case__165)
-    - id: case__166
-      type: case__166_entries
-      if: (inode_tree_tag == inode_tree_tag::case__166)
-    - id: case__167
-      type: case__167_entries
-      if: (inode_tree_tag == inode_tree_tag::case__167)
-    - id: case__168
-      type: case__168_entries
-      if: (inode_tree_tag == inode_tree_tag::case__168)
-    - id: case__169
-      type: case__169_entries
-      if: (inode_tree_tag == inode_tree_tag::case__169)
-    - id: case__170
-      type: case__170_entries
-      if: (inode_tree_tag == inode_tree_tag::case__170)
-    - id: case__171
-      type: case__171_entries
-      if: (inode_tree_tag == inode_tree_tag::case__171)
-    - id: case__172
-      type: case__172_entries
-      if: (inode_tree_tag == inode_tree_tag::case__172)
-    - id: case__173
-      type: case__173_entries
-      if: (inode_tree_tag == inode_tree_tag::case__173)
-    - id: case__174
-      type: case__174_entries
-      if: (inode_tree_tag == inode_tree_tag::case__174)
-    - id: case__175
-      type: case__175_entries
-      if: (inode_tree_tag == inode_tree_tag::case__175)
-    - id: case__176
-      type: case__176_entries
-      if: (inode_tree_tag == inode_tree_tag::case__176)
-    - id: case__177
-      type: case__177_entries
-      if: (inode_tree_tag == inode_tree_tag::case__177)
-    - id: case__178
-      type: case__178_entries
-      if: (inode_tree_tag == inode_tree_tag::case__178)
-    - id: case__179
-      type: case__179_entries
-      if: (inode_tree_tag == inode_tree_tag::case__179)
-    - id: case__180
-      type: case__180_entries
-      if: (inode_tree_tag == inode_tree_tag::case__180)
-    - id: case__181
-      type: case__181_entries
-      if: (inode_tree_tag == inode_tree_tag::case__181)
-    - id: case__182
-      type: case__182_entries
-      if: (inode_tree_tag == inode_tree_tag::case__182)
-    - id: case__183
-      type: case__183_entries
-      if: (inode_tree_tag == inode_tree_tag::case__183)
-    - id: case__184
-      type: case__184_entries
-      if: (inode_tree_tag == inode_tree_tag::case__184)
-    - id: case__185
-      type: case__185_entries
-      if: (inode_tree_tag == inode_tree_tag::case__185)
-    - id: case__186
-      type: case__186_entries
-      if: (inode_tree_tag == inode_tree_tag::case__186)
-    - id: case__187
-      type: case__187_entries
-      if: (inode_tree_tag == inode_tree_tag::case__187)
-    - id: case__188
-      type: case__188_entries
-      if: (inode_tree_tag == inode_tree_tag::case__188)
-    - id: case__189
-      type: case__189_entries
-      if: (inode_tree_tag == inode_tree_tag::case__189)
-    - id: case__190
-      type: case__190_entries
-      if: (inode_tree_tag == inode_tree_tag::case__190)
-    - id: case__191
-      type: case__191_0
-      if: (inode_tree_tag == inode_tree_tag::case__191)
-    - id: case__192
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_0
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_1
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_2
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_3
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_4
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_5
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_6
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_7
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_8
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_9
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_10
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_11
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_12
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_13
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_14
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: u2be
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_15
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_16
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_17
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_18
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_19
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_20
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_21
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_22
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_23
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_24
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_25
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_26
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_27
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_28
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_29
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_30
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: s4be
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_31
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_32
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_33
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_34
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_35
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_36
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_37
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_38
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_39
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_40
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_41
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_42
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_43
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_44
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_45
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_46
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: s8be
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_47
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_48
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_49
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_50
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_51
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_52
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_53
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_54
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_55
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_56
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_57
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_58
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_59
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_60
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_61
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: inode_tree
+      type: inode_tree_62
+      if: (inode_tree_tag == inode_tree_tag::inode_tree)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_entries
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_0
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
       size: 32
-      if: (inode_tree_tag == inode_tree_tag::case__192)
-    - id: case__208
-      type: case__208
-      if: (inode_tree_tag == inode_tree_tag::case__208)
-    - id: case__209
-      type: case__209
-      if: (inode_tree_tag == inode_tree_tag::case__209)
-    - id: case__210
-      type: case__210
-      if: (inode_tree_tag == inode_tree_tag::case__210)
-    - id: case__211
-      type: case__211
-      if: (inode_tree_tag == inode_tree_tag::case__211)
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_1
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_2
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_3
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+    - id: other_inode_trees
+      type: other_inode_trees_4
+      if: (inode_tree_tag == inode_tree_tag::other_inode_trees)
+  inode_tree_7:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 9
+      doc: inode_tree_field1_entries
+  inode_tree_8:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 10
+      doc: inode_tree_field1_entries
+  inode_tree_9:
+    seq:
+    - id: inode_tree_field0
+      type: u1
+    - id: inode_tree_field1
+      type: inode_tree_field1_entries
+      repeat: expr
+      repeat-expr: 11
+      doc: inode_tree_field1_entries
+  inode_tree_field1:
+    seq:
+    - id: inode_tree_field1_entries
+      type: inode_tree_field1_entries
+      repeat: eos
+  inode_tree_field1_0:
+    seq:
+    - id: len_inode_tree_field1
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: inode_tree_field1
+      type: inode_tree_field1
+      size: len_inode_tree_field1
+  inode_tree_field1_entries:
+    seq:
+    - id: inode_tree_field1_elt_field0
+      type: u1
+    - id: inode_tree_field1_elt_field1
+      type: inode_tree
+  inode_tree_field1_entries_0:
+    seq:
+    - id: inode_tree_field1_elt
+      type: inode_tree
   input_proof:
     seq:
     - id: input_proof_tag
@@ -3474,7 +2231,7 @@ types:
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
@@ -3497,7 +2254,7 @@ types:
   message_1:
     seq:
     - id: len_message
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message
@@ -3515,7 +2272,7 @@ types:
   message_path_0:
     seq:
     - id: len_message_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message_path
@@ -3533,7 +2290,7 @@ types:
   message_result_path_0:
     seq:
     - id: len_message_result_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: message_result_path
@@ -3551,7 +2308,7 @@ types:
   messages_0:
     seq:
     - id: len_messages
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: messages
@@ -3636,7 +2393,7 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op1
@@ -3649,7 +2406,7 @@ types:
   op1_2:
     seq:
     - id: len_op1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op1
@@ -3662,7 +2419,7 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op2
@@ -3675,7 +2432,7 @@ types:
   op2_2:
     seq:
     - id: len_op2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op2
@@ -3684,7 +2441,7 @@ types:
   op_0:
     seq:
     - id: len_op
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op
@@ -3748,6 +2505,184 @@ types:
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: script
       type: id_015__ptlimapt__scripted__contracts
+  other_inode_trees:
+    seq:
+    - id: other_inode_trees_entries
+      type: other_inode_trees_entries
+      repeat: eos
+  other_inode_trees_0:
+    seq:
+    - id: len_other_inode_trees
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: other_inode_trees
+      type: other_inode_trees
+      size: len_other_inode_trees
+  other_inode_trees_1:
+    seq:
+    - id: other_inode_trees_field0
+      type: u1
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_2:
+    seq:
+    - id: other_inode_trees_field0
+      type: u2be
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_3:
+    seq:
+    - id: other_inode_trees_field0
+      type: s4be
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_4:
+    seq:
+    - id: other_inode_trees_field0
+      type: s8be
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1_0
+    - id: other_inode_trees_field2
+      type: inode_tree
+  other_inode_trees_elt_field0:
+    seq:
+    - id: other_inode_trees_elt_field0
+      size-eos: true
+  other_inode_trees_elt_field0_0:
+    seq:
+    - id: len_other_inode_trees_elt_field0
+      type: u1
+      valid:
+        max: 255
+    - id: other_inode_trees_elt_field0
+      type: other_inode_trees_elt_field0
+      size: len_other_inode_trees_elt_field0
+  other_inode_trees_entries:
+    seq:
+    - id: other_inode_trees_elt_field0
+      type: other_inode_trees_elt_field0_0
+    - id: other_inode_trees_elt_field1
+      type: tree_encoding
+  other_inode_trees_field1:
+    seq:
+    - id: other_inode_trees_field1
+      size-eos: true
+  other_inode_trees_field1_0:
+    seq:
+    - id: len_other_inode_trees_field1
+      type: u1
+      valid:
+        max: 255
+    - id: other_inode_trees_field1
+      type: other_inode_trees_field1
+      size: len_other_inode_trees_field1
+  other_trees:
+    seq:
+    - id: other_trees_entries
+      type: other_trees_entries
+      repeat: eos
+  other_trees_0:
+    seq:
+    - id: len_other_trees
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: other_trees
+      type: other_trees
+      size: len_other_trees
+  other_trees_1:
+    seq:
+    - id: other_trees
+      size-eos: true
+  other_trees_2:
+    seq:
+    - id: len_other_trees
+      type: u1
+      valid:
+        max: 255
+    - id: other_trees
+      type: other_trees_1
+      size: len_other_trees
+  other_trees_3:
+    seq:
+    - id: len_other_trees
+      type: u2be
+      valid:
+        max: 65535
+    - id: other_trees
+      type: other_trees_1
+      size: len_other_trees
+  other_trees_4:
+    seq:
+    - id: other_trees_field0
+      type: u1
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_5:
+    seq:
+    - id: other_trees_field0
+      type: u2be
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_6:
+    seq:
+    - id: other_trees_field0
+      type: s4be
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_7:
+    seq:
+    - id: other_trees_field0
+      type: s8be
+    - id: other_trees_field1
+      type: other_trees_field1_0
+    - id: other_trees_field2
+      type: inode_tree
+  other_trees_elt_field0:
+    seq:
+    - id: other_trees_elt_field0
+      size-eos: true
+  other_trees_elt_field0_0:
+    seq:
+    - id: len_other_trees_elt_field0
+      type: u1
+      valid:
+        max: 255
+    - id: other_trees_elt_field0
+      type: other_trees_elt_field0
+      size: len_other_trees_elt_field0
+  other_trees_entries:
+    seq:
+    - id: other_trees_elt_field0
+      type: other_trees_elt_field0_0
+    - id: other_trees_elt_field1
+      type: tree_encoding
+  other_trees_field1:
+    seq:
+    - id: other_trees_field1
+      size-eos: true
+  other_trees_field1_0:
+    seq:
+    - id: len_other_trees_field1
+      type: u1
+      valid:
+        max: 255
+    - id: other_trees_field1
+      type: other_trees_field1
+      size: len_other_trees_field1
   parameters:
     seq:
     - id: entrypoint
@@ -3763,7 +2698,7 @@ types:
   payload_0:
     seq:
     - id: len_payload
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: payload
@@ -3784,11 +2719,11 @@ types:
   preendorsement:
     seq:
     - id: slot
-      type: u2
+      type: u2be
     - id: level
-      type: s4
+      type: s4be
     - id: round
-      type: s4
+      type: s4be
     - id: block_payload_hash
       size: 32
   previous_message_result:
@@ -3805,7 +2740,7 @@ types:
   previous_message_result_path_0:
     seq:
     - id: len_previous_message_result_path
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: previous_message_result_path
@@ -3872,35 +2807,35 @@ types:
     - id: proof_tag
       type: u1
       enum: proof_tag
-    - id: case__0
-      type: case__0
-      if: (proof_tag == proof_tag::case__0)
-    - id: case__2
-      type: case__2
-      if: (proof_tag == proof_tag::case__2)
-    - id: case__1
-      type: case__1
-      if: (proof_tag == proof_tag::case__1)
-    - id: case__3
-      type: case__3
-      if: (proof_tag == proof_tag::case__3)
+    - id: case_0
+      type: case_0
+      if: (proof_tag == proof_tag::case_0)
+    - id: case_2
+      type: case_2
+      if: (proof_tag == proof_tag::case_2)
+    - id: case_1
+      type: case_1
+      if: (proof_tag == proof_tag::case_1)
+    - id: case_3
+      type: case_3
+      if: (proof_tag == proof_tag::case_3)
   proof_0:
     seq:
     - id: proof_tag
       type: u1
       enum: proof_tag
-    - id: case__0
-      type: case__0_0
-      if: (proof_tag == proof_tag::case__0)
-    - id: case__2
-      type: case__2
-      if: (proof_tag == proof_tag::case__2)
-    - id: case__1
-      type: case__1
-      if: (proof_tag == proof_tag::case__1)
-    - id: case__3
-      type: case__3
-      if: (proof_tag == proof_tag::case__3)
+    - id: case_0
+      type: case_0_0
+      if: (proof_tag == proof_tag::case_0)
+    - id: case_2
+      type: case_2
+      if: (proof_tag == proof_tag::case_2)
+    - id: case_1
+      type: case_1
+      if: (proof_tag == proof_tag::case_1)
+    - id: case_3
+      type: case_3
+      if: (proof_tag == proof_tag::case_3)
   proof_1:
     seq:
     - id: pvm_step
@@ -3919,7 +2854,7 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: u4
+      type: u4be
       valid:
         max: 640
     - id: proposals
@@ -3931,7 +2866,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposals
       type: proposals_0
   proposals_entries:
@@ -4217,7 +3152,7 @@ types:
   seed_nonce_revelation:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: nonce
       size: 32
   sequence:
@@ -4228,7 +3163,7 @@ types:
   sequence_0:
     seq:
     - id: len_sequence
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: sequence
@@ -4260,7 +3195,7 @@ types:
   slot:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: index
       type: u1
     - id: header
@@ -4309,7 +3244,7 @@ types:
   tickets_info_0:
     seq:
     - id: len_tickets_info
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: tickets_info
@@ -4393,426 +3328,426 @@ types:
     - id: tree_encoding_tag
       type: u1
       enum: tree_encoding_tag
-    - id: case__0
+    - id: inode
       type: u1
-      if: (tree_encoding_tag == tree_encoding_tag::case__0)
-    - id: case__4
-      type: case__4_0
-      if: (tree_encoding_tag == tree_encoding_tag::case__4)
-    - id: case__8
-      type: case__8
-      if: (tree_encoding_tag == tree_encoding_tag::case__8)
-    - id: case__12
-      type: case__12
-      if: (tree_encoding_tag == tree_encoding_tag::case__12)
-    - id: case__16
-      type: case__16
-      if: (tree_encoding_tag == tree_encoding_tag::case__16)
-    - id: case__20
-      type: case__20
-      if: (tree_encoding_tag == tree_encoding_tag::case__20)
-    - id: case__24
-      type: case__24
-      if: (tree_encoding_tag == tree_encoding_tag::case__24)
-    - id: case__28
-      type: case__28
-      if: (tree_encoding_tag == tree_encoding_tag::case__28)
-    - id: case__32
-      type: case__32
-      if: (tree_encoding_tag == tree_encoding_tag::case__32)
-    - id: case__36
-      type: case__36
-      if: (tree_encoding_tag == tree_encoding_tag::case__36)
-    - id: case__40
-      type: case__40
-      if: (tree_encoding_tag == tree_encoding_tag::case__40)
-    - id: case__44
-      type: case__44
-      if: (tree_encoding_tag == tree_encoding_tag::case__44)
-    - id: case__48
-      type: case__48
-      if: (tree_encoding_tag == tree_encoding_tag::case__48)
-    - id: case__52
-      type: case__52
-      if: (tree_encoding_tag == tree_encoding_tag::case__52)
-    - id: case__56
-      type: case__56
-      if: (tree_encoding_tag == tree_encoding_tag::case__56)
-    - id: case__60
-      type: case__60
-      if: (tree_encoding_tag == tree_encoding_tag::case__60)
-    - id: case__64
-      type: case__64
-      if: (tree_encoding_tag == tree_encoding_tag::case__64)
-    - id: case__1
-      type: u2
-      if: (tree_encoding_tag == tree_encoding_tag::case__1)
-    - id: case__5
-      type: case__5
-      if: (tree_encoding_tag == tree_encoding_tag::case__5)
-    - id: case__9
-      type: case__9
-      if: (tree_encoding_tag == tree_encoding_tag::case__9)
-    - id: case__13
-      type: case__13
-      if: (tree_encoding_tag == tree_encoding_tag::case__13)
-    - id: case__17
-      type: case__17
-      if: (tree_encoding_tag == tree_encoding_tag::case__17)
-    - id: case__21
-      type: case__21
-      if: (tree_encoding_tag == tree_encoding_tag::case__21)
-    - id: case__25
-      type: case__25
-      if: (tree_encoding_tag == tree_encoding_tag::case__25)
-    - id: case__29
-      type: case__29
-      if: (tree_encoding_tag == tree_encoding_tag::case__29)
-    - id: case__33
-      type: case__33
-      if: (tree_encoding_tag == tree_encoding_tag::case__33)
-    - id: case__37
-      type: case__37
-      if: (tree_encoding_tag == tree_encoding_tag::case__37)
-    - id: case__41
-      type: case__41
-      if: (tree_encoding_tag == tree_encoding_tag::case__41)
-    - id: case__45
-      type: case__45
-      if: (tree_encoding_tag == tree_encoding_tag::case__45)
-    - id: case__49
-      type: case__49
-      if: (tree_encoding_tag == tree_encoding_tag::case__49)
-    - id: case__53
-      type: case__53
-      if: (tree_encoding_tag == tree_encoding_tag::case__53)
-    - id: case__57
-      type: case__57
-      if: (tree_encoding_tag == tree_encoding_tag::case__57)
-    - id: case__61
-      type: case__61
-      if: (tree_encoding_tag == tree_encoding_tag::case__61)
-    - id: case__65
-      type: case__65
-      if: (tree_encoding_tag == tree_encoding_tag::case__65)
-    - id: case__2
-      type: s4
-      if: (tree_encoding_tag == tree_encoding_tag::case__2)
-    - id: case__6
-      type: case__6
-      if: (tree_encoding_tag == tree_encoding_tag::case__6)
-    - id: case__10
-      type: case__10
-      if: (tree_encoding_tag == tree_encoding_tag::case__10)
-    - id: case__14
-      type: case__14
-      if: (tree_encoding_tag == tree_encoding_tag::case__14)
-    - id: case__18
-      type: case__18
-      if: (tree_encoding_tag == tree_encoding_tag::case__18)
-    - id: case__22
-      type: case__22
-      if: (tree_encoding_tag == tree_encoding_tag::case__22)
-    - id: case__26
-      type: case__26
-      if: (tree_encoding_tag == tree_encoding_tag::case__26)
-    - id: case__30
-      type: case__30
-      if: (tree_encoding_tag == tree_encoding_tag::case__30)
-    - id: case__34
-      type: case__34
-      if: (tree_encoding_tag == tree_encoding_tag::case__34)
-    - id: case__38
-      type: case__38
-      if: (tree_encoding_tag == tree_encoding_tag::case__38)
-    - id: case__42
-      type: case__42
-      if: (tree_encoding_tag == tree_encoding_tag::case__42)
-    - id: case__46
-      type: case__46
-      if: (tree_encoding_tag == tree_encoding_tag::case__46)
-    - id: case__50
-      type: case__50
-      if: (tree_encoding_tag == tree_encoding_tag::case__50)
-    - id: case__54
-      type: case__54
-      if: (tree_encoding_tag == tree_encoding_tag::case__54)
-    - id: case__58
-      type: case__58
-      if: (tree_encoding_tag == tree_encoding_tag::case__58)
-    - id: case__62
-      type: case__62
-      if: (tree_encoding_tag == tree_encoding_tag::case__62)
-    - id: case__66
-      type: case__66
-      if: (tree_encoding_tag == tree_encoding_tag::case__66)
-    - id: case__3
-      type: s8
-      if: (tree_encoding_tag == tree_encoding_tag::case__3)
-    - id: case__7
-      type: case__7
-      if: (tree_encoding_tag == tree_encoding_tag::case__7)
-    - id: case__11
-      type: case__11
-      if: (tree_encoding_tag == tree_encoding_tag::case__11)
-    - id: case__15
-      type: case__15
-      if: (tree_encoding_tag == tree_encoding_tag::case__15)
-    - id: case__19
-      type: case__19
-      if: (tree_encoding_tag == tree_encoding_tag::case__19)
-    - id: case__23
-      type: case__23
-      if: (tree_encoding_tag == tree_encoding_tag::case__23)
-    - id: case__27
-      type: case__27
-      if: (tree_encoding_tag == tree_encoding_tag::case__27)
-    - id: case__31
-      type: case__31
-      if: (tree_encoding_tag == tree_encoding_tag::case__31)
-    - id: case__35
-      type: case__35
-      if: (tree_encoding_tag == tree_encoding_tag::case__35)
-    - id: case__39
-      type: case__39
-      if: (tree_encoding_tag == tree_encoding_tag::case__39)
-    - id: case__43
-      type: case__43
-      if: (tree_encoding_tag == tree_encoding_tag::case__43)
-    - id: case__47
-      type: case__47
-      if: (tree_encoding_tag == tree_encoding_tag::case__47)
-    - id: case__51
-      type: case__51
-      if: (tree_encoding_tag == tree_encoding_tag::case__51)
-    - id: case__55
-      type: case__55
-      if: (tree_encoding_tag == tree_encoding_tag::case__55)
-    - id: case__59
-      type: case__59
-      if: (tree_encoding_tag == tree_encoding_tag::case__59)
-    - id: case__63
-      type: case__63
-      if: (tree_encoding_tag == tree_encoding_tag::case__63)
-    - id: case__67
-      type: case__67
-      if: (tree_encoding_tag == tree_encoding_tag::case__67)
-    - id: case__129
-      type: case__129_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__129)
-    - id: case__130
-      type: case__130_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__130)
-    - id: case__131
-      type: case__131_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__131)
-    - id: case__132
-      type: case__132_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__132)
-    - id: case__133
-      type: case__133_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__133)
-    - id: case__134
-      type: case__134_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__134)
-    - id: case__135
-      type: case__135_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__135)
-    - id: case__136
-      type: case__136_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__136)
-    - id: case__137
-      type: case__137_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__137)
-    - id: case__138
-      type: case__138_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__138)
-    - id: case__139
-      type: case__139_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__139)
-    - id: case__140
-      type: case__140_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__140)
-    - id: case__141
-      type: case__141_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__141)
-    - id: case__142
-      type: case__142_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__142)
-    - id: case__143
-      type: case__143_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__143)
-    - id: case__144
-      type: case__144_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__144)
-    - id: case__145
-      type: case__145_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__145)
-    - id: case__146
-      type: case__146_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__146)
-    - id: case__147
-      type: case__147_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__147)
-    - id: case__148
-      type: case__148_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__148)
-    - id: case__149
-      type: case__149_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__149)
-    - id: case__150
-      type: case__150_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__150)
-    - id: case__151
-      type: case__151_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__151)
-    - id: case__152
-      type: case__152_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__152)
-    - id: case__153
-      type: case__153_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__153)
-    - id: case__154
-      type: case__154_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__154)
-    - id: case__155
-      type: case__155_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__155)
-    - id: case__156
-      type: case__156_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__156)
-    - id: case__157
-      type: case__157_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__157)
-    - id: case__158
-      type: case__158_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__158)
-    - id: case__159
-      type: case__159_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__159)
-    - id: case__160
-      type: case__160_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__160)
-    - id: case__161
-      type: case__161_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__161)
-    - id: case__162
-      type: case__162_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__162)
-    - id: case__163
-      type: case__163_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__163)
-    - id: case__164
-      type: case__164_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__164)
-    - id: case__165
-      type: case__165_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__165)
-    - id: case__166
-      type: case__166_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__166)
-    - id: case__167
-      type: case__167_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__167)
-    - id: case__168
-      type: case__168_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__168)
-    - id: case__169
-      type: case__169_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__169)
-    - id: case__170
-      type: case__170_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__170)
-    - id: case__171
-      type: case__171_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__171)
-    - id: case__172
-      type: case__172_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__172)
-    - id: case__173
-      type: case__173_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__173)
-    - id: case__174
-      type: case__174_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__174)
-    - id: case__175
-      type: case__175_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__175)
-    - id: case__176
-      type: case__176_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__176)
-    - id: case__177
-      type: case__177_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__177)
-    - id: case__178
-      type: case__178_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__178)
-    - id: case__179
-      type: case__179_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__179)
-    - id: case__180
-      type: case__180_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__180)
-    - id: case__181
-      type: case__181_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__181)
-    - id: case__182
-      type: case__182_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__182)
-    - id: case__183
-      type: case__183_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__183)
-    - id: case__184
-      type: case__184_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__184)
-    - id: case__185
-      type: case__185_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__185)
-    - id: case__186
-      type: case__186_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__186)
-    - id: case__187
-      type: case__187_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__187)
-    - id: case__188
-      type: case__188_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__188)
-    - id: case__189
-      type: case__189_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__189)
-    - id: case__190
-      type: case__190_entries
-      if: (tree_encoding_tag == tree_encoding_tag::case__190)
-    - id: case__191
-      type: case__191_1
-      if: (tree_encoding_tag == tree_encoding_tag::case__191)
-    - id: case__192
-      type: case__192_0
-      if: (tree_encoding_tag == tree_encoding_tag::case__192)
-    - id: case__193
-      type: case__193_0
-      if: (tree_encoding_tag == tree_encoding_tag::case__193)
-    - id: case__195
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_0
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_1
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_2
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_3
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_4
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_5
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_6
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_7
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_8
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_9
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_10
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_11
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_12
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_13
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_14
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: u2be
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_15
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_16
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_17
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_18
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_19
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_20
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_21
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_22
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_23
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_24
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_25
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_26
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_27
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_28
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_29
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_30
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: s4be
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_31
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_32
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_33
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_34
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_35
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_36
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_37
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_38
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_39
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_40
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_41
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_42
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_43
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_44
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_45
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_46
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: s8be
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_47
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_48
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_49
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_50
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_51
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_52
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_53
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_54
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_55
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_56
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_57
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_58
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_59
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_60
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_61
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: inode
+      type: inode_62
+      if: (tree_encoding_tag == tree_encoding_tag::inode)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_entries
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_0
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_2
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_3
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
       type: bytes_dyn_uint30
-      if: (tree_encoding_tag == tree_encoding_tag::case__195)
-    - id: case__200
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
       size: 32
-      if: (tree_encoding_tag == tree_encoding_tag::case__200)
-    - id: case__208
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
       size: 32
-      if: (tree_encoding_tag == tree_encoding_tag::case__208)
-    - id: case__216
-      type: case__216
-      if: (tree_encoding_tag == tree_encoding_tag::case__216)
-    - id: case__217
-      type: case__217
-      if: (tree_encoding_tag == tree_encoding_tag::case__217)
-    - id: case__218
-      type: case__218
-      if: (tree_encoding_tag == tree_encoding_tag::case__218)
-    - id: case__219
-      type: case__219
-      if: (tree_encoding_tag == tree_encoding_tag::case__219)
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_4
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_5
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_6
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
+    - id: other_trees
+      type: other_trees_7
+      if: (tree_encoding_tag == tree_encoding_tag::other_trees)
   tx_rollup_commit:
     seq:
     - id: source
@@ -4852,7 +3787,7 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: level
-      type: s4
+      type: s4be
     - id: context_hash
       size: 32
     - id: message_index
@@ -4911,7 +3846,7 @@ types:
         A tx rollup handle: A tx rollup notation as given to an RPC or inside scripts,
         is a base58 tx rollup hash
     - id: level
-      type: s4
+      type: s4be
     - id: message
       type: message
     - id: message_position
@@ -5059,10 +3994,10 @@ types:
       type: op_0
 enums:
   amount_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
+    0: small
+    1: medium
+    2: biggish
+    3: bigger
   bool:
     0: false
     255: true
@@ -5515,144 +4450,144 @@ enums:
     250: zk_rollup_origination
     251: zk_rollup_publish
   inode_tree_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    4: case__4
-    5: case__5
-    6: case__6
-    7: case__7
-    8: case__8
-    9: case__9
-    10: case__10
-    11: case__11
-    12: case__12
-    13: case__13
-    14: case__14
-    15: case__15
-    16: case__16
-    17: case__17
-    18: case__18
-    19: case__19
-    20: case__20
-    21: case__21
-    22: case__22
-    23: case__23
-    24: case__24
-    25: case__25
-    26: case__26
-    27: case__27
-    28: case__28
-    29: case__29
-    30: case__30
-    31: case__31
-    32: case__32
-    33: case__33
-    34: case__34
-    35: case__35
-    36: case__36
-    37: case__37
-    38: case__38
-    39: case__39
-    40: case__40
-    41: case__41
-    42: case__42
-    43: case__43
-    44: case__44
-    45: case__45
-    46: case__46
-    47: case__47
-    48: case__48
-    49: case__49
-    50: case__50
-    51: case__51
-    52: case__52
-    53: case__53
-    54: case__54
-    55: case__55
-    56: case__56
-    57: case__57
-    58: case__58
-    59: case__59
-    60: case__60
-    61: case__61
-    62: case__62
-    63: case__63
-    64: case__64
-    65: case__65
-    66: case__66
-    67: case__67
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    132: case__132
-    133: case__133
-    134: case__134
-    135: case__135
-    136: case__136
-    137: case__137
-    138: case__138
-    139: case__139
-    140: case__140
-    141: case__141
-    142: case__142
-    143: case__143
-    144: case__144
-    145: case__145
-    146: case__146
-    147: case__147
-    148: case__148
-    149: case__149
-    150: case__150
-    151: case__151
-    152: case__152
-    153: case__153
-    154: case__154
-    155: case__155
-    156: case__156
-    157: case__157
-    158: case__158
-    159: case__159
-    160: case__160
-    161: case__161
-    162: case__162
-    163: case__163
-    164: case__164
-    165: case__165
-    166: case__166
-    167: case__167
-    168: case__168
-    169: case__169
-    170: case__170
-    171: case__171
-    172: case__172
-    173: case__173
-    174: case__174
-    175: case__175
-    176: case__176
-    177: case__177
-    178: case__178
-    179: case__179
-    180: case__180
-    181: case__181
-    182: case__182
-    183: case__183
-    184: case__184
-    185: case__185
-    186: case__186
-    187: case__187
-    188: case__188
-    189: case__189
-    190: case__190
-    191: case__191
-    192: case__192
-    208: case__208
-    209: case__209
-    210: case__210
-    211: case__211
-    224: case__224
+    0: inode_tree
+    1: inode_tree
+    2: inode_tree
+    3: inode_tree
+    4: inode_tree
+    5: inode_tree
+    6: inode_tree
+    7: inode_tree
+    8: inode_tree
+    9: inode_tree
+    10: inode_tree
+    11: inode_tree
+    12: inode_tree
+    13: inode_tree
+    14: inode_tree
+    15: inode_tree
+    16: inode_tree
+    17: inode_tree
+    18: inode_tree
+    19: inode_tree
+    20: inode_tree
+    21: inode_tree
+    22: inode_tree
+    23: inode_tree
+    24: inode_tree
+    25: inode_tree
+    26: inode_tree
+    27: inode_tree
+    28: inode_tree
+    29: inode_tree
+    30: inode_tree
+    31: inode_tree
+    32: inode_tree
+    33: inode_tree
+    34: inode_tree
+    35: inode_tree
+    36: inode_tree
+    37: inode_tree
+    38: inode_tree
+    39: inode_tree
+    40: inode_tree
+    41: inode_tree
+    42: inode_tree
+    43: inode_tree
+    44: inode_tree
+    45: inode_tree
+    46: inode_tree
+    47: inode_tree
+    48: inode_tree
+    49: inode_tree
+    50: inode_tree
+    51: inode_tree
+    52: inode_tree
+    53: inode_tree
+    54: inode_tree
+    55: inode_tree
+    56: inode_tree
+    57: inode_tree
+    58: inode_tree
+    59: inode_tree
+    60: inode_tree
+    61: inode_tree
+    62: inode_tree
+    63: inode_tree
+    64: inode_tree
+    65: inode_tree
+    66: inode_tree
+    67: inode_tree
+    128: other_inode_trees
+    129: other_inode_trees
+    130: other_inode_trees
+    131: other_inode_trees
+    132: other_inode_trees
+    133: other_inode_trees
+    134: other_inode_trees
+    135: other_inode_trees
+    136: other_inode_trees
+    137: other_inode_trees
+    138: other_inode_trees
+    139: other_inode_trees
+    140: other_inode_trees
+    141: other_inode_trees
+    142: other_inode_trees
+    143: other_inode_trees
+    144: other_inode_trees
+    145: other_inode_trees
+    146: other_inode_trees
+    147: other_inode_trees
+    148: other_inode_trees
+    149: other_inode_trees
+    150: other_inode_trees
+    151: other_inode_trees
+    152: other_inode_trees
+    153: other_inode_trees
+    154: other_inode_trees
+    155: other_inode_trees
+    156: other_inode_trees
+    157: other_inode_trees
+    158: other_inode_trees
+    159: other_inode_trees
+    160: other_inode_trees
+    161: other_inode_trees
+    162: other_inode_trees
+    163: other_inode_trees
+    164: other_inode_trees
+    165: other_inode_trees
+    166: other_inode_trees
+    167: other_inode_trees
+    168: other_inode_trees
+    169: other_inode_trees
+    170: other_inode_trees
+    171: other_inode_trees
+    172: other_inode_trees
+    173: other_inode_trees
+    174: other_inode_trees
+    175: other_inode_trees
+    176: other_inode_trees
+    177: other_inode_trees
+    178: other_inode_trees
+    179: other_inode_trees
+    180: other_inode_trees
+    181: other_inode_trees
+    182: other_inode_trees
+    183: other_inode_trees
+    184: other_inode_trees
+    185: other_inode_trees
+    186: other_inode_trees
+    187: other_inode_trees
+    188: other_inode_trees
+    189: other_inode_trees
+    190: other_inode_trees
+    191: other_inode_trees
+    192: other_inode_trees
+    208: other_inode_trees
+    209: other_inode_trees
+    210: other_inode_trees
+    211: other_inode_trees
+    224: other_inode_trees
   input_proof_tag:
     0: inbox__proof
     1: reveal__proof
@@ -5692,10 +4627,10 @@ enums:
     0: none
     1: some
   proof_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
+    0: case_0
+    1: case_1
+    2: case_2
+    3: case_3
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
@@ -5717,148 +4652,148 @@ enums:
     0: dissection
     1: proof
   tree_encoding_tag:
-    0: case__0
-    1: case__1
-    2: case__2
-    3: case__3
-    4: case__4
-    5: case__5
-    6: case__6
-    7: case__7
-    8: case__8
-    9: case__9
-    10: case__10
-    11: case__11
-    12: case__12
-    13: case__13
-    14: case__14
-    15: case__15
-    16: case__16
-    17: case__17
-    18: case__18
-    19: case__19
-    20: case__20
-    21: case__21
-    22: case__22
-    23: case__23
-    24: case__24
-    25: case__25
-    26: case__26
-    27: case__27
-    28: case__28
-    29: case__29
-    30: case__30
-    31: case__31
-    32: case__32
-    33: case__33
-    34: case__34
-    35: case__35
-    36: case__36
-    37: case__37
-    38: case__38
-    39: case__39
-    40: case__40
-    41: case__41
-    42: case__42
-    43: case__43
-    44: case__44
-    45: case__45
-    46: case__46
-    47: case__47
-    48: case__48
-    49: case__49
-    50: case__50
-    51: case__51
-    52: case__52
-    53: case__53
-    54: case__54
-    55: case__55
-    56: case__56
-    57: case__57
-    58: case__58
-    59: case__59
-    60: case__60
-    61: case__61
-    62: case__62
-    63: case__63
-    64: case__64
-    65: case__65
-    66: case__66
-    67: case__67
-    128: case__128
-    129: case__129
-    130: case__130
-    131: case__131
-    132: case__132
-    133: case__133
-    134: case__134
-    135: case__135
-    136: case__136
-    137: case__137
-    138: case__138
-    139: case__139
-    140: case__140
-    141: case__141
-    142: case__142
-    143: case__143
-    144: case__144
-    145: case__145
-    146: case__146
-    147: case__147
-    148: case__148
-    149: case__149
-    150: case__150
-    151: case__151
-    152: case__152
-    153: case__153
-    154: case__154
-    155: case__155
-    156: case__156
-    157: case__157
-    158: case__158
-    159: case__159
-    160: case__160
-    161: case__161
-    162: case__162
-    163: case__163
-    164: case__164
-    165: case__165
-    166: case__166
-    167: case__167
-    168: case__168
-    169: case__169
-    170: case__170
-    171: case__171
-    172: case__172
-    173: case__173
-    174: case__174
-    175: case__175
-    176: case__176
-    177: case__177
-    178: case__178
-    179: case__179
-    180: case__180
-    181: case__181
-    182: case__182
-    183: case__183
-    184: case__184
-    185: case__185
-    186: case__186
-    187: case__187
-    188: case__188
-    189: case__189
-    190: case__190
-    191: case__191
-    192: case__192
-    193: case__193
-    195: case__195
-    200: case__200
-    208: case__208
-    216: case__216
-    217: case__217
-    218: case__218
-    219: case__219
-    224: case__224
+    0: inode
+    1: inode
+    2: inode
+    3: inode
+    4: inode
+    5: inode
+    6: inode
+    7: inode
+    8: inode
+    9: inode
+    10: inode
+    11: inode
+    12: inode
+    13: inode
+    14: inode
+    15: inode
+    16: inode
+    17: inode
+    18: inode
+    19: inode
+    20: inode
+    21: inode
+    22: inode
+    23: inode
+    24: inode
+    25: inode
+    26: inode
+    27: inode
+    28: inode
+    29: inode
+    30: inode
+    31: inode
+    32: inode
+    33: inode
+    34: inode
+    35: inode
+    36: inode
+    37: inode
+    38: inode
+    39: inode
+    40: inode
+    41: inode
+    42: inode
+    43: inode
+    44: inode
+    45: inode
+    46: inode
+    47: inode
+    48: inode
+    49: inode
+    50: inode
+    51: inode
+    52: inode
+    53: inode
+    54: inode
+    55: inode
+    56: inode
+    57: inode
+    58: inode
+    59: inode
+    60: inode
+    61: inode
+    62: inode
+    63: inode
+    64: inode
+    65: inode
+    66: inode
+    67: inode
+    128: other_trees
+    129: other_trees
+    130: other_trees
+    131: other_trees
+    132: other_trees
+    133: other_trees
+    134: other_trees
+    135: other_trees
+    136: other_trees
+    137: other_trees
+    138: other_trees
+    139: other_trees
+    140: other_trees
+    141: other_trees
+    142: other_trees
+    143: other_trees
+    144: other_trees
+    145: other_trees
+    146: other_trees
+    147: other_trees
+    148: other_trees
+    149: other_trees
+    150: other_trees
+    151: other_trees
+    152: other_trees
+    153: other_trees
+    154: other_trees
+    155: other_trees
+    156: other_trees
+    157: other_trees
+    158: other_trees
+    159: other_trees
+    160: other_trees
+    161: other_trees
+    162: other_trees
+    163: other_trees
+    164: other_trees
+    165: other_trees
+    166: other_trees
+    167: other_trees
+    168: other_trees
+    169: other_trees
+    170: other_trees
+    171: other_trees
+    172: other_trees
+    173: other_trees
+    174: other_trees
+    175: other_trees
+    176: other_trees
+    177: other_trees
+    178: other_trees
+    179: other_trees
+    180: other_trees
+    181: other_trees
+    182: other_trees
+    183: other_trees
+    184: other_trees
+    185: other_trees
+    186: other_trees
+    187: other_trees
+    188: other_trees
+    189: other_trees
+    190: other_trees
+    191: other_trees
+    192: other_trees
+    193: other_trees
+    195: other_trees
+    200: other_trees
+    208: other_trees
+    216: other_trees
+    217: other_trees
+    218: other_trees
+    219: other_trees
+    224: other_trees
 seq:
 - id: id_015__ptlimapt__operation
   type: operation__shell_header

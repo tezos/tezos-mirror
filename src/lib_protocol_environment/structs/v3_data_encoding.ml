@@ -54,7 +54,9 @@ module Encoding = struct
         let j = Json_repr.convert (module Repr) (module Json_repr.Ezjsonm) j in
         make_lazy encoding (Json.destruct encoding j)
       in
-      repr_agnostic_custom {write; read} ~schema:Json_schema.any
+      repr_agnostic_custom
+        {write; read; is_object = false}
+        ~schema:Json_schema.any
     in
     Data_encoding__Encoding.raw_splitted ~json ~binary
 

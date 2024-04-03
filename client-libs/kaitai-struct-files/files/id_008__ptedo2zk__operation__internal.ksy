@@ -6,7 +6,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -52,7 +52,7 @@ types:
         A contract handle: A contract notation as given to an RPC or inside scripts.
         Can be a base58 implicit contract hash or a base58 originated contract hash.
     - id: nonce
-      type: u2
+      type: u2be
     - id: id_008__ptedo2zk__operation__alpha__internal_operation_tag
       type: u1
       enum: id_008__ptedo2zk__operation__alpha__internal_operation_tag

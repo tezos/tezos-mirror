@@ -48,10 +48,10 @@ module Type : sig
   val z : string * ClassSpec.t
 
   (** uint30 is u4 with a bound check. *)
-  val uint30 : string * ClassSpec.t
+  val uint30 : endian:Data_encoding__TzEndian.endianness -> string * ClassSpec.t
 
   (** int31 is s4 with a bound check. *)
-  val int31 : string * ClassSpec.t
+  val int31 : endian:Data_encoding__TzEndian.endianness -> string * ClassSpec.t
 
   (** [bytes_dyn_uint8] is a byte sequence dynamically sized by a [uint8]. *)
   val bytes_dyn_uint8 : string * ClassSpec.t
@@ -85,25 +85,37 @@ module Attr : sig
   (** [int8 ~id] is an [AttrSpec.t] definition of 8-bit signed integer. *)
   val int8 : id:string -> AttrSpec.t
 
-  (** [uint16 ~id] is an [AttrSpec.t] definition of 16-bit unsigned integer. *)
-  val uint16 : id:string -> AttrSpec.t
+  (** [uint16 ~id ~endian] is an [AttrSpec.t] definition of 16-bit unsigned
+      integer in [endian]ness. *)
+  val uint16 :
+    id:string -> endian:Data_encoding__TzEndian.endianness -> AttrSpec.t
 
-  (** [int16 ~id] is an [AttrSpec.t] definition of 16-bit signed integer. *)
-  val int16 : id:string -> AttrSpec.t
+  (** [int16 ~id] is an [AttrSpec.t] definition of 16-bit signed
+      integer in [endian]ness. *)
+  val int16 :
+    id:string -> endian:Data_encoding__TzEndian.endianness -> AttrSpec.t
 
-  (** [int32 ~id] is an [AttrSpec.t] definition of 32-bit signed integer. *)
-  val int32 : id:string -> AttrSpec.t
+  (** [int32 ~id] is an [AttrSpec.t] definition of 32-bit signed
+      integer in [endian]ness. *)
+  val int32 :
+    id:string -> endian:Data_encoding__TzEndian.endianness -> AttrSpec.t
 
-  (** [int64 ~id] is an [AttrSpec.t] definition of 64-bit signed integer. *)
-  val int64 : id:string -> AttrSpec.t
+  (** [int64 ~id] is an [AttrSpec.t] definition of 64-bit signed
+      integer in [endian]ness. *)
+  val int64 :
+    id:string -> endian:Data_encoding__TzEndian.endianness -> AttrSpec.t
 
-  (** [int31 ~id] is an [AttrSpec.t] definition of 31-bit signed integer.
+  (** [int31 ~id] is an [AttrSpec.t] definition of 31-bit signed
+      integer in [endian]ness.
       For more about this type see [Data_encoding.int31]. *)
-  val int31 : id:string -> AttrSpec.t
+  val int31 :
+    id:string -> endian:Data_encoding__TzEndian.endianness -> AttrSpec.t
 
-  (** [uint30 ~id] is an [AttrSpec.t] definition of 30-bit unsigned integer.
+  (** [uint30 ~id] is an [AttrSpec.t] definition of 30-bit unsigned
+      integer in [endian]ness.
       For more about this type see [Data_encoding.int31]. *)
-  val uint30 : id:string -> AttrSpec.t
+  val uint30 :
+    id:string -> endian:Data_encoding__TzEndian.endianness -> AttrSpec.t
 
   (** [float ~id] is an [AttrSpec.t] definition of 64-bit float. *)
   val float : id:string -> AttrSpec.t

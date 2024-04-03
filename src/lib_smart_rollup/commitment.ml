@@ -78,7 +78,7 @@ end
 type versioned = V1 of V1.t
 
 let versioned_encoding =
-  let open Data_encoding in
+  let open Data_encoding.V1 in
   union
     [
       case

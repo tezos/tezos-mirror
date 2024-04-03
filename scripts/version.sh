@@ -32,7 +32,7 @@ export full_opam_repository_tag=518f55a1ee5da870035b9593f98db03f43ce7f5f
 ## This value MUST be reflected in the `build_deps_image_version` variable
 ## of `.gitlab-ci.yml`, which is ensured by running `make -C ci` from the root.
 export opam_repository_url=https://gitlab.com/tezos/opam-repository
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-c9ef0c99bf6b62be8f18aae04e4a44033d710c21}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-73427137fb6186c0ba3abd5d93c524023c60fc01}"
 export opam_repository_git="$opam_repository_url.git"
 export opam_repository="$opam_repository_git"\#"$opam_repository_tag"
 

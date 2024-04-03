@@ -8,4 +8,4 @@ doc: ! >-
   precision, epoch or rfc3339 based.
 seq:
 - id: timestamp__system
-  type: s8
+  type: s8be

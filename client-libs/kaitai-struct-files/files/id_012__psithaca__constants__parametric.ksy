@@ -18,16 +18,16 @@ types:
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
   minimal_participation_ratio:
     seq:
     - id: numerator
-      type: u2
+      type: u2be
     - id: denominator
-      type: u2
+      type: u2be
   n:
     seq:
     - id: n
@@ -57,9 +57,9 @@ types:
   ratio_of_frozen_deposits_slashed_per_double_endorsement:
     seq:
     - id: numerator
-      type: u2
+      type: u2be
     - id: denominator
-      type: u2
+      type: u2be
   round_robin_over_delegates:
     seq:
     - id: round_robin_over_delegates_entries
@@ -68,7 +68,7 @@ types:
   round_robin_over_delegates_0:
     seq:
     - id: len_round_robin_over_delegates
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: round_robin_over_delegates
@@ -87,7 +87,7 @@ types:
   round_robin_over_delegates_entries:
     seq:
     - id: len_round_robin_over_delegates_elt
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: round_robin_over_delegates_elt
@@ -118,19 +118,19 @@ seq:
 - id: preserved_cycles
   type: u1
 - id: blocks_per_cycle
-  type: s4
+  type: s4be
 - id: blocks_per_commitment
-  type: s4
+  type: s4be
 - id: blocks_per_stake_snapshot
-  type: s4
+  type: s4be
 - id: blocks_per_voting_period
-  type: s4
+  type: s4be
 - id: hard_gas_limit_per_operation
   type: z
 - id: hard_gas_limit_per_block
   type: z
 - id: proof_of_work_threshold
-  type: s8
+  type: s8be
 - id: tokens_per_roll
   type: id_012__psithaca__mutez
 - id: seed_nonce_revelation_tip
@@ -148,23 +148,23 @@ seq:
 - id: hard_storage_limit_per_operation
   type: z
 - id: quorum_min
-  type: s4
+  type: s4be
 - id: quorum_max
-  type: s4
+  type: s4be
 - id: min_proposal_quorum
-  type: s4
+  type: s4be
 - id: liquidity_baking_subsidy
   type: id_012__psithaca__mutez
 - id: liquidity_baking_sunset_level
-  type: s4
+  type: s4be
 - id: liquidity_baking_escape_ema_threshold
-  type: s4
+  type: s4be
 - id: max_operations_time_to_live
-  type: s2
+  type: s2be
 - id: minimal_block_delay
-  type: s8
+  type: s8be
 - id: delay_increment_per_round
-  type: s8
+  type: s8be
 - id: consensus_committee_size
   type: int31
 - id: consensus_threshold

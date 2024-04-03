@@ -60,7 +60,7 @@ let%expect_test "test uint16 translation" =
     doc: ! 'Encoding id: ground_uint16'
     seq:
     - id: ground_uint16
-      type: u2
+      type: u2be
   |}]
 
 let%expect_test "test int16 translation" =
@@ -78,7 +78,7 @@ let%expect_test "test int16 translation" =
     doc: ! 'Encoding id: ground_int16'
     seq:
     - id: ground_int16
-      type: s2
+      type: s2be
   |}]
 
 let%expect_test "test int32 translation" =
@@ -96,7 +96,7 @@ let%expect_test "test int32 translation" =
     doc: ! 'Encoding id: ground_int32'
     seq:
     - id: ground_int32
-      type: s4
+      type: s4be
   |}]
 
 let%expect_test "test int64 translation" =
@@ -114,7 +114,7 @@ let%expect_test "test int64 translation" =
     doc: ! 'Encoding id: ground_int64'
     seq:
     - id: ground_int64
-      type: s8
+      type: s8be
   |}]
 
 let%expect_test "test int31 translation" =
@@ -134,7 +134,7 @@ let%expect_test "test int31 translation" =
       int31:
         seq:
         - id: int31
-          type: s4
+          type: s4be
           valid:
             min: -1073741824
             max: 1073741823
@@ -201,7 +201,7 @@ let%expect_test "test dynamic size bytes translation" =
       bytes_dyn_uint30:
         seq:
         - id: len_bytes_dyn_uint30
-          type: u4
+          type: u4be
           valid:
             max: 1073741823
         - id: bytes_dyn_uint30
@@ -261,7 +261,7 @@ let%expect_test "test dynamic size string translation" =
       bytes_dyn_uint30:
         seq:
         - id: len_bytes_dyn_uint30
-          type: u4
+          type: u4be
           valid:
             max: 1073741823
         - id: bytes_dyn_uint30

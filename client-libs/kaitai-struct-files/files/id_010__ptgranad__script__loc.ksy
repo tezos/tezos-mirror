@@ -6,7 +6,7 @@ types:
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823

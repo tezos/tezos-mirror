@@ -14,7 +14,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: voting_power
-      type: s8
+      type: s8be
   public_key_hash:
     seq:
     - id: public_key_hash_tag
@@ -40,7 +40,7 @@ enums:
     3: bls
 seq:
 - id: len_id_016__ptmumbai__vote__listings
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: id_016__ptmumbai__vote__listings

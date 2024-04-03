@@ -10,7 +10,7 @@ types:
   int31:
     seq:
     - id: int31
-      type: s4
+      type: s4be
       valid:
         min: -1073741824
         max: 1073741823
@@ -34,7 +34,7 @@ types:
   time_between_blocks_0:
     seq:
     - id: len_time_between_blocks
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: time_between_blocks
@@ -43,7 +43,7 @@ types:
   time_between_blocks_entries:
     seq:
     - id: time_between_blocks_elt
-      type: s8
+      type: s8be
   z:
     seq:
     - id: has_tail
@@ -71,27 +71,27 @@ seq:
 - id: preserved_cycles
   type: u1
 - id: blocks_per_cycle
-  type: s4
+  type: s4be
 - id: blocks_per_commitment
-  type: s4
+  type: s4be
 - id: blocks_per_roll_snapshot
-  type: s4
+  type: s4be
 - id: blocks_per_voting_period
-  type: s4
+  type: s4be
 - id: time_between_blocks
   type: time_between_blocks_0
 - id: endorsers_per_block
-  type: u2
+  type: u2be
 - id: hard_gas_limit_per_operation
   type: z
 - id: hard_gas_limit_per_block
   type: z
 - id: proof_of_work_threshold
-  type: s8
+  type: s8be
 - id: tokens_per_roll
   type: id_005__psbabym1__mutez
 - id: michelson_maximum_type_size
-  type: u2
+  type: u2be
 - id: seed_nonce_revelation_tip
   type: id_005__psbabym1__mutez
 - id: origination_size
@@ -109,14 +109,14 @@ seq:
 - id: hard_storage_limit_per_operation
   type: z
 - id: test_chain_duration
-  type: s8
+  type: s8be
 - id: quorum_min
-  type: s4
+  type: s4be
 - id: quorum_max
-  type: s4
+  type: s4be
 - id: min_proposal_quorum
-  type: s4
+  type: s4be
 - id: initial_endorsers
-  type: u2
+  type: u2be
 - id: delay_per_missing_endorsement
-  type: s8
+  type: s8be

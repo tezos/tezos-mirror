@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 005-PsBabyM1.voting_period'
 seq:
 - id: id_005__psbabym1__voting_period
-  type: s4
+  type: s4be

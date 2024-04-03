@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: sapling.transaction.diversifier_index'
 seq:
 - id: sapling__transaction__diversifier_index
-  type: s8
+  type: s8be

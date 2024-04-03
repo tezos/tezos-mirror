@@ -486,7 +486,7 @@ end) =
 struct
   open Tezos_context_sigs.Context.Proof_types
   module V1 = Make_V1 (Conf)
-  open Data_encoding
+  open Data_encoding.V1
 
   let entries = Conf.entries
 
@@ -532,7 +532,7 @@ struct
     let open Compact in
     req "length" @@ conv Int64.of_int Int64.to_int int64
 
-  let step_encoding : step Data_encoding.t = V1.step_encoding
+  let step_encoding : step Data_encoding.V1.t = V1.step_encoding
 
   let hash_encoding = Compact.payload V1.hash_encoding
 

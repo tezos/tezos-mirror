@@ -12,7 +12,7 @@ types:
   current_head_0:
     seq:
     - id: len_current_head
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: current_head

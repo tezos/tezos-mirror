@@ -11,7 +11,7 @@ enums:
     4: adoption
 seq:
 - id: index
-  type: s4
+  type: s4be
   doc: ! >-
     The voting period's index. Starts at 0 with the first block of the Alpha family
     of protocols.
@@ -20,7 +20,7 @@ seq:
   enum: kind_tag
   doc: One of the several kinds of periods in the voting procedure.
 - id: start_position
-  type: s4
+  type: s4be
   doc: ! >-
     The relative position of the first level of the period with respect to the first
     level of the Alpha family of protocols.

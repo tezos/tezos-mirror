@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 013-PtJakart.raw_level'
 seq:
 - id: id_013__ptjakart__raw_level
-  type: s4
+  type: s4be

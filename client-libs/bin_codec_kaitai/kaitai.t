@@ -46,7 +46,7 @@ ground.uint16 test
     Description: Unsigned 16 bit integers'
   seq:
   - id: ground__uint16
-    type: u2
+    type: u2be
 ground.int16 test
   $ ./codec.exe dump kaitai for ground.int16
   meta:
@@ -57,7 +57,7 @@ ground.int16 test
     Description: Signed 16 bit integers'
   seq:
   - id: ground__int16
-    type: s2
+    type: s2be
 ground.int32 test
   $ ./codec.exe dump kaitai for ground.int32
   meta:
@@ -68,7 +68,7 @@ ground.int32 test
     Description: Signed 32 bit integers'
   seq:
   - id: ground__int32
-    type: s4
+    type: s4be
 ground.int64 test
   $ ./codec.exe dump kaitai for ground.int64
   meta:
@@ -79,7 +79,7 @@ ground.int64 test
     Description: Signed 64 bit integers'
   seq:
   - id: ground__int64
-    type: s8
+    type: s8be
 ground.int31 test
   $ ./codec.exe dump kaitai for ground.int31
   meta:
@@ -92,7 +92,7 @@ ground.int31 test
     int31:
       seq:
       - id: int31
-        type: s4
+        type: s4be
         valid:
           min: -1073741824
           max: 1073741823
@@ -120,7 +120,7 @@ ground.bytes test
     bytes_dyn_uint30:
       seq:
       - id: len_bytes_dyn_uint30
-        type: u4
+        type: u4be
         valid:
           max: 1073741823
       - id: bytes_dyn_uint30
@@ -138,7 +138,7 @@ ground.string test
     bytes_dyn_uint30:
       seq:
       - id: len_bytes_dyn_uint30
-        type: u4
+        type: u4be
         valid:
           max: 1073741823
       - id: bytes_dyn_uint30

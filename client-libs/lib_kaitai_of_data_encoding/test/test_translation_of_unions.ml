@@ -105,7 +105,7 @@ let%expect_test "test medium union" =
       type: u1
       if: (more_union_tag == more_union_tag::a)
     - id: b
-      type: u2
+      type: u2be
       if: (more_union_tag == more_union_tag::b)
     - id: c
       type: u1
@@ -160,13 +160,13 @@ let%expect_test "test union with structures inside" =
       b:
         seq:
         - id: b_field0
-          type: u2
+          type: u2be
         - id: b_field1
           type: bytes_dyn_uint30
       bytes_dyn_uint30:
         seq:
         - id: len_bytes_dyn_uint30
-          type: u4
+          type: u4be
           valid:
             max: 1073741823
         - id: bytes_dyn_uint30

@@ -43,7 +43,7 @@ let%expect_test "test basic mu" =
       cons:
         seq:
         - id: hd
-          type: u2
+          type: u2be
         - id: tl
           type: ilist
       ilist:
@@ -124,7 +124,7 @@ let%expect_test "test more mu" =
       branches_0:
         seq:
         - id: len_branches
-          type: u4
+          type: u4be
           valid:
             max: 1073741823
         - id: branches

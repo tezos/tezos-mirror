@@ -125,7 +125,7 @@ types:
   alpha__operation_metadata__alpha__balance_updates_0:
     seq:
     - id: len_alpha__operation_metadata__alpha__balance_updates
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: alpha__operation_metadata__alpha__balance_updates
@@ -140,11 +140,11 @@ types:
   alpha__operation_metadata__alpha__staking_abstract_quantity:
     seq:
     - id: change
-      type: s8
+      type: s8be
   alpha__operation_metadata__alpha__tez_balance_update:
     seq:
     - id: change
-      type: s8
+      type: s8be
   alpha__operation_metadata__alpha__update_origin:
     seq:
     - id: alpha__operation_metadata__alpha__update_origin_tag
@@ -272,7 +272,7 @@ types:
         for unstaked frozen deposits, either a single staker or all the stakers delegating
         to some delegate.
     - id: cycle
-      type: s4
+      type: s4be
     - id: alpha__operation_metadata__alpha__tez_balance_update
       type: alpha__operation_metadata__alpha__tez_balance_update
 enums:

@@ -14,7 +14,7 @@ types:
     - id: payload_hash
       size: 32
     - id: payload_round
-      type: s4
+      type: s4be
     - id: proof_of_work_nonce
       size: 8
     - id: seed_nonce_hash_tag

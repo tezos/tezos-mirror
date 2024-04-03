@@ -11,10 +11,10 @@ enums:
     4: adoption
 seq:
 - id: index
-  type: s4
+  type: s4be
   doc: The voting period's index. Starts at 0 with the first block of protocol alpha.
 - id: kind
   type: u1
   enum: kind_tag
 - id: start_position
-  type: s4
+  type: s4be

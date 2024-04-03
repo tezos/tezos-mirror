@@ -8,7 +8,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -21,7 +21,7 @@ seq:
 - id: diversifier
   type: sapling__wallet__diversifier
 - id: amount
-  type: s8
+  type: s8be
 - id: rcm
   type: sapling__transaction__rcm
 - id: memo

@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 010-PtGRANAD.roll'
 seq:
 - id: id_010__ptgranad__roll
-  type: s4
+  type: s4be

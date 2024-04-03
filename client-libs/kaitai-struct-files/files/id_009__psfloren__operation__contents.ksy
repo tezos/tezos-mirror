@@ -18,7 +18,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposal
       size: 32
     - id: ballot
@@ -30,7 +30,7 @@ types:
   bh1_0:
     seq:
     - id: len_bh1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh1
@@ -43,7 +43,7 @@ types:
   bh2_0:
     seq:
     - id: len_bh2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bh2
@@ -52,7 +52,7 @@ types:
   bytes_dyn_uint30:
     seq:
     - id: len_bytes_dyn_uint30
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: bytes_dyn_uint30
@@ -90,7 +90,7 @@ types:
     - id: op2
       type: op2_0
     - id: slot
-      type: u2
+      type: u2be
   endorsement:
     seq:
     - id: id_009__psfloren__inlined__endorsement
@@ -98,7 +98,7 @@ types:
   endorsement_0:
     seq:
     - id: len_endorsement
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: endorsement
@@ -109,7 +109,7 @@ types:
     - id: endorsement
       type: endorsement_0
     - id: slot
-      type: u2
+      type: u2be
   id_009__psfloren__block_header__alpha__full_header:
     seq:
     - id: id_009__psfloren__block_header__alpha__full_header
@@ -125,7 +125,7 @@ types:
   id_009__psfloren__block_header__alpha__unsigned_contents:
     seq:
     - id: priority
-      type: u2
+      type: u2be
     - id: proof_of_work_nonce
       size: 8
     - id: seed_nonce_hash_tag
@@ -172,7 +172,7 @@ types:
       type: u1
       enum: id_009__psfloren__inlined__endorsement__contents_tag
     - id: endorsement
-      type: s4
+      type: s4be
       if: (id_009__psfloren__inlined__endorsement__contents_tag == id_009__psfloren__inlined__endorsement__contents_tag::endorsement)
   id_009__psfloren__mutez:
     seq:
@@ -184,7 +184,7 @@ types:
       type: u1
       enum: id_009__psfloren__operation__alpha__contents_tag
     - id: endorsement
-      type: s4
+      type: s4be
       if: (id_009__psfloren__operation__alpha__contents_tag == id_009__psfloren__operation__alpha__contents_tag::endorsement)
     - id: seed_nonce_revelation
       type: seed_nonce_revelation
@@ -260,7 +260,7 @@ types:
   op1_0:
     seq:
     - id: len_op1
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op1
@@ -273,7 +273,7 @@ types:
   op2_0:
     seq:
     - id: len_op2
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: op2
@@ -325,7 +325,7 @@ types:
   proposals_0:
     seq:
     - id: len_proposals
-      type: u4
+      type: u4be
       valid:
         max: 1073741823
     - id: proposals
@@ -337,7 +337,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, or P256 public key hash
     - id: period
-      type: s4
+      type: s4be
     - id: proposals
       type: proposals_0
   proposals_entries:
@@ -391,7 +391,7 @@ types:
   seed_nonce_revelation:
     seq:
     - id: level
-      type: s4
+      type: s4be
     - id: nonce
       size: 32
   transaction:

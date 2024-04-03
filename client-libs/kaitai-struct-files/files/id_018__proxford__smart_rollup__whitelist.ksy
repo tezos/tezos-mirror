@@ -38,7 +38,7 @@ enums:
     3: bls
 seq:
 - id: len_id_018__proxford__smart_rollup__whitelist
-  type: u4
+  type: u4be
   valid:
     max: 1073741823
 - id: id_018__proxford__smart_rollup__whitelist

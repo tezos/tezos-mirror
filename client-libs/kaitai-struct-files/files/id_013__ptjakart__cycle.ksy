@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 013-PtJakart.cycle'
 seq:
 - id: id_013__ptjakart__cycle
-  type: s4
+  type: s4be

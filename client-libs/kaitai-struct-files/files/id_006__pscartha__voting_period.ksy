@@ -4,4 +4,4 @@ meta:
 doc: ! 'Encoding id: 006-PsCARTHA.voting_period'
 seq:
 - id: id_006__pscartha__voting_period
-  type: s4
+  type: s4be

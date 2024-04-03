@@ -161,19 +161,25 @@ let int1_type_attr_spec ~id ~signed =
     dataType = DataType.(NumericType (Int_type (Int1Type {signed})));
   }
 
-let int_multi_type_attr_spec ~id ~signed width =
+let default_data_encoding_endianness = Data_encoding__TzEndian.Big_endian
+
+let int_multi_type_attr_spec ~id ~signed ~endian width =
+  let endian =
+    match endian with
+    | Data_encoding__TzEndian.Big_endian -> Some `BE
+    | Little_endian -> Some `LE
+  in
   {
     (Helpers.default_attr_spec ~id) with
     dataType =
-      DataType.(
-        NumericType (Int_type (IntMultiType {signed; width; endian = None})));
+      DataType.(NumericType (Int_type (IntMultiType {signed; width; endian})));
   }
 
-let uint30_attr ~id =
+let uint30_attr ~id ~endian =
   (* the integer literal bounds are from data-encoding source, specifically
      the binary reader *)
   {
-    (int_multi_type_attr_spec ~id ~signed:false DataType.W4) with
+    (int_multi_type_attr_spec ~id ~signed:false ~endian DataType.W4) with
     valid = Some (ValidationSpec.ValidationMax (Ast.IntNum ((1 lsl 30) - 1)));
   }
 
@@ -186,13 +192,16 @@ module Type = struct
 
   let z = z_type
 
-  let uint30 =
+  let uint30 ~endian =
     ( "uint30",
       (* the integer literal bounds are from data-encoding source, specifically
          the binary reader *)
-      {(Helpers.default_class_spec ()) with seq = [uint30_attr ~id:"uint30"]} )
+      {
+        (Helpers.default_class_spec ()) with
+        seq = [uint30_attr ~id:"uint30" ~endian];
+      } )
 
-  let int31 =
+  let int31 ~endian =
     ( "int31",
       (* the integer literal bounds are from data-encoding source, specifically
          the binary reader *)
@@ -201,7 +210,12 @@ module Type = struct
         seq =
           [
             {
-              (int_multi_type_attr_spec ~id:"int31" ~signed:true DataType.W4) with
+              (int_multi_type_attr_spec
+                 ~id:"int31"
+                 ~signed:true
+                 ~endian
+                 DataType.W4)
+              with
               valid =
                 Some
                   (ValidationSpec.ValidationRange
@@ -248,7 +262,11 @@ module Type = struct
         (Helpers.default_class_spec ()) with
         seq =
           [
-            int_multi_type_attr_spec ~id:size_id ~signed:false DataType.W2;
+            int_multi_type_attr_spec
+              ~id:size_id
+              ~signed:false
+              ~endian:default_data_encoding_endianness
+              DataType.W2;
             {
               (Helpers.default_attr_spec ~id) with
               dataType =
@@ -275,7 +293,7 @@ module Type = struct
         (Helpers.default_class_spec ()) with
         seq =
           [
-            uint30_attr ~id:size_id;
+            uint30_attr ~id:size_id ~endian:default_data_encoding_endianness;
             {
               (Helpers.default_attr_spec ~id) with
               dataType =
@@ -309,14 +327,6 @@ module Attr = struct
       dataType = DataType.(NumericType (Int_type (Int1Type {signed})));
     }
 
-  let int_multi_type_attr_spec ~id ~signed width =
-    {
-      (Helpers.default_attr_spec ~id) with
-      dataType =
-        DataType.(
-          NumericType (Int_type (IntMultiType {signed; width; endian = None})));
-    }
-
   let float_multi_type_attr_spec ~id =
     {
       (Helpers.default_attr_spec ~id) with
@@ -336,25 +346,29 @@ module Attr = struct
 
   let int8 ~id = int1_type_attr_spec ~id ~signed:true
 
-  let uint16 ~id = int_multi_type_attr_spec ~id ~signed:false DataType.W2
+  let uint16 ~id ~endian =
+    int_multi_type_attr_spec ~id ~signed:false ~endian DataType.W2
 
-  let int16 ~id = int_multi_type_attr_spec ~id ~signed:true DataType.W2
+  let int16 ~id ~endian =
+    int_multi_type_attr_spec ~id ~signed:true ~endian DataType.W2
 
-  let int32 ~id = int_multi_type_attr_spec ~id ~signed:true DataType.W4
+  let int32 ~id ~endian =
+    int_multi_type_attr_spec ~id ~signed:true ~endian DataType.W4
 
-  let int64 ~id = int_multi_type_attr_spec ~id ~signed:true DataType.W8
+  let int64 ~id ~endian =
+    int_multi_type_attr_spec ~id ~signed:true ~endian DataType.W8
 
-  let int31 ~id =
+  let int31 ~id ~endian =
     {
       (Helpers.default_attr_spec ~id) with
-      dataType = ComplexDataType (UserType (fst Type.int31));
+      dataType = ComplexDataType (UserType (fst (Type.int31 ~endian)));
     }
 
-  let uint30 ~id =
+  let uint30 ~id ~endian =
     (* the integer literal bounds are from data-encoding source, specifically
        the binary reader *)
     {
-      (int_multi_type_attr_spec ~id ~signed:false DataType.W4) with
+      (int_multi_type_attr_spec ~id ~signed:false ~endian DataType.W4) with
       valid = Some (ValidationSpec.ValidationMax (Ast.IntNum ((1 lsl 30) - 1)));
     }
 
@@ -431,7 +445,7 @@ module Attr = struct
   let binary_length_kind ~id kind =
     match kind with
     | `N -> failwith "Not implemented"
-    | `Uint30 -> uint30 ~id
-    | `Uint16 -> uint16 ~id
+    | `Uint30 -> uint30 ~id ~endian:default_data_encoding_endianness
+    | `Uint16 -> uint16 ~id ~endian:default_data_encoding_endianness
     | `Uint8 -> uint8 ~id
 end

@@ -41,7 +41,7 @@ let%expect_test "test bigger range" =
     doc: ! 'Encoding id: b_range'
     seq:
     - id: b_range
-      type: u2
+      type: u2be
       valid:
         max: 1025
   |}]
@@ -61,7 +61,7 @@ let%expect_test "test biggest range" =
     doc: ! 'Encoding id: bb_range'
     seq:
     - id: bb_range
-      type: s2
+      type: s2be
       valid:
         min: -22299
         max: 29290
@@ -141,7 +141,7 @@ let%expect_test "test bigger shifted range" =
               corrects the shift.
         seq:
         - id: shifted_big_range_shifted_to_zero
-          type: u4
+          type: u4be
           valid:
             max: 99899
     seq:
