@@ -42,6 +42,8 @@ let () =
 
 type instr = Set of {value : string; to_ : string}
 
+let make ~key ~value = Set {value; to_ = key}
+
 type t = instr list
 
 let instr_encoding : instr Data_encoding.t =

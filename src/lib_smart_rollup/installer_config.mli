@@ -29,6 +29,8 @@ type instr = Set of {value : string; to_ : string}
 (* A configuration is a list of instructions. *)
 type t = instr list
 
+val make : key:string -> value:string -> instr
+
 val pp : Format.formatter -> t -> unit
 
 val instr_encoding : instr Data_encoding.t
