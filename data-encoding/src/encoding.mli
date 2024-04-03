@@ -27,7 +27,7 @@
 (** Like most other [.mli] files in this directory, this is not intended for
     end-users. Instead, the interface from this file is used internally to
     assemble the end-user-intended module {!Data_encoding}. Refer to that module
-    for doucmentation.
+    for documentation.
 
     Note however that this module can be of interest to advanced users. You may
     read on if you need access to the concrete definition of the
