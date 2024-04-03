@@ -87,3 +87,4 @@ clean:
 	@rm -f ${KERNELS}
 	@make -C ${SDK_DIR} clean
 	@make -C ${DEMO_DIR} clean
+	@rm -f smart-rollup-installer tx-demo-collector
