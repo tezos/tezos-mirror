@@ -825,6 +825,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ieee-apsqrt"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4328941c554aaeea28ca420cd1f10e932fa38874faf8c75e3ed184c64c5c6cec"
+dependencies = [
+ "rustc_apfloat",
+]
+
+[[package]]
 name = "indenter"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1448,6 +1457,7 @@ dependencies = [
  "derive_more",
  "goblin",
  "hex",
+ "ieee-apsqrt",
  "kernel-loader",
  "lazy_static",
  "num_enum",

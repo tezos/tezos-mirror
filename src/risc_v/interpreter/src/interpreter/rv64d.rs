@@ -6,6 +6,7 @@
 //!
 //! Chapter 12 - "D" Standard Extension for Double-Precision Floating-Point
 
+use super::float::FloatExt;
 use crate::{
     machine_state::{
         bus::main_memory::MainMemoryLayout,
@@ -17,8 +18,7 @@ use crate::{
     state_backend as backend,
     traps::Exception,
 };
-
-use rustc_apfloat::{ieee::Double, Float};
+use rustc_apfloat::{ieee::Double, Float, Status, StatusAnd};
 
 impl From<Double> for FValue {
     fn from(f: Double) -> Self {
@@ -30,6 +30,14 @@ impl From<FValue> for Double {
     fn from(f: FValue) -> Self {
         let val: u64 = f.into();
         Double::from_bits(val as u128)
+    }
+}
+
+const CANONICAL_NAN_BITS: u64 = 0x7ff8000000000000;
+
+impl FloatExt for Double {
+    fn canonical_nan() -> Self {
+        Self::from_bits(CANONICAL_NAN_BITS as u128)
     }
 }
 
@@ -115,6 +123,28 @@ where
         rd: FRegister,
     ) -> Result<(), Exception> {
         self.run_fdiv::<Double>(rs1, rs2, rm, rd)
+    }
+
+    /// `FSQRT.D` R-type instruction.
+    pub fn run_fsqrt_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        let rval: u64 = self.fregisters.read(rs1).into();
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        let (StatusAnd { status, value }, _iterations) = ieee_apsqrt::sqrt_accurate(rval, rm);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, value.into());
+
+        Ok(())
     }
 
     /// `FMIN.D` R-type instruction.

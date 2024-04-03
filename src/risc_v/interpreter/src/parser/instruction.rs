@@ -113,6 +113,15 @@ impl InstrRoundingMode {
 }
 
 /// Floating-point R-type instruction, containing
+/// rounding mode, and one input argument.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FR1ArgWithRounding {
+    pub rs1: FRegister,
+    pub rm: InstrRoundingMode,
+    pub rd: FRegister,
+}
+
+/// Floating-point R-type instruction, containing
 /// rounding mode, and two input arguments.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct FR2ArgsWithRounding {
@@ -263,6 +272,7 @@ pub enum Instr {
     Fsubs(FR2ArgsWithRounding),
     Fmuls(FR2ArgsWithRounding),
     Fdivs(FR2ArgsWithRounding),
+    Fsqrts(FR1ArgWithRounding),
     Fmins(FRArgs),
     Fmaxs(FRArgs),
     Fmadds(FR3ArgsWithRounding),
@@ -286,6 +296,7 @@ pub enum Instr {
     Fsubd(FR2ArgsWithRounding),
     Fmuld(FR2ArgsWithRounding),
     Fdivd(FR2ArgsWithRounding),
+    Fsqrtd(FR1ArgWithRounding),
     Fmind(FRArgs),
     Fmaxd(FRArgs),
     Fmaddd(FR3ArgsWithRounding),
@@ -420,6 +431,7 @@ impl Instr {
             | Fsubs(_)
             | Fmuls(_)
             | Fdivs(_)
+            | Fsqrts(_)
             | Fmins(_)
             | Fmaxs(_)
             | Fmadds(_)
@@ -441,6 +453,7 @@ impl Instr {
             | Fsubd(_)
             | Fmuld(_)
             | Fdivd(_)
+            | Fsqrtd(_)
             | Fmind(_)
             | Fmaxd(_)
             | Fmaddd(_)
@@ -472,6 +485,12 @@ impl Instr {
 macro_rules! r_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {},{},{}", $op, $args.rd, $args.rs1, $args.rs2)
+    };
+}
+
+macro_rules! r2_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{}", $op, $args.rd, $args.rs1)
     };
 }
 
@@ -720,6 +739,7 @@ impl fmt::Display for Instr {
             Fsubs(args) => r_instr!(f, "fsub.s", args),
             Fmuls(args) => r_instr!(f, "fmul.s", args),
             Fdivs(args) => r_instr!(f, "fdiv.s", args),
+            Fsqrts(args) => r2_instr!(f, "fsqrt.s", args),
             Fmins(args) => r_instr!(f, "fmin.s", args),
             Fmaxs(args) => r_instr!(f, "fmax.s", args),
             Fmadds(args) => r4_instr!(f, "fmadd.s", args),
@@ -743,6 +763,7 @@ impl fmt::Display for Instr {
             Fsubd(args) => r_instr!(f, "fsub.d", args),
             Fmuld(args) => r_instr!(f, "fmul.d", args),
             Fdivd(args) => r_instr!(f, "fdiv.d", args),
+            Fsqrtd(args) => r2_instr!(f, "fsqrt.d", args),
             Fmind(args) => r_instr!(f, "fmin.d", args),
             Fmaxd(args) => r_instr!(f, "fmax.d", args),
             Fmaddd(args) => r4_instr!(f, "fmadd.d", args),

@@ -14,7 +14,7 @@ use crate::{
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{ieee::Double, ieee::Single, Float, Round, Status, StatusAnd};
+use rustc_apfloat::{Float, Round, Status, StatusAnd};
 use std::ops::Neg;
 
 pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {
@@ -29,18 +29,6 @@ pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {
         } else {
             self
         }
-    }
-}
-
-impl FloatExt for Single {
-    fn canonical_nan() -> Self {
-        Self::from_bits(0x7fc00000_u32 as u128)
-    }
-}
-
-impl FloatExt for Double {
-    fn canonical_nan() -> Self {
-        Self::from_bits(0x7ff8000000000000_u64 as u128)
     }
 }
 
@@ -292,7 +280,7 @@ where
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
     /// The sign bit is taken from `rs2`.
-    pub fn run_fsgnj<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+    pub(super) fn run_fsgnj<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
         self.f_sign_injection::<F>(rs1, rs2, rd, |_x, y| y);
     }
 
@@ -300,7 +288,12 @@ where
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
     /// The sign bit is taken from the negative of `rs2`.
-    pub fn run_fsgnjn<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+    pub(super) fn run_fsgnjn<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+    ) {
         self.f_sign_injection::<F>(rs1, rs2, rd, |_x, y| !y);
     }
 
@@ -308,7 +301,12 @@ where
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
     /// The sign bit is taken from the bitwise XOR of the sign bits from `rs1` & `rs2`.
-    pub fn run_fsgnjx<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+    pub(super) fn run_fsgnjx<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+    ) {
         self.f_sign_injection::<F>(rs1, rs2, rd, |x, y| x ^ y);
     }
 
@@ -362,7 +360,7 @@ where
         Ok(())
     }
 
-    fn f_rounding_mode(&self, rm: InstrRoundingMode) -> Result<Round, Exception> {
+    pub(super) fn f_rounding_mode(&self, rm: InstrRoundingMode) -> Result<Round, Exception> {
         let rm = match rm {
             InstrRoundingMode::Static(rm) => rm,
             InstrRoundingMode::Dynamic => self.csregisters.read(CSRegister::frm).try_into()?,
@@ -486,7 +484,7 @@ impl<M: backend::Manager> CSRegisters<M> {
         self.set_bits(CSRegister::fflags, 1 << mask as usize);
     }
 
-    fn set_exception_flag_status(&mut self, status: Status) {
+    pub(super) fn set_exception_flag_status(&mut self, status: Status) {
         let bits = status_to_bits(status);
         self.set_bits(CSRegister::fflags, bits as u64);
     }

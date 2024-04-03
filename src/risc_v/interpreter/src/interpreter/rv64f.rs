@@ -18,7 +18,7 @@ use crate::{
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{ieee::Single, Float};
+use rustc_apfloat::{ieee::Single, Float, Status, StatusAnd};
 
 impl From<Single> for FValue {
     fn from(f: Single) -> Self {
@@ -38,6 +38,14 @@ impl From<FValue> for Single {
         } else {
             Single::from_bits(val as u32 as u128)
         }
+    }
+}
+
+const CANONICAL_NAN_BITS: u32 = 0x7fc00000;
+
+impl FloatExt for Single {
+    fn canonical_nan() -> Self {
+        Self::from_bits(CANONICAL_NAN_BITS as u128)
     }
 }
 
@@ -123,6 +131,29 @@ where
         rd: FRegister,
     ) -> Result<(), Exception> {
         self.run_fdiv::<Single>(rs1, rs2, rm, rd)
+    }
+
+    /// `FSQRT.S` R-type instruction.
+    pub fn run_fsqrt_s(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        let rval = self.fregisters.read(rs1);
+        let rm = self.f_rounding_mode(rm)?;
+
+        let rval = fvalue_to_f32_bits(rval);
+
+        let (StatusAnd { status, value }, _iterations) = ieee_apsqrt::sqrt_accurate(rval, rm);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, f32_to_fvalue(value));
+
+        Ok(())
     }
 
     /// `FMIN.S` R-type instruction.
@@ -281,6 +312,18 @@ where
 #[inline(always)]
 fn f32_to_fvalue(val: u32) -> FValue {
     (val as u64 | 0xffffffff00000000).into()
+}
+
+fn fvalue_to_f32_bits(f: FValue) -> u32 {
+    let val: u64 = f.into();
+
+    // Check value correctly NaN boxed:
+    // all upper bits must be set to 1
+    if val >> 32 != 0xffffffff {
+        CANONICAL_NAN_BITS
+    } else {
+        val as u32
+    }
 }
 
 #[cfg(test)]
