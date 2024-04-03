@@ -6,6 +6,7 @@ oc.docker:amd64:
   stage: manual
   tags:
   - gcp
+  needs: []
   dependencies: []
   allow_failure: true
   before_script: []
