@@ -417,12 +417,12 @@ export class Simulator {
     );
   }
 
-  vdf_revelation_tip = (cycle) => {
+  vdf_revelation_tip(cycle) {
     return this.#reward_from_constants(
       cycle,
       this.config.proto.vdf_tip * this.config.proto.blocks_per_commitment,
     );
-  };
+  }
 
   #current_rewards_per_minute(cycle) {
     return this.reward_coeff(cycle).times(
