@@ -43,7 +43,8 @@ for control_file in "$myhome"/*control.in; do
   #
   dpkg_name=${OCTEZ_PKGNAME}-${pg}
   init_name=${OCTEZ_REALNAME}-${pg}
-  dpkg_dir="${dpkg_name}_${pkg_vers}-${OCTEZ_PKGREV}_${dpkg_arch}"
+  dpkg_vers=$(echo "${pkg_vers}" | tr '~' '-')
+  dpkg_dir="${dpkg_name}_${dpkg_vers}-${OCTEZ_PKGREV}_${dpkg_arch}"
   dpkg_fullname="${dpkg_dir}.deb"
 
   binaries=$(fixBinaryList "${common}/${pg}-binaries")
