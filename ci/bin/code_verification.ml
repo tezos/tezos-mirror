@@ -1304,6 +1304,36 @@ let jobs pipeline_type =
         ()
       |> enable_coverage_output_artifact |> job_external_split
     in
+    let job_tezt_slow : tezos_job =
+      job_tezt
+        ~__POS__
+        ~name:"tezt-slow"
+        ~rules:
+          (* See comment for [job_tezt_flaky] *)
+          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+        ~tezt_tests:
+          (tezt_tests
+             ~slow:true
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7063
+                The deselection of Paris [test_adaptive_issuance_launch.ml]
+                should be removed once the fixes to its slowness has been
+                snapshotted from Alpha. *)
+             [
+               Not
+                 (String_predicate
+                    ( File,
+                      Is
+                        "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
+                    ));
+             ])
+        ~tezt_variant:"-slow"
+        ~retry:2
+        ~tezt_parallel:3
+        ~parallel:(Vector 10)
+        ~dependencies:tezt_dependencies
+        ()
+      |> enable_coverage_output_artifact |> job_external_split
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -1318,6 +1348,7 @@ let jobs pipeline_type =
       job_oc_script_b58_prefix;
       job_oc_test_liquidity_baking_scripts;
       job_tezt_flaky;
+      job_tezt_slow;
     ]
     @ jobs_unit @ jobs_install_octez
     @

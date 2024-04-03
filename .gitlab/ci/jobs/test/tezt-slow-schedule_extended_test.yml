@@ -1,5 +1,0 @@
-include: .gitlab/ci/jobs/test/tezt-slow.yml
-
-tezt-slow:
-  extends:
-    - .tezt-slow
