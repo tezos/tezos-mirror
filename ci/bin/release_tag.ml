@@ -130,14 +130,25 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
 
 (** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
 let etherlink_jobs () =
+  let job_produce_docker_artifacts : Tezos_ci.tezos_job =
+    job_docker_authenticated
+      ~__POS__
+      ~stage:Stages.prepare_release
+      ~name:"docker:prepare-etherlink-release"
+      ~artifacts:
+        (Gitlab_ci.Util.artifacts ~expire_in:(Duration (Hours 1)) ["kernels.tar.gz"])
+      ["./scripts/ci/docker_prepare_etherlink_release.sh"]
+  in
   let job_gitlab_release : Tezos_ci.tezos_job =
     job
       ~__POS__
       ~image:Images.ci_release
       ~stage:Stages.publish_package_gitlab
       ~interruptible:false
-      ~dependencies:(Dependent [])
-      ~name:"gitlab:publish"
+      ~dependencies:(Dependent [ Job job_produce_docker_artifacts ])
+      ~artifacts:
+        (Gitlab_ci.Util.artifacts ~expire_in:Never ["kernels.tar.gz"])
+      ~name:"gitlab:etherlink-release"
       ["./scripts/ci/create_gitlab_etherlink_release.sh"]
   in
-  [job_gitlab_release]
+  [job_produce_docker_artifacts; job_gitlab_release]
