@@ -1,3 +1,4 @@
+octez-client
 octez-smart-rollup-wasm-debugger
 octez-smart-rollup-node
 octez-dac-client
@@ -5,7 +6,6 @@ octez-dac-node
 octez-signer
 octez-proxy-server
 octez-codec
-octez-client
 octez-admin-client
 octez-node
 octez-accuser-PtParisA
