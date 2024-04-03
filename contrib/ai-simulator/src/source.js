@@ -129,6 +129,8 @@ const safe_get = (array, cycle) => {
  * returns the total stake (in mutez) frozen on the chain.
  * @property {function(number):number} issuance_per_block - Takes a cycle and
  * returns the issuance per block (in mutez) for this cycle.
+ * @property {function(number):number} issuance_per_cycle - Takes a cycle and
+ * returns the issuance (in mutez) for this cycle.
  */
 
 /**
@@ -469,6 +471,10 @@ export class Simulator {
       vdf_revelation_tip +
       seed_nonce_revelation_tip
     );
+  }
+
+  issuance_per_cycle(cycle) {
+    this.issuance_per_block(cycle) * this.config.proto.blocks_per_cycle;
   }
 }
 
