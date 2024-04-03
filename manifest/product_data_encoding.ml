@@ -62,8 +62,7 @@ let _json_data_encoding_tests =
     ~path:"data-encoding/json-data-encoding/test"
     ~js_compatible:true
     ~modes:[Native; JS]
-    ~deps:
-      [json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler; conf_npm]
+    ~deps:[json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler]
     ?profile
 
 let json_data_encoding_bson =
@@ -140,14 +139,7 @@ let _data_encoding_tests =
     ~js_compatible:true
     ~modes:[Native; JS]
     ~deps:
-      [
-        data_encoding;
-        zarith;
-        zarith_stubs_js;
-        alcotest;
-        js_of_ocaml_compiler;
-        conf_npm;
-      ]
+      [data_encoding; zarith; zarith_stubs_js; alcotest; js_of_ocaml_compiler]
     ?profile
 
 let _data_encoding_expect_tests =

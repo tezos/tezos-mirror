@@ -20,7 +20,6 @@ depends: [
   "bigstringaf" { >= "0.5.0" }
   "alcotest" { with-test & >= "1.5.0" }
   "js_of_ocaml-compiler" {with-test}
-  "conf-npm" {with-test}
   "ppx_expect"
   "crowbar" { with-test & >= "0.2" }
 ]
