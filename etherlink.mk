@@ -61,10 +61,10 @@ endif
 	${DISPLAY_CONFIG}
 
 evm_benchmark_kernel.wasm::
-ifdef FEATURES
-	$(eval EVM_KERNEL_FEATURES := ${FEATURES},benchmark,debug)
+ifdef BENCHMARK_FEATURES
+	$(eval EVM_KERNEL_FEATURES := ${BENCHMARK_FEATURES})
 else
-	$(eval EVM_KERNEL_FEATURES := benchmark,debug)
+	$(eval EVM_KERNEL_FEATURES := benchmark-full)
 endif
 	@${MAKE} -f etherlink.mk \
 	EVM_KERNEL_FEATURES=${EVM_KERNEL_FEATURES} \
