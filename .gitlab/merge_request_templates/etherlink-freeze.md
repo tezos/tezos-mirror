@@ -9,8 +9,8 @@ The commit for the next ghostnet upgrade is: RELEASE_COMMIT
 Prepare the ghostnet kernel:
 ```
 $ git checkout RELEASE_COMMIT
-$ make -f etherlink.mk evm_kernel.wasm
-$ cp evm_kernel.wasm etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm
+$ etherlink/scripts/build-wasm.sh
+$ cp etherlink/kernels-<RELEASE_COMMIT>/evm_kernel.wasm etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm
 ```
 
 Update the constant `ghostnet_evm_commit` in `tezt/lib_tezos/constant.ml`:
@@ -27,11 +27,22 @@ $ rm -rf lib_prod
 $ cp -r lib_dev lib_prod
 ```
 
-Replace the various dev mention:
+Replace the various dev mention inside lib_prod:
 ```
+$ cd lib_prod
+
+# On Linux
 $ find . -type f -exec sed -i 's/dev\"/prod\"/g' {} +
 $ find . -type f -exec sed -i 's/\_dev/\_prod/g' {} +
+
+# Or on macOS
+$ find . -type f -exec sed -i '' 's/dev\"/prod\"/g' {} +
+$ find . -type f -exec sed -i '' 's/\_dev/\_prod/g' {} +
 ```
+
+Update `etherlink/bin_node/main.ml`:
+
+The main module uses both `lib_dev` and `lib_prod`. For all functions/branches for prod mode, replace the implementation with implementation from corresponding functions/branches for dev mode. This needs to be done manually.
 
 Update manifest:
 ```
@@ -57,7 +68,7 @@ if STORAGE_VERSION == current_version + 1 {
 Simply compile everything and run the tests!
 ```
 $ make octez-evm-node && make -f etherlink.mk evm_kernel.wasm
-$ tezt -f evm_sequencer.ml -f evm_rollup.ml -j 4 --keep-going
+$ dune exec etherlink/tezt/tests/main.exe -- -f evm_sequencer.ml -f evm_rollup.ml -j 4 --keep-going
 ```
 
 # Checklist
