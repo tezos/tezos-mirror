@@ -14,6 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
+(** Testing
+    -------
+    Component:    Irmin-mem
+    Invocation:   dune exec irmin/test/irmin-mem/main.exe
+    Subject:      This file is the entrypoint of all Irmin-mem Tezt tests. It dispatches to other files.
+*)
+
 let () =
   Lwt_main.run
   @@ Irmin_test_helpers.Irmin_test.Store.run "irmin-mem" ~slow:true ~misc:[]
