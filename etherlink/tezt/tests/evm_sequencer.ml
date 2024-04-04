@@ -1144,15 +1144,33 @@ let test_observer_applies_blueprint =
   let timeout = tbb *. float_of_int levels_to_wait *. 2. in
 
   let* _ =
-    Lwt.both
-      (Evm_node.wait_for_blueprint_applied
-         ~timeout
-         observer_node
-         levels_to_wait)
-      (Evm_node.wait_for_blueprint_applied
-         ~timeout
-         sequencer_node
-         levels_to_wait)
+    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  and* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
+  in
+
+  let* () =
+    check_block_consistency
+      ~left:sequencer_node
+      ~right:observer_node
+      ~block:(`Level (Int32.of_int levels_to_wait))
+      ()
+  in
+
+  (* We stop and start the sequencer, to ensure the observer node correctly
+     reconnects to it. *)
+  let* () = Evm_node.wait_for_retrying_connect observer_node
+  and* () =
+    let* () = Evm_node.terminate sequencer_node in
+    Evm_node.run sequencer_node
+  in
+
+  let levels_to_wait = 2 * levels_to_wait in
+
+  let* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout observer_node levels_to_wait
+  and* _ =
+    Evm_node.wait_for_blueprint_applied ~timeout sequencer_node levels_to_wait
   in
 
   let* () =
@@ -2297,6 +2315,7 @@ let test_sequencer_can_catch_up_on_event =
       (Int32.to_int last_produced_block)
   in
   let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.terminate observer in
   let* () =
     (* produces some blocks so the rollup node applies latest produced block. *)
     repeat 4 (fun () ->
@@ -2321,9 +2340,7 @@ let test_sequencer_can_catch_up_on_event =
     Evm_node.wait_for_evm_event ~check Blueprint_applied observer
   and* () =
     let* () = Evm_node.run sequencer in
-    (* need to wait for the sequencer to start before starting the observer *)
     Evm_node.run observer
-    (* terminated because connection dropped *)
   in
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
   unit

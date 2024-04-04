@@ -186,29 +186,40 @@ let install_finalizer_observer server =
   let* () = Evm_events_follower.shutdown () in
   Evm_context.shutdown ()
 
-let main_loop ~evm_node_endpoint =
+let[@tailrec] rec main_loop ~first_connection ~evm_node_endpoint =
   let open Lwt_result_syntax in
-  let rec loop (Qty next_blueprint_number) stream =
-    let*! candidate = Lwt_stream.get stream in
-    match candidate with
-    | Some blueprint ->
-        let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
-        let* _ = Tx_pool.pop_and_inject_transactions () in
-        loop (Qty (Z.succ next_blueprint_number)) stream
-    | None -> return_unit
+  let* () =
+    when_ (not first_connection) @@ fun () ->
+    let delay = Random.float 2. in
+    let*! () = Events.retrying_connect ~endpoint:evm_node_endpoint ~delay in
+    let*! () = Lwt_unix.sleep delay in
+    return_unit
   in
 
   let*! head = Evm_context.head_info () in
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6876
-     Should be resilient to errors from the EVM node endpoint *)
   let*! blueprints_stream =
     Evm_services.monitor_blueprints
       ~evm_node_endpoint
       head.next_blueprint_number
   in
+  (stream_loop [@tailcall])
+    ~evm_node_endpoint
+    head.next_blueprint_number
+    blueprints_stream
 
-  loop head.next_blueprint_number blueprints_stream
+and[@tailrec] stream_loop ~evm_node_endpoint (Qty next_blueprint_number) stream
+    =
+  let open Lwt_result_syntax in
+  let*! candidate = Lwt_stream.get stream in
+  match candidate with
+  | Some blueprint ->
+      let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
+      let* _ = Tx_pool.pop_and_inject_transactions () in
+      (stream_loop [@tailcall])
+        ~evm_node_endpoint
+        (Qty (Z.succ next_blueprint_number))
+        stream
+  | None -> (main_loop [@tailcall]) ~first_connection:false ~evm_node_endpoint
 
 let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
     ~(config : Configuration.t) () =
@@ -267,4 +278,4 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
   in
   let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
 
-  main_loop ~evm_node_endpoint
+  main_loop ~first_connection:true ~evm_node_endpoint
