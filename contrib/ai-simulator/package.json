@@ -6,7 +6,7 @@
   "scripts": {
     "watch": "watch 'npm run build' ./src/ ./site/",
     "build": "esbuild src/source.js --bundle --outfile=site/app.js --format=esm",
-    "css": "npx tailwindcss -i ./src/source.css -o ./site/app.css --watch",
+    "css": "npx tailwindcss -i ./src/source.css -o ./site/app.css",
     "server": "npx http-server site/ -p 8080"
   },
   "keywords": [],
