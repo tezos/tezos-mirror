@@ -124,9 +124,9 @@ oc.build:rpm:amd64:
       - fedora:39
       - rockylinux:9.3
 
-gitlab:publish:
+gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.4.0
-  stage: publish_package_gitlab
+  stage: publish_release_gitlab
   tags:
   - gcp
   needs:
@@ -141,4 +141,5 @@ gitlab:publish:
   - oc.build:rpm:amd64
   interruptible: false
   script:
+  - ./scripts/ci/create_gitlab_etherlink_package.sh
   - ./scripts/ci/create_gitlab_etherlink_release.sh
