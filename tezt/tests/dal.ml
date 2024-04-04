@@ -5370,35 +5370,28 @@ module Garbage_collection = struct
     let already_seen_slots =
       Array.init number_of_slots (fun index -> slot_index <> index)
     in
-    (* Wait for a GRAFT message between an attester and either a the
-       producer the observer, in any direction. *)
-    let check_graft_promise (producer_or_observer, peer_id) attester =
-      let graft_from_attester_promise =
+    (* Wait for a GRAFT message between all nodes. *)
+    let check_graft node1 node2 attester_pkh =
+      let check_graft ~from:node1 node2 =
         check_events_with_topic
-          ~event_with_topic:(Graft (Dal_node.read_identity attester))
-          producer_or_observer
+          ~event_with_topic:(Graft (Dal_node.read_identity node1))
+          node2
           ~num_slots:number_of_slots
           ~already_seen_slots
           attester_pkh
       in
-      let graft_from_producer_or_observer_promise =
-        check_events_with_topic
-          ~event_with_topic:(Graft peer_id)
-          attester
-          ~num_slots:number_of_slots
-          ~already_seen_slots
-          attester_pkh
-      in
-      Lwt.pick
-        [graft_from_attester_promise; graft_from_producer_or_observer_promise]
+      Lwt.pick [check_graft ~from:node1 node2; check_graft ~from:node2 node1]
     in
-
     let check_graft_promises =
-      [(check_graft_promise (slot_producer, slot_producer_peer_id)) attester]
-      @ [(check_graft_promise (observer, observer_peer_id)) attester]
+      check_graft slot_producer attester attester_pkh
+      :: check_graft observer attester attester_pkh
+      :: Account.(
+           Array.to_list
+           @@ (Array.map (fun key ->
+                   check_graft slot_producer observer key.public_key_hash))
+                Bootstrap.keys)
     in
-    Log.info
-      "Waiting for grafting of the attester - producer/observer connections" ;
+    Log.info "Waiting for grafting of the DAL nodes connections" ;
     (* The attester DAL node won't join the DAL network until it has
        processed some finalized L1 block in which the associated baker
        is reported to have some rights. For this to happen, we need to
