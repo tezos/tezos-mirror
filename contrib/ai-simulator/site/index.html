@@ -74,6 +74,21 @@
       Chart.defaults.borderColor = '#454347';
       Chart.defaults.backgroundColor = 'transparent';
 
+    /*
+     * This is the main script that generates the AI data report.
+     *
+     * The script is divided into two parts:
+     * - The first part is the configuration of the simulator and of a delegate.
+     * - The second part is the generation of the AI data report.
+     *
+     * The simulator is configured with the following parameters:
+     * - proto: The protocol parameters. Here we use the mainnet parameters for Paris Protocol.
+     * - chain: The global chain characteristics. Here we use the following parameters:
+     *    - AI activation cycle: The cycle at which the AI is activated.
+     *    - Total frozen stake: An array containing total frozen stake for each cycle.
+     *    - Total supply: An array containing total supply for each cycle.
+     *    - Total delegated: An array containing total delegated tez for each cycle.
+     */
       import {Simulator, Delegate, total_supply_storage, total_frozen_stake_storage, total_delegated_storage}
       from './app.js';
 
