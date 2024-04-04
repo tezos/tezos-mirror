@@ -89,7 +89,7 @@ odoc-lite:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms --exclude=target \
-		../scripts ../script-inputs ../src ../tezt ../irmin ../brassaia ../vendors ../dune ../dune-project ../dune-workspace $(TMPDOCDIR)/
+		../scripts ../script-inputs ../src ../tezt ../irmin ../brassaia ../vendors ../dune ../dune-project ../dune-workspace ../data-encoding $(TMPDOCDIR)/
 	cd $(TMPDOCDIR)/ && ./scripts/remove-old-protocols.sh
 	@echo "Running odoc in $(TMPDOCDIR), with build directory $(TOPBUILDDIR_ABS) and outputs in $(TMPDOCDIR)/odoc.log"
 	ODOC_WARN_ERROR=true dune build @doc --build-dir=$(TOPBUILDDIR_ABS) --root=$(TMPDOCDIR) >$(TMPDOCDIR)/odoc.log 2>&1; \
