@@ -161,10 +161,14 @@ macro_rules! run_f_x_instr {
     }};
 }
 
-/// Runs a F/D instruction over the hart state, touching both F & X regisers.
+/// Runs a F/D instruction over the hart state, touching both F & fcsr registers.
 macro_rules! run_f_r_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
         $state.hart.$run_fn($args.rs1, $args.rs2, $args.rd);
+        Ok(Add($instr.width()))
+    }};
+    ($state: ident, $instr: ident, $args: ident, $run_fn: ident, $($field: ident),+) => {{
+        $state.hart.$run_fn($args.rs1, $($args.$field,)* $args.rd)?;
         Ok(Add($instr.width()))
     }};
 }
@@ -312,6 +316,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Feqs(args) => run_f_r_instr!(self, instr, args, run_feq_s),
             Instr::Fles(args) => run_f_r_instr!(self, instr, args, run_fle_s),
             Instr::Flts(args) => run_f_r_instr!(self, instr, args, run_flt_s),
+            Instr::Fadds(args) => run_f_r_instr!(self, instr, args, run_fadd_s, rs2, rm),
+            Instr::Fsubs(args) => run_f_r_instr!(self, instr, args, run_fsub_s, rs2, rm),
+            Instr::Fmuls(args) => run_f_r_instr!(self, instr, args, run_fmul_s, rs2, rm),
+            Instr::Fdivs(args) => run_f_r_instr!(self, instr, args, run_fdiv_s, rs2, rm),
             Instr::Fmins(args) => run_f_r_instr!(self, instr, args, run_fmin_s),
             Instr::Fmaxs(args) => run_f_r_instr!(self, instr, args, run_fmax_s),
             Instr::Flw(args) => run_load_instr!(self, instr, args, run_flw),
@@ -327,6 +335,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Feqd(args) => run_f_r_instr!(self, instr, args, run_feq_d),
             Instr::Fled(args) => run_f_r_instr!(self, instr, args, run_fle_d),
             Instr::Fltd(args) => run_f_r_instr!(self, instr, args, run_flt_d),
+            Instr::Faddd(args) => run_f_r_instr!(self, instr, args, run_fadd_d, rs2, rm),
+            Instr::Fsubd(args) => run_f_r_instr!(self, instr, args, run_fsub_d, rs2, rm),
+            Instr::Fmuld(args) => run_f_r_instr!(self, instr, args, run_fmul_d, rs2, rm),
+            Instr::Fdivd(args) => run_f_r_instr!(self, instr, args, run_fdiv_d, rs2, rm),
             Instr::Fmind(args) => run_f_r_instr!(self, instr, args, run_fmin_d),
             Instr::Fmaxd(args) => run_f_r_instr!(self, instr, args, run_fmax_d),
             Instr::Fld(args) => run_load_instr!(self, instr, args, run_fld),

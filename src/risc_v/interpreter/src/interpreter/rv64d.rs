@@ -13,6 +13,7 @@ use crate::{
         registers::{FRegister, FValue, XRegister},
         MachineState,
     },
+    parser::instruction::InstrRoundingMode,
     state_backend as backend,
     traps::Exception,
 };
@@ -63,6 +64,58 @@ where
     /// See [Self::run_flt].
     pub fn run_flt_d(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
         self.run_flt::<Double>(rs1, rs2, rd);
+    }
+
+    /// `FADD.D` R-type instruction.
+    ///
+    /// See [Self::run_fadd].
+    pub fn run_fadd_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fadd::<Double>(rs1, rs2, rm, rd)
+    }
+
+    /// `FSUB.D` R-type instruction.
+    ///
+    /// See [Self::run_fsub].
+    pub fn run_fsub_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fsub::<Double>(rs1, rs2, rm, rd)
+    }
+
+    /// `FMUL.D` R-type instruction.
+    ///
+    /// See [Self::run_fmul].
+    pub fn run_fmul_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fmul::<Double>(rs1, rs2, rm, rd)
+    }
+
+    /// `FDIV.D` R-type instruction.
+    ///
+    /// See [Self::run_fdiv].
+    pub fn run_fdiv_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fdiv::<Double>(rs1, rs2, rm, rd)
     }
 
     /// `FMIN.D` R-type instruction.

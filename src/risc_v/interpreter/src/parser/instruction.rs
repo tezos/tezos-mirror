@@ -5,9 +5,12 @@
 
 use std::fmt;
 
-use crate::machine_state::{
-    csregisters::CSRegister,
-    registers::{FRegister, XRegister},
+use crate::{
+    interpreter::float::RoundingMode,
+    machine_state::{
+        csregisters::CSRegister,
+        registers::{FRegister, XRegister},
+    },
 };
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -88,6 +91,34 @@ pub struct FCmpArgs {
 pub struct FRArgs {
     pub rs1: FRegister,
     pub rs2: FRegister,
+    pub rd: FRegister,
+}
+
+/// There are 6 supported rounding modes that an instruction may use.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum InstrRoundingMode {
+    Dynamic,
+    Static(RoundingMode),
+}
+
+impl InstrRoundingMode {
+    /// Read the parsing mode from the byte given
+    pub fn from_rm(rm: u32) -> Option<Self> {
+        if rm == 0b111 {
+            Some(Self::Dynamic)
+        } else {
+            RoundingMode::try_from(rm as u64).map(Self::Static).ok()
+        }
+    }
+}
+
+/// Floating-point R-type instruction, containing
+/// rounding mode, and two input arguments.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FR2ArgsWithRounding {
+    pub rs1: FRegister,
+    pub rs2: FRegister,
+    pub rm: InstrRoundingMode,
     pub rd: FRegister,
 }
 
@@ -217,6 +248,10 @@ pub enum Instr {
     Feqs(FCmpArgs),
     Fles(FCmpArgs),
     Flts(FCmpArgs),
+    Fadds(FR2ArgsWithRounding),
+    Fsubs(FR2ArgsWithRounding),
+    Fmuls(FR2ArgsWithRounding),
+    Fdivs(FR2ArgsWithRounding),
     Fmins(FRArgs),
     Fmaxs(FRArgs),
     Flw(FLoadArgs),
@@ -232,6 +267,10 @@ pub enum Instr {
     Feqd(FCmpArgs),
     Fled(FCmpArgs),
     Fltd(FCmpArgs),
+    Faddd(FR2ArgsWithRounding),
+    Fsubd(FR2ArgsWithRounding),
+    Fmuld(FR2ArgsWithRounding),
+    Fdivd(FR2ArgsWithRounding),
     Fmind(FRArgs),
     Fmaxd(FRArgs),
     Fld(FLoadArgs),
@@ -358,6 +397,10 @@ impl Instr {
             | Feqs(_)
             | Fles(_)
             | Flts(_)
+            | Fadds(_)
+            | Fsubs(_)
+            | Fmuls(_)
+            | Fdivs(_)
             | Fmins(_)
             | Fmaxs(_)
             | Flw(_)
@@ -371,6 +414,10 @@ impl Instr {
             | Feqd(_)
             | Fled(_)
             | Fltd(_)
+            | Faddd(_)
+            | Fsubd(_)
+            | Fmuld(_)
+            | Fdivd(_)
             | Fmind(_)
             | Fmaxd(_)
             | Fld(_)
@@ -632,6 +679,10 @@ impl fmt::Display for Instr {
             Feqs(args) => r_instr!(f, "feq.s", args),
             Fles(args) => r_instr!(f, "fle.s", args),
             Flts(args) => r_instr!(f, "flt.s", args),
+            Fadds(args) => r_instr!(f, "fadd.s", args),
+            Fsubs(args) => r_instr!(f, "fsub.s", args),
+            Fmuls(args) => r_instr!(f, "fmul.s", args),
+            Fdivs(args) => r_instr!(f, "fdiv.s", args),
             Fmins(args) => r_instr!(f, "fmin.s", args),
             Fmaxs(args) => r_instr!(f, "fmax.s", args),
             Flw(args) => i_instr_load!(f, "flw", args),
@@ -647,6 +698,10 @@ impl fmt::Display for Instr {
             Feqd(args) => r_instr!(f, "feq.d", args),
             Fled(args) => r_instr!(f, "fle.d", args),
             Fltd(args) => r_instr!(f, "flt.d", args),
+            Faddd(args) => r_instr!(f, "fadd.d", args),
+            Fsubd(args) => r_instr!(f, "fsub.d", args),
+            Fmuld(args) => r_instr!(f, "fmul.d", args),
+            Fdivd(args) => r_instr!(f, "fdiv.d", args),
             Fmind(args) => r_instr!(f, "fmin.d", args),
             Fmaxd(args) => r_instr!(f, "fmax.d", args),
             Fld(args) => i_instr_load!(f, "fld", args),

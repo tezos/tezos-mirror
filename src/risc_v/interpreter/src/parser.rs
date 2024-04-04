@@ -258,6 +258,21 @@ macro_rules! f_r_instr {
     };
 }
 
+macro_rules! f_r_rm_2_instr {
+    ($enum_variant:ident, $instr:expr, $rs2_bits:expr, $rm:expr) => {{
+        if let Some(rounding) = InstrRoundingMode::from_rm($rm) {
+            $enum_variant(instruction::FR2ArgsWithRounding {
+                rd: rd_f($instr),
+                rs1: rs1_f($instr),
+                rs2: parse_fregister($rs2_bits),
+                rm: rounding,
+            })
+        } else {
+            Unknown { instr: $instr }
+        }
+    }};
+}
+
 macro_rules! fence_instr {
     ($enum_variant:ident, $instr:expr) => {
         $enum_variant(instruction::FenceArgs {
@@ -344,6 +359,8 @@ const F3_7: u32 = 0b111;
 
 const F5_0: u32 = 0b0_0000;
 const F5_1: u32 = 0b0_0001;
+const F5_2: u32 = 0b0_0010;
+const F5_3: u32 = 0b0_0011;
 const F5_4: u32 = 0b0_0100;
 const F5_5: u32 = 0b0_0101;
 const F5_8: u32 = 0b0_1000;
@@ -368,9 +385,9 @@ const FMT_D: u32 = 0b01;
 const WIDTH_W: u32 = 0b010;
 const WIDTH_D: u32 = 0b011;
 
-const RM_0: u32 = 0b0;
-const RM_1: u32 = 0b1;
-const RM_2: u32 = 0b10;
+const RM_0: u32 = 0b000;
+const RM_1: u32 = 0b001;
+const RM_2: u32 = 0b010;
 const RM_EQ: u32 = RM_2;
 const RM_LT: u32 = RM_1;
 const RM_LE: u32 = RM_0;
@@ -601,6 +618,18 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
         // F/D-type instructions
         OP_FP => match fmt(instr) {
             FMT_S => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_0, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Fadds, instr, rs2_bits, rounding)
+                }
+                (F5_1, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Fsubs, instr, rs2_bits, rounding)
+                }
+                (F5_2, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Fmuls, instr, rs2_bits, rounding)
+                }
+                (F5_3, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Fdivs, instr, rs2_bits, rounding)
+                }
                 (F5_4, RM_0, rs2_bits) => f_r_instr!(Fsgnjs, instr, rs2_bits),
                 (F5_4, RM_1, rs2_bits) => f_r_instr!(Fsgnjns, instr, rs2_bits),
                 (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxs, instr, rs2_bits),
@@ -624,6 +653,18 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 _ => Unknown { instr },
             },
             FMT_D => match (funct5(instr), rm(instr), rs2_bits(instr)) {
+                (F5_0, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Faddd, instr, rs2_bits, rounding)
+                }
+                (F5_1, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Fsubd, instr, rs2_bits, rounding)
+                }
+                (F5_2, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Fmuld, instr, rs2_bits, rounding)
+                }
+                (F5_3, rounding, rs2_bits) => {
+                    f_r_rm_2_instr!(Fdivd, instr, rs2_bits, rounding)
+                }
                 (F5_4, RM_0, rs2_bits) => f_r_instr!(Fsgnjd, instr, rs2_bits),
                 (F5_4, RM_1, rs2_bits) => f_r_instr!(Fsgnjnd, instr, rs2_bits),
                 (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxd, instr, rs2_bits),
