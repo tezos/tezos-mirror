@@ -20,4 +20,3 @@ The Octez Client and Wallet
 
 %files
 %{_bindir}/octez-*
-
