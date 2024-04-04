@@ -1925,11 +1925,21 @@ let jobs pipeline_type =
             ~stage:Stages.manual
             ()
         in
+        let job_build_homebrew_manual =
+          job_build_homebrew
+            ~__POS__
+            ~name:"oc.build:homebrew"
+            ~rules:[job_rule ~when_:Manual ()]
+            ~dependencies:(Dependent [])
+            ~stage:Stages.manual
+            ()
+        in
         [
           job_docker_amd64_test_manual;
           job_docker_arm64_test_manual;
           job_build_dpkg_amd64_manual;
           job_build_rpm_amd64_manual;
+          job_build_homebrew_manual;
         ]
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
