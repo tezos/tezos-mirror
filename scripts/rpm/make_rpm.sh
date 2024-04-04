@@ -9,7 +9,8 @@ set -eu
 
 # Setup
 #
-myhome=scripts/rpm
+product=${OCTEZ_PKGNAME}
+myhome=scripts/rpm/$product
 common=scripts/pkg-common
 dieonwarn=${dieonwarn:-1}
 
