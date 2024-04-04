@@ -571,18 +571,19 @@ let test_resilient_to_rollup_node_disconnect =
      the blueprints. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
+  (* We have unfortunately noticed that the test can be flaky. Sometimes,
+     the following RPC is done before the proxy being initialised, even though
+     we wait for it. The source of flakiness is unknown but happens very rarely,
+     we put a small sleep to make the least flaky possible. *)
+  let* () = Lwt_unix.sleep 2. in
   (* Check the consistency again *)
-  let* () =
-    check_head_consistency
-      ~error_msg:
-        "The head should be the same after the outage. Sequencer: {%L}, proxy: \
-         {%R}"
-      ~left:sequencer
-      ~right:proxy
-      ()
-  in
-
-  unit
+  check_head_consistency
+    ~error_msg:
+      "The head should be the same after the outage. Sequencer: {%L}, proxy: \
+       {%R}"
+    ~left:sequencer
+    ~right:proxy
+    ()
 
 let test_can_fetch_blueprint =
   Protocol.register_test

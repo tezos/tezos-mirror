@@ -445,21 +445,20 @@ let wait_for_level ?timeout sc_node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
-let unsafe_wait_sync ?path_client ?timeout sc_node =
+let unsafe_wait_sync ?timeout sc_node =
   let* node_level =
     match sc_node.persistent_state.endpoint with
     | Node node -> Node.get_level node
     | endpoint ->
         let* level =
-          Client.RPC.call (Client.create ?path:path_client ~endpoint ())
+          RPC_core.call (Client.as_foreign_endpoint endpoint)
           @@ RPC.get_chain_block_helper_current_level ()
         in
         return level.level
   in
   wait_for_level ?timeout sc_node node_level
 
-let wait_sync ?path_client sc_node ~timeout =
-  unsafe_wait_sync ?path_client sc_node ~timeout
+let wait_sync sc_node ~timeout = unsafe_wait_sync sc_node ~timeout
 
 let handle_event sc_node {name; value; timestamp = _} =
   match name with

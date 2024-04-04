@@ -66,3 +66,5 @@ type kernel_log_level = Debug | Info | Error | Fatal
 (** Logs kernel log [Debug]. *)
 val event_kernel_log :
   level:kernel_log_level -> kind:kernel_log_kind -> msg:string -> unit Lwt.t
+
+val retrying_connect : endpoint:Uri.t -> delay:float -> unit Lwt.t

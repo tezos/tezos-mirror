@@ -1703,11 +1703,6 @@ module Start_rollup_node = struct
         (Agent_state.http_client state)
         args.path_rollup_node
     in
-    let* path_client =
-      Http_client.local_path_from_agent_uri
-        (Agent_state.http_client state)
-        args.path_client
-    in
     let l1_endpoint = octez_endpoint state args.endpoint in
     let rollup_node =
       Sc_rollup_node.(
@@ -1731,7 +1726,7 @@ module Start_rollup_node = struct
     in
     let* () = Sc_rollup_node.run rollup_node args.address kernel_log_args in
 
-    let* _ = Sc_rollup_node.unsafe_wait_sync ~path_client rollup_node in
+    let* _ = Sc_rollup_node.unsafe_wait_sync rollup_node in
     Agent_state.add
       (Rollup_node_k (Sc_rollup_node.name rollup_node))
       rollup_node

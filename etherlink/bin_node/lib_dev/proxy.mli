@@ -1,18 +1,16 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint
-    ~data_dir ~config] starts the main event-loop of the Observer,
-    consuming the blueprints received from [evm_node_endpoint]. *)
+(** [main config ~rollup_node_endpoint ~keep_alive] starts
+    the main event-loop of the proxy using [rollup_node_endpoint]. *)
 val main :
-  ?kernel_path:string ->
+  Configuration.proxy Configuration.t ->
+  keep_alive:bool ->
   rollup_node_endpoint:Uri.t ->
-  evm_node_endpoint:Uri.t ->
-  data_dir:string ->
-  config:Configuration.observer Configuration.t ->
-  unit ->
   unit tzresult Lwt.t

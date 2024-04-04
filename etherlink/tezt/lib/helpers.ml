@@ -124,7 +124,7 @@ let check_block_consistency ~left ~right ?error_msg ~block () =
       ~default:
         Format.(
           sprintf
-            "Nodes do not have the same head (%s is %%L while %s is %%R"
+            "Nodes do not have the same head (%s is %%L while %s is %%R)"
             (Evm_node.name left)
             (Evm_node.name right))
       error_msg
