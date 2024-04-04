@@ -379,15 +379,34 @@ module Handler = struct
     let* block_info = PluginPred.block_info cctxt ~block ~metadata:`Always in
     let shell_header = PluginPred.block_shell_header block_info in
     let* dal_constants =
-      PluginPred.get_constants `Main (`Level pred_level) cctxt
+      let*? (module PluginCurr) =
+        Node_context.get_plugin_for_level ctxt ~level:block_level
+      in
+      PluginCurr.get_constants `Main (`Level block_level) cctxt
     in
     let* () =
       if dal_constants.Dal_plugin.feature_enable then
         let* slot_headers = PluginPred.get_published_slot_headers block_info in
         let* () =
           if should_store_cells ctxt then
+            let get_constants ~level =
+              let*? (module Plugin) =
+                Node_context.get_plugin_for_level ctxt ~level
+              in
+              Plugin.get_constants `Main (`Level level) cctxt
+            in
             let* cells_of_level =
-              PluginPred.Skip_list.cells_of_level block_info cctxt
+              let pred_published_level =
+                Int32.sub
+                  block_level
+                  (Int32.of_int (1 + dal_constants.Dal_plugin.attestation_lag))
+              in
+              PluginPred.Skip_list.cells_of_level
+                block_info
+                cctxt
+                ~dal_constants
+                ~pred_publication_level_dal_constants:
+                  (lazy (get_constants ~level:pred_published_level))
             in
             let cells_of_level =
               List.map

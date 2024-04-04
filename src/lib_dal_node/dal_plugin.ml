@@ -99,6 +99,9 @@ module type T = sig
     val cells_of_level :
       block_info ->
       Tezos_rpc.Context.generic ->
+      dal_constants:proto_parameters ->
+      pred_publication_level_dal_constants:
+        proto_parameters tzresult Lwt.t Lazy.t ->
       (hash * cell) list tzresult Lwt.t
   end
 

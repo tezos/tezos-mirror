@@ -126,20 +126,26 @@ module type T = sig
 
     (*
       This function mimics what the protocol does in
-      {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info and
-      an RPC context, this function computes the cells produced by the DAL skip
-      list during the level L of block_info using:
+      {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info at
+      some level L, an RPC context, the DAL constants for level L, and for level
+      L - attestation_lag - 1, the this function computes the cells produced by the
+      DAL skip list during the level L using:
 
        - The information telling which slot headers were waiting for attestation
        at level [L - attestation_lag];
 
        - The bitset of attested slots at level [L] in the block's metadata.
 
+      It is assumed that at level L the DAL is enabled.
+
       The ordering of the elements in the returned list is not relevant.
     *)
     val cells_of_level :
       block_info ->
       Tezos_rpc.Context.generic ->
+      dal_constants:proto_parameters ->
+      pred_publication_level_dal_constants:
+        proto_parameters tzresult Lwt.t Lazy.t ->
       (hash * cell) list tzresult Lwt.t
   end
 
