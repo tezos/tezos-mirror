@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
   "octez-libs" {with-test}
+  "octez-internal-libs" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
