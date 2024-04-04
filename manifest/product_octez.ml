@@ -7675,7 +7675,7 @@ let _octez_dal_node =
     ~path:"src/bin_dal_node"
     ~internal_name:"main"
     ~synopsis:"Tezos: `octez-dal-node` binary"
-    ~release_status:Experimental
+    ~release_status:Released
     ~with_macos_security_framework:true
     ~deps:
       ([
