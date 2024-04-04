@@ -6588,7 +6588,7 @@ let register ~protocols =
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"]
+    ~tags:["gc"; "multi"]
     ~bootstrap_profile:true
     ~number_of_slots:1
     "garbage collection of shards for all profiles"
