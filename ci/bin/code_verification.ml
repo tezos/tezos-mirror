@@ -1334,6 +1334,91 @@ let jobs pipeline_type =
         ()
       |> job_external_split
     in
+    let jobs_tezt =
+      let rules = make_rules ~dependent:true ~changes:changeset_octez () in
+      let coverage_expiry = Duration (Days 3) in
+      let tezt : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt"
+            (* Exclude all tests with tags in [tezt_tags_always_disable] or
+               [tezt_tags_exclusive_tags]. *)
+          ~tezt_tests:(tezt_tests [Not (Has_tag "flaky")])
+          ~tezt_parallel:3
+          ~parallel:(Vector 60)
+          ~rules
+          ~dependencies:tezt_dependencies
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_memory_4k : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-memory-4k"
+          ~tezt_tests:(tezt_tests ~memory_4k:true [])
+          ~tezt_variant:"-memory_4k"
+          ~parallel:(Vector 4)
+          ~dependencies:tezt_dependencies
+          ~rules
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_memory_3k : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-memory-3k"
+          ~tezt_tests:(tezt_tests ~memory_3k:true [])
+          ~tezt_variant:"-memory_3k"
+          ~dependencies:tezt_dependencies
+          ~rules
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_time_sensitive : tezos_job =
+        (* the following tests are executed with [~tezt_parallel:1] to ensure
+           that other tests do not affect their executions. However, these
+           tests are not particularly cpu/memory-intensive hence they do not
+           need to run on a particular machine contrary to performance
+           regression tests. *)
+        job_tezt
+          ~__POS__
+          ~name:"tezt-time-sensitive"
+          ~tezt_tests:(tezt_tests ~time_sensitive:true [])
+          ~tezt_variant:"-time_sensitive"
+          ~dependencies:tezt_dependencies
+          ~rules
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_static_binaries : tezos_job =
+        job_tezt
+          ~__POS__
+          ~tags:["gcp"]
+          ~name:"tezt:static-binaries"
+          ~tezt_tests:(tezt_tests [Has_tag "cli"; Not (Has_tag "flaky")])
+          ~tezt_parallel:3
+          ~retry:0
+          ~dependencies:
+            (Dependent
+               [
+                 Artifacts job_select_tezts;
+                 Artifacts job_build_x86_64_exp_dev_extra;
+                 Artifacts job_static_x86_64_experimental;
+                 Artifacts job_tezt_fetch_records;
+               ])
+          ~rules
+          ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
+          ()
+      in
+      [
+        tezt;
+        tezt_memory_4k;
+        tezt_memory_3k;
+        tezt_time_sensitive;
+        tezt_static_binaries;
+      ]
+      |> jobs_external_split ~path:"test/tezt"
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -1350,7 +1435,7 @@ let jobs pipeline_type =
       job_tezt_flaky;
       job_tezt_slow;
     ]
-    @ jobs_unit @ jobs_install_octez
+    @ jobs_unit @ jobs_install_octez @ jobs_tezt
     @
     match pipeline_type with
     | Before_merging ->

@@ -199,7 +199,6 @@ let () =
     | ".gitlab/ci/jobs/test/test_kernels.yml"
     | ".gitlab/ci/jobs/test/test_risc_v_kernels-before_merging.yml"
     | ".gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml"
-    | ".gitlab/ci/jobs/test/tezt.yml"
     | ".gitlab/ci/pipelines/before_merging.yml"
     | ".gitlab/ci/pipelines/schedule_extended_test.yml" ->
         true
