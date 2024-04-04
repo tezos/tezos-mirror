@@ -229,7 +229,9 @@ let register_protocol_tests_that_use_supports_correctly () =
 let register_protocol_specific_because_regression_tests () = ()
 
 (* Declaration of tests using tezt cloud. *)
-let () = Tezt_cloud.register ~tags:[Tag.cloud]
+let () =
+  Tezt_cloud.register ~tags:[Tag.cloud] ;
+  Dal_cloud.register ()
 
 let () =
   register_protocol_independent_tests () ;
