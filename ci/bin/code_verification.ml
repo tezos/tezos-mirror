@@ -43,6 +43,10 @@ type code_verification_pipeline = Before_merging | Schedule_extended_test
      - automatic in scheduled pipelines;
      - conditional in [before_merging] pipelines.
 
+     If a job has non-optional dependencies, then [dependent] must be
+     set to [true] to ensure that we only run the job in case previous
+     jobs succeeded (setting [when: on_success]).
+
      If [label], [changes] and [manual] are omitted, then rules will
      enable the job [On_success] in the [before_merging]
      pipeline. This is safe, but prefer specifying a [changes] clause
@@ -347,6 +351,13 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
     oc_unit_protocol_compiles;
   ]
 
+type install_octez_distribution = Ubuntu_focal | Ubuntu_jammy | Fedora_37
+
+let image_of_distribution = function
+  | Ubuntu_focal -> Images.ubuntu_focal
+  | Ubuntu_jammy -> Images.ubuntu_jammy
+  | Fedora_37 -> Images.fedora_37
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -390,9 +401,13 @@ let jobs pipeline_type =
   in
   (* Stages *)
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
-  let trigger, dependencies_needs_trigger =
+  let trigger_stage, make_dependencies =
     match pipeline_type with
-    | Schedule_extended_test -> ([], Staged [])
+    | Schedule_extended_test ->
+        let make_dependencies ~before_merging:_ ~schedule_extended_test =
+          schedule_extended_test ()
+        in
+        ([], make_dependencies)
     | Before_merging ->
         (* Define the [trigger] job
 
@@ -429,8 +444,17 @@ let jobs pipeline_type =
             ]
           |> job_external
         in
-        (* TODO: the dependency on job_trigger does not have to be optional *)
-        ([job_trigger], Dependent [Optional job_trigger])
+        let make_dependencies ~before_merging ~schedule_extended_test:_ =
+          before_merging job_trigger
+        in
+        ([job_trigger], make_dependencies)
+  in
+  (* Short-cut for jobs that has no dependencies except [job_trigger]
+     on [Before_merging] pipelines. *)
+  let dependencies_needs_trigger =
+    make_dependencies
+      ~before_merging:(fun job_trigger -> Dependent [Job job_trigger])
+      ~schedule_extended_test:(fun () -> Staged [])
   in
   let sanity =
     let job_sanity_ci : tezos_job =
@@ -704,7 +728,7 @@ let jobs pipeline_type =
           "git -C _opam-repo-for-release add packages";
           "git -C _opam-repo-for-release commit -m \"tezos packages\"";
         ]
-      |> job_external_once
+      |> job_external_split
     in
     let (jobs_opam_packages : tezos_job list) =
       read_opam_packages
@@ -713,7 +737,23 @@ let jobs pipeline_type =
               ~dependencies:(Dependent [Artifacts job_opam_prepare]))
       |> jobs_external_once ~path:"packaging/opam_package.yml"
     in
-    jobs_opam_packages
+    job_opam_prepare :: jobs_opam_packages
+  in
+  (* Dependencies for jobs that should run immediately after jobs
+     [job_build_x86_64] in [Before_merging] if they are present
+     (otherwise, they run immediately after [job_trigger]). In
+     [Scheduled_extended_test] we are not in a hurry and we let them
+     be [Staged []]. *)
+  let order_after_build =
+    make_dependencies
+      ~before_merging:(fun job_trigger ->
+        Dependent
+          (Job job_trigger
+          :: [
+               Optional job_build_x86_64_release;
+               Optional job_build_x86_64_exp_dev_extra;
+             ]))
+      ~schedule_extended_test:(fun () -> Staged [])
   in
   let test =
     (* check that ksy files are still up-to-date with octez *)
@@ -874,6 +914,211 @@ let jobs pipeline_type =
         ["dune build @runtest_rejections"]
       |> job_external_split
     in
+    let job_oc_script_test_gen_genesis : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.script:test-gen-genesis"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ~before_script:
+          (before_script ~eval_opam:true ["cd scripts/gen-genesis"])
+        ["dune build gen_genesis.exe"]
+      |> job_external_split
+    in
+    let job_oc_script_snapshot_alpha_and_link : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.script:snapshot_alpha_and_link"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~dependencies:order_after_build
+          (* Since the above dependencies are only for ordering, we do not set [dependent] *)
+        ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh"]
+      |> job_external_split
+    in
+    let job_oc_script_test_release_versions : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.script:test_octez_release_versions"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~dependencies:
+          (Dependent
+             [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
+          (* Since the above dependencies are only for ordering, we do not set [dependent] *)
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["./scripts/test_octez_release_version.sh"]
+      |> job_external_split
+    in
+    let job_oc_script_b58_prefix =
+      job
+        ~__POS__
+        ~name:"oc.script:b58_prefix"
+        ~stage:Stages.test
+          (* Requires Python. Can be changed to a python image, but using
+             the build docker image to keep in sync with the python
+             version used for the tests *)
+        ~image:Images.runtime_build_test_dependencies
+        ~rules:(make_rules ~changes:changeset_script_b58_prefix ())
+        ~dependencies:dependencies_needs_trigger
+        ~before_script:
+          (before_script ~source_version:true ~init_python_venv:true [])
+        [
+          "poetry run pylint scripts/b58_prefix/b58_prefix.py \
+           --disable=missing-docstring --disable=invalid-name";
+          "poetry run pytest scripts/b58_prefix/test_b58_prefix.py";
+        ]
+      |> job_external_split
+    in
+    let job_oc_test_liquidity_baking_scripts : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.test-liquidity-baking-scripts"
+        ~stage:Stages.test
+        ~image:Images.runtime_build_dependencies
+        ~dependencies:
+          (Dependent
+             [
+               Artifacts job_build_x86_64_release;
+               Artifacts job_build_x86_64_exp_dev_extra;
+             ])
+        ~rules:
+          (make_rules
+             ~dependent:true
+             ~changes:changeset_test_liquidity_baking_scripts
+             ())
+        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+        ["./scripts/ci/test_liquidity_baking_scripts.sh"]
+      |> job_external_split
+    in
+    (* The set of installation test jobs *)
+    let jobs_install_octez : tezos_job list =
+      let changeset_install_jobs =
+        ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
+      in
+      let install_octez_rules =
+        make_rules ~changes:changeset_install_jobs ~manual:true ()
+      in
+      let job_install_bin ~__POS__ ~name ?allow_failure ?(rc = false)
+          distribution =
+        let distribution_string =
+          match distribution with
+          | Ubuntu_focal | Ubuntu_jammy -> "ubuntu"
+          | Fedora_37 -> "fedora"
+        in
+        let script =
+          sf "./docs/introduction/install-bin-%s.sh" distribution_string
+          ^ if rc then " rc" else ""
+        in
+        job
+          ?allow_failure
+          ~__POS__
+          ~name
+          ~image:(image_of_distribution distribution)
+          ~dependencies:dependencies_needs_trigger
+          ~rules:install_octez_rules
+          ~stage:Stages.test
+          [script]
+      in
+      let job_install_opam_focal : tezos_job =
+        job
+          ~__POS__
+          ~name:"oc.install_opam_focal"
+          ~image:Images.opam_ubuntu_focal
+          ~dependencies:dependencies_needs_trigger
+          ~rules:(make_rules ~manual:true ())
+          ~allow_failure:Yes
+          ~stage:Stages.test
+            (* The default behavior of opam is to use `nproc` to determine its level of
+               parallelism. This returns the number of CPU of the "host" CI runner
+               instead of the number of cores a single CI job can reasonably use. *)
+          ~variables:[("OPAMJOBS", "4")]
+          ["./docs/introduction/install-opam.sh"]
+      in
+      let job_compile_sources ~__POS__ ~name ~image ~project ~branch =
+        job
+          ~__POS__
+          ~name
+          ~image
+          ~dependencies:dependencies_needs_trigger
+          ~rules:install_octez_rules
+          ~stage:Stages.test
+          [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
+      in
+      [
+        (* Test installing binary / binary RC distributions in all distributions *)
+        job_install_bin ~__POS__ ~name:"oc.install_bin_fedora_37" Fedora_37;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_rc_fedora_37"
+          ~rc:true
+          Fedora_37;
+        (* The Ubuntu jobs currently fail because the last rc packages can't be installed anymore.
+           See https://gitlab.com/tezos/tezos/-/issues/6902.
+           TODO: https://gitlab.com/tezos/tezos/-/issues/6915
+           This should be removed after the next release candidate. *)
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_ubuntu_focal"
+          ~allow_failure:Yes
+          Ubuntu_focal;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_ubuntu_jammy"
+          ~allow_failure:Yes
+          Ubuntu_jammy;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_rc_ubuntu_focal"
+          ~allow_failure:Yes
+          ~rc:true
+          Ubuntu_focal;
+        job_install_bin
+          ~__POS__
+          ~name:"oc.install_bin_rc_ubuntu_jammy"
+          ~allow_failure:Yes
+          ~rc:true
+          Ubuntu_jammy;
+        (* Test installing through opam *)
+        job_install_opam_focal;
+        (* Test compiling the [latest-release] branch on Bullseye *)
+        job_compile_sources
+          ~__POS__
+          ~name:"oc.compile_release_sources_bullseye"
+          ~image:Images.opam_debian_bullseye
+          ~project:"tezos/tezos"
+          ~branch:"latest-release";
+        (* Test compiling the [master] branch on Bullseye *)
+        job_compile_sources
+          ~__POS__
+          ~name:"oc.compile_sources_bullseye"
+          ~image:Images.opam_debian_bullseye
+          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+        job_compile_sources
+          ~__POS__
+          ~name:"oc.compile_sources_mantic"
+          ~image:Images.opam_ubuntu_mantic
+          ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
+          ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+      ]
+      |> jobs_external_split ~path:"test/install_octez"
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -882,8 +1127,13 @@ let jobs pipeline_type =
       job_misc_opam_checks;
       job_semgrep;
       job_oc_integration_compiler_rejections;
+      job_oc_script_test_gen_genesis;
+      job_oc_script_snapshot_alpha_and_link;
+      job_oc_script_test_release_versions;
+      job_oc_script_b58_prefix;
+      job_oc_test_liquidity_baking_scripts;
     ]
-    @ jobs_unit
+    @ jobs_unit @ jobs_install_octez
     @
     match pipeline_type with
     | Before_merging ->
@@ -972,5 +1222,5 @@ let jobs pipeline_type =
      (using {!job_external} or {!jobs_external}) and included by hand
      in the files [.gitlab/ci/pipelines/before_merging.yml] and
      [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
-  ignore (trigger @ sanity @ build @ packaging @ test @ doc @ manual) ;
+  ignore (trigger_stage @ sanity @ build @ packaging @ test @ doc @ manual) ;
   []

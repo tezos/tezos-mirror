@@ -26,11 +26,11 @@ include:
   - .gitlab/ci/jobs/doc/documentation.yml
 
   # Stage: packaging
-  - .gitlab/ci/jobs/packaging/opam:prepare.yml
+  - .gitlab/ci/jobs/packaging/opam:prepare-scheduled_extended_test.yml
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
   # Stage: test
-  - .gitlab/ci/jobs/test/install_octez.yml
+  - .gitlab/ci/jobs/test/install_octez-scheduled_extended_test.yml
   # Flaky tezts
   - .gitlab/ci/jobs/test/tezt-flaky-schedule_extended_test.yml
   # Slow tezts
@@ -45,11 +45,11 @@ include:
   - .gitlab/ci/jobs/test/oc.semgrep-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.unit-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.integration:compiler-rejections-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link.yml
-  - .gitlab/ci/jobs/test/oc.script:test-gen-genesis.yml
-  - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions.yml
-  - .gitlab/ci/jobs/test/oc.script:b58_prefix.yml
-  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts.yml
+  - .gitlab/ci/jobs/test/oc.script:snapshot_alpha_and_link-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.script:test-gen-genesis-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.script:b58_prefix-scheduled_extended_test.yml
+  - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/tezt.yml
   - .gitlab/ci/jobs/test/test_kernels.yml
   - .gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml

@@ -145,7 +145,34 @@ module Images = struct
   let debian_bookworm =
     Image.register ~name:"debian_bookworm" ~image_path:"debian:bookworm"
 
+  let ubuntu_focal =
+    Image.register
+      ~name:"ubuntu_focal"
+      ~image_path:"public.ecr.aws/lts/ubuntu:20.04_stable"
+
+  let ubuntu_jammy =
+    Image.register
+      ~name:"ubuntu_jammy"
+      ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"
+
+  let fedora_37 = Image.register ~name:"fedora_37" ~image_path:"fedora:37"
+
   let fedora_39 = Image.register ~name:"fedora_39" ~image_path:"fedora:39"
+
+  let opam_ubuntu_focal =
+    Image.register
+      ~name:"opam_ubuntu_focal"
+      ~image_path:"ocaml/opam:ubuntu-20.04"
+
+  let opam_ubuntu_mantic =
+    Image.register
+      ~name:"opam_ubuntu_mantic"
+      ~image_path:"ocaml/opam:ubuntu-23.10"
+
+  let opam_debian_bullseye =
+    Image.register
+      ~name:"opam_debian_bullseye"
+      ~image_path:"ocaml/opam:debian-11"
 
   let ci_release =
     Image.register
@@ -265,6 +292,7 @@ let enable_kernels =
 
 (** {2 Changesets} *)
 
+(* Only if octez source code has changed *)
 let changeset_octez =
   [
     "src/**/*";
@@ -276,10 +304,13 @@ let changeset_octez =
     "tzt_reference_test_suite/**/*";
   ]
 
+(* Only if octez source code has changed, if the images has changed or
+   if kernels.mk changed. *)
 let changeset_octez_or_kernels =
   ["images/**/*"; "scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"]
   @ changeset_octez
 
+(* Only if documentation has changed *)
 let changeset_octez_docs =
   [
     "scripts/**/*/";
@@ -378,6 +409,35 @@ let changeset_semgrep_files =
     "tezt/**/*";
     "devtools/**/*";
     "scripts/semgrep/**/*";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
+(* We only need to run the [oc.script:snapshot_alpha_and_link] job if
+   protocol Alpha or if the scripts changed. *)
+let changeset_script_snapshot_alpha_and_link =
+  [
+    "src/proto_alpha/**/*";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+    "scripts/snapshot_alpha_and_link.sh";
+    "scripts/snapshot_alpha.sh";
+    "scripts/user_activated_upgrade.sh";
+  ]
+
+let changeset_script_b58_prefix =
+  [
+    "scripts/b58_prefix/b58_prefix.py";
+    "scripts/b58_prefix/test_b58_prefix.py";
+    ".gitlab/**/*";
+    ".gitlab-ci.yml";
+  ]
+
+let changeset_test_liquidity_baking_scripts =
+  [
+    "src/**/*";
+    "scripts/ci/test_liquidity_baking_scripts.sh";
+    "scripts/check-liquidity-baking-scripts.sh";
     ".gitlab/**/*";
     ".gitlab-ci.yml";
   ]

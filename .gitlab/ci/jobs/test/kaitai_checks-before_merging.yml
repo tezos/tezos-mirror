@@ -16,8 +16,7 @@ kaitai_checks:
     - .gitlab-ci.yml
     when: on_success
   needs:
-  - job: trigger
-    optional: true
+  - trigger
   dependencies: []
   before_script:
   - . ./scripts/version.sh
