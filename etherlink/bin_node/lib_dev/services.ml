@@ -151,7 +151,7 @@ let expect_input input f =
 let build_with_input method_ ~f parameters =
   build method_ ~f:(fun input -> expect_input input f) parameters
 
-let dispatch_request (config : 'a Configuration.t)
+let dispatch_request (config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
@@ -412,7 +412,7 @@ let dispatch_request (config : 'a Configuration.t)
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request (_config : 'a Configuration.t)
+let dispatch_private_request (_config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in

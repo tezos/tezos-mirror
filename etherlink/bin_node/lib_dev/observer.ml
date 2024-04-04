@@ -145,7 +145,7 @@ let callback_log server conn req body =
 
 let observer_start
     ({rpc_addr; rpc_port; cors_origins; cors_headers; max_active_connections; _} :
-      Configuration.observer Configuration.t) ~directory =
+      Configuration.t) ~directory =
   let open Lwt_result_syntax in
   let open Tezos_rpc_http_server in
   let p2p_addr = P2p_addr.of_string_exn rpc_addr in
@@ -211,18 +211,18 @@ let main_loop ~evm_node_endpoint =
   loop head.next_blueprint_number blueprints_stream
 
 let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
-    ~(config : Configuration.observer Configuration.t) () =
+    ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   let* smart_rollup_address =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
   in
-
+  let*? observer_config = Configuration.observer_config_exn config in
   let* _loaded =
     Evm_context.start
       ~data_dir
       ?kernel_path
-      ~preimages:config.mode.preimages
-      ~preimages_endpoint:config.mode.preimages_endpoint
+      ~preimages:observer_config.preimages
+      ~preimages_endpoint:observer_config.preimages_endpoint
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)

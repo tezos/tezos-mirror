@@ -392,17 +392,17 @@ let proxy_command =
       in
       let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
       let* config =
-        Cli.create_or_read_proxy_config
+        Cli.create_or_read_config
           ~data_dir
           ~devmode
           ?rpc_addr
           ?rpc_port
           ?cors_origins
           ?cors_headers
-          ~rollup_node_endpoint
+          ~proxy:{rollup_node_endpoint}
           ()
       in
-      let* () = Configuration.save_proxy ~force:true ~data_dir config in
+      let* () = Configuration.save ~force:true ~data_dir config in
       let* () =
         if config.devmode then
           Evm_node_lib_dev.Proxy.main config ~keep_alive ~rollup_node_endpoint
@@ -515,25 +515,28 @@ let sequencer_command =
       in
       let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       let* configuration =
-        Cli.create_or_read_sequencer_config
+        let sequencer =
+          Configuration.sequencer_config_dft
+            ?preimages
+            ?preimages_endpoint
+            ?time_between_blocks
+            ?max_number_of_chunks
+            ?private_rpc_port
+            ~rollup_node_endpoint
+            ~sequencer:sequencer_pkh
+            ()
+        in
+        Cli.create_or_read_config
           ~data_dir
           ~devmode
           ?rpc_addr
           ?rpc_port
-          ?private_rpc_port
           ?cors_origins
           ?cors_headers
-          ~rollup_node_endpoint
-          ?preimages
-          ?preimages_endpoint
-          ?time_between_blocks
-          ?max_number_of_chunks
-          ~sequencer:sequencer_pkh
+          ~sequencer
           ()
       in
-      let* () =
-        Configuration.save_sequencer ~force:true ~data_dir configuration
-      in
+      let* () = Configuration.save ~force:true ~data_dir configuration in
       if devmode then
         Evm_node_lib_dev.Sequencer.main
           ~data_dir
@@ -609,19 +612,24 @@ let observer_command =
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   let* config =
-    Cli.create_or_read_observer_config
+    let observer =
+      Configuration.observer_config_dft
+        ?preimages
+        ?preimages_endpoint
+        ~evm_node_endpoint
+        ()
+    in
+    Cli.create_or_read_config
       ~data_dir
       ~devmode:true
       ?rpc_addr
       ?rpc_port
       ?cors_origins
       ?cors_headers
-      ~evm_node_endpoint
-      ?preimages
-      ?preimages_endpoint
+      ~observer
       ()
   in
-  let* () = Configuration.save_observer ~force:true ~data_dir config in
+  let* () = Configuration.save ~force:true ~data_dir config in
   Observer.main
     ?kernel_path:kernel
     ~rollup_node_endpoint

@@ -151,11 +151,9 @@ let start_server
       return (server, private_server))
     (fun _ -> return (server, private_server))
 
-let loop_sequencer :
-    Configuration.sequencer Configuration.t -> unit tzresult Lwt.t =
- fun config ->
+let loop_sequencer (config : Configuration.sequencer) =
   let open Lwt_result_syntax in
-  let time_between_blocks = config.mode.time_between_blocks in
+  let time_between_blocks = config.time_between_blocks in
   let rec loop last_produced_block =
     match time_between_blocks with
     | Nothing ->
@@ -183,18 +181,19 @@ let loop_sequencer :
 let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
     ~max_blueprints_ahead ~max_blueprints_catchup ~catchup_cooldown
     ?(genesis_timestamp = Helpers.now ()) ~cctxt ~sequencer
-    ~(configuration : Configuration.sequencer Configuration.t) ?kernel () =
+    ~(configuration : Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address rollup_node_endpoint
   in
+  let*? sequencer_config = Configuration.sequencer_config_exn configuration in
   let* status =
     Evm_context.start
       ?kernel_path:kernel
       ~data_dir
-      ~preimages:configuration.mode.preimages
-      ~preimages_endpoint:configuration.mode.preimages_endpoint
+      ~preimages:sequencer_config.preimages
+      ~preimages_endpoint:sequencer_config.preimages_endpoint
       ~smart_rollup_address
       ()
   in
@@ -246,7 +245,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
         cctxt;
         smart_rollup_address;
         sequencer_key = sequencer;
-        maximum_number_of_chunks = configuration.mode.max_number_of_chunks;
+        maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
       }
   in
   let* () =
@@ -270,7 +269,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
             ((module Sequencer), smart_rollup_address)
         in
         (private_directory, private_rpc_port))
-      configuration.mode.private_rpc_port
+      sequencer_config.private_rpc_port
   in
   let* server, private_server =
     start_server configuration ~directory ~private_info
@@ -278,5 +277,5 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_seq server private_server
   in
-  let* () = loop_sequencer configuration in
+  let* () = loop_sequencer sequencer_config in
   return_unit
