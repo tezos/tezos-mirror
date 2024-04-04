@@ -244,6 +244,7 @@ val init :
   ?path:string ->
   ?name:string ->
   ?color:Log.Color.t ->
+  ?event_level:Daemon.Level.default_level ->
   ?event_pipe:string ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->

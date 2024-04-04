@@ -238,9 +238,10 @@ let wait_for_ready baker =
       check_event baker "Baker started." promise
 
 let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
-    ?color ?event_pipe ?event_sections_levels ?(delegates = []) ?votefile
-    ?liquidity_baking_toggle_vote ?force_apply ?remote_mode ?operations_pool
-    ?dal_node ?minimal_nanotez_per_gas_unit ?state_recorder node client =
+    ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
+    ?votefile ?liquidity_baking_toggle_vote ?force_apply ?remote_mode
+    ?operations_pool ?dal_node ?minimal_nanotez_per_gas_unit ?state_recorder
+    node client =
   let* () = Node.wait_for_ready node in
   let baker =
     create
@@ -262,7 +263,7 @@ let init ?runner ~protocol ?(path = Uses.path (Protocol.baker protocol)) ?name
       node
       client
   in
-  let* () = run ?event_sections_levels baker in
+  let* () = run ?event_level ?event_sections_levels baker in
   let* () = wait_for_ready baker in
   return baker
 
