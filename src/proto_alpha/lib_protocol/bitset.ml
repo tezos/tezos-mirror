@@ -43,6 +43,15 @@ let add field pos =
 
 let from_list positions = List.fold_left_e add empty positions
 
+let to_list field =
+  let[@tailrec] rec to_list pos acc field =
+    if Z.equal Z.zero field then acc
+    else
+      let acc = if Z.testbit field 0 then pos :: acc else acc in
+      to_list (pos + 1) acc (Z.shift_right field 1)
+  in
+  to_list 0 [] field
+
 let fill ~length =
   let open Result_syntax in
   let* () = error_when Compare.Int.(length < 0) (Invalid_position length) in
