@@ -397,6 +397,13 @@
       };
 
       const tableBody = document.getElementById("report");
+      function print_tez(x) {
+        // if x is a number, we format it as a tez amount
+        if (typeof x === 'number') {
+          return (new Intl.NumberFormat().format(Math.round(x / 1_000_000))+" tz");
+        }
+        return x;
+      }
 
       // Generates the AI data report.
       function gen_report() {
@@ -414,9 +421,9 @@
           new_cell(first_block);
           new_cell(last_block);
 
-          new_cell(config.chain.total_supply[cycle]);
-          new_cell(config.chain.total_frozen_stake[cycle]);
-          new_cell(config.chain.total_delegated[cycle]);
+          new_cell(print_tez(config.chain.total_supply[cycle]));
+          new_cell(print_tez(config.chain.total_frozen_stake[cycle]));
+          new_cell(print_tez(config.chain.total_delegated[cycle]));
 
           new_cell(simulator.staked_ratio_for_next_cycle(cycle).toDecimal(3));
 
@@ -437,11 +444,11 @@
           new_cell(simulator.reward_coeff(cycle).toDecimal(3));
 
           new_cell(simulator.current_yearly_rate_value(cycle).toDecimal(3));
-          new_cell(simulator.attestation_reward_per_slot(cycle));
-          new_cell(simulator.baking_reward_fixed_portion(cycle));
-          new_cell(simulator.baking_reward_bonus_per_slot(cycle));
-          new_cell(simulator.seed_nonce_revelation_tip(cycle));
-          new_cell(simulator.vdf_revelation_tip(cycle));
+          new_cell(print_tez(simulator.attestation_reward_per_slot(cycle)));
+          new_cell(print_tez(simulator.baking_reward_fixed_portion(cycle)));
+          new_cell(print_tez(simulator.baking_reward_bonus_per_slot(cycle)));
+          new_cell(print_tez(simulator.seed_nonce_revelation_tip(cycle)));
+          new_cell(print_tez(simulator.vdf_revelation_tip(cycle)));
 
           const { baking_power } = delegate.baking_power(cycle);
 
@@ -452,25 +459,25 @@
           new_cell(estimated_rewards.estimated_number_of_blocks_baked);
           new_cell(estimated_rewards.estimated_number_of_attestations);
 
-          new_cell(estimated_rewards.estimated_rewards_for_fixed_portion_baking);
-          new_cell(estimated_rewards.estimated_rewards_for_baking_bonus);
-          new_cell(estimated_rewards.estimated_rewards_for_attestations);
-          new_cell(estimated_rewards.estimated_rewards_for_nonce_revelation);
-          new_cell(estimated_rewards.estimated_rewards_for_vdf_revelation);
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_fixed_portion_baking));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_baking_bonus));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_attestations));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_nonce_revelation));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_for_vdf_revelation));
 
-          new_cell(estimated_rewards.estimated_rewards_from_own_staking);
-          new_cell(estimated_rewards.estimated_rewards_from_third_party_staking);
-          new_cell(estimated_rewards.estimated_rewards_from_delegating);
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_own_staking));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_third_party_staking));
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_edge_of_baking_over_staking));
 
-          new_cell(estimated_rewards.estimated_rewards_from_edge_of_baking_over_staking);
+          new_cell(print_tez(estimated_rewards.estimated_rewards_from_delegating));
 
-          new_cell(estimated_rewards.estimated_total_rewards);
+          new_cell(print_tez(estimated_rewards.estimated_total_rewards));
 
-          new_cell(delegate.estimated_own_staked_balance(cycle));
-          new_cell(delegate.estimated_third_party_staked_balance(cycle));
+          new_cell(print_tez(delegate.estimated_own_staked_balance(cycle)));
+          new_cell(print_tez(delegate.estimated_third_party_staked_balance(cycle)));
 
-          new_cell(delegate.estimated_own_spendable_balance(cycle));
-          new_cell(delegate.third_party_delegated_balance(cycle));
+          new_cell(print_tez(delegate.estimated_own_spendable_balance(cycle)));
+          new_cell(print_tez(delegate.third_party_delegated_balance(cycle)));
 
           tableBody.appendChild(new_row);
         });
