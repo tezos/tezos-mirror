@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2023-2024 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,12 +26,22 @@
 
 exception Status_already_ready
 
+module LevelMap = Map.Make (struct
+  type t = Int32.t
+
+  (* keys are ordered descendingly *)
+  let compare a b = compare b a
+end)
+
+type proto_plugin = {proto_level : int; plugin : (module Dal_plugin.T)}
+
+type proto_plugins = proto_plugin LevelMap.t
+
 type ready_ctxt = {
   cryptobox : Cryptobox.t;
   proto_parameters : Dal_plugin.proto_parameters;
-  plugin : (module Dal_plugin.T);
+  proto_plugins : proto_plugins;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
-  plugin_proto : int; (* the [proto_level] of the plugin *)
   last_processed_level : int32 option;
   skip_list_cells_store : Skip_list_cells_store.t;
   mutable ongoing_amplifications : Types.Slot_id.Set.t;
@@ -77,53 +88,6 @@ let init config store gs_worker transport_layer cctxt metrics_server crawler =
     crawler;
   }
 
-let set_ready ctxt plugin skip_list_cells_store cryptobox
-    shards_proofs_precomputation proto_parameters plugin_proto =
-  let open Result_syntax in
-  match ctxt.status with
-  | Starting ->
-      let* () =
-        Profile_manager.validate_slot_indexes
-          ctxt.profile_ctxt
-          ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
-      in
-      ctxt.status <-
-        Ready
-          {
-            plugin;
-            cryptobox;
-            proto_parameters;
-            shards_proofs_precomputation;
-            plugin_proto;
-            last_processed_level = None;
-            skip_list_cells_store;
-            ongoing_amplifications = Types.Slot_id.Set.empty;
-          } ;
-      return_unit
-  | Ready _ -> raise Status_already_ready
-
-let update_plugin_in_ready ctxt plugin proto =
-  match ctxt.status with
-  | Starting -> ()
-  | Ready ready_ctxt ->
-      ctxt.status <- Ready {ready_ctxt with plugin; plugin_proto = proto}
-
-let next_level_to_gc ctxt ~current_level =
-  match ctxt.config.history_mode with
-  | Full -> Int32.zero
-  | Rolling {blocks = `Some n} ->
-      Int32.(max zero (sub current_level (of_int n)))
-  | Rolling {blocks = `Auto} -> (
-      match ctxt.status with
-      | Starting -> Int32.zero
-      | Ready {proto_parameters; _} ->
-          let n =
-            Profile_manager.get_default_shard_store_period
-              proto_parameters
-              ctxt.profile_ctxt
-          in
-          Int32.(max zero (sub current_level (of_int n))))
-
 type error += Node_not_ready
 
 let () =
@@ -145,6 +109,211 @@ let get_ready ctxt =
   match ctxt.status with
   | Ready ctxt -> Ok ctxt
   | Starting -> fail [Node_not_ready]
+
+let get_all_plugins ctxt =
+  match ctxt.status with
+  | Starting -> []
+  | Ready {proto_plugins; _} ->
+      LevelMap.bindings proto_plugins
+      |> List.map (fun (_block_level, {proto_level = _; plugin}) -> plugin)
+
+type error += No_plugin_for_proto of {proto_hash : Protocol_hash.t}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.no_plugin_for_proto"
+    ~title:"DAL node: no plugin for protocol"
+    ~description:"DAL node: no plugin for the protocol %a"
+    ~pp:(fun ppf proto_hash ->
+      Format.fprintf
+        ppf
+        "No plugin for the protocol %a."
+        Protocol_hash.pp
+        proto_hash)
+    Data_encoding.(obj1 (req "proto_hash" Protocol_hash.encoding))
+    (function No_plugin_for_proto {proto_hash} -> Some proto_hash | _ -> None)
+    (fun proto_hash -> No_plugin_for_proto {proto_hash})
+
+let resolve_plugin proto_hash =
+  let open Lwt_result_syntax in
+  let plugin_opt = Dal_plugin.get proto_hash in
+  match plugin_opt with
+  | None ->
+      let*! () = Event.(emit no_protocol_plugin proto_hash) in
+      fail [No_plugin_for_proto {proto_hash}]
+  | Some plugin ->
+      let*! () = Event.(emit protocol_plugin_resolved proto_hash) in
+      return plugin
+
+(* Loads the plugins for levels between [current_level - 2 - attestation_lag]
+   and [current_level], where [current_level] is the level at which the DAL
+   node started. Note that if a migration has happened in this interval, there
+   will be two plugins to be loaded. Note also that the node does not need the
+   plugin for levels smaller than [current_level - 2 - attestation_lag]
+   ([current_level - 2] is the level of the first processed block). *)
+let load_plugins cctxt ~current_level ~attestation_lag =
+  let open Lwt_result_syntax in
+  let last_level = current_level in
+  let first_level =
+    Int32.max 1l (Int32.sub current_level (Int32.of_int (attestation_lag + 2)))
+  in
+  let block = `Level first_level in
+  let* protocols =
+    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ~block ()
+  in
+  let first_proto = protocols.next_protocol in
+  let* plugin = resolve_plugin first_proto in
+  let* header = Shell_services.Blocks.Header.shell_header cctxt ~block () in
+  let proto_level = header.proto_level in
+  let proto_plugins =
+    LevelMap.add first_level {proto_level; plugin} LevelMap.empty
+  in
+  let* last_protocols =
+    Chain_services.Blocks.protocols cctxt ~block:(`Level last_level) ()
+  in
+  let last_proto = last_protocols.Chain_services.Blocks.next_protocol in
+  let* proto_plugins =
+    if Protocol_hash.equal first_proto last_proto then
+      (* There's no migration in between, we're done. *)
+      return proto_plugins
+    else
+      (* There was a migration in between; we search the migration level and then
+         we add the plugin *)
+      let rec find_migration_level level protocols =
+        if
+          Protocol_hash.equal
+            first_proto
+            protocols.Chain_services.Blocks.current_protocol
+        then return level
+        else
+          let block = `Level (Int32.pred level) in
+          let* protocols = Chain_services.Blocks.protocols cctxt ~block () in
+          find_migration_level (Int32.pred level) protocols
+      in
+      let* migration_level = find_migration_level last_level last_protocols in
+      let* plugin = resolve_plugin last_proto in
+      let* header =
+        Shell_services.Blocks.Header.shell_header
+          cctxt
+          ~block:(`Level migration_level)
+          ()
+      in
+      let proto_level = header.proto_level in
+      LevelMap.add migration_level {proto_level; plugin} proto_plugins |> return
+  in
+  return proto_plugins
+
+let set_ready ctxt cctxt skip_list_cells_store cryptobox
+    shards_proofs_precomputation proto_parameters ~level =
+  let open Lwt_result_syntax in
+  match ctxt.status with
+  | Starting ->
+      let*? () =
+        Profile_manager.validate_slot_indexes
+          ctxt.profile_ctxt
+          ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
+      in
+      let attestation_lag = proto_parameters.attestation_lag in
+      let* proto_plugins =
+        load_plugins cctxt ~current_level:level ~attestation_lag
+      in
+      ctxt.status <-
+        Ready
+          {
+            proto_plugins;
+            cryptobox;
+            proto_parameters;
+            shards_proofs_precomputation;
+            last_processed_level = None;
+            skip_list_cells_store;
+            ongoing_amplifications = Types.Slot_id.Set.empty;
+          } ;
+      return_unit
+  | Ready _ -> raise Status_already_ready
+
+let add_plugin_in_ready ctxt plugin ~proto_level ~block_level =
+  match ctxt.status with
+  | Starting -> ()
+  | Ready ready_ctxt ->
+      ctxt.status <-
+        Ready
+          {
+            ready_ctxt with
+            proto_plugins =
+              LevelMap.add
+                block_level
+                {proto_level; plugin}
+                ready_ctxt.proto_plugins;
+          }
+
+let add_plugin ctxt cctxt ~block_level ~proto_level =
+  let open Lwt_result_syntax in
+  let* protocols =
+    Tezos_shell_services.Chain_services.Blocks.protocols
+      cctxt
+      ~block:(`Level block_level)
+      ()
+  in
+  let proto_hash = protocols.next_protocol in
+  let* plugin = resolve_plugin proto_hash in
+  add_plugin_in_ready ctxt plugin ~block_level ~proto_level ;
+  return_unit
+
+let may_add_plugin ctxt cctxt ~block_level ~proto_level =
+  let open Lwt_result_syntax in
+  let*? {proto_plugins; _} = get_ready ctxt in
+  let plugin_opt = LevelMap.min_binding_opt proto_plugins in
+  match plugin_opt with
+  | None -> add_plugin ctxt cctxt ~proto_level ~block_level
+  | Some (_, {proto_level = prev_proto_level; _})
+    when prev_proto_level < proto_level ->
+      add_plugin ctxt cctxt ~proto_level ~block_level
+  | _ -> return_unit
+
+type error += No_plugin_for_level of {level : int32}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.no_plugin"
+    ~title:"DAL node: no plugin"
+    ~description:"DAL node: no plugin for the given level"
+    ~pp:(fun ppf level ->
+      Format.fprintf ppf "No plugin for the level %ld." level)
+    Data_encoding.(obj1 (req "level" int32))
+    (function No_plugin_for_level {level} -> Some level | _ -> None)
+    (fun level -> No_plugin_for_level {level})
+
+let get_plugin_for_level ctxt ~level =
+  let open Result_syntax in
+  let* {proto_plugins; _} = get_ready ctxt in
+  let plugins = LevelMap.bindings proto_plugins in
+  (* Say that [plugins = [(level_1, plugin_1); ... ; (level_n, plugin_n)]]. We
+     have [level_1 > ... > level_n]. We return the plugin [plugin_i] with the
+     smallest [i] such that [level_i <= level]. *)
+  let rec find = function
+    | [] -> fail [No_plugin_for_level {level}]
+    | (plugin_first_level, {plugin; proto_level = _}) :: rest ->
+        if level >= plugin_first_level then return plugin else find rest
+  in
+  find plugins
+
+let next_level_to_gc ctxt ~current_level =
+  match ctxt.config.history_mode with
+  | Full -> Int32.zero
+  | Rolling {blocks = `Some n} ->
+      Int32.(max zero (sub current_level (of_int n)))
+  | Rolling {blocks = `Auto} -> (
+      match ctxt.status with
+      | Starting -> Int32.zero
+      | Ready {proto_parameters; _} ->
+          let n =
+            Profile_manager.get_default_shard_store_period
+              proto_parameters
+              ctxt.profile_ctxt
+          in
+          Int32.(max zero (sub current_level (of_int n))))
 
 let update_last_processed_level ctxt ~level =
   let open Result_syntax in
@@ -195,7 +364,7 @@ let fetch_committee ctxt ~level =
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
   | None ->
-      let*? {plugin = (module Plugin); _} = get_ready ctxt in
+      let*? (module Plugin) = get_plugin_for_level ctxt ~level in
       let+ committee = Plugin.get_committee cctxt ~level in
       Committee_cache.add cache ~level ~committee ;
       committee

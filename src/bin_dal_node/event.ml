@@ -148,12 +148,13 @@ let protocol_plugin_resolved =
     ("proto_hash", Protocol_hash.encoding)
 
 let no_protocol_plugin =
-  declare_0
+  declare_1
     ~section
     ~name:"dal_node_no_plugin"
-    ~msg:"could not resolve plugin"
+    ~msg:"could not resolve plugin for protocol {proto_hash}"
     ~level:Error
-    ()
+    ~pp1:Protocol_hash.pp_short
+    ("proto_hash", Protocol_hash.encoding)
 
 let unexpected_protocol_plugin =
   declare_0
