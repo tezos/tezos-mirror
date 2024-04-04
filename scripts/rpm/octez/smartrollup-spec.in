@@ -1,7 +1,7 @@
 Name:		@PKG@
 Version:	@VERSION@
 Release:	@REVISION@
-Summary:	The Octez Node
+Summary:	The Octez Smart Rollup daemons
 
 Packager:   @MAINT@
 License:	MIT
@@ -16,16 +16,14 @@ Source0:	@FAKESRC@
 tar cpf - . | (cd $RPM_BUILD_ROOT && tar xpf -)
 
 %description
-The Octez Node daemons
+The Octez Smart Rollup daemons
 
 %files
 %{_bindir}/octez-*
 %{_sysconfdir}/init.d/octez-*
-%doc /usr/share/zcash-params/*
-%config /etc/octez/node.conf
+%config /etc/octez/smartrollup.conf
 
-%post 
+%post
 getent group tezos >/dev/null 2>&1 || groupadd tezos
 getent passwd tezos >/dev/null 2>&1 || useradd -g tezos -d /var/tezos tezos
 /usr/bin/systemctl daemon-reload
-
