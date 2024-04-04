@@ -482,21 +482,25 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
       let name = opt_merge_right artifacts.name name in
       let expose_as = opt_merge_right artifacts.expose_as expose_as in
       let expire_in =
-        opt_combine artifacts.expire_in expire_in @@ fun interval1 interval2 ->
+        opt_combine artifacts.expire_in expire_in
+        @@ fun expiration1 expiration2 ->
         (* This function gives a measure of the size of a duration in seconds.
            It is only used to compare durations. *)
-        let interval_to_seconds = function
-          | Gitlab_ci.Types.Seconds n -> n
-          | Minutes n -> n * 60
-          | Hours n -> n * 3600
-          | Days n -> n * 24 * 3600
-          | Weeks n -> n * 7 * 24 * 3600
-          | Months n -> n * 31 * 7 * 24 * 3600
-          | Years n -> n * 365 * 7 * 24 * 3600
-        in
-        if interval_to_seconds interval1 > interval_to_seconds interval2 then
-          interval1
-        else interval2
+        match (expiration1, expiration2) with
+        | Never, _ | _, Never -> Never
+        | Duration interval1, Duration interval2 ->
+            let interval_to_seconds = function
+              | Gitlab_ci.Types.Seconds n -> n
+              | Minutes n -> n * 60
+              | Hours n -> n * 3600
+              | Days n -> n * 24 * 3600
+              | Weeks n -> n * 7 * 24 * 3600
+              | Months n -> n * 31 * 7 * 24 * 3600
+              | Years n -> n * 365 * 7 * 24 * 3600
+            in
+            if interval_to_seconds interval1 > interval_to_seconds interval2
+            then Duration interval1
+            else Duration interval2
       in
       let when_ =
         opt_combine artifacts.when_ when_ @@ fun when1 when2 ->

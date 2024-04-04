@@ -215,7 +215,7 @@ let enable_coverage_location : tezos_job -> tezos_job =
     artifact.
 
     This function should be applied to test jobs that produce coverage. *)
-let enable_coverage_output_artifact ?(expire_in = Days 1) :
+let enable_coverage_output_artifact ?(expire_in = Duration (Days 1)) :
     tezos_job -> tezos_job =
  fun job ->
   job |> enable_coverage_location
@@ -237,7 +237,7 @@ let enable_coverage_report job : tezos_job =
                 path = "_coverage_report/cobertura.xml";
               }
             ())
-       ~expire_in:(Days 15)
+       ~expire_in:(Duration (Days 15))
        ~when_:Always
        ["_coverage_report/"; "$BISECT_FILE"]
   |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
@@ -437,7 +437,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
   let artifacts =
     (* Extend the lifespan to prevent failure for external tools using artifacts. *)
-    let expire_in = if release then Some (Days 90) else None in
+    let expire_in = if release then Some (Duration (Days 90)) else None in
     artifacts ?expire_in ["octez-binaries/$ARCH/*"]
   in
   let executable_files =
@@ -638,7 +638,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       // ("octez-*." ^ match target with Dpkg -> "deb" | Rpm -> "rpm")
     in
     artifacts
-      ~expire_in:(Days 1)
+      ~expire_in:(Duration (Days 1))
       ~when_:On_success
       ~name:"${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG"
       [artifact_path]
@@ -748,7 +748,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     artifacts
       ~name:"build-$ARCH-$CI_COMMIT_REF_SLUG"
       ~when_:On_success
-      ~expire_in:(Days 1)
+      ~expire_in:(Duration (Days 1))
       (* TODO: [paths] can be refined based on [release] *)
       [
         "octez-*";

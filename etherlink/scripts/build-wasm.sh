@@ -12,8 +12,8 @@ rust_image_tag=${rust_image_tag:-"master"}
 platform=${platform:-"linux/amd64"}
 
 # register information about the rust-toolchain image
-rust_toolchain_info() {
-  docker pull -q "${rust_image}:${rust_image_tag}"
+rust_toolchain_image_id() {
+  docker pull -q "${rust_image}:${rust_image_tag}" &> /dev/null
   docker inspect --format='{{index .RepoDigests 0}}' "${rust_image}:${rust_image_tag}"
 }
 
@@ -33,11 +33,11 @@ build() {
 # copy images in output directory
 copy() {
   output_dir=$1
-  rust_image_version=$2
+  rust_image_id=$2
   container=$(docker create etherlink_kernel:"$commit")
   docker cp "$container":/kernel "$output_dir"
   {
-    echo "rust-toolchain: $rust_image_version"
+    echo "rust-toolchain: $rust_image_id"
     echo "tezos: $commit"
   } > "$output_dir/.versions"
   echo "$container"
@@ -71,11 +71,11 @@ EOF
   evm_config=${1:-"$etherlink_dir/config/dev.yaml"}
   output_dir=${2:-"$etherlink_dir/kernels-$commit"}
   echo "fetching rust-toolchain image info: $rust_image:$rust_image_tag"
-  rust_image_version=$(rust_toolchain_info)
+  rust_image_id=$(rust_toolchain_image_id)
   echo "building the docker image with $evm_config"
   build "$evm_config"
   echo "copying kernels and preimages in $output_dir"
-  container=$(copy "$output_dir" "$rust_image_version")
+  container=$(copy "$output_dir" "$rust_image_id")
   echo "cleaning up"
   cleanup "$container"
   ;;
