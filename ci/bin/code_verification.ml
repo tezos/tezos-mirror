@@ -1269,6 +1269,30 @@ let jobs pipeline_type =
       ]
       |> jobs_external_split ~path:"test/install_octez"
     in
+    (* Tezt jobs.
+
+       The tezt jobs are split into a set of special-purpose jobs running the
+       tests of the corresponding tag:
+        - [tezt-memory-3k]: runs the jobs with tag [memory_3k],
+        - [tezt-memory-4k]: runs the jobs with tag [memory_4k],
+        - [tezt-time_sensitive]: runs the jobs with tag [time-sensitive],
+        - [tezt-slow]: runs the jobs with tag [slow].
+        - [tezt-flaky]: runs the jobs with tag [flaky] and
+          none of the tags above.
+
+       and a job [tezt] that runs all remaining tests (excepting those
+       that are tagged [ci_disabled], that are disabled in the CI.)
+
+       There is an implicit rule that the Tezt tags [memory_3k],
+       [memory_4k], [time_sensitive], [slow] and [cloud] are mutually
+       exclusive. The [flaky] tag is not exclusive to these tags. If
+       e.g. a test has both tags [slow] and [flaky], it will run in
+       [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
+       job if they also have another special tag. Tests tagged [cloud] are
+       meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
+       do not run in the CI.
+
+       For more information on tags, see [src/lib_test/tag.mli]. *)
     let tezt_dependencies =
       Dependent
         [
