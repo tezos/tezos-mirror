@@ -58,6 +58,16 @@ check:
 	# Check format of all crates
 	@exec ../../scripts/check-format-rust.sh
 
+.PHONY: audit
+audit:
+	@# We don't add this to the check target because it requires installation
+	@# of 'cargo-audit' via 'cargo install' which we can't control very well
+	@# on the machines of other developers. E.g. if we need to upgrade its
+	@# version, it may cause issues for developers.
+	@# For that reason we expose this as a separate target and run it only in
+	@# CI.
+	@cargo audit
+
 .PHONY: clean
 clean:
 	@cargo clean

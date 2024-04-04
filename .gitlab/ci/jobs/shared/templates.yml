@@ -233,6 +233,7 @@
   script:
     - make -C src/risc_v check
     - make -C src/risc_v test
+    - make -C src/risc_v audit
   cache:
     key: kernels
     paths:
