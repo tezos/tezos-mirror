@@ -119,6 +119,59 @@
           },
       };
 
+      // Creation of the simulator using the above configuration.
+      const simulator = new Simulator(config);
+
+      // Creation of a delegate, which stake's evolution will be displayed in the data table.
+
+      // Delegate configuration.
+      const delegate_config = {
+        // cycle at which the delegate starts to register.
+        delegate_registration_cycle: 9,
+        // delegate's parameters:
+        delegate_policy: {
+          // how much external stake the delegate accepts (must be between 0 and 5).
+          limit_of_staking_over_baking: 3,
+          // ratio of the staker's rewards that the delegate keeps for itself.
+          edge_of_baking_over_staking: 0.01, // 1%
+        },
+      };
+
+      /* Creation of a delegate with the given config.
+      *  One could create many delegates to compare
+      *  the effect of different parameters.
+      */
+      const delegate = new Delegate(simulator, delegate_config);
+
+      /* Warning: the delegate.set_* methods must be used in the order of the cycles.
+      *
+      *  Setting a value for a given cycle overrides values previously set for future cycles
+      *  It should be fixed in a future version.
+      */
+
+      // Set the initial balances of the delegate.
+      delegate.set_own_staked_balance(9, 10_000_000_000);
+      delegate.set_third_party_staked_balance(9, 20_000_000_000);
+      delegate.set_own_spendable_balance(9, 20_000_000_000);
+      delegate.set_third_party_delegated_balance(9, 30_000_000_000);
+
+      // Simulate an unstake of 4000 tez at cycle 15
+      delegate.set_own_staked_balance(15, delegate.estimated_own_staked_balance(15) - 4_000_000_000);
+      // the unstake tez are unstaked-frozen-deposits, not spendable,
+      // but they also count as delegated tez.
+      // we didn't model the unstaked-frozen-deposits, as they have no effects on staking rights.
+      delegate.set_own_spendable_balance(15, delegate.estimated_own_spendable_balance(15) + 4_000_000_000);
+
+      // Simulate an external stake of 1000 tez  at cycle 20
+      delegate.set_third_party_staked_balance(20, delegate.estimated_third_party_staked_balance(20) + 1_000_000_000);
+
+      // Simulate the departure of a staker with 1_000 tez at cycle 21
+      delegate.set_third_party_staked_balance(21, delegate.estimated_third_party_staked_balance(21) - 1_000_000_000);
+      delegate.set_third_party_delegated_balance(21, delegate.third_party_delegated_balance(21) + 1_000_000_000);
+      delegate.set_third_party_delegated_balance(25, delegate.third_party_delegated_balance(25) - 1_000_000_000);
+
+
+
       const gen_idx = (start, end) => {
           let arr = [];
           for(let i = start; i <= end; i++) { arr.push(i); }
@@ -141,26 +194,6 @@
 
       // Helpers
       const mutez_to_tez = (x) => Math.round(x / 1_000_000);
-
-      // Creation of the simulator.
-      const simulator = new Simulator(config);
-
-      // Creation of a delegate.
-      const delegate_config = {
-        delegate_registration_cycle: 10,
-        delegate_policy: {
-          limit_of_staking_over_baking: 3,
-          edge_of_baking_over_staking: 0.01,
-        },
-      };
-
-      const delegate = new Delegate(simulator, delegate_config);
-
-      delegate.set_own_staked_balance(9, 10_000_000_000)
-      delegate.set_third_party_staked_balance(9, 20_000_000_000)
-
-      delegate.set_own_spendable_balance(9, 20_000_000_000);
-      delegate.set_third_party_delegated_balance(9, 30_000_000_000);
 
       const chart_config = {
           type: 'line',
