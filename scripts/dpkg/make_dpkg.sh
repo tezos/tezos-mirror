@@ -9,7 +9,8 @@ set -eu
 
 # Setup
 #
-myhome=scripts/dpkg
+product=${product:-${OCTEZ_PKGNAME}}
+myhome=scripts/dpkg/$product
 common=scripts/pkg-common
 dieonwarn=${dieonwarn:-1}
 

@@ -114,8 +114,8 @@ warnings() {
 #
 
 getOctezVersion() {
-
-  if ! version=$(dune exec src/lib_version/exe/octez_print_version.exe -- --json 2> /dev/null); then
+  product="$OCTEZ_PKGNAME"
+  if ! version=$(dune exec "src/lib_version/exe/${product}_print_version.exe" -- --json 2> /dev/null); then
     echo "Cannot get version. Try eval \`opam env\`?" >&2
     exit 1
   fi
