@@ -93,24 +93,26 @@
       from './app.js';
 
       const config = {
+        // Paris Protocol parameters - no need to change these values.
           proto: {
               attestation_rewards: 10_240,
               base_total_issued_per_minute: 80_007_812,
-              blocks_per_cycle: 128,
-              blocks_per_commitment: 16,
+              blocks_per_cycle: 24576,
+              blocks_per_commitment: 192,
               bonus_baking_rewards: 5_120,
               consensus_committee_size: 7000,
-              consensus_rights_delay: 3,
+              consensus_rights_delay: 2,
               consensus_threshold: 4667,
               fixed_baking_rewards: 5_120,
               max_bonus: 0.05,
-              minimal_block_delay: 7,
+              minimal_block_delay: 10,
               nonce_revelation_tip: 1,
               vdf_tip: 1,
               max_limit_of_staking_over_baking: 5,
           },
+        // initial values for the chain
           chain: {
-              ai_activation_cycle: 17,
+              ai_activation_cycle: 5,
               total_frozen_stake: total_frozen_stake_storage,
               total_supply: total_supply_storage,
               total_delegated: total_delegated_storage,
