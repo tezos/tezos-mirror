@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+set -x
 
 ### Create a GitLab Etherlink release with links to all the related resources
 
