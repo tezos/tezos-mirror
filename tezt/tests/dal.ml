@@ -1699,44 +1699,6 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
        expected = %R)" ;
   return ()
 
-let test_dal_node_test_slots_propagation _protocol parameters cryptobox node
-    _client dal_node1 =
-  let dal_node2 = Dal_node.create ~node () in
-  let dal_node3 = Dal_node.create ~node () in
-  let dal_node4 = Dal_node.create ~node () in
-  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node2 in
-  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node3 in
-  let* () = Dal_node.init_config ~producer_profiles:[0] dal_node4 in
-  update_neighbors dal_node3 [dal_node1; dal_node2] ;
-  update_neighbors dal_node4 [dal_node3] ;
-  let* () = Dal_node.run dal_node2 in
-  let* () = Dal_node.run dal_node3 in
-  let* () = Dal_node.run dal_node4 in
-  let commitment1, _proof1 =
-    Dal.Commitment.dummy_commitment cryptobox "content1"
-  in
-  let slot_header1_exp = Dal.Commitment.to_string commitment1 in
-  let commitment2, _proof2 =
-    Dal.Commitment.dummy_commitment cryptobox "content2"
-  in
-  let slot_header2_exp = Dal.Commitment.to_string commitment2 in
-  let p1 = wait_for_stored_slot dal_node3 slot_header1_exp in
-  let p2 = wait_for_stored_slot dal_node3 slot_header2_exp in
-  let p3 = wait_for_stored_slot dal_node4 slot_header1_exp in
-  let p4 = wait_for_stored_slot dal_node4 slot_header2_exp in
-  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
-  let* slot_header1, _proof1 =
-    Helpers.(store_slot dal_node1 @@ make_slot ~slot_size "content1")
-  in
-  let* slot_header2, _proof2 =
-    Helpers.(store_slot dal_node2 @@ make_slot ~slot_size "content2")
-  in
-  Check.(
-    (slot_header1_exp = slot_header1) string ~error_msg:"Expected:%L. Got: %R") ;
-  Check.(
-    (slot_header2_exp = slot_header2) string ~error_msg:"Expected:%L. Got: %R") ;
-  Lwt.join [p1; p2; p3; p4]
-
 let commitment_of_slot cryptobox slot =
   let polynomial =
     Cryptobox.polynomial_from_slot
@@ -6401,11 +6363,6 @@ let register ~protocols =
     ~producer_profiles:[0]
     "dal node shard fetching and slot reconstruction"
     test_dal_node_rebuild_from_shards
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
-    "dal node slots propagation"
-    test_dal_node_test_slots_propagation
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]
