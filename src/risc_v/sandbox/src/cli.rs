@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use clap::{Parser, Subcommand, ValueEnum};
+use std::path::Path;
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Mode {
@@ -57,6 +58,10 @@ pub struct Options {
 
     #[arg(short = 'm', long, value_enum, default_value_t = ExitMode::User)]
     pub posix_exit_mode: ExitMode,
+
+    /// Path to the file containing inbox messages
+    #[arg(long)]
+    pub inbox_file: Option<Box<Path>>,
 }
 
 /// Parse the command-line arguments.

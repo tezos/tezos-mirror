@@ -76,20 +76,26 @@ fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
 
     // Prepare inbox
     let mut inbox = inbox::InboxBuilder::new();
-    inbox
-        .insert_external(vec![1, 2, 3, 4])
-        .insert_external(vec![1, 4, 3, 2])
-        .next_level()
-        .insert_external(vec![1, 1])
-        .next_level()
-        .insert_external(vec![1, 2])
-        .next_level()
-        .insert_transfer(
-            ContractKt1Hash::from_base58_check("KT1EfTusMLoeCAAGd9MZJn5yKzFr6kJU5U91").unwrap(),
-            PublicKeyHash::from_b58check("tz1dJ21ejKD17t7HKcKkTPuwQphgcSiehTYi").unwrap(),
-            meta.address.clone(),
-            MichelsonUnit,
-        );
+
+    if let Some(inbox_file) = opts.inbox_file {
+        inbox.load_from_file(&inbox_file)?;
+    } else {
+        inbox
+            .insert_external(vec![1, 2, 3, 4])
+            .insert_external(vec![1, 4, 3, 2])
+            .next_level()
+            .insert_external(vec![1, 1])
+            .next_level()
+            .insert_external(vec![1, 2])
+            .next_level()
+            .insert_transfer(
+                ContractKt1Hash::from_base58_check("KT1EfTusMLoeCAAGd9MZJn5yKzFr6kJU5U91").unwrap(),
+                PublicKeyHash::from_b58check("tz1dJ21ejKD17t7HKcKkTPuwQphgcSiehTYi").unwrap(),
+                meta.address.clone(),
+                MichelsonUnit,
+            );
+    }
+
     let mut inbox = inbox.build();
 
     let handle_syscall = if opts.posix {
