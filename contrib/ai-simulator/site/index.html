@@ -208,21 +208,21 @@
                       label: 'Total supply',
                       borderColor: 'rgb(175, 92, 92)',
                       yAxisID: 'y1',
-                      data: simulator.config.chain.total_supply.map(mutez_to_tez),
+                      data: idx.map((i) => mutez_to_tez(simulator.total_supply(i))),
                       order: 2,
                   },
                   {
                       label: 'Total frozen stake',
                       borderColor: 'rgb(75, 192, 92)',
                       yAxisID: 'y1',
-                      data: simulator.config.chain.total_frozen_stake.map(mutez_to_tez),
+                      data: idx.map((i) => mutez_to_tez(simulator.total_staked_balance(i))),
                       order: 2,
                   },
                   {
                       label: 'Total delegated',
                       borderColor: 'rgb(128, 0, 128)',
                       yAxisID: 'y1',
-                      data: simulator.config.chain.total_delegated.map(mutez_to_tez),
+                      data: idx.map((i) => mutez_to_tez(simulator.total_delegated_balance(i))),
                       order: 2,
                   },
                   {
@@ -349,7 +349,7 @@
                   onDrag: function(e, datasetIndex, index, value) {
                     simulator.set_staked_ratio_at(index, value);
                     window.chart.data.datasets[1].data =
-                        simulator.config.chain.total_frozen_stake.map(mutez_to_tez);
+                        idx.map((i) => mutez_to_tez(simulator.total_staked_balance(i)));
                     window.chart.data.datasets[6].data =
                         idx_mask.concat(idx_ai.map((i) =>
                             simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4)));
@@ -425,9 +425,9 @@
           new_cell(first_block);
           new_cell(last_block);
 
-          new_cell(print_tez(config.chain.total_supply[cycle]));
-          new_cell(print_tez(config.chain.total_frozen_stake[cycle]));
-          new_cell(print_tez(config.chain.total_delegated[cycle]));
+          new_cell(print_tez(simulator.total_supply(cycle)));
+          new_cell(print_tez(simulator.total_staked_balance(cycle)));
+          new_cell(print_tez(simulator.total_delegated_balance(cycle)));
 
           new_cell(simulator.staked_ratio_for_next_cycle(cycle).toDecimal(3));
 
