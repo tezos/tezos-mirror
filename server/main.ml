@@ -200,13 +200,13 @@ let reply_public_compressed_json ?status ?(headers = []) encoding data =
 let get_stats ~logger db_pool =
   let query =
     Caqti_request.Infix.(
-      Caqti_type.(unit ->? tup3 int32 int32 Sql_requests.Type.time_protocol))
+      Caqti_type.(unit ->? t3 int32 int32 Sql_requests.Type.time_protocol))
       "SELECT level, round, timestamp FROM blocks ORDER BY level DESC, round \
        DESC LIMIT 1"
   in
   with_caqti_error
     ~logger
-    (Caqti_lwt.Pool.use
+    (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt query ())
        db_pool)
     (function
@@ -229,7 +229,7 @@ let get_head ~logger conf db_pool =
   in
   with_caqti_error
     ~logger
-    (Caqti_lwt.Pool.use
+    (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
          maybe_with_metrics conf "get_head" @@ fun () -> Db.find_opt query ())
        db_pool)
@@ -244,7 +244,7 @@ let get_users ~logger conf db_pool =
   in
   with_caqti_error
     ~logger
-    (Caqti_lwt.Pool.use
+    (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
          maybe_with_metrics conf "get_users" @@ fun () ->
          Db.collect_list query ())
@@ -253,25 +253,25 @@ let get_users ~logger conf db_pool =
 
 let get_levels_at_timestamp0 db_pool timestamp =
   let lower =
-    Caqti_request.Infix.(Caqti_type.(int32 ->* tup2 int32 int32))
+    Caqti_request.Infix.(Caqti_type.(int32 ->* t2 int32 int32))
       "SELECT level, MIN(timestamp) FROM blocks, (SELECT MAX(level) AS m FROM \
        blocks WHERE timestamp <= ?) WHERE level = m OR level = m + 1 GROUP BY \
        level"
   in
   let upper =
-    Caqti_request.Infix.(Caqti_type.(int32 ->* tup2 int32 int32))
+    Caqti_request.Infix.(Caqti_type.(int32 ->* t2 int32 int32))
       "SELECT level, MIN(timestamp) FROM blocks, (SELECT MIN(level) AS m FROM \
        blocks WHERE timestamp >= ?) WHERE level = m OR level = m - 1 GROUP BY \
        level"
   in
   Lwt_result.bind
-    (Caqti_lwt.Pool.use
+    (Caqti_lwt_unix.Pool.use
        (fun (module Db : Caqti_lwt.CONNECTION) ->
          Db.collect_list lower timestamp)
        db_pool)
     (function
       | [] ->
-          Caqti_lwt.Pool.use
+          Caqti_lwt_unix.Pool.use
             (fun (module Db : Caqti_lwt.CONNECTION) ->
               Db.collect_list upper timestamp)
             db_pool
@@ -293,12 +293,12 @@ let refresh_users conf db_pool users =
   Lwt_mutex.with_lock Sql_requests.Mutex.nodes (fun () ->
       let query =
         Caqti_request.Infix.(
-          Caqti_type.(unit ->* tup2 string Sql_requests.Type.bcrypt_hash))
+          Caqti_type.(unit ->* t2 string Sql_requests.Type.bcrypt_hash))
           "SELECT name, password FROM nodes WHERE password IS NOT NULL"
       in
       Lwt_result.map
         (fun users_from_db -> users := users_from_db)
-        (Caqti_lwt.Pool.use
+        (Caqti_lwt_unix.Pool.use
            (fun (module Db : Caqti_lwt.CONNECTION) ->
              maybe_with_metrics conf "refresh_users" @@ fun () ->
              Db.collect_list query ())
@@ -310,11 +310,11 @@ let refresh_users conf db_pool users =
 let upsert_user conf db_pool login password =
   let query =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 string Sql_requests.Type.bcrypt_hash ->. unit))
+      Caqti_type.(t2 string Sql_requests.Type.bcrypt_hash ->. unit))
       "INSERT INTO nodes(name, password) VALUES ($1, $2) ON CONFLICT (name) DO \
        UPDATE SET password = $2"
   in
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       maybe_with_metrics conf "upsert_user" @@ fun () ->
       Lwt_mutex.with_lock Sql_requests.Mutex.nodes (fun () ->
@@ -327,13 +327,13 @@ let delete_user conf db_pool login =
     Caqti_request.Infix.(Caqti_type.(string ->. unit))
       "UPDATE nodes SET password = NULL WHERE name = $1"
   in
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       maybe_with_metrics conf "delete_user" @@ fun () -> Db.exec query login)
     db_pool
 
 let maybe_create_tables db_pool =
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
         (fun req ->
@@ -342,7 +342,7 @@ let maybe_create_tables db_pool =
     db_pool
 
 let maybe_alter_tables db_pool =
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       Lwt.map
         (fun () -> Ok ())
@@ -464,7 +464,7 @@ let endorsing_rights_callback =
           let* () =
             maybe_with_metrics conf "maybe_insert_endorsing_right__list"
             @@ fun () ->
-            Caqti_lwt.Pool.use
+            Caqti_lwt_unix.Pool.use
               (fun (module Db : Caqti_lwt.CONNECTION) ->
                 let* () =
                   let delegates =
@@ -549,7 +549,7 @@ let block_callback =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
     let level = Int32.of_string (Re.Group.get g 1) in
     let out =
-      Caqti_lwt.Pool.use
+      Caqti_lwt_unix.Pool.use
         (fun (module Db : Caqti_lwt.CONNECTION) ->
           let* () =
             (* Note: even if data is already in cache,
@@ -670,7 +670,7 @@ let operations_callback ~logger conf db_pool g source operations =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         let* () =
           let delegates =
@@ -733,7 +733,7 @@ let import_callback ~logger conf db_pool g data =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         (* delegates *)
         let* () =
@@ -916,7 +916,7 @@ let routes :
       conf:Config.t ->
       admins:(string * Bcrypt.hash) list ->
       users:(string * Bcrypt.hash) list ref ->
-      (Caqti_lwt.connection, Caqti_error.t) Caqti_lwt.Pool.t ->
+      (Caqti_lwt.connection, Caqti_error.t) Caqti_lwt_unix.Pool.t ->
       Cohttp.Header.t ->
       Cohttp.Code.meth ->
       Cohttp_lwt.Body.t ->
@@ -1185,7 +1185,7 @@ let () =
   let admins = List.map (fun (u, p) -> (u, Bcrypt.hash p)) conf.Config.admins in
   let code =
     Lwt_main.run
-      (match Caqti_lwt.connect_pool ~env:Sql_requests.env uri with
+      (match Caqti_lwt_unix.connect_pool ~env:Sql_requests.env uri with
       | Error e ->
           Lwt.bind
             (Lwt_io.eprintl (Caqti_error.show e))

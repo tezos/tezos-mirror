@@ -293,7 +293,7 @@ let maybe_insert_delegate =
 
 let maybe_insert_endorsing_right =
   Caqti_request.Infix.(
-    Caqti_type.(tup4 int32 int int Type.public_key_hash ->. unit))
+    Caqti_type.(t4 int32 int int Type.public_key_hash ->. unit))
     "INSERT INTO endorsing_rights (level, delegate, first_slot, \
      endorsing_power) SELECT ?, delegates.id, ?, ? FROM delegates WHERE \
      delegates.address = ? ON CONFLICT DO NOTHING"
@@ -301,9 +301,7 @@ let maybe_insert_endorsing_right =
 let maybe_insert_operation =
   Caqti_request.Infix.(
     Caqti_type.(
-      tup2
-        (tup4 int32 Type.operation_hash bool (option int32))
-        Type.public_key_hash
+      t2 (t4 int32 Type.operation_hash bool (option int32)) Type.public_key_hash
       ->. unit))
     "INSERT INTO operations (level, hash, endorsement, endorser, round) SELECT \
      $1, $2, $3, delegates.id, $4 FROM delegates WHERE delegates.address = $5 \
@@ -312,9 +310,9 @@ let maybe_insert_operation =
 let maybe_insert_block =
   Caqti_request.Infix.(
     Caqti_type.(
-      tup2
-        (tup4 int32 Type.time_protocol Type.block_hash int32)
-        (tup2 (option Type.block_hash) Type.public_key_hash)
+      t2
+        (t4 int32 Type.time_protocol Type.block_hash int32)
+        (t2 (option Type.block_hash) Type.public_key_hash)
       ->. unit))
     "INSERT INTO blocks (level, timestamp, hash, round, predecessor, baker) \
      SELECT ?, ?, ?, ?, blocks.id, delegates.id FROM delegates LEFT JOIN \
@@ -324,16 +322,16 @@ let maybe_insert_block =
      EXCLUDED.predecessor, EXCLUDED.baker) WHERE True"
 
 let maybe_insert_cycle =
-  Caqti_request.Infix.(Caqti_type.(tup3 int32 int32 int32 ->. unit))
+  Caqti_request.Infix.(Caqti_type.(t3 int32 int32 int32 ->. unit))
     "INSERT INTO cycles (id, level, size) VALUES (?, ?, ?) ON CONFLICT DO \
      NOTHING"
 
 let insert_received_operation =
   Caqti_request.Infix.(
     Caqti_type.(
-      tup2
-        (tup4 ptime Type.errors Type.public_key_hash bool)
-        (tup3 (option int32) string int32)
+      t2
+        (t4 ptime Type.errors Type.public_key_hash bool)
+        (t3 (option int32) string int32)
       ->. unit))
     "INSERT INTO operations_reception (timestamp, operation, source, errors) \
      SELECT $1, operations.id, nodes.id, $2 FROM operations, delegates, nodes \
@@ -345,9 +343,9 @@ let insert_received_operation =
 let insert_included_operation =
   Caqti_request.Infix.(
     Caqti_type.(
-      tup2
-        (tup3 Type.public_key_hash bool (option int32))
-        (tup2 Type.block_hash int32)
+      t2
+        (t3 Type.public_key_hash bool (option int32))
+        (t2 Type.block_hash int32)
       ->. unit))
     "INSERT INTO operations_inclusion (block, operation) SELECT blocks.id, \
      operations.id FROM operations, delegates, blocks WHERE delegates.address \
@@ -358,7 +356,7 @@ let insert_included_operation =
 let insert_received_block =
   Caqti_request.Infix.(
     Caqti_type.(
-      tup4 (option ptime) (option ptime) Type.block_hash string ->. unit))
+      t4 (option ptime) (option ptime) Type.block_hash string ->. unit))
     "INSERT INTO blocks_reception (application_timestamp, \
      validation_timestamp, block, source) SELECT ?, ?, blocks.id, nodes.id \
      FROM blocks, nodes WHERE blocks.hash = ? AND nodes.name = ? ON CONFLICT \

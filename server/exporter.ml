@@ -95,23 +95,22 @@ let parse_block_reception_row
 
 let select_single_cycle_info db_pool level =
   let cycle_request =
-    Caqti_request.Infix.(
-      Caqti_type.int32 ->? Caqti_type.(tup3 int32 int32 int32))
+    Caqti_request.Infix.(Caqti_type.int32 ->? Caqti_type.(t3 int32 int32 int32))
       "SELECT id, level, size FROM cycles WHERE level = (SELECT MAX (level) \
        FROM cycles WHERE level <= $1)"
   in
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find_opt cycle_request level)
     db_pool
 
 let select_cycles db_pool boundaries =
   let cycle_request =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32) ->* Caqti_type.(tup3 int32 int32 int32))
+      Caqti_type.(t2 int32 int32) ->* Caqti_type.(t3 int32 int32 int32))
       "SELECT id, level, size FROM cycles WHERE level >= (SELECT MAX(level) \
        FROM cycles WHERE level <= $1) AND level <= $2"
   in
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       Db.fold
         cycle_request
@@ -123,21 +122,21 @@ let select_cycles db_pool boundaries =
 let select_blocks conf db_pool boundaries =
   let block_request =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
+      Caqti_type.(t2 int32 int32)
       ->* Caqti_type.(
-            tup2
-              (tup4
+            t2
+              (t4
                  int32
                  Sql_requests.Type.block_hash
                  (option Sql_requests.Type.block_hash)
                  Sql_requests.Type.public_key_hash)
-              (tup2 int32 Sql_requests.Type.time_protocol)))
+              (t2 int32 Sql_requests.Type.time_protocol)))
       "SELECT b.level, b.hash, p.hash, d.address, b.round, b.timestamp FROM \
        blocks b JOIN delegates d ON d.id = b.baker LEFT JOIN blocks p ON p.id \
        = b.predecessor WHERE b.level >= ? AND b.level <= ?"
   in
   let* blocks =
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         maybe_with_metrics conf "select_blocks" @@ fun () ->
         Db.fold block_request parse_block_row boundaries Int32Map.empty)
@@ -145,10 +144,10 @@ let select_blocks conf db_pool boundaries =
   in
   let reception_request =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
+      Caqti_type.(t2 int32 int32)
       ->* Caqti_type.(
-            tup2
-              (tup4
+            t2
+              (t4
                  int32
                  Sql_requests.Type.block_hash
                  (option ptime)
@@ -159,7 +158,7 @@ let select_blocks conf db_pool boundaries =
        r.block = b.id JOIN nodes n ON n.id = r.source WHERE b.level >= ? AND \
        b.level <= ?"
   in
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       maybe_with_metrics conf "select_blocks_reception" @@ fun () ->
       Db.fold reception_request parse_block_reception_row boundaries blocks)
@@ -204,21 +203,19 @@ let select_ops conf db_pool boundaries =
   *)
   let q_rights =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
-      ->* Caqti_type.(tup4 int32 Sql_requests.Type.public_key_hash int int))
+      Caqti_type.(t2 int32 int32)
+      ->* Caqti_type.(t4 int32 Sql_requests.Type.public_key_hash int int))
       "SELECT e.level, d.address, e.first_slot, e.endorsing_power FROM \
        endorsing_rights e JOIN delegates d ON e.delegate = d.id WHERE e.level \
        >= ? AND e.level <= ?"
   in
   let q_included =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
+      Caqti_type.(t2 int32 int32)
       ->* Caqti_type.(
-            tup2
-              (tup4 int32 Sql_requests.Type.public_key_hash bool (option int32))
-              (tup2
-                 Sql_requests.Type.operation_hash
-                 Sql_requests.Type.block_hash)))
+            t2
+              (t4 int32 Sql_requests.Type.public_key_hash bool (option int32))
+              (t2 Sql_requests.Type.operation_hash Sql_requests.Type.block_hash)))
       "SELECT o.level, d.address, o.endorsement, o.round, o.hash, b.hash FROM \
        operations o JOIN operations_inclusion i ON i.operation = o.id JOIN \
        delegates d ON o.endorser = d.id JOIN blocks b ON i.block = b.id WHERE \
@@ -226,15 +223,15 @@ let select_ops conf db_pool boundaries =
   in
   let q_received =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32)
+      Caqti_type.(t2 int32 int32)
       ->* Caqti_type.(
-            tup2
-              (tup4
+            t2
+              (t4
                  int32
                  Sql_requests.Type.public_key_hash
                  ptime
                  Sql_requests.Type.operation_hash)
-              (tup4 Sql_requests.Type.errors string bool (option int32))))
+              (t4 Sql_requests.Type.errors string bool (option int32))))
       "SELECT o.level, d.address, r.timestamp, o.hash, r.errors, n.name, \
        o.endorsement, o.round FROM operations o JOIN operations_reception r ON \
        r.operation = o.id JOIN delegates d ON o.endorser = d.id JOIN nodes n \
@@ -316,20 +313,20 @@ let select_ops conf db_pool boundaries =
     Int32Map.add level ops info
   in
   let* out =
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         maybe_with_metrics conf "select_operations_rights" @@ fun () ->
         Db.fold q_rights cb_rights boundaries Int32Map.empty)
       db_pool
   in
   let* out =
-    Caqti_lwt.Pool.use
+    Caqti_lwt_unix.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
         maybe_with_metrics conf "select_operations_inclusion" @@ fun () ->
         Db.fold q_included cb_included boundaries out)
       db_pool
   in
-  Caqti_lwt.Pool.use
+  Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
       maybe_with_metrics conf "select_operations_reception" @@ fun () ->
       Db.fold q_received cb_received boundaries out)
