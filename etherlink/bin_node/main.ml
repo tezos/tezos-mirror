@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -343,6 +343,14 @@ let parent_hash_arg =
        ~default:
          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 
+let tx_pool_timeout_limit_arg =
+  Tezos_clic.default_arg
+    ~long:"tx-pool-timeout-limit"
+    ~placeholder:"3_600"
+    ~default:"3_600"
+    ~doc:"Transaction timeout limit inside the transaction pool (in seconds)."
+    Params.int
+
 let sequencer_key_arg =
   Tezos_clic.arg
     ~long:"sequencer-key"
@@ -431,7 +439,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args20
+    (args21
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -451,6 +459,7 @@ let sequencer_command =
        max_number_of_chunks_arg
        devmode_arg
        wallet_dir_arg
+       tx_pool_timeout_limit_arg
        (Client_config.password_filename_arg ()))
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
@@ -480,6 +489,7 @@ let sequencer_command =
            max_number_of_chunks,
            devmode,
            wallet_dir,
+           tx_pool_timeout_limit,
            password_filename )
          rollup_node_endpoint
          sequencer_str
@@ -533,6 +543,7 @@ let sequencer_command =
           ?rpc_port
           ?cors_origins
           ?cors_headers
+          ~tx_pool_timeout_limit:(Int64.of_int tx_pool_timeout_limit)
           ~sequencer
           ()
       in

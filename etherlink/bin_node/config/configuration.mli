@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Functori, <contact@functori.com>                       *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -57,6 +58,7 @@ type t = {
   observer : observer option;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
+  tx_pool_timeout_limit : int64;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -119,6 +121,7 @@ module Cli : sig
     ?proxy:proxy ->
     ?sequencer:sequencer ->
     ?observer:observer ->
+    ?tx_pool_timeout_limit:int64 ->
     unit ->
     t
 
@@ -133,6 +136,7 @@ module Cli : sig
     ?proxy:proxy ->
     ?sequencer:sequencer ->
     ?observer:observer ->
+    ?tx_pool_timeout_limit:int64 ->
     unit ->
     t tzresult Lwt.t
 end

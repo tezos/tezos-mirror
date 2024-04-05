@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -43,6 +44,7 @@ type t = {
   observer : observer option;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
+  tx_pool_timeout_limit : int64;
 }
 
 let default_filter_config =
@@ -81,6 +83,8 @@ let hard_maximum_number_of_chunks =
   max_cumulated_chunks_size / chunk_size
 
 let default_max_number_of_chunks = hard_maximum_number_of_chunks
+
+let default_tx_pool_timeout_limit = Int64.of_int 3600
 
 let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
     ?max_number_of_chunks ?private_rpc_port ~rollup_node_endpoint ~sequencer ()
@@ -216,27 +220,30 @@ let encoding : t Data_encoding.t =
            sequencer;
            observer;
            max_active_connections;
+           tx_pool_timeout_limit;
          } ->
-      ( rpc_addr,
-        rpc_port,
-        devmode,
-        cors_origins,
-        cors_headers,
-        log_filter,
-        proxy,
-        sequencer,
-        observer,
-        max_active_connections ))
-    (fun ( rpc_addr,
-           rpc_port,
-           devmode,
-           cors_origins,
-           cors_headers,
-           log_filter,
-           proxy,
-           sequencer,
-           observer,
-           max_active_connections ) ->
+      ( ( rpc_addr,
+          rpc_port,
+          devmode,
+          cors_origins,
+          cors_headers,
+          log_filter,
+          proxy,
+          sequencer,
+          observer,
+          max_active_connections ),
+        tx_pool_timeout_limit ))
+    (fun ( ( rpc_addr,
+             rpc_port,
+             devmode,
+             cors_origins,
+             cors_headers,
+             log_filter,
+             proxy,
+             sequencer,
+             observer,
+             max_active_connections ),
+           tx_pool_timeout_limit ) ->
       {
         rpc_addr;
         rpc_port;
@@ -248,21 +255,31 @@ let encoding : t Data_encoding.t =
         sequencer;
         observer;
         max_active_connections;
+        tx_pool_timeout_limit;
       })
-    (obj10
-       (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
-       (dft "devmode" bool default_devmode)
-       (dft "cors_origins" (list string) default_cors_origins)
-       (dft "cors_headers" (list string) default_cors_headers)
-       (dft "log_filter" log_filter_config_encoding default_filter_config)
-       (opt "proxy" proxy_encoding)
-       (opt "sequencer" sequencer_encoding)
-       (opt "observer" observer_encoding)
-       (dft
-          "max_active_connections"
-          Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.encoding
-          default_max_active_connections))
+    (merge_objs
+       (obj10
+          (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
+          (dft "rpc-port" ~description:"RPC port" uint16 default_rpc_port)
+          (dft "devmode" bool default_devmode)
+          (dft "cors_origins" (list string) default_cors_origins)
+          (dft "cors_headers" (list string) default_cors_headers)
+          (dft "log_filter" log_filter_config_encoding default_filter_config)
+          (opt "proxy" proxy_encoding)
+          (opt "sequencer" sequencer_encoding)
+          (opt "observer" observer_encoding)
+          (dft
+             "max_active_connections"
+             Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
+             .encoding
+             default_max_active_connections))
+       (obj1
+          (dft
+             "tx-pool-timeout-limit"
+             ~description:
+               "Transaction timeout limit inside the transaction pool"
+             int64
+             default_tx_pool_timeout_limit)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -296,7 +313,7 @@ let observer_config_exn {observer; _} =
 
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ?proxy ?sequencer ?observer () =
+      ?log_filter ?proxy ?sequencer ?observer ?tx_pool_timeout_limit () =
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -308,10 +325,15 @@ module Cli = struct
       sequencer;
       observer;
       max_active_connections = default_max_active_connections;
+      tx_pool_timeout_limit =
+        Option.value
+          ~default:default_tx_pool_timeout_limit
+          tx_pool_timeout_limit;
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?proxy ?sequencer ?observer configuration =
+      ?cors_headers ?log_filter ?proxy ?sequencer ?observer
+      ?tx_pool_timeout_limit configuration =
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -325,10 +347,15 @@ module Cli = struct
       sequencer = Option.either configuration.sequencer sequencer;
       observer = Option.either configuration.observer observer;
       max_active_connections = configuration.max_active_connections;
+      tx_pool_timeout_limit =
+        Option.value
+          ~default:configuration.tx_pool_timeout_limit
+          tx_pool_timeout_limit;
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?proxy ?sequencer ?observer () =
+      ?cors_headers ?log_filter ?proxy ?sequencer ?observer
+      ?tx_pool_timeout_limit () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -360,6 +387,7 @@ module Cli = struct
           ?proxy
           ?sequencer
           ?observer
+          ?tx_pool_timeout_limit
           configuration
       in
       return configuration
@@ -375,6 +403,7 @@ module Cli = struct
           ?proxy
           ?sequencer
           ?observer
+          ?tx_pool_timeout_limit
           ()
       in
       return config
