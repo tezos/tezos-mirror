@@ -31,12 +31,3 @@ val slot_pages :
     unit,
     Tezos_crypto_dal.Cryptobox.page list )
   Tezos_rpc.Service.service
-
-val shard :
-  ( [`GET],
-    unit,
-    (unit * Tezos_crypto_dal.Cryptobox.commitment) * int,
-    unit,
-    unit,
-    Tezos_crypto_dal.Cryptobox.shard )
-  Tezos_rpc.Service.service

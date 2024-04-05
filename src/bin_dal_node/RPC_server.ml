@@ -227,6 +227,10 @@ module Slots_handlers = struct
           ?header_status
           store
         |> Errors.to_tzresult)
+
+  let get_shard ctxt ((_, commitment), shard_index) () () =
+    call_handler1 ctxt (fun {shard_store; _} ->
+        Slot_manager.get_shard shard_store commitment shard_index)
 end
 
 module Profile_handlers = struct
@@ -470,11 +474,14 @@ let register_new :
        Tezos_rpc.Directory.opt_register1
        Services.P2P.Peers.patch_peer
        (P2P.patch_peer ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register
+       Services.get_shard
+       (Slots_handlers.get_shard ctxt)
 
 let register_legacy ctxt =
   let open RPC_server_legacy in
-  Tezos_rpc.Directory.empty |> register_shard ctxt
-  |> register_show_slot_pages ctxt
+  Tezos_rpc.Directory.empty |> register_show_slot_pages ctxt
 
 let register ctxt = register_new ctxt (register_legacy ctxt)
 

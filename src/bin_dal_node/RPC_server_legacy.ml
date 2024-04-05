@@ -34,21 +34,5 @@ let handle_slot_pages ctxt (_, commitment) () () =
     (Node_context.get_store ctxt).shard_store
     commitment
 
-let handle_shard ctxt ((_, commitment), shard) () () =
-  Slot_manager.get_shard
-    (Node_context.get_store ctxt).shard_store
-    commitment
-    shard
-
 let register_show_slot_pages ctxt dir =
   Tezos_rpc.Directory.register dir Services.slot_pages (handle_slot_pages ctxt)
-let register_shard ctxt dir =
-  Tezos_rpc.Directory.register dir Services.shard (handle_shard ctxt)
-
-let shard_rpc ctxt commitment shard =
-  Tezos_rpc.Context.make_call
-    Services.shard
-    ctxt
-    (((), commitment), shard)
-    ()
-    ()

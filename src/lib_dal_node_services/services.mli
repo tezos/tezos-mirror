@@ -197,6 +197,16 @@ val get_attestable_slots :
   ; query : unit >
   service
 
+(** Return the shard associated to the given index. *)
+val get_shard :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Tezos_crypto_dal.Cryptobox.shard
+  ; prefix : unit
+  ; params : (unit * Tezos_crypto_dal.Cryptobox.commitment) * int
+  ; query : unit >
+  service
+
 val version :
   < meth : [`GET]
   ; input : unit

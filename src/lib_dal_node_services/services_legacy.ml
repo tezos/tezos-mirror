@@ -31,12 +31,3 @@ let slot_pages =
     ~output:(Data_encoding.list Data_encoding.bytes)
     Tezos_rpc.Path.(
       open_root / "slot" / "pages" /: Cryptobox.Commitment.rpc_arg)
-
-let shard =
-  let shard_arg = Tezos_rpc.Arg.int in
-  Tezos_rpc.Service.get_service
-    ~description:"Fetch shard as bytes"
-    ~query:Tezos_rpc.Query.empty
-    ~output:Cryptobox.shard_encoding
-    Tezos_rpc.Path.(
-      open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
