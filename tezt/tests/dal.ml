@@ -318,7 +318,7 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
   f rollup_address sc_rollup_node
 
 let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
-    ?bootstrap_profile tezos_node =
+    ?bootstrap_profile ?history_mode tezos_node =
   let dal_node = Dal_node.create ?name ~node:tezos_node () in
   let* () =
     Dal_node.init_config
@@ -326,19 +326,21 @@ let make_dal_node ?name ?peers ?attester_profiles ?producer_profiles
       ?attester_profiles
       ?producer_profiles
       ?bootstrap_profile
+      ?history_mode
       dal_node
   in
   let* () = Dal_node.run ~event_level:`Debug dal_node ~wait_ready:true in
   return dal_node
 
 let with_dal_node ?peers ?attester_profiles ?producer_profiles
-    ?bootstrap_profile tezos_node f key =
+    ?bootstrap_profile ?history_mode tezos_node f key =
   let* dal_node =
     make_dal_node
       ?peers
       ?attester_profiles
       ?producer_profiles
       ?bootstrap_profile
+      ?history_mode
       tezos_node
   in
   f key dal_node
@@ -382,7 +384,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
     ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
     ?number_of_slots ?attestation_lag ?attestation_threshold ?commitment_period
     ?challenge_window ?(dal_enable = true) ?activation_timestamp
-    ?bootstrap_profile ?producer_profiles variant scenario =
+    ?bootstrap_profile ?producer_profiles ?history_mode variant scenario =
   let description = "Testing DAL node" in
   test
     ?regression
@@ -407,7 +409,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [team])
         ~protocol
         ~dal_enable
       @@ fun parameters cryptobox node client ->
-      with_dal_node ?bootstrap_profile ?producer_profiles node
+      with_dal_node ?bootstrap_profile ?producer_profiles ?history_mode node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
 

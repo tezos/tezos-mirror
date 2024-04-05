@@ -114,7 +114,7 @@ let default =
     network_name = default_network_name;
     endpoint = default_endpoint;
     metrics_addr = default_metrics_addr;
-    history_mode = Rolling {blocks = `Auto};
+    history_mode = default_history_mode;
     profiles = Operator [];
   }
 

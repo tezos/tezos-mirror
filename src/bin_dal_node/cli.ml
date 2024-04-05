@@ -230,12 +230,47 @@ module Term = struct
       & opt (some (p2p_point_arg ~default_port)) None
       & info ~docs ~doc ~docv:"ADDR[:PORT]" ["metrics-addr"])
 
+  let history_mode =
+    let open Cmdliner in
+    let open Result_syntax in
+    let doc =
+      "The duration for the shards to be kept in the node storage. Either a \
+       number, the string \"full\" or the string \"auto\". A number is \
+       interpreted as the number of blocks the shards should be kept; the \
+       string \"full\" means no shard deletion, the string \"auto\" means the \
+       default of the profile: 3 months for an observer or a slot producer, \
+       twice the attestation lag for an attester, no shard deletion for any \
+       other profile)."
+    in
+    let decoder =
+      Configuration_file.(
+        function
+        | "full" -> return Full
+        | "auto" -> return @@ Rolling {blocks = `Auto}
+        | s -> (
+            match int_of_string_opt s with
+            | Some i -> return @@ Rolling {blocks = `Some i}
+            | None ->
+                Error (`Msg ("Invalid argument " ^ s ^ " for history-mode."))))
+    in
+    let printer fmt = function
+      | Configuration_file.Full -> Format.fprintf fmt "full"
+      | Rolling {blocks = `Auto} -> Format.fprintf fmt "auto"
+      | Rolling {blocks = `Some i} -> Format.fprintf fmt "%d" i
+    in
+    let history_mode_arg = Arg.conv (decoder, printer) in
+    Arg.(
+      value
+      & opt (some history_mode_arg) None
+      & info ~docs ~doc ["history-mode"])
+
   let term process =
     Cmdliner.Term.(
       ret
         (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
        $ public_addr $ endpoint $ metrics_addr $ attester_profile
-       $ producer_profile $ observer_profile $ bootstrap_profile $ peers))
+       $ producer_profile $ observer_profile $ bootstrap_profile $ peers
+       $ history_mode))
 end
 
 module Run = struct
@@ -305,13 +340,15 @@ type options = {
   profiles : Types.profiles option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
+  history_mode : Configuration_file.history_mode option;
 }
 
 type t = Run | Config_init
 
 let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
-      endpoint metrics_addr attesters producers observers bootstrap_flag peers =
+      endpoint metrics_addr attesters producers observers bootstrap_flag peers
+      history_mode =
     let run profiles =
       run
         subcommand
@@ -325,6 +362,7 @@ let make ~run =
           profiles;
           metrics_addr;
           peers;
+          history_mode;
         }
     in
     match (bootstrap_flag, attesters @ producers @ observers) with

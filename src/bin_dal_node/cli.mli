@@ -48,6 +48,7 @@ type options = {
       (** Profiles of the DAL node used for tracking shards. *)
   metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)
   peers : string list;  (** DAL nodes to connect to. *)
+  history_mode : Configuration_file.history_mode option;
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type

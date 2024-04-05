@@ -35,6 +35,7 @@ let merge
         metrics_addr;
         profiles;
         peers;
+        history_mode;
       } configuration =
   let profiles =
     match profiles with
@@ -59,6 +60,7 @@ let merge
     profiles;
     metrics_addr = Option.value ~default:configuration.metrics_addr metrics_addr;
     peers = peers @ configuration.peers;
+    history_mode = Option.value ~default:configuration.history_mode history_mode;
   }
 
 let wrap_with_error main_promise =
