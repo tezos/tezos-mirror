@@ -471,12 +471,13 @@ only coverage has changed -- not the underlying source files.
 Executing tests through the GitLab CI
 -------------------------------------
 
-All tests are executed on all branches for each commit.  For
-instances, to see the latest runs of the CI on the master branch,
-visit `this page
-<https://gitlab.com/tezos/tezos/-/commits/master>`_. Each commit is
-annotated with a green checkmark icon if the CI passed, and a red
-cross icon if not. You can click the icon for more details.
+To execute the tests on a merge request, the ``trigger`` job needs to be
+manually executed. To trigger it, go to the GitLab merge request page. Click
+the grey gear in the leftmost circle of the pipeline, then click the ``Play``
+button. If necessary, Marge-bot will trigger the merge request pipeline before
+merging it. For instances, to see the latest runs of the CI, visit `this page
+<https://gitlab.com/tezos/tezos/-/pipelines?scope=finished>`_. You can click
+the status of a pipeline for more details.
 
 The results of the test suite on terminated pipelines is presented on
 the details of the merge request page corresponding to the
