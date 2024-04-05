@@ -165,8 +165,30 @@ const safe_get = (array, cycle) => {
 export class Simulator {
   #storage_issuance_bonus = [];
 
-  #clear() {
-    this.#storage_issuance_bonus = [];
+  #storage_total_supply = [];
+  #storage_total_supply_mask = [];
+
+  #storage_total_delegated = [];
+  #storage_total_delegated_mask = [];
+
+  #storage_total_staked = [];
+  #storage_total_staked_mask = [];
+
+  #storage_cache_index = 0;
+
+  set_total_supply(cycle, value) {
+    this.#storage_cache_index = Math.min(cycle, this.#storage_cache_index);
+    this.#storage_total_supply_mask[cycle] = value;
+  }
+
+  set_total_delegated(cycle, value) {
+    this.#storage_cache_index = Math.min(cycle, this.#storage_cache_index);
+    this.#storage_total_delegated_mask[cycle] = value;
+  }
+
+  set_total_staked(cycle, value) {
+    this.#storage_cache_index = Math.min(cycle, this.#storage_cache_index);
+    this.#storage_total_staked_mask[cycle] = value;
   }
 
   constructor(config) {
@@ -174,15 +196,26 @@ export class Simulator {
   }
 
   total_supply(cycle) {
-    return bigInt(this.config.chain.total_supply[cycle]);
+    this.#prepare_for(cycle);
+    return bigInt(this.#storage_total_supply[cycle]);
   }
 
   total_staked_balance(cycle) {
-    return bigInt(this.config.chain.total_frozen_stake[cycle]);
+    if (cycle <= this.config.proto.consensus_rights_delay + 1) {
+      return bigInt(
+        this.#storage_total_staked[
+          this.config.proto.consensus_rights_delay + 1
+        ],
+      );
+    }
+    // staked balances are set with adjusted cycles
+    this.#prepare_for(cycle - this.config.proto.consensus_rights_delay - 1);
+    return bigInt(this.#storage_total_staked[cycle]);
   }
 
   total_delegated_balance(cycle) {
-    return bigInt(this.config.chain.total_delegated[cycle]);
+    this.#prepare_for(cycle);
+    return bigInt(this.#storage_total_delegated[cycle]);
   }
 
   #compute_extremum(cycle, initial_value, final_value) {
@@ -262,17 +295,16 @@ export class Simulator {
 
   set_staked_ratio_at(cycle, value) {
     const ratio = bigRat.clip(bigRat(value), bigRat.zero, bigRat.one);
-    const total_supply = safe_get(this.config.chain.total_supply, cycle);
+    const total_supply = this.total_supply(cycle);
     const res = ratio.multiply(total_supply).ceil();
     const i = cycle + this.config.proto.consensus_rights_delay + 1;
-    this.config.chain.total_frozen_stake[i] = res;
-    this.#clear();
+    this.#storage_total_staked_mask[i] = res;
+    this.#storage_cache_index = Math.min(cycle, this.#storage_cache_index);
   }
 
   staked_ratio_for_next_cycle(cycle) {
-    const total_supply = safe_get(this.config.chain.total_supply, cycle);
-    const total_frozen_stake = safe_get(
-      this.config.chain.total_frozen_stake,
+    const total_supply = this.total_supply(cycle);
+    const total_frozen_stake = this.total_staked_balance(
       cycle + this.config.proto.consensus_rights_delay + 1,
     );
     return bigRat(total_frozen_stake).divide(total_supply);
@@ -343,10 +375,7 @@ export class Simulator {
     }
     const adjusted_cycle = cycle - this.config.proto.consensus_rights_delay - 1;
     const issuance_rate = this.issuance_rate_for_next_cycle(adjusted_cycle);
-    const total_supply = safe_get(
-      this.config.chain.total_supply,
-      adjusted_cycle,
-    );
+    const total_supply = this.total_supply(adjusted_cycle);
     return issuance_rate.multiply(
       bigRat(total_supply).divide(
         bigRat(this.config.proto.base_total_issued_per_minute).multiply(
@@ -434,7 +463,7 @@ export class Simulator {
 
   current_yearly_rate_value(cycle) {
     return this.#current_rewards_per_minute(cycle)
-      .divide(safe_get(this.config.chain.total_supply, cycle))
+      .divide(this.total_supply(cycle))
       .times(min_per_year)
       .times(100);
   }
@@ -473,6 +502,83 @@ export class Simulator {
 
   issuance_per_cycle(cycle) {
     return this.issuance_per_block(cycle) * this.config.proto.blocks_per_cycle;
+  }
+
+  #compute_new_balances(cycle) {
+    if (cycle < 0) {
+      return; // should not happen
+    }
+
+    if (cycle == 0) {
+      this.#storage_total_supply[0] = this.#storage_total_supply_mask[0];
+      this.#storage_total_delegated[0] = this.#storage_total_delegated_mask[0];
+      this.#storage_total_staked[this.config.proto.consensus_rights_delay + 1] =
+        this.#storage_total_staked_mask[
+          this.config.proto.consensus_rights_delay + 1
+        ];
+      return;
+    }
+
+    const issuance = this.issuance_per_cycle(cycle - 1);
+
+    const new_supply =
+      this.#storage_total_supply_mask[cycle] ??
+      this.total_supply(cycle - 1).add(issuance);
+
+    this.#storage_total_supply[cycle] = new_supply;
+
+    const delegated = this.total_delegated_balance(cycle - 1);
+
+    const staked = this.total_staked_balance(cycle);
+
+    if (this.is_ai_activated(cycle)) {
+      const ratio_for_delegated = bigRat(delegated).divide(
+        staked.times(2).add(delegated),
+      );
+
+      const ratio_for_staked = bigRat(staked)
+        .times(2)
+        .divide(staked.times(2).add(delegated));
+
+      const new_delegated =
+        this.#storage_total_delegated_mask[cycle] ??
+        ratio_for_delegated.multiply(issuance).add(delegated).round().valueOf();
+
+      this.#storage_total_delegated[cycle] = new_delegated;
+
+      const new_staked =
+        this.#storage_total_staked_mask[
+          cycle + this.config.proto.consensus_rights_delay + 1
+        ] ?? ratio_for_staked.multiply(issuance).add(staked).round().valueOf();
+
+      this.#storage_total_staked[
+        cycle + this.config.proto.consensus_rights_delay + 1
+      ] = new_staked;
+    } else {
+      const new_delegated =
+        this.#storage_total_delegated_mask[cycle] ?? delegated.add(issuance);
+
+      this.#storage_total_delegated[cycle] = new_delegated;
+
+      const new_staked =
+        this.#storage_total_staked_mask[
+          cycle + this.config.proto.consensus_rights_delay + 1
+        ] ??
+        this.#storage_total_staked[
+          cycle + this.config.proto.consensus_rights_delay
+        ];
+
+      this.#storage_total_staked[
+        cycle + this.config.proto.consensus_rights_delay + 1
+      ] = new_staked;
+    }
+  }
+
+  #prepare_for(cycle) {
+    for (let c = this.#storage_cache_index; c <= cycle; c++) {
+      this.#compute_new_balances(c);
+      this.#storage_cache_index++;
+    }
   }
 }
 
