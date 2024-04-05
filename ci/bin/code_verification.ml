@@ -1362,67 +1362,17 @@ let jobs pipeline_type =
        do not run in the CI.
 
        For more information on tags, see [src/lib_test/tag.mli]. *)
-    let tezt_dependencies =
-      Dependent
-        [
-          Artifacts job_select_tezts;
-          Artifacts job_build_x86_64_release;
-          Artifacts job_build_x86_64_exp_dev_extra;
-          Artifacts job_build_kernels;
-          Artifacts job_tezt_fetch_records;
-        ]
-    in
-    let job_tezt_flaky : tezos_job =
-      job_tezt
-        ~__POS__
-        ~name:"tezt-flaky"
-        ~tezt_tests:(tezt_tests [Has_tag "flaky"])
-        ~tezt_variant:"-flaky"
-          (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
-             Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
-             '--retry') *)
-        ~retry:2
-        ~tezt_retry:3
-        ~tezt_parallel:1
-        ~dependencies:tezt_dependencies
-        ~rules:
-          (* This job can only be manually triggered when it's
-             artifact dependencies exists, which they do when
-             [changeset_octez] is changed. *)
-          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
-        ()
-      |> enable_coverage_output_artifact
-    in
-    let job_tezt_slow : tezos_job =
-      job_tezt
-        ~__POS__
-        ~name:"tezt-slow"
-        ~rules:
-          (* See comment for [job_tezt_flaky] *)
-          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
-        ~tezt_tests:
-          (tezt_tests
-             ~slow:true
-             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7063
-                The deselection of Paris [test_adaptive_issuance_launch.ml]
-                should be removed once the fixes to its slowness has been
-                snapshotted from Alpha. *)
-             [
-               Not
-                 (String_predicate
-                    ( File,
-                      Is
-                        "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
-                    ));
-             ])
-        ~tezt_variant:"-slow"
-        ~retry:2
-        ~tezt_parallel:3
-        ~parallel:(Vector 10)
-        ~dependencies:tezt_dependencies
-        ()
-    in
     let jobs_tezt =
+      let dependencies =
+        Dependent
+          [
+            Artifacts job_select_tezts;
+            Artifacts job_build_x86_64_release;
+            Artifacts job_build_x86_64_exp_dev_extra;
+            Artifacts job_build_kernels;
+            Artifacts job_tezt_fetch_records;
+          ]
+      in
       let rules = make_rules ~dependent:true ~changes:changeset_octez () in
       let coverage_expiry = Duration (Days 3) in
       let tezt : tezos_job =
@@ -1435,7 +1385,18 @@ let jobs pipeline_type =
           ~tezt_parallel:3
           ~parallel:(Vector 60)
           ~rules
-          ~dependencies:tezt_dependencies
+          ~dependencies
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_memory_3k : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-memory-3k"
+          ~tezt_tests:(tezt_tests ~memory_3k:true [])
+          ~tezt_variant:"-memory_3k"
+          ~dependencies
+          ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
       in
@@ -1446,18 +1407,7 @@ let jobs pipeline_type =
           ~tezt_tests:(tezt_tests ~memory_4k:true [])
           ~tezt_variant:"-memory_4k"
           ~parallel:(Vector 4)
-          ~dependencies:tezt_dependencies
-          ~rules
-          ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_memory_3k : tezos_job =
-        job_tezt
-          ~__POS__
-          ~name:"tezt-memory-3k"
-          ~tezt_tests:(tezt_tests ~memory_3k:true [])
-          ~tezt_variant:"-memory_3k"
-          ~dependencies:tezt_dependencies
+          ~dependencies
           ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
@@ -1473,10 +1423,60 @@ let jobs pipeline_type =
           ~name:"tezt-time-sensitive"
           ~tezt_tests:(tezt_tests ~time_sensitive:true [])
           ~tezt_variant:"-time_sensitive"
-          ~dependencies:tezt_dependencies
+          ~dependencies
           ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_slow : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-slow"
+          ~rules:
+            (* See comment for [tezt_flaky] *)
+            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ~tezt_tests:
+            (tezt_tests
+               ~slow:true
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/7063
+                  The deselection of Paris [test_adaptive_issuance_launch.ml]
+                  should be removed once the fixes to its slowness has been
+                  snapshotted from Alpha. *)
+               [
+                 Not
+                   (String_predicate
+                      ( File,
+                        Is
+                          "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
+                      ));
+               ])
+          ~tezt_variant:"-slow"
+          ~retry:2
+          ~tezt_parallel:3
+          ~parallel:(Vector 10)
+          ~dependencies
+          ()
+      in
+      let tezt_flaky : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-flaky"
+          ~tezt_tests:(tezt_tests [Has_tag "flaky"])
+          ~tezt_variant:"-flaky"
+            (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
+               Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
+               '--retry') *)
+          ~retry:2
+          ~tezt_retry:3
+          ~tezt_parallel:1
+          ~dependencies
+          ~rules:
+            (* This job can only be manually triggered when it's
+               artifact dependencies exists, which they do when
+               [changeset_octez] is changed. *)
+            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ()
+        |> enable_coverage_output_artifact
       in
       let tezt_static_binaries : tezos_job =
         job_tezt
@@ -1500,9 +1500,11 @@ let jobs pipeline_type =
       in
       [
         tezt;
-        tezt_memory_4k;
         tezt_memory_3k;
+        tezt_memory_4k;
         tezt_time_sensitive;
+        tezt_slow;
+        tezt_flaky;
         tezt_static_binaries;
       ]
     in
@@ -1578,8 +1580,6 @@ let jobs pipeline_type =
       job_oc_script_test_release_versions;
       job_oc_script_b58_prefix;
       job_oc_test_liquidity_baking_scripts;
-      job_tezt_flaky;
-      job_tezt_slow;
     ]
     @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
     @

@@ -6653,116 +6653,6 @@ oc.test-liquidity-baking-scripts:
   script:
   - ./scripts/ci/test_liquidity_baking_scripts.sh
 
-tezt-flaky:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
-  stage: test
-  tags:
-  - gcp_tezt
-  rules:
-  - when: on_success
-  needs:
-  - select_tezts
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.tezt:fetch-records
-  dependencies:
-  - select_tezts
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.tezt:fetch-records
-  before_script:
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  script:
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
-  variables:
-    JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -flaky
-    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
-      /cloud && flaky
-    TEZT_RETRY: "3"
-    TEZT_PARALLEL: "1"
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
-  artifacts:
-    name: coverage-files-$CI_JOB_ID
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    - $JUNIT
-    - $BISECT_FILE
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-
-tezt-slow:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
-  stage: test
-  tags:
-  - gcp_tezt
-  rules:
-  - when: on_success
-  needs:
-  - select_tezts
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.tezt:fetch-records
-  dependencies:
-  - select_tezts
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.tezt:fetch-records
-  before_script:
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  script:
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
-  variables:
-    JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -slow
-    TESTS: slow && /ci_disabled && /memory_3k && /memory_4k && /time_sensitive &&
-      /cloud && not (file = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "3"
-  artifacts:
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    - $JUNIT
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 10
-
 test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -7221,6 +7111,62 @@ tezt:
   retry: 2
   parallel: 60
 
+tezt-memory-3k:
+  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - select_tezts
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  dependencies:
+  - select_tezts
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
+    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
+    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
+  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -memory_3k
+    TESTS: memory_3k && /ci_disabled && /memory_4k && /time_sensitive && /slow &&
+      /cloud
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "1"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    - $BISECT_FILE
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+
 tezt-memory-4k:
   image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
   stage: test
@@ -7278,62 +7224,6 @@ tezt-memory-4k:
   retry: 2
   parallel: 4
 
-tezt-memory-3k:
-  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
-  stage: test
-  tags:
-  - gcp_tezt
-  rules:
-  - when: on_success
-  needs:
-  - select_tezts
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.tezt:fetch-records
-  dependencies:
-  - select_tezts
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.tezt:fetch-records
-  before_script:
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  script:
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
-    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
-    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
-  variables:
-    JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -memory_3k
-    TESTS: memory_3k && /ci_disabled && /memory_4k && /time_sensitive && /slow &&
-      /cloud
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "1"
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
-  artifacts:
-    name: coverage-files-$CI_JOB_ID
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    - $JUNIT
-    - $BISECT_FILE
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-
 tezt-time-sensitive:
   image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
   stage: test
@@ -7373,6 +7263,116 @@ tezt-time-sensitive:
     TESTS: time_sensitive && /ci_disabled && /memory_3k && /memory_4k && /slow &&
       /cloud
     TEZT_RETRY: "1"
+    TEZT_PARALLEL: "1"
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+  artifacts:
+    name: coverage-files-$CI_JOB_ID
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    - $BISECT_FILE
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+
+tezt-slow:
+  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - select_tezts
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  dependencies:
+  - select_tezts
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
+    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
+    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
+  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -slow
+    TESTS: slow && /ci_disabled && /memory_3k && /memory_4k && /time_sensitive &&
+      /cloud && not (file = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "3"
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 10
+
+tezt-flaky:
+  image: ${build_deps_image_name}:runtime-e2etest-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - select_tezts
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  dependencies:
+  - select_tezts
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.tezt:fetch-records
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh "${TESTS}" --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh "${TESTS}" --color
+    --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files
+    fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY}
+  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -flaky
+    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
+      /cloud && flaky
+    TEZT_RETRY: "3"
     TEZT_PARALLEL: "1"
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
