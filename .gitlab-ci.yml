@@ -7,7 +7,7 @@ stages:
 .default_matrix: &default_matrix
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v19.1", "master"]
+        OCTEZ_BRANCH: ["v20-release", "v19.1", "master"]
 
         # OCTEZ_BRANCH: ["v19.1", "v19.0", "v18.1", "master"]
 
@@ -91,6 +91,13 @@ build:
 #   variables:
 #     ARCHIVE: "binaries-amd64-v19.0.zip"
 
+release:amd64:v20-release:
+  stage: deploy
+  extends: .release
+  dependencies: ["build: [amd64, v20-release]"]
+  variables:
+    ARCHIVE: "binaries-amd64-v20-release.zip"
+
 release:amd64:v19.1:
   stage: deploy
   extends: .release
@@ -118,6 +125,13 @@ release:amd64:master:
 #   dependencies: ["build: [arm64, v19.0]"]
 #   variables:
 #     ARCHIVE: "binaries-arm64-v19.0.zip"
+
+release:arm64:v20-release:
+  stage: deploy
+  extends: .release
+  dependencies: ["build: [arm64, v20-release]"]
+  variables:
+    ARCHIVE: "binaries-arm64-v20-release.zip"
 
 release:arm64:v19.1:
   stage: deploy
@@ -187,7 +201,14 @@ release:arm64:master:
 #   variables:
 #     ARCH: "amd64"
 #     OCTEZ_BRANCH: "v19.0"
-    
+
+docker:amd64:v20-release:
+  extends: .docker-push
+  dependencies: ["build: [amd64, v20-release]"]
+  variables:
+    ARCH: "amd64"
+    OCTEZ_BRANCH: "v20-release"
+
 docker:amd64:v19.1:
   extends: .docker-push
   dependencies: ["build: [amd64, v19.1]"]
@@ -215,6 +236,13 @@ docker:amd64:master:
 #   variables:
 #     ARCH: "arm64"
 #     OCTEZ_BRANCH: "v19.0"
+
+docker:arm64:v20-release:
+  extends: .docker-push
+  dependencies: ["build: [arm64, v20-release]"]
+  variables:
+    ARCH: "arm64"
+    OCTEZ_BRANCH: "v20-release"
 
 docker:arm64:v19.1:
   extends: .docker-push
@@ -282,6 +310,16 @@ docker:arm64:master:
 #       artifacts: false
 #   variables:
 #     OCTEZ_BRANCH: "v19.0"
+
+manifest:v20-release:
+  extends: .manifest
+  needs:
+    - job: "docker:amd64:v20-release"
+      artifacts: false
+    - job: "docker:arm64:v20-release"
+      artifacts: false
+  variables:
+    OCTEZ_BRANCH: "v20-release"
 
 manifest:v19.1:
   extends: .manifest
