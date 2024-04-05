@@ -1647,6 +1647,12 @@ let generate_dummy_slot slot_size =
   String.init slot_size (fun i ->
       match i mod 3 with 0 -> 'a' | 1 -> 'b' | _ -> 'c')
 
+let get_shards dal_node ~slot_header downloaded_shard_ids =
+  Lwt_list.map_s
+    (fun shard_id ->
+      Dal_RPC.(call dal_node @@ get_shard ~slot_header ~shard_id))
+    downloaded_shard_ids
+
 let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     client dal_node =
   (* Steps in this integration test:
@@ -1673,9 +1679,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     range 0 number_of_shards
     |> List.map (fun i -> i * crypto_params.redundancy_factor)
   in
-  let* shards =
-    Dal_RPC.(call dal_node @@ shards ~slot_header downloaded_shard_ids)
-  in
+  let* shards = get_shards dal_node ~slot_header downloaded_shard_ids in
   let shard_of_json shard =
     let shard =
       match Data_encoding.Json.from_string shard with
@@ -5159,11 +5163,11 @@ module Garbage_collection = struct
           None))
 
   let get_shard_rpc commitment shard_id node =
-    Dal_RPC.(call node @@ shard ~slot_header:commitment ~shard_id)
+    Dal_RPC.(call node @@ get_shard ~slot_header:commitment ~shard_id)
 
   let get_shard_rpc_failure_expected commitment node =
     let* shard_observer_response =
-      Dal_RPC.(call_raw node @@ shard ~slot_header:commitment ~shard_id:0)
+      Dal_RPC.(call_raw node @@ get_shard ~slot_header:commitment ~shard_id:0)
     in
     Check.(shard_observer_response.code = 500)
       ~__LOC__
@@ -5187,7 +5191,7 @@ module Garbage_collection = struct
       Log.info "RPC to producer for first shard" ;
       let* _first_shard =
         Dal_RPC.(
-          call slot_producer @@ shard ~slot_header:commitment ~shard_id:0)
+          call slot_producer @@ get_shard ~slot_header:commitment ~shard_id:0)
       in
       unit
     in

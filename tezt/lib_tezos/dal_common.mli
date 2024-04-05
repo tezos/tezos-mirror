@@ -111,14 +111,6 @@ module RPC_legacy : sig
 
   (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
   val slot_pages : string -> string list RPC_core.t
-
-  (** [shard ~slot_header ~shard_id] gets a shard from
-        a given slot header and shard id *)
-  val shard : slot_header:string -> shard_id:int -> string RPC_core.t
-
-  (** [shards ~slot_header shard_ids] gets a subset of shards from a given
-        slot header *)
-  val shards : slot_header:string -> int list -> string list RPC_core.t
 end
 
 module RPC : sig
@@ -259,6 +251,9 @@ module RPC : sig
   (** Call RPC /plugin/commitments_history/hash/[hash]. *)
   val get_plugin_commitments_history_hash :
     hash:string -> unit -> JSON.t RPC_core.t
+
+  (** Call /shard/<hash>/<shard-id> *)
+  val get_shard : slot_header:string -> shard_id:int -> string RPC_core.t
 
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
