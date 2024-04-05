@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -eu
+set -eux
 
 # misc linting
 find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +
