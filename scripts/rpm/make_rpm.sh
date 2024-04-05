@@ -50,7 +50,8 @@ for specfile in "$myhome"/*spec.in; do
   #
   rpm_name=${OCTEZ_PKGNAME}-${pg}
   init_name=${OCTEZ_REALNAME}-${pg}
-  rpm_fullname="${rpm_name}-${pkg_vers}-${OCTEZ_PKGREV}.${rpm_arch}.rpm"
+  rpm_vers=$(echo "${pkg_vers}" | tr -d '~')
+  rpm_fullname="${rpm_name}-${rpm_vers}-${OCTEZ_PKGREV}.${rpm_arch}.rpm"
 
   binaries=$(fixBinaryList "${common}/${pg}-binaries")
 
@@ -59,7 +60,7 @@ for specfile in "$myhome"/*spec.in; do
     continue
   fi
 
-  tar_name=${rpm_name}-${pkg_vers}
+  tar_name=${rpm_name}-${rpm_vers}
   # Populate the staging directory with control scripts
   # binaries and configuration as appropriate
   #
@@ -106,7 +107,7 @@ for specfile in "$myhome"/*spec.in; do
   # Edit the spec file to contain real values
   #
   spec_file="${pg}.spec"
-  sed -e "s/@ARCH@/${rpm_arch}/g" -e "s/@VERSION@/$pkg_vers/g" \
+  sed -e "s/@ARCH@/${rpm_arch}/g" -e "s/@VERSION@/$rpm_vers/g" \
     -e "s/@REVISION@/${OCTEZ_PKGREV}/g" \
     -e "s/@MAINT@/${OCTEZ_PKGMAINTAINER}/g" \
     -e "s/@PKG@/${rpm_name}/g" \
