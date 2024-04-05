@@ -7,9 +7,7 @@ stages:
 .default_matrix: &default_matrix
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v20-release", "v19.1", "master"]
-
-        # OCTEZ_BRANCH: ["v19.1", "v19.0", "v18.1", "master"]
+        OCTEZ_BRANCH: ["v20-release", "master"]
 
 fmt:
   stage: build
@@ -37,9 +35,9 @@ build:
     - git clone --depth 1 --branch $OCTEZ_BRANCH https://gitlab.com/tezos/tezos.git
     - opam-2.1 install -y --deps-only tezos/opam/virtual/octez-deps.opam
     # why ledgerwallet.0.3.0 - see https://gitlab.com/tezos/tezos/-/merge_requests/11656
-    - if [ "$OCTEZ_BRANCH" == "v19.0" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
-    - if [ "$OCTEZ_BRANCH" == "v18.1" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
-    - opam-2.1 install -y caqti.1.9.0 caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass
+    # - if [ "$OCTEZ_BRANCH" == "v19.0" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
+    # - if [ "$OCTEZ_BRANCH" == "v18.1" ]; then opam-2.1 install -y ledgerwallet.0.3.0 ; fi
+    - opam-2.1 install -y caqti.2.0.1 caqti-driver-sqlite3 caqti-driver-postgresql ezgzip safepass
     - dune build archiver/main.exe server/main.exe
 
 
@@ -98,12 +96,7 @@ release:amd64:v20-release:
   variables:
     ARCHIVE: "binaries-amd64-v20-release.zip"
 
-release:amd64:v19.1:
-  stage: deploy
-  extends: .release
-  dependencies: ["build: [amd64, v19.1]"]
-  variables:
-    ARCHIVE: "binaries-amd64-v19.1.zip"
+
 
 release:amd64:master:
   stage: deploy
@@ -111,6 +104,13 @@ release:amd64:master:
   dependencies: ["build: [amd64, master]"]
   variables:
     ARCHIVE: "binaries-amd64-master.zip"
+
+# release:amd64:v19.1:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [amd64, v19.1]"]
+#   variables:
+#     ARCHIVE: "binaries-amd64-v19.1.zip"
 
 # release:arm64:v18.1:
 #   stage: deploy
@@ -133,12 +133,12 @@ release:arm64:v20-release:
   variables:
     ARCHIVE: "binaries-arm64-v20-release.zip"
 
-release:arm64:v19.1:
-  stage: deploy
-  extends: .release
-  dependencies: ["build: [arm64, v19.1]"]
-  variables:
-    ARCHIVE: "binaries-arm64-v19.1.zip"
+# release:arm64:v19.1:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [arm64, v19.1]"]
+#   variables:
+#     ARCHIVE: "binaries-arm64-v19.1.zip"
 
 
 release:arm64:master:
@@ -209,12 +209,12 @@ docker:amd64:v20-release:
     ARCH: "amd64"
     OCTEZ_BRANCH: "v20-release"
 
-docker:amd64:v19.1:
-  extends: .docker-push
-  dependencies: ["build: [amd64, v19.1]"]
-  variables:
-    ARCH: "amd64"
-    OCTEZ_BRANCH: "v19.1"
+# docker:amd64:v19.1:
+#   extends: .docker-push
+#   dependencies: ["build: [amd64, v19.1]"]
+#   variables:
+#     ARCH: "amd64"
+#     OCTEZ_BRANCH: "v19.1"
 
 docker:amd64:master:
   extends: .docker-push
@@ -244,12 +244,12 @@ docker:arm64:v20-release:
     ARCH: "arm64"
     OCTEZ_BRANCH: "v20-release"
 
-docker:arm64:v19.1:
-  extends: .docker-push
-  dependencies: ["build: [arm64, v19.1]"]
-  variables:
-    ARCH: "arm64"
-    OCTEZ_BRANCH: "v19.1"
+# docker:arm64:v19.1:
+#   extends: .docker-push
+#   dependencies: ["build: [arm64, v19.1]"]
+#   variables:
+#     ARCH: "arm64"
+#     OCTEZ_BRANCH: "v19.1"
 
 docker:arm64:master:
   extends: .docker-push
@@ -321,15 +321,15 @@ manifest:v20-release:
   variables:
     OCTEZ_BRANCH: "v20-release"
 
-manifest:v19.1:
-  extends: .manifest
-  needs:
-    - job: "docker:amd64:v19.1"
-      artifacts: false
-    - job: "docker:arm64:v19.1"
-      artifacts: false
-  variables:
-    OCTEZ_BRANCH: "v19.1"
+# manifest:v19.1:
+#   extends: .manifest
+#   needs:
+#     - job: "docker:amd64:v19.1"
+#       artifacts: false
+#     - job: "docker:arm64:v19.1"
+#       artifacts: false
+#   variables:
+#     OCTEZ_BRANCH: "v19.1"
 
 manifest:master:
   extends: .manifest
