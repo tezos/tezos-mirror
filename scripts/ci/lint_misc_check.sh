@@ -5,7 +5,8 @@ set -eux
 # misc linting
 make check-opam-linting
 
-make check-linting
+scripts/lint.sh --check-scripts
+scripts/lint.sh --check-rust-toolchain
 
 # Ensure that all unit tests are restricted to their opam package
 make lint-tests-pkg

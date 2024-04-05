@@ -6746,6 +6746,30 @@ oc.python_check:
   script:
   - ./scripts/ci/lint_misc_python_check.sh
 
+oc.ocaml_fmt:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.ml'
+    - '**/*.mli'
+    - '**/.ocamlformat'
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - scripts/lint.sh --check-ocamlformat
+  - dune build --profile=dev @fmt
+
 misc_opam_checks:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: test
