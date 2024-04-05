@@ -270,13 +270,24 @@ let preimages_endpoint_arg =
        present on disk."
     uri_parameter
 
+let rollup_node_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"rollup-node-endpoint"
+    ~placeholder:"url"
+    ~doc:"The address of a rollup node."
+    uri_parameter
+
+let evm_node_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"rollup-node-endpoint"
+    ~placeholder:"url"
+    ~doc:"The address of an EVM node to connect to."
+    uri_parameter
+
 let rollup_node_endpoint_param =
   Tezos_clic.param
     ~name:"rollup-node-endpoint"
-    ~desc:
-      "The address of a service which provides pre-images for the rollup. \
-       Missing pre-images will be downloaded remotely if they are not already \
-       present on disk."
+    ~desc:"The address of a rollup node."
     uri_parameter
 
 let time_between_blocks_arg =
@@ -1085,6 +1096,114 @@ let replay_command =
         ~smart_rollup_address
         l2_level)
 
+let init_config_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:
+      {|Create an initial config with default value.
+If the <rollup-node-endpoint> is set then adds the configuration for the proxy
+mode.
+If the <rollup-node-endpoint> and the <sequencer-key> are set then adds the
+configuration for the sequencer mode.
+If the <evm-node-endpoint> is set then adds the configuration for the observer
+mode.|}
+    (args17
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       private_rpc_port_arg
+       cors_allowed_origins_arg
+       cors_allowed_headers_arg
+       preimages_arg
+       preimages_endpoint_arg
+       rollup_node_endpoint_arg
+       evm_node_endpoint_arg
+       time_between_blocks_arg
+       max_number_of_chunks_arg
+       devmode_arg
+       wallet_dir_arg
+       (Client_config.password_filename_arg ())
+       (Tezos_clic.arg
+          ~long:"sequencer-key"
+          ~doc:"key to sign the blueprints in sequencer mode."
+          ~placeholder:"<alias|tz1..>"
+          Params.string)
+       (Tezos_clic.switch
+          ~long:"force"
+          ~short:'f'
+          ~doc:"Overwrites the configuration file when it exists."
+          ()))
+    (prefixes ["init"; "config"] @@ stop)
+    (fun ( data_dir,
+           rpc_addr,
+           rpc_port,
+           private_rpc_port,
+           cors_origins,
+           cors_headers,
+           preimages,
+           preimages_endpoint,
+           rollup_node_endpoint,
+           evm_node_endpoint,
+           time_between_blocks,
+           max_number_of_chunks,
+           devmode,
+           wallet_dir,
+           password_filename,
+           sequencer,
+           force )
+         () ->
+      let proxy =
+        Option.map
+          (fun rollup_node_endpoint -> Configuration.{rollup_node_endpoint})
+          rollup_node_endpoint
+      in
+      let* sequencer =
+        let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
+        let* sequencer_pk_opt =
+          Option.map_es
+            (Client_keys.Public_key_hash.parse_source_string wallet_ctxt)
+            sequencer
+        in
+        match (rollup_node_endpoint, sequencer_pk_opt) with
+        | Some rollup_node_endpoint, Some sequencer ->
+            return_some
+            @@ Configuration.sequencer_config_dft
+                 ?preimages
+                 ?preimages_endpoint
+                 ?time_between_blocks
+                 ?max_number_of_chunks
+                 ?private_rpc_port
+                 ~rollup_node_endpoint
+                 ~sequencer
+                 ()
+        | _, _ -> return_none
+      in
+      let observer =
+        Option.map
+          (fun evm_node_endpoint ->
+            Configuration.observer_config_dft
+              ?preimages
+              ?preimages_endpoint
+              ~evm_node_endpoint
+              ())
+          evm_node_endpoint
+      in
+      let* config =
+        Configuration.Cli.create_or_read_config
+          ~data_dir
+          ?rpc_addr
+          ?rpc_port
+          ?cors_origins
+          ?cors_headers
+          ?proxy
+          ?sequencer
+          ?observer
+          ~devmode
+          ()
+      in
+      Configuration.save ~force ~data_dir config)
+
 (* List of program commands *)
 let commands =
   [
@@ -1098,6 +1217,7 @@ let commands =
     dump_to_rlp_command;
     reset_command;
     replay_command;
+    init_config_command;
   ]
 
 let global_options = Tezos_clic.no_options
