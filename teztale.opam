@@ -16,6 +16,7 @@ depends: [
   "tls-lwt"
   "aches"
   "prometheus-app"
+  "ocamlformat" { = "0.24.1"}
   ]
 depopts: [
   "octez-protocol-001-PtCJ7pwo-libs"
