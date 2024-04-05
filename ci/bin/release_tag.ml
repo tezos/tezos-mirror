@@ -183,12 +183,15 @@ let etherlink_jobs () =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_package_gitlab
+      ~stage:Stages.publish_release_gitlab
       ~interruptible:false
       ~dependencies
       ~artifacts:(Gitlab_ci.Util.artifacts ~expire_in:Never ["kernels.tar.gz"])
       ~name:"gitlab:etherlink-release"
-      ["./scripts/ci/create_gitlab_etherlink_release.sh"]
+      [
+        "./scripts/ci/create_gitlab_etherlink_package.sh";
+        "./scripts/ci/create_gitlab_etherlink_release.sh";
+      ]
   in
   [
     job_static_x86_64_release;
