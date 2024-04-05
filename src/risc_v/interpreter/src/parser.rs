@@ -84,6 +84,15 @@ fn rs2_f(instr: u32) -> FRegister {
     parse_fregister(rs2_bits(instr))
 }
 
+/// rs3 register
+#[allow(non_upper_case_globals)]
+const rs3_bits: fn(u32) -> u32 = funct5;
+
+#[inline(always)]
+fn rs3_f(instr: u32) -> FRegister {
+    parse_fregister(rs3_bits(instr))
+}
+
 #[inline(always)]
 fn imm_11_6(instr: u32) -> u32 {
     bits(instr, 26, 6) << 1
@@ -273,6 +282,22 @@ macro_rules! f_r_rm_2_instr {
     }};
 }
 
+macro_rules! f_r_rm_3_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        if let Some(rounding) = InstrRoundingMode::from_rm(rm($instr)) {
+            $enum_variant(instruction::FR3ArgsWithRounding {
+                rd: rd_f($instr),
+                rs1: rs1_f($instr),
+                rs2: rs2_f($instr),
+                rs3: rs3_f($instr),
+                rm: rounding,
+            })
+        } else {
+            Unknown { instr: $instr }
+        }
+    };
+}
+
 macro_rules! fence_instr {
     ($enum_variant:ident, $instr:expr) => {
         $enum_variant(instruction::FenceArgs {
@@ -345,6 +370,10 @@ const OP_JAL: u32 = 0b110_1111;
 const OP_JALR: u32 = 0b110_0111;
 const OP_FP: u32 = 0b1010011;
 const OP_FP_LOAD: u32 = 0b000_0111;
+const OP_FMADD: u32 = 0b100_0011;
+const OP_FMSUB: u32 = 0b100_0111;
+const OP_FNMSUB: u32 = 0b100_1011;
+const OP_FNMADD: u32 = 0b100_1111;
 const OP_FP_STORE: u32 = 0b010_0111;
 const OP_AMO: u32 = 0b010_1111;
 
@@ -687,6 +716,27 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 }),
                 _ => Unknown { instr },
             },
+            _ => Unknown { instr },
+        },
+        // F/D fused multiply add instructions
+        OP_FMADD => match fmt(instr) {
+            FMT_S => f_r_rm_3_instr!(Fmadds, instr),
+            FMT_D => f_r_rm_3_instr!(Fmaddd, instr),
+            _ => Unknown { instr },
+        },
+        OP_FMSUB => match fmt(instr) {
+            FMT_S => f_r_rm_3_instr!(Fmsubs, instr),
+            FMT_D => f_r_rm_3_instr!(Fmsubd, instr),
+            _ => Unknown { instr },
+        },
+        OP_FNMSUB => match fmt(instr) {
+            FMT_S => f_r_rm_3_instr!(Fnmsubs, instr),
+            FMT_D => f_r_rm_3_instr!(Fnmsubd, instr),
+            _ => Unknown { instr },
+        },
+        OP_FNMADD => match fmt(instr) {
+            FMT_S => f_r_rm_3_instr!(Fnmadds, instr),
+            FMT_D => f_r_rm_3_instr!(Fnmaddd, instr),
             _ => Unknown { instr },
         },
 

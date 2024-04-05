@@ -122,6 +122,17 @@ pub struct FR2ArgsWithRounding {
     pub rd: FRegister,
 }
 
+/// Floating-point R-type instruction, containing
+/// rounding mode, and three input arguments.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FR3ArgsWithRounding {
+    pub rs1: FRegister,
+    pub rs2: FRegister,
+    pub rs3: FRegister,
+    pub rm: InstrRoundingMode,
+    pub rd: FRegister,
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct FStoreArgs {
     pub rs1: XRegister,
@@ -254,6 +265,10 @@ pub enum Instr {
     Fdivs(FR2ArgsWithRounding),
     Fmins(FRArgs),
     Fmaxs(FRArgs),
+    Fmadds(FR3ArgsWithRounding),
+    Fmsubs(FR3ArgsWithRounding),
+    Fnmsubs(FR3ArgsWithRounding),
+    Fnmadds(FR3ArgsWithRounding),
     Flw(FLoadArgs),
     Fsw(FStoreArgs),
     Fsgnjs(FRArgs),
@@ -273,6 +288,10 @@ pub enum Instr {
     Fdivd(FR2ArgsWithRounding),
     Fmind(FRArgs),
     Fmaxd(FRArgs),
+    Fmaddd(FR3ArgsWithRounding),
+    Fmsubd(FR3ArgsWithRounding),
+    Fnmsubd(FR3ArgsWithRounding),
+    Fnmaddd(FR3ArgsWithRounding),
     Fld(FLoadArgs),
     Fsd(FStoreArgs),
     Fsgnjd(FRArgs),
@@ -403,6 +422,10 @@ impl Instr {
             | Fdivs(_)
             | Fmins(_)
             | Fmaxs(_)
+            | Fmadds(_)
+            | Fmsubs(_)
+            | Fnmsubs(_)
+            | Fnmadds(_)
             | Flw(_)
             | Fsw(_)
             | FmvXD(_)
@@ -420,6 +443,10 @@ impl Instr {
             | Fdivd(_)
             | Fmind(_)
             | Fmaxd(_)
+            | Fmaddd(_)
+            | Fmsubd(_)
+            | Fnmsubd(_)
+            | Fnmaddd(_)
             | Fld(_)
             | Fsd(_)
             | Csrrw(_)
@@ -445,6 +472,16 @@ impl Instr {
 macro_rules! r_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {},{},{}", $op, $args.rd, $args.rs1, $args.rs2)
+    };
+}
+
+macro_rules! r4_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!(
+            $f,
+            "{} {},{},{},{}",
+            $op, $args.rd, $args.rs1, $args.rs2, $args.rs3
+        )
     };
 }
 
@@ -685,6 +722,10 @@ impl fmt::Display for Instr {
             Fdivs(args) => r_instr!(f, "fdiv.s", args),
             Fmins(args) => r_instr!(f, "fmin.s", args),
             Fmaxs(args) => r_instr!(f, "fmax.s", args),
+            Fmadds(args) => r4_instr!(f, "fmadd.s", args),
+            Fmsubs(args) => r4_instr!(f, "fmsub.s", args),
+            Fnmsubs(args) => r4_instr!(f, "fnmsub.s", args),
+            Fnmadds(args) => r4_instr!(f, "fnmadd.s", args),
             Flw(args) => i_instr_load!(f, "flw", args),
             Fsw(args) => s_instr!(f, "fsw", args),
             Fsgnjs(args) => r_instr!(f, "fsgnj.s", args),
@@ -704,6 +745,10 @@ impl fmt::Display for Instr {
             Fdivd(args) => r_instr!(f, "fdiv.d", args),
             Fmind(args) => r_instr!(f, "fmin.d", args),
             Fmaxd(args) => r_instr!(f, "fmax.d", args),
+            Fmaddd(args) => r4_instr!(f, "fmadd.d", args),
+            Fmsubd(args) => r4_instr!(f, "fmsub.d", args),
+            Fnmsubd(args) => r4_instr!(f, "fnmsub.d", args),
+            Fnmaddd(args) => r4_instr!(f, "fnmadd.d", args),
             Fld(args) => i_instr_load!(f, "fld", args),
             Fsd(args) => s_instr!(f, "fsd", args),
             Fsgnjd(args) => r_instr!(f, "fsgnj.d", args),

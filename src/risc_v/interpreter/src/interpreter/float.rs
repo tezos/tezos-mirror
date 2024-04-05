@@ -15,11 +15,9 @@ use crate::{
     traps::Exception,
 };
 use rustc_apfloat::{ieee::Double, ieee::Single, Float, Round, Status, StatusAnd};
+use std::ops::Neg;
 
-pub trait FloatExt: Float + Into<FValue> + Copy
-where
-    FValue: Into<Self>,
-{
+pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {
     /// The canonical NaN has a positive sign and all
     /// significand bits clear expect the MSB (the quiet bit).
     fn canonical_nan() -> Self;
@@ -59,10 +57,7 @@ where
     /// Exactly one bit in `rd` will be set, all other bits are cleared.
     ///
     /// Does not set the floating-point exception flags.
-    pub(super) fn run_fclass<F: FloatExt>(&mut self, rs1: FRegister, rd: XRegister)
-    where
-        FValue: Into<F>,
-    {
+    pub(super) fn run_fclass<F: FloatExt>(&mut self, rs1: FRegister, rd: XRegister) {
         let rval: F = self.fregisters.read(rs1).into();
 
         let is_neg = rval.is_negative();
@@ -91,10 +86,7 @@ where
     /// if either input is a signalling NaN.
     ///
     /// If either input is `NaN`, the result is `0`.
-    pub(super) fn run_feq<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
-    where
-        FValue: Into<F>,
-    {
+    pub(super) fn run_feq<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
         let rval1: F = self.fregisters.read(rs1).into();
         let rval2: F = self.fregisters.read(rs2).into();
 
@@ -113,10 +105,7 @@ where
     ///
     /// If either input is `NaN`, the result is `0`, and the invalid operation exception
     /// flag is set.
-    pub(super) fn run_flt<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
-    where
-        FValue: Into<F>,
-    {
+    pub(super) fn run_flt<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
         let rval1: F = self.fregisters.read(rs1).into();
         let rval2: F = self.fregisters.read(rs2).into();
 
@@ -135,10 +124,7 @@ where
     ///
     /// If either input is `NaN`, the result is `0`, and the invalid operation exception
     /// flag is set.
-    pub(super) fn run_fle<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister)
-    where
-        FValue: Into<F>,
-    {
+    pub(super) fn run_fle<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
         let rval1: F = self.fregisters.read(rs1).into();
         let rval2: F = self.fregisters.read(rs2).into();
 
@@ -162,10 +148,7 @@ where
         rs2: FRegister,
         rm: InstrRoundingMode,
         rd: FRegister,
-    ) -> Result<(), Exception>
-    where
-        FValue: Into<F>,
-    {
+    ) -> Result<(), Exception> {
         self.f_arith_2(rs1, rs2, rm, rd, F::add_r)
     }
 
@@ -180,10 +163,7 @@ where
         rs2: FRegister,
         rm: InstrRoundingMode,
         rd: FRegister,
-    ) -> Result<(), Exception>
-    where
-        FValue: Into<F>,
-    {
+    ) -> Result<(), Exception> {
         self.f_arith_2(rs1, rs2, rm, rd, F::sub_r)
     }
 
@@ -198,10 +178,7 @@ where
         rs2: FRegister,
         rm: InstrRoundingMode,
         rd: FRegister,
-    ) -> Result<(), Exception>
-    where
-        FValue: Into<F>,
-    {
+    ) -> Result<(), Exception> {
         self.f_arith_2(rs1, rs2, rm, rd, F::mul_r)
     }
 
@@ -216,10 +193,7 @@ where
         rs2: FRegister,
         rm: InstrRoundingMode,
         rd: FRegister,
-    ) -> Result<(), Exception>
-    where
-        FValue: Into<F>,
-    {
+    ) -> Result<(), Exception> {
         self.f_arith_2(rs1, rs2, rm, rd, F::div_r)
     }
 
@@ -231,10 +205,7 @@ where
     /// the result is the non-NaN operand.
     ///
     /// Signaling NaNs set the invalid operation exception flag.
-    pub(super) fn run_fmin<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
-    where
-        FValue: Into<F>,
-    {
+    pub(super) fn run_fmin<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
         self.min_max(rs1, rs2, rd, F::minimum)
     }
 
@@ -246,44 +217,125 @@ where
     /// the result is the non-NaN operand.
     ///
     /// Signaling NaNs set the invalid operation exception flag.
-    pub(super) fn run_fmax<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
-    where
-        FValue: Into<F>,
-    {
+    pub(super) fn run_fmax<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
         self.min_max(rs1, rs2, rd, F::maximum)
+    }
+
+    /// `FMADD.*` instruction.
+    ///
+    /// `(rs1 x rs2) + rs3`, writing the result to `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fmadd<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.f_arith_3(rs1, rs2, rs3, rm, rd, F::mul_add_r)
+    }
+
+    /// `FMSUB.*` instruction.
+    ///
+    /// `(rs1 x rs2) - rs3`, writing the result to `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fmsub<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        let f = |rv1, rv2, rv3: F, rm| F::mul_add_r(rv1, rv2, -rv3, rm);
+        self.f_arith_3(rs1, rs2, rs3, rm, rd, f)
+    }
+
+    /// `FNMSUB.*` instruction.
+    ///
+    /// `- (rs1 x rs2) + rs3`, writing the result to `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fnmsub<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        let f = |rv1: F, rv2, rv3, rm| F::mul_add_r(-rv1, rv2, rv3, rm);
+        self.f_arith_3(rs1, rs2, rs3, rm, rd, f)
+    }
+
+    /// `FNMADD.*` instruction.
+    ///
+    /// `- (rs1 x rs2) - rs3`, writing the result to `rd`.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fnmadd<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        let f = |rv1: F, rv2, rv3: F, rm| F::mul_add_r(-rv1, rv2, -rv3, rm);
+        self.f_arith_3(rs1, rs2, rs3, rm, rd, f)
     }
 
     /// `FSGNJ.*` instruction.
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
     /// The sign bit is taken from `rs2`.
-    pub fn run_fsgnj<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
-    where
-        FValue: Into<F>,
-    {
-        self.f_sign_injection(rs1, rs2, rd, |_x, y| y);
+    pub fn run_fsgnj<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.f_sign_injection::<F>(rs1, rs2, rd, |_x, y| y);
     }
 
     /// `FSGNJN.*` instruction.
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
     /// The sign bit is taken from the negative of `rs2`.
-    pub fn run_fsgnjn<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
-    where
-        FValue: Into<F>,
-    {
-        self.f_sign_injection(rs1, rs2, rd, |_x, y| !y);
+    pub fn run_fsgnjn<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.f_sign_injection::<F>(rs1, rs2, rd, |_x, y| !y);
     }
 
     /// `FSGNJX.*` instruction.
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
     /// The sign bit is taken from the bitwise XOR of the sign bits from `rs1` & `rs2`.
-    pub fn run_fsgnjx<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister)
-    where
-        FValue: Into<F>,
-    {
-        self.f_sign_injection(rs1, rs2, rd, |x, y| x ^ y);
+    pub fn run_fsgnjx<F: FloatExt>(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+        self.f_sign_injection::<F>(rs1, rs2, rd, |x, y| x ^ y);
+    }
+
+    // perform fused 3-argument floating-point arithmetic
+    fn f_arith_3<F: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rs3: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+        f: fn(F, F, F, Round) -> StatusAnd<F>,
+    ) -> Result<(), Exception> {
+        let rval1: F = self.fregisters.read(rs1).into();
+        let rval2: F = self.fregisters.read(rs2).into();
+        let rval3: F = self.fregisters.read(rs3).into();
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        let StatusAnd { status, value } = f(rval1, rval2, rval3, rm).map(F::canonicalise);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, value.into());
+        Ok(())
     }
 
     // perform 2-argument floating-point arithmetic
@@ -294,10 +346,7 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
         f: fn(F, F, Round) -> StatusAnd<F>,
-    ) -> Result<(), Exception>
-    where
-        FValue: Into<F>,
-    {
+    ) -> Result<(), Exception> {
         let rval1: F = self.fregisters.read(rs1).into();
         let rval2: F = self.fregisters.read(rs2).into();
 
@@ -328,9 +377,7 @@ where
         rs2: FRegister,
         rd: FRegister,
         pick_sign: fn(bool, bool) -> bool,
-    ) where
-        FValue: Into<F>,
-    {
+    ) {
         let rval1: F = self.fregisters.read(rs1).into();
         let rval2: F = self.fregisters.read(rs2).into();
 
@@ -354,9 +401,7 @@ where
         rs2: FRegister,
         rd: FRegister,
         cmp: fn(F, F) -> F,
-    ) where
-        FValue: Into<F>,
-    {
+    ) {
         let rval1: F = self.fregisters.read(rs1).into();
         let rval2: F = self.fregisters.read(rs2).into();
 
