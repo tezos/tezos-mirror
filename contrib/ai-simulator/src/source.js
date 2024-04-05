@@ -353,7 +353,7 @@ export class Simulator {
     new_bonus = bigRat.clip(new_bonus, bigRat.zero, max_new_bonus);
     console.assert(0 <= new_bonus && new_bonus <= this.config.proto.max_bonus);
     this.#storage_issuance_bonus[cycle] = new_bonus;
-    return new_bonus;
+    return bigRat(new_bonus);
   }
 
   issuance_rate_for_next_cycle(cycle) {
