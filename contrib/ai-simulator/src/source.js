@@ -472,7 +472,7 @@ export class Simulator {
   }
 
   issuance_per_cycle(cycle) {
-    this.issuance_per_block(cycle) * this.config.proto.blocks_per_cycle;
+    return this.issuance_per_block(cycle) * this.config.proto.blocks_per_cycle;
   }
 }
 
