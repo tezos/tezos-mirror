@@ -50,6 +50,8 @@ cat $EXECUTABLE_FILES |
     chmod +w "octez-binaries/$ARCH/$executable"
   done
 
+# We use an arbitrary executable (the first one) from the list to compute the
+# version
 VERSION_BIN=$(xargs < "$EXECUTABLE_FILES" | cut -d " " -f 1)
 
 echo "Check $VERSION_BIN --version"
