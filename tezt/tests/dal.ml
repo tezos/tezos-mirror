@@ -4591,6 +4591,102 @@ module History_rpcs = struct
       ()
 end
 
+(* This test sets up a migration and starts the DAL around the migration
+   block. It mainly tests that the DAL node uses the right protocol plugins at
+   migration.
+
+   The [offset] says when to start the DAL node wrt to the migration level. It
+   can be negative. *)
+let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset =
+  Test.register
+    ~__FILE__
+    ~tags:
+      [
+        Tag.tezos2;
+        "dal";
+        Protocol.tag migrate_from;
+        Protocol.tag migrate_to;
+        "migration";
+        "plugin";
+        Tag.ci_disabled;
+      ]
+    ~uses:[Constant.octez_dal_node]
+    ~title:
+      (sf
+         "%s->%s: start the DAL node with offset of %d levels wrt to the \
+          migration level"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to)
+         offset)
+  @@ fun () ->
+  (* be sure to use the same parameters in both protocols *)
+  let consensus_committee_size = Some 512 in
+  let attestation_lag = Some 8 in
+  let number_of_slots = Some 32 in
+  let number_of_shards = Some 512 in
+  let slot_size = Some 126944 in
+  let redundancy_factor = Some 8 in
+  let page_size = Some 3967 in
+  let parameters =
+    make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
+    @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
+    @ make_int_parameter
+        ["dal_parametric"; "redundancy_factor"]
+        redundancy_factor
+    @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+    @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+  in
+  let* node, client, dal_parameters =
+    setup_node ~parameters ~protocol:migrate_from ()
+  in
+
+  (* The [+2] here is a bit arbitrary. We just want to avoid possible corner
+     cases due to a too small migration level, which will not occur in
+     practice. *)
+  let migration_level = dal_parameters.attestation_lag + 2 in
+
+  Log.info "Set user-activated-upgrade at level %d" migration_level ;
+  let* () = Node.terminate node in
+  let patch_config =
+    Node.Config_file.update_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  let nodes_args = Node.[Synchronisation_threshold 0; No_bootstrap_peers] in
+  let* () = Node.run ~patch_config node nodes_args in
+  let* () = Node.wait_for_ready node in
+
+  let* dal_node =
+    if offset >= 0 then (
+      (* [bake_for ~count] does not work across the migration block *)
+      let* () = bake_for ~count:(migration_level - 1) client in
+      let* () = if offset > 0 then bake_for ~count:offset client else unit in
+
+      Log.info "Start the DAL node" ;
+      let dal_node = Dal_node.create ~node () in
+      let* () = Dal_node.init_config dal_node in
+      let* () = Dal_node.run dal_node ~wait_ready:true in
+      return dal_node)
+    else
+      let* () = bake_for ~count:(migration_level - 1 + offset) client in
+
+      Log.info "Start the DAL node" ;
+      let dal_node = Dal_node.create ~node () in
+      let* () = Dal_node.init_config dal_node in
+      let* () = Dal_node.run dal_node ~wait_ready:true in
+
+      (* that is, till the migration level*)
+      let* () = bake_for ~count:(-offset) client in
+      return dal_node
+  in
+  let wait_for_dal_node =
+    wait_for_layer1_final_block dal_node (migration_level + 2)
+  in
+  let* () = bake_for ~count:4 client in
+  let* () = wait_for_dal_node in
+  unit
+
 module Amplification = struct
   let step_counter = ref 0
 
@@ -6681,4 +6777,17 @@ let register_migration ~migrate_from ~migrate_to =
   History_rpcs.test_commitments_history_rpcs_with_migration
     ~migration_level:10
     ~migrate_from
-    ~migrate_to
+    ~migrate_to ;
+  (* These tests can be safely removed when Paris is activated (and the Oxford
+     protocol is removed from tezt tests). *)
+  List.iter
+    (fun offset ->
+      test_start_dal_node_around_migration
+        ~migrate_from:Oxford
+        ~migrate_to:Paris
+        ~offset)
+    [-2; -1; 0; 1; 2] ;
+  List.iter
+    (fun offset ->
+      test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset)
+    [-2; -1; 0; 1; 2]
