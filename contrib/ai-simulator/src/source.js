@@ -580,7 +580,7 @@ export class Simulator {
  * @return {Delegate}. A delegate.
  */
 export class Delegate {
-  #storage_cache_size = -1;
+  #storage_cache_index = -1;
   #registration_cycle = null;
 
   #storage_own_staked_balance = [0];
@@ -598,7 +598,7 @@ export class Delegate {
   }
 
   clear() {
-    this.#storage_cache_size = -1;
+    this.#storage_cache_index = -1;
     this.#storage_own_staked_balance = [0];
     this.#storage_third_party_staked_balance = [0];
     this.#storage_own_spendable_balance = [0];
@@ -630,29 +630,29 @@ export class Delegate {
     return this.#storage_third_party_delegated_balance[cycle];
   }
 
-  // The storage_cache_size is used to register what are the values
+  // The storage_cache_index is used to register what are the values
   // still valid or the ones that need to be recomputed. Hence, for any change
   // that occurs at a certain level we need to recompute each data above this level.
   // This is why we we take the minimal value here
 
   set_own_spendable_balance(cycle, value) {
     this.#storage_own_spendable_balance_mask[cycle] = value;
-    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+    this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
 
   set_third_party_delegated_balance(cycle, value) {
     this.#storage_third_party_delegated_balance[cycle] = value;
-    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+    this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
 
   set_own_staked_balance(cycle, value) {
     this.#storage_own_staked_balance_mask[cycle] = value;
-    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+    this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
 
   set_third_party_staked_balance(cycle, value) {
     this.#storage_third_party_staked_balance_mask[cycle] = value;
-    this.#storage_cache_size = Math.min(this.#storage_cache_size, cycle);
+    this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
 
   is_activated(cycle) {
@@ -920,9 +920,9 @@ export class Delegate {
   }
 
   #prepare_for(cycle) {
-    for (let i = this.#storage_cache_size + 1; i < cycle; i++) {
+    for (let i = this.#storage_cache_index + 1; i < cycle; i++) {
       this.#compute_new_balances(i);
-      this.#storage_cache_size++;
+      this.#storage_cache_index++;
     }
   }
 
