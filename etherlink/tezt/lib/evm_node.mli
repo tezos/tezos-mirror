@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -59,6 +60,8 @@ type mode =
       max_number_of_chunks : int option;
       devmode : bool;  (** --devmode flag. *)
       wallet_dir : string option;  (** --wallet-dir: client directory. *)
+      tx_pool_timeout_limit : int option;
+          (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 

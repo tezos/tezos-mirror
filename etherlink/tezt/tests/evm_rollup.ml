@@ -284,8 +284,8 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
     ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
     ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
-    ?(setup_mode = Setup_proxy {devmode = true}) ?(force_install_kernel = true)
-    protocol =
+    ?tx_pool_timeout_limit ?(setup_mode = Setup_proxy {devmode = true})
+    ?(force_install_kernel = true) protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -409,6 +409,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
                max_number_of_chunks = None;
                devmode;
                wallet_dir = Some (Client.base_dir client);
+               tx_pool_timeout_limit;
              })
   in
   let* evm_node =
@@ -4519,6 +4520,7 @@ let test_migrate_proxy_to_sequencer_future =
           max_number_of_chunks = None;
           devmode = true;
           wallet_dir = Some (Client.base_dir client);
+          tx_pool_timeout_limit = None;
         }
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
@@ -4681,6 +4683,7 @@ let test_migrate_proxy_to_sequencer_past =
           max_number_of_chunks = None;
           devmode = true;
           wallet_dir = Some (Client.base_dir client);
+          tx_pool_timeout_limit = None;
         }
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)

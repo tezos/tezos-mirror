@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -47,6 +48,7 @@ type mode =
       max_number_of_chunks : int option;
       devmode : bool;
       wallet_dir : string option;
+      tx_pool_timeout_limit : int option;
     }
   | Proxy of {devmode : bool}
 
@@ -445,6 +447,7 @@ let run_args evm_node =
           max_number_of_chunks;
           devmode;
           wallet_dir;
+          tx_pool_timeout_limit;
         } ->
         [
           "run";
@@ -494,6 +497,10 @@ let run_args evm_node =
             max_number_of_chunks
         @ Cli_arg.optional_switch "devmode" devmode
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ Cli_arg.optional_arg
+            "tx-pool-timeout-limit"
+            string_of_int
+            tx_pool_timeout_limit
     | Observer {preimages_dir; initial_kernel; rollup_node_endpoint} ->
         [
           "run";
