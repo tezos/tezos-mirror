@@ -875,6 +875,36 @@ let compute_new_caboose block_store history_mode ~new_savepoint
 
 module BlocksLAFL = Set.Make (Int32)
 
+(* Limits the maximum number of elements that can be added into a
+   cycle.
+   This is mandatory when cementing metadata. Indeed, the current
+   version of camlzip support only 32bits zip files, that are files
+   smaller that ~4GB or containing less that 65_535 entries. When
+   cementing cycles, we might reach that limit. We set it to 2^16 - 1. *)
+let default_cycle_size_limit = 65_535l
+
+(* May shrink the size of the given cycles to make sure that the size
+   of a cycle never exceeds the camlzip 32bits limitation. The shrink
+   consist in dividing the cycles in two even parts, recursively,
+   until the limit is not exceeded anymore. *)
+let may_shrink_cycles cycles ~cycle_size_limit =
+  let rec loop acc cycles =
+    match cycles with
+    | [] -> List.rev acc
+    | ((cycle_start, cycle_end) as hd) :: tl ->
+        let diff = Int32.(sub cycle_end cycle_start) in
+        if diff >= cycle_size_limit then
+          let mid = Int32.(div diff 2l) in
+          let left_cycle_upper_bound = Int32.(add cycle_start mid) in
+          let left_cycle = (cycle_start, left_cycle_upper_bound) in
+          let right_cycle =
+            (Int32.(add left_cycle_upper_bound 1l), cycle_end)
+          in
+          loop acc (left_cycle :: right_cycle :: tl)
+        else loop (hd :: acc) tl
+  in
+  loop [] cycles
+
 (* FIXME: update doc *)
 (* [update_floating_stores block_store ~history_mode ~ro_store
    ~rw_store ~new_store ~new_head ~new_head_lafl
@@ -886,7 +916,7 @@ module BlocksLAFL = Set.Make (Int32)
    savepoint and caboose candidates. *)
 let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     ~new_store ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
-    ~cementing_highwatermark =
+    ~cementing_highwatermark ~cycle_size_limit =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_updating_floating_stores) () in
   let* lafl_block =
@@ -1025,7 +1055,11 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let sorted_lafl =
     List.sort Compare.Int32.compare (BlocksLAFL.elements !blocks_lafl)
   in
-  let* cycles_to_cement = loop [] initial_pred sorted_lafl in
+
+  let* cycles_to_cement =
+    let* cycles = loop [] initial_pred sorted_lafl in
+    return (may_shrink_cycles cycles ~cycle_size_limit)
+  in
   let* new_savepoint =
     compute_new_savepoint
       block_store
@@ -1197,7 +1231,7 @@ let instanciate_temporary_floating_store block_store =
 
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
-    ~cementing_highwatermark =
+    ~cementing_highwatermark ~cycle_size_limit =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_merging_thread) () in
   let*! new_ro_store =
@@ -1217,6 +1251,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
             ~new_head_lafl
             ~lowest_bound_to_preserve_in_floating
             ~cementing_highwatermark
+            ~cycle_size_limit
         in
         let cycle_reader =
           read_iterator_block_range_in_floating_stores
@@ -1328,9 +1363,9 @@ let split_context block_store new_head_lafl =
       let*! () = Store_events.(emit start_context_split new_head_lafl) in
       split ()
 
-let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
-    ~finalizer ~history_mode ~new_head ~new_head_metadata
-    ~cementing_highwatermark =
+let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
+    ~(on_error : tztrace -> unit tzresult Lwt.t) ~finalizer ~history_mode
+    ~new_head ~new_head_metadata ~cementing_highwatermark =
   let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
@@ -1390,6 +1425,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                         let* new_ro_store, new_savepoint, new_caboose =
                           create_merging_thread
                             block_store
+                            ~cycle_size_limit
                             ~history_mode
                             ~old_ro_store
                             ~old_rw_store
