@@ -108,7 +108,7 @@ module Shards = struct
       (KVS.value_exists store file_layout commitment)
       shard_indexes
 
-  let save_and_notify shards_store shards_watcher commitment shards =
+  let save_and_notify shards_store commitment shards =
     let open Lwt_result_syntax in
     let shards =
       Seq.map
@@ -129,7 +129,7 @@ module Shards = struct
 
        DAL/Node: rehaul the store  abstraction & notification system.
     *)
-    return @@ Lwt_watcher.notify shards_watcher commitment
+    return_unit
 
   let read_all shards_store commitment ~number_of_shards =
     Seq.ints 0
@@ -166,15 +166,9 @@ module Shard_proofs_cache =
 type node_store = {
   store : t;
   shard_store : Shards.t;
-  shards_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
-
-(** [open_shards_stream node_store] opens a stream that should be notified when
-    the storage is updated with new shards. *)
-let open_shards_stream {shards_watcher; _} =
-  Lwt_watcher.create_stream shards_watcher
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
 
@@ -190,7 +184,6 @@ let save_shard_proofs node_store commitment shard_proofs =
 let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
-  let shards_watcher = Lwt_watcher.create_input () in
   let*! repo = Repo.v (Irmin_pack.config base_dir) in
   let*! store = main repo in
   let* shard_store = Shards.init base_dir shard_store_dir in
@@ -199,7 +192,6 @@ let init config =
     {
       shard_store;
       store;
-      shards_watcher;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;
     }

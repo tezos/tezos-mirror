@@ -197,16 +197,6 @@ val get_attestable_slots :
   ; query : unit >
   service
 
-(** A service for monitor_shards RPC *)
-val monitor_shards :
-  < meth : [`GET]
-  ; input : unit
-  ; output : Cryptobox.Commitment.t
-  ; prefix : unit
-  ; params : unit
-  ; query : unit >
-  service
-
 val version :
   < meth : [`GET]
   ; input : unit
