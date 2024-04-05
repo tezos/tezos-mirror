@@ -557,6 +557,7 @@ let jobs pipeline_type =
     let job_static_x86_64_experimental =
       job_build_static_binaries
         ~__POS__
+        ~product:Octez
         ~arch:Amd64
           (* Even though not many tests depend on static executables, some
              of those that do are limiting factors in the total duration
@@ -575,8 +576,10 @@ let jobs pipeline_type =
     let bin_packages_jobs =
       match pipeline_type with
       | Schedule_extended_test ->
-          let job_build_dpkg_amd64 = job_build_dpkg_amd64 () |> job_external in
-          let job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
+          let job_build_dpkg_amd64 =
+            job_build_dpkg_amd64 Octez |> job_external
+          in
+          let job_build_rpm_amd64 = job_build_rpm_amd64 Octez |> job_external in
           [job_build_dpkg_amd64; job_build_rpm_amd64]
       | Before_merging -> []
     in
@@ -1185,6 +1188,7 @@ let jobs pipeline_type =
           job_build_bin_package
             ~__POS__
             ~name:"oc.build:dpkg:amd64"
+            ~product:Octez
             ~target:Dpkg
             ~arch:Tezos_ci.Amd64
             ~rules:[job_rule ~when_:Manual ()]
@@ -1197,6 +1201,7 @@ let jobs pipeline_type =
           job_build_bin_package
             ~__POS__
             ~name:"oc.build:rpm:amd64"
+            ~product:Octez
             ~target:Rpm
             ~arch:Tezos_ci.Amd64
             ~rules:[job_rule ~when_:Manual ()]

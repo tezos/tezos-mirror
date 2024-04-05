@@ -481,6 +481,8 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ~name
     script
 
+type product = Octez | Etherlink
+
 (* This version of the job builds both released and experimental executables.
    It is used in the following pipelines:
    - Before merging: check whether static executables still compile,
@@ -491,7 +493,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
+let job_build_static_binaries ~__POS__ ~product ~arch ?(release = false) ?rules
     ?dependencies () : tezos_job =
   let arch_string = arch_to_string arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
@@ -501,8 +503,11 @@ let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
     artifacts ?expire_in ["octez-binaries/$ARCH/*"]
   in
   let executable_files =
-    "script-inputs/released-executables"
-    ^ if not release then " script-inputs/experimental-executables" else ""
+    match product with
+    | Octez ->
+        "script-inputs/released-executables"
+        ^ if not release then " script-inputs/experimental-executables" else ""
+    | Etherlink -> "script-inputs/etherlink-executables"
   in
   job
     ?rules
@@ -678,9 +683,13 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
 type bin_package_target = Dpkg | Rpm
 
 let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
-    ?(stage = Stages.build) ~arch ~target () : tezos_job =
+    ?(stage = Stages.build) ~product ~arch ~target () : tezos_job =
   let arch_string = arch_to_string_alt arch in
   let target_string = match target with Dpkg -> "dpkg" | Rpm -> "rpm" in
+  let package_extension = match target with Dpkg -> "deb" | Rpm -> "rpm" in
+  let product_string =
+    match product with Octez -> "octez" | Etherlink -> "etherlink"
+  in
   let image =
     match target with Dpkg -> Images.debian_bookworm | Rpm -> Images.fedora_39
   in
@@ -694,8 +703,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
   in
   let artifacts =
     let artifact_path =
-      "$DISTRIBUTION"
-      // ("octez-*." ^ match target with Dpkg -> "deb" | Rpm -> "rpm")
+      "$DISTRIBUTION" // (product_string ^ "-*." ^ package_extension)
     in
     artifacts
       ~expire_in:(Duration (Days 1))
@@ -727,6 +735,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     ~stage
     ~variables:
       [
+        ("OCTEZ_PKGNAME", product_string);
         ("TARGET", target_string);
         ("OCTEZ_PKGMAINTAINER", "nomadic-labs");
         ("BLST_PORTABLE", "yes");
@@ -747,24 +756,28 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "eval $(opam env)";
       "make $TARGET";
       "mkdir $DISTRIBUTION";
-      "mv octez-*.* $DISTRIBUTION/";
+      Format.sprintf "mv %s-*.* $DISTRIBUTION/" product_string;
     ]
 
-let job_build_dpkg_amd64 : unit -> tezos_job =
+let job_build_dpkg_amd64 product : tezos_job =
   job_build_bin_package
     ~__POS__
     ~name:"oc.build:dpkg:amd64"
+    ~product
     ~target:Dpkg
     ~arch:Amd64
     ~dependencies:(Dependent [])
+    ()
 
-let job_build_rpm_amd64 : unit -> tezos_job =
+let job_build_rpm_amd64 product : tezos_job =
   job_build_bin_package
     ~__POS__
     ~name:"oc.build:rpm:amd64"
+    ~product
     ~target:Rpm
     ~arch:Amd64
     ~dependencies:(Dependent [])
+    ()
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     ?dependencies () =
