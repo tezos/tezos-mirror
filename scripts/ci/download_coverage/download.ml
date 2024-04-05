@@ -2,15 +2,17 @@ open Tezt
 open Base
 open Tezt_gitlab
 
-let usage () =
-  prerr_endline
-    {|Usage: dune exec scripts/ci/download_coverage/download.exe -- [-a from=last-merged-pipeline | -a from=<PIPELINE_ID>]
+let section =
+  Clap.section
+    "DOWNLOAD COVERAGE TRACES"
+    ~description:
+      {|Download coverage traces from a pipeline.
 
 Example: to fetch coverage traces from
 https://gitlab.com/tezos/tezos/-/pipelines/426773806, run
 (from the root of the repository):
 
-dune exec scripts/ci/download_coverage/download.exe -- -a from=426773806
+dune exec scripts/ci/download_coverage/download.exe -- --from 426773806
 
 You can use the PROJECT environment variable to specify which GitLab
 repository to fetch coverage traces from. Default is: tezos/tezos
@@ -19,10 +21,9 @@ The script can also be used to fetch coverage traces from the last successful pi
 latest MR merged to the default branch (configurable through the DEFAULT_BRANCH
 environment variable) for a given PROJECT:
 
-dune exec scripts/ci/download_coverage/download.exe -- -a from=last-merged-pipeline
+dune exec scripts/ci/download_coverage/download.exe -- --from last-merged-pipeline
 
-|} ;
-  exit 1
+|}
 
 let project = Sys.getenv_opt "PROJECT" |> Option.value ~default:"tezos/tezos"
 
@@ -99,12 +100,28 @@ let fetch_pipeline_coverage_from_jobs pipeline =
 
 type from = Pipeline of int | Last_merged_pipeline
 
-let cli_get_from =
-  match Cli.get_string_opt "from" with
-  | Some "last-merged-pipeline" -> Last_merged_pipeline
-  | Some s -> (
-      match int_of_string_opt s with Some i -> Pipeline i | None -> usage ())
-  | None -> usage ()
+let cli_from_type =
+  let parse = function
+    | "last-merged-pipeline" -> Some Last_merged_pipeline
+    | s -> Option.map (fun x -> Pipeline x) (int_of_string_opt s)
+  in
+  let show = function
+    | Pipeline id -> string_of_int id
+    | Last_merged_pipeline -> "last-merged-pipeline"
+  in
+  Clap.typ ~name:"from" ~dummy:Last_merged_pipeline ~parse ~show
+
+let cli_from =
+  Clap.default
+    cli_from_type
+    ~section
+    ~long:"from"
+    ~placeholder:"PIPELINE"
+    ~description:
+      "The ID of the pipeline to fetch records from. Also accepts \
+       'last-merged-pipeline', which denotes the last pipeline for the latest \
+       merge commit on the default branch."
+    Last_merged_pipeline
 
 let () =
   (* Register a test to benefit from error handling of Test.run,
@@ -112,7 +129,7 @@ let () =
   ( Test.register ~__FILE__ ~title:"download coverage" ~tags:["update"]
   @@ fun () ->
     let* _new_coverage_traces =
-      match cli_get_from with
+      match cli_from with
       | Pipeline pipeline_id -> fetch_pipeline_coverage_from_jobs pipeline_id
       | Last_merged_pipeline ->
           let* pipeline_id =

@@ -98,8 +98,8 @@ let jobs =
       [
         (* On the project default branch, we fetch coverage from the last merged MR *)
         "mkdir -p _coverage_report";
-        "dune exec scripts/ci/download_coverage/download.exe -- -a \
-         from=last-merged-pipeline --info --log-file \
+        "dune exec scripts/ci/download_coverage/download.exe -- --from \
+         last-merged-pipeline --info --log-file \
          _coverage_report/download_coverage.log";
         "./scripts/ci/report_coverage.sh";
       ]
