@@ -6,7 +6,7 @@ set -eu
 # shellcheck source=./scripts/ci/etherlink-release.sh
 . ./scripts/ci/etherlink-release.sh
 
-kernels_artifact_url="$CI_JOB_URL/artifacts/raw/kernels.tar.gz"]
+kernels_artifact_url="$CI_JOB_URL/artifacts/raw/kernels.tar.gz"
 
 echo "Query GitLab to get generic package URL"
 
