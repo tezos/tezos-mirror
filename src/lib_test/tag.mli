@@ -80,5 +80,7 @@ val tezos2 : string
 val etherlink : string
 
 (** ["slow"]: tag for tests that are too slow for the CI's [before_merging]
-    pipelines and that will only be run on the scheduled pipeline. *)
+    pipelines and that will only be run on the scheduled pipeline.
+
+    This tag should be used for tests that take more than 2 minutes in the CI. *)
 val slow : string

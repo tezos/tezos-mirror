@@ -45,7 +45,12 @@ type return = unit
 (** Speed levels.
 
     In Alcotest, one can ask not to run slow tests with [-q] from the command-line.
-    In Tezt, the equivalent is [-a quick]. *)
+    In Tezt, the equivalent is [quick].
+
+    Tests registered with [`Slow] or [`Quick] will have respectively the tag
+    ["slow"] or ["quick"].
+    ["slow"] tag may have consequences on how the test will be handled by the
+    CI. More information is given in [src/lib_test/tag.mli]. *)
 type speed_level = [`Quick | `Slow]
 
 (** Test cases.
