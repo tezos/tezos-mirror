@@ -3,7 +3,7 @@
 set -eux
 
 # misc linting
-find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +
+make check-opam-linting
 
 make check-linting
 

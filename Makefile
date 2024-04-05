@@ -393,7 +393,7 @@ EXCLUDE_TEST_DIRS := $(addprefix --exclude-file ,$(addsuffix /,${TEST_DIRS}))
 .PHONY: test
 test: test-code
 
-.PHONY: check-linting check-python-linting check-ocaml-linting
+.PHONY: check-linting check-python-linting check-ocaml-linting check-opam-linting
 
 check-linting:
 	@scripts/lint.sh --check-scripts
@@ -409,6 +409,9 @@ check-python-typecheck:
 
 check-ocaml-linting:
 	@./scripts/semgrep/lint-all-ocaml-sources.sh
+
+check-opam-linting:
+	@find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +
 
 .PHONY: fmt fmt-ocaml fmt-python
 fmt: fmt-ocaml fmt-python fmt-shell
