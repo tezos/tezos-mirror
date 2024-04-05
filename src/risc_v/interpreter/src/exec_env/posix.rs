@@ -18,15 +18,15 @@ use crate::{
 pub enum Posix {}
 
 impl ExecutionEnvironment for Posix {
-    type Layout = (Atom<u8>, Atom<u64>, Atom<u8>, ModeLayout);
+    type Layout = (Atom<u64>, Atom<u8>, ModeLayout);
 
     type State<M: Manager> = PosixState<M>;
 }
 
 /// Posix execution environment state
 pub struct PosixState<M: Manager> {
-    exited: Cell<u8, M>,
     code: Cell<u64, M>,
+    exited: Cell<u8, M>,
     exit_mode: ModeCell<M>,
 }
 
@@ -48,14 +48,18 @@ impl<M: Manager> PosixState<M> {
     }
 }
 
-impl<M: Manager> ExecutionEnvironmentState<M> for PosixState<M> {
+/// Implements a posix-ish environment for the RISC-V test suite.
+impl<M> ExecutionEnvironmentState<M> for PosixState<M>
+where
+    M: Manager,
+{
     type ExecutionEnvironment = Posix;
 
     fn bind(space: AllocatedOf<<Posix as ExecutionEnvironment>::Layout, M>) -> Self {
         Self {
-            exited: space.0,
-            code: space.1,
-            exit_mode: ModeCell::bind(space.3),
+            code: space.0,
+            exited: space.1,
+            exit_mode: ModeCell::bind(space.2),
         }
     }
 
@@ -93,20 +97,32 @@ impl<M: Manager> ExecutionEnvironmentState<M> for PosixState<M> {
             };
         }
 
-        let syscall_number = machine.hart.xregisters.read(a7);
-        match syscall_number {
-            // Exit
-            93 => {
-                let exited = self.exited.read();
-                self.exited.write(exited.saturating_add(1));
+        let mut handle_exit = |code| {
+            let exited = self.exited.read();
+            self.exited.write(exited.saturating_add(1));
+            self.code.write(code);
 
-                let code = machine.hart.xregisters.read(a0);
-                self.code.write(code);
-
-                EcallOutcome::Handled {
-                    continue_eval: false,
-                }
+            EcallOutcome::Handled {
+                continue_eval: false,
             }
+        };
+
+        // Successful physical memory tests set
+        //   a7 = 93 & a0 = 0
+        // Successful virtual memory tests set
+        //   a7 = 0 (a7 never gets set) & a0 = 1
+        // Failed physical memory tests set
+        //   a7 = 93 & a0 = 1 | (TEST_FAILED << 1)
+        // Failed virtual memory tests set
+        //   a7 = 0 (a7 never gets set) & a0 = 1 | (TEST_FAILED << 1)
+        let a7_val = machine.hart.xregisters.read(a7);
+        let a0_val = machine.hart.xregisters.read(a0);
+        match (a7_val, a0_val) {
+            // Exit (test pass, physical | virtual)
+            (93, 0) | (0, 1) => handle_exit(0),
+
+            // Exit (test fail, physical | virtual)
+            (93, code) | (0, code) => handle_exit(code),
 
             // Unimplemented
             _ => EcallOutcome::Fatal,
