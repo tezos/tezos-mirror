@@ -445,7 +445,6 @@ let proxy_command =
           ~proxy:{rollup_node_endpoint}
           ()
       in
-      let* () = Configuration.save ~force:true ~data_dir config in
       let* () =
         if config.devmode then
           Evm_node_lib_dev.Proxy.main config ~keep_alive ~rollup_node_endpoint
@@ -588,7 +587,6 @@ let sequencer_command =
           ~sequencer
           ()
       in
-      let* () = Configuration.save ~force:true ~data_dir configuration in
       if devmode then
         Evm_node_lib_dev.Sequencer.main
           ~data_dir
@@ -681,7 +679,6 @@ let observer_command =
       ~observer
       ()
   in
-  let* () = Configuration.save ~force:true ~data_dir config in
   Observer.main
     ?kernel_path:kernel
     ~rollup_node_endpoint
