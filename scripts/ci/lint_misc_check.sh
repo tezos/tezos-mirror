@@ -5,15 +5,7 @@ set -eu
 # misc linting
 find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +
 
-# Check that python environment is synchronized with the image's.
-diff poetry.lock /home/tezos/poetry.lock
-diff pyproject.toml /home/tezos/pyproject.toml
-
 make check-linting
-
-# python checks
-make check-python-linting
-make check-python-typecheck
 
 # Ensure that all unit tests are restricted to their opam package
 make lint-tests-pkg

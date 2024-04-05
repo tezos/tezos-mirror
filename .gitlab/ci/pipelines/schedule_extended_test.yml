@@ -6526,6 +6526,21 @@ oc.misc_checks:
   - scripts/check_wasm_pvm_regressions.sh check
   - etherlink/scripts/check_evm_store_migrations.sh check
 
+oc.python_check:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - . $HOME/.venv/bin/activate
+  script:
+  - ./scripts/ci/lint_misc_python_check.sh
+
 misc_opam_checks:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: test
