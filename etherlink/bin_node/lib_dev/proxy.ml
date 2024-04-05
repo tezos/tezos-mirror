@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -90,7 +90,7 @@ let retry_connection (f : Uri.t -> string tzresult Lwt.t) endpoint :
 let fetch_smart_rollup_address ~keep_alive f (endpoint : Uri.t) =
   if keep_alive then retry_connection f endpoint else f endpoint
 
-let main config ~keep_alive ~rollup_node_endpoint =
+let main (config : Configuration.t) ~keep_alive ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let* smart_rollup_address =
     fetch_smart_rollup_address
@@ -109,6 +109,7 @@ let main config ~keep_alive ~rollup_node_endpoint =
         rollup_node = (module Rollup_node_rpc);
         smart_rollup_address;
         mode = Proxy {rollup_node_endpoint};
+        tx_timeout_limit = config.tx_pool_timeout_limit;
       }
   in
   let () = Rollup_node_follower.start ~proxy:true ~rollup_node_endpoint in

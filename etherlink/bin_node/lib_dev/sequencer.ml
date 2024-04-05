@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -238,7 +239,12 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   end) in
   let* () =
     Tx_pool.start
-      {rollup_node = (module Sequencer); smart_rollup_address; mode = Sequencer}
+      {
+        rollup_node = (module Sequencer);
+        smart_rollup_address;
+        mode = Sequencer;
+        tx_timeout_limit = configuration.tx_pool_timeout_limit;
+      }
   in
   let* () =
     Block_producer.start

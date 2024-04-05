@@ -113,6 +113,7 @@ type parameters = {
   rollup_node : (module Services_backend_sig.S);
   smart_rollup_address : string;
   mode : mode;
+  tx_timeout_limit : int64;
 }
 
 module Types = struct
@@ -121,6 +122,7 @@ module Types = struct
     smart_rollup_address : string;
     mutable pool : Pool.t;
     mode : mode;
+    tx_timeout_limit : int64;
     mutable locked : bool;
   }
 
@@ -440,7 +442,8 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w ()
-      ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
+      ({rollup_node; smart_rollup_address; mode; tx_timeout_limit} :
+        Types.parameters) =
     let state =
       Types.
         {
@@ -448,6 +451,7 @@ module Handlers = struct
           smart_rollup_address;
           pool = Pool.empty;
           mode;
+          tx_timeout_limit;
           locked = false;
         }
     in
