@@ -293,6 +293,8 @@ ocaml-check:
   - gcp
   rules:
   - changes:
+    - '**/*.ml'
+    - '**/*.mli'
     - .gitlab-ci.yml
     - .gitlab/**/*
     - devtools/**/*

@@ -658,7 +658,7 @@ let jobs pipeline_type =
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.build
         ~dependencies:dependencies_needs_trigger
-        ~rules:(make_rules ~changes:changeset_ocaml_files ())
+        ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
         ~before_script:
           (before_script
              ~take_ownership:true

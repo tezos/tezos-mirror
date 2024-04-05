@@ -395,8 +395,11 @@ let changeset_kaitai_e2e_files =
           "client-libs/*kaitai*/**/*";
         ])
 
-let changeset_ocaml_files =
-  Changeset.(changeset_base @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"])
+(** Set of OCaml files for type checking ([dune build @check]). *)
+let changeset_ocaml_check_files =
+  Changeset.(
+    changeset_base
+    @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"])
 
 let changeset_lift_limits_patch =
   Changeset.(
