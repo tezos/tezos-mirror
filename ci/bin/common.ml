@@ -756,7 +756,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "eval $(opam env)";
       "make $TARGET";
       "mkdir $DISTRIBUTION";
-      Format.sprintf "mv %s-*.* $DISTRIBUTION/" product_string;
+      sf "mv %s-*.* $DISTRIBUTION/" product_string;
     ]
 
 let job_build_dpkg_amd64 product : tezos_job =
