@@ -30,10 +30,13 @@ use exec_env::{
     ExecutionEnvironment, ExecutionEnvironmentState,
 };
 use machine_state::{
-    csregisters::{CSRValue, CSRegister},
+    bus::Address,
+    csregisters::{satp::TranslationAlgorithm, CSRValue, CSRegister},
     registers::{FRegister, FValue},
+    AccessType,
 };
 use std::collections::BTreeMap;
+use traps::Exception;
 use InterpreterResult::*;
 
 type StateLayout = (
@@ -162,6 +165,10 @@ impl<'a> Interpreter<'a> {
         self.handle_step_result(result, max, should_continue)
     }
 
+    pub fn effective_translation_mode(&self) -> Option<TranslationAlgorithm> {
+        self.machine_state.effective_translation_mode()
+    }
+
     pub fn read_xregister(&self, reg: XRegister) -> u64 {
         self.machine_state.hart.xregisters.read(reg)
     }
@@ -205,6 +212,11 @@ impl<'a> Interpreter<'a> {
             },
             elf_program.parsed(),
         ))
+    }
+
+    /// Obtain the translated address of pc.
+    pub fn translate_instruction_address(&self, pc: Address) -> Result<Address, Exception> {
+        self.machine_state.translate(pc, AccessType::Instruction)
     }
 }
 
