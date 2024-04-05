@@ -140,6 +140,24 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
 
 (** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
 let etherlink_jobs () =
+  let job_static_arm64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~product:Etherlink
+      ~arch:Arm64
+      ~release:true
+      ()
+  in
+  let job_static_x86_64_release =
+    job_build_static_binaries
+      ~__POS__
+      ~product:Etherlink
+      ~arch:Amd64
+      ~release:true
+      ()
+  in
+  let job_build_dpkg_amd64 = job_build_dpkg_amd64 Etherlink in
+  let job_build_rpm_amd64 = job_build_rpm_amd64 Etherlink in
   let job_produce_docker_artifacts : Tezos_ci.tezos_job =
     job_docker_authenticated
       ~__POS__
@@ -151,15 +169,32 @@ let etherlink_jobs () =
            ["kernels.tar.gz"])
       ["./scripts/ci/docker_prepare_etherlink_release.sh"]
   in
+  let dependencies =
+    Dependent
+      [
+        Artifacts job_static_x86_64_release;
+        Artifacts job_static_arm64_release;
+        Artifacts job_build_dpkg_amd64;
+        Artifacts job_build_rpm_amd64;
+        Job job_produce_docker_artifacts
+      ]
+  in
   let job_gitlab_release : Tezos_ci.tezos_job =
     job
       ~__POS__
       ~image:Images.ci_release
       ~stage:Stages.publish_package_gitlab
       ~interruptible:false
-      ~dependencies:(Dependent [Job job_produce_docker_artifacts])
+      ~dependencies
       ~artifacts:(Gitlab_ci.Util.artifacts ~expire_in:Never ["kernels.tar.gz"])
       ~name:"gitlab:etherlink-release"
       ["./scripts/ci/create_gitlab_etherlink_release.sh"]
   in
-  [job_produce_docker_artifacts; job_gitlab_release]
+  [
+    job_static_x86_64_release;
+    job_static_arm64_release;
+    job_build_dpkg_amd64;
+    job_build_rpm_amd64;
+    job_produce_docker_artifacts;
+    job_gitlab_release;
+  ]
