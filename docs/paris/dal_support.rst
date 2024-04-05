@@ -4,8 +4,8 @@ DAL support
 
 The support for the :doc:`DAL <../shell/dal>` within the economic protocol relies on two operations:
 
-#. ``DAL_publish_commitment``: Allowing anyone to publish a DAL commitment
-#. ``DAL_attestation``: Allowing bakers to attest the data seen onto the DAL P2P network
+#. ``DAL_publish_commitment``: a new manager operation, allowing anyone to publish a DAL commitment
+#. ``attestation``: the existing :ref:`consensus operation <consensus_operations>`, allowing bakers to attach a DAL payload attesting the data seen on the DAL P2P network
 
 DAL publish commitment
 ======================
@@ -31,25 +31,26 @@ Economics
 
 Currently, the fees are estimated based on the execution cost of this operation alone. There are no additional charges related to the bandwidth required for bakers to download data from the DAL for this commitment. However, this might be subject to changes in the future.
 
-DAL attestation
-===============
+DAL attestation payloads
+========================
 
-``DAL_attestation`` is a new :ref:`consensus operation <consensus_operations>` performed by attesters. It serves to verify whether they were able to successfully download the shards assigned to them. The payload of this operation consists of the following fields:
-
-- Level: This refers to the level of the block that is being attested, specifically the level preceding the block that contains the ``DAL_attestation`` operation.
-- Tenderbake slot: This element identifies the attester, in particular, it determines the public key required for signature verification and the assigned  DAL shards.
-- Attestation: This is a bitset reflecting the status of each slot. The size of the bitset corresponds to the total number of slots. A value of 1 indicates successful retrieval of all assigned shards by the baker for that slot, while 0 indicates an unsuccessful attempt.
-  The lowest field of the bitset corresponds to the lowest slot index.
+The attestation operation includes an optional field ``dal_content``. This field
+allows attesters participating to the DAL to announce whether they were able to
+successfully download the shards assigned to them. Concretely, this field is a
+bitset reflecting the status of each slot. The size of the bitset corresponds to
+the total number of slots. A value of 1 indicates successful retrieval of all
+assigned shards by the baker for that slot, while 0 indicates an unsuccessful
+attempt.  The least significant bit corresponds to the smallest slot index.
 
 Attestation timing
 ------------------
 
-When a commitment is published at a certain level, say level ``PL``, the corresponding DAL attestations are expected to be included in the block at level ``PL + attestation_lag``.
+When a commitment is published at a certain level, say level ``PL``, the corresponding DAL payloads are expected to be included in the attestations contained in the block at level ``PL + attestation_lag``.
 
 Block metadata
 --------------
 
-In the block’s metadata, there is a specific field for the DAL. This field reflects the availability of slots based on the DAL attestations received. It is a bitfield with one bit per slot (its format is the same as the attestation part of the ``DAL_attestation`` operation). The bit is set to 1 if the slot is declared available. The lowest slot index corresponds to the lowest bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``availability_threshold`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
+In the block’s metadata, there is a specific field for the DAL. This field reflects the availability of slots based on the DAL payloads received. It is a bitfield with one bit per slot (its format is the same as the attestation payload of the ``attestation`` operation). The bit is set to 1 if the slot is declared available. The smallest slot index corresponds to the least significant bit. To consider a slot as available, there must be a minimum number of shards, as defined by the ``availability_threshold`` parameter, marked as available by the attesters for that slot (e.g. if the number of shards is 2048 and the availability threshold is 50%, then 1024 shards are required).
 
 Therefore, for data committed (published) at level ``L``, the slot's availability is determined by the metadata of the block at level ``L + attestation_lag``. Consequently, a smart rollup can only utilize this data from level ``L + attestation_lag + 1`` onward.
 
@@ -73,12 +74,13 @@ DAL-related protocol constants
 
 This section describes the protocol constants specific to the DAL as well as their default values on mainnet (see :ref:`protocol_constants` on how to find the values for tests networks):
 
-- ``feature_enable`` (false): Whether the DAL is available
-- ``number_of_slots`` (256): How many slots are available per block
-- ``attestation_lag`` (4): The timeframe for bakers to download shards between the published level of a commitment and the time they must attest the availability of those shards
-- ``attestation_threshold`` (50): The percentage of shards attested for a given slot to declare the slot available
+- ``feature_enable`` (true): Whether the DAL is available
+- ``incentives_enable`` (false): Whether baker incentives are available
+- ``number_of_slots`` (32): How many slots are available per block
+- ``attestation_lag`` (8): The timeframe for bakers to download shards between the published level of a commitment and the time they must attest the availability of those shards
+- ``attestation_threshold`` (66): The percentage of shards attested for a given slot to declare the slot available
 - ``blocks_per_epoch`` (1): Unused. Could be removed in the future
-- ``page_size`` (4KiB): The size of a page (see :ref:`dal_slots`)
-- ``slot_size`` (1MiB): The size of a slot (see :ref:`dal_slots`)
-- ``redundancy_factor`` (16): The erasure-code factor (see :ref:`dal_slots`)
-- ``number_of_shards`` (2048): The number of shards per slot (see :ref:`dal_slots`)
+- ``page_size`` (3967B, ~4KiB): The size of a page (see :ref:`dal_slots`)
+- ``slot_size`` (126944B, ~1MiB): The size of a slot (see :ref:`dal_slots`)
+- ``redundancy_factor`` (8): The erasure-code factor (see :ref:`dal_slots`)
+- ``number_of_shards`` (512): The number of shards per slot (see :ref:`dal_slots`)
