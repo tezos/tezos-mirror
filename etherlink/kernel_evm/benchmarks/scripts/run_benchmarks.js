@@ -45,6 +45,8 @@ commander
     .option('--mode <mode>', 'Kernel mode: `proxy` or `sequencer`', parse_mode)
     .option('--no-computation', 'Don\'t expect stage 2', true)
     .option('--multi-blueprint', 'Send each transaction in a separate blueprint',false)
+    .option('--start <i>', 'Start with benchmark nb <i>', 0)
+    .option('--stop <i>', 'Stop at bench nb <i>', -1)
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -60,6 +62,7 @@ let MODE = commander.opts().mode || "proxy";
 let MULTI_BLUEPRINT = commander.opts().multiBlueprint;
 let KEEP_TEMP = commander.opts().keepTemp;
 let FAST_MODE = commander.opts().fastMode;
+
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
 const EVM_INSTALLER_KERNEL_PATH = external.resource('evm_benchmark_kernel.wasm');
 const EVM_BENCHMARK_CONFIG_PATH = external.resource('etherlink/config/benchmarking.yaml');
@@ -530,6 +533,7 @@ async function run_all_benchmarks(benchmark_scripts) {
 // we exclude bench_loop_calldataload because with the current tick model it
 // puts the kernel in a stuck mode
 const excluded_benchmark = ["benchmarks/bench_loop_calldataload.js"]
-benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(name))
-
-run_all_benchmarks(benchmark_scripts.filter(filter_name));
+let benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(name))
+let stop = commander.opts().stop;
+let start = commander.opts().start;
+run_all_benchmarks(benchmark_scripts.filter(filter_name).slice(start,stop));
