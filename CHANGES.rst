@@ -129,7 +129,7 @@ Baker
 - Fixed situations where the baker would stall when a signing request
   hanged. (MR :gl:`!12353`)
 
-- Introduced two new nonces files (``<chain_id>_stateful_nonces`` and 
+- Introduced two new nonces files (``<chain_id>_stateful_nonces`` and
   ``<chain_id>_orphaned_nonces``). Each nonce is registered with a state
   for optimising the nonce lookup, reducing the number of rpc calls
   required to calculate nonce revelations. (MR :gl:`!12517`)
@@ -222,3 +222,6 @@ Miscellaneous
   overflow.
 
 - Versions now include information about the product. (MR :gl:`!12366`)
+
+- **Breaking change** Multiple occurrence of same argument now
+  fails when using ``lib-clic``. (MR :gl:`!12780`)

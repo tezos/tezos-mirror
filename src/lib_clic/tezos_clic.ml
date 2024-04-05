@@ -1044,9 +1044,10 @@ let check_version_flag =
   | _ -> return_unit
 
 let add_occurrence long value acc =
-  match StringMap.find_opt long acc with
-  | Some v -> StringMap.add long v acc
-  | None -> StringMap.add long [value] acc
+  StringMap.update
+    long
+    (function Some v -> Some (v @ [value]) | None -> Some [value])
+    acc
 
 let make_args_dict_consume ?command spec args =
   let open Lwt_result_syntax in
