@@ -89,8 +89,7 @@
      *    - Total supply: An array containing total supply for each cycle.
      *    - Total delegated: An array containing total delegated tez for each cycle.
      */
-      import {Simulator, Delegate, total_supply_storage, total_frozen_stake_storage, total_delegated_storage}
-      from './app.js';
+      import {Simulator, Delegate} from './app.js';
 
       const config = {
         // Paris Protocol parameters - no need to change these values.
@@ -113,9 +112,6 @@
         // initial values for the chain
           chain: {
               ai_activation_cycle: 5,
-              total_frozen_stake: total_frozen_stake_storage,
-              total_supply: total_supply_storage,
-              total_delegated: total_delegated_storage,
           },
       };
 

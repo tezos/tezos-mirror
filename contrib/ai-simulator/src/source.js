@@ -1056,7 +1056,3 @@ export class Delegate {
     return this.#third_party_delegated_balance(cycle);
   }
 }
-
-export { total_frozen_stake_storage } from "./total_frozen_stake_storage";
-export { total_supply_storage } from "./total_supply_storage";
-export { total_delegated_storage } from "./total_delegated_storage";
