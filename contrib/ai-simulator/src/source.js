@@ -762,9 +762,13 @@ export class Delegate {
     const total_delegated =
       this.simulator.total_delegated_balance(adjusted_cycle);
 
-    const num = considered_staked.times(2).add(considered_delegated);
+    const num = this.simulator.is_ai_activated(adjusted_cycle)
+      ? considered_staked.times(2).add(considered_delegated)
+      : considered_staked.add(considered_delegated);
 
-    const den = total_staked.times(2).add(total_delegated);
+    const den = this.simulator.is_ai_activated(adjusted_cycle)
+      ? total_staked.times(2).add(total_delegated)
+      : total_staked.add(total_delegated);
 
     const baking_power = bigRat(num).divide(den);
 
