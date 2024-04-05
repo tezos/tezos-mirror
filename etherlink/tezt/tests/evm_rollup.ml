@@ -43,11 +43,6 @@ type full_evm_setup = {
   evm_node : Evm_node.t;
   endpoint : string;
   l1_contracts : l1_contracts option;
-  config :
-    [ `Config of Installer_kernel_config.t
-    | `Path of string
-    | `Both of Installer_kernel_config.instr list * string ]
-    option;
   kernel : string;
   kernel_root_hash : string;
 }
@@ -277,11 +272,14 @@ type setup_mode =
     }
   | Setup_proxy of {devmode : bool}
 
-let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
+let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(kernel_installee = Constant.WASM.evm_kernel)
     ?(originator_key = Constant.bootstrap1.public_key_hash)
     ?(rollup_operator_key = Constant.bootstrap1.public_key_hash)
-    ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
+    ?(bootstrap_accounts =
+      List.map
+        (fun account -> account.Eth_account.address)
+        (Array.to_list Eth_account.bootstrap_accounts))
     ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
@@ -308,7 +306,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
     else return None
   in
   (* If a L1 bridge was set up, we make the kernel aware of the address. *)
-  let base_config =
+  let* base_config =
     let ticketer = Option.map (fun {exchanger; _} -> exchanger) l1_contracts in
     let administrator =
       if with_administrator then
@@ -328,29 +326,27 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
       | Setup_proxy _ -> None
       | Setup_sequencer {sequencer; _} -> Some sequencer.public_key
     in
-    Configuration.make_config
-      ?kernel_root_hash
-      ~bootstrap_accounts
-      ?da_fee_per_byte
-      ?minimum_base_fee_per_gas
-      ?ticketer
-      ?administrator
-      ?kernel_governance
-      ?kernel_security_governance
-      ?sequencer
-      ?sequencer_governance:
-        (Option.bind l1_contracts (fun {sequencer_governance; _} ->
-             sequencer_governance))
-      ()
-  in
-  let config =
-    match (config, base_config) with
-    | Some (`Config config), Some (`Config base) ->
-        Some (`Config (base @ config))
-    | Some (`Path path), Some (`Config base) -> Some (`Both (base, path))
-    | None, _ -> base_config
-    | Some (`Config config), None -> Some (`Config config)
-    | Some (`Path path), None -> Some (`Path path)
+    let output_config = Temp.file "config.yaml" in
+    let*! () =
+      Evm_node.make_kernel_installer_config
+        ?kernel_root_hash
+        ~bootstrap_accounts
+        ?da_fee_per_byte
+        ?minimum_base_fee_per_gas
+        ?ticketer
+        ?administrator
+        ?kernel_governance
+        ?kernel_security_governance
+        ?sequencer
+        ?sequencer_governance:
+          (Option.bind l1_contracts (fun {sequencer_governance; _} ->
+               sequencer_governance))
+        ~output:output_config
+        ()
+    in
+    match additional_config with
+    | Some config -> return @@ `Both (config, output_config)
+    | None -> return @@ `Path output_config
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -364,7 +360,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
   let* {output; root_hash; _} =
-    prepare_installer_kernel ~preimages_dir ?config kernel_installee
+    prepare_installer_kernel ~preimages_dir ~config:base_config kernel_installee
   in
   let* sc_rollup_address =
     originate_sc_rollup
@@ -431,14 +427,14 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
       evm_node;
       endpoint;
       l1_contracts;
-      config;
       kernel = output;
       kernel_root_hash = root_hash;
     }
 
-let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?whitelist ?da_fee_per_byte
-    ?minimum_base_fee_per_gas ?rollup_operator_key ~setup_mode f =
+let register_test ~title ~tags ?additional_config ?admin ?uses
+    ?commitment_period ?challenge_window ?bootstrap_accounts ?whitelist
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?rollup_operator_key ~setup_mode
+    f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
@@ -463,8 +459,8 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
     (fun protocol ->
       let* evm_setup =
         setup_evm_kernel
+          ?additional_config
           ?whitelist
-          ?config
           ?commitment_period
           ?challenge_window
           ?bootstrap_accounts
@@ -477,11 +473,10 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
       in
       f ~protocol ~evm_setup)
 
-let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
+let register_proxy ~title ~tags ?uses ?admin ?commitment_period
     ?challenge_window ?bootstrap_accounts ?minimum_base_fee_per_gas f protocols
     =
   register_test
-    ?config
     ~title
     ~tags
     ?uses
@@ -494,15 +489,16 @@ let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
     protocols
     ~setup_mode:(Setup_proxy {devmode = true})
 
-let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
-    ?bootstrap_accounts ?da_fee_per_byte ?minimum_base_fee_per_gas ?config
-    ?time_between_blocks ?whitelist ?rollup_operator_key f protocols =
+let register_both ~title ~tags ?uses ?additional_config ?admin
+    ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
+    ?rollup_operator_key f protocols =
   let register =
     register_test
-      ?config
       ~title
       ~tags
       ?uses
+      ?additional_config
       ?admin
       ?commitment_period
       ?challenge_window
@@ -685,7 +681,7 @@ let test_rpc_getBalance =
       ~account:Eth_account.bootstrap_accounts.(0).address
       ~endpoint:evm_node_endpoint
   in
-  Check.((balance = Configuration.default_bootstrap_account_balance) Wei.typ)
+  Check.((balance = Helpers.default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
@@ -1501,7 +1497,7 @@ let transfer ?data ~da_fee_per_byte ~expected_execution_gas ~evm_setup () =
        } =
     make_transfer
       ?data
-      ~value:Wei.(Configuration.default_bootstrap_account_balance - one_eth)
+      ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
       ~sender
       ~receiver
       evm_setup
@@ -1648,7 +1644,7 @@ let test_simulate =
 
 let test_full_blocks =
   register_proxy
-    ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "full_blocks"]
     ~title:
       "Check `eth_getBlockByNumber` with full blocks returns the correct \
@@ -1742,7 +1738,7 @@ let test_inject_100_transactions =
   register_proxy
     ~tags:["evm"; "bigger_blocks"]
     ~title:"Check blocks can contain more than 64 transactions"
-    ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
@@ -1968,30 +1964,18 @@ let test_eth_call_storage_contract_eth_cli =
   register_both ~title ~tags test_f
 
 let test_preinitialized_evm_kernel =
-  let administrator_key_path = Durable_storage_path.admin in
-  let administrator_key = Eth_account.bootstrap_accounts.(0).address in
-  let config =
-    `Config
-      Sc_rollup_helpers.Installer_kernel_config.
-        [
-          Set
-            {
-              value = Hex.(of_string administrator_key |> show);
-              to_ = administrator_key_path;
-            };
-        ]
-  in
+  let admin = Constant.bootstrap1 in
   register_proxy
     ~tags:["evm"; "administrator"; "config"]
     ~title:"Creates a kernel with an initialized administrator key"
-    ~config
-  @@ fun ~protocol:_ ~evm_setup:{sc_rollup_node; _} ->
+    ~admin
+  @@ fun ~protocol:_ ~evm_setup:{sc_rollup_node; l1_contracts; _} ->
   let* found_administrator_key_hex =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
          ~operation:Sc_rollup_rpc.Value
-         ~key:administrator_key_path
+         ~key:Durable_storage_path.admin
          ()
   in
   let found_administrator_key =
@@ -1999,7 +1983,9 @@ let test_preinitialized_evm_kernel =
       (fun administrator -> Hex.to_string (`Hex administrator))
       found_administrator_key_hex
   in
-  Check.((Some administrator_key = found_administrator_key) (option string))
+  Check.(
+    (Option.map (fun l -> l.admin) l1_contracts = found_administrator_key)
+      (option string))
     ~error_msg:
       (sf "Expected to read %%L as administrator key, but found %%R instead") ;
   unit
@@ -2130,7 +2116,7 @@ let test_deposit_and_withdraw =
   register_proxy
     ~tags:["evm"; "deposit"; "withdraw"]
     ~title:"Deposit and withdraw tez"
-    ~admin:(Some admin)
+    ~admin
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -2661,25 +2647,19 @@ let test_rpc_getTransactionByHash =
   unit
 
 let test_rpc_getTransactionByBlockHashAndIndex =
-  let config =
-    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
-  in
   register_both
     ~tags:["evm"; "rpc"; "get_transaction_by"; "block_hash_and_index"]
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~config
+    ~bootstrap_accounts:Eth_account.lots_of_address
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
 
 let test_rpc_getTransactionByBlockNumberAndIndex =
-  let config =
-    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
-  in
   register_both
     ~tags:["evm"; "rpc"; "get_transaction_by"; "block_number_and_index"]
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~config
+    ~bootstrap_accounts:Eth_account.lots_of_address
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
 
 type storage_migration_results = {
@@ -2696,13 +2676,13 @@ type storage_migration_results = {
      on master.
    - everytime a new path/rpc/object is stored in the kernel, a new sanity check
      MUST be generated. *)
-let gen_kernel_migration_test ?config ?(admin = Constant.bootstrap5)
+let gen_kernel_migration_test ?bootstrap_accounts ?(admin = Constant.bootstrap5)
     ~scenario_prior ~scenario_after protocol =
   let* evm_setup =
     setup_evm_kernel
+      ?bootstrap_accounts
       ~da_fee_per_byte:Wei.zero
       ~minimum_base_fee_per_gas:(Wei.of_string "21000")
-      ?config
       ~kernel_installee:Constant.WASM.ghostnet_evm_kernel
       ~admin:(Some admin)
       protocol
@@ -2761,7 +2741,7 @@ let test_kernel_migration =
   let scenario_prior ~evm_setup =
     let* transfer_result =
       make_transfer
-        ~value:Wei.(Configuration.default_bootstrap_account_balance - one_eth)
+        ~value:Wei.(Helpers.default_bootstrap_account_balance - one_eth)
         ~sender
         ~receiver
         evm_setup
@@ -2908,7 +2888,7 @@ let test_cannot_prepayed_leads_to_no_inclusion =
     ~tags:["evm"; "prepay"; "inclusion"]
     ~title:
       "Not being able to prepay a transaction leads to it not being included."
-    ~bootstrap_accounts:[||]
+    ~bootstrap_accounts:[]
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   (* No bootstrap accounts, so no one has funds. *)
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
@@ -3239,9 +3219,6 @@ let test_transaction_storage_before_and_after_migration =
       ])
     ~title:"Transaction storage before and after migration"
   @@ fun protocol ->
-  let config =
-    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
-  in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 3) in
   let raw_txs, tx_hashes = List.split txs in
   let check_one evm_setup tx_hash =
@@ -3259,7 +3236,11 @@ let test_transaction_storage_before_and_after_migration =
   let scenario_after ~evm_setup ~sanity_check:() =
     Lwt_list.iter_p (check_one evm_setup) tx_hashes
   in
-  gen_kernel_migration_test ~config ~scenario_prior ~scenario_after protocol
+  gen_kernel_migration_test
+    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~scenario_prior
+    ~scenario_after
+    protocol
 
 let test_kernel_root_hash_originate_absent =
   Protocol.register_test
@@ -3345,15 +3326,12 @@ let get_block_transaction_count_by evm_node ~by arg =
   return JSON.(transaction_count |-> "result" |> as_int64)
 
 let test_rpc_getBlockTransactionCountBy =
-  let config =
-    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
-  in
   register_both
     ~tags:["evm"; "rpc"; "get_block_transaction_count_by"]
     ~title:
       "RPC methods eth_getBlockTransactionCountByHash and \
        eth_getBlockTransactionCountByNumber"
-    ~config
+    ~bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; client; _} = evm_setup in
@@ -4040,14 +4018,15 @@ let test_block_hash_regression =
       ])
     ~title:"Regression test for L2 block hash"
   @@ fun protocol ->
-  let config =
-    `Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml")
-  in
   (* We use a timestamp equal to the next day after genesis.
      The genesis timestamp can be found in tezt/lib_tezos/client.ml *)
   let* {evm_node; sc_rollup_node; client; _} =
     setup_evm_kernel
-      ~config
+      ~bootstrap_accounts:
+        (List.map
+           (fun account -> account.Eth_account.address)
+           (Array.to_list Eth_account.bootstrap_accounts)
+        @ Eth_account.lots_of_address)
       ~admin:None
       ~timestamp:(At (Option.get @@ Ptime.of_date (2018, 7, 1)))
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -4952,16 +4931,15 @@ let test_reveal_storage =
 
      The only way for this new rollup to see initialized balances is for the
      duplication process to work. *)
-  let config =
-    `Config
-      Sc_rollup_helpers.Installer_kernel_config.
-        [
-          Reveal
-            {
-              hash = configuration_root_hash;
-              to_ = Durable_storage_path.reveal_config;
-            };
-        ]
+  let additional_config =
+    Sc_rollup_helpers.Installer_kernel_config.
+      [
+        Reveal
+          {
+            hash = configuration_root_hash;
+            to_ = Durable_storage_path.reveal_config;
+          };
+      ]
   in
 
   (* Setup the new rollup, but do not force the installation of the kernel as
@@ -4969,9 +4947,9 @@ let test_reveal_storage =
   let* {evm_node; sc_rollup_node; client; _} =
     setup_evm_kernel
       ~admin:None
-      ~config
+      ~additional_config
       ~force_install_kernel:false
-      ~bootstrap_accounts:[||]
+      ~bootstrap_accounts:[]
       protocol
   in
 
@@ -5081,7 +5059,7 @@ let test_outbox_size_limit_resilience ~slow =
   register_proxy
     ~tags:(["evm"; "withdraw"; "outbox"] @ if slow then [Tag.slow] else [])
     ~title:(sf "Outbox size limit resilience (%s)" slow_str)
-    ~admin:(Some admin)
+    ~admin
     ~commitment_period
     ~challenge_window
   @@ fun ~protocol:_ ~evm_setup ->
@@ -5484,9 +5462,8 @@ let test_tx_pool_transaction_size_exceeded =
 let test_whitelist_is_executed =
   let rollup_operator_key = Constant.bootstrap1.public_key_hash in
   let whitelist = [rollup_operator_key] in
-  let config =
-    `Config
-      [Installer_kernel_config.Set {value = ""; to_ = "/evm/remove_whitelist"}]
+  let additional_config =
+    [Installer_kernel_config.Set {value = ""; to_ = "/evm/remove_whitelist"}]
   in
   let commitment_period = 5 and challenge_window = 5 in
   register_both
@@ -5494,7 +5471,7 @@ let test_whitelist_is_executed =
     ~commitment_period
     ~whitelist
     ~rollup_operator_key
-    ~config
+    ~additional_config
     ~tags:["evm"; "whitelist"; "update"]
     ~title:
       "Check that the kernel submit a whitelist update message when flag is \

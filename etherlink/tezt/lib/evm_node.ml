@@ -774,3 +774,54 @@ let wait_termination (evm_node : t) =
   | Running {process; _} ->
       let* _status = Process.wait process in
       unit
+
+let make_kernel_installer_config ?kernel_root_hash ?chain_id ?bootstrap_balance
+    ?bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
+    ?sequencer_governance ?kernel_governance ?kernel_security_governance
+    ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
+    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
+    ~output () =
+  let cmd =
+    ["make"; "kernel"; "installer"; "config"; output]
+    @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
+    @ Cli_arg.optional_arg "chain-id" string_of_int chain_id
+    @ Cli_arg.optional_arg "sequencer" Fun.id sequencer
+    @ Cli_arg.optional_arg "delayed-bridge" Fun.id delayed_bridge
+    @ Cli_arg.optional_arg "ticketer" Fun.id ticketer
+    @ Cli_arg.optional_arg "admin" Fun.id administrator
+    @ Cli_arg.optional_arg "sequencer-governance" Fun.id sequencer_governance
+    @ Cli_arg.optional_arg "kernel-governance" Fun.id kernel_governance
+    @ Cli_arg.optional_arg
+        "kernel-security-governance"
+        Fun.id
+        kernel_security_governance
+    @ Cli_arg.optional_arg
+        "minimum-base-fee-per-gas"
+        Wei.to_string
+        minimum_base_fee_per_gas
+    @ ["--da-fee-per-byte"; Wei.to_string da_fee_per_byte]
+    @ Cli_arg.optional_arg
+        "delayed-inbox-timeout"
+        string_of_int
+        delayed_inbox_timeout
+    @ Cli_arg.optional_arg
+        "delayed-inbox-min-levels"
+        string_of_int
+        delayed_inbox_min_levels
+    @ Cli_arg.optional_arg
+        "sequencer-pool-address"
+        Fun.id
+        sequencer_pool_address
+    @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
+    @
+    match bootstrap_accounts with
+    | None -> []
+    | Some bootstrap_accounts ->
+        List.flatten
+        @@ List.map
+             (fun bootstrap_account ->
+               ["--bootstrap-account"; bootstrap_account])
+             bootstrap_accounts
+  in
+  let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
+  Runnable.{value = process; run = Process.check}

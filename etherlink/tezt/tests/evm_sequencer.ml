@@ -140,11 +140,14 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
   return
     {delayed_transaction_bridge; exchanger; bridge; admin; sequencer_governance}
 
-let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
-    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
-    ?delayed_inbox_min_levels ?max_number_of_chunks
-    ?(bootstrap_accounts = Eth_account.bootstrap_accounts)
+let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks
+    ?(bootstrap_accounts =
+      List.map
+        (fun account -> account.Eth_account.address)
+        (Array.to_list Eth_account.bootstrap_accounts))
     ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir protocol =
@@ -162,9 +165,9 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       ~default:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
       preimages_dir
   in
-  let base_config =
-    Configuration.make_config
-      ~bootstrap_accounts
+  let output_config = Temp.file "config.yaml" in
+  let*! () =
+    Evm_node.make_kernel_installer_config
       ~sequencer:sequencer.public_key
       ~delayed_bridge:l1_contracts.delayed_transaction_bridge
       ~ticketer:l1_contracts.exchanger
@@ -175,18 +178,13 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
       ?sequencer_pool_address
+      ~bootstrap_accounts
+      ~output:output_config
       ()
   in
-  let config =
-    match (config, base_config) with
-    | Some (`Config config), Some (`Config base) ->
-        Some (`Config (base @ config))
-    | Some (`Path path), Some (`Config base) -> Some (`Both (base, path))
-    | None, _ -> base_config
-    | Some (`Config config), None -> Some (`Config config)
-    | Some (`Path path), None -> Some (`Path path)
+  let* {output; _} =
+    prepare_installer_kernel ~preimages_dir ~config:(`Path output_config) kernel
   in
-  let* {output; _} = prepare_installer_kernel ~preimages_dir ?config kernel in
   let* sc_rollup_address =
     originate_sc_rollup
       ~keys:[]
@@ -868,14 +866,10 @@ let test_delayed_transfer_is_included =
   let* () = check_delayed_inbox_is_empty ~sc_rollup_node in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
-  Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
-    ~error_msg:"Balance should be updated" ;
-  Check.((receiver_balance_prev <> receiver_balance_next) Wei.typ)
-    ~error_msg:"Balance should be updated" ;
   Check.((sender_balance_prev > sender_balance_next) Wei.typ)
-    ~error_msg:"Expected a smaller balance" ;
+    ~error_msg:"Expected a smaller sender balance (before: %L < after: %R)" ;
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
-    ~error_msg:"Expected a bigger balance" ;
+    ~error_msg:"Expected a bigger receiver balance (before: %L > after: %R)" ;
   let*@! (_receipt : Transaction.transaction_receipt) =
     Rpc.get_transaction_receipt ~tx_hash observer
   in
@@ -1618,13 +1612,9 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
   Check.((sender_balance_prev = sender_balance_next) Wei.typ)
-    ~error_msg:"Balance should be the same" ;
+    ~error_msg:"Sender balance should be the same (prev %L = next %R)" ;
   Check.((receiver_balance_prev = receiver_balance_next) Wei.typ)
-    ~error_msg:"Balance should be same" ;
-  Check.((sender_balance_prev = sender_balance_next) Wei.typ)
-    ~error_msg:"Expected equal balance" ;
-  Check.((receiver_balance_next = receiver_balance_prev) Wei.typ)
-    ~error_msg:"Expected equal balance" ;
+    ~error_msg:"Receiver balance should be the same (prev %L = next %R)" ;
   (* Wait until it's forced *)
   let* _ =
     repeat 15 (fun () ->
@@ -1633,14 +1623,10 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint in
   let* receiver_balance_next = Eth_cli.balance ~account:receiver ~endpoint in
-  Check.((sender_balance_prev <> sender_balance_next) Wei.typ)
-    ~error_msg:"Balance should be updated" ;
-  Check.((receiver_balance_prev <> receiver_balance_next) Wei.typ)
-    ~error_msg:"Balance should be updated" ;
   Check.((sender_balance_prev > sender_balance_next) Wei.typ)
-    ~error_msg:"Expected a smaller balance" ;
+    ~error_msg:"Expected a smaller sender balance (prev %L > next %R)" ;
   Check.((receiver_balance_next > receiver_balance_prev) Wei.typ)
-    ~error_msg:"Expected a bigger balance" ;
+    ~error_msg:"Expected a bigger receiver balance (next %L > prev %R)" ;
   unit
 
 (** This tests the situation where force kernel upgrade happens too soon. *)
@@ -1805,7 +1791,7 @@ let test_external_transaction_to_delayed_inbox_fails =
       protocol
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
       ~time_between_blocks:Nothing
-      ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+      ~bootstrap_accounts:Eth_account.lots_of_address
   in
   let* () = Evm_node.wait_for_blueprint_injected ~timeout:5. sequencer 0 in
   (* Bake a couple more levels for the blueprint to be final *)
@@ -2511,11 +2497,11 @@ let test_blueprint_is_limited_in_size =
   @@ fun protocol ->
   let* {sc_rollup_node; client; sequencer; _} =
     setup_sequencer
-      ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
       ~sequencer:Constant.bootstrap1
       ~time_between_blocks:Nothing
       ~max_number_of_chunks:2
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+      ~bootstrap_accounts:Eth_account.lots_of_address
       protocol
   in
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
@@ -2599,7 +2585,7 @@ let test_blueprint_limit_with_delayed_inbox =
   @@ fun protocol ->
   let* {sc_rollup_node; client; sequencer; sc_rollup_address; l1_contracts; _} =
     setup_sequencer
-      ~config:(`Path (kernel_inputs_path ^ "/100-inputs-for-proxy-config.yaml"))
+      ~bootstrap_accounts:Eth_account.lots_of_address
       ~sequencer:Constant.bootstrap1
       ~time_between_blocks:Nothing
       ~max_number_of_chunks:2

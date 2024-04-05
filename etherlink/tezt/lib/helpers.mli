@@ -167,3 +167,5 @@ val send_n_transactions :
   ?wait_for_blocks:int ->
   string list ->
   (Evm_node.request list * Transaction.transaction_receipt * string list) Lwt.t
+
+val default_bootstrap_account_balance : Wei.t
