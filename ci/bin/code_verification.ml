@@ -1674,6 +1674,16 @@ let jobs pipeline_type =
   let coverage =
     match pipeline_type with
     | Before_merging ->
+        (* Write the name of each job that produces coverage as input for other scripts.
+           Only includes the stem of the name: parallel jobs only appear once.
+           E.g. as [tezt], not [tezt 1/60], [tezt 2/60], etc. *)
+        Base.write_file
+          "script-inputs/ci-coverage-producing-jobs"
+          ~contents:
+            (String.concat
+               "\n"
+               (List.map Tezos_ci.name_of_tezos_job !jobs_with_coverage_output)
+            ^ "\n") ;
         (* This job fetches coverage files by precedent test stage. It creates
            the html, summary and cobertura reports. It also provide a coverage %
            for the merge request. *)

@@ -33,34 +33,20 @@ let default_branch =
 let coverage_traces_directory =
   Sys.getenv_opt "COVERAGE_OUTPUT" |> Option.value ~default:"_coverage_output"
 
-let coverage_yml_path =
-  ".gitlab/ci/jobs/coverage/oc.unified_coverage-before_merging.yml"
+let coverage_jobs_path = "script-inputs/ci-coverage-producing-jobs"
 
-(** Read {!coverage_yml_path} to find the set of
-    jobs from which to collect coverage traces *)
+(** Read {!coverage_jobs_path} to find the set of jobs from which to
+    collect coverage traces *)
 let coverage_jobs =
-  let coverage_yml =
-    Base.read_file coverage_yml_path |> String.split_on_char '\n'
-  in
-  let _, coverage_yml =
-    Base.span (fun line -> not (line =~ rex "^\\s+dependencies:$")) coverage_yml
-  in
-  let coverage_jobs, _ =
-    Base.span (fun line -> not (line =~ rex "^\\s+script:$")) coverage_yml
-  in
+  (* Note: the contents of this file only includes the stem of each job name. *)
   let coverage_jobs =
-    List.map
-      (function
-        | line -> (
-            match line =~* rex {|- "(.*)"|} with
-            | Some job_name -> job_name
-            | None ->
-                Test.fail "Unexpected line %S in %s" line coverage_yml_path))
-      (List.tl coverage_jobs)
+    Base.read_file coverage_jobs_path
+    |> String.split_on_char '\n'
+    |> List.filter (( <> ) "")
   in
   Log.debug
     "From %s, read coverage jobs: [%s]"
-    coverage_yml_path
+    coverage_jobs_path
     (String.concat ", " coverage_jobs) ;
   coverage_jobs
 
@@ -79,6 +65,7 @@ let fetch_pipeline_coverage_from_jobs pipeline =
   let get_coverage_trace job =
     let job_id = JSON.(job |-> "id" |> as_int) in
     let job_name = JSON.(job |-> "name" |> as_string) in
+    let job_status = JSON.(job |-> "status" |> as_string) in
     let artifact_name =
       Base.replace_string (rex "[\\\\/_ @\\[\\]]+") job_name ~by:"-"
       ^ ".coverage"
@@ -86,7 +73,17 @@ let fetch_pipeline_coverage_from_jobs pipeline =
          job_names are mangled into coverage trace artifact paths. *)
     in
     let artifact_path = coverage_traces_directory // artifact_name in
-    if List.mem job_name coverage_jobs then
+    if
+      (job_status = "success" || job_status = "failed")
+      && List.exists
+           (fun coverage_job_stem ->
+             job_name = coverage_job_stem
+             (* vector parallel *)
+             || job_name =~ rex ("^" ^ coverage_job_stem ^ " \\d+/\\d+$")
+             || (* matrix parallel *)
+             job_name =~ rex ("^" ^ coverage_job_stem ^ ": \\[.*\\]$"))
+           coverage_jobs
+    then
       Some
         ( Gitlab.project_job_artifact ~project ~job_id ~artifact_path (),
           job_name,

@@ -53,6 +53,8 @@ type tezos_job = {
   source_position : string * int * int * int;
 }
 
+let name_of_tezos_job tezos_job = tezos_job.job.name
+
 let map_job (tezos_job : tezos_job)
     (f : Gitlab_ci.Types.job -> Gitlab_ci.Types.job) : tezos_job =
   {tezos_job with job = f tezos_job.job}
