@@ -1840,6 +1840,15 @@ let irmin_pack_unix =
     ~preprocess:[pps ppx_irmin_internal]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
+let irmin_test_helpers =
+  octez_internal_lib
+    "irmin_test_helpers"
+    ~path:"irmin/test/helpers"
+    ~deps:
+      [alcotezt; astring; fmt; irmin; jsonm; logs; lwt; mtime; mtime_clock_os]
+    ~preprocess:[pps ppx_irmin_internal]
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+
 let octez_clic =
   octez_lib
     "clic"
@@ -2722,6 +2731,7 @@ let _irmin_tests =
         octez_context_disk;
         octez_context_memory;
         octez_context_encoding;
+        irmin_test_helpers;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
