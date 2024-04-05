@@ -40,12 +40,3 @@ val shard :
     unit,
     Tezos_crypto_dal.Cryptobox.shard )
   Tezos_rpc.Service.service
-
-val shards :
-  ( [`POST],
-    unit,
-    unit * Tezos_crypto_dal.Cryptobox.commitment,
-    unit,
-    int trace,
-    Tezos_crypto_dal.Cryptobox.shard list )
-  Tezos_rpc.Service.service
