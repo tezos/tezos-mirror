@@ -66,6 +66,8 @@ type injector = {
           never included is retried. *)
 }
 
+type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
+
 type gc_parameters = {
   frequency_in_blocks : int32;  (** Frequency at which the GC is triggered. *)
   context_splitting_period : int option;
@@ -88,7 +90,7 @@ type t = {
   acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
   metrics_addr : string option;
   reconnection_delay : float;
-  fee_parameters : Operation_kind.fee_parameters;
+  fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   (*DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3718
@@ -160,7 +162,7 @@ val default_fee_parameter : Operation_kind.t -> Injector_common.fee_parameter
 
 (** [default_fee_parameters] is the default fee parameters configuration build
     with {!default_fee_parameter} for all purposes. *)
-val default_fee_parameters : Operation_kind.fee_parameters
+val default_fee_parameters : fee_parameters
 
 (** [default_batcher] is the default configuration parameters for the batcher. *)
 val default_batcher : batcher

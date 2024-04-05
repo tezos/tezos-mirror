@@ -329,6 +329,19 @@ module type S = sig
   (** The status of an operation in the injector. *)
   val operation_status : Inj_operation.Id.t -> status option
 
+  (** Returns the total operations per worker queue and in total. This function
+      is constant time excepted for the injectors iteration.  *)
+  val total_queued_operations : unit -> (tag list * int) list * int
+
+  (** Returns the queues of the injectors, with the oldest elements first. If
+      [tag] is provided, returns the queue for the injector which handles this
+      tag. *)
+  val get_queues : ?tag:tag -> unit -> (tag list * Inj_operation.t list) list
+
+  (** Clears the injectors queues completely. If [tag] is provided, only queues
+      for the injector which handles this tag is cleared. *)
+  val clear_queues : ?tag:tag -> unit -> unit tzresult Lwt.t
+
   (** Register a protocol client for a specific protocol to be used by the
       injector. This function {b must} be called for all protocols that the
       injector is meant support. *)

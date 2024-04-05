@@ -43,6 +43,8 @@ type batcher = {
 
 type injector = {retention_period : int; attempts : int; injection_ttl : int}
 
+type fee_parameters = Injector_common.fee_parameter Operation_kind.Map.t
+
 type gc_parameters = {
   frequency_in_blocks : int32;
   context_splitting_period : int option;
@@ -59,7 +61,7 @@ type t = {
   acl : Tezos_rpc_http_server.RPC_server.Acl.policy;
   metrics_addr : string option;
   reconnection_delay : float;
-  fee_parameters : Operation_kind.fee_parameters;
+  fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   dal_node_endpoint : Uri.t option;
@@ -381,6 +383,11 @@ let injector_encoding : injector Data_encoding.t =
        (dft "attempts" uint16 default_injector.attempts)
        (dft "injection_ttl" uint16 default_injector.injection_ttl)
 
+let fee_parameters_encoding =
+  Operation_kind.map_encoding (fun operation_kind ->
+      Injector_common.fee_parameter_encoding
+        ~default_fee_parameter:(default_fee_parameter operation_kind))
+
 let gc_parameters_encoding : gc_parameters Data_encoding.t =
   let open Data_encoding in
   conv
@@ -565,7 +572,7 @@ let encoding default_display : t Data_encoding.t =
                 ~description:
                   "The fee parameters for each purpose used when injecting \
                    operations in L1"
-                (Operation_kind.fee_parameters_encoding ~default_fee_parameter)
+                fee_parameters_encoding
                 default_fee_parameters)
              (req
                 ~description:"The mode for this rollup node"

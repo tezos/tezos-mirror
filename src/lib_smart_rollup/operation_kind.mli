@@ -1,9 +1,11 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* SPDX-FileCopyrightText: 2021-2024 Nomadic Labs <contact@nomadic-labs.com> *)
+(* SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>          *)
+(* SPDX-FileCopyrightText: 2023-2024 Marigold <contact@marigold.dev>         *)
+(* SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>         *)
+(*                                                                           *)
 (*****************************************************************************)
 
 (** The kind of operations that can be injected by the rollup node. *)
@@ -21,8 +23,6 @@ val all : t list
 
 module Map : Map.S with type key = t
 
-type fee_parameters = Injector_common.fee_parameter Map.t
-
 (** [to_string o] returns a string representation of operation_kind
     [o]. *)
 val to_string : t -> string
@@ -37,6 +37,4 @@ val of_string_exn : string -> t
 
 val encoding : t Data_encoding.t
 
-val fee_parameters_encoding :
-  default_fee_parameter:(t -> Injector_common.fee_parameter) ->
-  Injector_common.fee_parameter Map.t Data_encoding.t
+val map_encoding : (t -> 'value Data_encoding.t) -> 'value Map.t Data_encoding.t

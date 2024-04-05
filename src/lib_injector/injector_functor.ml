@@ -1516,5 +1516,72 @@ module Make (Parameters : PARAMETERS) = struct
       (fun (_signer, w) -> op_status_in_worker (Worker.state w) l1_hash)
       workers
 
+  let total_queued_operations () =
+    let workers = Worker.list table in
+    List.fold_left
+      (fun (acc, total) (tags, w) ->
+        let state = Worker.state w in
+        let len = Op_queue.length state.queue in
+        let tag_list = Tags.to_seq tags |> List.of_seq in
+        ((tag_list, len) :: acc, total + len))
+      ([], 0)
+      workers
+
+  let get_queues ?tag () =
+    let workers = Worker.list table in
+    List.fold_left
+      (fun acc (tags, w) ->
+        let to_count =
+          match tag with None -> true | Some tag -> Tags.mem tag tags
+        in
+        if not to_count then acc
+        else
+          let state = Worker.state w in
+          let queue = Op_queue.elements state.queue in
+          let tag_list = Tags.to_seq tags |> List.of_seq in
+          (tag_list, queue) :: acc)
+      []
+      workers
+
+  let clear_all_queues () =
+    let workers = Worker.list table in
+    List.iter_p
+      (fun (_tags, w) ->
+        let state = Worker.state w in
+        Injected_operations.clear state.injected.injected_operations ;
+        Injected_ophs.clear state.injected.injected_ophs ;
+        Included_operations.clear state.included.included_operations ;
+        Included_in_blocks.clear state.included.included_in_blocks ;
+        Op_queue.clear state.queue)
+      workers
+
+  let remove_operations_with_tag tag state =
+    let open Lwt_result_syntax in
+    Op_queue.fold
+      (fun id op acc ->
+        if Parameters.Tag.equal (Parameters.operation_tag op.operation) tag then
+          let* () = Op_queue.remove state.queue id in
+          acc
+        else acc)
+      state.queue
+      return_unit
+
+  let clear_queues ?tag () =
+    let open Lwt_result_syntax in
+    match tag with
+    | None ->
+        let*! () = clear_all_queues () in
+        return_unit
+    | Some tag ->
+        let workers = Worker.list table in
+        List.iter_ep
+          (fun (tags, w) ->
+            let to_clean = Tags.mem tag tags in
+            if not to_clean then return_unit
+            else
+              let state = Worker.state w in
+              remove_operations_with_tag tag state)
+          workers
+
   let register_proto_client = Inj_proto.register
 end

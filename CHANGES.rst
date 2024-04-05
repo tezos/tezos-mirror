@@ -206,6 +206,8 @@ Smart Rollup node
 - Added new administrative RPCs ``/health``, ``/version``, ``/stats/ocaml_gc``,
   ``/stats/memory``, and ``/config``. (MR :gl:`!12718`)
 
+- Administrative RPCs to inspect injector queues and clear them. (MR :gl:`!12497`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
