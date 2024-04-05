@@ -122,7 +122,11 @@
       // Creation of the simulator using the above configuration.
       const simulator = new Simulator(config);
 
-      // Creation of a delegate, which stake's evolution will be displayed in the data table.
+      simulator.set_total_supply(0, 997_513_562_000_000);
+      simulator.set_total_staked(config.proto.consensus_rights_delay + 1, 67_263_199_000_000);
+      simulator.set_total_delegated(0, 604961288973100);
+
+      // Creation of a delegate, whose stake's evolution will be displayed in the data table.
 
       // Delegate configuration.
       const delegate_config = {
