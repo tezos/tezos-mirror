@@ -542,6 +542,10 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ~name
     script
 
+type product = Octez | Etherlink
+
+let product_prefix = function Octez -> "oc" | Etherlink -> "eth"
+
 (* This version of the job builds both released and experimental executables.
    It is used in the following pipelines:
    - Before merging: check whether static executables still compile,
@@ -552,18 +556,25 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(release = false) ?rules
+let job_build_static_binaries ~__POS__ ~product ~arch ?(release = false) ?rules
     ?dependencies () : tezos_job =
   let arch_string = arch_to_string arch in
-  let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
+  let name =
+    String.concat
+      ""
+      [product_prefix product; ".build:static-"; arch_string; "-linux-binaries"]
+  in
   let artifacts =
     (* Extend the lifespan to prevent failure for external tools using artifacts. *)
     let expire_in = if release then Some (Duration (Days 90)) else None in
     artifacts ?expire_in ["octez-binaries/$ARCH/*"]
   in
   let executable_files =
-    "script-inputs/released-executables"
-    ^ if not release then " script-inputs/experimental-executables" else ""
+    match product with
+    | Octez ->
+        "script-inputs/released-executables"
+        ^ if not release then " script-inputs/experimental-executables" else ""
+    | Etherlink -> "script-inputs/etherlink-executables"
   in
   job
     ?rules
@@ -731,9 +742,12 @@ let bin_package_image =
   Image.register ~name:"generic" ~image_path:"$DISTRIBUTION"
 
 let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
-    ?(stage = Stages.build) ~arch ~target () : tezos_job =
+    ?(stage = Stages.build) ~product ~arch ~target () : tezos_job =
   let arch_string = arch_to_string_alt arch in
   let target_string = match target with Dpkg -> "dpkg" | Rpm -> "rpm" in
+  let product_string =
+    match product with Octez -> "octez" | Etherlink -> "etherlink"
+  in
   let image = bin_package_image in
   let parallel =
     let distributions =
@@ -775,6 +789,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     ~stage
     ~variables:
       [
+        ("OCTEZ_PKGNAME", product_string);
         ("TARGET", target_string);
         ("OCTEZ_PKGMAINTAINER", "nomadic-labs");
         ("BLST_PORTABLE", "yes");
@@ -797,24 +812,28 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "DISTRO=$(echo \"$DISTRIBUTION\" | cut -d':' -f1)";
       "RELEASE=$(echo \"$DISTRIBUTION\" | cut -d':' -f2)";
       "mkdir -p packages/$DISTRO/$RELEASE";
-      "mv octez-*.* packages/$DISTRO/$RELEASE/";
+      sf "mv %s-*.* packages/$DISTRO/$RELEASE/" product_string;
     ]
 
-let job_build_dpkg_amd64 : unit -> tezos_job =
+let job_build_dpkg_amd64 product : tezos_job =
   job_build_bin_package
     ~__POS__
-    ~name:"oc.build:dpkg:amd64"
+    ~name:(product_prefix product ^ ".build:dpkg:amd64")
+    ~product
     ~target:Dpkg
     ~arch:Amd64
     ~dependencies:(Dependent [])
+    ()
 
-let job_build_rpm_amd64 : unit -> tezos_job =
+let job_build_rpm_amd64 product : tezos_job =
   job_build_bin_package
     ~__POS__
-    ~name:"oc.build:rpm:amd64"
+    ~name:(product_prefix product ^ ".build:rpm:amd64")
+    ~product
     ~target:Rpm
     ~arch:Amd64
     ~dependencies:(Dependent [])
+    ()
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?(release = false)
     ?dependencies () =
