@@ -32,6 +32,13 @@ directory is under the
 \*`test` is a directory containing **unforked** tests from built for octez
 purposes that are using the `irmin` libraries.
 
+### Tests
+
+| Category | Local path | Upstream |
+| -------- | --------- | -------- |
+| `irmin-mem`    | `./test/irmin-mem` | [`test/irmin-mem`](https://github.com/mirage/irmin/tree/main/test/irmin-mem) |
+
+
 ## To-do before modifying the code
 
 - Import Irmin's tests, and ideally benches.
