@@ -280,6 +280,8 @@ module M015 = PtLimaPt_machine.M
 module M016 = PtMumbai_machine.M
 module M017 = PtNairob_machine.M
 module M018 = Proxford_machine.M
+module M019A = PtParisA_machine.M
+module M019B = PtParisB_machine.M
 
 module Client_config = struct
   include Client_config
