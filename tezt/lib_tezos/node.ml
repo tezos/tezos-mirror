@@ -224,6 +224,8 @@ let rpc_port node = node.persistent_state.rpc_port
 let rpc_endpoint node =
   sf "%s://%s:%d" (rpc_scheme node) (rpc_host node) (rpc_port node)
 
+let metrics_port node = node.persistent_state.metrics_port
+
 let data_dir node = node.persistent_state.data_dir
 
 let runner node = node.persistent_state.runner

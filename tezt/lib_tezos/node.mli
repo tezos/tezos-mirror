@@ -237,6 +237,8 @@ val net_port : t -> int
 (** Get the network port given as [--advertised-net-port] to a node. *)
 val advertised_net_port : t -> int option
 
+val metrics_port : t -> int
+
 (** Get the RPC scheme of a node.
 
     Returns [https] if node is started with [--rpc-tls], otherwise [http] *)

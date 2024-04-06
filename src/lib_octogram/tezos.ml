@@ -484,20 +484,19 @@ module Start_octez_node = struct
   let setup_octez_node ~network ~sync_threshold ~path_node ~metrics_port
       ~rpc_port ~net_port ~peers ?name ?snapshot ?dal_cryptobox_parameters () =
     let l1_node_args =
-      Node.
-        [
-          (* By default, Tezt set the difficulty to generate the identity file
-             of the Octez node to 0 (`--expected-pow 0`). The default value
-             used in network like mainnet, Weeklynet etc. is 26 (see
-             `lib_node_config/config_file.ml`). *)
-          Expected_pow 0;
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
+      [
+        (* By default, Tezt set the difficulty to generate the identity file
+           of the Octez node to 0 (`--expected-pow 0`). The default value
+           used in network like mainnet, Weeklynet etc. is 26 (see
+           `lib_node_config/config_file.ml`). *)
+        Node.Expected_pow 0;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6283
 
-             Use default PoW and add an option to override it. *)
-          Synchronisation_threshold sync_threshold;
-          Network network;
-          Metrics_addr (sf "0.0.0.0:%d" metrics_port);
-        ]
+           Use default PoW and add an option to override it. *)
+        Synchronisation_threshold sync_threshold;
+        Network network;
+        Metrics_addr (sf "0.0.0.0:%d" metrics_port);
+      ]
       @ List.map (fun x -> Node.Peer x) peers
     in
     let node =
