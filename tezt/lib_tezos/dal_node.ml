@@ -337,3 +337,27 @@ let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
   Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+
+module Agent = struct
+  let create ?(path = Uses.path Constant.octez_dal_node |> Filename.basename)
+      ?name ~node agent =
+    let* path = Agent.copy agent ~source:path in
+    let runner = Agent.runner agent in
+    let rpc_host = "0.0.0.0" in
+    let rpc_port = Agent.next_available_port agent in
+    let net_port = Agent.next_available_port agent in
+    let metrics_port = Agent.next_available_port agent in
+    let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
+    let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
+    create
+      ?name
+      ~path
+      ~runner
+      ~rpc_host
+      ~rpc_port
+      ~metrics_addr
+      ~listen_addr
+      ~node
+      ()
+    |> Lwt.return
+end
