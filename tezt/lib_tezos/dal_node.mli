@@ -87,6 +87,8 @@ val listen_addr : t -> string
 (** Get the node's metrics server point pair "address:port" given as [--metrics-addr] to a dal node. *)
 val metrics_addr : t -> string
 
+val metrics_port : t -> int
+
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
 

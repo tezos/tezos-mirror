@@ -77,6 +77,12 @@ let public_addr dal_node = dal_node.persistent_state.public_addr
 
 let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 
+let metrics_port dal_node =
+  try
+    dal_node.persistent_state.metrics_addr |> String.split_on_char ':'
+    |> Fun.flip List.nth 1 |> int_of_string
+  with _ -> 11733
+
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
 let spawn_command dal_node =
