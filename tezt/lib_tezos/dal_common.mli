@@ -65,6 +65,7 @@ module Helpers : sig
     ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 
   val publish_commitment :
+    ?dont_wait:bool ->
     ?counter:int ->
     ?force:bool ->
     ?source:Account.key ->

@@ -126,11 +126,14 @@ val byte_size :
   Client.t ->
   int Lwt.t
 
-(** [inject ?(request=`Inject) ?(force=false) ?(signature=None)
+(** [inject dont_wait ?(request=`Inject) ?(force=false) ?(signature=None)
    ?(error=None) t] injects an operation into the node. The node is
    extracted from the [Client]. If a node cannot be extracted, the
    injection fails. If the injection succeeds, the hash of the
    operation is returned.
+
+   @param dont_wait If [true], the operation is injected without waiting 
+   on some node event. Making [request] ignore. Default is [false].
 
    @param request If [`Inject], we do not wait the [prevalidator] to
    classify the operation. This can create some flakyness in the test
@@ -153,6 +156,7 @@ val byte_size :
    @param error If the injection is expecting to fail, allows to
    specify the expected error.  *)
 val inject :
+  ?dont_wait:bool ->
   ?request:[`Inject | `Notify] ->
   ?force:bool ->
   ?protocol:Protocol.t ->
@@ -600,6 +604,7 @@ module Manager : sig
      recovered via RPCs. Mainly those are the [branch] and the
      [counter]. *)
   val inject :
+    ?dont_wait:bool ->
     ?request:[`Inject | `Notify] ->
     ?force:bool ->
     ?branch:string ->
