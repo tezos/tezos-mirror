@@ -100,6 +100,20 @@ val arg :
   ('a, 'ctx) parameter ->
   ('a option, 'ctx) arg
 
+(** [multiple_arg ~doc ~long ?short converter] creates an argument to
+    a command.  The [~long] argument is the long format, without the
+    double dashes. The [?short] argument is the optional one letter
+    shortcut. If the argument is not provided, [None] is
+    returned. Multiple occurrence of the argument is allowed in the
+    command. *)
+val multiple_arg :
+  doc:string ->
+  ?short:char ->
+  long:string ->
+  placeholder:string ->
+  ('a, 'ctx) parameter ->
+  ('a list option, 'ctx) arg
+
 (** Create an argument that will contain the [~default] value if it is not provided. *)
 val default_arg :
   doc:string ->

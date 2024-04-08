@@ -2336,7 +2336,7 @@ let spawn_list_protocols mode client =
     | `Light -> "light"
     | `Proxy -> "proxy"
   in
-  spawn_command client (mode_arg client @ ["list"; mode_str; "protocols"])
+  spawn_command client ["list"; mode_str; "protocols"]
 
 let list_protocols mode client =
   let* output =
@@ -2358,9 +2358,7 @@ let list_understood_protocols ?config_file client =
   return (parse_list_protocols_output output)
 
 let spawn_migrate_mockup ~next_protocol client =
-  spawn_command
-    client
-    (mode_arg client @ ["migrate"; "mockup"; "to"; Protocol.hash next_protocol])
+  spawn_command client ["migrate"; "mockup"; "to"; Protocol.hash next_protocol]
 
 let migrate_mockup ~next_protocol client =
   spawn_migrate_mockup ~next_protocol client |> Process.check
