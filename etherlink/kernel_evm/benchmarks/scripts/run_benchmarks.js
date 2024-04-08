@@ -489,6 +489,7 @@ function initialize_headers(output, benchmark_log) {
 
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
+    if(benchmark_scripts.length === 0) exit();
     console.log(`Running benchmarks on: \n[ ${benchmark_scripts.join(',\n  ')}]`);
     var precompiles_field = [
         "address",
