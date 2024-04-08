@@ -59,6 +59,8 @@ type t = {
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
   tx_pool_timeout_limit : int64;
+  tx_pool_addr_limit : int64;
+  tx_pool_tx_per_addr_limit : int64;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -122,6 +124,8 @@ module Cli : sig
     ?sequencer:sequencer ->
     ?observer:observer ->
     ?tx_pool_timeout_limit:int64 ->
+    ?tx_pool_addr_limit:int64 ->
+    ?tx_pool_tx_per_addr_limit:int64 ->
     unit ->
     t
 
@@ -137,6 +141,8 @@ module Cli : sig
     ?sequencer:sequencer ->
     ?observer:observer ->
     ?tx_pool_timeout_limit:int64 ->
+    ?tx_pool_addr_limit:int64 ->
+    ?tx_pool_tx_per_addr_limit:int64 ->
     unit ->
     t tzresult Lwt.t
 end

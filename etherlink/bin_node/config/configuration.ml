@@ -45,6 +45,8 @@ type t = {
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
   tx_pool_timeout_limit : int64;
+  tx_pool_addr_limit : int64;
+  tx_pool_tx_per_addr_limit : int64;
 }
 
 let default_filter_config =
@@ -85,6 +87,10 @@ let hard_maximum_number_of_chunks =
 let default_max_number_of_chunks = hard_maximum_number_of_chunks
 
 let default_tx_pool_timeout_limit = Int64.of_int 3600
+
+let default_tx_pool_addr_limit = Int64.of_int 4000
+
+let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 
 let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
     ?max_number_of_chunks ?private_rpc_port ~rollup_node_endpoint ~sequencer ()
@@ -221,6 +227,8 @@ let encoding : t Data_encoding.t =
            observer;
            max_active_connections;
            tx_pool_timeout_limit;
+           tx_pool_addr_limit;
+           tx_pool_tx_per_addr_limit;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -232,7 +240,8 @@ let encoding : t Data_encoding.t =
           sequencer,
           observer,
           max_active_connections ),
-        tx_pool_timeout_limit ))
+        (tx_pool_timeout_limit, tx_pool_addr_limit, tx_pool_tx_per_addr_limit)
+      ))
     (fun ( ( rpc_addr,
              rpc_port,
              devmode,
@@ -243,7 +252,8 @@ let encoding : t Data_encoding.t =
              sequencer,
              observer,
              max_active_connections ),
-           tx_pool_timeout_limit ) ->
+           (tx_pool_timeout_limit, tx_pool_addr_limit, tx_pool_tx_per_addr_limit)
+         ) ->
       {
         rpc_addr;
         rpc_port;
@@ -256,6 +266,8 @@ let encoding : t Data_encoding.t =
         observer;
         max_active_connections;
         tx_pool_timeout_limit;
+        tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit;
       })
     (merge_objs
        (obj10
@@ -273,13 +285,26 @@ let encoding : t Data_encoding.t =
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
              default_max_active_connections))
-       (obj1
+       (obj3
           (dft
              "tx-pool-timeout-limit"
              ~description:
                "Transaction timeout limit inside the transaction pool"
              int64
-             default_tx_pool_timeout_limit)))
+             default_tx_pool_timeout_limit)
+          (dft
+             "tx-pool-addr-limit"
+             ~description:
+               "Maximum allowed addresses inside the transaction pool."
+             int64
+             default_tx_pool_addr_limit)
+          (dft
+             "tx-pool-tx-per-addr-limit"
+             ~description:
+               "Maximum allowed transactions per user address inside the \
+                transaction pool."
+             int64
+             default_tx_pool_tx_per_addr_limit)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -313,7 +338,8 @@ let observer_config_exn {observer; _} =
 
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ?proxy ?sequencer ?observer ?tx_pool_timeout_limit () =
+      ?log_filter ?proxy ?sequencer ?observer ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit () =
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -329,11 +355,18 @@ module Cli = struct
         Option.value
           ~default:default_tx_pool_timeout_limit
           tx_pool_timeout_limit;
+      tx_pool_addr_limit =
+        Option.value ~default:default_tx_pool_addr_limit tx_pool_addr_limit;
+      tx_pool_tx_per_addr_limit =
+        Option.value
+          ~default:default_tx_pool_tx_per_addr_limit
+          tx_pool_tx_per_addr_limit;
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?log_filter ?proxy ?sequencer ?observer
-      ?tx_pool_timeout_limit configuration =
+      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+      configuration =
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -351,11 +384,19 @@ module Cli = struct
         Option.value
           ~default:configuration.tx_pool_timeout_limit
           tx_pool_timeout_limit;
+      tx_pool_addr_limit =
+        Option.value
+          ~default:configuration.tx_pool_addr_limit
+          tx_pool_addr_limit;
+      tx_pool_tx_per_addr_limit =
+        Option.value
+          ~default:configuration.tx_pool_tx_per_addr_limit
+          tx_pool_tx_per_addr_limit;
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?log_filter ?proxy ?sequencer ?observer
-      ?tx_pool_timeout_limit () =
+      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -388,6 +429,8 @@ module Cli = struct
           ?sequencer
           ?observer
           ?tx_pool_timeout_limit
+          ?tx_pool_addr_limit
+          ?tx_pool_tx_per_addr_limit
           configuration
       in
       return configuration
@@ -404,6 +447,8 @@ module Cli = struct
           ?sequencer
           ?observer
           ?tx_pool_timeout_limit
+          ?tx_pool_addr_limit
+          ?tx_pool_tx_per_addr_limit
           ()
       in
       return config
