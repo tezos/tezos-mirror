@@ -259,6 +259,9 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
             smart_rollup_address;
         mode = Observer;
         tx_timeout_limit = config.tx_pool_timeout_limit;
+        tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit =
+          Int64.to_int config.tx_pool_tx_per_addr_limit;
       }
   in
 

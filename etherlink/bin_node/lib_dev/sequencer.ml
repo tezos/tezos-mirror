@@ -244,6 +244,9 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
         smart_rollup_address;
         mode = Sequencer;
         tx_timeout_limit = configuration.tx_pool_timeout_limit;
+        tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit =
+          Int64.to_int configuration.tx_pool_tx_per_addr_limit;
       }
   in
   let* () =
