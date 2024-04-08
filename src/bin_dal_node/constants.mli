@@ -48,3 +48,8 @@ val shards_verification_sampling_frequency : int
 val amplification_random_delay_min : float
 
 val amplification_random_delay_max : float
+
+(* During amplification, if the forked process takes more time than
+   this timeout to send the proved shards, then amplification attempt
+   is aborted to avoid keeping a pending promise forever. *)
+val amplification_timeout : float
