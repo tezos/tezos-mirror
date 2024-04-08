@@ -237,7 +237,6 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
               Option.value slash_history_opt_o ~default:[]
               |> List.map (fun (a, b) -> (a, Percentage.convert_from_o_to_p b))
             in
-
             let* slash_history_opt =
               Storage.Slashed_deposits.find ctxt delegate
             in

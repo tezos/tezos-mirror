@@ -1113,9 +1113,6 @@ module Slashed_deposits =
 
 (** Per cycle storage *)
 
-(* TODO #6957: Remove this from protocol Q. *)
-type denounced__Oxford = {for_double_attesting : bool; for_double_baking : bool}
-
 type denounced = {
   for_double_preattesting : bool;
   for_double_attesting : bool;
@@ -1168,29 +1165,6 @@ module Cycle = struct
               {for_double_preattesting; for_double_attesting; for_double_baking})
             (obj3
                (req "for_double_preattesting" bool)
-               (req "for_double_attesting" bool)
-               (req "for_double_baking" bool))
-      end)
-
-  (* TODO #6957: Remove this from protocol Q. *)
-  module Already_denounced__Oxford =
-    Make_indexed_data_storage
-      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
-         (struct
-           let name = ["slashed_deposits"]
-         end))
-         (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
-      (struct
-        type t = denounced__Oxford
-
-        let encoding =
-          let open Data_encoding in
-          conv
-            (fun ({for_double_attesting; for_double_baking} : denounced__Oxford) ->
-              (for_double_attesting, for_double_baking))
-            (fun (for_double_attesting, for_double_baking) ->
-              {for_double_attesting; for_double_baking})
-            (obj2
                (req "for_double_attesting" bool)
                (req "for_double_baking" bool))
       end)
@@ -1336,7 +1310,6 @@ module Cycle = struct
 end
 
 module Already_denounced = Cycle.Already_denounced
-module Already_denounced__Oxford = Cycle.Already_denounced__Oxford
 module Pending_consensus_keys = Cycle.Pending_consensus_keys
 module Pending_staking_parameters = Cycle.Pending_staking_parameters
 
