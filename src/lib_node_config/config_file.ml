@@ -763,6 +763,9 @@ let encoding =
           (list string)
           default_config.metrics_addr))
 
+let () =
+  Data_encoding.Registration.register (Data_encoding.def "node-config" encoding)
+
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
    of the actual exception which was raised (as [Cannot_destruct] takes an [exn]

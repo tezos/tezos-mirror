@@ -12,6 +12,7 @@
   octez-libs.base.unix
   octez-shell-libs.client-base-unix
   octez-shell-libs.client-base
+  octez-node-config
   octez-libs.clic
   octez-libs.stdlib-unix
   octez-libs.event-logging
