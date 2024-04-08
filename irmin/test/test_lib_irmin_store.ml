@@ -9,8 +9,7 @@
     -------
     Component:    Irmin
     Invocation:   dune exec irmin/test/main.exe -- --file test_lib_irmin_store.ml
-    Subject:      This file is the entrypoint of all Irmin Tezt tests. It dispatches to
-            other files.
+    Subject:      This file tests simple assertions about the store
 *)
 
 include Test_utils
