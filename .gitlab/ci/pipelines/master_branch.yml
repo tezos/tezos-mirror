@@ -219,7 +219,7 @@ publish:documentation:
     - src/**/*
     - tezt/**/*
     - vendors/**/*
-    when: on_success
+    when: always
   needs: []
   dependencies: []
   interruptible: false

@@ -101,11 +101,14 @@ let jobs =
              {|chmod 400 ~/.ssh/id_ed25519|};
            ])
       ~interruptible:false
+        (* We publish documentation [Always] -- the job has no
+           dependencies and so [On_success] is actually equivalent to
+           [Always], but the latter is more explicit. *)
       ~rules:
         [
           job_rule
             ~changes:(Changeset.encode changeset_octez_docs)
-            ~when_:On_success
+            ~when_:Always
             ();
         ]
       ["./scripts/ci/doc_publish.sh"]
