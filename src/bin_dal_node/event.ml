@@ -201,6 +201,15 @@ let stored_slot_shard =
     ("commitment", Cryptobox.Commitment.encoding)
     ("shard_index", Data_encoding.int31)
 
+let removed_slot_shards =
+  declare_1
+    ~section
+    ~name:"removed_slot_shards"
+    ~msg:"removed shards for commitment {commitment}"
+    ~level:Notice
+    ~pp1:Cryptobox.Commitment.pp_short
+    ("commitment", Cryptobox.Commitment.encoding)
+
 let decoding_data_failed =
   declare_1
     ~section
