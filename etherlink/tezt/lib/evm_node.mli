@@ -62,6 +62,12 @@ type mode =
       wallet_dir : string option;  (** --wallet-dir: client directory. *)
       tx_pool_timeout_limit : int option;
           (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
+      tx_pool_addr_limit : int option;
+          (** --tx-pool-addr-limit: maximum address allowed simultaneously inside
+              the pool. *)
+      tx_pool_tx_per_addr_limit : int option;
+          (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
+              simultaneously inside the pool. *)
     }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 

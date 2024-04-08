@@ -49,6 +49,8 @@ type mode =
       devmode : bool;
       wallet_dir : string option;
       tx_pool_timeout_limit : int option;
+      tx_pool_addr_limit : int option;
+      tx_pool_tx_per_addr_limit : int option;
     }
   | Proxy of {devmode : bool}
 
@@ -448,6 +450,8 @@ let run_args evm_node =
           devmode;
           wallet_dir;
           tx_pool_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
         } ->
         [
           "run";
@@ -501,6 +505,14 @@ let run_args evm_node =
             "tx-pool-timeout-limit"
             string_of_int
             tx_pool_timeout_limit
+        @ Cli_arg.optional_arg
+            "tx-pool-addr-limit"
+            string_of_int
+            tx_pool_addr_limit
+        @ Cli_arg.optional_arg
+            "tx-pool-tx-per-addr-limit"
+            string_of_int
+            tx_pool_tx_per_addr_limit
     | Observer {preimages_dir; initial_kernel; rollup_node_endpoint} ->
         [
           "run";
