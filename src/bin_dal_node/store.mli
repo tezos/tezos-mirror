@@ -12,7 +12,7 @@
 
 open Cryptobox
 
-type t (* This is the Irmin part of the store *)
+type irmin (* This is the Irmin part of the store *)
 
 module Value_size_hooks : sig
   (** [set_share_size size] sets the size of shard shares. This
@@ -76,7 +76,7 @@ module Shard_proofs_cache : sig
 end
 
 type node_store = private {
-  store : t; (* The Irmin part *)
+  store : irmin; (* The Irmin part *)
   shard_store : Shards.t;
   in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)

@@ -27,17 +27,21 @@
    use another storage solution that irmin as we don't need backtracking *)
 
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
-include StoreMaker.Make (Irmin.Contents.String)
+module Irmin = StoreMaker.Make (Irmin.Contents.String)
+
+type irmin = Irmin.t
 
 let shard_store_dir = "shard_store"
 
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
-  Info.v ~author:"DAL Node" ~message date
+  Irmin.Info.v ~author:"DAL Node" ~message date
 
-let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
+let set ~msg store path v =
+  Irmin.set_exn store path v ~info:(fun () -> info msg)
 
-let remove ~msg store path = remove_exn store path ~info:(fun () -> info msg)
+let remove ~msg store path =
+  Irmin.remove_exn store path ~info:(fun () -> info msg)
 
 module Value_size_hooks = struct
   (* The [value_size] required by [Tezos_key_value_store.directory] is known when
@@ -164,7 +168,7 @@ module Shard_proofs_cache =
 
 (** Store context *)
 type node_store = {
-  store : t;
+  store : irmin;
   shard_store : Shards.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
@@ -184,8 +188,8 @@ let save_shard_proofs node_store commitment shard_proofs =
 let init config =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
-  let*! repo = Repo.v (Irmin_pack.config base_dir) in
-  let*! store = main repo in
+  let*! repo = Irmin.Repo.v (Irmin_pack.config base_dir) in
+  let*! store = Irmin.main repo in
   let* shard_store = Shards.init base_dir shard_store_dir in
   let*! () = Event.(emit store_is_ready ()) in
   return
@@ -250,11 +254,11 @@ module Legacy = struct
     val to_string : ?prefix:string -> t -> string
 
     module Commitment : sig
-      val slot : Cryptobox.commitment -> slot_size:int -> Path.t
+      val slot : Cryptobox.commitment -> slot_size:int -> Irmin.Path.t
 
-      val headers : Cryptobox.commitment -> Path.t
+      val headers : Cryptobox.commitment -> Irmin.Path.t
 
-      val header : Cryptobox.commitment -> Types.slot_id -> Path.t
+      val header : Cryptobox.commitment -> Types.slot_id -> Irmin.Path.t
     end
 
     module Level : sig
@@ -268,15 +272,16 @@ module Legacy = struct
          "Others" path(s) are used to store information of slots headers when
          their statuses are [`Not_selected] or [`Unseen_or_not_finalized]. *)
 
-      val slots_indices : Types.level -> Path.t
+      val slots_indices : Types.level -> Irmin.Path.t
 
-      val accepted_header_commitment : Types.slot_id -> Path.t
+      val accepted_header_commitment : Types.slot_id -> Irmin.Path.t
 
-      val accepted_header_status : Types.slot_id -> Path.t
+      val accepted_header_status : Types.slot_id -> Irmin.Path.t
 
-      val others : Types.slot_id -> Path.t
+      val others : Types.slot_id -> Irmin.Path.t
 
-      val other_header_status : Types.slot_id -> Cryptobox.commitment -> Path.t
+      val other_header_status :
+        Types.slot_id -> Cryptobox.commitment -> Irmin.Path.t
     end
   end = struct
     type t = string list
@@ -354,8 +359,8 @@ module Legacy = struct
     let store = node_store.store in
     let header_path = Path.Commitment.header commitment slot_id in
     let levels_path = Path.Level.other_header_status slot_id commitment in
-    let* known_levels = mem store levels_path in
-    let* known_header = mem store header_path in
+    let* known_levels = Irmin.mem store levels_path in
+    let* known_header = Irmin.mem store header_path in
     (* An invariant that should hold for the storage. *)
     assert (known_levels = known_header) ;
     if known_levels then return_unit
@@ -383,13 +388,13 @@ module Legacy = struct
   let exists_slot_by_commitment node_store cryptobox commitment =
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let path = Path.Commitment.slot commitment ~slot_size in
-    mem node_store.store path
+    Irmin.mem node_store.store path
 
   let find_slot_by_commitment node_store cryptobox commitment =
     let open Lwt_result_syntax in
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
     let path = Path.Commitment.slot commitment ~slot_size in
-    let*! res_opt = find node_store.store path in
+    let*! res_opt = Irmin.find node_store.store path in
     Option.fold
       ~none:(return None)
       ~some:(fun v ->
@@ -494,7 +499,7 @@ module Legacy = struct
           Dal_metrics.slot_attested ~set:true slot_index ;
           set ~msg store status_path attested_str)
         else
-          let* old_data_opt = find store status_path in
+          let* old_data_opt = Irmin.find store status_path in
           Dal_metrics.slot_attested ~set:false slot_index ;
           if Option.is_some old_data_opt then
             set ~msg store status_path unattested_str
@@ -520,7 +525,7 @@ module Legacy = struct
     let open Lwt_result_syntax in
     let index = Types.Slot_id.{slot_level = level; slot_index} in
     let*! commitment_str_opt =
-      find node_store.store @@ Path.Level.accepted_header_commitment index
+      Irmin.find node_store.store @@ Path.Level.accepted_header_commitment index
     in
     Option.fold
       ~none:(fail `Not_found)
@@ -549,7 +554,7 @@ module Legacy = struct
     List.fold_left_es
       (fun acc slot_id ->
         let commitment_path = Path.Level.accepted_header_commitment slot_id in
-        let*! commitment_opt = find store commitment_path in
+        let*! commitment_opt = Irmin.find store commitment_path in
         match commitment_opt with
         | None -> return acc
         | Some read_commitment -> (
@@ -558,7 +563,7 @@ module Legacy = struct
             | `Skip -> return acc
             | `Keep commitment -> (
                 let status_path = Path.Level.accepted_header_status slot_id in
-                let*! status_opt = find store status_path in
+                let*! status_opt = Irmin.find store status_path in
                 match status_opt with
                 | None -> return acc
                 | Some status_str ->
@@ -590,7 +595,7 @@ module Legacy = struct
   let get_other_headers_of_identified_commitment commitment slot_id store acc =
     let open Lwt_result_syntax in
     let*! status_opt =
-      find store @@ Path.Level.other_header_status slot_id commitment
+      Irmin.find store @@ Path.Level.other_header_status slot_id commitment
     in
     match status_opt with
     | None -> return acc
@@ -614,7 +619,7 @@ module Legacy = struct
     let open Lwt_result_syntax in
     let store = node_store.store in
     (* Get the list of known slot identifiers for [commitment]. *)
-    let*! indexes = list store @@ Path.Commitment.headers commitment in
+    let*! indexes = Irmin.list store @@ Path.Commitment.headers commitment in
     (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
     let*? slot_ids = filter_indexes ?slot_level ?slot_index indexes in
     let* accu = get_other_headers_of_commitment commitment slot_ids store [] in
@@ -627,7 +632,7 @@ module Legacy = struct
     List.fold_left_es
       (fun acc slot_id ->
         let*! commitments_with_statuses =
-          list store @@ Path.Level.others slot_id
+          Irmin.list store @@ Path.Level.others slot_id
         in
         List.fold_left_es
           (fun acc (encoded_commitment, _status_tree) ->
@@ -647,7 +652,7 @@ module Legacy = struct
     let store = node_store.store in
     (* Get the list of slots indices from the given level. *)
     let*! slots_indices =
-      list store @@ Path.Level.slots_indices published_level
+      Irmin.list store @@ Path.Level.slots_indices published_level
     in
     (* Build the list of slot IDs. *)
     let slot_ids =
