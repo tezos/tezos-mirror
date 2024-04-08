@@ -239,8 +239,7 @@ module Term = struct
        interpreted as the number of blocks the shards should be kept; the \
        string \"full\" means no shard deletion, the string \"auto\" means the \
        default of the profile: 3 months for an observer or a slot producer, \
-       twice the attestation lag for an attester, no shard deletion for any \
-       other profile)."
+       twice the attestation lag for an attester and other profiles."
     in
     let decoder =
       Configuration_file.(

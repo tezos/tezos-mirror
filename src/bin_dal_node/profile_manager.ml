@@ -264,6 +264,33 @@ let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
     let* flags = List.map_es are_shards_stored all_slot_indexes in
     return (Types.Attestable_slots {slots = flags; published_level})
 
+let get_default_shard_store_period proto_parameters t =
+  (* For each profile we double the period, to give some slack just in case
+     (finalisation period, off by one, attestation_lag, ...).
+     With current mainnet parameters, this total period is 3 months
+     for observer & slot producer *)
+  let rollup_period =
+    2
+    * (proto_parameters.Dal_plugin.sc_rollup_challenge_window_in_blocks
+     + proto_parameters.commitment_period_in_blocks
+     + proto_parameters.dal_attested_slots_validity_lag)
+  in
+  let attestation_period = 2 * proto_parameters.attestation_lag in
+  match get_profiles t with
+  (* For observer & Producer, we keep the shards long enough for rollup to work
+     correctly; for attester & other profiles, we only want to keep the shards
+     during attestation lag period *)
+  | Random_observer -> rollup_period
+  | Operator l ->
+      if
+        List.exists
+          (function
+            | Types.Producer _ | Observer _ -> true | Attester _ -> false)
+          l
+      then rollup_period
+      else attestation_period
+  | Bootstrap -> attestation_period
+
 let profiles_filename = "profiles.json"
 
 (* TODO https://gitlab.com/tezos/tezos/-/issues/7033
