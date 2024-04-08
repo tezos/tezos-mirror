@@ -41,7 +41,7 @@ type status = Ready of ready_ctxt | Starting
 type t = {
   mutable status : status;
   config : Configuration_file.t;
-  store : Store.node_store;
+  store : Store.t;
   tezos_node_cctxt : Tezos_rpc.Context.generic;
   neighbors_cctxts : Dal_node_client.cctxt list;
   committee_cache : Committee_cache.t;

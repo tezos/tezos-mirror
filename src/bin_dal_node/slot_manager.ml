@@ -245,7 +245,7 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
 (** This function publishes the shards of a commitment that is waiting for
     attestion on L1 if this node has those shards on disk and their proofs in
     memory. *)
-let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
+let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
     cryptobox proto_parameters commitment published_level slot_index =
   let open Lwt_result_syntax in
   match

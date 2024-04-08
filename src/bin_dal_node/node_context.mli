@@ -57,7 +57,7 @@ type t
     instance [transport_layer], and tezos node client context [cctx]. *)
 val init :
   Configuration_file.t ->
-  Store.node_store ->
+  Store.t ->
   Gossipsub.Worker.t ->
   Gossipsub.Transport_layer.t ->
   Tezos_rpc.Context.generic ->
@@ -115,7 +115,7 @@ val get_config : t -> Configuration_file.t
 val get_status : t -> status
 
 (** [get_store ctxt] returns the dal node store. *)
-val get_store : t -> Store.node_store
+val get_store : t -> Store.t
 
 (** [get_gs_worker ctxt] returns the Gossipsub worker state. *)
 val get_gs_worker : t -> Gossipsub.Worker.t

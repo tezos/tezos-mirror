@@ -31,7 +31,7 @@
 *)
 val try_amplification :
   Store.Shards.t ->
-  Store.node_store ->
+  Store.t ->
   Cryptobox.Commitment.t ->
   published_level:int32 ->
   slot_index:int ->

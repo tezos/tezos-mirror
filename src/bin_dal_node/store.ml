@@ -169,7 +169,7 @@ module Shard_proofs_cache =
     end)
 
 (** Store context *)
-type node_store = {
+type t = {
   store : irmin;
   shard_store : Shards.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;

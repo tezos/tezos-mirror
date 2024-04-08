@@ -68,7 +68,7 @@ val get_slot_pages :
 (** [save_shards store commitment shards] stores [shards] onto the [store]
     associated to the given [commitment] *)
 val save_shards :
-  Store.node_store ->
+  Store.t ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   Cryptobox.shard Seq.t ->
