@@ -47,6 +47,7 @@ commander
     .option('--multi-blueprint', 'Send each transaction in a separate blueprint',false)
     .option('--start <i>', 'Start with benchmark nb <i>', 0)
     .option('--stop <i>', 'Stop at bench nb <i>', -1)
+    .option('--nth <i>', 'Just launch bench n° i')
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -536,4 +537,9 @@ const excluded_benchmark = ["benchmarks/bench_loop_calldataload.js"]
 let benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(name))
 let stop = commander.opts().stop;
 let start = commander.opts().start;
-run_all_benchmarks(benchmark_scripts.filter(filter_name).slice(start,stop));
+let bench_list = benchmark_scripts.filter(filter_name).slice(start,stop);
+if(!!commander.opts().nth){
+    let nth = parseInt(commander.opts().nth)
+    bench_list = [bench_list[nth]]
+}
+run_all_benchmarks(bench_list);
