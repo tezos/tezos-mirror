@@ -206,6 +206,8 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
         devmode;
         wallet_dir = Some (Client.base_dir client);
         tx_pool_timeout_limit = None;
+        tx_pool_addr_limit = None;
+        tx_pool_tx_per_addr_limit = None;
       }
   in
   let* sequencer =

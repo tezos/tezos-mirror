@@ -36,6 +36,25 @@ module Event = struct
       ("transaction", Data_encoding.string)
       ~pp1:Format.pp_print_string
 
+  let users_threshold_reached =
+    declare_0
+      ~section
+      ~name:"tx_pool_users_threshold_reached"
+      ~msg:
+        "The transaction pool has reached its maximum threshold for user \
+         transactions"
+      ~level:Info
+      ()
+
+  let txs_per_user_threshold_reached =
+    declare_1
+      ~section
+      ~name:"txs_per_user_threshold_reached"
+      ~msg:"User {address} has reached the maximum threshold for transactions"
+      ~level:Info
+      ("address", Data_encoding.string)
+      ~pp1:Format.pp_print_string
+
   let transaction_injected =
     declare_1
       ~section
@@ -85,6 +104,12 @@ let add_transaction ~transaction =
 
 let invalid_transaction ~transaction =
   Internal_event.Simple.emit Event.invalid_transaction transaction
+
+let users_threshold_reached =
+  Internal_event.Simple.emit Event.users_threshold_reached
+
+let txs_per_user_threshold_reached ~address =
+  Internal_event.Simple.emit Event.txs_per_user_threshold_reached address
 
 let transaction_injection_failed trace =
   Internal_event.Simple.emit Event.transaction_injection_failed trace

@@ -351,6 +351,24 @@ let tx_pool_timeout_limit_arg =
     ~doc:"Transaction timeout limit inside the transaction pool (in seconds)."
     Params.int
 
+let tx_pool_addr_limit_arg =
+  Tezos_clic.default_arg
+    ~long:"tx-pool-addr-limit"
+    ~placeholder:"4_000"
+    ~default:"4_000"
+    ~doc:"Maximum allowed addresses inside the transaction pool."
+    Params.int
+
+let tx_pool_tx_per_addr_limit_arg =
+  Tezos_clic.default_arg
+    ~long:"tx-pool-tx-per-addr-limit"
+    ~placeholder:"16"
+    ~default:"16"
+    ~doc:
+      "Maximum allowed transactions per user address inside the transaction \
+       pool."
+    Params.int
+
 let sequencer_key_arg =
   Tezos_clic.arg
     ~long:"sequencer-key"
@@ -439,7 +457,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args21
+    (args23
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -460,6 +478,8 @@ let sequencer_command =
        devmode_arg
        wallet_dir_arg
        tx_pool_timeout_limit_arg
+       tx_pool_addr_limit_arg
+       tx_pool_tx_per_addr_limit_arg
        (Client_config.password_filename_arg ()))
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
@@ -490,6 +510,8 @@ let sequencer_command =
            devmode,
            wallet_dir,
            tx_pool_timeout_limit,
+           tx_pool_addr_limit,
+           tx_pool_tx_per_addr_limit,
            password_filename )
          rollup_node_endpoint
          sequencer_str
@@ -544,6 +566,8 @@ let sequencer_command =
           ?cors_origins
           ?cors_headers
           ~tx_pool_timeout_limit:(Int64.of_int tx_pool_timeout_limit)
+          ~tx_pool_addr_limit:(Int64.of_int tx_pool_addr_limit)
+          ~tx_pool_tx_per_addr_limit:(Int64.of_int tx_pool_tx_per_addr_limit)
           ~sequencer
           ()
       in

@@ -125,6 +125,8 @@ type parameters = {
   smart_rollup_address : string;
   mode : mode;
   tx_timeout_limit : int64;
+  tx_pool_addr_limit : int;
+  tx_pool_tx_per_addr_limit : int;
 }
 
 module Types = struct
@@ -134,6 +136,8 @@ module Types = struct
     mutable pool : Pool.t;
     mode : mode;
     tx_timeout_limit : int64;
+    tx_pool_addr_limit : int;
+    tx_pool_tx_per_addr_limit : int;
     mutable locked : bool;
   }
 
@@ -243,10 +247,46 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
+let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
+    ~tx_pool_tx_per_addr_limit =
+  let open Lwt_result_syntax in
+  let boundaries_are_not_reached = return (false, "") in
+  match Pool.Pkey_map.find address pool.Pool.transactions with
+  | None ->
+      if Pool.Pkey_map.cardinal pool.Pool.transactions < tx_pool_addr_limit then
+        boundaries_are_not_reached
+      else
+        let*! () = Tx_pool_events.users_threshold_reached () in
+        return
+          ( true,
+            "The transaction pool has reached its maximum threshold for user \
+             transactions. Transaction is rejected." )
+  | Some txs ->
+      if Pool.Nonce_map.cardinal txs < tx_pool_tx_per_addr_limit then
+        boundaries_are_not_reached
+      else
+        let*! () =
+          Tx_pool_events.txs_per_user_threshold_reached
+            ~address:(Ethereum_types.Address.to_string address)
+        in
+        return
+          ( true,
+            "Limit of transaction for a user was reached. Transaction is \
+             rejected." )
+
 let on_normal_transaction state tx_raw =
   let open Lwt_result_syntax in
   let open Types in
-  let {rollup_node = (module Rollup_node); pool; _} = state in
+  let {
+    rollup_node = (module Rollup_node);
+    pool;
+    tx_pool_addr_limit;
+    tx_pool_tx_per_addr_limit;
+    _;
+  } =
+    state
+  in
+
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
   match is_valid with
   | Error err ->
@@ -256,19 +296,28 @@ let on_normal_transaction state tx_raw =
       in
       return (Error err)
   | Ok {address} ->
-      (* Add the tx to the pool*)
-      let*? pool = Pool.add pool address tx_raw in
-      (* compute the hash *)
-      let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
-      let hash =
-        Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
+      let* address_boundaries_are_reached, error_msg =
+        check_address_boundaries
+          ~pool
+          ~address
+          ~tx_pool_addr_limit
+          ~tx_pool_tx_per_addr_limit
       in
-      let*! () =
-        Tx_pool_events.add_transaction
-          ~transaction:(Ethereum_types.hash_to_string hash)
-      in
-      state.pool <- pool ;
-      return (Ok hash)
+      if address_boundaries_are_reached then return @@ Error error_msg
+      else
+        (* Add the tx to the pool*)
+        let*? pool = Pool.add pool address tx_raw in
+        (* compute the hash *)
+        let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+        let hash =
+          Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
+        in
+        let*! () =
+          Tx_pool_events.add_transaction
+            ~transaction:(Ethereum_types.hash_to_string hash)
+        in
+        state.pool <- pool ;
+        return (Ok hash)
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
@@ -465,7 +514,14 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w ()
-      ({rollup_node; smart_rollup_address; mode; tx_timeout_limit} :
+      ({
+         rollup_node;
+         smart_rollup_address;
+         mode;
+         tx_timeout_limit;
+         tx_pool_addr_limit;
+         tx_pool_tx_per_addr_limit;
+       } :
         Types.parameters) =
     let state =
       Types.
@@ -475,6 +531,8 @@ module Handlers = struct
           pool = Pool.empty;
           mode;
           tx_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
           locked = false;
         }
     in
