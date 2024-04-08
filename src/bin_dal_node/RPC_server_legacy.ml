@@ -34,44 +34,5 @@ let handle_slot_pages ctxt (_, commitment) () () =
     (Node_context.get_store ctxt).shard_store
     commitment
 
-let handle_shard ctxt ((_, commitment), shard) () () =
-  Slot_manager.get_shard
-    (Node_context.get_store ctxt).shard_store
-    commitment
-    shard
-
-let handle_shards ctxt (_, commitment) () shards =
-  Slot_manager.get_shards
-    (Node_context.get_store ctxt).shard_store
-    commitment
-    shards
-
 let register_show_slot_pages ctxt dir =
   Tezos_rpc.Directory.register dir Services.slot_pages (handle_slot_pages ctxt)
-
-let shards_service :
-    ( [`POST],
-      unit,
-      unit * Cryptobox.commitment,
-      unit,
-      int list,
-      Cryptobox.shard list )
-    Tezos_rpc.Service.service =
-  Services.shards
-
-let register_shards ctxt dir =
-  Tezos_rpc.Directory.register dir shards_service (handle_shards ctxt)
-
-let register_shard ctxt dir =
-  Tezos_rpc.Directory.register dir Services.shard (handle_shard ctxt)
-
-let shards_rpc ctxt commitment shards =
-  Tezos_rpc.Context.make_call shards_service ctxt ((), commitment) () shards
-
-let shard_rpc ctxt commitment shard =
-  Tezos_rpc.Context.make_call
-    Services.shard
-    ctxt
-    (((), commitment), shard)
-    ()
-    ()

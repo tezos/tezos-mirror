@@ -584,41 +584,6 @@ module Handler = struct
     make_stream_daemon
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
-
-  let new_slot_header ctxt =
-    (* Monitor neighbor DAL nodes and download published slots as shards. *)
-    let open Lwt_result_syntax in
-    let handler n_cctxt Node_context.{cryptobox; _} slot_header =
-      let dal_parameters = Cryptobox.parameters cryptobox in
-      let downloaded_shard_ids =
-        0
-        -- ((dal_parameters.number_of_shards / dal_parameters.redundancy_factor)
-           - 1)
-      in
-      let* shards =
-        RPC_server_legacy.shards_rpc n_cctxt slot_header downloaded_shard_ids
-      in
-      let shards = List.to_seq shards in
-      let* () =
-        Slot_manager.save_shards
-          (Node_context.get_store ctxt)
-          cryptobox
-          slot_header
-          shards
-      in
-      return_unit
-    in
-    let handler n_cctxt _stopper slot_header =
-      match Node_context.get_status ctxt with
-      | Starting -> return_unit
-      | Ready ready_ctxt -> handler n_cctxt ready_ctxt slot_header
-    in
-    List.map
-      (fun n_cctxt ->
-        make_stream_daemon
-          (handler n_cctxt)
-          (RPC_server.monitor_shards_rpc n_cctxt))
-      (Node_context.get_neighbors_cctxts ctxt)
 end
 
 let daemonize handlers =
@@ -638,10 +603,8 @@ let daemonize handlers =
 
 let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
   let open Gossipsub in
-  let shards_handler ({shard_store; shards_watcher; _} : Store.node_store) =
-    let save_and_notify =
-      Store.Shards.save_and_notify shard_store shards_watcher
-    in
+  let shards_handler ({shard_store; _} : Store.node_store) =
+    let save_and_notify = Store.Shards.save_and_notify shard_store in
     fun Types.Message.{share; _}
         Types.Message_id.{commitment; shard_index; level; slot_index; _} ->
       let open Lwt_result_syntax in
@@ -835,7 +798,5 @@ let run ~data_dir configuration_override =
       [Handler.resolve_plugin_and_set_ready config dal_config ctxt cctxt]
   in
   (* Start never-ending monitoring daemons *)
-  let* () =
-    daemonize (Handler.new_head ctxt cctxt :: Handler.new_slot_header ctxt)
-  in
+  let* () = daemonize [Handler.new_head ctxt cctxt] in
   return_unit

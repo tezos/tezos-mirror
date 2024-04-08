@@ -197,13 +197,13 @@ val get_attestable_slots :
   ; query : unit >
   service
 
-(** A service for monitor_shards RPC *)
-val monitor_shards :
+(** Return the shard associated to the given index. *)
+val get_shard :
   < meth : [`GET]
   ; input : unit
-  ; output : Cryptobox.Commitment.t
+  ; output : Tezos_crypto_dal.Cryptobox.shard
   ; prefix : unit
-  ; params : unit
+  ; params : (unit * Tezos_crypto_dal.Cryptobox.commitment) * int
   ; query : unit >
   service
 

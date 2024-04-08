@@ -131,17 +131,6 @@ module RPC_legacy = struct
   let slot_pages slot_header =
     make GET ["slot"; "pages"; slot_header] (fun pages ->
         pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
-
-  let shard ~slot_header ~shard_id =
-    make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
-    json |> JSON.encode
-
-  let shards ~slot_header shard_ids =
-    let data : RPC_core.data =
-      Data (`A (List.map (fun i -> `Float (float_of_int i)) shard_ids))
-    in
-    make ~data POST ["shards"; slot_header] (fun json ->
-        JSON.(json |> as_list |> List.map encode))
 end
 
 module Dal_RPC = struct
@@ -412,6 +401,10 @@ module Dal_RPC = struct
 
   let get_plugin_commitments_history_hash ~hash () =
     make GET ["plugin"; "commitments_history"; "hash"; hash] Fun.id
+
+  let get_shard ~slot_header ~shard_id =
+    make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
+    json |> JSON.encode
 
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct

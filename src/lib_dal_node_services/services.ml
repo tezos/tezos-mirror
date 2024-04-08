@@ -278,19 +278,21 @@ let get_attestable_slots :
       open_root / "profiles" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")
 
-let monitor_shards :
+let get_shard :
     < meth : [`GET]
     ; input : unit
-    ; output : Cryptobox.Commitment.t
+    ; output : Tezos_crypto_dal.Cryptobox.shard
     ; prefix : unit
-    ; params : unit
+    ; params : (unit * Tezos_crypto_dal.Cryptobox.commitment) * int
     ; query : unit >
     service =
+  let shard_arg = Tezos_rpc.Arg.int in
   Tezos_rpc.Service.get_service
-    ~description:"Monitor put shards."
+    ~description:"Fetch shard as bytes"
     ~query:Tezos_rpc.Query.empty
-    ~output:Cryptobox.Commitment.encoding
-    Tezos_rpc.Path.(open_root / "monitor_shards")
+    ~output:Cryptobox.shard_encoding
+    Tezos_rpc.Path.(
+      open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
 
 let version :
     < meth : [`GET]

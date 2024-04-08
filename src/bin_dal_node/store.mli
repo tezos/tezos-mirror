@@ -33,15 +33,11 @@ module Shards : sig
       given commitment.  *)
   val are_shards_available : t -> commitment -> int list -> bool tzresult Lwt.t
 
-  (** [save_and_notify store watcher commitment shards] adds to the
+  (** [save_and_notify store commitment shards] adds to the
       shard store all the given shards of the given commitment. The
       [watcher] is notified. *)
   val save_and_notify :
-    t ->
-    commitment Lwt_watcher.input ->
-    commitment ->
-    shard Seq.t ->
-    (unit, [> Errors.other]) result Lwt.t
+    t -> commitment -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
 
   (** [read_value store commitment shard_index] returns the associated
      share when the shard is available or an error when it is not.  *)
@@ -82,13 +78,9 @@ end
 type node_store = private {
   store : t; (* The Irmin part *)
   shard_store : Shards.t;
-  shards_watcher : commitment Lwt_watcher.input;
   in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
-
-val open_shards_stream :
-  node_store -> commitment Lwt_stream.t * Lwt_watcher.stopper
 
 (** [save_shard_proofs store commitment shard_proofs] replaces in
       the shard proof cache all the shard proofs for the given
