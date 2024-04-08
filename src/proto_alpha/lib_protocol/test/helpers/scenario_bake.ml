@@ -77,6 +77,77 @@ let check_all_balances block state : unit tzresult Lwt.t =
   in
   Assert.join_errors r1 r2
 
+(** Misc checks at block end *)
+let check_misc block state : unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let State.{account_map; _} = state in
+  String.Map.fold_s
+    (fun name account acc ->
+      match account.delegate with
+      | Some x when String.equal x name ->
+          let ufd_state =
+            List.map
+              (fun ({cycle; current; _} : Unstaked_frozen.r) ->
+                (cycle, current))
+              account.unstaked_frozen
+          in
+          let ufnlz_state =
+            Unstaked_finalizable.total account.unstaked_finalizable
+          in
+          let ufd_state_map =
+            List.fold_left
+              (fun acc (cycle, v) -> CycleMap.add cycle v acc)
+              CycleMap.empty
+              ufd_state
+          in
+          let* u_rpc =
+            Context.Delegate.unstaked_frozen_deposits (B block) account.pkh
+          in
+          let u_rpc =
+            List.map
+              (fun ({cycle; deposit} :
+                     Protocol.Delegate_services.deposit_per_cycle) ->
+                (cycle, deposit))
+              u_rpc
+          in
+          let finalizable_cycle =
+            Cycle.sub
+              (Block.current_cycle block)
+              (state.State.constants.consensus_rights_delay + 2)
+          in
+          let ufnlz_rpc, ufd_rpc =
+            match finalizable_cycle with
+            | None -> (Tez.zero, u_rpc)
+            | Some finalizable_cycle -> (
+                match
+                  List.partition
+                    (fun (cycle, _) -> Cycle.equal cycle finalizable_cycle)
+                    u_rpc
+                with
+                | [], l -> (Tez.zero, l)
+                | [(_, s)], l -> (s, l)
+                | _ -> assert false)
+          in
+          let*! r1 = Assert.equal_tez ~loc:__LOC__ ufnlz_rpc ufnlz_state in
+          let*! r2 =
+            List.fold_left
+              (fun acc (cycle, v) ->
+                let state_val =
+                  CycleMap.find cycle ufd_state_map
+                  |> Option.value ~default:Tez.zero
+                in
+                let*! r = Assert.equal_tez ~loc:__LOC__ v state_val in
+                let*! acc in
+                Assert.join_errors r acc)
+              return_unit
+              ufd_rpc
+          in
+          let*! r = Assert.join_errors r1 r2 in
+          Assert.join_errors r acc
+      | _ -> Lwt.return acc)
+    account_map
+    Result.return_unit
+
 let check_issuance_rpc block : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* We assume one block per minute *)
@@ -241,6 +312,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
     else apply_end_cycle current_cycle previous_block block state
   in
   let* () = check_all_balances block state in
+  let* () = check_misc block state in
   let* block, state =
     if state.force_attest_all then attest_all_ (block, state)
     else return (block, state)
