@@ -129,7 +129,7 @@ opam:octez-accuser-Proxford:
     when: always
   retry: 2
 
-opam:octez-accuser-PtParisA:
+opam:octez-accuser-PtParisB:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   tags:
@@ -180,7 +180,7 @@ opam:octez-accuser-PtParisA:
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
     RUNTEZTALIAS: "true"
-    package: octez-accuser-PtParisA
+    package: octez-accuser-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
@@ -321,7 +321,7 @@ opam:octez-baker-Proxford:
     when: always
   retry: 2
 
-opam:octez-baker-PtParisA:
+opam:octez-baker-PtParisB:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   tags:
@@ -372,7 +372,7 @@ opam:octez-baker-PtParisA:
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
     RUNTEZTALIAS: "true"
-    package: octez-baker-PtParisA
+    package: octez-baker-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
@@ -2561,7 +2561,7 @@ opam:octez-protocol-018-Proxford-libs:
     when: always
   retry: 2
 
-opam:octez-protocol-019-PtParisA-libs:
+opam:octez-protocol-019-PtParisB-libs:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   tags:
@@ -2612,7 +2612,7 @@ opam:octez-protocol-019-PtParisA-libs:
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
     RUNTEZTALIAS: "true"
-    package: octez-protocol-019-PtParisA-libs
+    package: octez-protocol-019-PtParisB-libs
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
@@ -3201,7 +3201,7 @@ opam:octez-smart-rollup-node-PtNairob:
     when: always
   retry: 2
 
-opam:octez-smart-rollup-node-PtParisA:
+opam:octez-smart-rollup-node-PtParisB:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   tags:
@@ -3252,7 +3252,7 @@ opam:octez-smart-rollup-node-PtParisA:
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
     RUNTEZTALIAS: "true"
-    package: octez-smart-rollup-node-PtParisA
+    package: octez-smart-rollup-node-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
@@ -5569,7 +5569,7 @@ opam:tezos-protocol-018-Proxford:
     when: always
   retry: 2
 
-opam:tezos-protocol-019-PtParisA:
+opam:tezos-protocol-019-PtParisB:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
   tags:
@@ -5620,7 +5620,7 @@ opam:tezos-protocol-019-PtParisA:
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
   variables:
     RUNTEZTALIAS: "true"
-    package: tezos-protocol-019-PtParisA
+    package: tezos-protocol-019-PtParisB
     SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
     RUSTC_WRAPPER: sccache
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log

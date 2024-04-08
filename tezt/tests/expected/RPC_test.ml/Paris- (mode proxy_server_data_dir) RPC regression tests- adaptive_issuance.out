@@ -32,7 +32,7 @@
 "80007812"
 
 ./octez-client rpc get /chains/main/blocks/head/context/adaptive_issuance_launch_cycle
-null
+5
 
 ./octez-client rpc get /chains/main/blocks/head/context/issuance/expected_issuance
 [ { "cycle": 0, "baking_reward_fixed_portion": "333333",

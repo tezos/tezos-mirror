@@ -1,9 +1,9 @@
 bls12-381	all	7
 octez-accuser-Proxford	exec	1
-octez-accuser-PtParisA	exec	1
+octez-accuser-PtParisB	exec	1
 octez-alcotezt	all	7
 octez-baker-Proxford	exec	1
-octez-baker-PtParisA	exec	1
+octez-baker-PtParisB	exec	1
 octez-client	exec	1
 octez-codec	exec	1
 octez-crawler	all	4
@@ -38,7 +38,7 @@ octez-protocol-015-PtLimaPt-libs	all	3
 octez-protocol-016-PtMumbai-libs	all	2
 octez-protocol-017-PtNairob-libs	all	2
 octez-protocol-018-Proxford-libs	all	2
-octez-protocol-019-PtParisA-libs	all	2
+octez-protocol-019-PtParisB-libs	all	2
 octez-protocol-alpha-libs	all	2
 octez-protocol-compiler	exec	6
 octez-proxy-server	exec	1
@@ -48,7 +48,7 @@ octez-signer	exec	4
 octez-smart-rollup-node	exec	1
 octez-smart-rollup-node-Proxford	all	1
 octez-smart-rollup-node-PtNairob	all	2
-octez-smart-rollup-node-PtParisA	all	2
+octez-smart-rollup-node-PtParisB	all	2
 octez-smart-rollup-node-alpha	all	2
 octez-smart-rollup-node-lib	all	2
 octez-smart-rollup-wasm-debugger	exec	1
@@ -85,7 +85,7 @@ tezos-protocol-015-PtLimaPt	all	5
 tezos-protocol-016-PtMumbai	all	5
 tezos-protocol-017-PtNairob	all	6
 tezos-protocol-018-Proxford	all	6
-tezos-protocol-019-PtParisA	all	6
+tezos-protocol-019-PtParisB	all	6
 tezos-protocol-alpha	all	6
 tezos-protocol-demo-counter	all	6
 tezos-protocol-demo-noops	all	6

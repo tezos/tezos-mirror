@@ -52,7 +52,7 @@ let number = function Oxford -> 018 | Paris -> 019 | Alpha -> 020
 let directory = function
   | Alpha -> "proto_alpha"
   | Oxford -> "proto_018_Proxford"
-  | Paris -> "proto_019_PtParisA"
+  | Paris -> "proto_019_PtParisB"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -60,7 +60,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Oxford -> "ProxfordYmVfjWnRcgjWH36fW6PArwqykTFzotUxRs6gmTcZDuH"
-  | Paris -> "PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5"
+  | Paris -> "PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 

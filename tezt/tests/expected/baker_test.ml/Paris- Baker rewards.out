@@ -1,7 +1,7 @@
 
 ./octez-client rpc get /chains/main/blocks/head/metadata
-{ "protocol": "PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5",
-  "next_protocol": "PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5",
+{ "protocol": "PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz",
+  "next_protocol": "PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz",
   "test_chain_status": { "status": "not_running" }, "max_operations_ttl": 2,
   "max_operation_data_length": 32768, "max_block_header_length": 289,
   "max_operation_list_length":
@@ -67,6 +67,7 @@
         "contract": "[PUBLIC_KEY_HASH]",
         "change": "2999999", "origin": "block" } ],
   "liquidity_baking_toggle_ema": 0, "adaptive_issuance_vote_ema": 0,
+  "adaptive_issuance_activation_cycle": 5,
   "implicit_operations_results":
     [ { "kind": "origination",
         "balance_updates":

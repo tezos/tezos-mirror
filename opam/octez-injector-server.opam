@@ -17,12 +17,12 @@ depends: [
 ]
 depopts: [
   "tezos-injector-018-Proxford"
-  "tezos-injector-019-PtParisA"
+  "tezos-injector-019-PtParisB"
   "tezos-injector-alpha"
 ]
 conflicts: [
   "tezos-injector-018-Proxford" { != version }
-  "tezos-injector-019-PtParisA" { != version }
+  "tezos-injector-019-PtParisB" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [
