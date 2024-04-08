@@ -687,7 +687,7 @@ let jobs pipeline_type =
         ~image:Images.runtime_prebuild_dependencies
         ~stage:Stages.build
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
-        ["scripts/ci/select_tezts.sh || exit $?"]
+        (script_propagate_exit_code "scripts/ci/select_tezts.sh")
         ~allow_failure:(With_exit_codes [17])
         ~artifacts:
           (artifacts
@@ -1146,7 +1146,7 @@ let jobs pipeline_type =
             ~dependencies:dependencies_needs_trigger
             (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
                invalid commits titles in situations where that is allowed. *)
-            ["./scripts/ci/check_commit_messages.sh || exit $?"]
+            (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
             ~allow_failure:(With_exit_codes [65])
           |> job_external
         in

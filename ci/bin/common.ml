@@ -214,6 +214,21 @@ let before_script ?(take_ownership = false) ?(source_version = false)
   @ toggle install_js_deps ". ./scripts/install_build_deps.js.sh"
   @ before_script
 
+(** A [script:] that executes [script] and propagates its exit code.
+
+    This might seem like a noop but is in fact necessary to please his
+    majesty GitLab.
+
+    For more info, see:
+     - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
+     - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
+     - https://gitlab.com/groups/gitlab-org/-/epics/6074
+
+   TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
+   {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
+   Runner feature flags}. *)
+let script_propagate_exit_code script = [script ^ " || exit $?"]
+
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
 (** Add variable for bisect_ppx instrumentation.
