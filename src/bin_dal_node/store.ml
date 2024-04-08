@@ -31,7 +31,9 @@ module Irmin = StoreMaker.Make (Irmin.Contents.String)
 
 type irmin = Irmin.t
 
-let shard_store_dir = "shard_store"
+module Stores_dirs = struct
+  let shard = "shard_store"
+end
 
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
@@ -190,7 +192,7 @@ let init config =
   let base_dir = Configuration_file.store_path config in
   let*! repo = Irmin.Repo.v (Irmin_pack.config base_dir) in
   let*! store = Irmin.main repo in
-  let* shard_store = Shards.init base_dir shard_store_dir in
+  let* shard_store = Shards.init base_dir Stores_dirs.shard in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
