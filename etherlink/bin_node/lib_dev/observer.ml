@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -257,6 +258,7 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
           Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
             smart_rollup_address;
         mode = Observer;
+        tx_timeout_limit = config.tx_pool_timeout_limit;
       }
   in
 

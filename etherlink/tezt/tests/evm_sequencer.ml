@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -204,6 +205,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
         max_number_of_chunks;
         devmode;
         wallet_dir = Some (Client.base_dir client);
+        tx_pool_timeout_limit = None;
       }
   in
   let* sequencer =

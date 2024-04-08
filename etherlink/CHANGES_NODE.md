@@ -4,6 +4,9 @@
 
 ### Features
 
+- The transaction pool is now removing any transaction that was included more
+  than a defined thresold ago (one hour by default). (!12741)
+
 ### Bug fixes
 
 ### Breaking changes

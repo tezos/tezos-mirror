@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -11,6 +12,7 @@ type parameters = {
   rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
   smart_rollup_address : string;  (** The address of the smart rollup. *)
   mode : mode;
+  tx_timeout_limit : int64;  (** TTL of a transaction inside the pool. *)
 }
 
 (** [start parameters] starts the tx-pool *)

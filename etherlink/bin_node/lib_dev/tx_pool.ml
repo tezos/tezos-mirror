@@ -16,6 +16,8 @@ module Pool = struct
     raw_tx : string; (* Current transaction. *)
     gas_price : Z.t; (* The maximum price the user can pay for fees. *)
     gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
+    inclusion_timestamp : Time.Protocol.t;
+        (* Time of inclusion in the transaction pool. *)
   }
 
   type t = {
@@ -32,9 +34,18 @@ module Pool = struct
     let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
     let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
+    let inclusion_timestamp = Helpers.now () in
     (* Add the transaction to the user's transaction map *)
     let transactions =
-      let transaction = {index = global_index; raw_tx; gas_price; gas_limit} in
+      let transaction =
+        {
+          index = global_index;
+          raw_tx;
+          gas_price;
+          gas_limit;
+          inclusion_timestamp;
+        }
+      in
       Pkey_map.update
         pkey
         (function
@@ -113,6 +124,7 @@ type parameters = {
   rollup_node : (module Services_backend_sig.S);
   smart_rollup_address : string;
   mode : mode;
+  tx_timeout_limit : int64;
 }
 
 module Types = struct
@@ -121,6 +133,7 @@ module Types = struct
     smart_rollup_address : string;
     mutable pool : Pool.t;
     mode : mode;
+    tx_timeout_limit : int64;
     mutable locked : bool;
   }
 
@@ -267,6 +280,12 @@ let can_prepay ~balance ~gas_price ~gas_limit =
 let can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas =
   gas_price >= base_fee_per_gas
 
+(** Check if a transaction timed out since the moment it was included in the 
+    transaction pool. *)
+let transaction_timed_out ~tx_timeout_limit ~current_timestamp
+    ~inclusion_timestamp =
+  Time.Protocol.diff current_timestamp inclusion_timestamp >= tx_timeout_limit
+
 let pop_transactions state ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let Types.
@@ -274,6 +293,7 @@ let pop_transactions state ~maximum_cumulative_size =
           rollup_node = (module Rollup_node : Services_backend_sig.S);
           pool;
           locked;
+          tx_timeout_limit;
           _;
         } =
     state
@@ -293,18 +313,23 @@ let pop_transactions state ~maximum_cumulative_size =
         addresses
     in
     let addr_with_nonces = List.filter_ok addr_with_nonces in
-    (* Remove transactions with too low nonce and the ones that
+    (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
     let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
+    let current_timestamp = Helpers.now () in
     let pool =
       addr_with_nonces
       |> List.fold_left
            (fun pool (pkey, balance, current_nonce) ->
              Pool.remove
                pkey
-               (fun nonce {gas_limit; gas_price; _} ->
+               (fun nonce {gas_limit; gas_price; inclusion_timestamp; _} ->
                  nonce < current_nonce
-                 || not (can_prepay ~balance ~gas_price ~gas_limit))
+                 || (not (can_prepay ~balance ~gas_price ~gas_limit))
+                 || transaction_timed_out
+                      ~current_timestamp
+                      ~inclusion_timestamp
+                      ~tx_timeout_limit)
                pool)
            pool
     in
@@ -440,7 +465,8 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w ()
-      ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
+      ({rollup_node; smart_rollup_address; mode; tx_timeout_limit} :
+        Types.parameters) =
     let state =
       Types.
         {
@@ -448,6 +474,7 @@ module Handlers = struct
           smart_rollup_address;
           pool = Pool.empty;
           mode;
+          tx_timeout_limit;
           locked = false;
         }
     in
