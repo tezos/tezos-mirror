@@ -89,8 +89,7 @@
      *    - Total supply: An array containing total supply for each cycle.
      *    - Total delegated: An array containing total delegated tez for each cycle.
      */
-      import {Simulator, Delegate, total_supply_storage, total_frozen_stake_storage, total_delegated_storage}
-      from './app.js';
+      import {Simulator, Delegate} from './app.js';
 
       const config = {
         // Paris Protocol parameters - no need to change these values.
@@ -113,16 +112,17 @@
         // initial values for the chain
           chain: {
               ai_activation_cycle: 5,
-              total_frozen_stake: total_frozen_stake_storage,
-              total_supply: total_supply_storage,
-              total_delegated: total_delegated_storage,
           },
       };
 
       // Creation of the simulator using the above configuration.
       const simulator = new Simulator(config);
 
-      // Creation of a delegate, which stake's evolution will be displayed in the data table.
+      simulator.set_total_supply(0, 997_513_562_000_000);
+      simulator.set_total_staked(config.proto.consensus_rights_delay + 1, 67_263_199_000_000);
+      simulator.set_total_delegated(0, 604961288973100);
+
+      // Creation of a delegate, whose stake's evolution will be displayed in the data table.
 
       // Delegate configuration.
       const delegate_config = {
@@ -204,21 +204,21 @@
                       label: 'Total supply',
                       borderColor: 'rgb(175, 92, 92)',
                       yAxisID: 'y1',
-                      data: simulator.config.chain.total_supply.map(mutez_to_tez),
+                      data: idx.map((i) => mutez_to_tez(simulator.total_supply(i))),
                       order: 2,
                   },
                   {
                       label: 'Total frozen stake',
                       borderColor: 'rgb(75, 192, 92)',
                       yAxisID: 'y1',
-                      data: simulator.config.chain.total_frozen_stake.map(mutez_to_tez),
+                      data: idx.map((i) => mutez_to_tez(simulator.total_staked_balance(i))),
                       order: 2,
                   },
                   {
                       label: 'Total delegated',
                       borderColor: 'rgb(128, 0, 128)',
                       yAxisID: 'y1',
-                      data: simulator.config.chain.total_delegated.map(mutez_to_tez),
+                      data: idx.map((i) => mutez_to_tez(simulator.total_delegated_balance(i))),
                       order: 2,
                   },
                   {
@@ -345,7 +345,7 @@
                   onDrag: function(e, datasetIndex, index, value) {
                     simulator.set_staked_ratio_at(index, value);
                     window.chart.data.datasets[1].data =
-                        simulator.config.chain.total_frozen_stake.map(mutez_to_tez);
+                        idx.map((i) => mutez_to_tez(simulator.total_staked_balance(i)));
                     window.chart.data.datasets[6].data =
                         idx_mask.concat(idx_ai.map((i) =>
                             simulator.issuance_rate_for_next_cycle(i - 1).toDecimal(4)));
@@ -421,9 +421,9 @@
           new_cell(first_block);
           new_cell(last_block);
 
-          new_cell(print_tez(config.chain.total_supply[cycle]));
-          new_cell(print_tez(config.chain.total_frozen_stake[cycle]));
-          new_cell(print_tez(config.chain.total_delegated[cycle]));
+          new_cell(print_tez(simulator.total_supply(cycle)));
+          new_cell(print_tez(simulator.total_staked_balance(cycle)));
+          new_cell(print_tez(simulator.total_delegated_balance(cycle)));
 
           new_cell(simulator.staked_ratio_for_next_cycle(cycle).toDecimal(3));
 
