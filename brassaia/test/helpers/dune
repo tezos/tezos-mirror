@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name irmin_test_helpers)
+ (public_name octez-internal-libs.irmin_test_helpers)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-alcotezt
+  astring
+  fmt
+  octez-internal-libs.irmin
+  jsonm
+  logs
+  lwt
+  mtime
+  mtime.clock.os)
+ (preprocess (pps octez-internal-libs.ppx_irmin.internal))
+ (flags
+  (:standard)
+  -w -66-68
+  -open Octez_alcotezt))

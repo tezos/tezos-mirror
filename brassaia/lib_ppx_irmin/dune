@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name ppx_irmin)
+ (public_name octez-internal-libs.ppx_irmin)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ppx_repr.lib)
+ (kind ppx_deriver))
