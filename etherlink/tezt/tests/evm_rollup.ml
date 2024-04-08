@@ -5287,6 +5287,129 @@ let test_tx_pool_timeout =
   | Empty -> unit
   | _ -> Test.fail "Inspected block shoud be empty."
 
+let test_tx_pool_address_boundaries =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "tx_pool"; "address"; "boundaries"]
+    ~title:
+      "Check that the boundaries set for the transaction pool are properly \
+       behaving."
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  let sequencer_admin = Constant.bootstrap1 in
+  let admin = Some Constant.bootstrap3 in
+  let setup_mode =
+    Setup_sequencer
+      {
+        time_between_blocks = Some Nothing;
+        sequencer = sequencer_admin;
+        devmode = true;
+      }
+  in
+  let* {evm_node = sequencer_node; _} =
+    setup_evm_kernel
+      ~sequencer_admin
+      ~admin
+      ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+      ~tx_pool_addr_limit:1
+      ~tx_pool_tx_per_addr_limit:1
+      ~setup_mode
+      protocol
+  in
+  let tx =
+    (* { "chainId": "1337",
+          "type": "LegacyTransaction",
+          "valid": true,
+          "hash": "0xb941cbf32821471381b6f003f9013b95c788ad24260d2af54848a5b504c09bb0",
+          "nonce": "0",
+          "gasPrice": "21000",
+          "gasLimit": "2000000",
+          "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
+          "to": "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
+          "v": "0a95",
+          "r": "964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004",
+          "s": "3eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a",
+          "value": "0" } *)
+    "f86480825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a0964f3d64696410dc1054af0aca06d5a4005a3bdf3db0b919e3de207af93e1004a03eb79935b4e15a576955c104fd6a614437dd0464d382198dde4c52a8eed4061a"
+  in
+  let tx' =
+    (* { "chainId": "1337",
+         "type": "LegacyTransaction",
+         "valid": true,
+         "hash": "0x51a24a5cf2eb3095f522e4c500b1bf5b0de6476f04a108ea1005cfef7ceec750",
+         "nonce": "1",
+         "gasPrice": "21000",
+         "gasLimit": "2000000",
+         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
+         "to": "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c",
+         "v": "0a95",
+         "r": "7298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776",
+         "s": "7042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e",
+         "value": "0" } *)
+    "f86401825208831e8480946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080820a95a07298a47ad7fcbe70dc9d3705af6e47147364c5ac8ede95fb561ffaa3443dd776a07042e72941ffdef02c773b7289d7e4241a5c819e78c7bfb362c7f151b0ba3e9e"
+  in
+  let tx'' =
+    (* { "chainId": "1337",
+         "type": "LegacyTransaction",
+         "valid": true,
+         "hash": "0x25a2f2e9c1cadada66ce255e609c0ace80435b0b595371a5da2bb104757e6ade",
+         "nonce": "0",
+         "gasPrice": "21000",
+         "gasLimit": "23300",
+         "from": "0xB53dc01974176E5dFf2298C5a94343c2585E3c54",
+         "to": "0xb53dc01974176e5dff2298c5a94343c2585e3c54",
+         "v": "0a95",
+         "r": "9bc3d2c48b9d3db98b277ddb804941deeb899d65b2a22c76600810270d1bcfcf",
+         "s": "5a3c7ead9bbf152acd4f7ea01a4cec70c921cde466840a9bdad4c2d8939963ef",
+         "value": "100000" } *)
+    "f86680825208825b0494b53dc01974176e5dff2298c5a94343c2585e3c54830186a080820a95a09bc3d2c48b9d3db98b277ddb804941deeb899d65b2a22c76600810270d1bcfcfa05a3c7ead9bbf152acd4f7ea01a4cec70c921cde466840a9bdad4c2d8939963ef"
+  in
+  let*@ tx_hash_expected = Rpc.send_raw_transaction ~raw_tx:tx sequencer_node in
+  (* Limitation on the number of transaction per address *)
+  let*@? rejected_transaction' =
+    Rpc.send_raw_transaction ~raw_tx:tx' sequencer_node
+  in
+  Check.(
+    (rejected_transaction'.message
+   = "Limit of transaction for a user was reached. Transaction is rejected.")
+      string)
+    ~error_msg:"This transaction should be rejected with error msg %R not %L" ;
+  (* Limitation on the number of allowed address inside the transaction pool *)
+  let*@? rejected_transaction'' =
+    Rpc.send_raw_transaction ~raw_tx:tx'' sequencer_node
+  in
+  Check.(
+    (rejected_transaction''.message
+   = "The transaction pool has reached its maximum threshold for user \
+      transactions. Transaction is rejected.")
+      string)
+    ~error_msg:"This transaction should be rejected with error msg %R not %L" ;
+  let*@ block_number = Rpc.produce_block sequencer_node in
+  let*@ block =
+    Rpc.get_block_by_number ~block:(Int.to_string block_number) sequencer_node
+  in
+  let tx_hash =
+    match block.transactions with
+    | Hash txs -> List.hd txs
+    | Empty ->
+        Test.fail
+          "Inspected block should contain a list of one transaction hash and \
+           not be empty."
+    | Full _ ->
+        Test.fail
+          "Inspected block should contain a list of one transaction hash, not \
+           full objects."
+  in
+  Check.((tx_hash = tx_hash_expected) string)
+    ~error_msg:"Expected transaction hash is %R, got %L" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5382,7 +5505,8 @@ let register_evm_node ~protocols =
   test_revert_is_correctly_propagated protocols ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
-  test_tx_pool_timeout protocols
+  test_tx_pool_timeout protocols ;
+  test_tx_pool_address_boundaries protocols
 
 let protocols = Protocol.all
 
