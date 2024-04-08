@@ -21,6 +21,20 @@ open Gitlab_ci.Util
 open Tezos_ci
 
 let jobs =
+  (* Like in the {!Schedule_extended_test} variant of
+     {!Code_verification} pipelines, we'd like to run as many jobs as
+     possible in [master_branch] pipelines. Therefore, the default
+     [when_] should be [Always] for jobs without dependencies.
+
+     [changes:] clauses can be used on [master_branch] pipelines. In
+     push pipelines like this one, [changes:]-clauses match against
+     the diff of the branch's [HEAD] between two pushes. That is, the
+     the difference between the previous state and the new state of
+     the branch. In the case of the [master] branch, this is just the
+     contents of the most recently merged MR. For more info on
+     [changes:] in different pipelines, see
+     {{:https://docs.gitlab.com/ee/ci/jobs/job_troubleshooting.html#jobs-or-pipelines-run-unexpectedly-when-using-changes}
+     GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
   let rules_always = [job_rule ~when_:Always ()] in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
