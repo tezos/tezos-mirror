@@ -87,6 +87,8 @@ val listen_addr : t -> string
 (** Get the node's metrics server point pair "address:port" given as [--metrics-addr] to a dal node. *)
 val metrics_addr : t -> string
 
+val metrics_port : t -> int
+
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
 
@@ -180,3 +182,19 @@ val wait_for_connections : t -> int -> unit Lwt.t
     [wait_for_disconnection node peer_id] waits until [node] receives a
     ["disconnected.v0"] event from the given peer id. *)
 val wait_for_disconnection : t -> peer_id:string -> unit Lwt.t
+
+val runner : t -> Runner.t option
+
+val point_str : t -> string
+
+module Agent : sig
+  (* Function below are similar to their counter-part in the main module of this
+     file except it takes an agent in parameter. This is to avoid silly mistakes
+     when using agents with Tezt cloud.
+
+     In the future, we could decide to merge the two by having an agent
+     corresponding to localhost.
+  *)
+
+  val create : ?path:string -> ?name:string -> node:Node.t -> Agent.t -> t Lwt.t
+end

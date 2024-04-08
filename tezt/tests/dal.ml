@@ -53,7 +53,18 @@ module Helpers = struct
 
   (* We override store slot so that it uses a DAL node in this file. *)
   let store_slot dal_node ?with_proof slot =
-    store_slot (Either.Left dal_node) ?with_proof slot
+    match Dal_node.runner dal_node with
+    | None -> store_slot (Either.Left dal_node) ?with_proof slot
+    | Some runner ->
+        let endpoint =
+          Endpoint.
+            {
+              host = runner.Runner.address;
+              scheme = "http";
+              port = Dal_node.rpc_port dal_node;
+            }
+        in
+        store_slot (Either.Right endpoint) ?with_proof slot
 end
 
 module Dal_RPC = struct
@@ -694,11 +705,12 @@ let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
   let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox' msg) in
   Helpers.publish_commitment ~source ?fee ~index ~commitment ~proof
 
-let publish_commitment ?counter ?force ~source ?(fee = 1200) ~index ~commitment
-    ~proof client =
+let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
+    ~commitment ~proof client =
   let commitment = Dal.Commitment.of_string commitment in
   let proof = Dal.Commitment.proof_of_string proof in
   Helpers.publish_commitment
+    ?dont_wait
     ?counter
     ?force
     ~source
@@ -1257,11 +1269,12 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot ?with_proof ?counter ?force ?(fee = 1_200) client
-    dal_node source ~index content =
+let publish_and_store_slot ?dont_wait ?with_proof ?counter ?force ?(fee = 1_200)
+    client dal_node source ~index content =
   let* commitment, proof = Helpers.store_slot dal_node ?with_proof content in
   let* _ =
     publish_commitment
+      ?dont_wait
       ?counter
       ?force
       ~source

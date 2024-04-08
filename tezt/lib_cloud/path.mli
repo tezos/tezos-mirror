@@ -1,0 +1,29 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Path to the directory containing the terraform script to setup the
+    docker registry. *)
+val terraform_docker_registry : string
+
+(** Path to the directory containing the terraform script to generate
+    the bucket storing the terraform state. *)
+val terraform_state_bucket : string
+
+(** Path to the directory containing the terraform script to generate
+    the VMs. *)
+val terraform_vm : string
+
+(** Path to the directory containing dockerfiles for each user. *)
+val docker : string
+
+(** Path to the zcash_params directory that can be used for the
+    dockerfiles. *)
+val zcash_params : string
+
+(** Path to the DAL trusted setup directory that can be used for the
+  dockerfiles.*)
+val dal_trusted_setup : string

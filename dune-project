@@ -143,6 +143,7 @@
 (package (name tezos-tps-evaluation))
 (package (name tezos-tree-encoding-test)(allow_empty))
 (package (name tezos_internal_irmin_tests)(allow_empty))
+(package (name tezt-cloud)(allow_empty))
 (package (name tezt-etherlink)(allow_empty))
 (package (name tezt-risc-v-sandbox)(allow_empty))
 (package (name tezt-tezos))

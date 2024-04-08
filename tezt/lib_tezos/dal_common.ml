@@ -537,14 +537,15 @@ module Helpers = struct
              Data_encoding.Json.pp
              parameters_json
 
-  let publish_commitment ?counter ?force ?source ?fee ?error ~index ~commitment
-      ~proof client =
+  let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
+      ~commitment ~proof client =
     (* We scale the fees to match the actual gas cost of publishing a slot header.
        Doing this here allows to keep the diff small as gas cost for
        publishing slot header is adjusted. *)
     let fee = Option.map (fun x -> x * 13) fee in
     Operation.Manager.(
       inject
+        ?dont_wait
         ?error
         ?force
         [

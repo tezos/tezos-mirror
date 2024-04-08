@@ -146,17 +146,19 @@ let spawn_inject ?(force = false) ?protocol ?signature t client =
   in
   return (Client.RPC.spawn client @@ inject_rpc (Data (`String op)))
 
-let inject ?(request = `Inject) ?force ?protocol ?signature ?error t client :
-    [`OpHash of string] Lwt.t =
+let inject ?(dont_wait = false) ?(request = `Inject) ?force ?protocol ?signature
+    ?error t client : [`OpHash of string] Lwt.t =
   let waiter =
-    let mode = Client.get_mode client in
-    match Client.mode_to_endpoint mode with
-    | None -> Test.fail "Operation.inject: Endpoint expected"
-    | Some (Proxy_server _ | Foreign_endpoint _) ->
-        Test.fail
-          "Operation.inject: Node endpoint expected instead of proxy server or \
-           foreign endpoint"
-    | Some (Node node) -> Node.wait_for_request ~request node
+    if dont_wait then Lwt.return_unit
+    else
+      let mode = Client.get_mode client in
+      match Client.mode_to_endpoint mode with
+      | None -> Test.fail "Operation.inject: Endpoint expected"
+      | Some (Proxy_server _ | Foreign_endpoint _) ->
+          Test.fail
+            "Operation.inject: Node endpoint expected instead of proxy server \
+             or foreign endpoint"
+      | Some (Node node) -> Node.wait_for_request ~request node
   in
   let* runnable = spawn_inject ?force ?protocol ?signature t client in
   match error with
@@ -817,9 +819,9 @@ module Manager = struct
         make ?source ?fee ?gas_limit ?storage_limit ~counter payload)
       payloads
 
-  let inject ?request ?force ?branch ?signer ?error managers client =
+  let inject ?dont_wait ?request ?force ?branch ?signer ?error managers client =
     let* op = operation ?branch ?signer managers client in
-    inject ?request ?force ?error op client
+    inject ?dont_wait ?request ?force ?error op client
 
   let get_branch ?chain ?(offset = 2) client =
     let block = sf "head~%d" offset in

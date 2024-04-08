@@ -30,7 +30,7 @@ module Parameters = struct
     rpc_port : int;
     listen_addr : string;
         (** The TCP address and port at which this instance can be reached. *)
-    public_addr : string;
+    public_addr : string option;
     metrics_addr : string;
     l1_node_endpoint : Client.endpoint;
     mutable pending_ready : unit option Lwt.u list;
@@ -77,6 +77,12 @@ let public_addr dal_node = dal_node.persistent_state.public_addr
 
 let metrics_addr dal_node = dal_node.persistent_state.metrics_addr
 
+let metrics_port dal_node =
+  try
+    dal_node.persistent_state.metrics_addr |> String.split_on_char ':'
+    |> Fun.flip List.nth 1 |> int_of_string
+  with _ -> 11733
+
 let data_dir dal_node = dal_node.persistent_state.data_dir
 
 let spawn_command dal_node =
@@ -100,13 +106,14 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
        Some (Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node));
        Some "--net-addr";
        Some (listen_addr dal_node);
-       Some "--public-addr";
-       Some (public_addr dal_node);
        Some "--metrics-addr";
        Some (metrics_addr dal_node);
        Some "--expected-pow";
        Some (string_of_float expected_pow);
      ]
+  @ (match public_addr dal_node with
+    | None -> []
+    | Some addr -> [Some "--public-addr"; Some addr])
   @ (if peers = [] then [None]
     else [Some "--peers"; Some (String.concat "," peers)])
   @ (if attester_profiles = [] then [None]
@@ -233,9 +240,6 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
     | Some addr -> addr
   in
-  let public_addr =
-    match public_addr with None -> listen_addr | Some addr -> addr
-  in
   let metrics_addr =
     match metrics_addr with
     | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
@@ -293,11 +297,13 @@ let make_arguments node =
     Format.asprintf "%s:%d" (rpc_host node) (rpc_port node);
     "--net-addr";
     listen_addr node;
-    "--public-addr";
-    public_addr node;
     "--metrics-addr";
     metrics_addr node;
   ]
+  @
+  match public_addr node with
+  | None -> []
+  | Some addr -> ["--public-addr"; addr]
 
 let do_runlike_command ?env ?(event_level = `Debug) node arguments =
   if node.status <> Not_running then
@@ -337,3 +343,41 @@ let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
   Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+
+let runner (t : t) = t.persistent_state.runner
+
+let point node =
+  let address = Runner.address node.persistent_state.runner in
+  let net_port =
+    String.split_on_char ':' node.persistent_state.listen_addr
+    |> Fun.flip List.nth 1
+  in
+  (address, net_port)
+
+let point_str node =
+  let addr, port = point node in
+  addr ^ ":" ^ port
+
+module Agent = struct
+  let create ?(path = Uses.path Constant.octez_dal_node |> Filename.basename)
+      ?name ~node agent =
+    let* path = Agent.copy agent ~source:path in
+    let runner = Agent.runner agent in
+    let rpc_host = "0.0.0.0" in
+    let rpc_port = Agent.next_available_port agent in
+    let net_port = Agent.next_available_port agent in
+    let metrics_port = Agent.next_available_port agent in
+    let metrics_addr = Format.asprintf "0.0.0.0:%d" metrics_port in
+    let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
+    create
+      ?name
+      ~path
+      ~runner
+      ~rpc_host
+      ~rpc_port
+      ~metrics_addr
+      ~listen_addr
+      ~node
+      ()
+    |> Lwt.return
+end
