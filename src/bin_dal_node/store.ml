@@ -26,6 +26,7 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
    use another storage solution that irmin as we don't need backtracking *)
 
+module KVS = Key_value_store
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 module Irmin = StoreMaker.Make (Irmin.Contents.String)
 
@@ -33,6 +34,8 @@ type irmin = Irmin.t
 
 module Stores_dirs = struct
   let shard = "shard_store"
+
+  let slot = "slot_store"
 end
 
 let info message =
@@ -85,8 +88,6 @@ module Value_size_hooks = struct
 end
 
 module Shards = struct
-  module KVS = Key_value_store
-
   type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) KVS.t
 
   let file_layout ~root_dir commitment =
@@ -158,6 +159,14 @@ module Shards = struct
     KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
 end
 
+module Slots = struct
+  type t = (Cryptobox.Commitment.t * int, unit, bytes) KVS.t
+
+  let init node_store_dir slot_store_dir =
+    let root_dir = Filename.concat node_store_dir slot_store_dir in
+    KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
+end
+
 module Shard_proofs_cache =
   Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (struct
@@ -172,6 +181,7 @@ module Shard_proofs_cache =
 type t = {
   store : irmin;
   shard_store : Shards.t;
+  slot_store : Slots.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
@@ -193,10 +203,12 @@ let init config =
   let*! repo = Irmin.Repo.v (Irmin_pack.config base_dir) in
   let*! store = Irmin.main repo in
   let* shard_store = Shards.init base_dir Stores_dirs.shard in
+  let* slot_store = Slots.init base_dir Stores_dirs.slot in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
       shard_store;
+      slot_store;
       store;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;

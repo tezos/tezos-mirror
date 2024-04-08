@@ -58,6 +58,12 @@ module Shards : sig
   val remove : t -> commitment -> unit tzresult Lwt.t
 end
 
+module Slots : sig
+  (** A store of slots, indexed by slot size and commitment. *)
+
+  type t
+end
+
 module Shard_proofs_cache : sig
   (** Shard proofs are not stored on disk because we can recompute
       them. This computation is quite costly though so we cache the
@@ -73,6 +79,7 @@ end
 type t = private {
   store : irmin; (* The Irmin part *)
   shard_store : Shards.t;
+  slot_store : Slots.t;
   in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
