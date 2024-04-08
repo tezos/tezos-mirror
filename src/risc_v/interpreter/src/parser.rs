@@ -267,6 +267,20 @@ macro_rules! f_r_instr {
     };
 }
 
+macro_rules! f_r_rm_1_instr {
+    ($enum_variant:ident, $instr:expr, $rm:expr) => {
+        if let Some(rounding) = InstrRoundingMode::from_rm($rm) {
+            $enum_variant(instruction::FR1ArgWithRounding {
+                rd: rd_f($instr),
+                rs1: rs1_f($instr),
+                rm: rounding,
+            })
+        } else {
+            Unknown { instr: $instr }
+        }
+    };
+}
+
 macro_rules! f_r_rm_2_instr {
     ($enum_variant:ident, $instr:expr, $rs2_bits:expr, $rm:expr) => {{
         if let Some(rounding) = InstrRoundingMode::from_rm($rm) {
@@ -393,6 +407,7 @@ const F5_3: u32 = 0b0_0011;
 const F5_4: u32 = 0b0_0100;
 const F5_5: u32 = 0b0_0101;
 const F5_8: u32 = 0b0_1000;
+const F5_11: u32 = 0b0_1011;
 const F5_12: u32 = 0b0_1100;
 const F5_16: u32 = 0b1_0000;
 const F5_20: u32 = 0b1_0100;
@@ -664,6 +679,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxs, instr, rs2_bits),
                 (F5_5, RM_MIN, rs2_bits) => f_r_instr!(Fmins, instr, rs2_bits),
                 (F5_5, RM_MAX, rs2_bits) => f_r_instr!(Fmaxs, instr, rs2_bits),
+                (F5_11, rounding, RS2_0) => f_r_rm_1_instr!(Fsqrts, instr, rounding),
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqs, instr, rs2_bits),
                 (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fles, instr, rs2_bits),
                 (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Flts, instr, rs2_bits),
@@ -699,6 +715,7 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F5_4, RM_2, rs2_bits) => f_r_instr!(Fsgnjxd, instr, rs2_bits),
                 (F5_5, RM_MIN, rs2_bits) => f_r_instr!(Fmind, instr, rs2_bits),
                 (F5_5, RM_MAX, rs2_bits) => f_r_instr!(Fmaxd, instr, rs2_bits),
+                (F5_11, rounding, RS2_0) => f_r_rm_1_instr!(Fsqrtd, instr, rounding),
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqd, instr, rs2_bits),
                 (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fled, instr, rs2_bits),
                 (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Fltd, instr, rs2_bits),

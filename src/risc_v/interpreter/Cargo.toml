@@ -21,6 +21,9 @@ path = "../kernel_loader"
 [dependencies.rustc_apfloat]
 workspace = true
 
+[dependencies.ieee-apsqrt]
+workspace = true
+
 [dev-dependencies]
 goblin = "0.7.1"
 hex = "0.4.3"

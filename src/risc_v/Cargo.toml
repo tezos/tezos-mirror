@@ -12,3 +12,4 @@ exclude = ["jstz", "dummy_kernel", "tests"]
 
 [workspace.dependencies]
 rustc_apfloat = "0.2.0"
+ieee-apsqrt = "0.1.1"
