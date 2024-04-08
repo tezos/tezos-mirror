@@ -65,41 +65,17 @@ let install_finalizer server =
   let* () = Tx_pool.shutdown () in
   Evm_context.shutdown ()
 
-(** [retry_connection f] retries the connection using [f]. If an error
-    happens in [f] and it is a lost connection, the connection is retried  *)
-let retry_connection (f : Uri.t -> string tzresult Lwt.t) endpoint :
-    string tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let rec retry ~delay =
-    let*! result = f endpoint in
-    match result with
-    | Ok smart_rollup_address -> return smart_rollup_address
-    | Error err when Rollup_services.is_connection_error err ->
-        let*! () = Events.retrying_connect ~endpoint ~delay in
-        let*! () = Lwt_unix.sleep delay in
-        let next_delay = delay *. 2. in
-        let delay = Float.min next_delay 30. in
-        retry ~delay
-    | res -> Lwt.return res
-  in
-  retry ~delay:1.
-
-(** [fetch_smart_rollup_address ~keep_alive f] tries to fetch the
-    smart rollup address using [f]. If [keep_alive] is true, tries to
-    fetch until it works. *)
-let fetch_smart_rollup_address ~keep_alive f (endpoint : Uri.t) =
-  if keep_alive then retry_connection f endpoint else f endpoint
-
-let main (config : Configuration.t) ~keep_alive ~rollup_node_endpoint =
+let main (config : Configuration.t) ~rollup_node_endpoint =
   let open Lwt_result_syntax in
   let* smart_rollup_address =
-    fetch_smart_rollup_address
-      ~keep_alive
-      Rollup_services.smart_rollup_address
+    Rollup_services.smart_rollup_address
+      ~keep_alive:config.keep_alive
       rollup_node_endpoint
   in
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
+
+    let keep_alive = config.keep_alive
 
     let smart_rollup_address = smart_rollup_address
   end) in
@@ -116,7 +92,13 @@ let main (config : Configuration.t) ~keep_alive ~rollup_node_endpoint =
         max_number_of_chunks = None;
       }
   in
-  let () = Rollup_node_follower.start ~proxy:true ~rollup_node_endpoint in
+  let () =
+    Rollup_node_follower.start
+      ~keep_alive:config.keep_alive
+      ~proxy:true
+      ~rollup_node_endpoint
+      ()
+  in
   let directory =
     Services.directory config ((module Rollup_node_rpc), smart_rollup_address)
   in

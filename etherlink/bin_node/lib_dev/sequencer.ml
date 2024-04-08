@@ -186,7 +186,9 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let open Lwt_result_syntax in
   let open Configuration in
   let* smart_rollup_address =
-    Rollup_services.smart_rollup_address rollup_node_endpoint
+    Rollup_services.smart_rollup_address
+      ~keep_alive:configuration.keep_alive
+      rollup_node_endpoint
   in
   let*? sequencer_config = Configuration.sequencer_config_exn configuration in
   let* status =
@@ -264,9 +266,19 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   in
   let* () =
     Evm_events_follower.start
-      {rollup_node_endpoint; filter_event = (fun _ -> true)}
+      {
+        rollup_node_endpoint;
+        keep_alive = configuration.keep_alive;
+        filter_event = (fun _ -> true);
+      }
   in
-  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
+  let () =
+    Rollup_node_follower.start
+      ~keep_alive:configuration.keep_alive
+      ~proxy:false
+      ~rollup_node_endpoint
+      ()
+  in
 
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)

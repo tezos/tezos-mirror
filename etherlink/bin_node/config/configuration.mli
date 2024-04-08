@@ -61,6 +61,7 @@ type t = {
   tx_pool_timeout_limit : int64;
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
+  keep_alive : bool;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -126,6 +127,7 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
+    keep_alive:bool ->
     unit ->
     t
 
@@ -143,6 +145,7 @@ module Cli : sig
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
+    keep_alive:bool ->
     unit ->
     t tzresult Lwt.t
 end

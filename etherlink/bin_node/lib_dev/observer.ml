@@ -11,6 +11,8 @@ open Ethereum_types
 module MakeBackend (Ctxt : sig
   val evm_node_endpoint : Uri.t
 
+  val keep_alive : bool
+
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
@@ -75,6 +77,7 @@ end) : Services_backend_sig.Backend = struct
 
       let* response =
         call_service
+          ~keep_alive:Ctxt.keep_alive
           ~base:Ctxt.evm_node_endpoint
           (Services.dispatch_service ~path:Resto.Path.root)
           ()
@@ -126,6 +129,8 @@ let on_new_blueprint next_blueprint_number
 
 module Make (Ctxt : sig
   val evm_node_endpoint : Uri.t
+
+  val keep_alive : bool
 
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.S =
@@ -246,6 +251,8 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
     (module Make (struct
       let smart_rollup_address = smart_rollup_address
 
+      let keep_alive = config.keep_alive
+
       let evm_node_endpoint = evm_node_endpoint
     end) : Services_backend_sig.S)
   in
@@ -278,10 +285,17 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
     Evm_events_follower.start
       {
         rollup_node_endpoint;
+        keep_alive = config.keep_alive;
         filter_event =
           (function New_delayed_transaction _ -> false | _ -> true);
       }
   in
-  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
+  let () =
+    Rollup_node_follower.start
+      ~keep_alive:config.keep_alive
+      ~proxy:false
+      ~rollup_node_endpoint
+      ()
+  in
 
   main_loop ~first_connection:true ~evm_node_endpoint

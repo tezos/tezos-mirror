@@ -47,6 +47,7 @@ type t = {
   tx_pool_timeout_limit : int64;
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
+  keep_alive : bool;
 }
 
 let default_filter_config =
@@ -61,6 +62,8 @@ let default_rpc_addr = "127.0.0.1"
 let default_rpc_port = 8545
 
 let default_devmode = false
+
+let default_keep_alive = false
 
 let default_cors_origins = []
 
@@ -229,6 +232,7 @@ let encoding : t Data_encoding.t =
            tx_pool_timeout_limit;
            tx_pool_addr_limit;
            tx_pool_tx_per_addr_limit;
+           keep_alive;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -240,8 +244,10 @@ let encoding : t Data_encoding.t =
           sequencer,
           observer,
           max_active_connections ),
-        (tx_pool_timeout_limit, tx_pool_addr_limit, tx_pool_tx_per_addr_limit)
-      ))
+        ( tx_pool_timeout_limit,
+          tx_pool_addr_limit,
+          tx_pool_tx_per_addr_limit,
+          keep_alive ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              devmode,
@@ -252,8 +258,10 @@ let encoding : t Data_encoding.t =
              sequencer,
              observer,
              max_active_connections ),
-           (tx_pool_timeout_limit, tx_pool_addr_limit, tx_pool_tx_per_addr_limit)
-         ) ->
+           ( tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             keep_alive ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -268,6 +276,7 @@ let encoding : t Data_encoding.t =
         tx_pool_timeout_limit;
         tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit;
+        keep_alive;
       })
     (merge_objs
        (obj10
@@ -285,7 +294,7 @@ let encoding : t Data_encoding.t =
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
              default_max_active_connections))
-       (obj3
+       (obj4
           (dft
              "tx-pool-timeout-limit"
              ~description:
@@ -304,7 +313,8 @@ let encoding : t Data_encoding.t =
                "Maximum allowed transactions per user address inside the \
                 transaction pool."
              int64
-             default_tx_pool_tx_per_addr_limit)))
+             default_tx_pool_tx_per_addr_limit)
+          (dft "keep_alive" bool default_keep_alive)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -339,7 +349,7 @@ let observer_config_exn {observer; _} =
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
       ?log_filter ?proxy ?sequencer ?observer ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit () =
+      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive () =
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -361,12 +371,13 @@ module Cli = struct
         Option.value
           ~default:default_tx_pool_tx_per_addr_limit
           tx_pool_tx_per_addr_limit;
+      keep_alive;
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?log_filter ?proxy ?sequencer ?observer
       ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-      configuration =
+      ~keep_alive configuration =
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -392,11 +403,13 @@ module Cli = struct
         Option.value
           ~default:configuration.tx_pool_tx_per_addr_limit
           tx_pool_tx_per_addr_limit;
+      keep_alive = configuration.keep_alive || keep_alive;
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?log_filter ?proxy ?sequencer ?observer
-      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit () =
+      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+      ~keep_alive () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -425,6 +438,7 @@ module Cli = struct
           ?cors_origins
           ?cors_headers
           ?log_filter
+          ~keep_alive
           ?proxy
           ?sequencer
           ?observer
@@ -442,6 +456,7 @@ module Cli = struct
           ?rpc_port
           ?cors_origins
           ?cors_headers
+          ~keep_alive
           ?log_filter
           ?proxy
           ?sequencer
