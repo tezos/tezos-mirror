@@ -482,23 +482,11 @@ let register () =
              + Constants_repr.max_slashing_period)
       in
       let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
-      let* requests =
-        List.map_es
-          (fun cycle ->
-            let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
-            return (cycle, deposit))
-          cycles
-      in
-      let* slashed_requests =
-        Alpha_context.Unstake_requests.For_RPC
-        .apply_slash_to_unstaked_unfinalizable
-          ctxt
-          ~delegate:pkh
-          ~requests
-      in
       List.map_es
-        (fun (cycle, deposit) -> return {cycle; deposit})
-        slashed_requests) ;
+        (fun cycle ->
+          let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
+          return {cycle; deposit})
+        cycles) ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Delegate.For_RPC.staking_balance ctxt pkh) ;
