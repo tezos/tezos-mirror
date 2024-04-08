@@ -20,12 +20,11 @@ const { spawn } = require('child_process');
 const { execSync } = require('child_process');
 const external = require("./lib/external")
 const path = require('node:path')
-const { timestamp } = require("./lib/timestamp")
 const csv = require('csv-stringify/sync');
 const commander = require('commander');
 const { mkdirSync } = require('node:fs');
 const { exit } = require('process');
-
+const { v4: uuidv4 } = require('uuid');
 function parse_mode(mode, _) {
     if (mode != "sequencer" && mode != "proxy") {
         console.error("Mode can be either `proxy` or `sequencer`");
@@ -310,12 +309,12 @@ async function run_benchmark(path, logs) {
     }
 }
 
-function build_benchmark_scenario(benchmark_script) {
+function build_benchmark_scenario(benchmark_script, inbox) {
     try {
         let bench_path = path.format({ dir: __dirname, base: benchmark_script })
         let extra = MODE == 'sequencer' ? `--sequencer ${SEQUENCER_KEY}` : "";
         extra += MULTI_BLUEPRINT ? ` --multi-blueprint` : ``;
-        execSync(`node ${bench_path} ${extra} > transactions.json`);
+        execSync(`node ${bench_path} ${extra} > ${inbox}`);
     } catch (error) {
         console.log(`Error running script ${benchmark_script}. Please fixed the error in the script before running this benchmark script`)
         console.error(error);
@@ -427,6 +426,10 @@ function log_benchmark_result(benchmark_name, data) {
     return rows;
 }
 
+function inbox_filename(time) {
+    return path.format({ dir: OUTPUT_DIRECTORY, base: `inbox_${time}.json` })
+}
+
 function logs_filename(time) {
     return path.format({ dir: OUTPUT_DIRECTORY, base: `logs_${time}.log` })
 }
@@ -466,8 +469,8 @@ function add_dump(filename, specific_dump_filename, is_first) {
         fs.appendFileSync(filename, ",")
     fs.appendFileSync(filename, `"${specific_dump_filename}"`);
 }
-
-const PROFILER_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + "/profiling"
+const ID = uuidv4();
+const PROFILER_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + `/profiling_${ID}`
 mkdirSync(PROFILER_OUTPUT_DIRECTORY, { recursive: true })
 
 // Determine the header list by looking at object properties
@@ -492,11 +495,12 @@ async function run_all_benchmarks(benchmark_scripts) {
         "data_size",
         "ticks",
     ]
-    let time = timestamp();
+    let time = ID; 
     let output = output_filename(time);
     let all_opcodes_dump = all_opcodes_dump_filename(time);
     let precompiles_output = precompiles_filename(time);
-    let logs = logs_filename(time)
+    let logs = logs_filename(time);
+    let inbox = inbox_filename(time);
     console.log(`Output in ${output}`);
     console.log(`Dumped opcodes list in ${all_opcodes_dump}`);
     console.log(`Precompiles in ${precompiles_output}`);
@@ -513,8 +517,8 @@ async function run_all_benchmarks(benchmark_scripts) {
         var benchmark_name = parts[parts.length - 1].split(".")[0];
         console.log(`Benchmarking ${benchmark_script} (mode: ${MODE})`);
         fs.appendFileSync(logs, `=================================================\nBenchmarking ${benchmark_script}\n`)
-        build_benchmark_scenario(benchmark_script);
-        run_benchmark_result = await run_benchmark("transactions.json", logs);
+        build_benchmark_scenario(benchmark_script,inbox);
+        run_benchmark_result = await run_benchmark(inbox, logs);
         benchmark_log = log_benchmark_result(benchmark_name, run_benchmark_result);
         if (i == 0) benchmark_csv_config = initialize_headers(output, benchmark_log);
         fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config))
@@ -528,7 +532,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     fs.appendFileSync(all_opcodes_dump, "]");
     console.log("Benchmarking complete");
     fs.appendFileSync(logs, "=================================================\nBenchmarking complete.\n")
-    execSync("rm transactions.json");
+    execSync(`rm ${inbox}`);
 }
 
 // we exclude bench_loop_calldataload because with the current tick model it
