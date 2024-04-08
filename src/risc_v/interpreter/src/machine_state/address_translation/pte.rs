@@ -38,7 +38,7 @@ impl FieldValue for PPNField {
         PPNField { raw_bits: value }
     }
 
-    fn raw_bits(self) -> u64 {
+    fn raw_bits(&self) -> u64 {
         self.raw_bits
     }
 }
