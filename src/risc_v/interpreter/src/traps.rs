@@ -17,6 +17,7 @@
 //!
 
 use crate::machine_state::{bus::Address, csregisters::CSRValue};
+use std::fmt::Formatter;
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
 #[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug, Clone, Copy)]
@@ -54,7 +55,10 @@ impl TryFrom<&Exception> for EnvironException {
             | Exception::IllegalInstruction
             | Exception::InstructionAccessFault(_)
             | Exception::LoadAccessFault(_)
-            | Exception::StoreAccessFault(_) => {
+            | Exception::StoreAccessFault(_)
+            | Exception::InstructionPageFault(_)
+            | Exception::LoadPageFault(_)
+            | Exception::StoreAMOPageFault(_) => {
                 Err("Execution environment supports only ecall exceptions")
             }
         }
@@ -62,7 +66,7 @@ impl TryFrom<&Exception> for EnvironException {
 }
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
-#[derive(PartialEq, Eq, thiserror::Error, strum::Display, Debug)]
+#[derive(PartialEq, Eq, thiserror::Error, strum::Display)]
 pub enum Exception {
     /// `InstructionAccessFault(addr)` where `addr` is the faulting instruction address
     InstructionAccessFault(Address),
@@ -75,6 +79,21 @@ pub enum Exception {
     EnvCallFromUMode,
     EnvCallFromSMode,
     EnvCallFromMMode,
+    InstructionPageFault(Address),
+    LoadPageFault(Address),
+    StoreAMOPageFault(Address),
+}
+
+impl core::fmt::Debug for Exception {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Self::InstructionPageFault(adr) => write!(f, "InstructionPageFault({adr:#X})"),
+            Self::LoadPageFault(adr) => write!(f, "LoadPageFault({adr:#X})"),
+            Self::StoreAMOPageFault(adr) => write!(f, "StoreAMOPageFault({adr:#X})"),
+            Self::LoadAccessFault(adr) => write!(f, "LoadAccessFault({adr:#X})"),
+            other => write!(f, "{other}"),
+        }
+    }
 }
 
 /// RISC-V Interrupts (also known as asynchronous exceptions)
@@ -151,6 +170,9 @@ impl TrapContext for Exception {
             Exception::EnvCallFromUMode => 8,
             Exception::EnvCallFromSMode => 9,
             Exception::EnvCallFromMMode => 11,
+            Exception::InstructionPageFault(_) => 12,
+            Exception::LoadPageFault(_) => 13,
+            Exception::StoreAMOPageFault(_) => 15,
         }
     }
 
@@ -168,6 +190,9 @@ impl TrapContext for Exception {
             Exception::InstructionAccessFault(addr) => *addr,
             Exception::LoadAccessFault(addr) => *addr,
             Exception::StoreAccessFault(addr) => *addr,
+            Exception::InstructionPageFault(addr) => *addr,
+            Exception::LoadPageFault(addr) => *addr,
+            Exception::StoreAMOPageFault(addr) => *addr,
         }
     }
 

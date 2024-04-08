@@ -7,7 +7,7 @@ use crate::{
     machine_state::{
         bus::{main_memory::MainMemoryLayout, Addressable, OutOfBounds},
         registers::XRegister,
-        MachineState,
+        AccessType, MachineState,
     },
     state_backend as backend,
     traps::Exception,
@@ -20,6 +20,8 @@ where
 {
     /// Generic read function for loading `mem::size_of<T>` bytes from `address`
     pub(super) fn read_from_address<T: backend::Elem>(&self, address: u64) -> Result<T, Exception> {
+        let address = self.translate(address, AccessType::Load)?;
+
         self.bus
             .read(address)
             .map_err(|_: OutOfBounds| Exception::LoadAccessFault(address))
@@ -41,6 +43,8 @@ where
         address: u64,
         value: T,
     ) -> Result<(), Exception> {
+        let address = self.translate(address, AccessType::Store)?;
+
         self.bus
             .write(address, value)
             .map_err(|_: OutOfBounds| Exception::StoreAccessFault(address))

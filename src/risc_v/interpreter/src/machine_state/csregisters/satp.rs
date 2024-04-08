@@ -68,7 +68,7 @@ impl FieldValue for Option<TranslationAlgorithm> {
         }
     }
 
-    fn raw_bits(self) -> u64 {
+    fn raw_bits(&self) -> u64 {
         match self {
             None => 0,
             Some(algorithm) => algorithm.enc(),

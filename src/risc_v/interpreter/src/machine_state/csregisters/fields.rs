@@ -10,7 +10,7 @@ pub trait FieldValue {
     fn new(value: u64) -> Self;
 
     /// Returns the underlying bits of the field.
-    fn raw_bits(self) -> u64;
+    fn raw_bits(&self) -> u64;
 }
 
 /// Generic field of a register which holds an unsigned value
@@ -18,12 +18,18 @@ pub struct UnsignedValue {
     bits: u64,
 }
 
+impl UnsignedValue {
+    pub fn value(&self) -> u64 {
+        self.raw_bits()
+    }
+}
+
 impl FieldValue for UnsignedValue {
     fn new(value: u64) -> Self {
         UnsignedValue { bits: value }
     }
 
-    fn raw_bits(self) -> u64 {
+    fn raw_bits(&self) -> u64 {
         self.bits
     }
 }

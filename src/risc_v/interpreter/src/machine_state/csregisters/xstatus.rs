@@ -24,8 +24,8 @@ impl FieldValue for bool {
         (value & 1) == 1
     }
 
-    fn raw_bits(self) -> u64 {
-        self as u64
+    fn raw_bits(&self) -> u64 {
+        *self as u64
     }
 }
 
@@ -49,8 +49,8 @@ impl FieldValue for MPPValue {
         }
     }
 
-    fn raw_bits(self) -> u64 {
-        self as u8 as u64
+    fn raw_bits(&self) -> u64 {
+        *self as u8 as u64
     }
 }
 
@@ -70,8 +70,8 @@ impl FieldValue for SPPValue {
         }
     }
 
-    fn raw_bits(self) -> u64 {
-        self as u8 as u64
+    fn raw_bits(&self) -> u64 {
+        *self as u8 as u64
     }
 }
 
@@ -84,8 +84,8 @@ pub enum XLenValue {
 }
 
 impl FieldValue for XLenValue {
-    fn raw_bits(self) -> u64 {
-        self as u8 as u64
+    fn raw_bits(&self) -> u64 {
+        *self as u8 as u64
     }
 
     fn new(value: u64) -> Self {
@@ -120,8 +120,8 @@ impl FieldValue for ExtensionValue {
         }
     }
 
-    fn raw_bits(self) -> u64 {
-        self as u8 as u64
+    fn raw_bits(&self) -> u64 {
+        *self as u8 as u64
     }
 }
 

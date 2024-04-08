@@ -27,6 +27,7 @@ use crate::{
     state_backend as backend,
     traps::{EnvironException, Exception, Interrupt, TrapContext},
 };
+pub use address_translation::AccessType;
 use twiddle::Twiddle;
 
 /// Layout for the machine state
@@ -200,6 +201,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
 
     /// Fetch instruction from the address given by program counter
     fn fetch_instr(&self, pc: Address) -> Result<Instr, Exception> {
+        let pc = self.translate(pc, AccessType::Instruction)?;
         // The resons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read eagerly all 4 bytes.
