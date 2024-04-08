@@ -2480,7 +2480,7 @@ let slow_suite (speed, x) =
     ]
     (speed, x)
 
-let run name ?(slow = false) ?random_seed ~sleep ~misc tl =
+let run ~__FILE__ name ?(slow = false) ?random_seed ~sleep ~misc tl =
   let () =
     match random_seed with
     | Some x -> Random.init x

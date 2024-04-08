@@ -15,6 +15,7 @@
  *)
 
 val run :
+  __FILE__:string ->
   string ->
   ?slow:bool ->
   ?random_seed:int ->
