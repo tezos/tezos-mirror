@@ -21,11 +21,12 @@ open Gitlab_ci.Util
 open Tezos_ci
 
 let jobs =
+  let rules_always = [job_rule ~when_:Always ()] in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
       ~__POS__ (* Always rebuild on master to reduce risk of tampering *)
       ~always_rebuild:true
-      ~rules:[job_rule ~when_:Always ()]
+      ~rules:rules_always
       ()
   in
   let rules_octez_docker_changes_or_master =
@@ -65,18 +66,10 @@ let jobs =
       ~job_docker_arm64:job_docker_arm64_experimental
   in
   let job_static_arm64 =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Arm64
-      ~rules:[job_rule ~when_:Always ()]
-      ()
+    job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
   in
   let job_static_x86_64 =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~rules:[job_rule ~when_:Always ()]
-      ()
+    job_build_static_binaries ~__POS__ ~arch:Amd64 ~rules:rules_always ()
   in
   let job_unified_coverage_default : tezos_job =
     job
