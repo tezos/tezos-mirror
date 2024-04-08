@@ -29,27 +29,11 @@ let jobs =
       ~rules:rules_always
       ()
   in
-  let rules_octez_docker_changes_or_master =
-    [
-      job_rule ~if_:Rules.on_master ~when_:Always ();
-      job_rule
-        ~changes:(Changeset.encode changeset_octez_docker_changes_or_master)
-        ();
-    ]
-  in
   let job_docker_amd64_experimental : tezos_job =
-    job_docker_build
-      ~__POS__
-      ~rules:rules_octez_docker_changes_or_master
-      ~arch:Amd64
-      Experimental
+    job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
   in
   let job_docker_arm64_experimental : tezos_job =
-    job_docker_build
-      ~__POS__
-      ~rules:rules_octez_docker_changes_or_master
-      ~arch:Arm64
-      Experimental
+    job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
   in
   let job_docker_merge_manifests =
     job_docker_merge_manifests
