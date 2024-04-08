@@ -43,6 +43,7 @@ commander
     .option('--fast-mode', "Launch kernel in fast mode, but less information is collected", false)
     .option('--keep-temp', "Keep temporary files", false)
     .option('--mode <mode>', 'Kernel mode: `proxy` or `sequencer`', parse_mode)
+    .option('--no-computation', 'Don\'t expect stage 2', true)
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -53,7 +54,7 @@ function filter_name(name) {
         && (EXCLUDE_REGEX === undefined
             || !name.match(EXCLUDE_REGEX))
 }
-
+let COMPUTATION = commander.opts().computation;
 let MODE = commander.opts().mode || "proxy";
 let KEEP_TEMP = commander.opts().keepTemp;
 let FAST_MODE = commander.opts().fastMode;
@@ -161,7 +162,6 @@ function run_profiler(path, logs) {
         }
         let nb_reboots = 0;
 
-        var profiler_output_path = "";
 
         let config =
             MODE == "proxy" ?
@@ -196,7 +196,7 @@ function run_profiler(path, logs) {
                 : null;
             if (profiler_output_path_result !== null) {
                 results.profiler_output_path = profiler_output_path_result;
-                if (KEEP_TEMP) console.log(`Flamechart: ${profiler_output_path}`)
+                if (KEEP_TEMP) console.log(`Flamechart: ${profiler_output_path_result}`)
             }
             push_match(output, results.gas_costs, /\[Benchmarking\] gas_used:\s*(\d+)/g)
             push_match(output, results.tx_status, /\[Benchmarking\] Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
@@ -217,16 +217,18 @@ function run_profiler(path, logs) {
             if (!FAST_MODE && results.profiler_output_path == "") {
                 console.log(new Error("Profiler output path not found"));
             }
-            check([], results.gas_used, "Gas usage data not found", (x, y) => x != y);
-            check(0, results.tx_status.length, "Status data not found", (x, y) => x != y);
-            check(results.tx_status.length, results.estimated_ticks_per_tx.length, "Missing estimated ticks per tx info $?");
-            check(results.tx_status.length, results.tx_size.length, "Missing transaction size data $?");
-            check(results.tx_status.length, results.receipt_size.length, "Missing receipt size value $?");
-            check(results.tx_status.length, results.bloom_size.length, "Missing bloom size value $?")
-            check(results.block_in_progress_store.length, nb_reboots, "Missing stored block size value $?")
-            check(results.block_in_progress_read.length, nb_reboots, "Missing read bip size value $?")
-            check(results.tx_status.length, results.tx_type.length, "Missing transaction type $?")
-            check(results.tx_status.length, results.reason.length, "Missing transaction exit reason $?")
+            if (COMPUTATION) {
+                check([], results.gas_used, "Gas usage data not found", (x, y) => x != y);
+                check(0, results.tx_status.length, "Status data not found", (x, y) => x != y);
+                check(results.tx_status.length, results.estimated_ticks_per_tx.length, "Missing estimated ticks per tx info $?");
+                check(results.tx_status.length, results.tx_size.length, "Missing transaction size data $?");
+                check(results.tx_status.length, results.receipt_size.length, "Missing receipt size value $?");
+                check(results.tx_status.length, results.bloom_size.length, "Missing bloom size value $?")
+                check(results.block_in_progress_store.length, nb_reboots, "Missing stored block size value $?")
+                check(results.block_in_progress_read.length, nb_reboots, "Missing read bip size value $?")
+                check(results.tx_status.length, results.tx_type.length, "Missing transaction type $?")
+                check(results.tx_status.length, results.reason.length, "Missing transaction exit reason $?")
+            }
             resolve(results);
         });
     })
