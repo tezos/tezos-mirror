@@ -2,16 +2,15 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name irmin_pack_unix)
- (public_name octez-internal-libs.irmin_pack.unix)
- (instrumentation
-  (backend bisect_ppx))
+ (name brassaia_pack_unix)
+ (public_name octez-internal-libs.brassaia_pack.unix)
+ (instrumentation (backend bisect_ppx))
  (libraries
   fmt
   index
   index.unix
-  octez-internal-libs.irmin
-  octez-internal-libs.irmin_pack
+  octez-internal-libs.brassaia
+  octez-internal-libs.brassaia_pack
   logs
   lwt
   lwt.unix
@@ -21,6 +20,7 @@
   checkseum
   checkseum.ocaml
   rusage)
- (preprocess
-  (pps octez-internal-libs.ppx_irmin.internal))
- (flags (:standard) -w -66-68))
+ (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
+ (flags
+  (:standard)
+  -w -66-68))

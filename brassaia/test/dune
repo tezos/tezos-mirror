@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name irmin_test_tezt_lib)
+ (name brassaia_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -12,7 +12,7 @@
   octez-libs.tezos-context.disk
   octez-libs.tezos-context.memory
   octez-libs.tezos-context.encoding
-  octez-internal-libs.irmin_test_helpers
+  octez-internal-libs.brassaia_test_helpers
   octez-libs.stdlib-unix
   octez-libs.test-helpers
   tezt)
@@ -26,19 +26,19 @@
   -open Tezos_test_helpers
   -open Tezt
   -open Tezt.Base)
- (modules tezt_main test_lib_irmin_store test_utils))
+ (modules tezt_brassaia test_lib_brassaia_store test_utils))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  irmin_test_tezt_lib
+  brassaia_test_tezt_lib
   tezt)
  (modules main))
 
 (rule
  (alias runtest)
- (package tezos_internal_irmin_tests)
+ (package tezos_internal_brassaia_tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

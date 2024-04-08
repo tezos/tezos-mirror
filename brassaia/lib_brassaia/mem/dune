@@ -2,11 +2,14 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name irmin_mem)
- (public_name octez-internal-libs.irmin.mem)
- (instrumentation
-  (backend bisect_ppx))
- (libraries octez-internal-libs.irmin logs lwt)
- (preprocess
-  (pps octez-internal-libs.ppx_irmin.internal))
- (flags (:standard) -w -68))
+ (name brassaia_mem)
+ (public_name octez-internal-libs.brassaia.mem)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-internal-libs.brassaia
+  logs
+  lwt)
+ (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
+ (flags
+  (:standard)
+  -w -68))

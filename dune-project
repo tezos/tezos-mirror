@@ -142,6 +142,7 @@
 (package (name tezos-tooling))
 (package (name tezos-tps-evaluation))
 (package (name tezos-tree-encoding-test)(allow_empty))
+(package (name tezos_internal_brassaia_tests)(allow_empty))
 (package (name tezos_internal_irmin_tests)(allow_empty))
 (package (name tezt-cloud)(allow_empty))
 (package (name tezt-etherlink)(allow_empty))

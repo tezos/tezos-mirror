@@ -2,8 +2,9 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name irmin_data)
- (public_name octez-internal-libs.irmin.data)
- (instrumentation
-  (backend bisect_ppx))
- (libraries bigstringaf fmt))
+ (name brassaia_data)
+ (public_name octez-internal-libs.brassaia.data)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  bigstringaf
+  fmt))

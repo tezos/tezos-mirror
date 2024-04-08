@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name ppx_irmin)
- (public_name octez-internal-libs.ppx_irmin)
+ (name ppx_brassaia)
+ (public_name octez-internal-libs.ppx_brassaia)
  (instrumentation (backend bisect_ppx))
  (libraries
   ppx_repr.lib)
