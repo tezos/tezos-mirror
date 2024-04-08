@@ -8,16 +8,16 @@ oc.misc_checks:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - tezt/**/*
-    - devtools/**/*
-    - scripts/**/*
-    - docs/**/*
-    - contrib/**/*
-    - client-libs/**/*
-    - etherlink/**/*
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - client-libs/**/*
+    - contrib/**/*
+    - devtools/**/*
+    - docs/**/*
+    - etherlink/**/*
+    - scripts/**/*
+    - src/**/*
+    - tezt/**/*
     when: on_success
   needs:
   - trigger

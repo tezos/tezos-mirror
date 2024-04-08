@@ -14,16 +14,16 @@ opam:prepare:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"

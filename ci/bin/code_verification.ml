@@ -43,7 +43,7 @@ type code_verification_pipeline = Before_merging | Schedule_extended_test
 type manual =
   | No  (** Do not add rule for manual trigger. *)
   | Yes  (** Add rule for manual trigger. *)
-  | On_changes of string list  (** Add manual trigger on certain [changes:] *)
+  | On_changes of Changeset.t  (** Add manual trigger on certain [changes:] *)
 
 (* [make_rules] makes rules for jobs that are:
      - automatic in scheduled pipelines;
@@ -79,13 +79,15 @@ let make_rules ?label ?changes ?(manual = No) ?(dependent = false) pipeline_type
       (* Modifying some files can force tests to run. *)
       @ (match changes with
         | None -> []
-        | Some changes -> [job_rule ~changes ~when_:On_success ()])
+        | Some changes ->
+            [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()])
       (* For some tests, it can be relevant to have a manual trigger. *)
       @
       match manual with
       | No -> []
       | Yes -> [job_rule ~when_:Manual ()]
-      | On_changes changes -> [job_rule ~when_:Manual ~changes ()])
+      | On_changes changes ->
+          [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
 
 type opam_package_group = Executable | All
 
@@ -109,7 +111,7 @@ let opam_rules ~only_marge_bot ?batch_index () =
         (if only_marge_bot then
          If.(Rules.merge_request && Rules.triggered_by_marge_bot)
         else Rules.merge_request)
-      ~changes:changeset_opam_jobs
+      ~changes:(Changeset.encode changeset_opam_jobs)
       ~when_
       ();
     job_rule ~when_:Never ();
@@ -1159,7 +1161,8 @@ let jobs pipeline_type =
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let changeset_install_jobs =
-        ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
+        Changeset.make
+          ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
       in
       let install_octez_rules =
         make_rules ~changes:changeset_install_jobs ~manual:Yes ()

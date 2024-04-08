@@ -8,12 +8,12 @@ tezt:
   - gcp_tezt
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -73,12 +73,12 @@ tezt-memory-4k:
   - gcp_tezt
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -138,12 +138,12 @@ tezt-memory-3k:
   - gcp_tezt
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -202,12 +202,12 @@ tezt-time-sensitive:
   - gcp_tezt
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -266,12 +266,12 @@ tezt:static-binaries:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:

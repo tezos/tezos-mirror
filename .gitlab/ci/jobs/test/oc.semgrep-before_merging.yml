@@ -8,12 +8,12 @@ oc.semgrep:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - tezt/**/*
+    - .gitlab-ci.yml
+    - .gitlab/**/*
     - devtools/**/*
     - scripts/semgrep/**/*
-    - .gitlab/**/*
-    - .gitlab-ci.yml
+    - src/**/*
+    - tezt/**/*
     when: on_success
   needs:
   - trigger

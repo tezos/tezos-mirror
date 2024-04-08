@@ -8,10 +8,10 @@ oc.check_lift_limits_patch:
   - gcp
   rules:
   - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
     - src/bin_tps_evaluation/lift_limits.patch
     - src/proto_alpha/lib_protocol/main.ml
-    - .gitlab/**/*
-    - .gitlab-ci.yml
     when: on_success
   needs:
   - trigger

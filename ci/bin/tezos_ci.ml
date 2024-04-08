@@ -279,6 +279,19 @@ module Image = struct
   let all () = String_map.bindings !images
 end
 
+module Changeset = struct
+  type t = String_set.t
+
+  let make = String_set.of_list
+
+  let encode changeset =
+    changeset |> String_set.elements |> List.sort String.compare
+
+  let union = String_set.union
+
+  let ( @ ) = union
+end
+
 type arch = Amd64 | Arm64
 
 let arch_to_string = function Amd64 -> "x86_64" | Arm64 -> "arm64"

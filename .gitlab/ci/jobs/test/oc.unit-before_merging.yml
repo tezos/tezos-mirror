@@ -8,12 +8,12 @@ oc.unit:non-proto-x86_64:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -49,12 +49,12 @@ oc.unit:other-x86_64:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -90,12 +90,12 @@ oc.unit:proto-x86_64:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -131,12 +131,12 @@ oc.unit:non-proto-arm64:
   - gcp_arm64
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -170,12 +170,12 @@ oc.unit:webassembly-x86_64:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -196,12 +196,12 @@ oc.unit:js_components:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:
@@ -226,12 +226,12 @@ oc.unit:protocol_compiles:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/**/*
     - michelson_test_scripts/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:

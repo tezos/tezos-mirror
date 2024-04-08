@@ -8,12 +8,12 @@ kaitai_checks:
   - gcp
   rules:
   - changes:
-    - scripts/ci/**/*
-    - images/**/*
-    - src/**/*
-    - client-libs/*kaitai*/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - client-libs/*kaitai*/**/*
+    - images/**/*
+    - scripts/ci/**/*
+    - src/**/*
     when: on_success
   needs:
   - trigger

@@ -131,21 +131,21 @@ oc.docker:amd64:
   - if: $CI_COMMIT_BRANCH == "master"
     when: always
   - changes:
-    - scripts/**/*
-    - script-inputs/**/*
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - Dockerfile
+    - Makefile
+    - build.Dockerfile
     - dune
     - dune-project
     - dune-workspace
-    - opam
-    - Makefile
     - kernels.mk
-    - build.Dockerfile
-    - Dockerfile
-    - .gitlab/**/*
-    - .gitlab-ci.yml
+    - opam
+    - script-inputs/**/*
+    - scripts/**/*
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
     when: on_success
   dependencies: []
   before_script: []
@@ -173,21 +173,21 @@ oc.docker:arm64:
   - if: $CI_COMMIT_BRANCH == "master"
     when: always
   - changes:
-    - scripts/**/*
-    - script-inputs/**/*
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - Dockerfile
+    - Makefile
+    - build.Dockerfile
     - dune
     - dune-project
     - dune-workspace
-    - opam
-    - Makefile
     - kernels.mk
-    - build.Dockerfile
-    - Dockerfile
-    - .gitlab/**/*
-    - .gitlab-ci.yml
+    - opam
+    - script-inputs/**/*
+    - scripts/**/*
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
     when: on_success
   dependencies: []
   before_script:
@@ -244,17 +244,17 @@ publish:documentation:
   - gcp
   rules:
   - changes:
-    - scripts/**/*/
-    - script-inputs/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*
     - dune
     - dune-project
     - dune-workspace
-    - docs/**/*
-    - .gitlab/**/*
-    - .gitlab-ci.yml
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
     when: on_success
   needs: []
   dependencies: []

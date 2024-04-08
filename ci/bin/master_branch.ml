@@ -31,7 +31,9 @@ let jobs =
   let rules_octez_docker_changes_or_master =
     [
       job_rule ~if_:Rules.on_master ~when_:Always ();
-      job_rule ~changes:changeset_octez_docker_changes_or_master ();
+      job_rule
+        ~changes:(Changeset.encode changeset_octez_docker_changes_or_master)
+        ();
     ]
   in
   let job_docker_amd64_experimental : tezos_job =
@@ -122,7 +124,13 @@ let jobs =
              {|chmod 400 ~/.ssh/id_ed25519|};
            ])
       ~interruptible:false
-      ~rules:[job_rule ~changes:changeset_octez_docs ~when_:On_success ()]
+      ~rules:
+        [
+          job_rule
+            ~changes:(Changeset.encode changeset_octez_docs)
+            ~when_:On_success
+            ();
+        ]
       ["./scripts/ci/doc_publish.sh"]
   in
   (* Smart Rollup: Kernel SDK

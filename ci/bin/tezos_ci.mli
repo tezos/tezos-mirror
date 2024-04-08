@@ -127,6 +127,28 @@ module Image : sig
   val all : unit -> (string * t) list
 end
 
+(** Changesets are used to specify [changes:] clauses in rules.
+
+    Note: Operations over changesets do not preserve order nor
+    duplicates. Ordering and duplicates in [changes:] clauses have no
+    semantic impact. *)
+module Changeset : sig
+  (** A changeset. *)
+  type t
+
+  (** Create a changeset from a list of strings. *)
+  val make : string list -> t
+
+  (** Encode a changeset as a alphabetically sorted list of strings. *)
+  val encode : t -> string list
+
+  (** Combine two changesets. *)
+  val union : t -> t -> t
+
+  (** Operator for {!union}. *)
+  val ( @ ) : t -> t -> t
+end
+
 (** Represents architectures. *)
 type arch = Amd64 | Arm64
 
