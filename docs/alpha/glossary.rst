@@ -1,12 +1,14 @@
 Glossary
 ========
 
-This glossary is divided in two sections, the first one concerns Tezos, and
-the second one concerns the `economic protocol`_. The definitions in the latter
-section may be different for other protocol versions.
+This glossary is divided in two sections:
 
-Tezos
------
+- The first section contains Tezos generic terms (i.e., which are not related to a particular protocol), such as Tezos_ or block_.
+- The second section contains terms defined by the `economic protocol`_, such as Tez_/XTZ_, account_, `smart contract`_, or delegate_.
+  The list of terms in this section and/or their definitions may be different for other protocol versions.
+
+Tezos terms
+-----------
 
 _`Block`
     The Tezos blockchain is a linked list of blocks (or actually, a tree when several competing branches exist).
@@ -84,11 +86,18 @@ _`Shell`
     (handling communication between nodes) and the `economic protocol`_ layer
     (handling the context_, operation_ application, scoring, etc.).
 
+_`Tezos`
+    Used either as a noun or an adjective to designate:
+
+      * An open-source project and software (as in, "contributing to the Tezos protocol")
+      * A peer-to-peer network of nodes maintaining a blockchain (as in "a Tezos node")
+      * The specific Tezos chain with the most economic relevance (as in "the Tezos chain"). In particular, the chain whose millionth block had hash `BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7 <https://tzkt.io/BKtC4QCWoF73kxLj773vFpQuuwrnye6PS7T1aM3XEPvFXiQbNu7>`__
+
 _`Weight`
     See fitness_.
 
-Protocol
---------
+Protocol terms
+--------------
 
 .. _def_accuser_alpha:
 
@@ -109,7 +118,7 @@ _`Account`
     In the context_, each account is associated with a balance (an amount of
     tez available).
 
-    An account can be either an `originated account`_ or an `implicit account`_.
+    An account can be either an `user account`_ or a `smart contract`_.
 
 _`Baker`
     When a delegate_ creates a new block_, it is called the baker of this block.
@@ -166,9 +175,9 @@ _`Cycle`
 .. _def_delegate_alpha:
 
 _`Delegate`
-    An `implicit account`_ that can participate in consensus and in governance.
+    A `user account`_ that can participate in consensus and in governance.
     Actual participation is under further provisions, like having a `minimal stake`_.
-    An implicit account becomes a delegate by registering as such.
+    A user account becomes a delegate by registering as such.
     Through delegation_, other accounts can delegate their rights to a delegate account.
     The delegate's rights are calculated based on its stake_.
     Note that ``tz4`` accounts cannot be delegates.
@@ -225,19 +234,8 @@ _`Gas`
     the execution of a `smart contract`_. Gas is used to measure how
     much computing power is used to execute a `smart contract`_.
 
-.. _def_implicit_account_alpha:
-
 _`Implicit account`
-    An account_ that is linked to a public key. Contrary to a `smart
-    contract`_, an implicit account cannot include a script and it
-    cannot reject incoming transactions.
-
-    If *registered*, an `implicit account`_ can act as a delegate_.
-
-    The address of an implicit account always starts with the
-    letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
-    signature scheme) and finally the hash of the public key.
-    See :doc:`./accounts` for a more detailed explanation on addresses.
+    See `user account`_.
 
 _`Layer 1`
     The primary blockchain i.e. the Tezos chain. Within any blockchain ecosystem, Layer 1 (L1) refers to the main chain to
@@ -314,14 +312,33 @@ _`Stake`
     :ref:`here<active_stake_alpha>` for details.
 
 _`Staker`
-    An `implicit account`_ that made a security deposit.
-    The implicit account must have set a delegate.
-    The security deposit accrues to the stake of the implicit account's delegate and is
+    A `user account`_ that made a security deposit.
+    The user account must have set a delegate.
+    The security deposit accrues to the stake of the user account's delegate and is
     subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_alpha>`.
+
+_`Tez`
+    A unit of the cryptocurrency native to a Tezos_ chain, such as in "I sent you 2 tez." Tez is invariable. It is not capitalized except at the beginning of a sentence or when you would otherwise capitalize a noun.
+    See also XTZ_.
 
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
+
+.. _def_implicit_account_alpha:
+
+_`User account`
+    An account_ that is linked to a public key. Contrary to a `smart
+    contract`_, a user account cannot include a script and it
+    cannot reject incoming transactions.
+    User accounts are sometimes called "implicit accounts".
+
+    If *registered*, a user account can act as a delegate_.
+
+    The address of a user account always starts with the
+    letters ``tz`` followed by ``1``, ``2``, ``3``, or ``4`` (depending on the
+    signature scheme) and finally the hash of the public key.
+    See :doc:`./accounts` for a more detailed explanation on addresses.
 
 _`Validation pass`
     An index (a natural number) associated with a particular kind of
@@ -341,3 +358,8 @@ _`Voting listings`
     than the `minimal stake`_ at that moment. For each delegate_, the voting listings
     reflect the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.
+
+_`XTZ`
+    XTZ, tez, or ꜩ (``\ua729``, "Latin small letter tz") is the native currency of Tezos.
+
+    "XTZ" is an ISO-4217-compatible code for representing tez on the most economically relevant Tezos chain. Unless there is a very specific reason to use an ISO code for it, the term tez is preferred. Situations where the ISO code might be useful typically involve accounting systems, exchange rates with other currencies, and anything that might need some sort of standardized code.
