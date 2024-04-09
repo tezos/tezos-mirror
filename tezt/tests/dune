@@ -118,6 +118,7 @@
   src_lib_benchmark_lib_micheline_rewriting_test_tezt_lib
   src_lib_base_unix_test_tezt_lib
   src_lib_base_test_tezt_lib
+  irmin_test_irmin_mem_tezt_lib
   irmin_test_tezt_lib
   etherlink_tezt_tests_tezt_lib
   etherlink_bin_node_test_tezt_lib)

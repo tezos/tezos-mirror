@@ -14,12 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-val run :
-  __FILE__:string ->
-  string ->
-  ?slow:bool ->
-  ?random_seed:int ->
-  sleep:(float -> unit Lwt.t) ->
-  misc:unit Alcotest_lwt.test list ->
-  (Alcotest.speed_level * Common.t) list ->
-  unit Lwt.t
+let config ~root:_ = Irmin_mem.config ()
+
+module KV = Irmin_mem.KV.Make (Irmin.Contents.String)
+module Bench = Irmin_bench.Make (KV)
+
+let size ~root:_ = 0
+let () = Bench.run ~config ~size

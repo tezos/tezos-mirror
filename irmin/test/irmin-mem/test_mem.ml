@@ -14,12 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-val run :
-  __FILE__:string ->
-  string ->
-  ?slow:bool ->
-  ?random_seed:int ->
-  sleep:(float -> unit Lwt.t) ->
-  misc:unit Alcotest_lwt.test list ->
-  (Alcotest.speed_level * Common.t) list ->
-  unit Lwt.t
+let store =
+  Irmin_test_helpers.Irmin_test.store
+    (module Irmin_mem)
+    (module Irmin.Metadata.None)
+
+let config = Irmin_mem.config ()
+let init ~config:_ = Lwt.return_unit
+
+let suite =
+  Irmin_test_helpers.Irmin_test.Suite.create ~name:"MEM" ~init ~store ~config ()

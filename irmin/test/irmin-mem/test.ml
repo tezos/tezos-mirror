@@ -14,12 +14,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-val run :
-  __FILE__:string ->
-  string ->
-  ?slow:bool ->
-  ?random_seed:int ->
-  sleep:(float -> unit Lwt.t) ->
-  misc:unit Alcotest_lwt.test list ->
-  (Alcotest.speed_level * Common.t) list ->
-  unit Lwt.t
+(** Testing
+    -------
+    Component:    Irmin-mem
+    Invocation:   dune exec irmin/test/irmin-mem/main.exe
+    Subject:      This file is the entrypoint of all Irmin-mem Tezt tests. It dispatches to other files.
+*)
+
+let () =
+  Lwt_main.run
+  @@ Irmin_test_helpers.Irmin_test.Store.run ~__FILE__ "irmin-mem" ~slow:true
+       ~misc:[] ~sleep:Lwt_unix.sleep
+       [ (`Quick, Test_mem.suite) ]

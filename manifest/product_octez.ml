@@ -2754,6 +2754,20 @@ let _irmin_tests =
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
+let _irmin_mem_tests =
+  tezt
+    ["test"; "test_mem"]
+    ~path:"irmin/test/irmin-mem"
+    ~opam:"tezos_internal_irmin_tests"
+    ~synopsis:"Tezos internal irmin tests"
+    ~deps:
+      [
+        octez_context_memory;
+        irmin_test_helpers;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
 (* This binding assumes that librustzcash.a is installed in the system default
    directories or in: $OPAM_SWITCH_PREFIX/lib
 
