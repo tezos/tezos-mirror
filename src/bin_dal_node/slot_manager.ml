@@ -114,9 +114,6 @@ let add_commitment node_store slot cryptobox =
   let* () =
     if exists then return_unit
     else
-      let*! () =
-        Store.Legacy.add_slot_by_commitment node_store cryptobox slot commitment
-      in
       Store.Slots.add_slot_by_commitment
         node_store.slot_store
         cryptobox

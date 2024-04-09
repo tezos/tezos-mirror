@@ -215,12 +215,10 @@ module Slots = struct
       ~tztrace_of_error:Fun.id
       res
 
-  let find_slot_by_commitment slot_store cryptobox commitment =
+  let find_slot_by_commitment t cryptobox commitment =
     let open Lwt_result_syntax in
     let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let*! res =
-      KVS.read_value slot_store file_layout (commitment, slot_size) ()
-    in
+    let*! res = KVS.read_value t file_layout (commitment, slot_size) () in
     let data_kind = Types.Store.Slot in
     match res with
     | Ok slot -> return_some slot
@@ -301,15 +299,6 @@ let decode_slot_id v =
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string Types.slot_id_encoding v
 
-let encode_slot slot_size =
-  Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
-
-let decode_slot slot_size v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Slot
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
 
    DAL/Node: Replace Irmin storage for paths
@@ -321,8 +310,6 @@ module Legacy = struct
     val to_string : ?prefix:string -> t -> string
 
     module Commitment : sig
-      val slot : Cryptobox.commitment -> slot_size:int -> Irmin.Path.t
-
       val headers : Cryptobox.commitment -> Irmin.Path.t
 
       val header : Cryptobox.commitment -> Types.slot_id -> Irmin.Path.t
@@ -363,10 +350,6 @@ module Legacy = struct
 
     module Commitment = struct
       let root = ["commitments"]
-
-      let slot commitment ~slot_size =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / Int.to_string slot_size / "slot"
 
       let headers commitment =
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
@@ -409,15 +392,6 @@ module Legacy = struct
     end
   end
 
-  let add_slot_by_commitment node_store cryptobox slot commitment =
-    let open Lwt_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    let encoded_slot = encode_slot slot_size slot in
-    let* () = set ~msg:"Slot stored" node_store.store path encoded_slot in
-    let* () = Event.(emit stored_slot_content commitment) in
-    return_unit
-
   let associate_slot_id_with_commitment node_store commitment slot_id =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
        Improve the implementation of this handler.
@@ -451,23 +425,6 @@ module Legacy = struct
         store
         levels_path
         (encode_header_status `Unseen_or_not_finalized)
-
-  let exists_slot_by_commitment node_store cryptobox commitment =
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    Irmin.mem node_store.store path
-
-  let find_slot_by_commitment node_store cryptobox commitment =
-    let open Lwt_result_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    let*! res_opt = Irmin.find node_store.store path in
-    Option.fold
-      ~none:(return None)
-      ~some:(fun v ->
-        let*? dec = decode_slot slot_size v in
-        return @@ Some dec)
-      res_opt
 
   let add_slot_headers ~number_of_slots ~block_level slot_headers node_store =
     let module SI = Set.Make (Int) in
