@@ -55,6 +55,14 @@ module Event = struct
       ("address", Data_encoding.string)
       ~pp1:Format.pp_print_string
 
+  let tx_data_size_limit_reached =
+    declare_0
+      ~section
+      ~name:"tx_data_size_limit_reached"
+      ~msg:"The transaction data size is beyond the allowed threshold."
+      ~level:Info
+      ()
+
   let transaction_injected =
     declare_1
       ~section
@@ -110,6 +118,9 @@ let users_threshold_reached =
 
 let txs_per_user_threshold_reached ~address =
   Internal_event.Simple.emit Event.txs_per_user_threshold_reached address
+
+let tx_data_size_limit_reached =
+  Internal_event.Simple.emit Event.tx_data_size_limit_reached
 
 let transaction_injection_failed trace =
   Internal_event.Simple.emit Event.transaction_injection_failed trace
