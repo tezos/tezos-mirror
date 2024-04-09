@@ -8,8 +8,8 @@ docker:hadolint-before_merging:
   - gcp
   rules:
   - changes:
-    - build.Dockerfile
     - Dockerfile
+    - build.Dockerfile
     when: on_success
   dependencies: []
   script:

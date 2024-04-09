@@ -8,11 +8,11 @@ ocaml-check:
   - gcp
   rules:
   - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - devtools/**/*
     - src/**/*
     - tezt/**/*
-    - .gitlab/**/*
-    - .gitlab-ci.yml
-    - devtools/**/*
     when: on_success
   needs:
   - trigger

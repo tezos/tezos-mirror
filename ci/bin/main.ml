@@ -193,12 +193,6 @@ let () =
     | ".gitlab/ci/jobs/packaging/debian_repository.yml"
     | ".gitlab/ci/jobs/shared/images.yml"
     | ".gitlab/ci/jobs/shared/templates.yml" | ".gitlab/ci/jobs/test/common.yml"
-    | ".gitlab/ci/jobs/test/test_etherlink_kernel-before_merging.yml"
-    | ".gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml"
-    | ".gitlab/ci/jobs/test/test_evm_compatibility.yml"
-    | ".gitlab/ci/jobs/test/test_kernels.yml"
-    | ".gitlab/ci/jobs/test/test_risc_v_kernels-before_merging.yml"
-    | ".gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml"
     | ".gitlab/ci/pipelines/before_merging.yml"
     | ".gitlab/ci/pipelines/schedule_extended_test.yml" ->
         true

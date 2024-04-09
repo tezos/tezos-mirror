@@ -8,12 +8,12 @@ oc.script:snapshot_alpha_and_link:
   - gcp
   rules:
   - changes:
-    - src/proto_alpha/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
-    - scripts/snapshot_alpha_and_link.sh
+    - .gitlab/**/*
     - scripts/snapshot_alpha.sh
+    - scripts/snapshot_alpha_and_link.sh
     - scripts/user_activated_upgrade.sh
+    - src/proto_alpha/**/*
     when: on_success
   needs:
   - job: trigger

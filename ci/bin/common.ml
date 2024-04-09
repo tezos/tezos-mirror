@@ -307,155 +307,199 @@ let enable_kernels =
 
 (** {2 Changesets} *)
 
-(* Only if octez source code has changed *)
+(** Modifying these files will unconditionally execute all conditional jobs. *)
+let changeset_base = Changeset.make [".gitlab/**/*"; ".gitlab-ci.yml"]
+
+let changeset_images = Changeset.make ["images/**/*"]
+
+(** Only if octez source code has changed *)
 let changeset_octez =
-  [
-    "src/**/*";
-    "etherlink/**/*";
-    "tezt/**/*";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-    "michelson_test_scripts/**/*";
-    "tzt_reference_test_suite/**/*";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "src/**/*";
+          "etherlink/**/*";
+          "tezt/**/*";
+          "michelson_test_scripts/**/*";
+          "tzt_reference_test_suite/**/*";
+        ])
 
-(* Only if octez source code has changed, if the images has changed or
-   if kernels.mk changed. *)
+(** Only if octez source code has changed, if the images has changed or
+    if kernels.mk changed. *)
 let changeset_octez_or_kernels =
-  ["images/**/*"; "scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"]
-  @ changeset_octez
+  Changeset.(
+    changeset_base @ changeset_octez @ changeset_images
+    @ make ["scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"])
 
-(* Only if documentation has changed *)
+(** Only if documentation has changed *)
 let changeset_octez_docs =
-  [
-    "scripts/**/*/";
-    "script-inputs/**/*/";
-    "src/**/*";
-    "tezt/**/*";
-    "vendors/**/*";
-    "dune";
-    "dune-project";
-    "dune-workspace";
-    "docs/**/*";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "scripts/**/*/";
+          "script-inputs/**/*/";
+          "src/**/*";
+          "tezt/**/*";
+          "vendors/**/*";
+          "dune";
+          "dune-project";
+          "dune-workspace";
+          "docs/**/*";
+        ])
 
 let changeset_octez_docker_changes_or_master =
-  [
-    "scripts/**/*";
-    "script-inputs/**/*";
-    "src/**/*";
-    "tezt/**/*";
-    "vendors/**/*";
-    "dune";
-    "dune-project";
-    "dune-workspace";
-    "opam";
-    "Makefile";
-    "kernels.mk";
-    "build.Dockerfile";
-    "Dockerfile";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "scripts/**/*";
+          "script-inputs/**/*";
+          "src/**/*";
+          "tezt/**/*";
+          "vendors/**/*";
+          "dune";
+          "dune-project";
+          "dune-workspace";
+          "opam";
+          "Makefile";
+          "kernels.mk";
+          "build.Dockerfile";
+          "Dockerfile";
+        ])
 
-let changeset_hadolint_docker_files = ["build.Dockerfile"; "Dockerfile"]
+let changeset_hadolint_docker_files =
+  Changeset.make ["build.Dockerfile"; "Dockerfile"]
 
-(* The set of [changes:] that trigger opam jobs *)
+(** The set of [changes:] that trigger opam jobs.
+
+    Note: unlike all other changesets, this one does not include {!changeset_base}.
+    This is to avoid running these costly jobs too often. *)
 let changeset_opam_jobs =
-  [
-    "**/dune";
-    "**/dune.inc";
-    "**/*.dune.inc";
-    "**/dune-project";
-    "**/dune-workspace";
-    "**/*.opam";
-    ".gitlab/ci/jobs/packaging/opam:prepare.yml";
-    ".gitlab/ci/jobs/packaging/opam_package.yml";
-    "manifest/manifest.ml";
-    "manifest/main.ml";
-    "scripts/opam-prepare-repo.sh";
-    "scripts/version.sh";
-  ]
+  Changeset.(
+    make
+      [
+        "**/dune";
+        "**/dune.inc";
+        "**/*.dune.inc";
+        "**/dune-project";
+        "**/dune-workspace";
+        "**/*.opam";
+        ".gitlab/ci/jobs/packaging/opam:prepare.yml";
+        ".gitlab/ci/jobs/packaging/opam_package.yml";
+        "manifest/manifest.ml";
+        "manifest/main.ml";
+        "scripts/opam-prepare-repo.sh";
+        "scripts/version.sh";
+      ])
 
 let changeset_kaitai_e2e_files =
-  [
-    (* Regenerate the client-libs-dependencies image when the CI
-       scripts change. *)
-    "scripts/ci/**/*";
-    "images/**/*";
-    "src/**/*";
-    "client-libs/*kaitai*/**/*";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-  ]
+  Changeset.(
+    changeset_base @ changeset_images
+    @ make
+        [
+          (* Regenerate the client-libs-dependencies image when the CI
+             scripts change. *)
+          "scripts/ci/**/*";
+          "src/**/*";
+          "client-libs/*kaitai*/**/*";
+        ])
 
 let changeset_ocaml_files =
-  ["src/**/*"; "tezt/**/*"; ".gitlab/**/*"; ".gitlab-ci.yml"; "devtools/**/*"]
+  Changeset.(changeset_base @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"])
 
 let changeset_lift_limits_patch =
-  [
-    "src/bin_tps_evaluation/lift_limits.patch";
-    "src/proto_alpha/lib_protocol/main.ml";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "src/bin_tps_evaluation/lift_limits.patch";
+          "src/proto_alpha/lib_protocol/main.ml";
+        ])
 
 (* The linting job runs over the set of [source_directories]
    defined in [scripts/lint.sh] that must be included here: *)
 let changeset_lint_files =
-  [
-    "src/**/*";
-    "tezt/**/*";
-    "devtools/**/*";
-    "scripts/**/*";
-    "docs/**/*";
-    "contrib/**/*";
-    "client-libs/**/*";
-    "etherlink/**/*";
-    ".gitlab-ci.yml";
-    ".gitlab/**/*";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "src/**/*";
+          "tezt/**/*";
+          "devtools/**/*";
+          "scripts/**/*";
+          "docs/**/*";
+          "contrib/**/*";
+          "client-libs/**/*";
+          "etherlink/**/*";
+        ])
 
 let changeset_semgrep_files =
-  [
-    "src/**/*";
-    "tezt/**/*";
-    "devtools/**/*";
-    "scripts/semgrep/**/*";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-  ]
+  Changeset.(
+    changeset_base
+    @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "scripts/semgrep/**/*"])
 
 (* We only need to run the [oc.script:snapshot_alpha_and_link] job if
    protocol Alpha or if the scripts changed. *)
 let changeset_script_snapshot_alpha_and_link =
-  [
-    "src/proto_alpha/**/*";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-    "scripts/snapshot_alpha_and_link.sh";
-    "scripts/snapshot_alpha.sh";
-    "scripts/user_activated_upgrade.sh";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "src/proto_alpha/**/*";
+          "scripts/snapshot_alpha_and_link.sh";
+          "scripts/snapshot_alpha.sh";
+          "scripts/user_activated_upgrade.sh";
+        ])
 
 let changeset_script_b58_prefix =
-  [
-    "scripts/b58_prefix/b58_prefix.py";
-    "scripts/b58_prefix/test_b58_prefix.py";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "scripts/b58_prefix/b58_prefix.py";
+          "scripts/b58_prefix/test_b58_prefix.py";
+        ])
 
 let changeset_test_liquidity_baking_scripts =
-  [
-    "src/**/*";
-    "scripts/ci/test_liquidity_baking_scripts.sh";
-    "scripts/check-liquidity-baking-scripts.sh";
-    ".gitlab/**/*";
-    ".gitlab-ci.yml";
-  ]
+  Changeset.(
+    changeset_base
+    @ make
+        [
+          "src/**/*";
+          "scripts/ci/test_liquidity_baking_scripts.sh";
+          "scripts/check-liquidity-baking-scripts.sh";
+        ])
+
+let changeset_test_kernels =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["kernels.mk"; "src/kernel_*/**/*"])
+
+let changeset_test_etherlink_kernel =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["etherlink.mk"; "etherlink/kernel_evm/**/*"; "src/kernel_sdk/**/*"])
+
+let changeset_test_risc_v_kernels =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["src/kernel_sdk/**/*"; "src/risc_v/**/*"])
+
+let changeset_test_evm_compatibility =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make
+        [
+          "etherlink.mk";
+          "etherlink/kernel_evm/evm_execution/**/*";
+          "etherlink/kernel_evm/evm_evaluation/**/*";
+        ])
 
 (** {2 Job makers} *)
 

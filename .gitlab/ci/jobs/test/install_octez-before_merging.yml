@@ -8,8 +8,8 @@ oc.install_bin_fedora_37:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -26,8 +26,8 @@ oc.install_bin_rc_fedora_37:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -44,8 +44,8 @@ oc.install_bin_ubuntu_focal:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -63,8 +63,8 @@ oc.install_bin_ubuntu_jammy:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -82,8 +82,8 @@ oc.install_bin_rc_ubuntu_focal:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -101,8 +101,8 @@ oc.install_bin_rc_ubuntu_jammy:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -137,8 +137,8 @@ oc.compile_release_sources_bullseye:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -155,8 +155,8 @@ oc.compile_sources_bullseye:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true
@@ -174,8 +174,8 @@ oc.compile_sources_mantic:
   - gcp
   rules:
   - changes:
-    - docs/introduction/install*.sh
     - docs/introduction/compile*.sh
+    - docs/introduction/install*.sh
     when: on_success
   - when: manual
     allow_failure: true

@@ -8,12 +8,12 @@ oc.docker:client-libs-dependencies:
   - gcp
   rules:
   - changes:
-    - scripts/ci/**/*
-    - images/**/*
-    - src/**/*
-    - client-libs/*kaitai*/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - client-libs/*kaitai*/**/*
+    - images/**/*
+    - scripts/ci/**/*
+    - src/**/*
     when: on_success
   dependencies: []
   before_script: []

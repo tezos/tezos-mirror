@@ -43,7 +43,7 @@ type code_verification_pipeline = Before_merging | Schedule_extended_test
 type manual =
   | No  (** Do not add rule for manual trigger. *)
   | Yes  (** Add rule for manual trigger. *)
-  | On_changes of string list  (** Add manual trigger on certain [changes:] *)
+  | On_changes of Changeset.t  (** Add manual trigger on certain [changes:] *)
 
 (* [make_rules] makes rules for jobs that are:
      - automatic in scheduled pipelines;
@@ -79,13 +79,15 @@ let make_rules ?label ?changes ?(manual = No) ?(dependent = false) pipeline_type
       (* Modifying some files can force tests to run. *)
       @ (match changes with
         | None -> []
-        | Some changes -> [job_rule ~changes ~when_:On_success ()])
+        | Some changes ->
+            [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()])
       (* For some tests, it can be relevant to have a manual trigger. *)
       @
       match manual with
       | No -> []
       | Yes -> [job_rule ~when_:Manual ()]
-      | On_changes changes -> [job_rule ~when_:Manual ~changes ()])
+      | On_changes changes ->
+          [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
 
 type opam_package_group = Executable | All
 
@@ -109,7 +111,7 @@ let opam_rules ~only_marge_bot ?batch_index () =
         (if only_marge_bot then
          If.(Rules.merge_request && Rules.triggered_by_marge_bot)
         else Rules.merge_request)
-      ~changes:changeset_opam_jobs
+      ~changes:(Changeset.encode changeset_opam_jobs)
       ~when_
       ();
     job_rule ~when_:Never ();
@@ -550,6 +552,8 @@ let jobs pipeline_type =
     | Before_merging -> jobs_external ~path jobs
     | Schedule_extended_test -> jobs
   in
+  (* Common GitLab CI caches *)
+  let cache_kernels = {key = "kernels"; paths = ["cargo/"]} in
   (* Stages *)
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
   let trigger_stage, make_dependencies =
@@ -758,11 +762,7 @@ let jobs pipeline_type =
              "src/risc_v/risc-v-dummy.elf";
              "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
            ])
-      ~cache:
-        [
-          {key = "kernels"; paths = ["cargo/"]};
-          {key = "kernels-sccache"; paths = ["_sccache"]};
-        ]
+      ~cache:[cache_kernels; {key = "kernels-sccache"; paths = ["_sccache"]}]
     |> enable_kernels |> enable_sccache |> job_external_split
   in
   (* Fetch records for Tezt generated on the last merge request pipeline
@@ -1159,7 +1159,8 @@ let jobs pipeline_type =
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let changeset_install_jobs =
-        ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
+        Changeset.make
+          ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
       in
       let install_octez_rules =
         make_rules ~changes:changeset_install_jobs ~manual:Yes ()
@@ -1439,6 +1440,69 @@ let jobs pipeline_type =
       ]
       |> jobs_external_split ~path:"test/tezt"
     in
+    let jobs_kernels : tezos_job list =
+      let make_job_kernel ~__POS__ ~name ~changes script =
+        job
+          ~__POS__
+          ~name
+          ~image:Images.rust_toolchain
+          ~stage:Stages.test
+          ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+          ~rules:(make_rules ~dependent:true ~changes ())
+          script
+          ~cache:[cache_kernels]
+        |> enable_kernels
+      in
+      let job_test_kernels : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_kernels"
+          ~changes:changeset_test_kernels
+          ["make -f kernels.mk check"; "make -f kernels.mk test"]
+        |> job_external_split
+      in
+      let job_test_etherlink_kernel : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_etherlink_kernel"
+          ~changes:changeset_test_etherlink_kernel
+          ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
+        |> job_external_split
+      in
+      let job_test_risc_v_kernels : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_risc_v_kernels"
+          ~changes:changeset_test_risc_v_kernels
+          [
+            "make -C src/risc_v check";
+            "make -C src/risc_v test";
+            "make -C src/risc_v audit";
+          ]
+        |> job_external_split
+      in
+      let job_test_evm_compatibility : tezos_job =
+        make_job_kernel
+          ~__POS__
+          ~name:"test_evm_compatibility"
+          ~changes:changeset_test_evm_compatibility
+          [
+            "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
+             evm-evaluation-assessor";
+            "git clone --depth 1 --branch v13 \
+             https://github.com/ethereum/tests ethereum_tests";
+            "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ \
+             --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c";
+          ]
+        |> job_external_split
+      in
+      [
+        job_test_kernels;
+        job_test_etherlink_kernel;
+        job_test_risc_v_kernels;
+        job_test_evm_compatibility;
+      ]
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -1455,7 +1519,7 @@ let jobs pipeline_type =
       job_tezt_flaky;
       job_tezt_slow;
     ]
-    @ jobs_unit @ jobs_install_octez @ jobs_tezt
+    @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
     @
     match pipeline_type with
     | Before_merging ->

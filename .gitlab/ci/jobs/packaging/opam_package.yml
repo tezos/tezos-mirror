@@ -14,16 +14,16 @@ opam:bls12-381:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -78,16 +78,16 @@ opam:octez-accuser-Proxford:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -142,16 +142,16 @@ opam:octez-accuser-PtParisB:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -206,16 +206,16 @@ opam:octez-alcotezt:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -270,16 +270,16 @@ opam:octez-baker-Proxford:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -334,16 +334,16 @@ opam:octez-baker-PtParisB:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -398,16 +398,16 @@ opam:octez-client:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -462,16 +462,16 @@ opam:octez-codec:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -526,16 +526,16 @@ opam:octez-crawler:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -590,16 +590,16 @@ opam:octez-dac-client:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -654,16 +654,16 @@ opam:octez-dac-node:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -718,16 +718,16 @@ opam:octez-dal-node:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -782,16 +782,16 @@ opam:octez-distributed-internal:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -846,16 +846,16 @@ opam:octez-distributed-lwt-internal:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -910,16 +910,16 @@ opam:octez-injector:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -974,16 +974,16 @@ opam:octez-internal-libs:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1038,16 +1038,16 @@ opam:octez-l2-libs:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1102,16 +1102,16 @@ opam:octez-libs:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1166,16 +1166,16 @@ opam:octez-node:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -1230,16 +1230,16 @@ opam:octez-node-config:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1294,16 +1294,16 @@ opam:octez-proto-libs:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1358,16 +1358,16 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1422,16 +1422,16 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1486,16 +1486,16 @@ opam:octez-protocol-002-PsYLVpVv-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1550,16 +1550,16 @@ opam:octez-protocol-003-PsddFKi3-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1614,16 +1614,16 @@ opam:octez-protocol-004-Pt24m4xi-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1678,16 +1678,16 @@ opam:octez-protocol-005-PsBabyM1-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1742,16 +1742,16 @@ opam:octez-protocol-006-PsCARTHA-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1806,16 +1806,16 @@ opam:octez-protocol-007-PsDELPH1-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1870,16 +1870,16 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1934,16 +1934,16 @@ opam:octez-protocol-009-PsFLoren-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -1998,16 +1998,16 @@ opam:octez-protocol-010-PtGRANAD-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2062,16 +2062,16 @@ opam:octez-protocol-011-PtHangz2-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2126,16 +2126,16 @@ opam:octez-protocol-012-Psithaca-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2190,16 +2190,16 @@ opam:octez-protocol-013-PtJakart-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2254,16 +2254,16 @@ opam:octez-protocol-014-PtKathma-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2318,16 +2318,16 @@ opam:octez-protocol-015-PtLimaPt-libs:
     when: delayed
     start_in: 3 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2382,16 +2382,16 @@ opam:octez-protocol-016-PtMumbai-libs:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2446,16 +2446,16 @@ opam:octez-protocol-017-PtNairob-libs:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2510,16 +2510,16 @@ opam:octez-protocol-018-Proxford-libs:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2574,16 +2574,16 @@ opam:octez-protocol-019-PtParisB-libs:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2638,16 +2638,16 @@ opam:octez-protocol-alpha-libs:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2702,16 +2702,16 @@ opam:octez-protocol-compiler:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -2766,16 +2766,16 @@ opam:octez-proxy-server:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -2830,16 +2830,16 @@ opam:octez-rpc-process:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2894,16 +2894,16 @@ opam:octez-shell-libs:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -2958,16 +2958,16 @@ opam:octez-signer:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -3022,16 +3022,16 @@ opam:octez-smart-rollup-node:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -3086,16 +3086,16 @@ opam:octez-smart-rollup-node-Proxford:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3150,16 +3150,16 @@ opam:octez-smart-rollup-node-PtNairob:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3214,16 +3214,16 @@ opam:octez-smart-rollup-node-PtParisB:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3278,16 +3278,16 @@ opam:octez-smart-rollup-node-alpha:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3342,16 +3342,16 @@ opam:octez-smart-rollup-node-lib:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3406,16 +3406,16 @@ opam:octez-smart-rollup-wasm-debugger:
     when: delayed
     start_in: 1 minute
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -3470,16 +3470,16 @@ opam:octez-smart-rollup-wasm-debugger-lib:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3534,16 +3534,16 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3598,16 +3598,16 @@ opam:octez-version:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -3662,16 +3662,16 @@ opam:tezos-benchmark:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3726,16 +3726,16 @@ opam:tezos-client-demo-counter:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3790,16 +3790,16 @@ opam:tezos-client-genesis:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3854,16 +3854,16 @@ opam:tezos-dac-client-lib:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3918,16 +3918,16 @@ opam:tezos-dac-lib:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -3982,16 +3982,16 @@ opam:tezos-dac-node-lib:
     when: delayed
     start_in: 2 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4046,16 +4046,16 @@ opam:tezos-dal-node-lib:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4110,16 +4110,16 @@ opam:tezos-dal-node-services:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4174,16 +4174,16 @@ opam:tezos-openapi:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4238,16 +4238,16 @@ opam:tezos-protocol-000-Ps9mPmXa:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4302,16 +4302,16 @@ opam:tezos-protocol-001-PtCJ7pwo:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4366,16 +4366,16 @@ opam:tezos-protocol-002-PsYLVpVv:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4430,16 +4430,16 @@ opam:tezos-protocol-003-PsddFKi3:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4494,16 +4494,16 @@ opam:tezos-protocol-004-Pt24m4xi:
     when: delayed
     start_in: 4 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4558,16 +4558,16 @@ opam:tezos-protocol-005-PsBABY5H:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4622,16 +4622,16 @@ opam:tezos-protocol-005-PsBabyM1:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4686,16 +4686,16 @@ opam:tezos-protocol-006-PsCARTHA:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4750,16 +4750,16 @@ opam:tezos-protocol-007-PsDELPH1:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4814,16 +4814,16 @@ opam:tezos-protocol-008-PtEdo2Zk:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4878,16 +4878,16 @@ opam:tezos-protocol-008-PtEdoTez:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -4942,16 +4942,16 @@ opam:tezos-protocol-009-PsFLoren:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5006,16 +5006,16 @@ opam:tezos-protocol-010-PtGRANAD:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5070,16 +5070,16 @@ opam:tezos-protocol-011-PtHangz2:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5134,16 +5134,16 @@ opam:tezos-protocol-012-Psithaca:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5198,16 +5198,16 @@ opam:tezos-protocol-013-PtJakart:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5262,16 +5262,16 @@ opam:tezos-protocol-014-PtKathma:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5326,16 +5326,16 @@ opam:tezos-protocol-015-PtLimaPt:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5390,16 +5390,16 @@ opam:tezos-protocol-016-PtMumbai:
     when: delayed
     start_in: 5 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5454,16 +5454,16 @@ opam:tezos-protocol-017-PtNairob:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5518,16 +5518,16 @@ opam:tezos-protocol-018-Proxford:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5582,16 +5582,16 @@ opam:tezos-protocol-019-PtParisB:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5646,16 +5646,16 @@ opam:tezos-protocol-alpha:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5710,16 +5710,16 @@ opam:tezos-protocol-demo-counter:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5774,16 +5774,16 @@ opam:tezos-protocol-demo-noops:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5838,16 +5838,16 @@ opam:tezos-protocol-genesis:
     when: delayed
     start_in: 6 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5902,16 +5902,16 @@ opam:tezos-proxy-server-config:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
@@ -5966,16 +5966,16 @@ opam:tezt-tezos:
     when: delayed
     start_in: 7 minutes
   - changes:
-    - '**/dune'
-    - '**/dune.inc'
     - '**/*.dune.inc'
+    - '**/*.opam'
+    - '**/dune'
     - '**/dune-project'
     - '**/dune-workspace'
-    - '**/*.opam'
+    - '**/dune.inc'
     - .gitlab/ci/jobs/packaging/opam:prepare.yml
     - .gitlab/ci/jobs/packaging/opam_package.yml
-    - manifest/manifest.ml
     - manifest/main.ml
+    - manifest/manifest.ml
     - scripts/opam-prepare-repo.sh
     - scripts/version.sh
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"

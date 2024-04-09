@@ -1,20 +1,13 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
-test_etherlink_kernel:
+test_risc_v_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
   - gcp
   rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - etherlink.mk
-    - etherlink/kernel_evm/**/*
-    - images/**/*
-    - src/kernel_sdk/**/*
-    when: on_success
+  - when: on_success
   needs:
   - oc.docker:rust-toolchain
   dependencies:
@@ -24,8 +17,9 @@ test_etherlink_kernel:
     paths:
     - cargo/
   script:
-  - make -f etherlink.mk check
-  - make -f etherlink.mk test
+  - make -C src/risc_v check
+  - make -C src/risc_v test
+  - make -C src/risc_v audit
   variables:
     CC: clang
     CARGO_HOME: $CI_PROJECT_DIR/cargo

@@ -8,10 +8,10 @@ oc.script:b58_prefix:
   - gcp
   rules:
   - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
     - scripts/b58_prefix/b58_prefix.py
     - scripts/b58_prefix/test_b58_prefix.py
-    - .gitlab/**/*
-    - .gitlab-ci.yml
     when: on_success
   needs:
   - trigger

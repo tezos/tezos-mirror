@@ -8,11 +8,11 @@ oc.test-liquidity-baking-scripts:
   - gcp
   rules:
   - changes:
-    - src/**/*
-    - scripts/ci/test_liquidity_baking_scripts.sh
-    - scripts/check-liquidity-baking-scripts.sh
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - scripts/check-liquidity-baking-scripts.sh
+    - scripts/ci/test_liquidity_baking_scripts.sh
+    - src/**/*
     when: on_success
   needs:
   - oc.build_x86_64-released

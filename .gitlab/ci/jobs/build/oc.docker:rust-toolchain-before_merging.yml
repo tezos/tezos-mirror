@@ -8,16 +8,16 @@ oc.docker:rust-toolchain:
   - gcp
   rules:
   - changes:
-    - images/**/*
-    - scripts/ci/**/*
-    - kernels.mk
-    - etherlink.mk
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
     - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink.mk
+    - etherlink/**/*
+    - images/**/*
+    - kernels.mk
     - michelson_test_scripts/**/*
+    - scripts/ci/**/*
+    - src/**/*
+    - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
   - when: manual
