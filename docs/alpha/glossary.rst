@@ -313,6 +313,12 @@ _`Stake`
     it. However, there are cases when this is not the case, see
     :ref:`here<active_stake_alpha>` for details.
 
+_`Staker`
+    An `implicit account`_ that made a security deposit.
+    The implicit account must have set a delegate.
+    The security deposit accrues to the stake of the implicit account's delegate and is
+    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_alpha>`.
+
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
