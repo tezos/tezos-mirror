@@ -77,9 +77,12 @@ function check_transaction_record(record, acc) {
         if (isNaN(record.sputnik_runtime_ticks)) record_error(acc, `missing sputnik ticks`)
         if (isNaN(record.tx_size)) record_error(acc, `missing tx size`)
         if (isNaN(record.receipt_size)) record_error(acc, `missing receipt size`)
-        if (!record.status.includes(`true`)) record_error(acc, `${record.status}`)
+        // only acceptable Ok_false is for reboots (OutOfTicks) or expected
+        if (!(record.status === record.expected || record.reason?.includes(`OutOfTicks`))
+            && !record.status?.includes("true"))
+            record_error(acc, `${record.status} (${record.reason})`)
     } else {
-        record_error(acc, `${record.status}`)
+        record_error(acc, `${record.status} : ${record.reason}`)
     }
 
 }

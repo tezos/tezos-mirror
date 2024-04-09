@@ -45,13 +45,14 @@ commander
     .option('--no-computation', 'Don\'t expect stage 2', true)
     .option('--multi-blueprint', 'Send each transaction in a separate blueprint',false)
     .option('--start <i>', 'Start with benchmark nb <i>', 0)
-    .option('--stop <i>', 'Stop at bench nb <i>', -1)
+    .option('--stop <i>', 'Stop at bench nb <i>', undefined)
     .option('--nth <i>', 'Just launch bench n° i')
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
 let EXCLUDE_REGEX = commander.opts().exclude
-function filter_name(name) {
+function filter_name(bench) {
+    let name = script_of_bench(bench);
     return (INCLUDE_REGEX === undefined
         || name.match(INCLUDE_REGEX))
         && (EXCLUDE_REGEX === undefined
@@ -207,8 +208,8 @@ function run_profiler(path, logs) {
                 results.profiler_output_path = profiler_output_path_result;
                 if (KEEP_TEMP) console.log(`Flamechart: ${profiler_output_path_result}`)
             }
-            if(blueprint_regexp.test(output)) results.nb_blueprint_chunks += 1;
-            if(delayed_regexp.test(output)) results.nb_delayed_inputs += 1;
+            if (blueprint_regexp.test(output)) results.nb_blueprint_chunks += 1;
+            if (delayed_regexp.test(output)) results.nb_delayed_inputs += 1;
             push_match(output, results.gas_costs, /\[Benchmarking\] gas_used:\s*(\d+)/g)
             push_match(output, results.tx_status, /\[Benchmarking\] Transaction status: (OK_[a-zA-Z09]+|ERROR_[A-Z_]+)\b/g)
             push_match(output, results.estimated_ticks, /\[Benchmarking\] Estimated ticks:\s*(\d+)/g)
@@ -352,7 +353,7 @@ function build_benchmark_scenario(benchmark_script, inbox) {
     }
 }
 
-function log_benchmark_result({ benchmark_name, options }, data) {
+function log_benchmark_result({ benchmark_name, options, expect_false }, data) {
     rows = [];
 
     console.log(`Number of transactions: ${data.tx_status.length}`)
@@ -362,6 +363,7 @@ function log_benchmark_result({ benchmark_name, options }, data) {
         let row = {
             benchmark_name,
             options,
+            expected: expect_false.includes(j) ? "OK_false" : "",
             signature_verification_ticks: data.signature_verification_ticks?.[j],
             hashing_ticks: data.hashing_ticks?.[j],
             status,
@@ -474,7 +476,7 @@ function output_filename(time) {
     return path.format({ dir: OUTPUT_DIRECTORY, base: `benchmark_result_${time}.csv` })
 }
 function all_opcodes_dump_filename(time) {
-        return path.format({ dir: OUTPUT_DIRECTORY, base: `dump_opcodes_${time}.json` })
+    return path.format({ dir: OUTPUT_DIRECTORY, base: `dump_opcodes_${time}.json` })
 }
 
 function opcodes_dump_filename_csv(benchmark_name, time) {
@@ -488,9 +490,9 @@ function precompiles_filename(time) {
 function dump_bench_opcode(filename, opcodes) {
     let columns = {
         opcode: "opcode",
-        ticks : "ticks",
-        gas : "gas:",
-        step_result : "step_result"
+        ticks: "ticks",
+        gas: "gas:",
+        step_result: "step_result"
     }
     fs.writeFileSync(
         filename,
@@ -523,18 +525,28 @@ function initialize_headers(output, benchmark_log) {
     return benchmark_csv_config;
 }
 
-function split_name_and_options(path) {
-    const parts = path.split("/");
+function split_bench_infos(bench) {
+    const benchmark_script = script_of_bench(bench);
+    const parts = benchmark_script.split("/");
     const benchmark_name = parts[parts.length - 1].split(".")[0];
-    const i = path.indexOf(' ');
-    if (i === -1) return { benchmark_name, options: '' };
-    else return { benchmark_name, options: path.substring(i + 1) }
+    const i = benchmark_script.indexOf(' ');
+    let expect_false = typeof bench === "string" ? [] : bench.expect_false;
+    let infos = { benchmark_name, benchmark_script, expect_false };
+
+    if (i === -1) return { options: '', ...infos };
+    else return { options: bench.substring(i + 1), ...infos }
+}
+
+
+function script_of_bench(bench) {
+    if (typeof bench === "string") return bench;
+    else return bench.script;
 }
 
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
+    console.log(`Running benchmarks on: \n[ ${benchmark_scripts.map(JSON.stringify).join(',\n  ')}]`);
     if(benchmark_scripts.length === 0) exit();
-    console.log(`Running benchmarks on: \n[ ${benchmark_scripts.join(',\n  ')}]`);
     var precompiles_field = [
         "address",
         "data_size",
@@ -549,7 +561,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Output in ${output}`);
     console.log(`Dumped opcodes list in ${all_opcodes_dump}`);
     console.log(`Precompiles in ${precompiles_output}`);
-    if(MULTI_BLUEPRINT) console.log(`For every scenario, one tx per blueprint`)
+    if (MULTI_BLUEPRINT) console.log(`For every scenario, one tx per blueprint`)
     const precompile_csv_config = { columns: precompiles_field };
     fs.writeFileSync(precompiles_output, csv.stringify([], { header: true, ...precompile_csv_config }));
     fs.writeFileSync(logs, "Logging debugger\n")
@@ -557,13 +569,13 @@ async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Full logs in ${logs}`)
     let benchmark_csv_config = Object();
     for (var i = 0; i < benchmark_scripts.length; i++) {
-        var benchmark_script = benchmark_scripts[i];
-        let bench_info = split_name_and_options(benchmark_script);
-        console.log(`Benchmarking ${benchmark_script} (mode: ${MODE})`);
-        fs.appendFileSync(logs, `=================================================\nBenchmarking ${benchmark_script}\n`)
-        build_benchmark_scenario(benchmark_script,inbox);
+        let benchmark = benchmark_scripts[i];
+        let bench_info = split_bench_infos(benchmark);
+        console.log(`Benchmarking ${bench_info.benchmark_script} (mode: ${MODE})`);
+        fs.appendFileSync(logs, `=================================================\nBenchmarking ${bench_info.benchmark_script}\n`)
+        build_benchmark_scenario(bench_info.benchmark_script, inbox);
         run_benchmark_result = await run_benchmark(inbox, logs);
-        benchmark_log = log_benchmark_result(benchmark_name, run_benchmark_result);
+        benchmark_log = log_benchmark_result(bench_info, run_benchmark_result);
         if (i == 0) benchmark_csv_config = initialize_headers(output, benchmark_log);
         fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config))
         fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
@@ -582,7 +594,7 @@ async function run_all_benchmarks(benchmark_scripts) {
 // we exclude bench_loop_calldataload because with the current tick model it
 // puts the kernel in a stuck mode
 const excluded_benchmark = ["benchmarks/bench_loop_calldataload.js"]
-let benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(name))
+let benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(script_of_bench(name)))
 let stop = commander.opts().stop;
 let start = commander.opts().start;
 let bench_list = benchmark_scripts.filter(filter_name).slice(start,stop);
