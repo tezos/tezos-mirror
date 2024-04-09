@@ -29,6 +29,84 @@ open Zcash_srs
 
 exception Failed_to_load_trusted_setup of string
 
+exception Failed_to_write_uncompressed_srs of string
+
+(* Magic string for marking serialized uncompressed srs files.
+ * The U means uncompressed.
+ * The version is string encoded to avoid endianness issues *)
+let magic = "TZ_SRS_U01"
+
+let read_uncompressed_srs ~srsu_g1_path ~srsu_g2_path () =
+  let open Lwt_syntax in
+  let header_sz = String.length magic in
+  let do_read ~path ty =
+    Lwt_utils_unix.with_open_in path @@ fun fd ->
+    (* Setup a header ourselves with magic/version, because [Repr] does not
+     * offer guarantees concerning the backward compatibility of serialization. *)
+    let header = Bytes.create header_sz in
+    let* nr =
+      Lwt.catch
+        (fun () -> Lwt_unix.read fd header 0 header_sz)
+        (function
+          | Unix.Unix_error (error_code, function_name, _) ->
+              Lwt.reraise
+                (Failed_to_load_trusted_setup
+                   (Format.sprintf
+                      "%s: Unix.Unix_error: %s"
+                      function_name
+                      (Unix.error_message error_code)))
+          | e ->
+              Lwt.reraise (Failed_to_load_trusted_setup (Printexc.to_string e)))
+    in
+    let () =
+      if nr <> header_sz then
+        raise
+          (Failed_to_load_trusted_setup
+             (Format.asprintf "Missing header: %s" path))
+    in
+    (* Check the input file is in the expected format
+     * by comparing the magic string present at the beginning of the file *)
+    let () =
+      if String.equal (Bytes.to_string header) magic then ()
+      else
+        raise
+          (Failed_to_load_trusted_setup
+             (Format.asprintf "Not an uncompressed srs: %s" path))
+    in
+    (* Map file into memory to access it efficiently *)
+    match
+      Lwt_bytes.map_file
+        ~pos:(Int64.of_int header_sz)
+        ~fd:(Lwt_unix.unix_file_descr fd)
+        ~shared:false
+        ()
+    with
+    | exception Unix.Unix_error (error_code, function_name, _) ->
+        raise
+          (Failed_to_load_trusted_setup
+             (Format.sprintf
+                "%s: Unix.Unix_error for %s: %s"
+                function_name
+                path
+                (Unix.error_message error_code)))
+    | exception e -> raise (Failed_to_load_trusted_setup (Printexc.to_string e))
+    | res -> (
+        let of_bin_string = Repr.unstage (Repr.of_bin_string ty) in
+        (* Unfortunate copy, we should be able to serialize bigstringaf
+             directly instead *)
+        let res = Lwt_bytes.to_string res in
+        match of_bin_string res with
+        | Ok srs -> return srs
+        | Error (`Msg msg) ->
+            raise
+              (Failed_to_load_trusted_setup
+                 (Format.sprintf "%s: Failed to deserialize: %s" path msg)))
+  in
+  let open Lwt_result_syntax in
+  let* srs_g1 = do_read ~path:srsu_g1_path Srs_g1.t in
+  let* srs_g2 = do_read ~path:srsu_g2_path Srs_g2.t in
+  return (srs_g1, srs_g2)
+
 let read_srs ?len ~srs_g1_path ~srs_g2_path () =
   let open Lwt_result_syntax in
   let to_bigstring ~path =
@@ -98,6 +176,95 @@ module Internal_for_tests = struct
   let fake_srs1 = Lazy.from_fun (compute_fake_srs Srs_g1.generate_insecure)
 
   let fake_srs2 = Lazy.from_fun (compute_fake_srs Srs_g2.generate_insecure)
+
+  (* Writes a uncompressed SRS given SRS₁ and SRS₂.
+   * The serialisation format is based on Repr, but is prepended by a header
+   * containing [magic], ie 'TZ_SRS_U01', for tezos srs uncompressed version 01.
+   *)
+  let write_uncompressed_srs ~srsu_g1_path ~srsu_g2_path (srs_g1, srs_g2) =
+    let open Lwt_result_syntax in
+    let write ~path srs ty =
+      let open Tezos_stdlib_unix.Lwt_utils_unix in
+      with_open_out path @@ fun fd ->
+      let*! () =
+        Lwt.catch
+          (fun () ->
+            let chan = Lwt_io.of_fd ~mode:Output fd in
+            let*! () = Lwt_io.write chan magic in
+            let to_bin_string = Repr.(unstage (to_bin_string ty)) in
+            let bin = to_bin_string srs in
+            let*! () = Lwt_io.write chan bin in
+            let*! () = Lwt_io.flush chan in
+            Lwt.return_unit)
+          (function
+            | Unix.Unix_error (error_code, function_name, _) ->
+                Lwt.reraise
+                  (Failed_to_load_trusted_setup
+                     (Format.sprintf
+                        "%s: Unix.Unix_error: %s"
+                        function_name
+                        (Unix.error_message error_code)))
+            | e ->
+                Lwt.reraise
+                  (Failed_to_write_uncompressed_srs (Printexc.to_string e)))
+      in
+      Lwt.return_unit
+    in
+    let* () = write ~path:srsu_g1_path srs_g1 Srs_g1.t in
+    let* () = write ~path:srsu_g2_path srs_g2 Srs_g2.t in
+    return_unit
+
+  (* Generates SRS uncompressed from zcash srs
+   * Serialization format contains a magic, see [write_uncompressed_srs].
+   * This also tests the reading function in order to check it is equal once
+   * deserialized. *)
+  let _generate_srsu_uncompressed_serialized_from_zcash_file ~srs_g1_path
+      ~srs_g2_path ~srsu_g1_path ~srsu_g2_path =
+    let open Lwt_result_syntax in
+    let*! r = read_srs ~srs_g1_path ~srs_g2_path () in
+    let* srs_g1, srs_g2 =
+      match r with
+      | Ok (srs_g1, srs_g2) -> Lwt.return_ok (srs_g1, srs_g2)
+      | Error (`End_of_file msg) ->
+          Lwt.return_error
+            (error_of_exn
+               (Failed_to_load_trusted_setup
+                  (Format.sprintf "End_of_file: %s" msg)))
+      | Error (`Invalid_point i) ->
+          Lwt.return_error
+            (error_of_exn
+               (Failed_to_load_trusted_setup
+                  (Format.sprintf "Invalid point: %d" i)))
+    in
+    let*! result =
+      write_uncompressed_srs ~srsu_g1_path ~srsu_g2_path (srs_g1, srs_g2)
+    in
+    let*? () =
+      Result.map_error (fun err -> Lwt_utils_unix.Io_error err) result
+    in
+    let t1 = Unix.gettimeofday () in
+    let*! r = read_uncompressed_srs ~srsu_g1_path ~srsu_g2_path () in
+    let*? srs_g1', srs_g2' =
+      Result.map_error (fun err -> Lwt_utils_unix.Io_error err) r
+    in
+    let t2 = Unix.gettimeofday () in
+    let g_equal f_size f_get f_eq g g' =
+      if f_size g <> f_size g' then false
+      else
+        let rec loop i =
+          if i < f_size g then
+            let point1 = f_get g i in
+            let point2 = f_get g' i in
+            let res = f_eq point1 point2 in
+            if res then loop (i + 1) else false
+          else true
+        in
+        loop 0
+    in
+    assert (g_equal Srs_g1.size Srs_g1.get G1.eq srs_g1 srs_g1') ;
+    assert (g_equal Srs_g2.size Srs_g2.get G2.eq srs_g2 srs_g2') ;
+    Format.eprintf "Timing reading uncompressed_srs: %f\n%!" (t2 -. t1) ;
+    return_unit
 
   module Print = struct
     (* Bounds (following inequalities are given for log₂ for simplicity)
