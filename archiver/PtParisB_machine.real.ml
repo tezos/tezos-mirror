@@ -24,23 +24,19 @@
 (*****************************************************************************)
 
 module Block_services =
-  Tezos_client_019_PtParisA.Protocol_client_context.Alpha_block_services
+  Tezos_client_019_PtParisB.Protocol_client_context.Alpha_block_services
 
 open Lwt_result_syntax
-open Tezos_protocol_019_PtParisA
-open Tezos_protocol_plugin_019_PtParisA
+open Tezos_protocol_019_PtParisB
+open Tezos_protocol_plugin_019_PtParisB
 
 module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
-  let hash =
-    (* This is a hack to allow both Protocols Paris A and Paris B, "ParisA.."
-       can still be output in some logs *)
-    Protocol_hash.of_b58check_exn
-      "PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz"
+  let hash = Protocol.hash
 
-  type wrap_full = Tezos_client_019_PtParisA.Protocol_client_context.wrap_full
+  type wrap_full = Tezos_client_019_PtParisB.Protocol_client_context.wrap_full
 
   let wrap_full cctxt =
-    new Tezos_client_019_PtParisA.Protocol_client_context.wrap_full cctxt
+    new Tezos_client_019_PtParisB.Protocol_client_context.wrap_full cctxt
 
   let slot_to_int x =
     (* YES this is Fun.x ! *)
