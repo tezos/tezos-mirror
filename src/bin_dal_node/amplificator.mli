@@ -14,10 +14,10 @@
     shards are stored.
 *)
 
-(** [try_amplification shard_store node_store commitment
+(** [try_amplification node_store commitment
     ~published_level ~slot_index gs_worker node_ctxt] is called each
     time a new shard is received by an observer node, after being
-    added to the shard store [shard_store]. The argument [commitment]
+    added to the shard store [node_store.shard_store]. The argument [commitment]
     is the commitment of the received shard. This function performs an
     amplification in the following case:
     - the prover SRS is available,
@@ -30,7 +30,6 @@
     short time.
 *)
 val try_amplification :
-  Store.Shards.t ->
   Store.t ->
   Cryptobox.Commitment.t ->
   published_level:int32 ->

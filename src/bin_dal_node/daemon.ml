@@ -622,7 +622,6 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
                  | _ -> false)
                profile_list ->
           Amplificator.try_amplification
-            shard_store
             node_store
             commitment
             ~published_level:level
