@@ -33,6 +33,21 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
             let offset = compute_offset(address, branch_address);
             format!("{} {},{}", op, rd, offset)
         }
+        "c.j" => {
+            let offset = compute_offset(address, args);
+            format!("{} {}", op, offset)
+        }
+        "c.addi" => {
+            let mut args = args.split(',');
+            let rd_rs1 = args.next().unwrap();
+            let imm = args.next().unwrap();
+            match (rd_rs1, imm) {
+                // objdump seems to treat `c.nop` as a pseudoinstruction, but,
+                // unlike `nop`, the spec defines it as an instruction
+                ("zero", "0") => "c.nop".to_string(),
+                _ => format!("{} {},{}", op, rd_rs1, imm),
+            }
+        }
         _ => {
             if args.is_empty() {
                 op.to_string()
