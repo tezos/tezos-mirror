@@ -16,10 +16,20 @@ ed25519-dalek = "2.1.0"
 color-eyre = "0.6.2"
 crossterm = "0.27.0"
 ratatui = "0.26.1"
+serde_json = "1.0.115"
+
 
 [dependencies.clap]
 version = "4.4.6"
 features = ["derive"]
+
+[dependencies.serde]
+version = "1.0.197"
+features = ["derive"]
+
+[dependencies.hex]
+version = "0.4.3"
+features = ["serde"]
 
 [dependencies.kernel-loader]
 path = "../kernel_loader"

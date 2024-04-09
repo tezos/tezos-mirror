@@ -1,4 +1,11 @@
-use std::collections::LinkedList;
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
+mod file;
+
+use self::file::{InboxFile, Message};
+use std::{collections::LinkedList, error::Error, path::Path};
 use tezos_crypto_rs::hash::{BlockHash, ContractKt1Hash};
 use tezos_smart_rollup_encoding::{
     inbox::{InboxMessage, InfoPerLevel, InternalInboxMessage, Transfer},
@@ -21,6 +28,31 @@ impl InboxBuilder {
         };
         builder.start_level();
         builder
+    }
+
+    /// Load inbox messages from a JSON file.
+    pub fn load_from_file(&mut self, path: impl AsRef<Path>) -> Result<&mut Self, Box<dyn Error>> {
+        let inbox_messages = InboxFile::load(path.as_ref())
+            .map_err(|err| {
+                format!(
+                    "Failed to read inbox from {}: {err}",
+                    path.as_ref().display()
+                )
+            })?
+            .0;
+        for (idx, level) in inbox_messages.into_iter().enumerate() {
+            if idx > 0 {
+                self.next_level();
+            }
+
+            for message in level {
+                match message {
+                    Message::Raw(raw) => self.insert_raw(raw),
+                    Message::External { external } => self.insert_external(external),
+                };
+            }
+        }
+        Ok(self)
     }
 
     /// Inject the `start of level` and `info per level` messages to indicate
