@@ -388,40 +388,20 @@ function log_benchmark_result(benchmark_name, data) {
         rows.push(row)
     }
 
-    // first kernel run
-    // the nb of tx correspond to the full inbox, not just those done in first run
-    let reboot_idx = 0
-    rows.push({
-        benchmark_name: benchmark_name + "(all)",
-        interpreter_init_ticks: data.interpreter_init_ticks?.[0],
-        interpreter_decode_ticks: data.interpreter_decode_ticks?.[0],
-        stage_one_ticks: data.stage_one_ticks?.[0],
-        blueprint_chunks: data.nb_blueprint_chunks,
-        delayed_inputs: data.nb_delayed_inputs,
-        kernel_run_ticks: data.kernel_run_ticks?.[0],
-        estimated_ticks: data.estimated_ticks?.[0],
-        inbox_size: data.inbox_size,
-        nb_tx: data.tx_status.length,
-        nb_msg: data.nb_msg,
-        block_in_progress_store: data.block_in_progress_store[0] ? data.block_in_progress_store[0] : '',
-        block_in_progress_store_ticks: data.block_in_progress_store[0] ? data.block_in_progress_store_ticks?.[reboot_idx++] : ''
-    });
-
-    //reboots
-    for (var j = 1; j < data.kernel_run_ticks?.length; j++) {
+    // rows concerning individual runs
+    for (var j = 0; j < data.kernel_run_ticks?.length; j++) {
         rows.push({
-            benchmark_name: benchmark_name + "(all)",
+            benchmark_name: benchmark_name + "(run)",
             interpreter_init_ticks: data.interpreter_init_ticks?.[j],
             interpreter_decode_ticks: data.interpreter_decode_ticks?.[j],
             stage_one_ticks: data.stage_one_ticks?.[j],
             kernel_run_ticks: data.kernel_run_ticks?.[j],
             estimated_ticks: data.estimated_ticks?.[j],
-            block_in_progress_store: data.block_in_progress_store[j] ? data.block_in_progress_store[j] : '',
-            block_in_progress_store_ticks: data.block_in_progress_store[j] ? data.block_in_progress_store_ticks?.[reboot_idx] : '',
-            block_in_progress_read: data.block_in_progress_read[j - 1], // the first read correspond to second run
-            block_in_progress_read_ticks: data.block_in_progress_read[j - 1] ? data.block_in_progress_read_ticks?.[reboot_idx - 1] : ''
+            block_in_progress_store: data.block_in_progress_store?.[j],
+            block_in_progress_store_ticks: data.block_in_progress_store_ticks?.[j],
+            block_in_progress_read: data.block_in_progress_read?.[j],
+            block_in_progress_read_ticks: data.block_in_progress_read_ticks?.[j],
         });
-        if (data.block_in_progress_read[j - 1]) reboot_idx++
     }
 
     // ticks that are not covered by identified area of interest
@@ -433,17 +413,24 @@ function log_benchmark_result(benchmark_name, data) {
         - sumArray(data.signature_verification_ticks)
         - sumArray(data.store_transaction_object_ticks)
         - sumArray(data.store_receipt_ticks)
+        - sumArray(data.block_in_progress_read_ticks)
+        - sumArray(data.block_in_progress_store_ticks)
         - finalize_ticks
 
     // row concerning all runs
     rows.push({
         benchmark_name: benchmark_name + "(all)",
+        inbox_size: data.inbox_size,
+        nb_tx: data.tx_status.length,
+        nb_msg: data.nb_msg,
+        blueprint_chunks: data.nb_blueprint_chunks,
+        delayed_inputs: data.nb_delayed_inputs,
         unaccounted_ticks,
         block_finalize: finalize_ticks
     });
 
     // rows concerning blueprint reading when creating bip
-    for(let i = 0; i < data.bip_size.length; i++){
+    for (let i = 0; i < data.bip_size.length; i++) {
         rows.push({
             benchmark_name: benchmark_name + "(bip)",
             next_bip_ticks: data.next_bip_ticks?.[i],
