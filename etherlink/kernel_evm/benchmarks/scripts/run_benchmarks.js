@@ -43,7 +43,7 @@ commander
     .option('--keep-temp', "Keep temporary files", false)
     .option('--mode <mode>', 'Kernel mode: `proxy` or `sequencer`', parse_mode)
     .option('--no-computation', 'Don\'t expect stage 2', true)
-    .option('--multi-blueprint', 'Send each transaction in a separate blueprint',false)
+    .option('--multi-blueprint', 'Send each transaction in a separate blueprint', false)
     .option('--start <i>', 'Start with benchmark nb <i>', 0)
     .option('--stop <i>', 'Stop at bench nb <i>', undefined)
     .option('--nth <i>', 'Just launch bench n° i')
@@ -286,6 +286,10 @@ async function get_ticks(path, function_call_keyword) {
 // Parse the profiler output file and get the tick counts of the differerent function calls
 async function analyze_profiler_output(path) {
     let results = Object();
+
+    // if no profiling output file, can't analyse it
+    if (!path) return results;
+
     results.kernel_run_ticks = await get_ticks(path, "kernel_run");
     results.run_transaction_ticks = await get_ticks(path, "run_transaction");
     results.signature_verification_ticks = await get_ticks(path, "EthereumTransactionCommon.*caller");
@@ -302,6 +306,7 @@ async function analyze_profiler_output(path) {
     results.block_in_progress_read_ticks = await get_ticks(path, "read_block_in_progress");
     results.next_bip_ticks = await get_ticks(path, "next_bip_from_blueprint");
 
+    let nb_reboots = results.block_in_progress_store_ticks;
     let nb_runs = results.kernel_run_ticks?.length;
     let nb_transactions = results.run_transaction_ticks?.length;
     let nb_blocks = results.block_finalize?.length;
@@ -309,9 +314,9 @@ async function analyze_profiler_output(path) {
     check(nb_runs, results.interpreter_decode_ticks?.length, "Error in nb of interpreter decode ticks $?")
     check(nb_transactions, results.signature_verification_ticks?.length, "Error in nb of signatures ticks $?")
     check(nb_transactions, results.hashing_ticks?.length, "Error in nb of hash ticks $?")
-    check(nb_transactions, results.store_transaction_object_ticks?.length, "Error in nb of stored tx ticks $?")
-    check(nb_transactions, results.store_receipt_ticks?.length, "Error in nb of receipts ticks $?")
-    check(nb_transactions, results.logs_to_bloom?.length, "Error in nb of bloom ticks $?")
+    check(nb_transactions - nb_reboots, results.store_transaction_object_ticks?.length, "Error in nb of stored tx ticks $?")
+    check(nb_transactions - nb_reboots, results.store_receipt_ticks?.length, "Error in nb of receipts ticks $?")
+    check(nb_transactions - nb_reboots, results.logs_to_bloom?.length, "Error in nb of bloom ticks $?")
     // last bp reading should be empty and lead to no block
     check(nb_blocks + 1, results.next_bip_ticks?.length, "Error in nb of bp reading ticks $?")
     check(results.block_in_progress_store?.length, results.block_in_progress_read?.length, "not as many bip read as store $?")
@@ -321,10 +326,16 @@ async function analyze_profiler_output(path) {
 
 // Run given benchmark
 async function run_benchmark(path, logs) {
-    var inbox_size = fs.statSync(path).size
-    run_profiler_result = await run_profiler(path, logs);
-    profiler_output_analysis_result = FAST_MODE ? {} : await analyze_profiler_output(run_profiler_result.profiler_output_path);
-    if (!KEEP_TEMP && !FAST_MODE) {
+    let inbox_size = fs.statSync(path).size
+    let nb_lines = fs.readFileSync(path, 'utf8').split('\n').length - 1;
+    let nb_msg = Math.ceil((nb_lines - 4) / 2);
+
+    run_profiler_result = await run_profiler(path, logs)
+        .catch((err) => { console.error(err); return Object() });
+    profiler_output_analysis_result = FAST_MODE ? {} :
+        await analyze_profiler_output(run_profiler_result.profiler_output_path)
+            .catch((err) => { console.error(err); return Object() });
+    if (!KEEP_TEMP && !FAST_MODE && !!run_profiler_result?.profiler_output_path) {
         fs.unlink(run_profiler_result.profiler_output_path, (err) => {
             if (err) {
                 console.error(err);
@@ -336,6 +347,7 @@ async function run_benchmark(path, logs) {
     if (!FAST_MODE) check(profiler_output_analysis_result.next_bip_ticks?.length, run_profiler_result.bip_size.length, "Pb with nb of blueprint size $?");
     return {
         inbox_size,
+        nb_msg,
         ...profiler_output_analysis_result,
         ...run_profiler_result
     }
@@ -350,7 +362,9 @@ function build_benchmark_scenario(benchmark_script, inbox) {
     } catch (error) {
         console.log(`Error running script ${benchmark_script}. Please fixed the error in the script before running this benchmark script`)
         console.error(error);
+        return false;
     }
+    return true;
 }
 
 function log_benchmark_result({ benchmark_name, options, expect_false }, data) {
@@ -546,13 +560,13 @@ function script_of_bench(bench) {
 // Run the benchmark suite and write the result to benchmark_result_${TIMESTAMP}.csv
 async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Running benchmarks on: \n[ ${benchmark_scripts.map(JSON.stringify).join(',\n  ')}]`);
-    if(benchmark_scripts.length === 0) exit();
+    if (benchmark_scripts.length === 0) exit();
     var precompiles_field = [
         "address",
         "data_size",
         "ticks",
     ]
-    let time = ID; 
+    let time = ID;
     let output = output_filename(time);
     let all_opcodes_dump = all_opcodes_dump_filename(time);
     let precompiles_output = precompiles_filename(time);
@@ -573,17 +587,21 @@ async function run_all_benchmarks(benchmark_scripts) {
         let bench_info = split_bench_infos(benchmark);
         console.log(`Benchmarking ${bench_info.benchmark_script} (mode: ${MODE})`);
         fs.appendFileSync(logs, `=================================================\nBenchmarking ${bench_info.benchmark_script}\n`)
-        build_benchmark_scenario(bench_info.benchmark_script, inbox);
-        run_benchmark_result = await run_benchmark(inbox, logs);
-        benchmark_log = log_benchmark_result(bench_info, run_benchmark_result);
-        if (i == 0) benchmark_csv_config = initialize_headers(output, benchmark_log);
-        fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config))
-        fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
+        try {
+            build_benchmark_scenario(bench_info.benchmark_script, inbox);
+            run_benchmark_result = await run_benchmark(inbox, logs);
+            benchmark_log = log_benchmark_result(bench_info, run_benchmark_result);
+            if (i == 0) benchmark_csv_config = initialize_headers(output, benchmark_log);
+            fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config))
+            fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
 
-        let opcodes_dump = opcodes_dump_filename_csv(bench_info.benchmark_name, time);
-        console.log(`Dumped opcodes in ${opcodes_dump}`);
-        dump_bench_opcode(opcodes_dump, run_benchmark_result.opcodes, all_opcodes_dump, i == 0);
-        add_dump(all_opcodes_dump, opcodes_dump, i == 0)
+            let opcodes_dump = opcodes_dump_filename_csv(bench_info.benchmark_name, time);
+            console.log(`Dumped opcodes in ${opcodes_dump}`);
+            dump_bench_opcode(opcodes_dump, run_benchmark_result.opcodes, all_opcodes_dump, i == 0);
+            add_dump(all_opcodes_dump, opcodes_dump, i == 0)
+        } catch (err) {
+            console.error(err);
+        }
     }
     fs.appendFileSync(all_opcodes_dump, "]");
     console.log("Benchmarking complete");
@@ -597,8 +615,8 @@ const excluded_benchmark = ["benchmarks/bench_loop_calldataload.js"]
 let benchmark_scripts = require("./benchmarks_list.json").filter((name) => !excluded_benchmark.includes(script_of_bench(name)))
 let stop = commander.opts().stop;
 let start = commander.opts().start;
-let bench_list = benchmark_scripts.filter(filter_name).slice(start,stop);
-if(!!commander.opts().nth){
+let bench_list = benchmark_scripts.filter(filter_name).slice(start, stop);
+if (!!commander.opts().nth) {
     let nth = parseInt(commander.opts().nth)
     bench_list = [bench_list[nth]]
 }
