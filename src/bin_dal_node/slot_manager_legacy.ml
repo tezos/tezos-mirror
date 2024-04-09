@@ -192,27 +192,6 @@ let save_shards store cryptobox commitment shards =
   Store.(Shards.write_all store.shard_store commitment shards)
   |> Errors.to_tzresult
 
-let with_commitment_as_seq commitment shards_indices =
-  Seq.map (fun index -> (commitment, index)) @@ List.to_seq shards_indices
-
-let rev_fetched_values_as seq f init =
-  Seq_s.E.fold_left
-    (fun acc (_commitment, shard_id, v) ->
-      match v with
-      | Error err -> Error err
-      | Ok v -> Ok (f Cryptobox.{index = shard_id; share = v} acc))
-    init
-    seq
-
-let get_shards store commitment shard_ids =
-  let open Lwt_result_syntax in
-  let res =
-    Store.Shards.read_values store
-    @@ with_commitment_as_seq commitment shard_ids
-  in
-  let* rev_list = rev_fetched_values_as res List.cons [] in
-  return @@ List.rev rev_list
-
 let get_slot cryptobox store commitment =
   let open Lwt_result_syntax in
   let {Cryptobox.number_of_shards; redundancy_factor; _} =
