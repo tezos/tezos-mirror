@@ -35,36 +35,37 @@ let merge_exn msg x =
 open Astring
 
 module type S =
-  Irmin.S
+  Brassaia.S
     with type Schema.Path.step = string
      and type Schema.Path.t = string list
      and type Schema.Contents.t = string
      and type Schema.Branch.t = string
 
 module type Generic_key =
-  Irmin.Generic_key.S
+  Brassaia.Generic_key.S
     with type Schema.Path.step = string
      and type Schema.Path.t = string list
      and type Schema.Contents.t = string
      and type Schema.Branch.t = string
 
 module Schema = struct
-  module Hash = Irmin.Hash.SHA1
-  module Commit = Irmin.Commit.Make (Hash)
-  module Path = Irmin.Path.String_list
-  module Metadata = Irmin.Metadata.None
-  module Node = Irmin.Node.Generic_key.Make (Hash) (Path) (Metadata)
-  module Branch = Irmin.Branch.String
-  module Info = Irmin.Info.Default
-  module Contents = Irmin.Contents.String
+  module Hash = Brassaia.Hash.SHA1
+  module Commit = Brassaia.Commit.Make (Hash)
+  module Path = Brassaia.Path.String_list
+  module Metadata = Brassaia.Metadata.None
+  module Node = Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata)
+  module Branch = Brassaia.Branch.String
+  module Info = Brassaia.Info.Default
+  module Contents = Brassaia.Contents.String
 end
 
-let store : (module Irmin.Maker) -> (module Irmin.Metadata.S) -> (module S) =
+let store :
+    (module Brassaia.Maker) -> (module Brassaia.Metadata.S) -> (module S) =
  fun (module B) (module M) ->
   let module Schema = struct
     include Schema
     module Metadata = M
-    module Node = Irmin.Node.Generic_key.Make (Hash) (Path) (Metadata)
+    module Node = Brassaia.Node.Generic_key.Make (Hash) (Path) (Metadata)
   end in
   let module S = B.Make (Schema) in
   (module S)
@@ -73,9 +74,9 @@ type store = S of (module S) | Generic_key of (module Generic_key)
 
 type t = {
   name : string;
-  init : config:Irmin.config -> unit Lwt.t;
-  clean : config:Irmin.config -> unit Lwt.t;
-  config : Irmin.config;
+  init : config:Brassaia.config -> unit Lwt.t;
+  clean : config:Brassaia.config -> unit Lwt.t;
+  config : Brassaia.config;
   store : store;
   stats : (unit -> int * int) option;
   (* Certain store implementations currently don't support implementing
@@ -135,7 +136,7 @@ end
 
 module Make_helpers (S : Generic_key) = struct
   module B = S.Backend
-  module Graph = Irmin.Node.Graph (B.Node)
+  module Graph = Brassaia.Node.Graph (B.Node)
 
   let info message =
     let date = Int64.of_float 0. in
@@ -152,7 +153,7 @@ module Make_helpers (S : Generic_key) = struct
     | `Node key -> key
     | _ -> Alcotest.fail "expecting node_key"
 
-  type x = int [@@deriving irmin]
+  type x = int [@@deriving brassaia]
 
   let v repo = B.Repo.contents_t repo
   let n repo = B.Repo.node_t repo
@@ -217,7 +218,7 @@ module Make_helpers (S : Generic_key) = struct
     let config_ptr = ref None in
     Lwt.catch
       (fun () ->
-        let module Conf = Irmin.Backend.Conf in
+        let module Conf = Brassaia.Backend.Conf in
         let generate_random_root config =
           let id = Random.int 100 |> string_of_int in
           let root_value =
@@ -272,7 +273,7 @@ let filter_src src =
        ])
 
 let reporter ?prefix () =
-  Irmin.Export_for_backends.Logging.reporter ~filter_src ?prefix
+  Brassaia.Export_for_backends.Logging.reporter ~filter_src ?prefix
     (module Mtime_clock)
 
 let () =
@@ -294,7 +295,7 @@ let line msg =
 let ( / ) = Filename.concat
 
 let testable t =
-  Alcotest.testable (Irmin.Type.pp_dump t) Irmin.Type.(unstage (equal t))
+  Alcotest.testable (Brassaia.Type.pp_dump t) Brassaia.Type.(unstage (equal t))
 
 let check t = Alcotest.check (testable t)
 
@@ -306,10 +307,10 @@ let slist (type a) (a : a Alcotest.testable) compare =
   Alcotest.testable (Alcotest.pp l) eq
 
 let checks t =
-  let t = slist (testable t) Irmin.Type.(unstage (compare t)) in
+  let t = slist (testable t) Brassaia.Type.(unstage (compare t)) in
   Alcotest.check t
 
-(* also in test/irmin-pack/common.ml *)
+(* also in test/brassaia-pack/common.ml *)
 let check_raises_lwt msg exn (type a) (f : unit -> a Lwt.t) =
   Lwt.catch
     (fun x ->
@@ -324,7 +325,7 @@ let check_raises_lwt msg exn (type a) (f : unit -> a Lwt.t) =
             "Fail %s: expected function to raise %s, but it raised %s instead."
             msg (Printexc.to_string exn) (Printexc.to_string e))
 
-module T = Irmin.Type
+module T = Brassaia.Type
 
 module type Sleep = sig
   val sleep : float -> unit Lwt.t

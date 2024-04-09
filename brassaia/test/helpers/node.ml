@@ -16,13 +16,15 @@
 
 let check _pos typ ~expected actual =
   let typ =
-    Alcotest.testable Irmin.Type.(pp_dump typ) Irmin.Type.(unstage (equal typ))
+    Alcotest.testable
+      Brassaia.Type.(pp_dump typ)
+      Brassaia.Type.(unstage (equal typ))
   in
   Alcotest.check typ "" expected actual
 
 module type Map = sig
-  type t [@@deriving irmin]
-  type data [@@deriving irmin]
+  type t [@@deriving brassaia]
+  type data [@@deriving brassaia]
   type key := string
 
   val empty : unit -> t
@@ -38,7 +40,7 @@ module type Map = sig
 end
 
 module Suite (Map : Map) = struct
-  type key = string [@@deriving irmin]
+  type key = string [@@deriving brassaia]
 
   let random_bindings n =
     List.init n (fun i -> (string_of_int i, Map.random_data ()))
@@ -75,7 +77,8 @@ module Suite (Map : Map) = struct
     let module Map = struct
       include Map
 
-      type nonrec t = t [@@deriving irmin ~equal ~to_bin_string ~of_bin_string]
+      type nonrec t = t
+      [@@deriving brassaia ~equal ~to_bin_string ~of_bin_string]
     end in
     let bindings = random_bindings 256 in
     let m = map_of_bindings bindings in
@@ -101,27 +104,27 @@ module Suite (Map : Map) = struct
     ]
 end
 
-module Make (Make_node : Irmin.Node.Generic_key.Maker) : sig
+module Make (Make_node : Brassaia.Node.Generic_key.Maker) : sig
   val suite : unit Alcotest.test_case list
 end = struct
   (* For each [Node] maker, we can instantiate the test suite above twice: once
      for regular nodes, and once for portable nodes. *)
 
-  module Schema = Irmin.Schema.KV (Irmin.Contents.String)
+  module Schema = Brassaia.Schema.KV (Brassaia.Contents.String)
   module Hash = Schema.Hash
-  module Key = Irmin.Key.Of_hash (Hash)
+  module Key = Brassaia.Key.Of_hash (Hash)
   module Node = Make_node (Hash) (Schema.Path) (Schema.Metadata) (Key) (Key)
 
-  type key = Key.t [@@deriving irmin]
+  type key = Key.t [@@deriving brassaia]
 
   module Extras = struct
     type data = [ `Node of Key.t | `Contents of Key.t * unit ]
-    [@@deriving irmin]
+    [@@deriving brassaia]
 
     let random_data =
-      let hash_of_string = Irmin.Type.(unstage (of_bin_string Hash.t)) in
+      let hash_of_string = Brassaia.Type.(unstage (of_bin_string Hash.t)) in
       let random_string =
-        Irmin.Type.(unstage (random (string_of (`Fixed Hash.hash_size))))
+        Brassaia.Type.(unstage (random (string_of (`Fixed Hash.hash_size))))
       in
       fun () ->
         match hash_of_string (random_string ()) with

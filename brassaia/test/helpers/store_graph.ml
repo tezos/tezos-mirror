@@ -22,8 +22,8 @@ module Make (S : Generic_key) = struct
 
   let test_iter x () =
     let test repo =
-      let pp_id = Irmin.Type.pp S.Tree.kinded_key_t in
-      let eq_id = Irmin.Type.(unstage (equal S.Tree.kinded_key_t)) in
+      let pp_id = Brassaia.Type.pp S.Tree.kinded_key_t in
+      let eq_id = Brassaia.Type.(unstage (equal S.Tree.kinded_key_t)) in
       let mem k ls = List.exists (fun k' -> eq_id k k') ls in
       let visited = ref [] in
       let skipped = ref [] in
@@ -37,7 +37,9 @@ module Make (S : Generic_key) = struct
       in
       let node k =
         if mem (`Node k) !visited then
-          Alcotest.failf "node %a visited twice" (Irmin.Type.pp B.Node.Key.t) k;
+          Alcotest.failf "node %a visited twice"
+            (Brassaia.Type.pp B.Node.Key.t)
+            k;
         visited := `Node k :: !visited;
         Lwt.return_unit
       in
@@ -45,7 +47,7 @@ module Make (S : Generic_key) = struct
         let e = `Contents (k, S.Metadata.default) in
         if mem e !visited then
           Alcotest.failf "contents %a visited twice"
-            (Irmin.Type.pp B.Contents.Key.t)
+            (Brassaia.Type.pp B.Contents.Key.t)
             k;
         (match order with None -> () | Some f -> f e);
         visited := e :: !visited;
@@ -61,7 +63,7 @@ module Make (S : Generic_key) = struct
           (fun k ->
             if not (mem k !visited) then
               Alcotest.failf "%a should be visited"
-                (Irmin.Type.pp S.Tree.kinded_key_t)
+                (Brassaia.Type.pp S.Tree.kinded_key_t)
                 k)
           nodes
       in

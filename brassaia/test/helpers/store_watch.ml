@@ -58,7 +58,9 @@ module Make (Log : Logs.LOG) (Zzz : Sleep) (S : Generic_key) = struct
       let v1 = "bar" in
       let v2 = "foo" in
       let r = ref 0 in
-      let eq = Irmin.Type.(unstage (equal (Irmin.Diff.t (S.commit_t repo)))) in
+      let eq =
+        Brassaia.Type.(unstage (equal (Brassaia.Diff.t (S.commit_t repo))))
+      in
       let old_head = ref h in
       let check x =
         let+ h2 = S.Head.get t in
@@ -373,7 +375,7 @@ module Make (Log : Logs.LOG) (Zzz : Sleep) (S : Generic_key) = struct
   let tests =
     (* [test_watches] has been disabled for being flaky.
         TODO: work out why, fix it, and re-enable it.
-        See https://github.com/mirage/irmin/issues/1447. *)
+        See https://github.com/mirage/brassaia/issues/1447. *)
     let _ = ("Basic operations", test_watches) in
     [ ("Callbacks and exceptions", test_watch_exn) ]
 end

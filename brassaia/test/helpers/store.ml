@@ -17,13 +17,13 @@
 open! Import
 open Common
 
-let src = Logs.Src.create "test" ~doc:"Irmin tests"
+let src = Logs.Src.create "test" ~doc:"Brassaia tests"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Make (S : Generic_key) = struct
   include Common.Make_helpers (S)
-  module History = Irmin.Commit.History (B.Commit)
+  module History = Brassaia.Commit.History (B.Commit)
 
   let with_binding k v t = S.Tree.add t k v
   let random_value value = random_string value
@@ -102,7 +102,7 @@ module Make (S : Generic_key) = struct
         (fun () ->
           let+ _ = with_contents repo (fun t -> B.Contents.add t v2) in
           Alcotest.fail "Add after close should not be allowed")
-        (function Irmin.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
+        (function Brassaia.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
     in
     run x test
 
@@ -175,7 +175,7 @@ module Make (S : Generic_key) = struct
       let* t1 = B.Node.find n k1 in
       let k' = B.Node.Val.find (get t1) "x" in
       check
-        (Irmin.Type.option B.Node.Val.value_t)
+        (Brassaia.Type.option B.Node.Val.value_t)
         "find x"
         (Some (normal kv1))
         k';
@@ -255,7 +255,7 @@ module Make (S : Generic_key) = struct
             with_node repo (fun g -> Graph.add g n0 [ "b" ] (`Node n0))
           in
           Alcotest.fail "Add after close should not be allowed")
-        (function Irmin.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
+        (function Brassaia.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
     in
     run x test
 
@@ -304,7 +304,7 @@ module Make (S : Generic_key) = struct
         (fun () ->
           let+ _ = with_info 3 (History.v ~node:kt1 ~parents:[]) in
           Alcotest.fail "Add after close should not be allowed")
-        (function Irmin.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
+        (function Brassaia.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
     in
     run x test
 
@@ -315,7 +315,7 @@ module Make (S : Generic_key) = struct
         S.Info.v ~author:"test" ~message (Int64.of_int date)
       in
       let check_keys = checks B.Commit.Key.t in
-      let equal_key = Irmin.Type.(unstage (equal B.Commit.Key.t)) in
+      let equal_key = Brassaia.Type.(unstage (equal B.Commit.Key.t)) in
       let h = h repo in
       let initialise_nodes =
         Lwt_list.map_p
@@ -457,7 +457,7 @@ module Make (S : Generic_key) = struct
         (fun () ->
           let+ _ = S.Branch.set repo b1 kv1 in
           Alcotest.fail "Add after close should not be allowed")
-        (function Irmin.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
+        (function Brassaia.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
     in
     run x test
 
@@ -493,25 +493,25 @@ module Make (S : Generic_key) = struct
   let test_simple_merges ?hook x () =
     (* simple merges *)
     let check_merge () =
-      let ok = Irmin.Merge.ok in
+      let ok = Brassaia.Merge.ok in
       let dt = [%typ: int64 option] in
       let dx = [%typ: (string * int64) list] in
       let merge_skip ~old:_ _ _ = ok None in
       let merge_left ~old:_ x _ = ok x in
       let merge_right ~old:_ _ y = ok y in
-      let merge_default = Irmin.Merge.default dt in
+      let merge_default = Brassaia.Merge.default dt in
       let merge = function
-        | "left" -> Irmin.Merge.v dt merge_left
-        | "right" -> Irmin.Merge.v dt merge_right
-        | "skip" -> Irmin.Merge.v dt merge_skip
+        | "left" -> Brassaia.Merge.v dt merge_left
+        | "right" -> Brassaia.Merge.v dt merge_right
+        | "skip" -> Brassaia.Merge.v dt merge_skip
         | _ -> merge_default
       in
-      let merge_x = Irmin.Merge.alist T.string T.int64 merge in
+      let merge_x = Brassaia.Merge.alist T.string T.int64 merge in
       let old () = ok (Some [ ("left", 1L); ("foo", 2L) ]) in
       let x = [ ("left", 2L); ("right", 0L) ] in
       let y = [ ("left", 1L); ("bar", 3L); ("skip", 0L) ] in
       let m = [ ("left", 2L); ("bar", 3L) ] in
-      Irmin.Merge.(f merge_x) ~old x y >>= function
+      Brassaia.Merge.(f merge_x) ~old x y >>= function
       | Error (`Conflict c) -> Alcotest.failf "conflict %s" c
       | Ok m' ->
           check dx "compound merge" m m';
@@ -522,19 +522,19 @@ module Make (S : Generic_key) = struct
       let* kv1 = kv1 ~repo in
       let* kv2 = kv2 ~repo in
       let result =
-        T.(result (option B.Contents.Key.t) Irmin.Merge.conflict_t)
+        T.(result (option B.Contents.Key.t) Brassaia.Merge.conflict_t)
       in
       (* merge contents *)
       let* kv1' =
         with_contents repo (fun v ->
-            Irmin.Merge.f (B.Contents.merge v) ~old:(old (Some kv1)) (Some kv1)
-              (Some kv1))
+            Brassaia.Merge.f (B.Contents.merge v) ~old:(old (Some kv1))
+              (Some kv1) (Some kv1))
       in
       check result "merge kv1" (Ok (Some kv1)) kv1';
       let* kv2' =
         with_contents repo (fun v ->
-            Irmin.Merge.f (B.Contents.merge v) ~old:(old (Some kv1)) (Some kv1)
-              (Some kv2))
+            Brassaia.Merge.f (B.Contents.merge v) ~old:(old (Some kv1))
+              (Some kv1) (Some kv2))
       in
       check result "merge kv2" (Ok (Some kv2)) kv2';
 
@@ -553,7 +553,7 @@ module Make (S : Generic_key) = struct
                              \c/ *)
       let* k4 =
         with_node repo (fun g ->
-            Irmin.Merge.(f @@ B.Node.merge g)
+            Brassaia.Merge.(f @@ B.Node.merge g)
               ~old:(old (Some k0)) (Some k2) (Some k3))
       in
       let* k4 = merge_exn "k4" k4 in
@@ -574,7 +574,7 @@ module Make (S : Generic_key) = struct
       may_get_keys repo [ kr1; kr2 ] hook >>= fun () ->
       let* kr3 =
         with_info 3 (fun h ~info ->
-            Irmin.Merge.f
+            Brassaia.Merge.f
               (History.merge h ~info:(fun () -> info))
               ~old:(old kr0) kr1 kr2)
       in
@@ -582,7 +582,7 @@ module Make (S : Generic_key) = struct
       may_get_keys repo [ kr3 ] hook >>= fun () ->
       let* kr3_key' =
         with_info 4 (fun h ~info ->
-            Irmin.Merge.f
+            Brassaia.Merge.f
               (History.merge h ~info:(fun () -> info))
               ~old:(old kr2) kr2 kr3)
       in
@@ -591,7 +591,7 @@ module Make (S : Generic_key) = struct
       check_key "kr3 id with immediate parent'" kr3 kr3_key';
       let* kr3_key =
         with_info 5 (fun h ~info ->
-            Irmin.Merge.f
+            Brassaia.Merge.f
               (History.merge h ~info:(fun () -> info))
               ~old:(old kr0) kr0 kr3)
       in
@@ -823,7 +823,7 @@ module Make (S : Generic_key) = struct
       assert_lcas "weird lcas 4" ~max_depth:1 3 c11 c15 [ c11 ] >>= fun () ->
       assert_lcas "weird lcas 4" ~max_depth:3 3 c15 c16 [ c11 ] >>= fun () ->
       (* fast-forward *)
-      let ff = testable Irmin.Type.(result unit S.ff_error_t) in
+      let ff = testable Brassaia.Type.(result unit S.ff_error_t) in
       let* t12 = S.of_commit c12 in
       let* b1 = S.Head.fast_forward t12 c16 in
       Alcotest.(check ff) "ff 1.1" (Error `Rejected) b1;
@@ -892,7 +892,9 @@ module Make (S : Generic_key) = struct
       let* tree2 = S.get_tree t [ "u" ] in
       let* tree3 = S.Tree.add tree [ "x"; "z" ] vx in
       let* v' =
-        Irmin.Merge.f S.Tree.merge ~old:(Irmin.Merge.promise tree1) tree2 tree3
+        Brassaia.Merge.f S.Tree.merge
+          ~old:(Brassaia.Merge.promise tree1)
+          tree2 tree3
         >>= merge_exn "tree"
       in
       S.set_tree_exn t ~info:(infof "merge") [ "u" ] v' >>= fun () ->
@@ -995,7 +997,7 @@ module Make (S : Generic_key) = struct
         (fun () ->
           let+ _ = S.set_exn t ~info:(infof "add after close") [ "a" ] "bar" in
           Alcotest.fail "Add after close should not be allowed")
-        (function Irmin.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
+        (function Brassaia.Closed -> Lwt.return_unit | exn -> Lwt.fail exn)
     in
     run x test
 
@@ -1036,7 +1038,7 @@ module Make (S : Generic_key) = struct
     in
     run x test
 
-  let stats_t = Alcotest.testable (Irmin.Type.pp_dump S.Tree.stats_t) ( = )
+  let stats_t = Alcotest.testable (Brassaia.Type.pp_dump S.Tree.stats_t) ( = )
 
   let empty_stats =
     { S.Tree.nodes = 0; leafs = 0; skips = 0; depth = 0; width = 0 }
@@ -1080,10 +1082,10 @@ module Make (S : Generic_key) = struct
     in
     run x test
 
-  let pp_depth = Irmin.Type.pp S.Tree.depth_t
-  let pp_key = Irmin.Type.pp S.Path.t
+  let pp_depth = Brassaia.Type.pp S.Tree.depth_t
+  let pp_key = Brassaia.Type.pp S.Path.t
   let contents_t = T.pair S.contents_t S.metadata_t
-  let diff_t = T.(pair S.path_t (Irmin.Diff.t contents_t))
+  let diff_t = T.(pair S.path_t (Brassaia.Diff.t contents_t))
   let check_diffs = checks diff_t
   let check_ls = checks T.(pair S.step_t S.tree_t)
 
@@ -1184,7 +1186,7 @@ module Make (S : Generic_key) = struct
 
       (* Testing [Tree.diff] *)
       let contents_t = T.pair S.contents_t S.metadata_t in
-      let diff = T.(pair S.path_t (Irmin.Diff.t contents_t)) in
+      let diff = T.(pair S.path_t (Brassaia.Diff.t contents_t)) in
       let check_diffs = checks diff in
       let check_val = check T.(option contents_t) in
       let check_ls = checks T.(pair S.step_t S.tree_t) in
@@ -1378,7 +1380,7 @@ module Make (S : Generic_key) = struct
       let* v2 = S.get_tree t [ "b" ] in
       let* v1 = S.Tree.add v0 [ "y" ] foo2 in
       let* v' =
-        Irmin.Merge.(f S.Tree.merge ~old:(promise v0) v1 v2)
+        Brassaia.Merge.(f S.Tree.merge ~old:(promise v0) v1 v2)
         >>= merge_exn "merge trees"
       in
       S.set_tree_exn t ~info:(infof "merge_path") [ "b" ] v' >>= fun () ->
@@ -1454,7 +1456,7 @@ module Make (S : Generic_key) = struct
     in
     run x test
 
-  (* let pp_proof = Irmin.Type.pp S.Tree.Proof.t *)
+  (* let pp_proof = Brassaia.Type.pp S.Tree.Proof.t *)
 
   let test_proofs x () =
     let test repo =
@@ -1650,7 +1652,7 @@ module Make (S : Generic_key) = struct
         | Ok (_, ()) -> ()
         | Error e ->
             Alcotest.failf "check_proof: %a"
-              (Irmin.Type.pp S.Tree.verifier_error_t)
+              (Brassaia.Type.pp S.Tree.verifier_error_t)
               e
       in
       let* () = Lwt_list.iter_s check_proof [ f0; f1 ] in
@@ -1774,7 +1776,8 @@ module Make (S : Generic_key) = struct
         ~node:(fun k _ i ->
           if not (List.length k = 0 || List.length k = 1) then
             Alcotest.failf "nodes should be at [] and [foo], got %a"
-              (Irmin.Type.pp S.path_t) k;
+              (Brassaia.Type.pp S.path_t)
+              k;
           Lwt.return i)
         0
       >>= fun nb_contents ->
@@ -1854,7 +1857,7 @@ module Make (S : Generic_key) = struct
     in
     run x test
 
-  module Sync = Irmin.Sync.Make (S)
+  module Sync = Brassaia.Sync.Make (S)
 
   let test_sync x () =
     let test repo =
@@ -1869,7 +1872,7 @@ module Make (S : Generic_key) = struct
       let* h = S.history t1 ~min:[ h ] in
       Alcotest.(check int) "history-v" 3 (S.History.nb_vertex h);
       Alcotest.(check int) "history-e" 2 (S.History.nb_edges h);
-      let remote = Irmin.remote_store (module S) t1 in
+      let remote = Brassaia.remote_store (module S) t1 in
       let* partial = Sync.fetch_exn t1 ~depth:0 remote in
       let partial =
         match partial with
@@ -1903,7 +1906,7 @@ module Make (S : Generic_key) = struct
     in
     run x test
 
-  module Dot = Irmin.Dot (S)
+  module Dot = Brassaia.Dot (S)
 
   let output_file x t file =
     let buf = Buffer.create 1024 in
@@ -1984,7 +1987,7 @@ module Make (S : Generic_key) = struct
       let* c3 = none_fail (S.Head.find t) "head not found" in
       let info () = S.Commit.info c3 in
       with_commit repo (fun commit_t ->
-          Irmin.Merge.f
+          Brassaia.Merge.f
             (B.Commit.merge commit_t ~info)
             ~old
             (Some (S.Commit.key c3))
@@ -2122,7 +2125,7 @@ module Make (S : Generic_key) = struct
     in
     run x test
 
-  let pp_write_error = Irmin.Type.pp S.write_error_t
+  let pp_write_error = Brassaia.Type.pp S.write_error_t
   let tree_t = testable S.tree_t
 
   let test_with_tree x () =
@@ -2277,7 +2280,7 @@ module Make (S : Generic_key) = struct
 
   let test_shallow_objects x () =
     let test repo =
-      (* NOTE: A store of type `Irmin.Generic_key.S` does not currently expose
+      (* NOTE: A store of type `Brassaia.Generic_key.S` does not currently expose
          functions for building nodes / commits with non-existent children, due to
          the need to have _keys_ for all store pointers.
 
@@ -2337,7 +2340,7 @@ module Make (S : Generic_key) = struct
 
   let test_pre_hash_collisions x () =
     let pre_hash_of ty =
-      let f = Irmin.Type.(pre_hash ty |> unstage) in
+      let f = Brassaia.Type.(pre_hash ty |> unstage) in
       fun x ->
         let buf = Buffer.create 0 in
         f x (Buffer.add_string buf);
@@ -2350,7 +2353,7 @@ module Make (S : Generic_key) = struct
           let* acc = S.Tree.add acc [ s ] s in
           add_entries acc (i - 1)
     in
-    let equal_hash = Irmin.Type.(equal S.Hash.t |> unstage) in
+    let equal_hash = Brassaia.Type.(equal S.Hash.t |> unstage) in
     let test create_tree repo =
       let* tree = create_tree () in
       let* c = S.Commit.v repo ~info:S.Info.empty ~parents:[] tree in
@@ -2376,7 +2379,7 @@ module Make (S : Generic_key) = struct
           "node pre-hash attack succeeded. pre-hash is \"%s\". backend node is \
            %a."
           (String.escaped node_ph)
-          (Irmin.Type.pp S.Backend.Node.Val.t)
+          (Brassaia.Type.pp S.Backend.Node.Val.t)
           node_b;
 
       let* blob_k =
@@ -2388,7 +2391,7 @@ module Make (S : Generic_key) = struct
           "commit pre-hash attack succeeded. pre-hash is \"%s\". backend \
            commit is %a."
           (String.escaped commit_ph)
-          (Irmin.Type.pp S.Backend.Commit.Val.t)
+          (Brassaia.Type.pp S.Backend.Commit.Val.t)
           commit_b;
 
       S.Backend.Repo.close repo
@@ -2398,7 +2401,7 @@ module Make (S : Generic_key) = struct
     (* with a length one node, *)
     run x (test @@ fun () -> add_entries (S.Tree.empty ()) 1) >>= fun () ->
     (* and with a length >256 node (which is the threshold for unstable inodes
-       in irmin pack). *)
+       in brassaia pack). *)
     run x (test @@ fun () -> add_entries (S.Tree.empty ()) 260)
 end
 
@@ -2418,7 +2421,7 @@ let suite sleep (speed, x) =
   let module T_graph = Store_graph.Make (S) in
   let module T_watch = Store_watch.Make (Log) (Zzz) (S) in
   let with_tree_enabled =
-    (* Disabled for flakiness. See https://github.com/mirage/irmin/issues/1090. *)
+    (* Disabled for flakiness. See https://github.com/mirage/brassaia/issues/1090. *)
     not
       (List.mem ~equal:String.equal (Suite.name x)
          [
@@ -2480,7 +2483,7 @@ let slow_suite (speed, x) =
     ]
     (speed, x)
 
-let run name ?(slow = false) ?random_seed ~sleep ~misc tl =
+let run ~__FILE__ name ?(slow = false) ?random_seed ~sleep ~misc tl =
   let () =
     match random_seed with
     | Some x -> Random.init x
