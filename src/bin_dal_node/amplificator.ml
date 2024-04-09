@@ -156,7 +156,7 @@ let amplify shard_store slot_store node_ctxt cryptobox commitment precomputation
       let*! () = Lwt_io.close oc_parent in
       let*? shards, shard_proofs = res in
       let* () =
-        Store.(Shards.save_and_notify slot_store.shard_store commitment shards)
+        Store.(Shards.write_all slot_store.shard_store commitment shards)
         |> Errors.to_tzresult
       in
       Store.save_shard_proofs slot_store commitment shard_proofs ;

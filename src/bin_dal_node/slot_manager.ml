@@ -139,9 +139,7 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
   let* slot = get_commitment_slot node_store cryptobox commitment in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  let* () =
-    Store.(Shards.save_and_notify node_store.shard_store commitment shards)
-  in
+  let* () = Store.(Shards.write_all node_store.shard_store commitment shards) in
   if with_proof then
     let*? precomputation =
       match shards_proofs_precomputation with

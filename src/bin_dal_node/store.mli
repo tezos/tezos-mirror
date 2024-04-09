@@ -33,10 +33,9 @@ module Shards : sig
       given commitment.  *)
   val are_shards_available : t -> commitment -> int list -> bool tzresult Lwt.t
 
-  (** [save_and_notify store commitment shards] adds to the
-      shard store all the given shards of the given commitment. The
-      [watcher] is notified. *)
-  val save_and_notify :
+  (** [write_all store commitment shards] adds to the shard store all the given
+      shards of the given commitment. *)
+  val write_all :
     t -> commitment -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
 
   (** [read_value store commitment shard_index] returns the associated

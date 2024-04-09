@@ -604,7 +604,7 @@ let daemonize handlers =
 let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
   let open Gossipsub in
   let shards_handler ({shard_store; _} : Store.t) =
-    let save_and_notify = Store.Shards.save_and_notify shard_store in
+    let save_and_notify = Store.Shards.write_all shard_store in
     fun Types.Message.{share; _}
         Types.Message_id.{commitment; shard_index; level; slot_index; _} ->
       let open Lwt_result_syntax in

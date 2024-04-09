@@ -114,7 +114,7 @@ module Shards = struct
       (KVS.value_exists store file_layout commitment)
       shard_indexes
 
-  let save_and_notify shards_store commitment shards =
+  let write_all shards_store commitment shards =
     let open Lwt_result_syntax in
     let shards =
       Seq.map
