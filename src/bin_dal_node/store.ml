@@ -32,6 +32,14 @@ module Irmin = StoreMaker.Make (Irmin.Contents.String)
 
 type irmin = Irmin.t
 
+let trace_decoding_error ~data_kind ~tztrace_of_error r =
+  let open Result_syntax in
+  match r with
+  | Ok r -> return r
+  | Error err ->
+      let tztrace = tztrace_of_error err in
+      fail @@ `Decoding_failed (data_kind, tztrace)
+
 module Stores_dirs = struct
   let shard = "shard_store"
 
@@ -245,14 +253,6 @@ let init config =
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;
     }
-
-let trace_decoding_error ~data_kind ~tztrace_of_error r =
-  let open Result_syntax in
-  match r with
-  | Ok r -> return r
-  | Error err ->
-      let tztrace = tztrace_of_error err in
-      fail @@ `Decoding_failed (data_kind, tztrace)
 
 let tztrace_of_read_error read_err =
   [Exn (Data_encoding.Binary.Read_error read_err)]
