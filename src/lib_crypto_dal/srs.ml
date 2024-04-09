@@ -183,7 +183,7 @@ module Internal_for_tests = struct
   end
 
   let print_verifier_srs_from_file ?(max_srs_size = Zcash_srs.max_srs_g1_size)
-      ~srs_g1_path ~srs_g2_path () =
+      ~srs_g1_path ~srs_g2_path ~dest_path () =
     let params =
       Print.
         {
@@ -215,12 +215,16 @@ module Internal_for_tests = struct
             (Srs_g1.get srs_g1 i |> G1.to_compressed_bytes |> Hex.of_bytes
            |> Hex.show))
     in
-    Printf.printf
+    let oc = open_out dest_path in
+    Printf.fprintf
+      oc
       "\n\nlet srs_g1 = [|\n  %s\n|] |> read_srs_g1"
       (String.concat " ;\n  " @@ srs1) ;
-    Printf.printf
+    Printf.fprintf
+      oc
       "\n\nlet srs_g2 = [\n  %s\n] |> read_srs_g2"
       (String.concat " ;\n  " @@ srs2) ;
+    close_out oc ;
     return_unit
 end
 

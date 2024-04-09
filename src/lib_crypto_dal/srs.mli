@@ -90,12 +90,14 @@ module Internal_for_tests : sig
         format. Run with
          [let _ = Lwt_main.run
            @@ Srs.Internal_for_tests.(
-            print_verifier_srs_from_file ~zcash_g1_path ~zcash_g2_path) ()]
-        This function can be used to add points in srs_g1 & srs_g2 in Zcash_srs *)
+            print_verifier_srs_from_file ~srs_g1_path ~srs_g2_path ~dest_path) ()]
+        This function writes points of srs_g1 & srs_g2 in [dest_path] that can
+        be added in Zcash_srs *)
   val print_verifier_srs_from_file :
     ?max_srs_size:int ->
     srs_g1_path:string ->
     srs_g2_path:string ->
+    dest_path:string ->
     unit ->
     (unit, [> `End_of_file of string | `Invalid_point of int]) result Lwt.t
 end
