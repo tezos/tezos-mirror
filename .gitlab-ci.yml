@@ -7,7 +7,7 @@ stages:
 .default_matrix: &default_matrix
     matrix:
       - ARCH: ["amd64", "arm64"]
-        OCTEZ_BRANCH: ["v20-release", "master"]
+        OCTEZ_BRANCH: ["octez-v20.0-rc1", "master"]
 
 fmt:
   stage: build
@@ -89,12 +89,12 @@ build:
 #   variables:
 #     ARCHIVE: "binaries-amd64-v19.0.zip"
 
-release:amd64:v20-release:
+release:amd64:octez-v20.0-rc1:
   stage: deploy
   extends: .release
-  dependencies: ["build: [amd64, v20-release]"]
+  dependencies: ["build: [amd64, octez-v20.0-rc1]"]
   variables:
-    ARCHIVE: "binaries-amd64-v20-release.zip"
+    ARCHIVE: "binaries-amd64-octez-v20.0-rc1.zip"
 
 
 
@@ -126,12 +126,12 @@ release:amd64:master:
 #   variables:
 #     ARCHIVE: "binaries-arm64-v19.0.zip"
 
-release:arm64:v20-release:
+release:arm64:octez-v20.0-rc1:
   stage: deploy
   extends: .release
-  dependencies: ["build: [arm64, v20-release]"]
+  dependencies: ["build: [arm64, octez-v20.0-rc1]"]
   variables:
-    ARCHIVE: "binaries-arm64-v20-release.zip"
+    ARCHIVE: "binaries-arm64-octez-v20.0-rc1.zip"
 
 # release:arm64:v19.1:
 #   stage: deploy
@@ -202,12 +202,12 @@ release:arm64:master:
 #     ARCH: "amd64"
 #     OCTEZ_BRANCH: "v19.0"
 
-docker:amd64:v20-release:
+docker:amd64:octez-v20.0-rc1:
   extends: .docker-push
-  dependencies: ["build: [amd64, v20-release]"]
+  dependencies: ["build: [amd64, octez-v20.0-rc1]"]
   variables:
     ARCH: "amd64"
-    OCTEZ_BRANCH: "v20-release"
+    OCTEZ_BRANCH: "octez-v20.0-rc1"
 
 # docker:amd64:v19.1:
 #   extends: .docker-push
@@ -237,12 +237,12 @@ docker:amd64:master:
 #     ARCH: "arm64"
 #     OCTEZ_BRANCH: "v19.0"
 
-docker:arm64:v20-release:
+docker:arm64:octez-v20.0-rc1:
   extends: .docker-push
-  dependencies: ["build: [arm64, v20-release]"]
+  dependencies: ["build: [arm64, octez-v20.0-rc1]"]
   variables:
     ARCH: "arm64"
-    OCTEZ_BRANCH: "v20-release"
+    OCTEZ_BRANCH: "octez-v20.0-rc1"
 
 # docker:arm64:v19.1:
 #   extends: .docker-push
@@ -311,15 +311,15 @@ docker:arm64:master:
 #   variables:
 #     OCTEZ_BRANCH: "v19.0"
 
-manifest:v20-release:
+manifest:octez-v20.0-rc1:
   extends: .manifest
   needs:
-    - job: "docker:amd64:v20-release"
+    - job: "docker:amd64:octez-v20.0-rc1"
       artifacts: false
-    - job: "docker:arm64:v20-release"
+    - job: "docker:arm64:octez-v20.0-rc1"
       artifacts: false
   variables:
-    OCTEZ_BRANCH: "v20-release"
+    OCTEZ_BRANCH: "octez-v20.0-rc1"
 
 # manifest:v19.1:
 #   extends: .manifest
