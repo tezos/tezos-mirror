@@ -23,17 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This file contains ZCash SRS for DAL’s verifier
-   This SRS is suitable for following parameters :
-     slot_size between 2¹⁵ and 2²⁰
-     page_size = 2¹²
-     redundancy_factor between 2¹ and 2⁴
-     nb_shards = 2⁶, 2¹¹ or 2¹²
-   It can also handle the following parameters configuration :
-     slot_size = 126 944
-     page_size = 3 967
-     redundancy_factor = 8
-     nb_shards = 512
+(* This file contains ZCash SRS for DAL’s verifier, generated with
+   [Srs.Internal_for_tests.print_verifier_srs_from_file]. The sets of
+   parameters suitable for this SRS are those defined in this function.
 *)
 
 open Kzg.Bls
