@@ -192,11 +192,6 @@ let save_shards store cryptobox commitment shards =
   Store.(Shards.write_all store.shard_store commitment shards)
   |> Errors.to_tzresult
 
-let get_shard store commitment shard_id =
-  let open Lwt_result_syntax in
-  let* share = Store.Shards.read_value store commitment shard_id in
-  return {Cryptobox.share; index = shard_id}
-
 let with_commitment_as_seq commitment shards_indices =
   Seq.map (fun index -> (commitment, index)) @@ List.to_seq shards_indices
 
@@ -233,7 +228,7 @@ let get_slot cryptobox store commitment =
       let provided = minimal_number_of_shards - remaining in
       tzfail @@ Missing_shards {provided; required = minimal_number_of_shards}
     else
-      let*! res = get_shard store commitment shard_id in
+      let*! res = Store.Shards.read store commitment shard_id in
       match res with
       | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
       | Error _ -> loop acc (shard_id + 1) remaining

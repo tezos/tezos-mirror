@@ -143,8 +143,10 @@ module Shards = struct
     |> Seq.map (fun shard_index -> (commitment, shard_index))
     |> KVS.read_values shards_store file_layout
 
-  let read_value store commitment shard_id =
-    KVS.read_value store file_layout commitment shard_id
+  let read store commitment shard_id =
+    let open Lwt_result_syntax in
+    let* share = KVS.read_value store file_layout commitment shard_id in
+    return {Cryptobox.share; index = shard_id}
 
   let read_values store keys = KVS.read_values store file_layout keys
 

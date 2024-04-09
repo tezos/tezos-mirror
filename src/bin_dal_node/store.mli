@@ -38,9 +38,9 @@ module Shards : sig
   val write_all :
     t -> commitment -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
 
-  (** [read_value store commitment shard_index] returns the associated
-     share when the shard is available or an error when it is not.  *)
-  val read_value : t -> commitment -> int -> share tzresult Lwt.t
+  (** [read store commitment shard_id] gets the shard associated to
+    [commitment] at the range [shard_id]. *)
+  val read : t -> Cryptobox.commitment -> int -> Cryptobox.shard tzresult Lwt.t
 
   (** Same as [read_value] but for a sequence of shards. *)
   val read_values :
