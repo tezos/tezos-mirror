@@ -81,6 +81,13 @@ pub struct XRegToFRegArgs {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub struct XRegToFRegArgsWithRounding {
+    pub rd: FRegister,
+    pub rs1: XRegister,
+    pub rm: InstrRoundingMode,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct FCmpArgs {
     pub rs1: FRegister,
     pub rs2: FRegister,
@@ -307,6 +314,10 @@ pub enum Instr {
     Fnmadds(FR3ArgsWithRounding),
     Flw(FLoadArgs),
     Fsw(FStoreArgs),
+    Fcvtsw(XRegToFRegArgsWithRounding),
+    Fcvtswu(XRegToFRegArgsWithRounding),
+    Fcvtsl(XRegToFRegArgsWithRounding),
+    Fcvtslu(XRegToFRegArgsWithRounding),
     Fsgnjs(FRArgs),
     Fsgnjns(FRArgs),
     Fsgnjxs(FRArgs),
@@ -331,6 +342,10 @@ pub enum Instr {
     Fnmaddd(FR3ArgsWithRounding),
     Fld(FLoadArgs),
     Fsd(FStoreArgs),
+    Fcvtdw(XRegToFRegArgsWithRounding),
+    Fcvtdwu(XRegToFRegArgsWithRounding),
+    Fcvtdl(XRegToFRegArgsWithRounding),
+    Fcvtdlu(XRegToFRegArgsWithRounding),
     Fsgnjd(FRArgs),
     Fsgnjnd(FRArgs),
     Fsgnjxd(FRArgs),
@@ -464,6 +479,10 @@ impl Instr {
             | Mulw(_)
             | FmvXW(_)
             | FmvWX(_)
+            | Fcvtsw(_)
+            | Fcvtswu(_)
+            | Fcvtsl(_)
+            | Fcvtslu(_)
             | Fsgnjs(_)
             | Fsgnjns(_)
             | Fsgnjxs(_)
@@ -486,6 +505,10 @@ impl Instr {
             | Fsw(_)
             | FmvXD(_)
             | FmvDX(_)
+            | Fcvtdw(_)
+            | Fcvtdwu(_)
+            | Fcvtdl(_)
+            | Fcvtdlu(_)
             | Fsgnjd(_)
             | Fsgnjnd(_)
             | Fsgnjxd(_)
@@ -820,6 +843,10 @@ impl fmt::Display for Instr {
             Fnmadds(args) => r4_instr!(f, "fnmadd.s", args),
             Flw(args) => i_instr_load!(f, "flw", args),
             Fsw(args) => s_instr!(f, "fsw", args),
+            Fcvtsw(args) => f_s1_instr!(f, "fcvt.s.w", args),
+            Fcvtswu(args) => f_s1_instr!(f, "fcvt.s.wu", args),
+            Fcvtsl(args) => f_s1_instr!(f, "fcvt.s.l", args),
+            Fcvtslu(args) => f_s1_instr!(f, "fcvt.s.lu", args),
             Fsgnjs(args) => r_instr!(f, "fsgnj.s", args),
             Fsgnjns(args) => r_instr!(f, "fsgnjn.s", args),
             Fsgnjxs(args) => r_instr!(f, "fsgnjx.s", args),
@@ -844,6 +871,10 @@ impl fmt::Display for Instr {
             Fnmaddd(args) => r4_instr!(f, "fnmadd.d", args),
             Fld(args) => i_instr_load!(f, "fld", args),
             Fsd(args) => s_instr!(f, "fsd", args),
+            Fcvtdw(args) => f_s1_instr!(f, "fcvt.d.w", args),
+            Fcvtdwu(args) => f_s1_instr!(f, "fcvt.d.wu", args),
+            Fcvtdl(args) => f_s1_instr!(f, "fcvt.d.l", args),
+            Fcvtdlu(args) => f_s1_instr!(f, "fcvt.d.lu", args),
             Fsgnjd(args) => r_instr!(f, "fsgnj.d", args),
             Fsgnjnd(args) => r_instr!(f, "fsgnjn.d", args),
             Fsgnjxd(args) => r_instr!(f, "fsgnjx.d", args),

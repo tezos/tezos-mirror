@@ -276,6 +276,35 @@ where
         self.f_arith_3(rs1, rs2, rs3, rm, rd, f)
     }
 
+    /// `FCVT.int.fmt` instruction.
+    ///
+    /// Converts a 32 or 64 bit float, into a 32 or 64 bit integer, with rounding.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fcvt_int_fmt<F: FloatExt, T>(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+        cast: fn(u64) -> T,
+        cvt: fn(T, Round) -> StatusAnd<F>,
+    ) -> Result<(), Exception> {
+        let rval = self.xregisters.read(rs1);
+        let rval = cast(rval);
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        let StatusAnd { status, value } = cvt(rval, rm);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, value.into());
+
+        Ok(())
+    }
+
     /// `FSGNJ.*` instruction.
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.

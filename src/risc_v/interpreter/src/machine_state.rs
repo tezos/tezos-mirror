@@ -161,6 +161,11 @@ macro_rules! run_f_x_instr {
         $state.hart.$run_fn($args.rs1, $args.rd);
         Ok(Add($instr.width()))
     }};
+
+    ($state: ident, $instr: ident, $args: ident, $run_fn: ident, $rm:ident) => {{
+        $state.hart.$run_fn($args.rs1, $args.$rm, $args.rd)?;
+        Ok(Add($instr.width()))
+    }};
 }
 
 /// Runs a F/D instruction over the hart state, touching both F & fcsr registers.
@@ -353,6 +358,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Fnmadds(args) => run_f_r_instr!(self, instr, args, run_fnmadd_s, rs2, rs3, rm),
             Instr::Flw(args) => run_load_instr!(self, instr, args, run_flw),
             Instr::Fsw(args) => run_store_instr!(self, instr, args, run_fsw),
+            Instr::Fcvtsw(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_w, rm),
+            Instr::Fcvtswu(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_wu, rm),
+            Instr::Fcvtsl(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_l, rm),
+            Instr::Fcvtslu(args) => run_f_x_instr!(self, instr, args, run_fcvt_s_lu, rm),
             Instr::Fsgnjs(args) => run_f_r_instr!(self, instr, args, run_fsgnj_s),
             Instr::Fsgnjns(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_s),
             Instr::Fsgnjxs(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_s),
@@ -377,6 +386,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Fnmaddd(args) => run_f_r_instr!(self, instr, args, run_fnmadd_d, rs2, rs3, rm),
             Instr::Fld(args) => run_load_instr!(self, instr, args, run_fld),
             Instr::Fsd(args) => run_store_instr!(self, instr, args, run_fsd),
+            Instr::Fcvtdw(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_w, rm),
+            Instr::Fcvtdwu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_wu, rm),
+            Instr::Fcvtdl(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_l, rm),
+            Instr::Fcvtdlu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_lu, rm),
             Instr::Fsgnjd(args) => run_f_r_instr!(self, instr, args, run_fsgnj_d),
             Instr::Fsgnjnd(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_d),
             Instr::Fsgnjxd(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_d),

@@ -217,6 +217,60 @@ where
         self.run_fnmadd::<Double>(rs1, rs2, rs3, rm, rd)
     }
 
+    /// `FCVT.D.W` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_w(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(
+            rs1,
+            rm,
+            rd,
+            |u| u as i64 as i32 as i128,
+            Double::from_i128_r,
+        )
+    }
+
+    /// `FCVT.D.WU` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_wu(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u32 as u128, Double::from_u128_r)
+    }
+
+    /// `FCVT.D.W` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_l(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i64 as i128, Double::from_i128_r)
+    }
+
+    /// `FCVT.D.WU` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_lu(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u128, Double::from_u128_r)
+    }
+
     /// `FSGNJ.D` R-type instruction.
     ///
     /// See [Self::run_fsgnj].
