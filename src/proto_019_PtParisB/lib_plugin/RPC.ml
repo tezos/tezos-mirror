@@ -4173,6 +4173,17 @@ module Delegates = struct
         ~query:RPC_query.empty
         ~output:Tez.encoding
         RPC_path.(path / "delegated_balance")
+
+    let unstaked_frozen_deposits =
+      RPC_service.get_service
+        ~description:
+          "Returns, for each cycle, the sum of unstaked-but-frozen deposits \
+           for this cycle. Cycles go from the last unslashable cycle to the \
+           current cycle."
+        ~query:RPC_query.empty
+        ~output:
+          (Data_encoding.list Delegate_services.deposit_per_cycle_encoding)
+        RPC_path.(path / "unstaked_frozen_deposits")
   end
 
   let unstake_requests ctxt pkh =
@@ -4287,12 +4298,34 @@ module Delegates = struct
       S.delegated_balance
       (fun ctxt pkh () () ->
         let* () = check_delegate_registered ctxt pkh in
-        overrided_delegated_balance ctxt pkh)
+        overrided_delegated_balance ctxt pkh) ;
+    Registration.register1
+      ~chunked:false
+      S.unstaked_frozen_deposits
+      (fun ctxt pkh () () ->
+        let* () = check_delegate_registered ctxt pkh in
+        let ctxt_cycle = (Alpha_context.Level.current ctxt).cycle in
+        let last_unslashable_cycle =
+          Option.value ~default:Cycle.root
+          @@ Cycle.sub
+               ctxt_cycle
+               (Constants.slashable_deposits_period ctxt
+               + Constants_repr.max_slashing_period)
+        in
+        let cycles = Cycle.(last_unslashable_cycle ---> ctxt_cycle) in
+        List.map_es
+          (fun cycle ->
+            let* deposit = Unstaked_frozen_deposits.balance ctxt pkh cycle in
+            return Delegate_services.{cycle; deposit})
+          cycles)
 
   let delegated_balance ctxt block pkh =
     RPC_context.make_call1 S.delegated_balance ctxt block pkh () ()
 
   let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
+
+  let unstaked_frozen_deposits ctxt block pkh =
+    RPC_context.make_call1 S.unstaked_frozen_deposits ctxt block pkh () ()
 end
 
 module Staking = struct
