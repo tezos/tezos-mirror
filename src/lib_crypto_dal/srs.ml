@@ -174,7 +174,7 @@ module Internal_for_tests = struct
         List.sort_uniq Int.compare (page_shards @ commitment_srs)
         |> List.filter (fun i -> i > 0) )
 
-    let _generate_all_poly_lengths ~max_srs_size =
+    let generate_all_poly_lengths ~max_srs_size =
       List.fold_left
         (fun (acc_size, acc_lengths) p ->
           let size, lengths = generate_poly_lengths ~max_srs_size p in
@@ -184,7 +184,8 @@ module Internal_for_tests = struct
 
   let print_verifier_srs_from_file ?(max_srs_size = Zcash_srs.max_srs_g1_size)
       ~srs_g1_path ~srs_g2_path ~dest_path () =
-    let params =
+    (* Some "historical" parameters that may be used in tests *)
+    let base_params =
       Print.
         {
           redundancy = [1; 2; 3; 4] |> List.map (Int.shift_left 1);
@@ -193,9 +194,35 @@ module Internal_for_tests = struct
           shards = [11; 12] |> List.map (Int.shift_left 1);
         }
     in
+    (* Mainnet parameters *)
+    let default_params =
+      Print.{slot = [126_944]; page = [3967]; redundancy = [8]; shards = [512]}
+    in
+    (* Some additionnal parameters used in tests *)
+    let test_params =
+      Print.
+        {
+          slot = [63_472; 126_944; 253_888];
+          page = [3967];
+          redundancy = [2; 4; 8];
+          shards = [256];
+        }
+    in
+    (* Some additionnal parameters that are powers of 2 used in tests *)
+    let test_params_pow_2 =
+      Print.
+        {
+          redundancy = [3] |> List.map (Int.shift_left 1);
+          slot = [11; 15] |> List.map (Int.shift_left 1);
+          page = [7; 8] |> List.map (Int.shift_left 1);
+          shards = [6; 8] |> List.map (Int.shift_left 1);
+        }
+    in
     let open Lwt_result_syntax in
     let srs_g1_size, lengths =
-      Print.generate_poly_lengths ~max_srs_size params
+      Print.generate_all_poly_lengths
+        ~max_srs_size
+        [base_params; default_params; test_params; test_params_pow_2]
     in
     let* srs_g1, srs_g2 = read_srs ~srs_g1_path ~srs_g2_path () in
     let srs2 =
