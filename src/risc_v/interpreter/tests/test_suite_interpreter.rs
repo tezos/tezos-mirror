@@ -177,27 +177,27 @@ test_case!(#[ignore], test_suite_rv64uc_v_rvc, "rv64uc-v-rvc");
 test_case!(test_suite_rv64ud_p_fadd, "rv64ud-p-fadd");
 test_case!(test_suite_rv64ud_p_fclass, "rv64ud-p-fclass");
 test_case!(test_suite_rv64ud_p_fcmp, "rv64ud-p-fcmp");
-test_case!(#[ignore], test_suite_rv64ud_p_fcvt, "rv64ud-p-fcvt");
+test_case!(test_suite_rv64ud_p_fcvt, "rv64ud-p-fcvt");
 test_case!(#[ignore], test_suite_rv64ud_p_fcvt_w, "rv64ud-p-fcvt_w");
 test_case!(test_suite_rv64ud_p_fdiv, "rv64ud-p-fdiv");
 test_case!(test_suite_rv64ud_p_fmadd, "rv64ud-p-fmadd");
 test_case!(test_suite_rv64ud_p_fmin, "rv64ud-p-fmin");
 test_case!(test_suite_rv64ud_p_ldst, "rv64ud-p-ldst");
 test_case!(test_suite_rv64ud_p_move, "rv64ud-p-move");
-test_case!(#[ignore], test_suite_rv64ud_p_recoding, "rv64ud-p-recoding");
+test_case!(test_suite_rv64ud_p_recoding, "rv64ud-p-recoding");
 test_case!(test_suite_rv64ud_p_structural, "rv64ud-p-structural");
 
 test_case!(test_suite_rv64ud_v_fadd, "rv64ud-v-fadd");
 test_case!(test_suite_rv64ud_v_fclass, "rv64ud-v-fclass");
 test_case!(test_suite_rv64ud_v_fcmp, "rv64ud-v-fcmp");
-test_case!(#[ignore], test_suite_rv64ud_v_fcvt, "rv64ud-v-fcvt");
+test_case!(test_suite_rv64ud_v_fcvt, "rv64ud-v-fcvt");
 test_case!(#[ignore], test_suite_rv64ud_v_fcvt_w, "rv64ud-v-fcvt_w");
 test_case!(test_suite_rv64ud_v_fdiv, "rv64ud-v-fdiv");
 test_case!(test_suite_rv64ud_v_fmadd, "rv64ud-v-fmadd");
 test_case!(test_suite_rv64ud_v_fmin, "rv64ud-v-fmin");
 test_case!(test_suite_rv64ud_v_ldst, "rv64ud-v-ldst");
 test_case!(test_suite_rv64ud_v_move, "rv64ud-v-move");
-test_case!(#[ignore], test_suite_rv64ud_v_recoding, "rv64ud-v-recoding");
+test_case!(test_suite_rv64ud_v_recoding, "rv64ud-v-recoding");
 test_case!(test_suite_rv64ud_v_structural, "rv64ud-v-structural");
 
 // RV64-UF

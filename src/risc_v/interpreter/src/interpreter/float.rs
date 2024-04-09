@@ -14,7 +14,7 @@ use crate::{
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{Float, Round, Status, StatusAnd};
+use rustc_apfloat::{Float, FloatConvert, Round, Status, StatusAnd};
 use std::ops::Neg;
 
 pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {
@@ -295,6 +295,35 @@ where
         let rm = self.f_rounding_mode(rm)?;
 
         let StatusAnd { status, value } = cvt(rval, rm);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, value.into());
+
+        Ok(())
+    }
+
+    /// `FCVT.fmt.fmt` instruction.
+    ///
+    /// Conversion between f32/f64 values.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fcvt_fmt_fmt<F: FloatExt + FloatConvert<T>, T: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        let rval: F = self.fregisters.read(rs1).into();
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        // ignored - all information comes from status.
+        let mut loses_info = false;
+
+        let StatusAnd { status, value } = rval.convert_r(rm, &mut loses_info).map(T::canonicalise);
 
         if status != Status::OK {
             self.csregisters.set_exception_flag_status(status);

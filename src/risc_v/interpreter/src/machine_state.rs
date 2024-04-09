@@ -390,6 +390,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Fcvtdwu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_wu, rm),
             Instr::Fcvtdl(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_l, rm),
             Instr::Fcvtdlu(args) => run_f_x_instr!(self, instr, args, run_fcvt_d_lu, rm),
+            Instr::Fcvtds(args) => run_f_r_instr!(self, instr, args, run_fcvt_d_s, rm),
+            Instr::Fcvtsd(args) => run_f_r_instr!(self, instr, args, run_fcvt_s_d, rm),
             Instr::Fsgnjd(args) => run_f_r_instr!(self, instr, args, run_fsgnj_d),
             Instr::Fsgnjnd(args) => run_f_r_instr!(self, instr, args, run_fsgnjn_d),
             Instr::Fsgnjxd(args) => run_f_r_instr!(self, instr, args, run_fsgnjx_d),

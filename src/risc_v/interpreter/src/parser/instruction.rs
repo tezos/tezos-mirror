@@ -346,6 +346,8 @@ pub enum Instr {
     Fcvtdwu(XRegToFRegArgsWithRounding),
     Fcvtdl(XRegToFRegArgsWithRounding),
     Fcvtdlu(XRegToFRegArgsWithRounding),
+    Fcvtds(FR1ArgWithRounding),
+    Fcvtsd(FR1ArgWithRounding),
     Fsgnjd(FRArgs),
     Fsgnjnd(FRArgs),
     Fsgnjxd(FRArgs),
@@ -509,6 +511,8 @@ impl Instr {
             | Fcvtdwu(_)
             | Fcvtdl(_)
             | Fcvtdlu(_)
+            | Fcvtds(_)
+            | Fcvtsd(_)
             | Fsgnjd(_)
             | Fsgnjnd(_)
             | Fsgnjxd(_)
@@ -875,6 +879,8 @@ impl fmt::Display for Instr {
             Fcvtdwu(args) => f_s1_instr!(f, "fcvt.d.wu", args),
             Fcvtdl(args) => f_s1_instr!(f, "fcvt.d.l", args),
             Fcvtdlu(args) => f_s1_instr!(f, "fcvt.d.lu", args),
+            Fcvtds(args) => r2_instr!(f, "fcvt.d.s", args),
+            Fcvtsd(args) => r2_instr!(f, "fcvt.s.d", args),
             Fsgnjd(args) => r_instr!(f, "fsgnj.d", args),
             Fsgnjnd(args) => r_instr!(f, "fsgnjn.d", args),
             Fsgnjxd(args) => r_instr!(f, "fsgnjx.d", args),
