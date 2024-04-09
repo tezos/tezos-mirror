@@ -17,9 +17,9 @@ tezos_client=./octez-client
 smart_rollup_node=./octez-smart-rollup-node
 
 # Protocol configuration.
-protocol_hash=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-protocol_parameters=src/proto_alpha/parameters/sandbox-parameters.json
-protocol_name=alpha
+protocol_hash=PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5
+protocol_parameters=src/proto_019_PtParisA/parameters/sandbox-parameters.json
+protocol_name=paris
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
@@ -36,10 +36,10 @@ proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
 
 # Generated files.
-openapi_json=docs/api/rpc-openapi-dev.json
-proto_openapi_json=docs/api/$protocol_name-openapi-dev.json
-mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-dev.json
-smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-dev.json
+openapi_json=docs/api/rpc-openapi-rc.json
+proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
+smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
 
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)
@@ -48,7 +48,7 @@ version=$(dune exec octez-version -- --full-with-commit)
 $tezos_node config init --data-dir $data_dir \
   --network sandbox \
   --expected-pow 0 \
-  --local-rpc-addr localhost:$rpc_port \
+  --rpc-addr localhost:$rpc_port \
   --no-bootstrap-peer \
   --synchronisation-threshold 0
 $tezos_node identity generate --data-dir $data_dir
