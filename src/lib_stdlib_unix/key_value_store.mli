@@ -25,6 +25,19 @@
 
 open Error_monad
 
+type error +=
+  | Missing_stored_kvs_data of {filepath : string; index : int}
+  | Wrong_encoded_value_size of {
+      file : string;
+      index : int;
+      expected : int;
+      got : int;
+    }
+  | Closed of {action : string}
+  | Corrupted_data of {action : string; filepath : string; index : int}
+  | Encoding_failed of {filepath : string; index : int}
+  | Decoding_failed of {filepath : string; index : int}
+
 (** {1 Key-value store}
 
     This module defines a simple key-value store. The design is
