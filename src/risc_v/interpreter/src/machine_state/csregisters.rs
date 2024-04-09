@@ -9,10 +9,10 @@ pub mod satp;
 pub mod xstatus;
 
 use self::satp::{SvLength, TranslationAlgorithm};
-use super::{bus::Address, mode::TrapMode};
+use super::{bus::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
     machine_state::mode::Mode,
-    state_backend::{self as backend, Region},
+    state_backend::{self as backend, Manager, Region},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
 };
 use num_enum::TryFromPrimitive;
@@ -1072,7 +1072,7 @@ pub type Result<R> = core::result::Result<R, Exception>;
 /// Throws [`Exception::IllegalInstruction`] in case of insufficient privilege.
 /// Section 2.1 - privileged spec
 #[inline(always)]
-pub fn check_privilege(reg: CSRegister, mode: Mode) -> Result<()> {
+fn check_privilege(reg: CSRegister, mode: Mode) -> Result<()> {
     if mode.privilege() < reg.privilege() {
         return Err(Exception::IllegalInstruction);
     }
@@ -1091,6 +1091,28 @@ pub fn check_write(reg: CSRegister) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Check if access to SATP is valid, conforming to TVM flag.
+///
+/// See section 3.1.6.5
+fn check_satp_access(csr: CSRegister, tvm_field: bool) -> Result<()> {
+    if tvm_field && csr == CSRegister::satp {
+        return Err(Exception::IllegalInstruction);
+    }
+
+    Ok(())
+}
+
+/// Perform general checks on all read or write operations on a CSR.
+///
+/// Examples of checks: Privilege checks, SATP trapping
+pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> Result<()> {
+    let mode = hart_state.mode.read();
+    check_privilege(csr, mode)?;
+    let mstatus = hart_state.csregisters.read(CSRegister::mstatus);
+    let tvm = xstatus::get_TVM(mstatus);
+    check_satp_access(csr, tvm)
 }
 
 /// CSRs

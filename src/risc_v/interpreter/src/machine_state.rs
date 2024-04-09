@@ -489,6 +489,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         );
 
         let new_pc = self.hart.take_trap(interrupt, current_pc);
+        // Commit pc, it may be read by other instructions in this step
+        self.hart.pc.write(new_pc);
         Ok(new_pc)
     }
 
