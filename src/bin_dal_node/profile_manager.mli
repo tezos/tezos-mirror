@@ -80,7 +80,7 @@ val get_profiles : t -> Types.profiles
 (** See {!Services.get_attestable_slots} *)
 val get_attestable_slots :
   shard_indices:int list ->
-  Store.node_store ->
+  Store.t ->
   Dal_plugin.proto_parameters ->
   attested_level:int32 ->
   (Types.attestable_slots, [Errors.decoding | Errors.other]) result Lwt.t

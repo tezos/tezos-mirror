@@ -139,9 +139,7 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
   let* slot = get_commitment_slot node_store cryptobox commitment in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  let* () =
-    Store.(Shards.save_and_notify node_store.shard_store commitment shards)
-  in
+  let* () = Store.(Shards.write_all node_store.shard_store commitment shards) in
   if with_proof then
     let*? precomputation =
       match shards_proofs_precomputation with
@@ -245,7 +243,7 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
 (** This function publishes the shards of a commitment that is waiting for
     attestion on L1 if this node has those shards on disk and their proofs in
     memory. *)
-let publish_slot_data ~level_committee (node_store : Store.node_store) gs_worker
+let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
     cryptobox proto_parameters commitment published_level slot_index =
   let open Lwt_result_syntax in
   match

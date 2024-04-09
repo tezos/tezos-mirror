@@ -12,7 +12,7 @@
 
 open Cryptobox
 
-type t (* This is the Irmin part of the store *)
+type irmin (* This is the Irmin part of the store *)
 
 module Value_size_hooks : sig
   (** [set_share_size size] sets the size of shard shares. This
@@ -33,19 +33,14 @@ module Shards : sig
       given commitment.  *)
   val are_shards_available : t -> commitment -> int list -> bool tzresult Lwt.t
 
-  (** [save_and_notify store commitment shards] adds to the
-      shard store all the given shards of the given commitment. The
-      [watcher] is notified. *)
-  val save_and_notify :
+  (** [write_all store commitment shards] adds to the shard store all the given
+      shards of the given commitment. *)
+  val write_all :
     t -> commitment -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
 
-  (** [read_value store commitment shard_index] returns the associated
-     share when the shard is available or an error when it is not.  *)
-  val read_value : t -> commitment -> int -> share tzresult Lwt.t
-
-  (** Same as [read_value] but for a sequence of shards. *)
-  val read_values :
-    t -> (commitment * int) Seq.t -> (commitment * int * share tzresult) Seq_s.t
+  (** [read store commitment shard_id] gets the shard associated to
+    [commitment] at the range [shard_id]. *)
+  val read : t -> Cryptobox.commitment -> int -> Cryptobox.shard tzresult Lwt.t
 
   (** Same as [read_values] but for all possible shards of the given commitment. *)
   val read_all :
@@ -75,8 +70,8 @@ module Shard_proofs_cache : sig
   val find_opt : 'a t -> commitment -> 'a option
 end
 
-type node_store = private {
-  store : t; (* The Irmin part *)
+type t = private {
+  store : irmin; (* The Irmin part *)
   shard_store : Shards.t;
   in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
@@ -85,9 +80,9 @@ type node_store = private {
 (** [save_shard_proofs store commitment shard_proofs] replaces in
       the shard proof cache all the shard proofs for the given
       commitment with the given ones. *)
-val save_shard_proofs : node_store -> commitment -> shard_proof array -> unit
+val save_shard_proofs : t -> commitment -> shard_proof array -> unit
 
-val init : Configuration_file.t -> node_store tzresult Lwt.t
+val init : Configuration_file.t -> t tzresult Lwt.t
 
 module Legacy : sig
   (** The Irmin part of the storage is considered legacy because we
@@ -120,7 +115,7 @@ module Legacy : sig
       slot content, no cryptographic verification is performed by this
       function. *)
   val add_slot_by_commitment :
-    node_store -> Cryptobox.t -> bytes -> commitment -> unit Lwt.t
+    t -> Cryptobox.t -> bytes -> commitment -> unit Lwt.t
 
   (** [associate_slot_id_with_commitment store commitment slot_id]
       adds an entry to the bidirectional mapping between commitments
@@ -130,18 +125,17 @@ module Legacy : sig
       This function is only used by RPCs.
   *)
   val associate_slot_id_with_commitment :
-    node_store -> commitment -> Types.slot_id -> unit Lwt.t
+    t -> commitment -> Types.slot_id -> unit Lwt.t
 
   (** [exists_slot_by_commitment store cryptobox commitment] returns
       true IFF a slot is associated to the given commitment. *)
-  val exists_slot_by_commitment :
-    node_store -> Cryptobox.t -> commitment -> bool Lwt.t
+  val exists_slot_by_commitment : t -> Cryptobox.t -> commitment -> bool Lwt.t
 
   (** [find_slot_by_commitment store cryptobox commitment] returns the
       slot associated to some commitment or an error if no slot is
       associated. *)
   val find_slot_by_commitment :
-    node_store ->
+    t ->
     Cryptobox.t ->
     commitment ->
     (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
@@ -159,7 +153,7 @@ module Legacy : sig
     number_of_slots:int ->
     block_level:int32 ->
     (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
-    node_store ->
+    t ->
     unit tzresult Lwt.t
 
   (** [update_selected_slot_headers_statuses ~block_level
@@ -172,7 +166,7 @@ module Legacy : sig
     attestation_lag:int ->
     number_of_slots:int ->
     int list ->
-    node_store ->
+    t ->
     unit Lwt.t
 
   (** [get_commitment_by_published_level_and_index ~level ~slot_index
@@ -181,7 +175,7 @@ module Legacy : sig
   val get_commitment_by_published_level_and_index :
     level:int32 ->
     slot_index:int ->
-    node_store ->
+    t ->
     ( commitment,
       [> `Decoding_failed of Types.Store.kind * tztrace | `Not_found] )
     result
@@ -197,7 +191,7 @@ module Legacy : sig
     commitment ->
     ?slot_level:int32 ->
     ?slot_index:int ->
-    node_store ->
+    t ->
     ( Types.slot_header list,
       [> `Decoding_failed of Types.Store.kind * tztrace] )
     result
@@ -211,7 +205,7 @@ module Legacy : sig
   val get_published_level_headers :
     published_level:int32 ->
     ?header_status:Types.header_status ->
-    node_store ->
+    t ->
     ( Types.slot_header list,
       [> `Decoding_failed of Types.Store.kind * tztrace] )
     result

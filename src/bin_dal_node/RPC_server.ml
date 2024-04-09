@@ -230,7 +230,7 @@ module Slots_handlers = struct
 
   let get_shard ctxt ((_, commitment), shard_index) () () =
     call_handler1 ctxt (fun {shard_store; _} ->
-        Slot_manager.get_shard shard_store commitment shard_index)
+        Store.Shards.read shard_store commitment shard_index)
 end
 
 module Profile_handlers = struct

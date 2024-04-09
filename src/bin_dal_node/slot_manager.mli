@@ -42,7 +42,7 @@ type error +=
     slots' size given in [cryptobox], or the [slot]'s commitment otherwise.
 *)
 val add_commitment :
-  Store.node_store ->
+  Store.t ->
   Cryptobox.slot ->
   Cryptobox.t ->
   (Cryptobox.commitment, [Errors.decoding | Errors.other]) result Lwt.t
@@ -54,7 +54,7 @@ val add_commitment :
     if there is no entry for [commitment] in [node_store].
 *)
 val associate_slot_id_with_commitment :
-  Store.node_store ->
+  Store.t ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   Types.slot_id ->
@@ -67,7 +67,7 @@ val associate_slot_id_with_commitment :
     if there is no slot content for [commitment] in [node_store].
 *)
 val get_commitment_slot :
-  Store.node_store ->
+  Store.t ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   (slot, [> Errors.decoding | Errors.not_found]) result Lwt.t
@@ -84,7 +84,7 @@ val get_commitment_slot :
     if there is no slot content for [commitment] in [node_store]. *)
 val add_commitment_shards :
   shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation option ->
-  Store.node_store ->
+  Store.t ->
   Cryptobox.t ->
   Cryptobox.commitment ->
   with_proof:bool ->
@@ -110,7 +110,7 @@ val publish_slot_data :
   level_committee:
     (level:int32 ->
     Committee_cache.shard_indexes Signature.Public_key_hash.Map.t tzresult Lwt.t) ->
-  Store.node_store ->
+  Store.t ->
   Gossipsub.Worker.t ->
   Cryptobox.t ->
   Dal_plugin.proto_parameters ->
@@ -126,7 +126,7 @@ val store_slot_headers :
   number_of_slots:int ->
   block_level:int32 ->
   (Dal_plugin.slot_header * Dal_plugin.operation_application_result) list ->
-  Store.node_store ->
+  Store.t ->
   unit tzresult Lwt.t
 
 (** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
@@ -144,7 +144,7 @@ val update_selected_slot_headers_statuses :
   attestation_lag:int ->
   number_of_slots:int ->
   Dal_plugin.slot_index list ->
-  Store.node_store ->
+  Store.t ->
   unit Lwt.t
 
 (** [get_commitment_by_published_level_and_index ~level ~slot_index node_store]
@@ -159,7 +159,7 @@ val update_selected_slot_headers_statuses :
 val get_commitment_by_published_level_and_index :
   level:Types.level ->
   slot_index:Types.slot_index ->
-  Store.node_store ->
+  Store.t ->
   (Cryptobox.commitment, [Errors.decoding | Errors.not_found]) result Lwt.t
 
 (** [get_commitment_headers commitment ?slot_level ?slot_index store] returns
@@ -172,7 +172,7 @@ val get_commitment_headers :
   Cryptobox.commitment ->
   ?slot_level:Types.level ->
   ?slot_index:Types.slot_index ->
-  Store.node_store ->
+  Store.t ->
   (Types.slot_header list, Errors.decoding) result Lwt.t
 
 (** [get_published_level_headers ~published_level ?header_status store] returns
@@ -185,5 +185,5 @@ val get_commitment_headers :
 val get_published_level_headers :
   published_level:Types.level ->
   ?header_status:Types.header_status ->
-  Store.node_store ->
+  Store.t ->
   (Types.slot_header list, Errors.decoding) result Lwt.t
