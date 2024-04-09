@@ -15,6 +15,7 @@ cd "$(dirname "$0")"/../.. || exit
 tezos_node=./octez-node
 tezos_client=./octez-client
 smart_rollup_node=./octez-smart-rollup-node
+dal_node=./octez-dal-node
 
 # Protocol configuration.
 protocol_hash=PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5
@@ -26,20 +27,26 @@ activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dH
 
 # RPC port.
 rpc_port=8732
+dal_rpc_port=10732
 
 # Temporary files.
 tmp=openapi-tmp
 data_dir=$tmp/octez-sandbox
 client_dir=$tmp/octez-client
+dal_node_data_dir=$tmp/dal-node
 api_json=$tmp/rpc-api.json
 proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
+dal_api_json=$tmp/dal-api.json
+dal_proto_api_json=$tmp/dal-proto-api.json
 
 # Generated files.
 openapi_json=docs/api/rpc-openapi-rc.json
 proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
 smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
+dal_node_openapi_json=docs/api/dal-node-openapi-dev.json
+dal_proto_openapi_json=docs/api/dal-proto-openapi-dev.json
 
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)
@@ -70,13 +77,27 @@ $tezos_client --base-dir $client_dir activate protocol $protocol_hash \
 # Wait a bit again...
 sleep 1
 
+# Run a DAL node
+mkdir $dal_node_data_dir
+$dal_node config init --data-dir $dal_node_data_dir \
+  --endpoint "http://localhost:$rpc_port" --expected-pow 0
+$dal_node identity generate --data-dir $dal_node_data_dir
+$dal_node run --data-dir $dal_node_data_dir &
+dal_node_pid="$!"
+
+# Wait a bit again...
+sleep 1
+
 # Get the RPC descriptions.
 curl "http://localhost:$rpc_port/describe/?recurse=yes" > $api_json
 curl "http://localhost:$rpc_port/describe/chains/main/blocks/head?recurse=yes" > $proto_api_json
 curl "http://localhost:$rpc_port/describe/chains/main/mempool?recurse=yes" > $mempool_api_json
+curl "http://localhost:$dal_rpc_port/describe/?recurse=yes" > $dal_api_json
+curl "http://localhost:$dal_rpc_port/describe/plugin/?recurse=yes" > $dal_proto_api_json
 
-# Kill the node.
+# Kill the nodes.
 kill -9 "$node_pid"
+kill -9 "$dal_node_pid"
 
 # Remove RPC starting with "/private/"
 clean_private_rpc() {
@@ -104,6 +125,18 @@ dune exec src/bin_openapi/rpc_openapi.exe -- \
   $mempool_api_json |
   clean_private_rpc "$@" > $mempool_openapi_json
 echo "Generated OpenAPI specification: $mempool_openapi_json"
+dune exec src/bin_openapi/rpc_openapi.exe -- \
+  "$version" \
+  "Octez DAL Node RPC" "The RPC API for the Octez DAL node." \
+  $dal_api_json |
+  clean_private_rpc "$@" > $dal_node_openapi_json
+echo "Generated OpenAPI specification: $dal_node_openapi_json"
+dune exec src/bin_openapi/rpc_openapi.exe -- \
+  "$version" \
+  "Octez DAL Node RPC" "The RPC API for protocol $protocol_name served by the Octez DAL node." \
+  $dal_proto_api_json |
+  clean_private_rpc "$@" > $dal_proto_openapi_json
+echo "Generated OpenAPI specification: $dal_proto_openapi_json"
 
 # Gernerate openapi file for rollup node
 $smart_rollup_node generate openapi -P $protocol_hash > $smart_rollup_node_openapi_json
