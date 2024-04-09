@@ -7,16 +7,7 @@ tezt-flaky:
   tags:
   - gcp_tezt
   rules:
-  - changes:
-    - src/**/*
-    - etherlink/**/*
-    - tezt/**/*
-    - .gitlab/**/*
-    - .gitlab-ci.yml
-    - michelson_test_scripts/**/*
-    - tzt_reference_test_suite/**/*
-    when: manual
-    allow_failure: true
+  - when: on_success
   needs:
   - select_tezts
   - oc.build_x86_64-released

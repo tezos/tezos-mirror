@@ -39,6 +39,12 @@ open Common
    unconditional variant [schedule_extended_test]. *)
 type code_verification_pipeline = Before_merging | Schedule_extended_test
 
+(** Manual trigger configuration for [make_rules] *)
+type manual =
+  | No  (** Do not add rule for manual trigger. *)
+  | Yes  (** Add rule for manual trigger. *)
+  | On_changes of string list  (** Add manual trigger on certain [changes:] *)
+
 (* [make_rules] makes rules for jobs that are:
      - automatic in scheduled pipelines;
      - conditional in [before_merging] pipelines.
@@ -47,19 +53,24 @@ type code_verification_pipeline = Before_merging | Schedule_extended_test
      set to [true] to ensure that we only run the job in case previous
      jobs succeeded (setting [when: on_success]).
 
+     If [label] is set, add rule that selects the job in
+     [Before_merging] pipelines for merge requests with the given
+     label. Rules for manual triggers can be configured using
+     [manual].
+
      If [label], [changes] and [manual] are omitted, then rules will
      enable the job [On_success] in the [before_merging]
      pipeline. This is safe, but prefer specifying a [changes] clause
      if possible. *)
-let make_rules ?label ?changes ?(manual = false) ?(dependent = false)
-    pipeline_type =
+let make_rules ?label ?changes ?(manual = No) ?(dependent = false) pipeline_type
+    =
   match pipeline_type with
   | Schedule_extended_test ->
       (* The scheduled pipeline always runs all jobs unconditionally
          -- unless they are dependent on a previous, non-trigger job, in the
          pipeline. *)
       [job_rule ~when_:(if dependent then On_success else Always) ()]
-  | Before_merging ->
+  | Before_merging -> (
       (* MR labels can be used to force tests to run. *)
       (match label with
       | Some label ->
@@ -70,7 +81,11 @@ let make_rules ?label ?changes ?(manual = false) ?(dependent = false)
         | None -> []
         | Some changes -> [job_rule ~changes ~when_:On_success ()])
       (* For some tests, it can be relevant to have a manual trigger. *)
-      @ if manual then [job_rule ~when_:Manual ()] else []
+      @
+      match manual with
+      | No -> []
+      | Yes -> [job_rule ~when_:Manual ()]
+      | On_changes changes -> [job_rule ~when_:Manual ~changes ()])
 
 type opam_package_group = Executable | All
 
@@ -358,6 +373,142 @@ let image_of_distribution = function
   | Ubuntu_jammy -> Images.ubuntu_jammy
   | Fedora_37 -> Images.fedora_37
 
+let job_tezt ~__POS__ ?rules ?parallel ?(tags = ["gcp_tezt"]) ~name
+    ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
+    ?(tezt_parallel = 1) ?(tezt_variant = "")
+    ?(before_script = before_script ~source_version:true ~eval_opam:true [])
+    ~dependencies () : tezos_job =
+  let variables =
+    [
+      ("JUNIT", "tezt-junit.xml");
+      ("TEZT_VARIANT", tezt_variant);
+      ("TESTS", Tezt_core.TSL.show tezt_tests);
+      ("TEZT_RETRY", string_of_int tezt_retry);
+      ("TEZT_PARALLEL", string_of_int tezt_parallel);
+    ]
+  in
+  let artifacts =
+    artifacts
+      ~reports:(reports ~junit:"$JUNIT" ())
+      [
+        "selected_tezts.tsv";
+        "tezt.log";
+        "tezt-*.log";
+        "tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json";
+        "$JUNIT";
+      ]
+      (* The record artifacts [tezt-results-$CI_NODE_INDEX.json]
+         should be stored for as long as a given commit on master is
+         expected to be HEAD in order to support auto-balancing. At
+         the time of writing, we have approximately 6 merges per day,
+         so 1 day should more than enough. However, we set it to 3
+         days to keep records over the weekend. The tezt artifacts
+         (including records and coverage) take up roughly 2MB /
+         job. Total artifact storage becomes [N*P*T*W] where [N] is
+         the days of retention (3 atm), [P] the number of pipelines
+         per day (~200 atm), [T] the number of Tezt jobs per pipeline
+         (60) and [W] the artifact size per tezt job (2MB). This makes
+         35GB which is less than 0.5% than our
+         {{:https://gitlab.com/tezos/tezos/-/artifacts}total artifact
+         usage}. *)
+      ~expire_in:(Duration (Days 7))
+      ~when_:Always
+  in
+  let print_variables =
+    [
+      "TESTS";
+      "JUNIT";
+      "CI_NODE_INDEX";
+      "CI_NODE_TOTAL";
+      "TEZT_PARALLEL";
+      "TEZT_VARIANT";
+    ]
+  in
+  let retry = if retry = 0 then None else Some retry in
+  job
+    ~__POS__
+    ~image:Images.runtime_e2etest_dependencies
+    ~name
+    ?parallel
+    ~tags
+    ~stage:Stages.test
+    ?rules
+    ~artifacts
+    ~variables
+    ~dependencies
+    ?retry
+    ~before_script
+    [
+      (* Print [print_variables] in a shell-friendly manner for easier debugging *)
+      "echo \""
+      ^ String.concat
+          " "
+          (List.map (fun var -> sf {|%s=\"${%s}\"|} var var) print_variables)
+      ^ "\"";
+      (* Store the list of tests that have been scheduled for execution for later debugging.
+         It is imperative this this first call to tezt receives any flags passed to the
+         second call that affect test selection.Note that TESTS must be quoted (here and below)
+         since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
+         syntax. *)
+      "./scripts/ci/tezt.sh \"${TESTS}\" --from-record tezt/records --job \
+       ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv";
+      (* For Tezt tests, there are multiple timeouts:
+         - --global-timeout is the internal timeout of Tezt, which only works if tests
+           are cooperative;
+         - the "timeout" command, which we set to send SIGTERM to Tezt 60s after --global-timeout
+           in case tests are not cooperative;
+         - the "timeout" command also sends SIGKILL 60s after having sent SIGTERM in case
+           Tezt is still stuck;
+         - the CI timeout.
+         The use of the "timeout" command is to make sure that Tezt eventually exits,
+         because if the CI timeout is reached, there are no artefacts,
+         and thus no logs to investigate.
+         See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
+      "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
+       \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
+       --global-timeout 1800 --on-unknown-regression-files fail --junit \
+       ${JUNIT} --from-record tezt/records --job \
+       ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+       tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
+       ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
+      "if [ -n \"${BISECT_FILE:-}\" ]; then ./scripts/ci/merge_coverage.sh; fi";
+    ]
+
+(** Tezt tag selector string.
+
+    It returns a TSL expression that:
+    - always deselects tags with [ci_disabled];
+    - selects, respectively deselects, the tests with the tags
+      [memory_3k], [memory_4k], [time_sensitive], [slow] or [cloud],
+      depending on the value of the corresponding function
+      argument. These arguments all default to false.
+
+    See [src/lib_test/tag.mli] for a description of the above tags.
+
+    The list of TSL expressions [and_] are appended to the final
+    selector, allowing to modify the selection further. *)
+let tezt_tests ?(memory_3k = false) ?(memory_4k = false)
+    ?(time_sensitive = false) ?(slow = false) ?(cloud = false)
+    (and_ : Tezt_core.TSL_AST.t list) : Tezt_core.TSL_AST.t =
+  let tags =
+    [
+      (false, "ci_disabled");
+      (memory_3k, "memory_3k");
+      (memory_4k, "memory_4k");
+      (time_sensitive, "time_sensitive");
+      (slow, "slow");
+      (cloud, "cloud");
+    ]
+  in
+  let positive, negative = List.partition fst tags in
+  let positive = List.map snd positive in
+  let negative = List.map snd negative in
+  Tezt_core.(
+    TSL.conjunction
+    @@ List.map (fun tag -> TSL_AST.Has_tag tag) positive
+    @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
+    @ and_)
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -496,7 +647,7 @@ let jobs pipeline_type =
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
       ~__POS__
-      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:true ())
+      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:Yes ())
       ~dependencies:dependencies_needs_trigger
       ()
     |> job_external_split
@@ -545,7 +696,7 @@ let jobs pipeline_type =
       ()
     |> job_external_split
   in
-  let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:true () in
+  let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
   let job_build_arm64_release : Tezos_ci.tezos_job =
     job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
   in
@@ -553,20 +704,118 @@ let jobs pipeline_type =
     job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
     |> job_external_split
   in
+  (* Used in [before_merging] and [schedule_extended_tests].
+
+     Fetch records for Tezt generated on the last merge request pipeline
+     on the most recently merged MR and makes them available in artifacts
+     for future merge request pipelines. *)
+  let job_select_tezts : tezos_job =
+    job
+      ~__POS__
+      ~name:"select_tezts"
+        (* We need:
+           - Git (to run git diff)
+           - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
+      ~image:Images.runtime_prebuild_dependencies
+      ~stage:Stages.build
+      ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
+      (script_propagate_exit_code "scripts/ci/select_tezts.sh")
+      ~allow_failure:(With_exit_codes [17])
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Days 3))
+           ~when_:Always
+           ["selected_tezts.tsl"])
+    |> job_external_once
+  in
+  let job_build_kernels : tezos_job =
+    job
+      ~__POS__
+      ~name:"oc.build_kernels"
+      ~image:Images.rust_toolchain
+      ~stage:Stages.build
+      ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
+      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+      [
+        "make -f kernels.mk build";
+        "make -f etherlink.mk evm_kernel.wasm";
+        "make -C src/risc_v risc-v-sandbox risc-v-dummy.elf";
+        "make -C src/risc_v/tests/ build";
+      ]
+      ~artifacts:
+        (artifacts
+           ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
+           ~expire_in:(Duration (Days 1))
+           ~when_:On_success
+           [
+             "evm_kernel.wasm";
+             "smart-rollup-installer";
+             "sequenced_kernel.wasm";
+             "tx_kernel.wasm";
+             "tx_kernel_dal.wasm";
+             "dal_echo_kernel.wasm";
+             "src/risc_v/risc-v-sandbox";
+             "src/risc_v/risc-v-dummy.elf";
+             "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
+           ])
+      ~cache:
+        [
+          {key = "kernels"; paths = ["cargo/"]};
+          {key = "kernels-sccache"; paths = ["_sccache"]};
+        ]
+    |> enable_kernels |> enable_sccache |> job_external_split
+  in
+  (* Fetch records for Tezt generated on the last merge request pipeline
+         on the most recently merged MR and makes them available in artifacts
+         for future merge request pipelines. *)
+  let job_tezt_fetch_records : tezos_job =
+    job
+      ~__POS__
+      ~name:"oc.tezt:fetch-records"
+      ~image:Images.runtime_build_dependencies
+      ~stage:Stages.build
+      ~before_script:
+        (before_script
+           ~take_ownership:true
+           ~source_version:true
+           ~eval_opam:true
+           [])
+      ~rules:(make_rules ~changes:changeset_octez ())
+      [
+        "dune exec scripts/ci/update_records/update.exe -- --log-file \
+         tezt-fetch-records.log --from last-successful-schedule-extended-test \
+         --info";
+      ]
+      ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
+        (* Allow failure of this job, since Tezt can use the records
+           stored in the repo as backup for balancing. *)
+      ~allow_failure:Yes
+      ~artifacts:
+        (artifacts
+           ~expire_in:(Duration (Hours 4))
+           ~when_:Always
+           [
+             "tezt-fetch-records.log";
+             "tezt/records/*.json";
+             (* Keep broken records for debugging *)
+             "tezt/records/*.json.broken";
+           ])
+    |> job_external_split
+  in
+  let job_static_x86_64_experimental =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Amd64
+        (* Even though not many tests depend on static executables, some
+           of those that do are limiting factors in the total duration
+           of pipelines. So we start this job as early as possible,
+           without waiting for sanity_ci. *)
+      ~dependencies:dependencies_needs_trigger
+      ~rules:(make_rules ~changes:changeset_octez ())
+      ()
+    |> job_external_split
+  in
   let build =
-    let job_static_x86_64_experimental =
-      job_build_static_binaries
-        ~__POS__
-        ~arch:Amd64
-          (* Even though not many tests depend on static executables, some
-             of those that do are limiting factors in the total duration
-             of pipelines. So we start this job as early as possible,
-             without waiting for sanity_ci. *)
-        ~dependencies:dependencies_needs_trigger
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ()
-      |> job_external_split
-    in
     (* TODO: The code is a bit convulted here because these jobs are
        either in the build or in the manual stage depending on the
        pipeline type. However, we can put them in the build stage on
@@ -596,105 +845,6 @@ let jobs pipeline_type =
              [])
         ["dune build @check"]
       |> job_external_split
-    in
-    let job_build_kernels : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.build_kernels"
-        ~image:Images.rust_toolchain
-        ~stage:Stages.build
-        ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
-        ~rules:
-          (make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
-        [
-          "make -f kernels.mk build";
-          "make -f etherlink.mk evm_kernel.wasm";
-          "make -C src/risc_v risc-v-sandbox risc-v-dummy.elf";
-          "make -C src/risc_v/tests/ build";
-        ]
-        ~artifacts:
-          (artifacts
-             ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
-             ~expire_in:(Duration (Days 1))
-             ~when_:On_success
-             [
-               "evm_kernel.wasm";
-               "smart-rollup-installer";
-               "sequenced_kernel.wasm";
-               "tx_kernel.wasm";
-               "tx_kernel_dal.wasm";
-               "dal_echo_kernel.wasm";
-               "src/risc_v/risc-v-sandbox";
-               "src/risc_v/risc-v-dummy.elf";
-               "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
-             ])
-        ~cache:
-          [
-            {key = "kernels"; paths = ["cargo/"]};
-            {key = "kernels-sccache"; paths = ["_sccache"]};
-          ]
-      |> enable_kernels |> enable_sccache |> job_external_split
-    in
-    (* Fetch records for Tezt generated on the last merge request pipeline
-       on the most recently merged MR and makes them available in artifacts
-       for future merge request pipelines. *)
-    let job_tezt_fetch_records : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.tezt:fetch-records"
-        ~image:Images.runtime_build_dependencies
-        ~stage:Stages.build
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ~rules:(make_rules ~changes:changeset_octez ())
-        [
-          "dune exec scripts/ci/update_records/update.exe -- --log-file \
-           tezt-fetch-records.log --from \
-           last-successful-schedule-extended-test --info";
-        ]
-        ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
-          (* Allow failure of this job, since Tezt can use the records
-             stored in the repo as backup for balancing. *)
-        ~allow_failure:Yes
-        ~artifacts:
-          (artifacts
-             ~expire_in:(Duration (Hours 4))
-             ~when_:Always
-             [
-               "tezt-fetch-records.log";
-               "tezt/records/*.json";
-               (* Keep broken records for debugging *)
-               "tezt/records/*.json.broken";
-             ])
-      |> job_external_split
-    in
-    (* Used in [before_merging] and [schedule_extended_tests].
-
-       Fetch records for Tezt generated on the last merge request pipeline
-       on the most recently merged MR and makes them available in artifacts
-       for future merge request pipelines. *)
-    let job_select_tezts : tezos_job =
-      job
-        ~__POS__
-        ~name:"select_tezts"
-          (* We need:
-             - Git (to run git diff)
-             - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
-        ~image:Images.runtime_prebuild_dependencies
-        ~stage:Stages.build
-        ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
-        ["scripts/ci/select_tezts.sh || exit $?"]
-        ~allow_failure:(With_exit_codes [17])
-        ~artifacts:
-          (artifacts
-             ~expire_in:(Duration (Days 3))
-             ~when_:Always
-             ["selected_tezts.tsl"])
-      |> job_external_once
     in
     [
       job_docker_rust_toolchain;
@@ -1012,7 +1162,7 @@ let jobs pipeline_type =
         ["docs/introduction/install*.sh"; "docs/introduction/compile*.sh"]
       in
       let install_octez_rules =
-        make_rules ~changes:changeset_install_jobs ~manual:true ()
+        make_rules ~changes:changeset_install_jobs ~manual:Yes ()
       in
       let job_install_bin ~__POS__ ~name ?allow_failure ?(rc = false)
           distribution =
@@ -1041,7 +1191,7 @@ let jobs pipeline_type =
           ~name:"oc.install_opam_focal"
           ~image:Images.opam_ubuntu_focal
           ~dependencies:dependencies_needs_trigger
-          ~rules:(make_rules ~manual:true ())
+          ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
           ~stage:Stages.test
             (* The default behavior of opam is to use `nproc` to determine its level of
@@ -1119,6 +1269,176 @@ let jobs pipeline_type =
       ]
       |> jobs_external_split ~path:"test/install_octez"
     in
+    (* Tezt jobs.
+
+       The tezt jobs are split into a set of special-purpose jobs running the
+       tests of the corresponding tag:
+        - [tezt-memory-3k]: runs the jobs with tag [memory_3k],
+        - [tezt-memory-4k]: runs the jobs with tag [memory_4k],
+        - [tezt-time_sensitive]: runs the jobs with tag [time-sensitive],
+        - [tezt-slow]: runs the jobs with tag [slow].
+        - [tezt-flaky]: runs the jobs with tag [flaky] and
+          none of the tags above.
+
+       and a job [tezt] that runs all remaining tests (excepting those
+       that are tagged [ci_disabled], that are disabled in the CI.)
+
+       There is an implicit rule that the Tezt tags [memory_3k],
+       [memory_4k], [time_sensitive], [slow] and [cloud] are mutually
+       exclusive. The [flaky] tag is not exclusive to these tags. If
+       e.g. a test has both tags [slow] and [flaky], it will run in
+       [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
+       job if they also have another special tag. Tests tagged [cloud] are
+       meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
+       do not run in the CI.
+
+       For more information on tags, see [src/lib_test/tag.mli]. *)
+    let tezt_dependencies =
+      Dependent
+        [
+          Artifacts job_select_tezts;
+          Artifacts job_build_x86_64_release;
+          Artifacts job_build_x86_64_exp_dev_extra;
+          Artifacts job_build_kernels;
+          Artifacts job_tezt_fetch_records;
+        ]
+    in
+    let job_tezt_flaky : tezos_job =
+      job_tezt
+        ~__POS__
+        ~name:"tezt-flaky"
+        ~tezt_tests:(tezt_tests [Has_tag "flaky"])
+        ~tezt_variant:"-flaky"
+          (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
+             Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
+             '--retry') *)
+        ~retry:2
+        ~tezt_retry:3
+        ~tezt_parallel:1
+        ~dependencies:tezt_dependencies
+        ~rules:
+          (* This job can only be manually triggered when it's
+             artifact dependencies exists, which they do when
+             [changeset_octez] is changed. *)
+          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+        ()
+      |> enable_coverage_output_artifact |> job_external_split
+    in
+    let job_tezt_slow : tezos_job =
+      job_tezt
+        ~__POS__
+        ~name:"tezt-slow"
+        ~rules:
+          (* See comment for [job_tezt_flaky] *)
+          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+        ~tezt_tests:
+          (tezt_tests
+             ~slow:true
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7063
+                The deselection of Paris [test_adaptive_issuance_launch.ml]
+                should be removed once the fixes to its slowness has been
+                snapshotted from Alpha. *)
+             [
+               Not
+                 (String_predicate
+                    ( File,
+                      Is
+                        "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
+                    ));
+             ])
+        ~tezt_variant:"-slow"
+        ~retry:2
+        ~tezt_parallel:3
+        ~parallel:(Vector 10)
+        ~dependencies:tezt_dependencies
+        ()
+      |> job_external_split
+    in
+    let jobs_tezt =
+      let rules = make_rules ~dependent:true ~changes:changeset_octez () in
+      let coverage_expiry = Duration (Days 3) in
+      let tezt : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt"
+            (* Exclude all tests with tags in [tezt_tags_always_disable] or
+               [tezt_tags_exclusive_tags]. *)
+          ~tezt_tests:(tezt_tests [Not (Has_tag "flaky")])
+          ~tezt_parallel:3
+          ~parallel:(Vector 60)
+          ~rules
+          ~dependencies:tezt_dependencies
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_memory_4k : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-memory-4k"
+          ~tezt_tests:(tezt_tests ~memory_4k:true [])
+          ~tezt_variant:"-memory_4k"
+          ~parallel:(Vector 4)
+          ~dependencies:tezt_dependencies
+          ~rules
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_memory_3k : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-memory-3k"
+          ~tezt_tests:(tezt_tests ~memory_3k:true [])
+          ~tezt_variant:"-memory_3k"
+          ~dependencies:tezt_dependencies
+          ~rules
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_time_sensitive : tezos_job =
+        (* the following tests are executed with [~tezt_parallel:1] to ensure
+           that other tests do not affect their executions. However, these
+           tests are not particularly cpu/memory-intensive hence they do not
+           need to run on a particular machine contrary to performance
+           regression tests. *)
+        job_tezt
+          ~__POS__
+          ~name:"tezt-time-sensitive"
+          ~tezt_tests:(tezt_tests ~time_sensitive:true [])
+          ~tezt_variant:"-time_sensitive"
+          ~dependencies:tezt_dependencies
+          ~rules
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_static_binaries : tezos_job =
+        job_tezt
+          ~__POS__
+          ~tags:["gcp"]
+          ~name:"tezt:static-binaries"
+          ~tezt_tests:(tezt_tests [Has_tag "cli"; Not (Has_tag "flaky")])
+          ~tezt_parallel:3
+          ~retry:0
+          ~dependencies:
+            (Dependent
+               [
+                 Artifacts job_select_tezts;
+                 Artifacts job_build_x86_64_exp_dev_extra;
+                 Artifacts job_static_x86_64_experimental;
+                 Artifacts job_tezt_fetch_records;
+               ])
+          ~rules
+          ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
+          ()
+      in
+      [
+        tezt;
+        tezt_memory_4k;
+        tezt_memory_3k;
+        tezt_time_sensitive;
+        tezt_static_binaries;
+      ]
+      |> jobs_external_split ~path:"test/tezt"
+    in
     [
       job_kaitai_checks;
       job_kaitai_e2e_checks;
@@ -1132,8 +1452,10 @@ let jobs pipeline_type =
       job_oc_script_test_release_versions;
       job_oc_script_b58_prefix;
       job_oc_test_liquidity_baking_scripts;
+      job_tezt_flaky;
+      job_tezt_slow;
     ]
-    @ jobs_unit @ jobs_install_octez
+    @ jobs_unit @ jobs_install_octez @ jobs_tezt
     @
     match pipeline_type with
     | Before_merging ->
@@ -1146,7 +1468,7 @@ let jobs pipeline_type =
             ~dependencies:dependencies_needs_trigger
             (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
                invalid commits titles in situations where that is allowed. *)
-            ["./scripts/ci/check_commit_messages.sh || exit $?"]
+            (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
             ~allow_failure:(With_exit_codes [65])
           |> job_external
         in

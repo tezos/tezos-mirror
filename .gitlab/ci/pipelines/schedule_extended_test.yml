@@ -32,9 +32,9 @@ include:
   # Stage: test
   - .gitlab/ci/jobs/test/install_octez-scheduled_extended_test.yml
   # Flaky tezts
-  - .gitlab/ci/jobs/test/tezt-flaky-schedule_extended_test.yml
+  - .gitlab/ci/jobs/test/tezt-flaky-scheduled_extended_test.yml
   # Slow tezts
-  - .gitlab/ci/jobs/test/tezt-slow-schedule_extended_test.yml
+  - .gitlab/ci/jobs/test/tezt-slow-scheduled_extended_test.yml
   # Tests that may not have been run in before_merging pipeline
   # because of absence of certain changes
   - .gitlab/ci/jobs/test/kaitai_checks-scheduled_extended_test.yml
@@ -50,7 +50,7 @@ include:
   - .gitlab/ci/jobs/test/oc.script:test_octez_release_versions-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.script:b58_prefix-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/oc.test-liquidity-baking-scripts-scheduled_extended_test.yml
-  - .gitlab/ci/jobs/test/tezt.yml
+  - .gitlab/ci/jobs/test/tezt-scheduled_extended_test.yml
   - .gitlab/ci/jobs/test/test_kernels.yml
   - .gitlab/ci/jobs/test/test_etherlink_kernel-schedule_extended_test.yml
   - .gitlab/ci/jobs/test/test_risc_v_kernels-schedule_extended_test.yml
