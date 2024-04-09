@@ -74,6 +74,11 @@ module Slots : sig
     bytes ->
     commitment ->
     (unit, [> Errors.other]) result Lwt.t
+
+  (** [exists_slot_by_commitment store cryptobox commitment] returns
+      true IFF a slot is associated to the given commitment. *)
+  val exists_slot_by_commitment :
+    t -> Cryptobox.t -> commitment -> (bool, [> Errors.decoding]) result Lwt.t
 end
 
 module Shard_proofs_cache : sig

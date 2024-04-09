@@ -205,6 +205,15 @@ module Slots = struct
     in
     let*! () = Event.(emit stored_slot_content commitment) in
     return_unit
+
+  let exists_slot_by_commitment t cryptobox commitment =
+    let open Lwt_syntax in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let+ res = KVS.value_exists t file_layout (commitment, slot_size) () in
+    trace_decoding_error
+      ~data_kind:Types.Store.Slot
+      ~tztrace_of_error:Fun.id
+      res
 end
 
 module Shard_proofs_cache =

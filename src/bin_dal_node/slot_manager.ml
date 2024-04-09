@@ -95,8 +95,9 @@ let commit cryptobox polynomial =
 
 let commitment_should_exist node_store cryptobox commitment =
   let open Lwt_result_syntax in
-  let*! exists =
-    Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
+  let* exists =
+    Store.(
+      Slots.exists_slot_by_commitment node_store.slot_store cryptobox commitment)
   in
   if not exists then fail `Not_found else return_unit
 
@@ -106,8 +107,9 @@ let add_commitment node_store slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let*? commitment = commit cryptobox polynomial in
-  let*! exists =
-    Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
+  let* exists =
+    Store.(
+      Slots.exists_slot_by_commitment node_store.slot_store cryptobox commitment)
   in
   let* () =
     if exists then return_unit
