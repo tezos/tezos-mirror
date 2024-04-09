@@ -394,7 +394,10 @@ let dispatch_request (config : Configuration.t)
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request (_config : Configuration.t)
+let dispatch_private_request
+    (produce_block :
+      force:bool -> timestamp:Time.Protocol.t -> int tzresult Lwt.t)
+    (_config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
@@ -422,9 +425,7 @@ let dispatch_private_request (_config : Configuration.t)
         let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in
           let timestamp = Option.value timestamp ~default:(Helpers.now ()) in
-          let* nb_transactions =
-            Block_producer.produce_block ~force:true ~timestamp
-          in
+          let* nb_transactions = produce_block ~force:true ~timestamp in
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in
         build ~f module_ parameters
@@ -458,13 +459,13 @@ let generic_dispatch config ctx dir path dispatch_request =
 let dispatch_public config ctx dir =
   generic_dispatch config ctx dir Path.root dispatch_request
 
-let dispatch_private config ctx dir =
+let dispatch_private config ctx ~produce_block dir =
   generic_dispatch
     config
     ctx
     dir
     Path.(add_suffix root "private")
-    dispatch_private_request
+    (dispatch_private_request produce_block)
 
 let directory config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
@@ -474,8 +475,10 @@ let directory config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
 
 let private_directory config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
+    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+    ~produce_block =
   Directory.empty |> version
   |> dispatch_private
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       ~produce_block
