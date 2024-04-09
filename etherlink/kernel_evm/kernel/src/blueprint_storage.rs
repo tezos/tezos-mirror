@@ -278,6 +278,7 @@ fn parse_and_validate_blueprint<Host: Runtime>(
         Err(e) => Ok((BlueprintValidity::DecoderError(e), bytes.len())),
         Ok(blueprint_with_hashes) => {
             // Validate parent hash
+            #[cfg(not(feature = "benchmark"))]
             if !valid_parent_hash(host, &blueprint_with_hashes) {
                 Ok((BlueprintValidity::InvalidParentHash, bytes.len()))
             } else {
@@ -289,6 +290,9 @@ fn parse_and_validate_blueprint<Host: Runtime>(
                     current_blueprint_size,
                 )
             }
+
+            #[cfg(feature = "benchmark")]
+            fetch_delayed_txs(host, blueprint_with_hashes, delayed_inbox)
         }
     }
 }

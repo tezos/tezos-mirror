@@ -44,6 +44,7 @@ commander
     .option('--keep-temp', "Keep temporary files", false)
     .option('--mode <mode>', 'Kernel mode: `proxy` or `sequencer`', parse_mode)
     .option('--no-computation', 'Don\'t expect stage 2', true)
+    .option('--multi-blueprint', 'Send each transaction in a separate blueprint',false)
     .parse(process.argv);
 
 let INCLUDE_REGEX = commander.opts().include
@@ -56,6 +57,7 @@ function filter_name(name) {
 }
 let COMPUTATION = commander.opts().computation;
 let MODE = commander.opts().mode || "proxy";
+let MULTI_BLUEPRINT = commander.opts().multiBlueprint;
 let KEEP_TEMP = commander.opts().keepTemp;
 let FAST_MODE = commander.opts().fastMode;
 const RUN_DEBUGGER_COMMAND = external.bin('./octez-smart-rollup-wasm-debugger');
@@ -240,7 +242,7 @@ async function get_ticks(path, function_call_keyword) {
     const fileStream = fs.createReadStream(path);
     var ticks_count_for_transactions = [];
     var previous_row_is_given_function_call = false;
-
+    const regexp = new RegExp(function_call_keyword);
     const rl = readline.createInterface({
         input: fileStream,
         crlfDelay: Infinity
@@ -251,7 +253,7 @@ async function get_ticks(path, function_call_keyword) {
             tokens = l.split(" ");
             calls = tokens[0];
             ticks = tokens[1];
-            if (calls.includes(function_call_keyword)) {
+            if (regexp.test(calls)) {
                 if (previous_row_is_given_function_call) {
                     ticks_count_for_transactions[ticks_count_for_transactions.length - 1] += parseInt(ticks);
                 } else {
@@ -272,13 +274,13 @@ async function analyze_profiler_output(path) {
     let results = Object();
     results.kernel_run_ticks = await get_ticks(path, "kernel_run");
     results.run_transaction_ticks = await get_ticks(path, "run_transaction");
-    results.signature_verification_ticks = await get_ticks(path, "25EthereumTransactionCommon6caller");
-    results.sputnik_runtime_ticks = await get_ticks(path, "EvmHandler$LT$Host$GT$7execute");
-    results.store_transaction_object_ticks = await get_ticks(path, "storage24store_transaction_object");
+    results.signature_verification_ticks = await get_ticks(path, "EthereumTransactionCommon.*caller");
+    results.sputnik_runtime_ticks = await get_ticks(path, "EvmHandler.*Host.*execute");
+    results.store_transaction_object_ticks = await get_ticks(path, "storage.*store_transaction_object");
     results.store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
     results.interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
     results.interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
-    results.stage_one_ticks = await get_ticks(path, "stage_one");
+    results.stage_one_ticks = await get_ticks(path, "stage_one.*fetch");
     results.block_finalize = await get_ticks(path, "store_current_block");
     results.logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     results.block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
@@ -311,6 +313,7 @@ function build_benchmark_scenario(benchmark_script) {
     try {
         let bench_path = path.format({ dir: __dirname, base: benchmark_script })
         let extra = MODE == 'sequencer' ? `--sequencer ${SEQUENCER_KEY}` : "";
+        extra += MULTI_BLUEPRINT ? ` --multi-blueprint` : ``;
         execSync(`node ${bench_path} ${extra} > transactions.json`);
     } catch (error) {
         console.log(`Error running script ${benchmark_script}. Please fixed the error in the script before running this benchmark script`)
@@ -478,6 +481,7 @@ async function run_all_benchmarks(benchmark_scripts) {
     console.log(`Output in ${output}`);
     console.log(`Dumped opcodes in ${opcodes_dump}`);
     console.log(`Precompiles in ${precompiles_output}`);
+    if(MULTI_BLUEPRINT) console.log(`For every scenario, one tx per blueprint`)
     const precompile_csv_config = { columns: precompiles_field };
     fs.writeFileSync(precompiles_output, csv.stringify([], { header: true, ...precompile_csv_config }));
     fs.writeFileSync(logs, "Logging debugger\n")
