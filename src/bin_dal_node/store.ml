@@ -239,8 +239,8 @@ module Shard_proofs_cache =
 (** Store context *)
 type t = {
   store : irmin;
-  shard_store : Shards.t;
-  slot_store : Slots.t;
+  shards : Shards.t;
+  slots : Slots.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
@@ -261,13 +261,13 @@ let init config =
   let base_dir = Configuration_file.store_path config in
   let*! repo = Irmin.Repo.v (Irmin_pack.config base_dir) in
   let*! store = Irmin.main repo in
-  let* shard_store = Shards.init base_dir Stores_dirs.shard in
-  let* slot_store = Slots.init base_dir Stores_dirs.slot in
+  let* shards = Shards.init base_dir Stores_dirs.shard in
+  let* slots = Slots.init base_dir Stores_dirs.slot in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
-      shard_store;
-      slot_store;
+      shards;
+      slots;
       store;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;

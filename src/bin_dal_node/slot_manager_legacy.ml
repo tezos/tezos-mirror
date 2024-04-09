@@ -189,8 +189,7 @@ let save_shards store cryptobox commitment shards =
     if Cryptobox.Commitment.equal commitment rebuilt_commitment then Ok ()
     else Result_syntax.fail [Invalid_shards_commitment_association]
   in
-  Store.(Shards.write_all store.shard_store commitment shards)
-  |> Errors.to_tzresult
+  Store.(Shards.write_all store.shards commitment shards) |> Errors.to_tzresult
 
 let get_slot cryptobox store commitment =
   let open Lwt_result_syntax in

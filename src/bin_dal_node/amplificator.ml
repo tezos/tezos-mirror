@@ -73,8 +73,7 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
           number_of_shards ))
   in
   let shards =
-    Store.(
-      Shards.read_all node_store.Store.shard_store commitment ~number_of_shards)
+    Store.(Shards.read_all node_store.shards commitment ~number_of_shards)
     |> Seq_s.filter_map (function
            | _, index, Ok share -> Some Cryptobox.{index; share}
            | _ -> None)
@@ -157,7 +156,7 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
       let*! () = Lwt_io.close oc_parent in
       let*? shards, shard_proofs = res in
       let* () =
-        Store.(Shards.write_all node_store.shard_store commitment shards)
+        Store.(Shards.write_all node_store.shards commitment shards)
         |> Errors.to_tzresult
       in
       Store.save_shard_proofs node_store commitment shard_proofs ;
@@ -207,7 +206,7 @@ let try_amplification (node_store : Store.t) commitment ~published_level
       let redundancy_factor = dal_parameters.redundancy_factor in
       let number_of_needed_shards = number_of_shards / redundancy_factor in
       let* number_of_already_stored_shards =
-        Store.Shards.count_values node_store.shard_store commitment
+        Store.Shards.count_values node_store.shards commitment
       in
       let slot_id : Types.slot_id =
         {slot_level = published_level; slot_index}
@@ -250,7 +249,7 @@ let try_amplification (node_store : Store.t) commitment ~published_level
         (* Count again the stored shards because we may have received
            more shards during the random delay. *)
         let* number_of_already_stored_shards =
-          Store.Shards.count_values node_store.shard_store commitment
+          Store.Shards.count_values node_store.shards commitment
         in
         (* If we have received all the shards while waiting the random
            delay, there is no point in reconstructing anymore *)

@@ -253,7 +253,7 @@ let get_attestable_slots ~shard_indices store proto_parameters ~attested_level =
       | Error (#decoding as e) -> fail (e :> [Errors.decoding | Errors.other])
       | Ok commitment ->
           Store.Shards.are_shards_available
-            store.shard_store
+            store.shards
             commitment
             shard_indices
           |> lwt_map_error (fun e -> `Other e)

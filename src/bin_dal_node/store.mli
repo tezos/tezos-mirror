@@ -104,9 +104,9 @@ module Shard_proofs_cache : sig
 end
 
 type t = private {
-  store : irmin; (* The Irmin part *)
-  shard_store : Shards.t;
-  slot_store : Slots.t;
+  store : irmin;  (** The Irmin-based part of the store *)
+  shards : Shards.t;  (** Shards store *)
+  slots : Slots.t;  (** Slots store *)
   in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
