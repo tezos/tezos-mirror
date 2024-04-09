@@ -310,6 +310,15 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::Amomaxuw(args) => run_amo_instr!(self, instr, args, run_amomaxuw),
             Instr::Lrd(args) => run_amo_instr!(self, instr, args, run_lrd),
             Instr::Scd(args) => run_amo_instr!(self, instr, args, run_scd),
+            Instr::Amoswapd(args) => run_amo_instr!(self, instr, args, run_amoswapd),
+            Instr::Amoaddd(args) => run_amo_instr!(self, instr, args, run_amoaddd),
+            Instr::Amoxord(args) => run_amo_instr!(self, instr, args, run_amoxord),
+            Instr::Amoandd(args) => run_amo_instr!(self, instr, args, run_amoandd),
+            Instr::Amoord(args) => run_amo_instr!(self, instr, args, run_amoord),
+            Instr::Amomind(args) => run_amo_instr!(self, instr, args, run_amomind),
+            Instr::Amomaxd(args) => run_amo_instr!(self, instr, args, run_amomaxd),
+            Instr::Amominud(args) => run_amo_instr!(self, instr, args, run_amominud),
+            Instr::Amomaxud(args) => run_amo_instr!(self, instr, args, run_amomaxud),
 
             // RV64M multiplication and division instructions
             Instr::Rem(args) => run_r_type_instr!(self, instr, args, run_rem),

@@ -264,6 +264,15 @@ pub enum Instr {
     Amomaxuw(AmoArgs),
     Lrd(AmoArgs),
     Scd(AmoArgs),
+    Amoswapd(AmoArgs),
+    Amoaddd(AmoArgs),
+    Amoxord(AmoArgs),
+    Amoandd(AmoArgs),
+    Amoord(AmoArgs),
+    Amomind(AmoArgs),
+    Amomaxd(AmoArgs),
+    Amominud(AmoArgs),
+    Amomaxud(AmoArgs),
 
     // RV64M division instructions
     Rem(RTypeArgs),
@@ -431,6 +440,15 @@ impl Instr {
             | Amomaxuw(_)
             | Lrd(_)
             | Scd(_)
+            | Amoswapd(_)
+            | Amoaddd(_)
+            | Amoxord(_)
+            | Amoandd(_)
+            | Amoord(_)
+            | Amomind(_)
+            | Amomaxd(_)
+            | Amominud(_)
+            | Amomaxud(_)
             | Rem(_)
             | Remu(_)
             | Remw(_)
@@ -745,6 +763,7 @@ impl fmt::Display for Instr {
             Jal(args) => u_instr!(f, "jal", args),
             Jalr(args) => i_instr_load!(f, "jalr", args),
 
+            // RV64A instructions
             Lrw(args) => amo_instr!(f, "lr.w", args),
             Scw(args) => amo_instr!(f, "sc.w", args),
             Amoswapw(args) => amo_instr!(f, "amoswap.w", args),
@@ -758,6 +777,15 @@ impl fmt::Display for Instr {
             Amomaxuw(args) => amo_instr!(f, "amomaxu.w", args),
             Lrd(args) => amo_instr!(f, "lr.d", args),
             Scd(args) => amo_instr!(f, "sc.d", args),
+            Amoswapd(args) => amo_instr!(f, "amoswap.d", args),
+            Amoaddd(args) => amo_instr!(f, "amoadd.d", args),
+            Amoxord(args) => amo_instr!(f, "amoxor.d", args),
+            Amoandd(args) => amo_instr!(f, "amoand.d", args),
+            Amoord(args) => amo_instr!(f, "amoor.d", args),
+            Amomind(args) => amo_instr!(f, "amomin.d", args),
+            Amomaxd(args) => amo_instr!(f, "amomax.d", args),
+            Amominud(args) => amo_instr!(f, "amominu.d", args),
+            Amomaxud(args) => amo_instr!(f, "amomaxu.d", args),
 
             // RV64M multiplication and division instructions
             Rem(args) => r_instr!(f, "rem", args),

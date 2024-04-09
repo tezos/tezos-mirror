@@ -93,4 +93,65 @@ where
             Ok(())
         }
     }
+
+    /// Generic implementation of any atomic memory operation, implementing
+    /// read-modify-write operations for multi-processor synchronisation
+    /// (Section 8.4)
+    fn run_amo<T: backend::Elem>(
+        &mut self,
+        rs1: XRegister,
+        rs2: XRegister,
+        rd: XRegister,
+        f: fn(T, T) -> T,
+        to: fn(u64) -> T,
+        from: fn(T) -> u64,
+    ) -> Result<(), Exception> {
+        let address_rs1 = self.hart.xregisters.read(rs1);
+
+        // "The A extension requires that the address held in rs1 be naturally
+        // aligned to the size of the operand (i.e., eight-byte aligned for
+        // 64-bit words and four-byte aligned for 32-bit words). If the address
+        // is not naturally aligned, an address-misaligned exception or
+        // an access-fault exception will be generated."
+        if address_rs1 % mem::size_of::<T>() as u64 != 0 {
+            return Err(Exception::StoreAMOAccessFault(address_rs1));
+        }
+
+        // Load the value from address in rs1
+        let value_rs1: T = self.read_from_address(address_rs1)?;
+
+        // Apply the binary operation to the loaded value and the value in rs2
+        let value_rs2 = to(self.hart.xregisters.read(rs2));
+        let value = f(value_rs1, value_rs2);
+
+        // Write the value read fom the address in rs1 in rd
+        self.hart.xregisters.write(rd, from(value_rs1));
+
+        // Store the resulting value to the address in rs1
+        self.write_to_address(address_rs1, value)
+    }
+
+    /// Generic implementation of an atomic memory operation which works on
+    /// 32-bit values
+    pub(super) fn run_amo_w(
+        &mut self,
+        rs1: XRegister,
+        rs2: XRegister,
+        rd: XRegister,
+        f: fn(i32, i32) -> i32,
+    ) -> Result<(), Exception> {
+        self.run_amo(rs1, rs2, rd, f, |x| x as i32, |x| x as u64)
+    }
+
+    /// Generic implementation of an atomic memory operation which works on
+    /// 64-bit values
+    pub(super) fn run_amo_d(
+        &mut self,
+        rs1: XRegister,
+        rs2: XRegister,
+        rd: XRegister,
+        f: fn(u64, u64) -> u64,
+    ) -> Result<(), Exception> {
+        self.run_amo(rs1, rs2, rd, f, |x| x, |x| x)
+    }
 }

@@ -55,31 +55,6 @@ where
         self.run_sc::<i32>(rs1, rs2, rd, |x| x as i32)
     }
 
-    /// Generic implementation of any atomic memory operation which works on
-    /// 32-bit values, implementing read-modify-write operations for multi-
-    /// processor synchronisation (Section 8.4)
-    fn run_amo_w(
-        &mut self,
-        rs1: XRegister,
-        rs2: XRegister,
-        rd: XRegister,
-        f: fn(i32, i32) -> i32,
-    ) -> Result<(), Exception> {
-        // Load the value from address in rs1
-        let address_rs1 = self.hart.xregisters.read(rs1);
-        let value_rs1: i32 = self.read_from_address(address_rs1)?;
-
-        // Apply the binary operation to the loaded value and the value in rs2
-        let value_rs2 = self.hart.xregisters.read(rs2) as i32;
-        let value = f(value_rs1, value_rs2);
-
-        // Write the value read fom the address in rs1 in rd
-        self.hart.xregisters.write(rd, value_rs1 as u64);
-
-        // Store the resulting value to the address in rs1
-        self.write_to_address(address_rs1, value)
-    }
-
     /// `AMOSWAP.W` R-type instruction
     ///
     /// Loads in rd the value from the address in rs1 and writes val(rs2)
@@ -111,9 +86,7 @@ where
         _rl: bool,
         _aq: bool,
     ) -> Result<(), Exception> {
-        self.run_amo_w(rs1, rs2, rd, |value_rs1, value_rs2| {
-            i32::wrapping_add(value_rs1, value_rs2)
-        })
+        self.run_amo_w(rs1, rs2, rd, i32::wrapping_add)
     }
 
     /// `AMOXOR.W` R-type instruction
@@ -130,9 +103,7 @@ where
         _rl: bool,
         _aq: bool,
     ) -> Result<(), Exception> {
-        self.run_amo_w(rs1, rs2, rd, |value_rs1, value_rs2| {
-            i32::bitxor(value_rs1, value_rs2)
-        })
+        self.run_amo_w(rs1, rs2, rd, i32::bitxor)
     }
 
     /// `AMOAND.W` R-type instruction
@@ -149,9 +120,7 @@ where
         _rl: bool,
         _aq: bool,
     ) -> Result<(), Exception> {
-        self.run_amo_w(rs1, rs2, rd, |value_rs1, value_rs2| {
-            i32::bitand(value_rs1, value_rs2)
-        })
+        self.run_amo_w(rs1, rs2, rd, i32::bitand)
     }
 
     /// `AMOOR.W` R-type instruction
@@ -168,9 +137,7 @@ where
         _rl: bool,
         _aq: bool,
     ) -> Result<(), Exception> {
-        self.run_amo_w(rs1, rs2, rd, |value_rs1, value_rs2| {
-            i32::bitor(value_rs1, value_rs2)
-        })
+        self.run_amo_w(rs1, rs2, rd, i32::bitor)
     }
 
     /// `AMOMIN.W` R-type instruction
@@ -187,9 +154,7 @@ where
         _rl: bool,
         _aq: bool,
     ) -> Result<(), Exception> {
-        self.run_amo_w(rs1, rs2, rd, |value_rs1, value_rs2| {
-            i32::min(value_rs1, value_rs2)
-        })
+        self.run_amo_w(rs1, rs2, rd, i32::min)
     }
 
     /// `AMOMAX.W` R-type instruction
@@ -206,9 +171,7 @@ where
         _rl: bool,
         _aq: bool,
     ) -> Result<(), Exception> {
-        self.run_amo_w(rs1, rs2, rd, |value_rs1, value_rs2| {
-            i32::max(value_rs1, value_rs2)
-        })
+        self.run_amo_w(rs1, rs2, rd, i32::max)
     }
 
     /// `AMOMINU.W` R-type instruction
@@ -305,13 +268,12 @@ mod test {
         }
     }
 
-    test_lrsc!(test_lrw_scw, run_lrw, run_scw, 4, u32);
-
-    macro_rules! test_amo_w {
-        ($name:ident, $instr: ident, $f: expr) => {
-            backend_test!($name, F, {
+    #[macro_export]
+    macro_rules! test_amo {
+        ($instr: ident, $f: expr, $align: expr, $t: ident) => {
+            backend_test!($instr, F, {
                 proptest!(|(
-                    r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/4..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/4).prop_map(|x| x * 4),
+                    r1_addr in (DEVICES_ADDRESS_SPACE_LENGTH/$align..(DEVICES_ADDRESS_SPACE_LENGTH+1023_u64)/$align).prop_map(|x| x * $align),
                     r1_val in any::<u64>(),
                     r2_val in any::<u64>(),
                 )| {
@@ -322,10 +284,10 @@ mod test {
                     state.write_to_bus(0, a0, r1_val)?;
                     state.hart.xregisters.write(a1, r2_val);
                     state.$instr(a0, a1, a2, false, false)?;
-                    let res: i32 = state.read_from_address(r1_addr)?;
+                    let res: $t = state.read_from_address(r1_addr)?;
 
                     prop_assert_eq!(
-                        state.hart.xregisters.read(a2) as i32, r1_val as i32);
+                        state.hart.xregisters.read(a2) as $t, r1_val as $t);
                     // avoids redundant_closure_call warnings
                     let f = $f;
                     prop_assert_eq!(res, f(r1_val, r2_val))
@@ -335,35 +297,63 @@ mod test {
         }
     }
 
-    test_amo_w!(test_amoswapw, run_amoswapw, |_, r2_val| r2_val as i32);
+    test_lrsc!(test_lrw_scw, run_lrw, run_scw, 4, u32);
 
-    test_amo_w!(test_amoaddw, run_amoaddw, |r1_val, r2_val| (r1_val as i32)
-        .wrapping_add(r2_val as i32));
+    test_amo!(run_amoswapw, |_, r2_val| r2_val as i32, 4, i32);
 
-    test_amo_w!(test_amoxorw, run_amoxorw, |r1_val, r2_val| (r1_val as i32)
-        .bitxor(r2_val as i32));
-
-    test_amo_w!(test_amoandw, run_amoandw, |r1_val, r2_val| (r1_val as i32)
-        .bitand(r2_val as i32));
-
-    test_amo_w!(test_amoorw, run_amoorw, |r1_val, r2_val| (r1_val as i32)
-        .bitor(r2_val as i32));
-
-    test_amo_w!(test_amominw, run_amominw, |r1_val, r2_val| (r1_val as i32)
-        .min(r2_val as i32));
-
-    test_amo_w!(test_amomaxw, run_amomaxw, |r1_val, r2_val| (r1_val as i32)
-        .max(r2_val as i32));
-
-    test_amo_w!(
-        test_amominuw,
-        run_amominuw,
-        |r1_val, r2_val| (r1_val as u32).min(r2_val as u32) as i32
+    test_amo!(
+        run_amoaddw,
+        |r1_val, r2_val| (r1_val as i32).wrapping_add(r2_val as i32),
+        4,
+        i32
     );
 
-    test_amo_w!(
-        test_amomaxuw,
+    test_amo!(
+        run_amoxorw,
+        |r1_val, r2_val| (r1_val as i32).bitxor(r2_val as i32),
+        4,
+        i32
+    );
+
+    test_amo!(
+        run_amoandw,
+        |r1_val, r2_val| (r1_val as i32).bitand(r2_val as i32),
+        4,
+        i32
+    );
+
+    test_amo!(
+        run_amoorw,
+        |r1_val, r2_val| (r1_val as i32).bitor(r2_val as i32),
+        4,
+        i32
+    );
+
+    test_amo!(
+        run_amominw,
+        |r1_val, r2_val| (r1_val as i32).min(r2_val as i32),
+        4,
+        i32
+    );
+
+    test_amo!(
+        run_amomaxw,
+        |r1_val, r2_val| (r1_val as i32).max(r2_val as i32),
+        4,
+        i32
+    );
+
+    test_amo!(
+        run_amominuw,
+        |r1_val, r2_val| (r1_val as u32).min(r2_val as u32) as i32,
+        4,
+        i32
+    );
+
+    test_amo!(
         run_amomaxuw,
-        |r1_val, r2_val| (r1_val as u32).max(r2_val as u32) as i32
+        |r1_val, r2_val| (r1_val as u32).max(r2_val as u32) as i32,
+        4,
+        i32
     );
 }
