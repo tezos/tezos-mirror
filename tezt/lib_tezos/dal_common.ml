@@ -376,8 +376,8 @@ module Dal_RPC = struct
                    score = get "score" json |> as_float;
                  })))
 
-  let get_plugin_commitments_history_hash ~hash () =
-    make GET ["plugin"; "commitments_history"; "hash"; hash] Fun.id
+  let get_plugin_commitments_history_hash ~proto_hash ~hash () =
+    make GET ["plugin"; proto_hash; "commitments_history"; "hash"; hash] Fun.id
 
   let get_level_slot_shard_content ~slot_level ~slot_index ~shard_index =
     make

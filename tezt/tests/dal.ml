@@ -4339,8 +4339,8 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   Log.info "Slot sucessfully attested" ;
   unit
 
-let test_commitments_history_rpcs _protocol dal_parameters _cryptobox node
-    client dal_node =
+let test_commitments_history_rpcs protocol dal_parameters _cryptobox node client
+    dal_node =
   let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
   let lag = dal_parameters.attestation_lag in
@@ -4477,7 +4477,11 @@ let test_commitments_history_rpcs _protocol dal_parameters _cryptobox node
           (fun hash ->
             let* cell =
               Dal_RPC.(
-                call dal_node @@ get_plugin_commitments_history_hash ~hash ())
+                call dal_node
+                @@ get_plugin_commitments_history_hash
+                     ~proto_hash:(Protocol.hash protocol)
+                     ~hash
+                     ())
             in
             check_cell cell ~check_level:None)
           back_pointers
