@@ -187,7 +187,7 @@ let get_verifier_srs2 = get_verifier_srs2_aux max_srs_size get_srs2
 let is_in_srs2 i = List.mem_assoc i srs_g2
 
 module Internal_for_tests = struct
-  let max_srs_size = 1 lsl 16
+  let max_srs_size = 1 lsl 9
 
   let fake_srs_seed =
     Scalar.of_string
