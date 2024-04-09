@@ -58,6 +58,39 @@ module Shards : sig
   val remove : t -> commitment -> unit tzresult Lwt.t
 end
 
+module Slots : sig
+  (** A store of slots, indexed by slot size and commitment. *)
+
+  type t
+
+  (** [add_slot_by_commitment store cryptobox slot_content commitment]
+      adds a mapping from the given commitment to the given slot
+      content. The given cryptobox is only used to get the size of the
+      slot content, no cryptographic verification is performed by this
+      function. *)
+  val add_slot_by_commitment :
+    t ->
+    Cryptobox.t ->
+    bytes ->
+    commitment ->
+    (unit, [> Errors.other]) result Lwt.t
+
+  (** [exists_slot_by_commitment store cryptobox commitment] returns
+      true IFF a slot is associated to the given commitment. *)
+  val exists_slot_by_commitment :
+    t -> Cryptobox.t -> commitment -> (bool, [> Errors.decoding]) result Lwt.t
+
+  (** [find_slot_by_commitment store cryptobox commitment] returns the
+      slot associated to some commitment or [None] if no slot is
+      associated. *)
+  val find_slot_by_commitment :
+    t ->
+    Cryptobox.t ->
+    commitment ->
+    (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
+    Lwt.t
+end
+
 module Shard_proofs_cache : sig
   (** Shard proofs are not stored on disk because we can recompute
       them. This computation is quite costly though so we cache the
@@ -71,8 +104,9 @@ module Shard_proofs_cache : sig
 end
 
 type t = private {
-  store : irmin; (* The Irmin part *)
-  shard_store : Shards.t;
+  store : irmin;  (** The Irmin-based part of the store *)
+  shards : Shards.t;  (** Shards store *)
+  slots : Slots.t;  (** Slots store *)
   in_memory_shard_proofs : shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
@@ -109,14 +143,6 @@ module Legacy : sig
 
   *)
 
-  (** [add_slot_by_commitment store cryptobox slot_content commitment]
-      adds a mapping from the given commitment to the given slot
-      content. The given cryptobox is only used to get the size of the
-      slot content, no cryptographic verification is performed by this
-      function. *)
-  val add_slot_by_commitment :
-    t -> Cryptobox.t -> bytes -> commitment -> unit Lwt.t
-
   (** [associate_slot_id_with_commitment store commitment slot_id]
       adds an entry to the bidirectional mapping between commitments
       and slot identifiers. The status is initialized to
@@ -126,20 +152,6 @@ module Legacy : sig
   *)
   val associate_slot_id_with_commitment :
     t -> commitment -> Types.slot_id -> unit Lwt.t
-
-  (** [exists_slot_by_commitment store cryptobox commitment] returns
-      true IFF a slot is associated to the given commitment. *)
-  val exists_slot_by_commitment : t -> Cryptobox.t -> commitment -> bool Lwt.t
-
-  (** [find_slot_by_commitment store cryptobox commitment] returns the
-      slot associated to some commitment or an error if no slot is
-      associated. *)
-  val find_slot_by_commitment :
-    t ->
-    Cryptobox.t ->
-    commitment ->
-    (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
-    Lwt.t
 
   (** [add_slot_headers ~number_of_slots ~block_level slot_headers
       store] adds all the given slot headers at the given block level,

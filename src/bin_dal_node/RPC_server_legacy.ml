@@ -31,7 +31,7 @@ let handle_slot_pages ctxt (_, commitment) () () =
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
   Slot_manager.get_slot_pages
     cryptobox
-    (Node_context.get_store ctxt).shard_store
+    (Node_context.get_store ctxt).shards
     commitment
 
 let register_show_slot_pages ctxt dir =

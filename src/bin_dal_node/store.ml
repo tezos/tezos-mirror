@@ -26,13 +26,24 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
    use another storage solution that irmin as we don't need backtracking *)
 
+module KVS = Key_value_store
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 module Irmin = StoreMaker.Make (Irmin.Contents.String)
 
 type irmin = Irmin.t
 
+let trace_decoding_error ~data_kind ~tztrace_of_error r =
+  let open Result_syntax in
+  match r with
+  | Ok r -> return r
+  | Error err ->
+      let tztrace = tztrace_of_error err in
+      fail @@ `Decoding_failed (data_kind, tztrace)
+
 module Stores_dirs = struct
   let shard = "shard_store"
+
+  let slot = "slot_store"
 end
 
 let info message =
@@ -85,8 +96,6 @@ module Value_size_hooks = struct
 end
 
 module Shards = struct
-  module KVS = Key_value_store
-
   type nonrec t = (Cryptobox.Commitment.t, int, Cryptobox.share) KVS.t
 
   let file_layout ~root_dir commitment =
@@ -158,6 +167,65 @@ module Shards = struct
     KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
 end
 
+module Slots = struct
+  type t = (Cryptobox.Commitment.t * int, unit, bytes) KVS.t
+
+  let file_layout ~root_dir (commitment, slot_size) =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+
+       Make Key-Value store layout resilient to crypto parameters change. *)
+    let number_of_slots = 1 in
+    let commitment_string = Cryptobox.Commitment.to_b58check commitment in
+    let filename = Format.sprintf "%s_%d" commitment_string slot_size in
+    let filepath = Filename.concat root_dir filename in
+    Key_value_store.layout
+      ~encoding:(Data_encoding.Fixed.bytes slot_size)
+      ~filepath
+      ~eq:Stdlib.( = )
+      ~index_of:(fun () -> 0)
+      ~number_of_keys_per_file:number_of_slots
+      ()
+
+  let init node_store_dir slot_store_dir =
+    let root_dir = Filename.concat node_store_dir slot_store_dir in
+    KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
+
+  let add_slot_by_commitment t cryptobox slot commitment =
+    let open Lwt_result_syntax in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let* () =
+      KVS.write_value
+        ~override:true
+        t
+        file_layout
+        (commitment, slot_size)
+        ()
+        slot
+      |> Errors.other_lwt_result
+    in
+    let*! () = Event.(emit stored_slot_content commitment) in
+    return_unit
+
+  let exists_slot_by_commitment t cryptobox commitment =
+    let open Lwt_syntax in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let+ res = KVS.value_exists t file_layout (commitment, slot_size) () in
+    trace_decoding_error
+      ~data_kind:Types.Store.Slot
+      ~tztrace_of_error:Fun.id
+      res
+
+  let find_slot_by_commitment t cryptobox commitment =
+    let open Lwt_result_syntax in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let*! res = KVS.read_value t file_layout (commitment, slot_size) () in
+    let data_kind = Types.Store.Slot in
+    match res with
+    | Ok slot -> return_some slot
+    | Error [KVS.Missing_stored_kvs_data _] -> return_none
+    | Error err -> fail @@ `Decoding_failed (data_kind, err)
+end
+
 module Shard_proofs_cache =
   Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (struct
@@ -171,7 +239,8 @@ module Shard_proofs_cache =
 (** Store context *)
 type t = {
   store : irmin;
-  shard_store : Shards.t;
+  shards : Shards.t;
+  slots : Slots.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
 }
@@ -192,23 +261,17 @@ let init config =
   let base_dir = Configuration_file.store_path config in
   let*! repo = Irmin.Repo.v (Irmin_pack.config base_dir) in
   let*! store = Irmin.main repo in
-  let* shard_store = Shards.init base_dir Stores_dirs.shard in
+  let* shards = Shards.init base_dir Stores_dirs.shard in
+  let* slots = Slots.init base_dir Stores_dirs.slot in
   let*! () = Event.(emit store_is_ready ()) in
   return
     {
-      shard_store;
+      shards;
+      slots;
       store;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;
     }
-
-let trace_decoding_error ~data_kind ~tztrace_of_error r =
-  let open Result_syntax in
-  match r with
-  | Ok r -> return r
-  | Error err ->
-      let tztrace = tztrace_of_error err in
-      fail @@ `Decoding_failed (data_kind, tztrace)
 
 let tztrace_of_read_error read_err =
   [Exn (Data_encoding.Binary.Read_error read_err)]
@@ -236,15 +299,6 @@ let decode_slot_id v =
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string Types.slot_id_encoding v
 
-let encode_slot slot_size =
-  Data_encoding.Binary.to_string_exn (Data_encoding.Fixed.bytes slot_size)
-
-let decode_slot slot_size v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Slot
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string (Data_encoding.Fixed.bytes slot_size) v
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
 
    DAL/Node: Replace Irmin storage for paths
@@ -256,8 +310,6 @@ module Legacy = struct
     val to_string : ?prefix:string -> t -> string
 
     module Commitment : sig
-      val slot : Cryptobox.commitment -> slot_size:int -> Irmin.Path.t
-
       val headers : Cryptobox.commitment -> Irmin.Path.t
 
       val header : Cryptobox.commitment -> Types.slot_id -> Irmin.Path.t
@@ -298,10 +350,6 @@ module Legacy = struct
 
     module Commitment = struct
       let root = ["commitments"]
-
-      let slot commitment ~slot_size =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / Int.to_string slot_size / "slot"
 
       let headers commitment =
         let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
@@ -344,15 +392,6 @@ module Legacy = struct
     end
   end
 
-  let add_slot_by_commitment node_store cryptobox slot commitment =
-    let open Lwt_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    let encoded_slot = encode_slot slot_size slot in
-    let* () = set ~msg:"Slot stored" node_store.store path encoded_slot in
-    let* () = Event.(emit stored_slot_content commitment) in
-    return_unit
-
   let associate_slot_id_with_commitment node_store commitment slot_id =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
        Improve the implementation of this handler.
@@ -386,23 +425,6 @@ module Legacy = struct
         store
         levels_path
         (encode_header_status `Unseen_or_not_finalized)
-
-  let exists_slot_by_commitment node_store cryptobox commitment =
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    Irmin.mem node_store.store path
-
-  let find_slot_by_commitment node_store cryptobox commitment =
-    let open Lwt_result_syntax in
-    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
-    let path = Path.Commitment.slot commitment ~slot_size in
-    let*! res_opt = Irmin.find node_store.store path in
-    Option.fold
-      ~none:(return None)
-      ~some:(fun v ->
-        let*? dec = decode_slot slot_size v in
-        return @@ Some dec)
-      res_opt
 
   let add_slot_headers ~number_of_slots ~block_level slot_headers node_store =
     let module SI = Set.Make (Int) in

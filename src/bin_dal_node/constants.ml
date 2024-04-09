@@ -37,6 +37,8 @@ let shards_store_lru_size =
   irmin_internals_entries_per_toplevel_entry * number_of_slots
   * number_of_remembered_levels
 
+let slots_store_lru_size = 64
+
 (* Fewer cache sizes should be enough in practice,
    but we cache 50 since each cache entry has quite a small memory footprint. *)
 let committee_cache_size = 50

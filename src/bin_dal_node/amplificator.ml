@@ -59,7 +59,7 @@ let proved_shards_encoding =
   let shards_proofs_encoding = array Cryptobox.shard_proof_encoding in
   obj2 (req "shards" shards_encoding) (req "proofs" shards_proofs_encoding)
 
-let amplify shard_store slot_store node_ctxt cryptobox commitment precomputation
+let amplify node_store node_ctxt cryptobox commitment precomputation
     ~published_level ~slot_index ~number_of_already_stored_shards
     ~number_of_needed_shards ~number_of_shards gs_worker proto_parameters =
   let open Lwt_result_syntax in
@@ -73,7 +73,7 @@ let amplify shard_store slot_store node_ctxt cryptobox commitment precomputation
           number_of_shards ))
   in
   let shards =
-    Store.Shards.read_all shard_store commitment ~number_of_shards
+    Store.(Shards.read_all node_store.shards commitment ~number_of_shards)
     |> Seq_s.filter_map (function
            | _, index, Ok share -> Some Cryptobox.{index; share}
            | _ -> None)
@@ -156,10 +156,10 @@ let amplify shard_store slot_store node_ctxt cryptobox commitment precomputation
       let*! () = Lwt_io.close oc_parent in
       let*? shards, shard_proofs = res in
       let* () =
-        Store.(Shards.write_all slot_store.shard_store commitment shards)
+        Store.(Shards.write_all node_store.shards commitment shards)
         |> Errors.to_tzresult
       in
-      Store.save_shard_proofs slot_store commitment shard_proofs ;
+      Store.save_shard_proofs node_store commitment shard_proofs ;
       let* () =
         Slot_manager.publish_proved_shards
           ~published_level
@@ -178,8 +178,8 @@ let amplify shard_store slot_store node_ctxt cryptobox commitment precomputation
       in
       return_unit
 
-let try_amplification (shard_store : Store.Shards.t) (slot_store : Store.t)
-    commitment ~published_level ~slot_index gs_worker node_ctxt =
+let try_amplification (node_store : Store.t) commitment ~published_level
+    ~slot_index gs_worker node_ctxt =
   let open Lwt_result_syntax in
   match Node_context.get_status node_ctxt with
   | Starting ->
@@ -206,7 +206,7 @@ let try_amplification (shard_store : Store.Shards.t) (slot_store : Store.t)
       let redundancy_factor = dal_parameters.redundancy_factor in
       let number_of_needed_shards = number_of_shards / redundancy_factor in
       let* number_of_already_stored_shards =
-        Store.Shards.count_values shard_store commitment
+        Store.Shards.count_values node_store.shards commitment
       in
       let slot_id : Types.slot_id =
         {slot_level = published_level; slot_index}
@@ -249,7 +249,7 @@ let try_amplification (shard_store : Store.Shards.t) (slot_store : Store.t)
         (* Count again the stored shards because we may have received
            more shards during the random delay. *)
         let* number_of_already_stored_shards =
-          Store.Shards.count_values shard_store commitment
+          Store.Shards.count_values node_store.shards commitment
         in
         (* If we have received all the shards while waiting the random
            delay, there is no point in reconstructing anymore *)
@@ -261,8 +261,7 @@ let try_amplification (shard_store : Store.Shards.t) (slot_store : Store.t)
           return_unit
         else
           amplify
-            shard_store
-            slot_store
+            node_store
             node_ctxt
             cryptobox
             commitment

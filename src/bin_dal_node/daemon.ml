@@ -404,7 +404,7 @@ module Handler = struct
     List.iter_es
       (fun commitment ->
         let*! () = Event.(emit removed_slot_shards commitment) in
-        Store.Shards.remove store.shard_store commitment)
+        Store.Shards.remove store.shards commitment)
       commitments
 
   (* Monitor heads and store *finalized* published slot headers indexed by block
@@ -603,8 +603,8 @@ let daemonize handlers =
 
 let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
   let open Gossipsub in
-  let shards_handler ({shard_store; _} : Store.t) =
-    let save_and_notify = Store.Shards.write_all shard_store in
+  let shards_handler ({shards; _} : Store.t) =
+    let save_and_notify = Store.Shards.write_all shards in
     fun Types.Message.{share; _}
         Types.Message_id.{commitment; shard_index; level; slot_index; _} ->
       let open Lwt_result_syntax in
@@ -622,7 +622,6 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
                  | _ -> false)
                profile_list ->
           Amplificator.try_amplification
-            shard_store
             node_store
             commitment
             ~published_level:level

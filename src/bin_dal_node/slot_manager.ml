@@ -95,8 +95,9 @@ let commit cryptobox polynomial =
 
 let commitment_should_exist node_store cryptobox commitment =
   let open Lwt_result_syntax in
-  let*! exists =
-    Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
+  let* exists =
+    Store.(
+      Slots.exists_slot_by_commitment node_store.slots cryptobox commitment)
   in
   if not exists then fail `Not_found else return_unit
 
@@ -106,13 +107,18 @@ let add_commitment node_store slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let*? commitment = commit cryptobox polynomial in
-  let*! exists =
-    Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
+  let* exists =
+    Store.(
+      Slots.exists_slot_by_commitment node_store.slots cryptobox commitment)
   in
-  let*! () =
-    if exists then Lwt.return_unit
+  let* () =
+    if exists then return_unit
     else
-      Store.Legacy.add_slot_by_commitment node_store cryptobox slot commitment
+      Store.Slots.add_slot_by_commitment
+        node_store.slots
+        cryptobox
+        slot
+        commitment
   in
   return commitment
 
@@ -127,7 +133,7 @@ let associate_slot_id_with_commitment node_store cryptobox commitment slot_id =
 let get_commitment_slot node_store cryptobox commitment =
   let open Lwt_result_syntax in
   let* slot_opt =
-    Store.Legacy.find_slot_by_commitment node_store cryptobox commitment
+    Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
   in
   match slot_opt with
   | None -> fail `Not_found
@@ -139,7 +145,7 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
   let* slot = get_commitment_slot node_store cryptobox commitment in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  let* () = Store.(Shards.write_all node_store.shard_store commitment shards) in
+  let* () = Store.(Shards.write_all node_store.shards commitment shards) in
   if with_proof then
     let*? precomputation =
       match shards_proofs_precomputation with
@@ -267,10 +273,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
   | Some shard_proofs ->
       let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
       let shards =
-        Store.Shards.read_all
-          node_store.shard_store
-          commitment
-          ~number_of_shards
+        Store.Shards.read_all node_store.shards commitment ~number_of_shards
       in
       publish_proved_shards
         ~published_level

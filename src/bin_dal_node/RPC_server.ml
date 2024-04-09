@@ -229,8 +229,8 @@ module Slots_handlers = struct
         |> Errors.to_tzresult)
 
   let get_shard ctxt ((_, commitment), shard_index) () () =
-    call_handler1 ctxt (fun {shard_store; _} ->
-        Store.Shards.read shard_store commitment shard_index)
+    call_handler1 ctxt (fun {shards; _} ->
+        Store.Shards.read shards commitment shard_index)
 end
 
 module Profile_handlers = struct
