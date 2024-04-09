@@ -1024,7 +1024,7 @@ let hash_raw_tx str =
 let transaction_nonce bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _])
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _]) ->
@@ -1047,11 +1047,34 @@ let transaction_nonce bytes =
         nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
+(** [transaction_data bytes] returns the data of a given raw transaction. *)
+let transaction_data bytes =
+  let open Result_syntax in
+  if String.starts_with ~prefix:"01" bytes then
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; _; _; Value data; _])
+    | Ok (Rlp.List [_; _; _; _; _; _; Value data; _; _; _; _]) ->
+        return data
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; _; _; _; Value data; _])
+    | Ok (Rlp.List [_; _; _; _; _; _; _; Value data; _; _; _; _]) ->
+        return data
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
+  else
+    (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; _; Value data; _; _; _]) -> return data
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
+
 (** [transaction_gas_limit bytes] returns the gas limit of a given raw transaction. *)
 let transaction_gas_limit bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _])
     | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _; _; _]) ->
@@ -1079,7 +1102,7 @@ let transaction_gas_limit bytes =
 let transaction_gas_price bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _])
     | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _; _; _]) ->
