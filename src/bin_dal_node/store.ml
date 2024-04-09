@@ -162,9 +162,41 @@ end
 module Slots = struct
   type t = (Cryptobox.Commitment.t * int, unit, bytes) KVS.t
 
+  let file_layout ~root_dir (commitment, slot_size) =
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
+
+       Make Key-Value store layout resilient to crypto parameters change. *)
+    let number_of_slots = 1 in
+    let commitment_string = Cryptobox.Commitment.to_b58check commitment in
+    let filename = Format.sprintf "%s_%d" commitment_string slot_size in
+    let filepath = Filename.concat root_dir filename in
+    Key_value_store.layout
+      ~encoding:(Data_encoding.Fixed.bytes slot_size)
+      ~filepath
+      ~eq:Stdlib.( = )
+      ~index_of:(fun () -> 0)
+      ~number_of_keys_per_file:number_of_slots
+      ()
+
   let init node_store_dir slot_store_dir =
     let root_dir = Filename.concat node_store_dir slot_store_dir in
     KVS.init ~lru_size:Constants.slots_store_lru_size ~root_dir
+
+  let add_slot_by_commitment t cryptobox slot commitment =
+    let open Lwt_result_syntax in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let* () =
+      KVS.write_value
+        ~override:true
+        t
+        file_layout
+        (commitment, slot_size)
+        ()
+        slot
+      |> Errors.other_lwt_result
+    in
+    let*! () = Event.(emit stored_slot_content commitment) in
+    return_unit
 end
 
 module Shard_proofs_cache =

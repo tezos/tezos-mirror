@@ -109,10 +109,17 @@ let add_commitment node_store slot cryptobox =
   let*! exists =
     Store.Legacy.exists_slot_by_commitment node_store cryptobox commitment
   in
-  let*! () =
-    if exists then Lwt.return_unit
+  let* () =
+    if exists then return_unit
     else
-      Store.Legacy.add_slot_by_commitment node_store cryptobox slot commitment
+      let*! () =
+        Store.Legacy.add_slot_by_commitment node_store cryptobox slot commitment
+      in
+      Store.Slots.add_slot_by_commitment
+        node_store.slot_store
+        cryptobox
+        slot
+        commitment
   in
   return commitment
 

@@ -62,6 +62,18 @@ module Slots : sig
   (** A store of slots, indexed by slot size and commitment. *)
 
   type t
+
+  (** [add_slot_by_commitment store cryptobox slot_content commitment]
+      adds a mapping from the given commitment to the given slot
+      content. The given cryptobox is only used to get the size of the
+      slot content, no cryptographic verification is performed by this
+      function. *)
+  val add_slot_by_commitment :
+    t ->
+    Cryptobox.t ->
+    bytes ->
+    commitment ->
+    (unit, [> Errors.other]) result Lwt.t
 end
 
 module Shard_proofs_cache : sig
