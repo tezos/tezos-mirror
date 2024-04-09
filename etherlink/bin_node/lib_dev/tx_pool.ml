@@ -28,9 +28,8 @@ module Pool = struct
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
   (** Add a transaction to the pool. *)
-  let add t pkey raw_tx =
+  let add {transactions; global_index} pkey raw_tx =
     let open Result_syntax in
-    let {transactions; global_index} = t in
     let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
     let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
@@ -249,6 +248,18 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
+let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
+  let maximum_chunks_per_l1_level =
+    Option.value
+      ~default:Sequencer_blueprint.maximum_chunks_per_l1_level
+      max_number_of_chunks
+  in
+  Bytes.length tx_data
+  > Sequencer_blueprint.maximum_usable_space_in_blueprint
+      (* Minus one so that the "rest" of the raw transaction can
+         be contained within one of the chunks. *)
+      (maximum_chunks_per_l1_level - 1)
+
 let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
     ~tx_pool_tx_per_addr_limit =
   let open Lwt_result_syntax in
@@ -284,11 +295,11 @@ let on_normal_transaction state tx_raw =
     pool;
     tx_pool_addr_limit;
     tx_pool_tx_per_addr_limit;
+    max_number_of_chunks;
     _;
   } =
     state
   in
-
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
   match is_valid with
   | Error err ->
@@ -298,28 +309,33 @@ let on_normal_transaction state tx_raw =
       in
       return (Error err)
   | Ok {address} ->
-      let* address_boundaries_are_reached, error_msg =
-        check_address_boundaries
-          ~pool
-          ~address
-          ~tx_pool_addr_limit
-          ~tx_pool_tx_per_addr_limit
-      in
-      if address_boundaries_are_reached then return @@ Error error_msg
+      let*? tx_data = Ethereum_types.transaction_data tx_raw in
+      if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
+        let*! () = Tx_pool_events.tx_data_size_limit_reached () in
+        return @@ Error "Transaction data exceeded the allowed size."
       else
-        (* Add the tx to the pool*)
-        let*? pool = Pool.add pool address tx_raw in
-        (* compute the hash *)
-        let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
-        let hash =
-          Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
+        let* address_boundaries_are_reached, error_msg =
+          check_address_boundaries
+            ~pool
+            ~address
+            ~tx_pool_addr_limit
+            ~tx_pool_tx_per_addr_limit
         in
-        let*! () =
-          Tx_pool_events.add_transaction
-            ~transaction:(Ethereum_types.hash_to_string hash)
-        in
-        state.pool <- pool ;
-        return (Ok hash)
+        if address_boundaries_are_reached then return @@ Error error_msg
+        else
+          (* Add the transaction to the pool *)
+          let*? pool = Pool.add pool address tx_raw in
+          (* Compute the hash *)
+          let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+          let hash =
+            Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
+          in
+          let*! () =
+            Tx_pool_events.add_transaction
+              ~transaction:(Ethereum_types.hash_to_string hash)
+          in
+          state.pool <- pool ;
+          return (Ok hash)
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
