@@ -42,10 +42,6 @@ module Shards : sig
     [commitment] at the range [shard_id]. *)
   val read : t -> Cryptobox.commitment -> int -> Cryptobox.shard tzresult Lwt.t
 
-  (** Same as [read_value] but for a sequence of shards. *)
-  val read_values :
-    t -> (commitment * int) Seq.t -> (commitment * int * share tzresult) Seq_s.t
-
   (** Same as [read_values] but for all possible shards of the given commitment. *)
   val read_all :
     t ->

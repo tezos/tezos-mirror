@@ -148,8 +148,6 @@ module Shards = struct
     let* share = KVS.read_value store file_layout commitment shard_id in
     return {Cryptobox.share; index = shard_id}
 
-  let read_values store keys = KVS.read_values store file_layout keys
-
   let count_values store commitment =
     KVS.count_values store file_layout commitment
 
