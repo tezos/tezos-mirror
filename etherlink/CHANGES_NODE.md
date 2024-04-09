@@ -5,7 +5,7 @@
 ### Features
 
 - The transaction pool is now removing any transaction that was included more
-  than a defined thresold ago (one hour by default). (!12741)
+  than a defined threshold ago (one hour by default). (!12741)
 - The transaction pool imposes a limit of users permitted simultaneously
   (4000 by default). (!12749)
 - The transaction pool has a threshold of simultaneous transactions allowed per user
