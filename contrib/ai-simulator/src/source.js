@@ -686,7 +686,7 @@ export class Simulator {
  * @return {Delegate}. A delegate.
  */
 export class Delegate {
-  #storage_cache_index = -1;
+  #storage_cache_index = 0;
   #registration_cycle = null;
 
   #storage_own_staked_balance = [0];
@@ -704,7 +704,7 @@ export class Delegate {
   }
 
   clear() {
-    this.#storage_cache_index = -1;
+    this.#storage_cache_index = 0;
     this.#storage_own_staked_balance = [0];
     this.#storage_third_party_staked_balance = [0];
     this.#storage_own_spendable_balance = [0];
@@ -1006,31 +1006,51 @@ export class Delegate {
   }
 
   #compute_new_balances(cycle) {
-    const rewards = this.estimated_rewards(cycle);
+    if (cycle < 0) {
+      return; // should not happen
+    }
 
-    this.#storage_own_staked_balance[cycle + 1] =
-      this.#storage_own_staked_balance_mask[cycle + 1] ??
-      this.#storage_own_staked_balance[cycle] +
+    if (cycle == 0) {
+      this.#storage_own_staked_balance[0] =
+        this.#storage_own_staked_balance_mask[0] ?? 0;
+
+      this.#storage_third_party_staked_balance[0] =
+        this.#storage_third_party_staked_balance_mask[0] ?? 0;
+
+      this.#storage_own_spendable_balance[0] =
+        this.#storage_own_spendable_balance_mask[0] ?? 0;
+
+      this.#storage_third_party_delegated_balance[0] =
+        this.#storage_third_party_delegated_balance[0] ?? 0;
+
+      return;
+    }
+
+    const rewards = this.estimated_rewards(cycle - 1);
+
+    this.#storage_own_staked_balance[cycle] =
+      this.#storage_own_staked_balance_mask[cycle] ??
+      this.#storage_own_staked_balance[cycle - 1] +
         rewards.estimated_rewards_from_own_staking +
         rewards.estimated_rewards_from_edge_of_baking_over_staking;
 
-    this.#storage_third_party_staked_balance[cycle + 1] =
-      this.#storage_third_party_staked_balance_mask[cycle + 1] ??
-      this.#storage_third_party_staked_balance[cycle] +
+    this.#storage_third_party_staked_balance[cycle] =
+      this.#storage_third_party_staked_balance_mask[cycle] ??
+      this.#storage_third_party_staked_balance[cycle - 1] +
         rewards.estimated_rewards_from_third_party_staking;
 
-    this.#storage_own_spendable_balance[cycle + 1] =
-      this.#storage_own_spendable_balance_mask[cycle + 1] ??
-      this.#storage_own_spendable_balance[cycle] +
+    this.#storage_own_spendable_balance[cycle] =
+      this.#storage_own_spendable_balance_mask[cycle] ??
+      this.#storage_own_spendable_balance[cycle - 1] +
         rewards.estimated_rewards_from_delegating;
 
-    this.#storage_third_party_delegated_balance[cycle + 1] =
-      this.#storage_third_party_delegated_balance[cycle + 1] ??
-      this.#storage_third_party_delegated_balance[cycle];
+    this.#storage_third_party_delegated_balance[cycle] =
+      this.#storage_third_party_delegated_balance[cycle] ??
+      this.#storage_third_party_delegated_balance[cycle - 1];
   }
 
   #prepare_for(cycle) {
-    for (let i = this.#storage_cache_index + 1; i < cycle; i++) {
+    for (let i = this.#storage_cache_index; i <= cycle; i++) {
       this.#compute_new_balances(i);
       this.#storage_cache_index++;
     }
