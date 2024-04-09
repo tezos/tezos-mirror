@@ -296,6 +296,20 @@ macro_rules! f_r_fmt_int_instr {
     };
 }
 
+macro_rules! f_r_int_fmt_instr {
+    ($enum_variant:ident, $instr:expr, $rm:expr) => {
+        if let Some(rounding) = InstrRoundingMode::from_rm($rm) {
+            $enum_variant(instruction::FRegToXRegArgsWithRounding {
+                rd: rd($instr),
+                rs1: rs1_f($instr),
+                rm: rounding,
+            })
+        } else {
+            Unknown { instr: $instr }
+        }
+    };
+}
+
 macro_rules! f_r_rm_2_instr {
     ($enum_variant:ident, $instr:expr, $rs2_bits:expr, $rm:expr) => {{
         if let Some(rounding) = InstrRoundingMode::from_rm($rm) {
@@ -723,6 +737,10 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqs, instr, rs2_bits),
                 (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fles, instr, rs2_bits),
                 (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Flts, instr, rs2_bits),
+                (F5_24, rounding, RS2_0) => f_r_int_fmt_instr!(Fcvtws, instr, rounding),
+                (F5_24, rounding, RS2_1) => f_r_int_fmt_instr!(Fcvtwus, instr, rounding),
+                (F5_24, rounding, RS2_2) => f_r_int_fmt_instr!(Fcvtls, instr, rounding),
+                (F5_24, rounding, RS2_3) => f_r_int_fmt_instr!(Fcvtlus, instr, rounding),
                 (F5_26, rounding, RS2_0) => f_r_fmt_int_instr!(Fcvtsw, instr, rounding),
                 (F5_26, rounding, RS2_1) => f_r_fmt_int_instr!(Fcvtswu, instr, rounding),
                 (F5_26, rounding, RS2_2) => f_r_fmt_int_instr!(Fcvtsl, instr, rounding),
@@ -764,6 +782,10 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
                 (F5_20, RM_EQ, rs2_bits) => f_cmp_instr!(Feqd, instr, rs2_bits),
                 (F5_20, RM_LE, rs2_bits) => f_cmp_instr!(Fled, instr, rs2_bits),
                 (F5_20, RM_LT, rs2_bits) => f_cmp_instr!(Fltd, instr, rs2_bits),
+                (F5_24, rounding, RS2_0) => f_r_int_fmt_instr!(Fcvtwd, instr, rounding),
+                (F5_24, rounding, RS2_1) => f_r_int_fmt_instr!(Fcvtwud, instr, rounding),
+                (F5_24, rounding, RS2_2) => f_r_int_fmt_instr!(Fcvtld, instr, rounding),
+                (F5_24, rounding, RS2_3) => f_r_int_fmt_instr!(Fcvtlud, instr, rounding),
                 (F5_26, rounding, RS2_0) => f_r_fmt_int_instr!(Fcvtdw, instr, rounding),
                 (F5_26, rounding, RS2_1) => f_r_fmt_int_instr!(Fcvtdwu, instr, rounding),
                 (F5_26, rounding, RS2_2) => f_r_fmt_int_instr!(Fcvtdl, instr, rounding),

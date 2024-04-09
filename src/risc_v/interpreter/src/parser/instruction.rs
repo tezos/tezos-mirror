@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::fmt;
+use std::fmt::{self};
 
 use crate::{
     interpreter::float::RoundingMode,
@@ -84,6 +84,13 @@ pub struct XRegToFRegArgs {
 pub struct XRegToFRegArgsWithRounding {
     pub rd: FRegister,
     pub rs1: XRegister,
+    pub rm: InstrRoundingMode,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct FRegToXRegArgsWithRounding {
+    pub rd: XRegister,
+    pub rs1: FRegister,
     pub rm: InstrRoundingMode,
 }
 
@@ -318,6 +325,10 @@ pub enum Instr {
     Fcvtswu(XRegToFRegArgsWithRounding),
     Fcvtsl(XRegToFRegArgsWithRounding),
     Fcvtslu(XRegToFRegArgsWithRounding),
+    Fcvtws(FRegToXRegArgsWithRounding),
+    Fcvtwus(FRegToXRegArgsWithRounding),
+    Fcvtls(FRegToXRegArgsWithRounding),
+    Fcvtlus(FRegToXRegArgsWithRounding),
     Fsgnjs(FRArgs),
     Fsgnjns(FRArgs),
     Fsgnjxs(FRArgs),
@@ -348,6 +359,10 @@ pub enum Instr {
     Fcvtdlu(XRegToFRegArgsWithRounding),
     Fcvtds(FR1ArgWithRounding),
     Fcvtsd(FR1ArgWithRounding),
+    Fcvtwd(FRegToXRegArgsWithRounding),
+    Fcvtwud(FRegToXRegArgsWithRounding),
+    Fcvtld(FRegToXRegArgsWithRounding),
+    Fcvtlud(FRegToXRegArgsWithRounding),
     Fsgnjd(FRArgs),
     Fsgnjnd(FRArgs),
     Fsgnjxd(FRArgs),
@@ -485,6 +500,10 @@ impl Instr {
             | Fcvtswu(_)
             | Fcvtsl(_)
             | Fcvtslu(_)
+            | Fcvtws(_)
+            | Fcvtwus(_)
+            | Fcvtls(_)
+            | Fcvtlus(_)
             | Fsgnjs(_)
             | Fsgnjns(_)
             | Fsgnjxs(_)
@@ -513,6 +532,10 @@ impl Instr {
             | Fcvtdlu(_)
             | Fcvtds(_)
             | Fcvtsd(_)
+            | Fcvtwd(_)
+            | Fcvtwud(_)
+            | Fcvtld(_)
+            | Fcvtlud(_)
             | Fsgnjd(_)
             | Fsgnjnd(_)
             | Fsgnjxd(_)
@@ -620,6 +643,17 @@ macro_rules! u_instr {
 macro_rules! f_s1_instr {
     ($f:expr, $op:expr, $args:expr) => {
         write!($f, "{} {},{}", $op, $args.rd, $args.rs1)
+    };
+}
+
+macro_rules! f_r1_rm_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        match $args.rm {
+            InstrRoundingMode::Dynamic => f_s1_instr!($f, $op, $args),
+            InstrRoundingMode::Static(rm) => {
+                write!($f, "{} {},{},{}", $op, $args.rd, $args.rs1, rm)
+            }
+        }
     };
 }
 
@@ -851,6 +885,10 @@ impl fmt::Display for Instr {
             Fcvtswu(args) => f_s1_instr!(f, "fcvt.s.wu", args),
             Fcvtsl(args) => f_s1_instr!(f, "fcvt.s.l", args),
             Fcvtslu(args) => f_s1_instr!(f, "fcvt.s.lu", args),
+            Fcvtws(args) => f_r1_rm_instr!(f, "fcvt.w.s", args),
+            Fcvtwus(args) => f_r1_rm_instr!(f, "fcvt.wu.s", args),
+            Fcvtls(args) => f_r1_rm_instr!(f, "fcvt.l.s", args),
+            Fcvtlus(args) => f_r1_rm_instr!(f, "fcvt.lu.s", args),
             Fsgnjs(args) => r_instr!(f, "fsgnj.s", args),
             Fsgnjns(args) => r_instr!(f, "fsgnjn.s", args),
             Fsgnjxs(args) => r_instr!(f, "fsgnjx.s", args),
@@ -881,6 +919,10 @@ impl fmt::Display for Instr {
             Fcvtdlu(args) => f_s1_instr!(f, "fcvt.d.lu", args),
             Fcvtds(args) => r2_instr!(f, "fcvt.d.s", args),
             Fcvtsd(args) => r2_instr!(f, "fcvt.s.d", args),
+            Fcvtwd(args) => f_r1_rm_instr!(f, "fcvt.w.d", args),
+            Fcvtwud(args) => f_r1_rm_instr!(f, "fcvt.wu.d", args),
+            Fcvtld(args) => f_r1_rm_instr!(f, "fcvt.l.d", args),
+            Fcvtlud(args) => f_r1_rm_instr!(f, "fcvt.lu.d", args),
             Fsgnjd(args) => r_instr!(f, "fsgnj.d", args),
             Fsgnjnd(args) => r_instr!(f, "fsgnjn.d", args),
             Fsgnjxd(args) => r_instr!(f, "fsgnjx.d", args),

@@ -229,13 +229,7 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
-        self.run_fcvt_int_fmt(
-            rs1,
-            rm,
-            rd,
-            |u| u as i64 as i32 as i128,
-            Double::from_i128_r,
-        )
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i32 as i128, Double::from_i128_r)
     }
 
     /// `FCVT.D.WU` R-type instruction.
@@ -296,6 +290,70 @@ where
         rd: FRegister,
     ) -> Result<(), Exception> {
         self.run_fcvt_fmt_fmt::<Double, Single>(rs1, rm, rd)
+    }
+
+    /// `FCVT.S.W` R-type instruction.
+    pub fn run_fcvt_w_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as i32 as u64,
+            |f, rm| Double::to_i128_r(f, 32, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    pub fn run_fcvt_wu_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as i32 as u64,
+            |f, rm| Double::to_u128_r(f, 32, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.W` R-type instruction.
+    pub fn run_fcvt_l_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as u64,
+            |f, rm| Double::to_i128_r(f, 64, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    pub fn run_fcvt_lu_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as u64,
+            |f, rm| Double::to_u128_r(f, 64, rm, &mut false),
+        )
     }
 
     /// `FSGNJ.D` R-type instruction.
