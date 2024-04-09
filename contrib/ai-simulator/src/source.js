@@ -958,17 +958,6 @@ export class Delegate {
       estimated_total_rewards,
     );
 
-    const estimated_rewards_from_edge_of_baking_over_staking =
-      estimated_rewards_from_staking
-        .times(this.config.delegate_policy.edge_of_baking_over_staking)
-        .ceil()
-        .valueOf();
-
-    const reduced_estimated_rewards_from_staking =
-      estimated_rewards_from_staking.minus(
-        estimated_rewards_from_edge_of_baking_over_staking,
-      );
-
     const { own_staked, considered_staked } = this.delegate_info(cycle);
 
     const ratio_own_stake = considered_staked.isZero()
@@ -980,14 +969,24 @@ export class Delegate {
       : bigRat.one.minus(ratio_own_stake);
 
     const estimated_rewards_from_own_staking = ratio_own_stake
-      .times(reduced_estimated_rewards_from_staking)
+      .times(estimated_rewards_from_staking)
       .ceil()
       .valueOf();
 
-    const estimated_rewards_from_third_party_staking = ratio_third_party_stake
-      .times(reduced_estimated_rewards_from_staking)
-      .ceil()
-      .valueOf();
+    const estimated_rewards_from_third_party_staking_raw =
+      ratio_third_party_stake.times(estimated_rewards_from_staking);
+
+    const estimated_rewards_from_edge_of_baking_over_staking =
+      estimated_rewards_from_third_party_staking_raw
+        .times(this.config.delegate_policy.edge_of_baking_over_staking)
+        .ceil()
+        .valueOf();
+
+    const estimated_rewards_from_third_party_staking =
+      estimated_rewards_from_third_party_staking_raw
+        .minus(estimated_rewards_from_edge_of_baking_over_staking)
+        .ceil()
+        .valueOf();
 
     return {
       estimated_number_of_blocks_baked,
