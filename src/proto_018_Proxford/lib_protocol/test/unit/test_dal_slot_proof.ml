@@ -48,8 +48,7 @@ struct
 
     let cryptobox =
       Lazy.from_fun @@ fun () ->
-      WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
+      Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
   end)
 
   (* Tests to check insertion of slots in a dal skip list. *)
@@ -60,7 +59,7 @@ struct
     let {S.Header.id; _} = Hist.Internal_for_tests.content skip_list in
     let level = mk_level id in
     let index = mk_slot_index id in
-    let*? _data, _poly, slot = mk_slot ~level ~index () in
+    let* _data, _poly, slot = mk_slot ~level ~index () in
     let@ result = Hist.add_confirmed_slot_headers_no_cache skip_list [slot] in
     check_result result
 
@@ -169,14 +168,14 @@ struct
   let helper_confirmed_slot_on_genesis ~level ~mk_page_info ~check_produce
       ?check_verify () =
     let open Lwt_result_wrap_syntax in
-    let*? _slot_data, polynomial, slot = mk_slot ~level () in
+    let* _slot_data, polynomial, slot = mk_slot ~level () in
     let*?@ skip_list, cache =
       Hist.add_confirmed_slot_headers
         genesis_history
         genesis_history_cache
         [slot]
     in
-    let*? page_info, page_id = mk_page_info slot polynomial in
+    let* page_info, page_id = mk_page_info slot polynomial in
     produce_and_verify_proof
       skip_list
       ~get_history:(get_history cache)
@@ -205,7 +204,7 @@ struct
   (** Test where a slot is confirmed, requesting a proof for a confirmed page,
       where correct data are provided, but the given page proof is wrong. *)
   let confirmed_slot_on_genesis_confirmed_page_bad_page_proof =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     helper_confirmed_slot_on_genesis
       ~level:(Raw_level_repr.succ level_ten)
       ~mk_page_info:(fun slot poly ->
@@ -319,7 +318,7 @@ struct
 
   (** Unconfirmation proof for a page with bad page proof. *)
   let confirmed_slot_on_genesis_unconfirmed_page_bad_proof =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     let level = level_ten in
     helper_confirmed_slot_on_genesis_unconfirmed_page
       ~page_level:level

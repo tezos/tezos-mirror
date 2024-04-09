@@ -275,7 +275,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
       ~protocol
       ()
   in
-  let cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
+  let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f dal_parameters cryptobox node client bootstrap1_key
 
@@ -667,18 +667,27 @@ let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
    slot contents but represented using a different [slot_size] leads
    to a proof-checking error. *)
 let publish_dummy_slot_with_wrong_proof_for_different_slot_size ~source ?fee
-    ~index parameters cryptobox =
+    ~index parameters cryptobox ?counter ?force ?error client =
   let cryptobox_params =
     {
       parameters.Dal.Parameters.cryptobox with
       slot_size = 2 * parameters.cryptobox.slot_size;
     }
   in
-  let cryptobox' = Helpers.make_cryptobox cryptobox_params in
+  let* cryptobox' = Helpers.make_cryptobox cryptobox_params in
   let msg = "a" in
   let commitment, _proof = Dal.(Commitment.dummy_commitment cryptobox msg) in
   let _commitment, proof = Dal.(Commitment.dummy_commitment cryptobox' msg) in
-  Helpers.publish_commitment ~source ?fee ~index ~commitment ~proof
+  Helpers.publish_commitment
+    ~source
+    ?fee
+    ~index
+    ~commitment
+    ~proof
+    ?counter
+    ?force
+    ?error
+    client
 
 let publish_commitment ?dont_wait ?counter ?force ~source ?(fee = 1200) ~index
     ~commitment ~proof client =
@@ -1655,7 +1664,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     ({index = shard.index; share = shard.share} : Cryptobox.shard)
   in
   let shards = shards |> List.to_seq |> Seq.map shard_of_json in
-  let cryptobox = Helpers.make_cryptobox parameters.cryptobox in
+  let* cryptobox = Helpers.make_cryptobox parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with
     | Ok p -> Cryptobox.polynomial_to_slot cryptobox p |> Bytes.to_string
@@ -6130,7 +6139,7 @@ let dal_crypto_benchmark () =
       let* result =
         Config.init_prover_dal
           ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-          Config.{activated = true; bootstrap_peers = []}
+          Config.default
       in
       Log.info "SRS loaded." ;
       let*? config =
@@ -6194,7 +6203,24 @@ let dal_crypto_benchmark () =
                  let*? page_proof = prove_page dal polynomial i in
                  page_proof)
         in
-        if verifier_srs then Internal_for_tests.init_verifier_dal_default () ;
+        let* () =
+          if verifier_srs then
+            let result =
+              Cryptobox.Config.init_verifier_dal Cryptobox.Config.default
+            in
+            let*? config =
+              Result.map_error
+                (fun x ->
+                  `Fail
+                    (Format.asprintf
+                       "%a"
+                       Tezos_error_monad.Error_monad.pp_print_trace
+                       x))
+                result
+            in
+            Lwt.return config
+          else Lwt.return_unit
+        in
         let is_valid =
           Profiler.record_f Profiler.main "verify commitment" @@ fun () ->
           verify_commitment dal commitment commitment_proof
