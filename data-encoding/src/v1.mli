@@ -1854,7 +1854,7 @@ let expr_encoding =
           of a value is [M.(partial_encoding (layout v) v)].
 
           It is the user's responsibility to ensure that all the values of [M]
-          follow the invariants documented in {!S}. *)
+          follow the invariants documented in {!module-type-S}. *)
       val make : (module S with type input = 'a) -> 'a t
     end
   end
