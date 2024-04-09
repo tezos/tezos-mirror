@@ -48,6 +48,11 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
                 _ => format!("{} {},{}", op, rd_rs1, imm),
             }
         }
+        "lr.w" | "lr.w.aq" | "lr.w.rl" | "lr.w.aqrl" | "lr.d" | "lr.d.aq" | "lr.d.rl"
+        | "lr.d.aqrl" => {
+            let args = args.replace(",(", ",zero,(");
+            format!("{} {}", op, args)
+        }
         _ => {
             if args.is_empty() {
                 op.to_string()

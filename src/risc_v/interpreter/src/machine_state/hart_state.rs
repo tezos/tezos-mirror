@@ -4,6 +4,7 @@ use crate::{
         csregisters::{self, xstatus, CSRegister},
         mode::{self, Mode, TrapMode},
         registers,
+        reservation_set::{self, ReservationSet},
     },
     state_backend::{self as backend, Atom, Cell},
     traps::TrapContext,
@@ -25,6 +26,9 @@ pub struct HartState<M: backend::Manager> {
 
     /// Program counter
     pub pc: Cell<Address, M>,
+
+    /// Reservation set address
+    pub reservation_set: ReservationSet<M>,
 }
 
 /// Layout of [HartState]
@@ -33,7 +37,8 @@ pub type HartStateLayout = (
     registers::FRegistersLayout,
     csregisters::CSRegistersLayout,
     mode::ModeLayout,
-    Atom<Address>, // Program counter layout
+    Atom<Address>,                         // Program counter layout
+    reservation_set::ReservationSetLayout, // Reservation set layout
 );
 
 impl<M: backend::Manager> HartState<M> {
@@ -45,6 +50,7 @@ impl<M: backend::Manager> HartState<M> {
             csregisters: csregisters::CSRegisters::bind(space.2),
             mode: mode::ModeCell::bind(space.3),
             pc: Cell::bind(space.4),
+            reservation_set: ReservationSet::bind(space.5),
         }
     }
 
@@ -55,6 +61,7 @@ impl<M: backend::Manager> HartState<M> {
         self.csregisters.reset();
         self.mode.reset();
         self.pc.write(pc);
+        self.reservation_set.reset();
     }
 
     /// Given a trap source and a return address, take a trap on the machine.

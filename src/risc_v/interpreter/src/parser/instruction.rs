@@ -251,6 +251,8 @@ pub enum Instr {
     Jalr(ITypeArgs),
 
     // RV64A R-type atomic instructions
+    Lrw(AmoArgs),
+    Scw(AmoArgs),
     Amoswapw(AmoArgs),
     Amoaddw(AmoArgs),
     Amoxorw(AmoArgs),
@@ -260,6 +262,8 @@ pub enum Instr {
     Amomaxw(AmoArgs),
     Amominuw(AmoArgs),
     Amomaxuw(AmoArgs),
+    Lrd(AmoArgs),
+    Scd(AmoArgs),
 
     // RV64M division instructions
     Rem(RTypeArgs),
@@ -414,6 +418,8 @@ impl Instr {
             | Auipc(_)
             | Jal(_)
             | Jalr(_)
+            | Lrw(_)
+            | Scw(_)
             | Amoswapw(_)
             | Amoaddw(_)
             | Amoxorw(_)
@@ -423,6 +429,8 @@ impl Instr {
             | Amomaxw(_)
             | Amominuw(_)
             | Amomaxuw(_)
+            | Lrd(_)
+            | Scd(_)
             | Rem(_)
             | Remu(_)
             | Remw(_)
@@ -577,9 +585,23 @@ macro_rules! fence_instr {
 }
 
 macro_rules! amo_instr {
-    ($f:expr, $op:expr, $args:expr) => {
-        write!($f, "{} {},{},({})", $op, $args.rd, $args.rs2, $args.rs1)
-    };
+    ($f:expr, $op:expr, $args:expr) => {{
+        let mut bits = String::new();
+        if $args.aq || $args.rl {
+            bits.push('.')
+        };
+        if $args.aq {
+            bits.push_str("aq")
+        };
+        if $args.rl {
+            bits.push_str("rl")
+        };
+        write!(
+            $f,
+            "{}{} {},{},({})",
+            $op, bits, $args.rd, $args.rs2, $args.rs1
+        )
+    }};
 }
 
 macro_rules! csr_instr {
@@ -723,6 +745,8 @@ impl fmt::Display for Instr {
             Jal(args) => u_instr!(f, "jal", args),
             Jalr(args) => i_instr_load!(f, "jalr", args),
 
+            Lrw(args) => amo_instr!(f, "lr.w", args),
+            Scw(args) => amo_instr!(f, "sc.w", args),
             Amoswapw(args) => amo_instr!(f, "amoswap.w", args),
             Amoaddw(args) => amo_instr!(f, "amoadd.w", args),
             Amoxorw(args) => amo_instr!(f, "amoxor.w", args),
@@ -732,6 +756,8 @@ impl fmt::Display for Instr {
             Amomaxw(args) => amo_instr!(f, "amomax.w", args),
             Amominuw(args) => amo_instr!(f, "amominu.w", args),
             Amomaxuw(args) => amo_instr!(f, "amomaxu.w", args),
+            Lrd(args) => amo_instr!(f, "lr.d", args),
+            Scd(args) => amo_instr!(f, "sc.d", args),
 
             // RV64M multiplication and division instructions
             Rem(args) => r_instr!(f, "rem", args),
