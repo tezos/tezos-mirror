@@ -79,6 +79,16 @@ module Slots : sig
       true IFF a slot is associated to the given commitment. *)
   val exists_slot_by_commitment :
     t -> Cryptobox.t -> commitment -> (bool, [> Errors.decoding]) result Lwt.t
+
+  (** [find_slot_by_commitment store cryptobox commitment] returns the
+      slot associated to some commitment or [None] if no slot is
+      associated. *)
+  val find_slot_by_commitment :
+    t ->
+    Cryptobox.t ->
+    commitment ->
+    (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
+    Lwt.t
 end
 
 module Shard_proofs_cache : sig

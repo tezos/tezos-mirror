@@ -214,6 +214,18 @@ module Slots = struct
       ~data_kind:Types.Store.Slot
       ~tztrace_of_error:Fun.id
       res
+
+  let find_slot_by_commitment slot_store cryptobox commitment =
+    let open Lwt_result_syntax in
+    let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+    let*! res =
+      KVS.read_value slot_store file_layout (commitment, slot_size) ()
+    in
+    let data_kind = Types.Store.Slot in
+    match res with
+    | Ok slot -> return_some slot
+    | Error [KVS.Missing_stored_kvs_data _] -> return_none
+    | Error err -> fail @@ `Decoding_failed (data_kind, err)
 end
 
 module Shard_proofs_cache =
