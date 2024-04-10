@@ -7,12 +7,19 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     prelude::*,
-    style::palette::tailwind,
+    style::{palette::tailwind, Stylize},
     symbols::border,
     widgets::{block::*, *},
 };
 use risc_v_interpreter::{
-    machine_state::{csregisters, mode::Mode, registers},
+    machine_state::{
+        csregisters::{
+            self,
+            xstatus::{ExtensionValue, MPPValue, SPPValue},
+        },
+        mode::Mode,
+        registers,
+    },
     Interpreter, InterpreterResult,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -262,6 +269,102 @@ impl<'a> DebuggerApp<'a> {
             .render(area, buf)
     }
 
+    fn render_mstatus_pane(&mut self, area: Rect, buf: &mut Buffer) {
+        let title = Title::from(" MSTATUS ".bold());
+        let block = Block::default()
+            .title(title.alignment(Alignment::Left))
+            .borders(Borders::ALL)
+            .border_set(border::THICK);
+
+        use csregisters::*;
+        use CSRegister as CSR;
+
+        let mstatus = self.interpreter.read_csregister(CSR::mstatus);
+        let mbe = xstatus::get_MBE(mstatus);
+        let sbe = xstatus::get_SBE(mstatus);
+        let tvm = xstatus::get_TVM(mstatus);
+        let tsr = xstatus::get_TSR(mstatus);
+        let sum = xstatus::get_SUM(mstatus);
+        let mxr = xstatus::get_MXR(mstatus);
+        let mie = xstatus::get_MIE(mstatus);
+        let sie = xstatus::get_SIE(mstatus);
+        let mpie = xstatus::get_MPIE(mstatus);
+        let spie = xstatus::get_SPIE(mstatus);
+        let mpp = xstatus::get_MPP(mstatus);
+        let spp = xstatus::get_SPP(mstatus);
+        let mprv = xstatus::get_MPRV(mstatus);
+        let tw = xstatus::get_TW(mstatus);
+        let ube = xstatus::get_UBE(mstatus);
+        let sd = xstatus::get_SD(mstatus);
+        let xs = xstatus::get_XS(mstatus);
+        let fs = xstatus::get_FS(mstatus);
+        let vs = xstatus::get_VS(mstatus);
+
+        let bool_field = |name: &'static str, toggled| match toggled {
+            false => name.fg(GRAY),
+            true => name.bold(),
+        };
+
+        let spp_field = |spp_val: SPPValue| match spp_val {
+            SPPValue::User => "U".bold(),
+            SPPValue::Supervisor => "S".fg(BLUE),
+        };
+
+        let mpp_field = |mpp_val: MPPValue| match mpp_val {
+            MPPValue::User => "U".bold(),
+            MPPValue::Supervisor => "S".fg(BLUE),
+            MPPValue::Machine => "M".fg(RED),
+        };
+
+        let ext_field = |ext_val: ExtensionValue| match ext_val {
+            ExtensionValue::Off => "O".fg(GRAY),
+            ExtensionValue::Initial => "I".fg(GREEN),
+            ExtensionValue::Clean => "C".fg(BLUE),
+            ExtensionValue::Dirty => "D".fg(RED),
+        };
+
+        let mstatus_text = Text::from(vec![
+            Line::from(vec![
+                // M-level / higher-privilege settings
+                " XS:".fg(GRAY),
+                ext_field(xs),
+                bool_field(" MBE", mbe),
+                bool_field(" MIE", mie),
+                bool_field(" MPIE", mpie),
+                " MPP:".into(),
+                mpp_field(mpp),
+            ]),
+            Line::from(vec![
+                // S-level / lower-privilege settings
+                " FS:".fg(GRAY),
+                ext_field(fs),
+                bool_field(" SBE", sbe),
+                bool_field(" SIE", sie),
+                bool_field(" SPIE", spie),
+                " SPP:".into(),
+                spp_field(spp),
+            ]),
+            Line::from(vec![
+                // Misc
+                " VS:".fg(GRAY),
+                ext_field(vs),
+                bool_field(" TVM", tvm),
+                bool_field(" SUM", sum),
+                bool_field(" TSR", tsr),
+                bool_field(" MPRV", mprv),
+                bool_field(" MXR", mxr),
+                bool_field(" TW", tw),
+                bool_field(" UBE", ube),
+                bool_field(" SD", sd),
+            ]),
+        ]);
+
+        Paragraph::new(mstatus_text)
+            .left_aligned()
+            .block(block)
+            .render(area, buf)
+    }
+
     fn render_fregisters_pane(&mut self, area: Rect, buf: &mut Buffer) {
         let title = Title::from(" F Registers ".bold());
         let block = Block::default()
@@ -454,7 +557,12 @@ impl Widget for &mut DebuggerApp<'_> {
         let registers_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![Constraint::Fill(1), Constraint::Percentage(50)]);
-        let [xregisters_area, f_area] = registers_layout.areas(registers_area);
+        let [x_area, f_area] = registers_layout.areas(registers_area);
+
+        let x_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Fill(1), Constraint::Length(5)]);
+        let [xregisters_area, mstatus_area] = x_layout.areas(x_area);
 
         let f_layout = Layout::default()
             .direction(Direction::Vertical)
@@ -463,6 +571,7 @@ impl Widget for &mut DebuggerApp<'_> {
 
         self.render_program_pane(program_area, buf);
         self.render_xregisters_pane(xregisters_area, buf);
+        self.render_mstatus_pane(mstatus_area, buf);
         self.render_fregisters_pane(fregisters_area, buf);
         self.render_fcsr_pane(fcsr_area, buf);
         self.render_status_pane(status_area, buf);
