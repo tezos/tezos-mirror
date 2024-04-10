@@ -513,6 +513,9 @@ module Delegate = struct
   let staking_balance ctxt pkh =
     Delegate_services.staking_balance rpc_ctxt ctxt pkh
 
+  let unstaked_frozen_deposits ctxt pkh =
+    Delegate_services.unstaked_frozen_deposits rpc_ctxt ctxt pkh
+
   let staking_denominator ctxt pkh =
     let open Lwt_result_syntax in
     let+ pseudotokens =
