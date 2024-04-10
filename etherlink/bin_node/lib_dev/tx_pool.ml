@@ -127,6 +127,7 @@ type parameters = {
   tx_timeout_limit : int64;
   tx_pool_addr_limit : int;
   tx_pool_tx_per_addr_limit : int;
+  max_number_of_chunks : int option;
 }
 
 module Types = struct
@@ -138,6 +139,7 @@ module Types = struct
     tx_timeout_limit : int64;
     tx_pool_addr_limit : int;
     tx_pool_tx_per_addr_limit : int;
+    max_number_of_chunks : int option;
     mutable locked : bool;
   }
 
@@ -521,6 +523,7 @@ module Handlers = struct
          tx_timeout_limit;
          tx_pool_addr_limit;
          tx_pool_tx_per_addr_limit;
+         max_number_of_chunks;
        } :
         Types.parameters) =
     let state =
@@ -533,6 +536,7 @@ module Handlers = struct
           tx_timeout_limit;
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
+          max_number_of_chunks;
           locked = false;
         }
     in

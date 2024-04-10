@@ -16,6 +16,9 @@ type parameters = {
   tx_pool_addr_limit : int;  (** Maximum allowed addresses inside the pool. *)
   tx_pool_tx_per_addr_limit : int;
       (** Maximum allowed transactions per address inside the pool. *)
+  max_number_of_chunks : int option;
+      (** Maximum allowed number of chunks to be sent (relevant for the
+          sequencer). *)
 }
 
 (** [start parameters] starts the tx-pool *)

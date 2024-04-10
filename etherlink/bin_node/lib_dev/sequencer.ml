@@ -247,6 +247,10 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
         tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit =
           Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+        max_number_of_chunks =
+          (match configuration.sequencer with
+          | Some {max_number_of_chunks; _} -> Some max_number_of_chunks
+          | None -> None);
       }
   in
   let* () =
