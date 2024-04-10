@@ -41,7 +41,7 @@ type 'a view =
   | `Null  (** The [null] constant. *) ]
 
 (** Each representation must provide a unique identifier, obtained via
-    the {!repr_uid} function. This identifier is used when converting
+    the {!val-repr_uid} function. This identifier is used when converting
     between representations, to optimize out a copy when converting
     from a representation to itself. Beware that this optimization
     relies only on this [uid] token. Converting between values of the
