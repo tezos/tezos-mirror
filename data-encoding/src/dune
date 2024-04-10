@@ -20,7 +20,7 @@
 
 (documentation
  (package data-encoding)
- (mld_files index tutorial))
+ (mld_files tutorial))
 
 (rule
  (targets tutorial.mld)

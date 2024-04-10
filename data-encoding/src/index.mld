@@ -1,5 +1,0 @@
-{0 Data-encoding: Type-safe serialization and deserialization of data structures. }
-
-Define [encoding]s for your types, use them to serialise and deserialise data.
-
-Check-out the {!page-tutorial} or the {{!module:Data_encoding}[API]}.
