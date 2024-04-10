@@ -44,7 +44,7 @@ openapi_json=docs/api/rpc-openapi-rc.json
 proto_openapi_json=docs/api/$protocol_name-openapi-rc.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-rc.json
 smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-rc.json
-dal_node_openapi_json=docs/api/dal-node-openapi-dev.json
+dal_node_openapi_json=docs/api/dal-node-openapi-rc.json
 
 # Get version number.
 version=$(dune exec octez-version -- --full-with-commit)
