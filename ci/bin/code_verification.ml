@@ -194,180 +194,6 @@ let read_opam_packages =
         Some {name; group; batch_index}
     | _ -> fail ()
 
-let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
-    ~job_build_arm64_release ~job_build_arm64_exp_dev_extra pipeline_type :
-    tezos_job list =
-  let build_dependencies = function
-    | Amd64 ->
-        Dependent
-          [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra]
-    | Arm64 ->
-        Dependent
-          [Job job_build_arm64_release; Job job_build_arm64_exp_dev_extra]
-  in
-  let rules =
-    (* TODO: Note that all jobs defined in this function are
-       [dependent] in the sense that they all have
-       [dependencies:]. However, AFAICT, these dependencies are all
-       dummy dependencies for ordering -- not for artifacts. This
-       means that these unit tests can very well run even if their
-       dependencies failed. Moreover, the ordering serves no purpose
-       on scheduled pipelines, so we might even remove them for that
-       [pipeline_type]. *)
-    make_rules ~changes:changeset_octez ~dependent:true pipeline_type
-  in
-  let job_unit_test ~__POS__ ?(image = Images.runtime_build_dependencies)
-      ?timeout ?parallel_vector ~arch ~name ?(enable_coverage = true)
-      ~make_targets () : tezos_job =
-    let arch_string = arch_to_string arch in
-    let script =
-      ["make $MAKE_TARGETS"]
-      @ if enable_coverage then ["./scripts/ci/merge_coverage.sh"] else []
-    in
-    let dependencies = build_dependencies arch in
-    let variables =
-      [("ARCH", arch_string); ("MAKE_TARGETS", String.concat " " make_targets)]
-    in
-
-    let variables, parallel =
-      (* When parallel_vector is set to non-zero (translating to the
-         [parallel_vector:] clause), set the variable
-         [DISTRIBUTE_TESTS_TO_PARALLELS] to [true], so that
-         [scripts/test_wrapper.sh] partitions the set of @runtest
-         targets to build. *)
-      match parallel_vector with
-      | Some n ->
-          ( variables @ [("DISTRIBUTE_TESTS_TO_PARALLELS", "true")],
-            Some (Vector n) )
-      | None -> (variables, None)
-    in
-    let job =
-      job
-        ?timeout
-        ?parallel
-        ~__POS__
-        ~retry:2
-        ~name
-        ~stage:Stages.test
-        ~image
-        ~arch
-        ~dependencies
-        ~rules
-        ~variables
-        ~artifacts:
-          (artifacts
-             ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
-             ["test_results"]
-             ~reports:(reports ~junit:"test_results/*.xml" ())
-             ~expire_in:(Duration (Days 1))
-             ~when_:Always)
-        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        script
-    in
-    if enable_coverage then
-      job |> enable_coverage_instrumentation |> enable_coverage_output_artifact
-    else job
-  in
-  let oc_unit_non_proto_x86_64 =
-    job_unit_test
-      ~__POS__
-      ~name:"oc.unit:non-proto-x86_64"
-      ~arch:Amd64 (* The [lib_benchmark] unit tests require Python *)
-      ~image:Images.runtime_build_test_dependencies
-      ~make_targets:["test-nonproto-unit"]
-      ()
-  in
-  let oc_unit_other_x86_64 =
-    (* Runs unit tests for contrib. *)
-    job_unit_test
-      ~__POS__
-      ~name:"oc.unit:other-x86_64"
-      ~arch:Amd64
-      ~make_targets:["test-other-unit"]
-      ()
-  in
-  let oc_unit_proto_x86_64 =
-    (* Runs unit tests for protocol. *)
-    job_unit_test
-      ~__POS__
-      ~name:"oc.unit:proto-x86_64"
-      ~arch:Amd64
-      ~make_targets:["test-proto-unit"]
-      ()
-  in
-  let oc_unit_non_proto_arm64 =
-    job_unit_test
-      ~__POS__
-      ~name:"oc.unit:non-proto-arm64"
-      ~parallel_vector:2
-      ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
-      ~image:Images.runtime_build_test_dependencies
-      ~make_targets:["test-nonproto-unit"; "test-webassembly"]
-        (* No coverage for arm64 jobs -- the code they test is a
-           subset of that tested by x86_64 unit tests. *)
-      ~enable_coverage:false
-      ()
-  in
-  let oc_unit_webassembly_x86_64 =
-    job
-      ~__POS__
-      ~name:"oc.unit:webassembly-x86_64"
-      ~arch:Amd64 (* The wasm tests are written in Python *)
-      ~image:Images.runtime_build_test_dependencies
-      ~stage:Stages.test
-      ~dependencies:(build_dependencies Amd64)
-      ~rules
-      ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
-           This test takes around 2 to 4min to complete, but it sometimes
-           hangs. We use a timeout to retry the test in this case. The
-           underlying issue should be fixed eventually, turning this timeout
-           unnecessary. *)
-      ~timeout:(Minutes 20)
-      ["make test-webassembly"]
-  in
-  let oc_unit_js_components =
-    job
-      ~__POS__
-      ~name:"oc.unit:js_components"
-      ~arch:Amd64
-      ~image:Images.runtime_build_test_dependencies
-      ~stage:Stages.test
-      ~dependencies:(build_dependencies Amd64)
-      ~rules
-      ~retry:2
-      ~variables:[("RUNTEZTALIAS", "true")]
-      ~before_script:
-        (before_script
-           ~take_ownership:true
-           ~source_version:true
-           ~eval_opam:true
-           ~install_js_deps:true
-           [])
-      ["make test-js"]
-  in
-  let oc_unit_protocol_compiles =
-    job
-      ~__POS__
-      ~name:"oc.unit:protocol_compiles"
-      ~arch:Amd64
-      ~image:Images.runtime_build_dependencies
-      ~stage:Stages.test
-      ~dependencies:(build_dependencies Amd64)
-      ~rules
-      ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-      ["dune build @runtest_compile_protocol"]
-  in
-  [
-    oc_unit_non_proto_x86_64;
-    oc_unit_other_x86_64;
-    oc_unit_proto_x86_64;
-    oc_unit_non_proto_arm64;
-    oc_unit_webassembly_x86_64;
-    oc_unit_js_components;
-    oc_unit_protocol_compiles;
-  ]
-
 (* These are the set of Linux distributions and their release for
    which we test installation of the deprecated Serokell PPA binary
    packages. *)
@@ -1158,12 +984,181 @@ let jobs pipeline_type =
       |> job_external_split
     in
     let jobs_unit : tezos_job list =
-      jobs_unit_tests
-        ~job_build_x86_64_release
-        ~job_build_x86_64_exp_dev_extra
-        ~job_build_arm64_release
-        ~job_build_arm64_exp_dev_extra
-        pipeline_type
+      let build_dependencies = function
+        | Amd64 ->
+            Dependent
+              [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra]
+        | Arm64 ->
+            Dependent
+              [Job job_build_arm64_release; Job job_build_arm64_exp_dev_extra]
+      in
+      let rules =
+        (* TODO: Note that all jobs defined here are
+           [dependent] in the sense that they all have
+           [dependencies:]. However, AFAICT, these dependencies are all
+           dummy dependencies for ordering -- not for artifacts. This
+           means that these unit tests can very well run even if their
+           dependencies failed. Moreover, the ordering serves no purpose
+           on scheduled pipelines, so we might even remove them for that
+           [pipeline_type]. *)
+        make_rules ~changes:changeset_octez ~dependent:true ()
+      in
+      let job_unit_test ~__POS__ ?(image = Images.runtime_build_dependencies)
+          ?timeout ?parallel_vector ~arch ~name ?(enable_coverage = true)
+          ~make_targets () : tezos_job =
+        let arch_string = arch_to_string arch in
+        let script =
+          ["make $MAKE_TARGETS"]
+          @ if enable_coverage then ["./scripts/ci/merge_coverage.sh"] else []
+        in
+        let dependencies = build_dependencies arch in
+        let variables =
+          [
+            ("ARCH", arch_string);
+            ("MAKE_TARGETS", String.concat " " make_targets);
+          ]
+        in
+
+        let variables, parallel =
+          (* When parallel_vector is set to non-zero (translating to the
+             [parallel_vector:] clause), set the variable
+             [DISTRIBUTE_TESTS_TO_PARALLELS] to [true], so that
+             [scripts/test_wrapper.sh] partitions the set of @runtest
+             targets to build. *)
+          match parallel_vector with
+          | Some n ->
+              ( variables @ [("DISTRIBUTE_TESTS_TO_PARALLELS", "true")],
+                Some (Vector n) )
+          | None -> (variables, None)
+        in
+        let job =
+          job
+            ?timeout
+            ?parallel
+            ~__POS__
+            ~retry:2
+            ~name
+            ~stage:Stages.test
+            ~image
+            ~arch
+            ~dependencies
+            ~rules
+            ~variables
+            ~artifacts:
+              (artifacts
+                 ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
+                 ["test_results"]
+                 ~reports:(reports ~junit:"test_results/*.xml" ())
+                 ~expire_in:(Duration (Days 1))
+                 ~when_:Always)
+            ~before_script:
+              (before_script ~source_version:true ~eval_opam:true [])
+            script
+        in
+        if enable_coverage then
+          job |> enable_coverage_instrumentation
+          |> enable_coverage_output_artifact
+        else job
+      in
+      let oc_unit_non_proto_x86_64 =
+        job_unit_test
+          ~__POS__
+          ~name:"oc.unit:non-proto-x86_64"
+          ~arch:Amd64 (* The [lib_benchmark] unit tests require Python *)
+          ~image:Images.runtime_build_test_dependencies
+          ~make_targets:["test-nonproto-unit"]
+          ()
+      in
+      let oc_unit_other_x86_64 =
+        (* Runs unit tests for contrib. *)
+        job_unit_test
+          ~__POS__
+          ~name:"oc.unit:other-x86_64"
+          ~arch:Amd64
+          ~make_targets:["test-other-unit"]
+          ()
+      in
+      let oc_unit_proto_x86_64 =
+        (* Runs unit tests for protocol. *)
+        job_unit_test
+          ~__POS__
+          ~name:"oc.unit:proto-x86_64"
+          ~arch:Amd64
+          ~make_targets:["test-proto-unit"]
+          ()
+      in
+      let oc_unit_non_proto_arm64 =
+        job_unit_test
+          ~__POS__
+          ~name:"oc.unit:non-proto-arm64"
+          ~parallel_vector:2
+          ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
+          ~image:Images.runtime_build_test_dependencies
+          ~make_targets:["test-nonproto-unit"; "test-webassembly"]
+            (* No coverage for arm64 jobs -- the code they test is a
+               subset of that tested by x86_64 unit tests. *)
+          ~enable_coverage:false
+          ()
+      in
+      let oc_unit_webassembly_x86_64 =
+        job
+          ~__POS__
+          ~name:"oc.unit:webassembly-x86_64"
+          ~arch:Amd64 (* The wasm tests are written in Python *)
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.test
+          ~dependencies:(build_dependencies Amd64)
+          ~rules
+          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
+               This test takes around 2 to 4min to complete, but it sometimes
+               hangs. We use a timeout to retry the test in this case. The
+               underlying issue should be fixed eventually, turning this timeout
+               unnecessary. *)
+          ~timeout:(Minutes 20)
+          ["make test-webassembly"]
+      in
+      let oc_unit_js_components =
+        job
+          ~__POS__
+          ~name:"oc.unit:js_components"
+          ~arch:Amd64
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.test
+          ~dependencies:(build_dependencies Amd64)
+          ~rules
+          ~retry:2
+          ~variables:[("RUNTEZTALIAS", "true")]
+          ~before_script:
+            (before_script
+               ~take_ownership:true
+               ~source_version:true
+               ~eval_opam:true
+               ~install_js_deps:true
+               [])
+          ["make test-js"]
+      in
+      let oc_unit_protocol_compiles =
+        job
+          ~__POS__
+          ~name:"oc.unit:protocol_compiles"
+          ~arch:Amd64
+          ~image:Images.runtime_build_dependencies
+          ~stage:Stages.test
+          ~dependencies:(build_dependencies Amd64)
+          ~rules
+          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+          ["dune build @runtest_compile_protocol"]
+      in
+      [
+        oc_unit_non_proto_x86_64;
+        oc_unit_other_x86_64;
+        oc_unit_proto_x86_64;
+        oc_unit_non_proto_arm64;
+        oc_unit_webassembly_x86_64;
+        oc_unit_js_components;
+        oc_unit_protocol_compiles;
+      ]
       |> jobs_external_split ~path:"test/oc.unit"
     in
     let job_oc_integration_compiler_rejections : tezos_job =
@@ -1656,7 +1651,178 @@ let jobs pipeline_type =
         [job_commit_titles]
     | Schedule_extended_test -> []
   in
-  let doc = [] in
+  let doc =
+    let jobs_install_python =
+      (* Creates a job that tests installation of the python environment in [image] *)
+      let job_install_python ~__POS__ ~name ~image =
+        job
+          ~__POS__
+          ~name
+          ~image
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules:
+            (make_rules
+               ~changes:
+                 (Changeset.make
+                    ["docs/developer/install-python-debian-ubuntu.sh"])
+               ~manual:Yes
+               ~label:"ci--docs"
+               ())
+          [
+            "./docs/developer/install-python-debian-ubuntu.sh \
+             ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} \
+             ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+          ]
+      in
+      (* The set of python installation test jobs. *)
+      [
+        job_install_python
+          ~__POS__
+          ~name:"oc.install_python_focal"
+          ~image:Images.ubuntu_focal;
+        job_install_python
+          ~__POS__
+          ~name:"oc.install_python_jammy"
+          ~image:Images.ubuntu_jammy;
+        job_install_python
+          ~__POS__
+          ~name:"oc.install_python_bullseye"
+          ~image:Images.debian_bullseye;
+      ]
+      |> jobs_external_split ~path:"doc/oc.install_python"
+    in
+    let jobs_documentation : tezos_job list =
+      let rules =
+        make_rules ~changes:changeset_octez_docs ~label:"ci--docs" ()
+      in
+      let job_odoc =
+        job
+          ~__POS__
+          ~name:"documentation:odoc"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules
+          ~before_script:(before_script ~eval_opam:true [])
+          ~artifacts:
+            (artifacts
+               ~expire_in:(Duration (Hours 1))
+               (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
+               ["docs/_build/api/odoc/"])
+          ["make -C docs odoc-lite"]
+      in
+      let job_manuals =
+        job
+          ~__POS__
+          ~name:"documentation:manuals"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules
+          ~before_script:(before_script ~eval_opam:true [])
+          ~artifacts:
+            (artifacts
+               ~expire_in:(Duration (Weeks 1))
+               [
+                 "docs/*/octez-*.html";
+                 "docs/api/octez-*.txt";
+                 "docs/developer/metrics.csv";
+                 "docs/user/node-config.json";
+               ])
+          ["./.gitlab/ci/jobs/doc/documentation:manuals.sh"]
+      in
+      let job_docgen =
+        job
+          ~__POS__
+          ~name:"documentation:docgen"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:dependencies_needs_trigger
+          ~rules
+          ~before_script:(before_script ~eval_opam:true [])
+          ~artifacts:
+            (artifacts
+               ~expire_in:(Duration (Weeks 1))
+               [
+                 "docs/alpha/rpc.rst";
+                 "docs/shell/rpc.rst";
+                 "docs/user/default-acl.json";
+                 "docs/api/errors.rst";
+                 "docs/shell/p2p_api.rst";
+               ])
+          ["make -C docs -j docexes-gen"]
+      in
+      let doc_build_dependencies =
+        Dependent
+          [Artifacts job_odoc; Artifacts job_manuals; Artifacts job_docgen]
+      in
+      let job_build_all =
+        job
+          ~__POS__
+          ~name:"documentation:build_all"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:doc_build_dependencies
+            (* Warning: the [documentation:linkcheck] job must have at least the same
+               restrictions in the rules as [documentation:build_all], otherwise the CI
+               may complain that [documentation:linkcheck] depends on [documentation:build_all]
+               which does not exist. *)
+          ~rules:
+            (make_rules
+               ~dependent:true
+               ~changes:changeset_octez_docs
+               ~label:"ci--docs"
+               ())
+          ~before_script:
+            (before_script ~eval_opam:true ~init_python_venv:true [])
+          ~artifacts:
+            (artifacts
+               ~expose_as:"Documentation - excluding old protocols"
+               ~expire_in:(Duration (Weeks 1))
+               (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
+               ["docs/_build/"])
+          ["make -C docs -j sphinx"]
+      in
+      let job_documentation_linkcheck : tezos_job =
+        job
+          ~__POS__
+          ~name:"documentation:linkcheck"
+          ~image:Images.runtime_build_test_dependencies
+          ~stage:Stages.doc
+          ~dependencies:
+            (Dependent
+               [
+                 Artifacts job_manuals;
+                 Artifacts job_docgen;
+                 Artifacts job_build_all;
+               ])
+          ~rules:
+            (make_rules
+               ~dependent:true
+               ~label:"ci--docs"
+               ~manual:(On_changes changeset_octez_docs)
+               ())
+          ~allow_failure:Yes
+          ~before_script:
+            (before_script
+               ~source_version:true
+               ~eval_opam:true
+               ~init_python_venv:true
+               [])
+          ["make -C docs redirectcheck"; "make -C docs linkcheck"]
+      in
+      [
+        job_odoc;
+        job_manuals;
+        job_docgen;
+        job_build_all;
+        job_documentation_linkcheck;
+      ]
+      |> jobs_external_split ~path:"doc/documentation"
+    in
+    jobs_install_python @ jobs_documentation
+  in
   let manual =
     match pipeline_type with
     | Before_merging ->

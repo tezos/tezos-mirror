@@ -1,0 +1,187 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+documentation:odoc:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - make -C docs odoc-lite
+  artifacts:
+    expire_in: 1 hour
+    paths:
+    - docs/_build/api/odoc/
+
+documentation:manuals:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - ./.gitlab/ci/jobs/doc/documentation:manuals.sh
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/*/octez-*.html
+    - docs/api/octez-*.txt
+    - docs/developer/metrics.csv
+    - docs/user/node-config.json
+
+documentation:docgen:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - make -C docs -j docexes-gen
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/alpha/rpc.rst
+    - docs/shell/rpc.rst
+    - docs/user/default-acl.json
+    - docs/api/errors.rst
+    - docs/shell/p2p_api.rst
+
+documentation:build_all:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: on_success
+  needs:
+  - documentation:odoc
+  - documentation:manuals
+  - documentation:docgen
+  dependencies:
+  - documentation:odoc
+  - documentation:manuals
+  - documentation:docgen
+  before_script:
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - make -C docs -j sphinx
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/_build/
+    expose_as: Documentation - excluding old protocols
+
+documentation:linkcheck:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: doc
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*
+    - tezt/**/*
+    - vendors/**/*
+    when: manual
+    allow_failure: true
+  needs:
+  - documentation:manuals
+  - documentation:docgen
+  - documentation:build_all
+  dependencies:
+  - documentation:manuals
+  - documentation:docgen
+  - documentation:build_all
+  allow_failure: true
+  before_script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  script:
+  - make -C docs redirectcheck
+  - make -C docs linkcheck

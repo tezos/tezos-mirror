@@ -21,7 +21,7 @@ include:
   - .gitlab/ci/jobs/build/oc.build_x86_64-exp-dev-extra-before_merging.yml
   - .gitlab/ci/jobs/build/oc.build_x86_64-released-before_merging.yml
   - .gitlab/ci/jobs/build/oc.build_kernels-before_merging.yml
-  - .gitlab/ci/jobs/doc/documentation.yml
+  - .gitlab/ci/jobs/doc/documentation-before_merging.yml
   - .gitlab/ci/jobs/build/oc.docker:amd64-test_manual.yml
   - .gitlab/ci/jobs/build/oc.docker:arm64-test_manual.yml
   - .gitlab/ci/jobs/build/oc.build:rpm:amd64-manual.yml
@@ -60,5 +60,4 @@ include:
       - if: '$CI_MERGE_REQUEST_LABELS !~ /(?:^|,)ci--no-coverage(?:$|,)/'
 
   # Stage: doc
-  - .gitlab/ci/jobs/doc/documentation:linkcheck.yml
-  - .gitlab/ci/jobs/doc/oc.install_python.yml
+  - .gitlab/ci/jobs/doc/oc.install_python-before_merging.yml

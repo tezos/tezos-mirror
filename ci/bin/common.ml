@@ -145,6 +145,9 @@ module Images = struct
   let debian_bookworm =
     Image.register ~name:"debian_bookworm" ~image_path:"debian:bookworm"
 
+  let debian_bullseye =
+    Image.register ~name:"debian_bullseye" ~image_path:"debian:bullseye"
+
   let ubuntu_focal =
     Image.register
       ~name:"ubuntu_focal"
