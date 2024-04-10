@@ -13,12 +13,15 @@ use ratatui::{
 };
 use risc_v_interpreter::{
     machine_state::{
+        bus::Address,
         csregisters::{
             self,
+            satp::{self, SvLength, TranslationAlgorithm},
             xstatus::{ExtensionValue, MPPValue, SPPValue},
+            CSRValue, CSRegister,
         },
         mode::Mode,
-        registers,
+        registers, AccessType,
     },
     Interpreter, InterpreterResult,
 };
@@ -37,11 +40,106 @@ const SELECTED_STYLE_FG: Color = BLUE;
 const NEXT_STYLE_FG: Color = GREEN;
 const MAX_STEPS: usize = 1_000_000;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Instruction<'a> {
     address: u64,
     text: &'a str,
     jump: Option<(u64, Option<&'a str>)>,
+}
+
+enum EffectiveTranslationState {
+    Off,
+    On,
+    Faulting,
+}
+
+impl EffectiveTranslationState {
+    pub fn text(&self) -> &'static str {
+        match self {
+            Self::Off => "Off",
+            Self::On => "On",
+            Self::Faulting => "Faulting",
+        }
+    }
+
+    pub fn fg(&self) -> Color {
+        match self {
+            Self::Off => GRAY,
+            Self::On => GREEN,
+            Self::Faulting => RED,
+        }
+    }
+}
+
+enum SATPModeState {
+    // Reserved / Unsupported
+    Invalid,
+    // Translation is BARE mode
+    Bare,
+    // Translation is SvXY mode
+    Sv(SvLength),
+}
+
+struct TranslationState {
+    mode: SATPModeState,
+    base: Address,
+    effective: EffectiveTranslationState,
+}
+
+impl TranslationState {
+    fn update(
+        &mut self,
+        faulting: bool,
+        effective_mode: Option<TranslationAlgorithm>,
+        satp_val: CSRValue,
+    ) {
+        self.effective = if faulting {
+            EffectiveTranslationState::Faulting
+        } else {
+            match effective_mode {
+                None => EffectiveTranslationState::Off,
+                Some(_alg) => EffectiveTranslationState::On,
+            }
+        };
+
+        self.base = satp::get_PPN(satp_val).value();
+
+        self.mode = match satp::get_MODE(satp_val) {
+            None => SATPModeState::Invalid,
+            Some(alg) => match alg {
+                TranslationAlgorithm::Bare => SATPModeState::Bare,
+                TranslationAlgorithm::Sv(length) => SATPModeState::Sv(length),
+            },
+        }
+    }
+}
+
+impl SATPModeState {
+    pub fn text(&self) -> &'static str {
+        match self {
+            Self::Invalid => "Invalid",
+            Self::Bare => "Bare",
+            Self::Sv(length) => match length {
+                SvLength::Sv39 => "Sv39",
+                SvLength::Sv48 => "Sv48",
+                SvLength::Sv57 => "Sv57",
+            },
+        }
+    }
+
+    pub fn fg(&self) -> Color {
+        match self {
+            Self::Invalid => GRAY,
+            Self::Bare => BLUE,
+            Self::Sv(_) => GREEN,
+        }
+    }
+}
+
+struct DebuggerState {
+    pub interpreter: InterpreterResult,
+    pub prev_pc: Address,
+    pub translation: TranslationState,
 }
 
 struct ProgramView<'a> {
@@ -56,7 +154,7 @@ pub struct DebuggerApp<'a> {
     title: &'a str,
     interpreter: &'a mut Interpreter<'a>,
     program: ProgramView<'a>,
-    status: InterpreterResult,
+    state: DebuggerState,
 }
 
 macro_rules! xregister_line {
@@ -131,7 +229,15 @@ impl<'a> DebuggerApp<'a> {
                     .collect::<Vec<Instruction>>(),
                 symbols,
             ),
-            status: InterpreterResult::Running(0),
+            state: DebuggerState {
+                interpreter: InterpreterResult::Running(0),
+                prev_pc: 0,
+                translation: TranslationState {
+                    mode: SATPModeState::Bare,
+                    base: 0,
+                    effective: EffectiveTranslationState::Off,
+                },
+            },
         }
     }
 
@@ -162,8 +268,31 @@ impl<'a> DebuggerApp<'a> {
         Ok(())
     }
 
+    /// Returns the physical program counter, and if the translation algorithm is faulting
+    fn update_pc_after_step(&mut self) -> (Address, bool) {
+        let raw_pc = self.interpreter.read_pc();
+        let res @ (pc, _faulting) = match self.interpreter.translate_instruction_address(raw_pc) {
+            Err(_e) => (self.state.prev_pc, true),
+            Ok(pc) => (pc, false),
+        };
+
+        self.state.prev_pc = pc;
+
+        res
+    }
+
+    fn update_translation_after_step(&mut self, faulting: bool) {
+        let effective_mode = self.interpreter.effective_translation_mode();
+        let satp_val = self.interpreter.read_csregister(CSRegister::satp);
+        self.state
+            .translation
+            .update(faulting, effective_mode, satp_val)
+    }
+
     fn update_after_step(&mut self, result: InterpreterResult) {
-        let pc = self.interpreter.read_pc();
+        let (pc, faulting) = self.update_pc_after_step();
+        self.update_translation_after_step(faulting);
+
         self.program.next_instr = self
             .program
             .instructions
@@ -176,7 +305,7 @@ impl<'a> DebuggerApp<'a> {
                 )
             });
         self.program.state.select(Some(self.program.next_instr));
-        self.status = result;
+        self.state.interpreter = result;
     }
 
     fn step(&mut self, max_steps: usize) {
@@ -187,7 +316,11 @@ impl<'a> DebuggerApp<'a> {
     fn step_until_breakpoint(&mut self) {
         self.step(1);
         let result = self.interpreter.step_many(MAX_STEPS, |m| {
-            !self.program.breakpoints.contains(&m.hart.pc.read())
+            let raw_pc = m.hart.pc.read();
+            let pc = m
+                .translate(raw_pc, AccessType::Instruction)
+                .unwrap_or(raw_pc);
+            !self.program.breakpoints.contains(&pc)
         });
         self.update_after_step(result);
     }
@@ -488,15 +621,30 @@ impl<'a> DebuggerApp<'a> {
             "   PC: ".into(),
             format!("{:x}", self.interpreter.read_pc()).fg(ORANGE),
         ]);
+        let TranslationState {
+            mode,
+            base,
+            effective,
+        } = &self.state.translation;
+
+        let virt_line = Line::from(vec![
+            "   Address Translation: ".into(),
+            effective.text().to_string().fg(effective.fg()),
+            " | ".into(),
+            mode.text().to_string().fg(mode.fg()),
+            ":".fg(GRAY),
+            format!("{:x}", base).fg(ORANGE),
+        ]);
         let mode_line = Line::from(vec![
             "   Mode: ".into(),
             format!("{:?}", self.interpreter.read_mode()).fg(BLUE),
         ]);
-        let status_text = match &self.status {
+        let status_text = match &self.state.interpreter {
             InterpreterResult::Running(steps) => vec![
                 Line::from(vec!["   Running".bold().fg(GREEN)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                 pc_line,
+                virt_line,
                 mode_line,
             ],
             InterpreterResult::Exit { code, steps } => {
@@ -505,12 +653,14 @@ impl<'a> DebuggerApp<'a> {
                     Line::from(vec![format!("   Exit with code {}", code).bold().fg(color)]),
                     Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                     pc_line,
+                    virt_line,
                 ]
             }
             InterpreterResult::Exception(exc, steps) => vec![
                 Line::from(vec![format!("   Exception: {:?}", exc).bold().fg(RED)]),
                 Line::from(vec![format!("   Steps executed: {}", steps).into()]),
                 pc_line,
+                virt_line,
             ],
         };
         Paragraph::new(Text::from(status_text))
@@ -539,19 +689,20 @@ impl<'a> DebuggerApp<'a> {
 impl Widget for &mut DebuggerApp<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Split main layout from bottom instructions bar
+        use Constraint::{Fill, Length, Percentage};
         let outer_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Fill(1), Constraint::Length(1)])
+            .constraints(vec![Fill(1), Length(1)])
             .split(area);
 
         let main_layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)]);
+            .constraints(vec![Percentage(50), Percentage(50)]);
         let [program_area, rhs_area] = main_layout.areas(outer_layout[0]);
 
         let rhs_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Fill(1), Constraint::Length(6)]);
+            .constraints(vec![Fill(1), Length(7)]);
         let [registers_area, status_area] = rhs_layout.areas(rhs_area);
 
         let registers_layout = Layout::default()
@@ -566,7 +717,7 @@ impl Widget for &mut DebuggerApp<'_> {
 
         let f_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Fill(1), Constraint::Length(5)]);
+            .constraints(vec![Fill(1), Length(5)]);
         let [fregisters_area, fcsr_area] = f_layout.areas(f_area);
 
         self.render_program_pane(program_area, buf);

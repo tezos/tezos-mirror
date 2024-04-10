@@ -183,27 +183,35 @@ where
 }
 
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
+    /// Get the effective translation mode when addressing memory.
+    /// [`None`] represents that either `SATP.mode` is a reserved / not implemented mode or
+    /// that the system is in `Machine` mode in which case translation is ignored.
+    pub fn effective_translation_mode(&self) -> Option<TranslationAlgorithm> {
+        // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
+        //    The satp register must be active, i.e.,
+        //    the effective privilege mode must be S-mode or U-mode.
+        match self.hart.mode.read() {
+            Mode::User | Mode::Supervisor => (),
+            Mode::Machine => return None,
+        };
+        let satp = self.hart.csregisters.read(CSRegister::satp);
+        satp::get_MODE(satp)
+    }
+
     /// Translate a virtual address to a physical address as described in section 5.3.2
     pub fn translate(
         &self,
         v_addr: Address,
         access_type: AccessType,
     ) -> Result<Address, Exception> {
-        // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
-        //    The satp register must be active, i.e.,
-        //    the effective privilege mode must be S-mode or U-mode.
-        match self.hart.mode.read() {
-            Mode::User | Mode::Supervisor => (),
-            Mode::Machine => return Ok(v_addr),
-        };
-        let satp = self.hart.csregisters.read(CSRegister::satp);
-        let mode = satp::get_MODE(satp);
+        let mode = self.effective_translation_mode();
 
         match mode {
             // An invalid mode should not be writable, but it is treated as BARE
             None => Ok(v_addr),
             Some(TranslationAlgorithm::Bare) => Ok(v_addr),
             Some(TranslationAlgorithm::Sv(length)) => {
+                let satp = self.hart.csregisters.read(CSRegister::satp);
                 sv_translate_impl(&self.bus, v_addr, satp, length, &access_type)
                     .map_err(|_e| access_type.exception(v_addr))
             }

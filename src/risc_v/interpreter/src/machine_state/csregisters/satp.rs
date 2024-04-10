@@ -53,6 +53,8 @@ impl TranslationAlgorithm {
     }
 }
 
+/// `None` represents that the value of SATP.mode is reserved or
+/// that we do not care about it / is irrelevant.
 impl FieldValue for Option<TranslationAlgorithm> {
     fn new(value: u64) -> Self {
         use SvLength::*;
