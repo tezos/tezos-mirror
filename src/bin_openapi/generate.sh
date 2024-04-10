@@ -18,8 +18,8 @@ smart_rollup_node=./octez-smart-rollup-node
 dal_node=./octez-dal-node
 
 # Protocol configuration.
-protocol_hash=PtParisA6ruu136piHaBC7cQLDP87JEqtczJWP2pLa5QCELGBH5
-protocol_parameters=src/proto_019_PtParisA/parameters/sandbox-parameters.json
+protocol_hash=PtParisBQscdCm6Cfow6ndeU6wKJyA3aV1j4D3gQBQMsTQyJCrz
+protocol_parameters=src/proto_019_PtParisB/parameters/sandbox-parameters.json
 protocol_name=paris
 
 # Secret key to activate the protocol.
