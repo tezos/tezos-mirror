@@ -107,6 +107,7 @@ depends: [
   "tls-lwt" { >= "0.16.0" }
   "uri" { >= "3.1.0" }
   "uutf"
+  "vector"
   "yaml" { >= "3.1.0" }
   "zarith" { >= "1.13" & < "1.14" }
   "zarith_stubs_js" { >= "0.16.1" }
