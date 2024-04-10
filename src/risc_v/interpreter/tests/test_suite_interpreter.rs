@@ -109,12 +109,12 @@ test_case!(#[ignore], test_suite_rv64mzicbo_p_zero, "rv64mzicbo-p-zero");
 // RV64-SI
 test_case!(test_suite_rv64si_p_csr, "rv64si-p-csr");
 test_case!(#[ignore], test_suite_rv64si_p_dirty, "rv64si-p-dirty");
-test_case!(#[ignore], test_suite_rv64si_p_icache_alias, "rv64si-p-icache-alias");
 test_case!(
-    test_suite_rv64si_p_ma_fetch,
-    "rv64si-p-ma_fetch",
-    Mode::Supervisor
+    test_suite_rv64si_p_icache_alias,
+    "rv64si-p-icache-alias",
+    Mode::Machine
 );
+test_case!(test_suite_rv64si_p_ma_fetch, "rv64si-p-ma_fetch");
 test_case!(test_suite_rv64si_p_sbreak, "rv64si-p-sbreak");
 test_case!(
     test_suite_rv64si_p_scall,
