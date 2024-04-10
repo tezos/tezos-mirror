@@ -84,13 +84,15 @@
               if ! ( ${checkFlakeLock} ${opam-repository} $opam_repo_flake opam-repository && \
                      ${checkFlakeLock} ${tezos-opam-repository} $tezos_opam_repo_flake tezos-opam-repository );
               then
-                nix flake lock --quiet \
+                nix flake lock \
                   --override-input opam-repository $opam_repo_flake \
-                  --override-input tezos_opam_repo_flake $tezos_opam_repo_flake \
+                  --override-input tezos-opam-repository $tezos_opam_repo_flake \
                   2> /dev/null > /dev/null
 
                 echo Or copy the 'flake.lock' from CI artifacts.
                 echo
+
+                exit 1
               fi
             '';
           in

@@ -460,6 +460,27 @@ let jobs pipeline_type =
           "make -C ci check";
         ]
     in
+    let job_nix : tezos_job =
+      job
+        ~__POS__
+        ~name:"nix"
+        ~image:Images.nix
+        ~stage:Stages.sanity
+        ~artifacts:(artifacts ~when_:On_failure ["flake.lock"])
+        ~rules:
+          (make_rules
+             ~changes:
+               (Changeset.make ["**/*.nix"; "flake.lock"; "scripts/version.sh"])
+             ())
+        ~before_script:
+          [
+            "mkdir -p ~/.config/nix";
+            "echo 'extra-experimental-features = flakes nix-command' > \
+             ~/.config/nix/nix.conf";
+          ]
+        ["nix run .#ci-check-version-sh-lock"]
+        ~cache:[{key = "nix-store"; paths = ["/nix/store"]}]
+    in
     let job_docker_hadolint =
       job
         ~rules:(make_rules ~changes:changeset_hadolint_docker_files ())
@@ -475,7 +496,17 @@ let jobs pipeline_type =
         ~stage:Stages.sanity
         ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
     in
-    [job_sanity_ci; job_docker_hadolint]
+    let mr_only_jobs =
+      match pipeline_type with
+      | Before_merging ->
+          [
+            (* This job shall only run in pipelines for MRs because it's not
+               sensitive to changes in time. *)
+            job_nix;
+          ]
+      | _ -> []
+    in
+    [job_sanity_ci; job_docker_hadolint] @ mr_only_jobs
   in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
