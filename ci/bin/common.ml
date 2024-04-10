@@ -307,6 +307,7 @@ let changeset_octez =
     @ make
         [
           "src/**/*";
+          "data-encoding/**/*";
           "etherlink/**/*";
           "tezt/**/*";
           "michelson_test_scripts/**/*";
