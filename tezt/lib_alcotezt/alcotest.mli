@@ -144,6 +144,10 @@ val triple :
 (** The result testable type. *)
 val result : 'a testable -> 'e testable -> ('a, 'e) result testable
 
+(** The reject testable type.
+    [reject] always fails on values of any type. *)
+val reject : 'a testable
+
 (** The option testable type. *)
 val option : 'a testable -> 'a option testable
 
