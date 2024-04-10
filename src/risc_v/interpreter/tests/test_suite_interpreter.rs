@@ -108,7 +108,7 @@ test_case!(#[ignore], test_suite_rv64mzicbo_p_zero, "rv64mzicbo-p-zero");
 
 // RV64-SI
 test_case!(test_suite_rv64si_p_csr, "rv64si-p-csr");
-test_case!(#[ignore], test_suite_rv64si_p_dirty, "rv64si-p-dirty");
+test_case!(test_suite_rv64si_p_dirty, "rv64si-p-dirty", Mode::Machine);
 test_case!(
     test_suite_rv64si_p_icache_alias,
     "rv64si-p-icache-alias",
