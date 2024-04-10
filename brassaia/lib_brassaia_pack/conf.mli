@@ -22,7 +22,7 @@ type inode_child_order =
   | `Custom of depth:int -> bytes -> int  (** use a custom index *) ]
 
 module type S = sig
-  val entries : int
+  val nb_entries : int
   (** The branching factor of the inode tree. 32 is a good choice for general
       applications. *)
 

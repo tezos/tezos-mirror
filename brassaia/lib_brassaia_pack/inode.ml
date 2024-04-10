@@ -47,7 +47,7 @@ struct
   end
 
   (* Keep at most 50 bits of information. *)
-  let max_depth = int_of_float (log (2. ** 50.) /. log (float Conf.entries))
+  let max_depth = int_of_float (log (2. ** 50.) /. log (float Conf.nb_entries))
 
   module T = struct
     type hash = H.t [@@deriving brassaia ~pp ~to_bin_string ~equal]
@@ -92,14 +92,14 @@ struct
 
     type key = bytes
 
-    let log_entry = int_of_float (log (float Conf.entries) /. log 2.)
+    let log_entry = int_of_float (log (float Conf.nb_entries) /. log 2.)
 
     let () =
       assert (log_entry >= 1);
       (* NOTE: the [`Hash_bits] mode is restricted to inodes with at most 1024
          entries in order to simplify the implementation (see below). *)
       assert ((not (Conf.inode_child_order = `Hash_bits)) || log_entry <= 10);
-      assert (Conf.entries = int_of_float (2. ** float log_entry))
+      assert (Conf.nb_entries = int_of_float (2. ** float log_entry))
 
     let key =
       match Conf.inode_child_order with
@@ -136,7 +136,7 @@ struct
         (* The index is contained in a single character of the hash *)
         let i = Bytes.get_uint8 k n in
         let e0 = i lsr (byte - log_entry - r) in
-        let r0 = e0 land (Conf.entries - 1) in
+        let r0 = e0 land (Conf.nb_entries - 1) in
         r0
       else
         (* The index spans two characters of the hash *)
@@ -151,7 +151,9 @@ struct
         r0 + r1
 
     let short_hash = Brassaia.Type.(unstage (short_hash bytes))
-    let seeded_hash ~depth k = abs (short_hash ~seed:depth k) mod Conf.entries
+
+    let seeded_hash ~depth k =
+      abs (short_hash ~seed:depth k) mod Conf.nb_entries
 
     let index =
       match Conf.inode_child_order with
@@ -502,7 +504,7 @@ struct
 
     (** The rule to determine the [is_root] property of a v0 [Value] is a bit
         convoluted, it relies on the fact that back then the following property
-        was enforced: [Conf.stable_hash > Conf.entries].
+        was enforced: [Conf.stable_hash > Conf.nb_entries].
 
         When [t] is of tag [Values], then [t] is root iff [t] is stable.
 
@@ -518,7 +520,7 @@ struct
         - When an unstable inode enters [stabilize], it becomes stable if it has
           at most [Conf.stable_hash] leaves.
         - A [Value] has at most [Conf.stable_hash] leaves because
-          [Conf.entries <= Conf.stable_hash] is enforced. *)
+          [Conf.nb_entries <= Conf.stable_hash] is enforced. *)
     let is_root = function
       | { tv = V0_stable (Values _); _ } -> true
       | { tv = V0_unstable (Values _); _ } -> false
@@ -1033,8 +1035,8 @@ struct
             Fmt.pf ppf "pointers should be sorted: %a" pp t
         | `Blinded_root -> Fmt.pf ppf "blinded root"
         | `Too_large_values t ->
-            Fmt.pf ppf "A Values should have at most Conf.entries elements: %a"
-              pp t
+            Fmt.pf ppf
+              "A Values should have at most Conf.nb_entries elements: %a" pp t
         | `Empty -> Fmt.pf ppf "concrete subtrees cannot be empty"
     end
 
@@ -1099,7 +1101,7 @@ struct
       let check_entries t es =
         if es = [] then raise Empty;
         let s = sort_entries es in
-        if List.compare_length_with es Conf.entries > 0 then
+        if List.compare_length_with es Conf.nb_entries > 0 then
           raise (Too_large_values t);
         if List.compare_lengths s es <> 0 then raise (Duplicated_entries t);
         if s <> es then raise (Unsorted_entries t)
@@ -1118,7 +1120,7 @@ struct
             check_entries t l;
             Some (Values (StepMap.of_list (List.map Concrete.of_entry l)))
         | Concrete.Tree tr ->
-            let entries = Array.make Conf.entries None in
+            let entries = Array.make Conf.nb_entries None in
             check_pointers t tr.pointers;
             List.iter
               (fun { Concrete.index; pointer; tree } ->
@@ -1228,7 +1230,7 @@ struct
             let vs = StepMap.of_list vs in
             Values vs
         | Tree t ->
-            let entries = Array.make Conf.entries None in
+            let entries = Array.make Conf.nb_entries None in
             let ptr_of_key = Ptr.of_key layout in
             List.iter
               (fun { Bin.index; vref } ->
@@ -1300,12 +1302,16 @@ struct
             if replace then StepMap.cardinal vs else StepMap.cardinal vs + 1
           in
           let parent =
-            if length <= Conf.entries then values layout (StepMap.add s v vs)
+            if length <= Conf.nb_entries then values layout (StepMap.add s v vs)
             else
               let vs = StepMap.bindings (StepMap.add s v vs) in
               let empty =
                 tree layout
-                  { length = 0; depth; entries = Array.make Conf.entries None }
+                  {
+                    length = 0;
+                    depth;
+                    entries = Array.make Conf.nb_entries None;
+                  }
               in
               let aux t (s', v) =
                 let key' = Child_ordering.key s' in
@@ -1360,7 +1366,7 @@ struct
       | Tree tr -> (
           let depth = tr.depth in
           let len = tr.length - 1 in
-          if len <= Conf.entries then
+          if len <= Conf.nb_entries then
             let vs = seq_tree layout tr in
             let vs = StepMap.of_seq vs in
             let vs = StepMap.remove s vs in
@@ -1413,7 +1419,7 @@ struct
         let rec aux_small seq map =
           match seq () with
           | Seq.Nil ->
-              assert (!len <= Conf.entries);
+              assert (!len <= Conf.nb_entries);
               values la map
           | Seq.Cons ((s, v), rest) ->
               let map =
@@ -1425,7 +1431,7 @@ struct
                     | Some _ -> Some v)
                   map
               in
-              if !len = Conf.entries then aux_big rest (values la map)
+              if !len = Conf.nb_entries then aux_big rest (values la map)
               else aux_small rest map
         in
         aux_small l StepMap.empty
@@ -1607,7 +1613,7 @@ struct
         hash t
 
       let hash_inode ~depth ~length es =
-        let entries = Array.make Conf.entries None in
+        let entries = Array.make Conf.nb_entries None in
         List.iter (fun (index, ptr) -> entries.(index) <- Some ptr) es;
         let v : truncated_ptr v = Tree { depth; length; entries } in
         Bin.V.hash (to_bin_v Truncated Bin.Ptr_any v)
@@ -1619,7 +1625,7 @@ struct
         | `Blinded h -> k h Concrete.Blinded
         | `Values vs ->
             let vs = List.map strengthen_step_value vs in
-            assert (List.compare_length_with vs Conf.entries <= 0);
+            assert (List.compare_length_with vs Conf.nb_entries <= 0);
             let hash = hash_values ~depth vs in
             let c = Concrete.Values (List.map Concrete.to_entry vs) in
             k hash c
@@ -1669,7 +1675,7 @@ struct
 
       let of_proof (Partial _ as la) ~depth (proof : t) =
         match proof with
-        | `Values vs when List.compare_length_with vs Conf.entries > 0 -> (
+        | `Values vs when List.compare_length_with vs Conf.nb_entries > 0 -> (
             if depth <> 0 then None
             else
               (* [proof] is a big stable inode that was unshallowed and encoded
@@ -1753,7 +1759,7 @@ struct
             `Node key )
 
     let of_inode_tree ~index layout tr =
-      let entries = Array.make Conf.entries None in
+      let entries = Array.make Conf.nb_entries None in
       let ptr_of_key hash =
         let key = index hash in
         Ptr.of_key layout key
