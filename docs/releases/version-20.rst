@@ -63,6 +63,7 @@ Starting from Octez v20, a distribution of packages are provided along with each
 - Debian Linux
 - Fedora Linux
 - Rocky Linux
+- Ubuntu
 
 You may now install binaries by downloading their packages from the `Octez release page
 <https://gitlab.com/tezos/tezos/-/releases>`__, browsing to your distribution
