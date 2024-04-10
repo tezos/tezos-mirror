@@ -582,12 +582,16 @@ module Config : sig
 
   val default : t
 
-  (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the
-     DAL according to the dal configuration [config], a function to find the SRS
-     files [find_trusted_setup_files] and the optional log2 of the SRS size
-     [srs_size_log2]. *)
+  (** [init_verifier_dal config] initializes the DAL according to the DAL
+      configuration [config], with a minimal SRS for the verifier.
+     Note that only verifying functions can be used with this setup *)
   val init_verifier_dal : t -> unit Error_monad.tzresult
 
+  (** [init_prover_dal ~find_srs_files ?(srs_size_log2=21) config] initializes
+      the DAL according to the DAL configuration [config], a function to find
+      the SRS files [find_srs_files] and the optional log2 of the SRS size
+      [srs_size_log2].
+      Note that the proving & verifying functions can be used with this setup *)
   val init_prover_dal :
     find_srs_files:(unit -> (string * string) Error_monad.tzresult) ->
     ?srs_size_log2:int ->
