@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol oxford RPC",
     "description": "The RPC API for protocol oxford served by the Octez node.",
-    "version": "Octez 20.0~rc1 (TBD)"
+    "version": "Octez 20.0~rc1 (e38cf666)"
   },
   "paths": {
     "/": {
