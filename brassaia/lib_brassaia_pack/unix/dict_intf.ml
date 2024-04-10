@@ -15,18 +15,19 @@
  *)
 
 module type S = sig
-  module Fm : File_manager.S
+  module File_manager : File_manager.S
 
   type t
 
   val find : t -> int -> string option
   val index : t -> string -> int option
-  val init : Fm.t -> (t, [> Fm.Io.read_error ]) result
+  val init : File_manager.t -> (t, [> File_manager.Io.read_error ]) result
   val close : t -> unit
 end
 
 module type Sigs = sig
   module type S = S
 
-  module Make (Fm : File_manager.S) : S with module Fm = Fm
+  module Make (File_manager : File_manager.S) :
+    S with module File_manager = File_manager
 end

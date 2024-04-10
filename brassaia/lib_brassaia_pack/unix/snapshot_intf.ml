@@ -18,14 +18,14 @@ open! Import
 
 module type Args = sig
   module Hash : Brassaia.Hash.S
-  module Fm : File_manager.S
-  module Dispatcher : Dispatcher.S with module Fm = Fm
+  module File_manager : File_manager.S
+  module Dispatcher : Dispatcher.S with module File_manager = File_manager
 
   module Inode :
     Inode.Persistent
       with type hash := Hash.t
        and type key = Hash.t Pack_key.t
-       and type file_manager = Fm.t
+       and type file_manager = File_manager.t
        and type dispatcher = Dispatcher.t
 
   module Contents_pack :
@@ -58,7 +58,7 @@ module type Sigs = sig
         ( unit,
           [> `Double_close
           | `Index_failure of string
-          | `Io_misc of Fm.Io.misc_error
+          | `Io_misc of File_manager.Io.misc_error
           | `Pending_flush
           | `Ro_not_allowed ] )
         result

@@ -48,7 +48,7 @@ module Make (Args : Args) = struct
       Index_unix.Make (Pack_index.Key) (Value_unit) (Index.Cache.Unbounded)
 
     type t = {
-      fm : Fm.t;
+      file_manager : File_manager.t;
       dispatcher : Dispatcher.t;
       log_size : int;
       inode_pack : read Inode_pack.t;
@@ -59,12 +59,16 @@ module Make (Args : Args) = struct
       (* In order to read from the pack files, we need to open at least two
          files: suffix and control. We just open the file manager for
          simplicity. *)
-      let fm = Fm.open_ro config |> Fm.Errs.raise_if_error in
-      let dispatcher = Dispatcher.init fm |> Fm.Errs.raise_if_error in
+      let file_manager =
+        File_manager.open_ro config |> File_manager.Errs.raise_if_error
+      in
+      let dispatcher =
+        Dispatcher.init file_manager |> File_manager.Errs.raise_if_error
+      in
       let log_size = Conf.index_log_size config in
-      { fm; dispatcher; log_size; inode_pack; contents_pack }
+      { file_manager; dispatcher; log_size; inode_pack; contents_pack }
 
-    let close t = Fm.close t.fm
+    let close t = File_manager.close t.file_manager
 
     let key_of_hash hash t =
       Inode_pack.index_direct_with_kind t hash |> Option.get

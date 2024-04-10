@@ -30,7 +30,7 @@ module Make (Args : Gc_args.S) : sig
     generation:int ->
     unlink:bool ->
     dispatcher:Args.Dispatcher.t ->
-    fm:Args.Fm.t ->
+    file_manager:Args.File_manager.t ->
     contents:read Args.Contents_store.t ->
     node:read Args.Node_store.t ->
     commit:read Args.Commit_store.t ->

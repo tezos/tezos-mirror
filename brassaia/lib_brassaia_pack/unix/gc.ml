@@ -20,7 +20,7 @@ open! Import
 module Make (Args : Gc_args.S) = struct
   module Args = Args
   open Args
-  module Io = Fm.Io
+  module Io = File_manager.Io
   module Ao = Append_only_file.Make (Io) (Errs)
   module Worker = Gc_worker.Make (Args)
 
@@ -33,7 +33,7 @@ module Make (Args : Gc_args.S) = struct
     resolver : (Stats.Latest_gc.stats, Errs.t) result Lwt.u;
     promise : (Stats.Latest_gc.stats, Errs.t) result Lwt.t;
     dispatcher : Dispatcher.t;
-    fm : Fm.t;
+    file_manager : File_manager.t;
     contents : read Contents_store.t;
     node : read Node_store.t;
     commit : read Commit_store.t;
@@ -43,7 +43,7 @@ module Make (Args : Gc_args.S) = struct
   }
 
   let init_and_start ~root ~lower_root ~output ~generation ~unlink ~dispatcher
-      ~fm ~contents ~node ~commit commit_key =
+      ~file_manager ~contents ~node ~commit commit_key =
     let open Result_syntax in
     let new_suffix_start_offset, latest_gc_target_offset =
       let state : _ Pack_key.state = Pack_key.inspect commit_key in
@@ -55,7 +55,10 @@ module Make (Args : Gc_args.S) = struct
           (* The caller of this function lifted the key to a direct one. *)
           assert false
     in
-    let status = Fm.control fm |> Fm.Control.payload |> fun p -> p.status in
+    let status =
+      File_manager.control file_manager |> File_manager.Control.payload
+      |> fun p -> p.status
+    in
     (* Ensure we are calling GC on a commit strictly newer than last GC commit
        Only checking when the output is the root (it is not a snapshot export) *)
     let* () =
@@ -129,7 +132,7 @@ module Make (Args : Gc_args.S) = struct
         promise;
         resolver;
         dispatcher;
-        fm;
+        file_manager;
         contents;
         node;
         commit;
@@ -152,15 +155,18 @@ module Make (Args : Gc_args.S) = struct
     (* Calculate chunk num in main process since more chunks could have been
        added while GC was running. GC process only tells us how many chunks are
        to be removed. *)
-    let suffix = Fm.suffix t.fm in
-    let chunk_num = Fm.Suffix.chunk_num suffix - removable_chunk_num in
+    let suffix = File_manager.suffix t.file_manager in
+    let chunk_num =
+      File_manager.Suffix.chunk_num suffix - removable_chunk_num
+    in
     (* Assert that we have at least one chunk (the appendable chunk), which
        is guaranteed by the GC process. *)
     assert (chunk_num >= 1);
 
-    Fm.swap t.fm ~generation ~mapping_size:gc_results.mapping_size
-      ~suffix_start_offset ~chunk_start_idx ~chunk_num ~suffix_dead_bytes
-      ~latest_gc_target_offset ~volume:gc_results.modified_volume
+    File_manager.swap t.file_manager ~generation
+      ~mapping_size:gc_results.mapping_size ~suffix_start_offset
+      ~chunk_start_idx ~chunk_num ~suffix_dead_bytes ~latest_gc_target_offset
+      ~volume:gc_results.modified_volume
 
   let unlink_all { root; generation; _ } removable_chunk_idxs =
     (* Unlink suffix chunks *)
@@ -242,7 +248,7 @@ module Make (Args : Gc_args.S) = struct
     | Ok ok -> ok |> Result.map_error gc_error
 
   let clean_after_abort t =
-    Fm.cleanup t.fm |> Errs.log_if_error "clean_after_abort"
+    File_manager.cleanup t.file_manager |> Errs.log_if_error "clean_after_abort"
 
   let finalise ~wait t =
     match t.resulting_stats with
@@ -315,7 +321,7 @@ module Make (Args : Gc_args.S) = struct
         Lwt.return
           {
             Control_file_intf.Payload.Upper.Latest.generation =
-              Fm.generation t.fm + 1;
+              File_manager.generation t.file_manager + 1;
             latest_gc_target_offset = t.latest_gc_target_offset;
             suffix_start_offset = t.new_suffix_start_offset;
             suffix_dead_bytes = Int63.zero;

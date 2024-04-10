@@ -19,31 +19,31 @@ include Dispatcher_intf
 module Payload = Control_file.Payload.Upper.Latest
 
 (* The following [with module Io = Io.Unix] forces unix *)
-module Make (Fm : File_manager.S with module Io = Io.Unix) :
-  S with module Fm = Fm = struct
-  module Fm = Fm
-  module Io = Fm.Io
-  module Suffix = Fm.Suffix
-  module Sparse = Fm.Sparse
-  module Lower = Fm.Lower
-  module Errs = Fm.Errs
-  module Control = Fm.Control
+module Make (File_manager : File_manager.S with module Io = Io.Unix) :
+  S with module File_manager = File_manager = struct
+  module File_manager = File_manager
+  module Io = File_manager.Io
+  module Suffix = File_manager.Suffix
+  module Sparse = File_manager.Sparse
+  module Lower = File_manager.Lower
+  module Errs = File_manager.Errs
+  module Control = File_manager.Control
 
-  type t = { fm : Fm.t }
+  type t = { file_manager : File_manager.t }
 
-  let init fm =
-    let t = { fm } in
+  let init file_manager =
+    let t = { file_manager } in
     Ok t
 
   let get_prefix t =
-    match Fm.prefix t.fm with
+    match File_manager.prefix t.file_manager with
     | Some prefix -> prefix
     | None -> raise (Errors.Pack_error (`Invalid_prefix_read "no prefix found"))
 
-  let get_suffix t = Fm.suffix t.fm
+  let get_suffix t = File_manager.suffix t.file_manager
 
   let suffix_start_offset t =
-    let pl = Control.payload (Fm.control t.fm) in
+    let pl = Control.payload (File_manager.control t.file_manager) in
     match pl.status with
     | Payload.From_v1_v2_post_upgrade _ | Used_non_minimal_indexing_strategy
     | No_gc_yet ->
@@ -54,7 +54,7 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
     | Gced { suffix_start_offset; _ } -> suffix_start_offset
 
   let suffix_dead_bytes t =
-    let pl = Control.payload (Fm.control t.fm) in
+    let pl = Control.payload (File_manager.control t.file_manager) in
     match pl.status with
     | Payload.From_v1_v2_post_upgrade _ | Used_non_minimal_indexing_strategy
     | No_gc_yet ->
@@ -79,7 +79,7 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
     suffix_start_offset + soff - suffix_dead_bytes
 
   let end_offset t =
-    let end_soff = Suffix.end_soff (Fm.suffix t.fm) in
+    let end_soff = Suffix.end_soff (File_manager.suffix t.file_manager) in
     offset_of_soff t end_soff
 
   let dispatch_suffix t ~off =
@@ -99,7 +99,7 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
     let read_sparse () =
       try (Sparse.read_range_exn (get_prefix t) ~off ~min_len ~max_len buf, None)
       with Errors.Pack_error (`Invalid_sparse_read _) as exn -> (
-        match Fm.lower t.fm with
+        match File_manager.lower t.file_manager with
         | None -> raise exn
         | Some lower -> read_lower lower)
     in
@@ -107,7 +107,7 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
     | Some off ->
         (Suffix.read_range_exn (get_suffix t) ~off ~min_len ~max_len buf, None)
     | None -> (
-        match (volume_identifier, Fm.lower t.fm) with
+        match (volume_identifier, File_manager.lower t.file_manager) with
         | None, _ -> read_sparse ()
         | volume, Some lower -> read_lower ?volume lower
         | Some _, None -> assert false)
