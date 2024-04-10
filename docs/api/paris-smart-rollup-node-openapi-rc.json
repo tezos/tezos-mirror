@@ -589,10 +589,10 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisA.contract_id.originated" },
+                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -618,13 +618,13 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisA.contract_id.originated" },
+                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -703,10 +703,10 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisA.contract_id.originated" },
+                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -732,13 +732,13 @@
                                                                 "properties":
                                                                   { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisA.contract_id.originated" },
+                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -898,10 +898,10 @@
                                                                     "properties":
                                                                     { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisA.contract_id.originated" },
+                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -929,13 +929,13 @@
                                                                     "properties":
                                                                     { "parameters":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "parameters_ty":
                                                                     { "$ref":
-                                                                    "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" },
+                                                                    "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" },
                                                                     "destination":
                                                                     { "$ref":
-                                                                    "#/components/schemas/019-PtParisA.contract_id.originated" },
+                                                                    "#/components/schemas/019-PtParisB.contract_id.originated" },
                                                                     "entrypoint":
                                                                     { "$ref":
                                                                     "#/components/schemas/unistring" } },
@@ -1351,6 +1351,21 @@
                                     [ { "title": "Some", "type": "integer",
                                         "minimum": -2147483648,
                                         "maximum": 2147483647 } ] } } } },
+                  "default":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "description":
+                                    "The full list of errors is available with the global RPC `GET errors`" } } } } } } },
+      "/health":
+        { "get":
+            { "description":
+                "Returns an empty response if the rollup node can answer requests",
+              "responses":
+                { "200":
+                    { "description": "",
+                      "content": { "application/json": { "schema": {} } } },
                   "default":
                     { "description": "",
                       "content":
@@ -1849,15 +1864,486 @@
                         { "application/json":
                             { "schema":
                                 { "description":
+                                    "The full list of errors is available with the global RPC `GET errors`" } } } } } } },
+      "/stats/memory":
+        { "get":
+            { "description": "Gets memory usage stats",
+              "responses":
+                { "200":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "oneOf":
+                                    [ { "title": "Linux_proc_statm",
+                                        "type": "object",
+                                        "properties":
+                                          { "page_size":
+                                              { "type": "integer",
+                                                "minimum": -1073741824,
+                                                "maximum": 1073741823 },
+                                            "size":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" },
+                                            "resident":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" },
+                                            "shared":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" },
+                                            "text":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" },
+                                            "lib":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" },
+                                            "data":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" },
+                                            "dt":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" } },
+                                        "required":
+                                          [ "page_size", "size", "resident",
+                                            "shared", "text", "lib", "data",
+                                            "dt" ] },
+                                      { "title": "Darwin_ps",
+                                        "type": "object",
+                                        "properties":
+                                          { "page_size":
+                                              { "type": "integer",
+                                                "minimum": -1073741824,
+                                                "maximum": 1073741823 },
+                                            "mem": { "type": "number" },
+                                            "resident":
+                                              { "$ref":
+                                                  "#/components/schemas/int64" } },
+                                        "required":
+                                          [ "page_size", "mem", "resident" ] } ] } } } },
+                  "default":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "description":
+                                    "The full list of errors is available with the global RPC `GET errors`" } } } } } } },
+      "/stats/ocaml_gc":
+        { "get":
+            { "description": "Gets stats from the OCaml Garbage Collector",
+              "responses":
+                { "200":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "type": "object",
+                                  "properties":
+                                    { "minor_words": { "type": "number" },
+                                      "promoted_words": { "type": "number" },
+                                      "major_words": { "type": "number" },
+                                      "minor_collections":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "major_collections":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "forced_major_collections":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "heap_words":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "heap_chunks":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "live_words":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "live_blocks":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "free_words":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "free_blocks":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "largest_free":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "fragments":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "compactions":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "top_heap_words":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 },
+                                      "stack_size":
+                                        { "type": "integer",
+                                          "minimum": -1073741824,
+                                          "maximum": 1073741823 } },
+                                  "required":
+                                    [ "minor_words", "promoted_words",
+                                      "major_words", "minor_collections",
+                                      "major_collections",
+                                      "forced_major_collections",
+                                      "heap_words", "heap_chunks",
+                                      "live_words", "live_blocks",
+                                      "free_words", "free_blocks",
+                                      "largest_free", "fragments",
+                                      "compactions", "top_heap_words",
+                                      "stack_size" ] } } } },
+                  "default":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "description":
+                                    "The full list of errors is available with the global RPC `GET errors`" } } } } } } },
+      "/version":
+        { "get":
+            { "description":
+                "Returns the version information of the rollup node",
+              "responses":
+                { "200":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "type": "object",
+                                  "properties":
+                                    { "version":
+                                        { "$ref":
+                                            "#/components/schemas/unistring" },
+                                      "store_version":
+                                        { "$ref":
+                                            "#/components/schemas/unistring" },
+                                      "context_version":
+                                        { "$ref":
+                                            "#/components/schemas/unistring" } },
+                                  "required":
+                                    [ "version", "store_version",
+                                      "context_version" ] } } } },
+                  "default":
+                    { "description": "",
+                      "content":
+                        { "application/json":
+                            { "schema":
+                                { "description":
                                     "The full list of errors is available with the global RPC `GET errors`" } } } } } } } },
   "components":
     { "schemas":
-        { "019-PtParisA.contract_id.originated":
+        { "017-PtNairob.big_map_id":
+            { "title": "Big map identifier",
+              "description": "A big map identifier",
+              "oneOf": [ { "$ref": "#/components/schemas/bignum" } ] },
+          "017-PtNairob.bond_id":
+            { "oneOf":
+                [ { "title": "Tx_rollup_bond_id", "type": "object",
+                    "properties":
+                      { "tx_rollup":
+                          { "$ref":
+                              "#/components/schemas/017-PtNairob.tx_rollup_id" } },
+                    "required": [ "tx_rollup" ] },
+                  { "title": "Smart_rollup_bond_id", "type": "object",
+                    "properties":
+                      { "smart_rollup":
+                          { "$ref":
+                              "#/components/schemas/017-PtNairob.smart_rollup_address" } },
+                    "required": [ "smart_rollup" ] } ] },
+          "017-PtNairob.contract_id":
+            { "title": "A contract handle",
+              "description":
+                "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "017-PtNairob.contract_id.originated":
             { "title": "A contract handle -- originated account",
               "description":
                 "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
-          "019-PtParisA.michelson.v1.primitives":
+          "017-PtNairob.entrypoint":
+            { "title": "entrypoint",
+              "description": "Named entrypoint to a Michelson smart contract",
+              "oneOf":
+                [ { "title": "default", "type": "string",
+                    "enum": [ "default" ] },
+                  { "title": "root", "type": "string", "enum": [ "root" ] },
+                  { "title": "do", "type": "string", "enum": [ "do" ] },
+                  { "title": "set_delegate", "type": "string",
+                    "enum": [ "set_delegate" ] },
+                  { "title": "remove_delegate", "type": "string",
+                    "enum": [ "remove_delegate" ] },
+                  { "title": "deposit", "type": "string",
+                    "enum": [ "deposit" ] },
+                  { "title": "named",
+                    "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] } ] },
+          "017-PtNairob.expressionKind":
+            { "title": "Expression kind",
+              "description":
+                "One of the four possible kinds of expression (integer, string, primitive application or sequence).",
+              "type": "string",
+              "enum":
+                [ "string", "integer", "sequence", "primitiveApplication",
+                  "bytes" ] },
+          "017-PtNairob.michelson.v1.primitives":
+            { "type": "string",
+              "enum":
+                [ "SHA512", "HASH_KEY", "SIZE", "SAPLING_VERIFY_UPDATE",
+                  "False", "SAPLING_EMPTY_STATE", "RENAME",
+                  "sapling_transaction", "UNPACK", "NAT", "unit",
+                  "bls12_381_fr", "Pair", "IF_NONE", "int", "timestamp",
+                  "storage", "UNPAIR", "view", "BLAKE2B", "AMOUNT", "DUP",
+                  "nat", "NEG", "bool", "SELF_ADDRESS", "ISNAT", "DIG",
+                  "CHAIN_ID", "set", "LSR", "key", "address", "ABS",
+                  "CREATE_CONTRACT", "SHA256", "JOIN_TICKETS", "LEVEL",
+                  "bls12_381_g1", "operation", "tx_rollup_l2_address",
+                  "string", "CHECK_SIGNATURE", "STEPS_TO_QUOTA", "SELF",
+                  "DIP", "lambda", "AND", "COMPARE", "chain_id", "MAP",
+                  "APPLY", "Elt", "BYTES", "NOT", "IMPLICIT_ACCOUNT", "LT",
+                  "UNIT", "EMIT", "SET_DELEGATE", "Some", "parameter",
+                  "signature", "ticket", "EMPTY_BIG_MAP", "None", "SUB",
+                  "key_hash", "ADD", "map", "VOTING_POWER", "big_map", "CDR",
+                  "GT", "IF_CONS", "CONS", "LSL", "DUG", "PACK", "SHA3",
+                  "SOURCE", "or", "SUB_MUTEZ", "LAMBDA", "RIGHT",
+                  "CREATE_ACCOUNT", "Unit", "CAST", "NEQ", "ITER",
+                  "FAILWITH", "PUSH", "OPEN_CHEST", "SOME", "list",
+                  "BALANCE", "NIL", "pair", "CAR", "UPDATE",
+                  "TOTAL_VOTING_POWER", "PAIR", "constant", "LAMBDA_REC",
+                  "ADDRESS", "True", "Right", "Lambda_rec", "IF", "NEVER",
+                  "sapling_transaction_deprecated", "SWAP", "EMPTY_MAP",
+                  "MUL", "INT", "option", "KECCAK", "LEFT", "Left", "chest",
+                  "SPLIT_TICKET", "chest_key", "bls12_381_g2", "EDIV",
+                  "LOOP", "bytes", "TICKET", "LE", "PAIRING_CHECK",
+                  "MIN_BLOCK_TIME", "OR", "contract", "GET_AND_UPDATE",
+                  "mutez", "sapling_state", "NONE", "IF_LEFT", "GET", "NOW",
+                  "TRANSFER_TOKENS", "LOOP_LEFT", "CONTRACT",
+                  "TICKET_DEPRECATED", "VIEW", "EMPTY_SET", "XOR", "never",
+                  "READ_TICKET", "EQ", "GE", "MEM", "SENDER", "DROP",
+                  "CONCAT", "EXEC", "SLICE", "code" ] },
+          "017-PtNairob.michelson_v1.context_desc":
+            { "type": "string", "enum": [ "View", "Lambda" ] },
+          "017-PtNairob.mutez":
+            { "$ref": "#/components/schemas/positive_bignum" },
+          "017-PtNairob.operation_conflict":
+            { "title": "Conflict error",
+              "description": "Conflict between two operations",
+              "type": "object",
+              "properties":
+                { "existing":
+                    { "$ref": "#/components/schemas/Operation_hash" },
+                  "new_operation":
+                    { "$ref": "#/components/schemas/Operation_hash" } },
+              "required": [ "existing", "new_operation" ] },
+          "017-PtNairob.primitiveNamespace":
+            { "title": "Primitive namespace",
+              "description":
+                "One of the five possible namespaces of primitive (data constructor, type name, instruction, keyword, or constant hash).",
+              "type": "string",
+              "enum":
+                [ "constant", "type", "constant_hash", "keyword",
+                  "instruction" ] },
+          "017-PtNairob.scripted.contracts":
+            { "type": "object", "properties": { "code": {}, "storage": {} },
+              "required": [ "code", "storage" ] },
+          "017-PtNairob.smart_rollup_address":
+            { "title": "A smart rollup address",
+              "description":
+                "A smart rollup is identified by a base58 address starting with sr1",
+              "oneOf":
+                [ { "$ref": "#/components/schemas/Smart_rollup_hash" } ] },
+          "017-PtNairob.transaction_destination":
+            { "title": "A destination of a transaction",
+              "description":
+                "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, a base58 originated transaction rollup, or a base58 originated smart rollup.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "017-PtNairob.tx_rollup_id":
+            { "title": "A tx rollup handle",
+              "description":
+                "A tx rollup notation as given to an RPC or inside scripts, is a base58 tx rollup hash",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "018-Proxford.big_map_id":
+            { "title": "Big map identifier",
+              "description": "A big map identifier",
+              "oneOf": [ { "$ref": "#/components/schemas/bignum" } ] },
+          "018-Proxford.bond_id":
+            { "type": "object",
+              "properties":
+                { "smart_rollup":
+                    { "$ref": "#/components/schemas/smart_rollup_address" } },
+              "required": [ "smart_rollup" ] },
+          "018-Proxford.contract_id":
+            { "title": "A contract handle",
+              "description":
+                "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "018-Proxford.contract_id.originated":
+            { "title": "A contract handle -- originated account",
+              "description":
+                "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "018-Proxford.entrypoint":
+            { "title": "entrypoint",
+              "description": "Named entrypoint to a Michelson smart contract",
+              "oneOf":
+                [ { "title": "default", "type": "string",
+                    "enum": [ "default" ] },
+                  { "title": "root", "type": "string", "enum": [ "root" ] },
+                  { "title": "do", "type": "string", "enum": [ "do" ] },
+                  { "title": "set_delegate", "type": "string",
+                    "enum": [ "set_delegate" ] },
+                  { "title": "remove_delegate", "type": "string",
+                    "enum": [ "remove_delegate" ] },
+                  { "title": "deposit", "type": "string",
+                    "enum": [ "deposit" ] },
+                  { "title": "stake", "type": "string", "enum": [ "stake" ] },
+                  { "title": "unstake", "type": "string",
+                    "enum": [ "unstake" ] },
+                  { "title": "finalize_unstake", "type": "string",
+                    "enum": [ "finalize_unstake" ] },
+                  { "title": "set_delegate_parameters", "type": "string",
+                    "enum": [ "set_delegate_parameters" ] },
+                  { "title": "named",
+                    "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] } ] },
+          "018-Proxford.expressionKind":
+            { "title": "Expression kind",
+              "description":
+                "One of the four possible kinds of expression (integer, string, primitive application or sequence).",
+              "type": "string",
+              "enum":
+                [ "string", "integer", "sequence", "primitiveApplication",
+                  "bytes" ] },
+          "018-Proxford.michelson.v1.primitives":
+            { "type": "string",
+              "enum":
+                [ "SHA512", "HASH_KEY", "SIZE", "SAPLING_VERIFY_UPDATE",
+                  "False", "SAPLING_EMPTY_STATE", "RENAME",
+                  "sapling_transaction", "UNPACK", "NAT", "unit",
+                  "bls12_381_fr", "Pair", "IF_NONE", "int", "timestamp",
+                  "storage", "UNPAIR", "view", "BLAKE2B", "AMOUNT", "DUP",
+                  "nat", "NEG", "bool", "SELF_ADDRESS", "ISNAT", "DIG",
+                  "CHAIN_ID", "set", "LSR", "key", "address", "ABS",
+                  "CREATE_CONTRACT", "SHA256", "JOIN_TICKETS", "LEVEL",
+                  "bls12_381_g1", "operation", "tx_rollup_l2_address",
+                  "string", "CHECK_SIGNATURE", "STEPS_TO_QUOTA", "SELF",
+                  "DIP", "lambda", "AND", "COMPARE", "chain_id", "MAP",
+                  "APPLY", "Elt", "BYTES", "NOT", "IMPLICIT_ACCOUNT", "LT",
+                  "UNIT", "EMIT", "SET_DELEGATE", "Some", "parameter",
+                  "signature", "ticket", "EMPTY_BIG_MAP", "None", "SUB",
+                  "key_hash", "ADD", "map", "VOTING_POWER", "big_map", "CDR",
+                  "GT", "IF_CONS", "CONS", "LSL", "DUG", "PACK", "SHA3",
+                  "SOURCE", "or", "SUB_MUTEZ", "LAMBDA", "RIGHT",
+                  "CREATE_ACCOUNT", "Unit", "CAST", "NEQ", "ITER",
+                  "FAILWITH", "PUSH", "OPEN_CHEST", "SOME", "list",
+                  "BALANCE", "NIL", "pair", "CAR", "UPDATE",
+                  "TOTAL_VOTING_POWER", "PAIR", "constant", "LAMBDA_REC",
+                  "ADDRESS", "True", "Right", "Lambda_rec", "IF", "NEVER",
+                  "sapling_transaction_deprecated", "SWAP", "EMPTY_MAP",
+                  "MUL", "INT", "option", "KECCAK", "LEFT", "Left", "chest",
+                  "SPLIT_TICKET", "chest_key", "bls12_381_g2", "EDIV",
+                  "LOOP", "bytes", "TICKET", "LE", "PAIRING_CHECK",
+                  "MIN_BLOCK_TIME", "OR", "contract", "GET_AND_UPDATE",
+                  "mutez", "sapling_state", "NONE", "IF_LEFT", "GET", "NOW",
+                  "TRANSFER_TOKENS", "LOOP_LEFT", "CONTRACT",
+                  "TICKET_DEPRECATED", "VIEW", "EMPTY_SET", "XOR", "never",
+                  "READ_TICKET", "EQ", "GE", "MEM", "SENDER", "DROP",
+                  "CONCAT", "EXEC", "SLICE", "code" ] },
+          "018-Proxford.michelson_v1.context_desc":
+            { "type": "string", "enum": [ "View", "Lambda" ] },
+          "018-Proxford.mutez":
+            { "$ref": "#/components/schemas/positive_bignum" },
+          "018-Proxford.operation_conflict":
+            { "title": "Conflict error",
+              "description": "Conflict between two operations",
+              "type": "object",
+              "properties":
+                { "existing":
+                    { "$ref": "#/components/schemas/Operation_hash" },
+                  "new_operation":
+                    { "$ref": "#/components/schemas/Operation_hash" } },
+              "required": [ "existing", "new_operation" ] },
+          "018-Proxford.primitiveNamespace":
+            { "title": "Primitive namespace",
+              "description":
+                "One of the five possible namespaces of primitive (data constructor, type name, instruction, keyword, or constant hash).",
+              "type": "string",
+              "enum":
+                [ "constant", "type", "constant_hash", "keyword",
+                  "instruction" ] },
+          "018-Proxford.scripted.contracts":
+            { "type": "object", "properties": { "code": {}, "storage": {} },
+              "required": [ "code", "storage" ] },
+          "018-Proxford.transaction_destination":
+            { "title": "A destination of a transaction",
+              "description":
+                "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, a base58 originated transaction rollup, or a base58 originated smart rollup.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "019-PtParisB.big_map_id":
+            { "title": "Big map identifier",
+              "description": "A big map identifier",
+              "oneOf": [ { "$ref": "#/components/schemas/bignum" } ] },
+          "019-PtParisB.bond_id":
+            { "type": "object",
+              "properties":
+                { "smart_rollup":
+                    { "$ref": "#/components/schemas/smart_rollup_address" } },
+              "required": [ "smart_rollup" ] },
+          "019-PtParisB.contract_id":
+            { "title": "A contract handle",
+              "description":
+                "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "019-PtParisB.contract_id.originated":
+            { "title": "A contract handle -- originated account",
+              "description":
+                "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "019-PtParisB.entrypoint":
+            { "title": "entrypoint",
+              "description": "Named entrypoint to a Michelson smart contract",
+              "oneOf":
+                [ { "title": "default", "type": "string",
+                    "enum": [ "default" ] },
+                  { "title": "root", "type": "string", "enum": [ "root" ] },
+                  { "title": "do", "type": "string", "enum": [ "do" ] },
+                  { "title": "set_delegate", "type": "string",
+                    "enum": [ "set_delegate" ] },
+                  { "title": "remove_delegate", "type": "string",
+                    "enum": [ "remove_delegate" ] },
+                  { "title": "deposit", "type": "string",
+                    "enum": [ "deposit" ] },
+                  { "title": "stake", "type": "string", "enum": [ "stake" ] },
+                  { "title": "unstake", "type": "string",
+                    "enum": [ "unstake" ] },
+                  { "title": "finalize_unstake", "type": "string",
+                    "enum": [ "finalize_unstake" ] },
+                  { "title": "set_delegate_parameters", "type": "string",
+                    "enum": [ "set_delegate_parameters" ] },
+                  { "title": "named",
+                    "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] } ] },
+          "019-PtParisB.expressionKind":
+            { "title": "Expression kind",
+              "description":
+                "One of the four possible kinds of expression (integer, string, primitive application or sequence).",
+              "type": "string",
+              "enum":
+                [ "string", "integer", "sequence", "primitiveApplication",
+                  "bytes" ] },
+          "019-PtParisB.michelson.v1.primitives":
             { "type": "string",
               "enum":
                 [ "SHA256", "GT", "RIGHT", "SAPLING_EMPTY_STATE", "False",
@@ -1891,20 +2377,238 @@
                   "EMPTY_MAP", "UPDATE", "chain_id", "TICKET_DEPRECATED",
                   "EMPTY_SET", "FAILWITH", "MAP", "SOURCE", "DIP", "COMPARE",
                   "EQ", "SELF_ADDRESS", "code" ] },
+          "019-PtParisB.michelson_v1.context_desc":
+            { "type": "string", "enum": [ "View", "Lambda" ] },
+          "019-PtParisB.mutez":
+            { "$ref": "#/components/schemas/positive_bignum" },
+          "019-PtParisB.operation_conflict":
+            { "title": "Conflict error",
+              "description": "Conflict between two operations",
+              "type": "object",
+              "properties":
+                { "existing":
+                    { "$ref": "#/components/schemas/Operation_hash" },
+                  "new_operation":
+                    { "$ref": "#/components/schemas/Operation_hash" } },
+              "required": [ "existing", "new_operation" ] },
+          "019-PtParisB.primitiveNamespace":
+            { "title": "Primitive namespace",
+              "description":
+                "One of the five possible namespaces of primitive (data constructor, type name, instruction, keyword, or constant hash).",
+              "type": "string",
+              "enum":
+                [ "constant", "type", "constant_hash", "keyword",
+                  "instruction" ] },
+          "019-PtParisB.scripted.contracts":
+            { "type": "object", "properties": { "code": {}, "storage": {} },
+              "required": [ "code", "storage" ] },
+          "019-PtParisB.transaction_destination":
+            { "title": "A destination of a transaction",
+              "description":
+                "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, a base58 originated transaction rollup, or a base58 originated smart rollup.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Bls12_381.Public_key":
+            { "title": "A Bls12_381 public key (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Bls12_381.Public_key_hash":
+            { "title": "A Bls12_381 public key hash (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Chain_id":
+            { "title": "Network identifier (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Commitment_hash":
+            { "title": "A commitment ID (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Context_hash":
+            { "title": "A hash of context (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Crypto_box.Public_key_hash":
+            { "title": "A Cryptobox public key ID (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
           "DAL_commitment":
             { "title":
                 "Commitment representation for the DAL (Base58Check-encoded)",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Ed25519.Public_key_hash":
+            { "title": "An Ed25519 public key hash (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Inbox_list_hash":
+            { "title": "A merkle root hash for inboxes (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Message_result_hash":
+            { "title": "A message result hash (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Message_result_list_hash":
+            { "title":
+                "A merklised message result list hash (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
           "Operation_hash":
             { "title": "A Tezos operation ID (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Operation_list_list_hash":
+            { "title": "A list of list of operations (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Protocol_hash":
+            { "title": "A Tezos protocol ID (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Signature.Public_key":
+            { "title":
+                "A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded)",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
           "Signature.Public_key_hash":
             { "title":
                 "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Signature.V1":
+            { "title":
+                "A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Smart_rollup_commitment_hash":
+            { "title":
+                "The hash of a commitment of a smart rollup (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
           "Smart_rollup_context_hash":
             { "title":
                 "A base58-check encoded hash of a Smart rollup node context (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Smart_rollup_hash":
+            { "title": "A smart rollup address (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Smart_rollup_inbox_hash":
+            { "title":
+                "The hash of an inbox of a smart rollup (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Smart_rollup_merkelized_payload_hashes_hash":
+            { "title":
+                "The merkelized payload hashes' hash of the smart rollup inbox (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Smart_rollup_reveal_data_blake2b_hash":
+            { "title": "A smart rollup reveal hash (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Smart_rollup_serialized_message_hash":
+            { "title":
+                "The hash of a serialized message of the smart rollup inbox. (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Smart_rollup_state_hash":
+            { "title":
+                "The hash of the VM state of a smart rollup (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "Zk_rollup_hash":
+            { "title": "A zk rollup address (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "alpha.big_map_id":
+            { "title": "Big map identifier",
+              "description": "A big map identifier",
+              "oneOf": [ { "$ref": "#/components/schemas/bignum" } ] },
+          "alpha.bond_id":
+            { "type": "object",
+              "properties":
+                { "smart_rollup":
+                    { "$ref": "#/components/schemas/smart_rollup_address" } },
+              "required": [ "smart_rollup" ] },
+          "alpha.contract_id":
+            { "title": "A contract handle",
+              "description":
+                "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "alpha.contract_id.originated":
+            { "title": "A contract handle -- originated account",
+              "description":
+                "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "alpha.entrypoint":
+            { "title": "entrypoint",
+              "description": "Named entrypoint to a Michelson smart contract",
+              "oneOf":
+                [ { "title": "default", "type": "string",
+                    "enum": [ "default" ] },
+                  { "title": "root", "type": "string", "enum": [ "root" ] },
+                  { "title": "do", "type": "string", "enum": [ "do" ] },
+                  { "title": "set_delegate", "type": "string",
+                    "enum": [ "set_delegate" ] },
+                  { "title": "remove_delegate", "type": "string",
+                    "enum": [ "remove_delegate" ] },
+                  { "title": "deposit", "type": "string",
+                    "enum": [ "deposit" ] },
+                  { "title": "stake", "type": "string", "enum": [ "stake" ] },
+                  { "title": "unstake", "type": "string",
+                    "enum": [ "unstake" ] },
+                  { "title": "finalize_unstake", "type": "string",
+                    "enum": [ "finalize_unstake" ] },
+                  { "title": "set_delegate_parameters", "type": "string",
+                    "enum": [ "set_delegate_parameters" ] },
+                  { "title": "named",
+                    "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] } ] },
+          "alpha.expressionKind":
+            { "title": "Expression kind",
+              "description":
+                "One of the four possible kinds of expression (integer, string, primitive application or sequence).",
+              "type": "string",
+              "enum":
+                [ "string", "integer", "sequence", "primitiveApplication",
+                  "bytes" ] },
+          "alpha.michelson.v1.primitives":
+            { "type": "string",
+              "enum":
+                [ "SHA256", "GT", "RIGHT", "SAPLING_EMPTY_STATE", "False",
+                  "RENAME", "CAST", "tx_rollup_l2_address", "PACK", "BYTES",
+                  "timestamp", "bls12_381_g2", "Pair", "IF_LEFT", "contract",
+                  "mutez", "storage", "PAIR", "view", "UNPACK", "ADD",
+                  "DROP", "big_map", "MUL", "NAT", "SELF", "CONTRACT", "CDR",
+                  "SAPLING_VERIFY_UPDATE", "pair", "LSL", "int", "operation",
+                  "SHA512", "CREATE_ACCOUNT", "BLAKE2B", "SPLIT_TICKET",
+                  "LEFT", "never", "unit", "address", "signature",
+                  "CHAIN_ID", "constant", "SLICE", "SENDER",
+                  "IMPLICIT_ACCOUNT", "key_hash", "AMOUNT",
+                  "CHECK_SIGNATURE", "sapling_state", "LT", "EXEC", "Elt",
+                  "EMIT", "NONE", "CREATE_CONTRACT", "LSR", "SET_DELEGATE",
+                  "OPEN_CHEST", "TRANSFER_TOKENS", "Some", "parameter",
+                  "set", "bls12_381_fr", "EDIV", "None", "STEPS_TO_QUOTA",
+                  "key", "ABS", "list", "NEVER", "map", "CAR", "IF",
+                  "GET_AND_UPDATE", "CONCAT", "LOOP", "DIG", "KECCAK",
+                  "Lambda_rec", "SOME", "option", "SUB", "INT", "PUSH",
+                  "CONS", "Unit", "ISNAT", "NEG", "XOR", "APPLY", "UNPAIR",
+                  "JOIN_TICKETS", "SIZE", "lambda", "AND", "NEQ", "or",
+                  "BALANCE", "UNIT", "VOTING_POWER", "OR", "LAMBDA", "chest",
+                  "LOOP_LEFT", "True", "Right", "Ticket", "HASH_KEY", "DUG",
+                  "sapling_transaction", "SUB_MUTEZ", "EMPTY_BIG_MAP", "MEM",
+                  "IF_NONE", "nat", "TOTAL_VOTING_POWER", "LE", "Left",
+                  "chest_key", "READ_TICKET", "ticket", "bls12_381_g1",
+                  "LEVEL", "VIEW", "string", "PAIRING_CHECK", "LAMBDA_REC",
+                  "NOW", "SHA3", "bool", "MIN_BLOCK_TIME", "GET", "bytes",
+                  "sapling_transaction_deprecated", "NIL", "IF_CONS", "GE",
+                  "NOT", "SWAP", "ITER", "ADDRESS", "TICKET", "DUP",
+                  "EMPTY_MAP", "UPDATE", "chain_id", "TICKET_DEPRECATED",
+                  "EMPTY_SET", "FAILWITH", "MAP", "SOURCE", "DIP", "COMPARE",
+                  "EQ", "SELF_ADDRESS", "code" ] },
+          "alpha.michelson_v1.context_desc":
+            { "type": "string", "enum": [ "View", "Lambda" ] },
+          "alpha.mutez": { "$ref": "#/components/schemas/positive_bignum" },
+          "alpha.operation_conflict":
+            { "title": "Conflict error",
+              "description": "Conflict between two operations",
+              "type": "object",
+              "properties":
+                { "existing":
+                    { "$ref": "#/components/schemas/Operation_hash" },
+                  "new_operation":
+                    { "$ref": "#/components/schemas/Operation_hash" } },
+              "required": [ "existing", "new_operation" ] },
+          "alpha.primitiveNamespace":
+            { "title": "Primitive namespace",
+              "description":
+                "One of the five possible namespaces of primitive (data constructor, type name, instruction, keyword, or constant hash).",
+              "type": "string",
+              "enum":
+                [ "constant", "type", "constant_hash", "keyword",
+                  "instruction" ] },
+          "alpha.scripted.contracts":
+            { "type": "object", "properties": { "code": {}, "storage": {} },
+              "required": [ "code", "storage" ] },
+          "alpha.transaction_destination":
+            { "title": "A destination of a transaction",
+              "description":
+                "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash, a base58 originated contract hash, a base58 originated transaction rollup, or a base58 originated smart rollup.",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
           "bignum":
             { "title": "Big number",
@@ -1913,6 +2617,122 @@
           "block_hash":
             { "title": "A block identifier (Base58Check-encoded)",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "block_header":
+            { "title": "Block header",
+              "description":
+                "Block header. It contains both shell and protocol specific data.",
+              "type": "object",
+              "properties":
+                { "level":
+                    { "type": "integer", "minimum": -2147483648,
+                      "maximum": 2147483647 },
+                  "proto":
+                    { "type": "integer", "minimum": 0, "maximum": 255 },
+                  "predecessor":
+                    { "$ref": "#/components/schemas/block_hash" },
+                  "timestamp":
+                    { "$ref": "#/components/schemas/timestamp.protocol" },
+                  "validation_pass":
+                    { "type": "integer", "minimum": 0, "maximum": 255 },
+                  "operations_hash":
+                    { "$ref": "#/components/schemas/Operation_list_list_hash" },
+                  "fitness": { "$ref": "#/components/schemas/fitness" },
+                  "context": { "$ref": "#/components/schemas/Context_hash" },
+                  "protocol_data":
+                    { "type": "string",
+                      "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+              "required":
+                [ "level", "proto", "predecessor", "timestamp",
+                  "validation_pass", "operations_hash", "fitness", "context",
+                  "protocol_data" ] },
+          "block_locator":
+            { "description": "A sparse block locator à la Bitcoin",
+              "type": "object",
+              "properties":
+                { "current_head":
+                    { "$ref": "#/components/schemas/block_header" },
+                  "history":
+                    { "type": "array",
+                      "items": { "$ref": "#/components/schemas/block_hash" } } },
+              "required": [ "current_head", "history" ] },
+          "context_hash_version":
+            { "description":
+                "A version number for the context hash computation",
+              "type": "integer", "minimum": 0, "maximum": 65535 },
+          "dal_skip_list_pointer":
+            { "title":
+                "A hash that represents the skip list pointers (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "distributed_db_version":
+            { "description":
+                "A version number for the distributed DB protocol",
+              "type": "integer", "minimum": 0, "maximum": 65535 },
+          "distributed_db_version.name":
+            { "description": "A name for the distributed DB protocol",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "fitness":
+            { "title": "Block fitness",
+              "description":
+                "The fitness, or score, of a block, that allow the Tezos to decide which chain is the best. A fitness value is a list of byte sequences. They are compared as follows: shortest lists are smaller; lists of the same length are compared according to the lexicographical order.",
+              "type": "array",
+              "items":
+                { "type": "string",
+                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+          "generic_error":
+            { "title": "Generic error",
+              "description": "An unclassified error", "type": "object",
+              "properties":
+                { "kind": { "type": "string", "enum": [ "generic" ] },
+                  "error": { "$ref": "#/components/schemas/unistring" } },
+              "required": [ "kind", "error" ] },
+          "history_mode":
+            { "title": "history mode",
+              "description": "Storage mode for the Tezos shell.",
+              "oneOf":
+                [ { "title": "archive",
+                    "description":
+                      "Archive mode retains every block and operations since the genesis block including their metadata and their associated contexts.",
+                    "type": "string", "enum": [ "archive" ] },
+                  { "title": "full",
+                    "description":
+                      "Full mode retains every block and operations since the genesis block but periodically prunes older blocks' metadata to reduce the storage size.",
+                    "type": "object",
+                    "properties":
+                      { "full":
+                          { "type": "object",
+                            "properties":
+                              { "additional_cycles":
+                                  { "title": "additional cycles",
+                                    "description":
+                                      "Number of additional cycles preserved below the savepoint. By default: 1 additional cycles will be stored.",
+                                    "type": "integer", "minimum": 0,
+                                    "maximum": 1000 } },
+                            "required": [ "additional_cycles" ] } },
+                    "required": [ "full" ] },
+                  { "title": "rolling",
+                    "description":
+                      "Rolling mode only retain the most recent cycles by periodically periodically discarding older blocks to reduce the storage size.",
+                    "type": "object",
+                    "properties":
+                      { "rolling":
+                          { "type": "object",
+                            "properties":
+                              { "additional_cycles":
+                                  { "title": "additional cycles",
+                                    "description":
+                                      "Number of additional cycles preserved below the savepoint. By default: 1 additional cycles will be stored.",
+                                    "type": "integer", "minimum": 0,
+                                    "maximum": 1000 } },
+                            "required": [ "additional_cycles" ] } },
+                    "required": [ "rolling" ] },
+                  { "title": "full_alias",
+                    "description":
+                      "Full mode with default number of additional cycles.",
+                    "type": "string", "enum": [ "full" ] },
+                  { "title": "rolling_alias",
+                    "description":
+                      "Rolling mode with default number of additional cycles.",
+                    "type": "string", "enum": [ "rolling" ] } ] },
           "int64":
             { "title": "64 bit integers",
               "description": "Decimal representation of 64 bit integers",
@@ -1931,6 +2751,8 @@
                             "enum":
                               [ "Int32", "Int16", "Uint16", "Int64", "Int8",
                                 "Uint8" ] },
+                        "endianness":
+                          { "type": "string", "enum": [ "Little", "Big" ] },
                         "kind": { "type": "string", "enum": [ "Int" ] } },
                     "required": [ "size", "kind" ] },
                   { "title": "Bool", "type": "object",
@@ -1942,6 +2764,8 @@
                       { "min":
                           { "type": "integer", "minimum": -1073741824,
                             "maximum": 1073741823 },
+                        "endianness":
+                          { "type": "string", "enum": [ "Little", "Big" ] },
                         "max":
                           { "type": "integer", "minimum": -1073741824,
                             "maximum": 1073741823 },
@@ -2017,7 +2841,43 @@
                     "properties":
                       { "kind": { "type": "string", "enum": [ "Padding" ] } },
                     "required": [ "kind" ] } ] },
-          "micheline.019-PtParisA.michelson_v1.expression":
+          "micheline..expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref": "#/components/schemas/micheline..expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim": { "$ref": "#/components/schemas/unistring" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline..expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.017-PtNairob.generic.expression":
             { "oneOf":
                 [ { "title": "Int", "type": "object",
                     "properties":
@@ -2037,7 +2897,44 @@
                   { "title": "Sequence", "type": "array",
                     "items":
                       { "$ref":
-                          "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" } },
+                          "#/components/schemas/micheline.017-PtNairob.generic.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim": { "$ref": "#/components/schemas/unistring" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.017-PtNairob.generic.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.017-PtNairob.michelson_v1.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.017-PtNairob.michelson_v1.expression" } },
                   { "title": "Prim__generic",
                     "description":
                       "Generic primitive (any number of args with or without annotations)",
@@ -2045,22 +2942,376 @@
                     "properties":
                       { "prim":
                           { "$ref":
-                              "#/components/schemas/019-PtParisA.michelson.v1.primitives" },
+                              "#/components/schemas/017-PtNairob.michelson.v1.primitives" },
                         "args":
                           { "type": "array",
                             "items":
                               { "$ref":
-                                  "#/components/schemas/micheline.019-PtParisA.michelson_v1.expression" } },
+                                  "#/components/schemas/micheline.017-PtNairob.michelson_v1.expression" } },
                         "annots":
                           { "type": "array",
                             "items":
                               { "$ref": "#/components/schemas/unistring" } } },
                     "required": [ "prim" ] } ] },
+          "micheline.018-Proxford.generic.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.018-Proxford.generic.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim": { "$ref": "#/components/schemas/unistring" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.018-Proxford.generic.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.018-Proxford.michelson_v1.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.018-Proxford.michelson_v1.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim":
+                          { "$ref":
+                              "#/components/schemas/018-Proxford.michelson.v1.primitives" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.018-Proxford.michelson_v1.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.019-PtParisB.generic.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.019-PtParisB.generic.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim": { "$ref": "#/components/schemas/unistring" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.019-PtParisB.generic.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.019-PtParisB.michelson_v1.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim":
+                          { "$ref":
+                              "#/components/schemas/019-PtParisB.michelson.v1.primitives" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.019-PtParisB.michelson_v1.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.alpha.generic.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.alpha.generic.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim": { "$ref": "#/components/schemas/unistring" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.alpha.generic.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.alpha.michelson_v1.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.alpha.michelson_v1.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim":
+                          { "$ref":
+                              "#/components/schemas/alpha.michelson.v1.primitives" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.alpha.michelson_v1.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.alpha_client.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.alpha_client.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim": { "$ref": "#/components/schemas/unistring" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.alpha_client.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.generic.expression":
+            { "oneOf":
+                [ { "title": "Int", "type": "object",
+                    "properties":
+                      { "int": { "$ref": "#/components/schemas/bignum" } },
+                    "required": [ "int" ] },
+                  { "title": "String", "type": "object",
+                    "properties":
+                      { "string":
+                          { "$ref": "#/components/schemas/unistring" } },
+                    "required": [ "string" ] },
+                  { "title": "Bytes", "type": "object",
+                    "properties":
+                      { "bytes":
+                          { "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
+                    "required": [ "bytes" ] },
+                  { "title": "Sequence", "type": "array",
+                    "items":
+                      { "$ref":
+                          "#/components/schemas/micheline.generic.expression" } },
+                  { "title": "Prim__generic",
+                    "description":
+                      "Generic primitive (any number of args with or without annotations)",
+                    "type": "object",
+                    "properties":
+                      { "prim": { "$ref": "#/components/schemas/unistring" },
+                        "args":
+                          { "type": "array",
+                            "items":
+                              { "$ref":
+                                  "#/components/schemas/micheline.generic.expression" } },
+                        "annots":
+                          { "type": "array",
+                            "items":
+                              { "$ref": "#/components/schemas/unistring" } } },
+                    "required": [ "prim" ] } ] },
+          "micheline.location":
+            { "title": "Canonical location in a Micheline expression",
+              "description":
+                "The location of a node in a Micheline expression tree in prefix order, with zero being the root and adding one for every basic node, sequence and primitive application.",
+              "type": "integer", "minimum": -1073741824,
+              "maximum": 1073741823 },
+          "mutez":
+            { "title": "A millionth of a tez",
+              "description":
+                "One million mutez make a tez (1 tez = 1e6 mutez)",
+              "oneOf": [ { "$ref": "#/components/schemas/positive_bignum" } ] },
+          "nanotez":
+            { "title": "A thousandth of a mutez",
+              "description":
+                "One thousand nanotez make a mutez (1 tez = 1e9 nanotez)",
+              "type": "array",
+              "items":
+                { "oneOf": [ { "$ref": "#/components/schemas/bignum" } ] } },
+          "network_version":
+            { "description":
+                "A version number for the network protocol (includes distributed DB version and p2p version)",
+              "type": "object",
+              "properties":
+                { "chain_name":
+                    { "$ref":
+                        "#/components/schemas/distributed_db_version.name" },
+                  "distributed_db_version":
+                    { "$ref": "#/components/schemas/distributed_db_version" },
+                  "p2p_version":
+                    { "$ref": "#/components/schemas/p2p_version" } },
+              "required":
+                [ "chain_name", "distributed_db_version", "p2p_version" ] },
+          "p2p_address":
+            { "description": "An address for locating peers.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "p2p_connection.id":
+            { "description":
+                "The identifier for a p2p connection. It includes an address and a port number.",
+              "type": "object",
+              "properties":
+                { "addr": { "$ref": "#/components/schemas/p2p_address" },
+                  "port":
+                    { "type": "integer", "minimum": 0, "maximum": 65535 } },
+              "required": [ "addr" ] },
+          "p2p_point.id":
+            { "description": "Identifier for a peer point",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "p2p_version":
+            { "description": "A version number for the p2p layer.",
+              "type": "integer", "minimum": 0, "maximum": 65535 },
           "positive_bignum":
             { "title": "Positive big number",
               "description":
                 "Decimal representation of a positive big number",
               "type": "string" },
+          "protocol.environment_version":
+            { "type": "integer", "minimum": 0, "maximum": 65535 },
           "sc_l2_message":
             { "description": "A hex encoded smart rollup message",
               "type": "string", "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" },
@@ -2214,6 +3465,31 @@
                             "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$" } },
                     "required":
                       [ "kind", "rollup", "cemented_commitment", "proof" ] } ] },
+          "sc_rollup_node_mode":
+            { "oneOf":
+                [ { "title": "custom", "type": "object",
+                    "properties":
+                      { "custom":
+                          { "type": "array",
+                            "items":
+                              { "type": "string",
+                                "enum":
+                                  [ "add_messages", "publish", "refute",
+                                    "recover", "timeout", "cement",
+                                    "execute_outbox_message" ] } } },
+                    "required": [ "custom" ] },
+                  { "title": "observer", "type": "string",
+                    "enum": [ "observer" ] },
+                  { "title": "accuser", "type": "string",
+                    "enum": [ "accuser" ] },
+                  { "title": "bailout", "type": "string",
+                    "enum": [ "bailout" ] },
+                  { "title": "batcher", "type": "string",
+                    "enum": [ "batcher" ] },
+                  { "title": "maintenance", "type": "string",
+                    "enum": [ "maintenance" ] },
+                  { "title": "operator", "type": "string",
+                    "enum": [ "operator" ] } ] },
           "schema.field":
             { "oneOf":
                 [ { "title": "Named_field", "type": "object",
@@ -2266,6 +3542,9 @@
                     "properties":
                       { "kind": { "type": "string", "enum": [ "Variable" ] } },
                     "required": [ "kind" ] } ] },
+          "script_expr":
+            { "title": "A script expression ID (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
           "service_tree":
             { "oneOf":
                 [ { "title": "Static", "type": "object",
@@ -5765,6 +7044,23 @@
             { "title":
                 "The hash of the VM state of a smart rollup (Base58Check-encoded)",
               "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "timestamp.protocol":
+            { "description":
+                "A timestamp as seen by the protocol: second-level precision, epoch based.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "timestamp.rfc":
+            { "title": "RFC 3339 formatted timestamp",
+              "description": "A date in RFC 3339 notation.",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] },
+          "timestamp.system":
+            { "description":
+                "A timestamp as seen by the underlying, local computer: subsecond-level precision, epoch or rfc3339 based.",
+              "oneOf":
+                [ { "title": "RFC encoding",
+                    "oneOf":
+                      [ { "$ref": "#/components/schemas/timestamp.rfc" } ] },
+                  { "title": "Second since epoch",
+                    "oneOf": [ { "$ref": "#/components/schemas/int64" } ] } ] },
           "union case":
             { "type": "object",
               "properties":
@@ -5790,4 +7086,7 @@
                             "items":
                               { "type": "integer", "minimum": 0,
                                 "maximum": 255 } } },
-                    "required": [ "invalid_utf8_string" ] } ] } } } }
+                    "required": [ "invalid_utf8_string" ] } ] },
+          "value_hash":
+            { "title": "Hash of a consensus value (Base58Check-encoded)",
+              "oneOf": [ { "$ref": "#/components/schemas/unistring" } ] } } } }
