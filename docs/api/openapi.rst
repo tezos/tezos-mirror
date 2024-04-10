@@ -106,6 +106,18 @@ The OpenAPI specifications for the RPCs of the smart rollup node for the Oxford
 - `oxford-smart-rollup-node-openapi.json (version 19.1)
   <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
 
+- `oxford-smart-rollup-node-openapi.json (version 20.0~rc1)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi-rc.json>`_
+
+Paris RPCs
+----------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Paris
+(``PtParisB``) protocol can be found at:
+
+- `paris-smart-rollup-node-openapi.json (version 20.0~rc1)
+  <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/paris-smart-rollup-node-openapi-rc.json>`_
+
 
 DAL Node
 ~~~~~~~~
