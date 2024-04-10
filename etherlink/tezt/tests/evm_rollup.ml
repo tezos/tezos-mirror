@@ -285,8 +285,8 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
     ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-    ?(setup_mode = Setup_proxy {devmode = true}) ?(force_install_kernel = true)
-    protocol =
+    ?max_number_of_chunks ?(setup_mode = Setup_proxy {devmode = true})
+    ?(force_install_kernel = true) protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -407,7 +407,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
                max_blueprints_ahead = None;
                max_blueprints_catchup = None;
                catchup_cooldown = None;
-               max_number_of_chunks = None;
+               max_number_of_chunks;
                devmode;
                wallet_dir = Some (Client.base_dir client);
                tx_pool_timeout_limit;
@@ -5410,6 +5410,70 @@ let test_tx_pool_address_boundaries =
     ~error_msg:"Expected transaction hash is %R, got %L" ;
   unit
 
+let test_tx_pool_transaction_size_exceeded =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "tx_pool"; "max"; "transaction"; "size"]
+    ~title:
+      "Check that a transaction that exceed the data size limit will be \
+       rejected."
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  let sequencer_admin = Constant.bootstrap1 in
+  let admin = Some Constant.bootstrap3 in
+  let setup_mode =
+    Setup_sequencer
+      {
+        time_between_blocks = Some Nothing;
+        sequencer = sequencer_admin;
+        devmode = true;
+      }
+  in
+  let* {evm_node = sequencer_node; _} =
+    setup_evm_kernel
+      ~sequencer_admin
+      ~admin
+      ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+      ~max_number_of_chunks:1
+      ~setup_mode
+      protocol
+  in
+  let tx =
+    (* {
+         "chainId": "1337",
+         "type": "LegacyTransaction",
+         "valid": true,
+         "hash": "0xb4c823c72996be6f4767997f21dac443568f3d0a1cd24f3b29eeb66cb5aca2f8",
+         "nonce": "0",
+         "gasPrice": "21000",
+         "gasLimit": "23300",
+         "from": "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c",
+         "to": "0xb53dc01974176e5dff2298c5a94343c2585e3c54",
+         "v": "0a96",
+         "r": "f333e35786005f6d2c0a351d7bb42950c0236a800be8c2e0b5878af9f8c86fec",
+         "s": "620a8fc5b904363a9ce8af6f4fceba432f671c1e809894bf911e0176ab8e7b1c",
+         "value": "0",
+         "data": "01"
+       } *)
+    "f86380825208825b0494b53dc01974176e5dff2298c5a94343c2585e3c548001820a96a0f333e35786005f6d2c0a351d7bb42950c0236a800be8c2e0b5878af9f8c86feca0620a8fc5b904363a9ce8af6f4fceba432f671c1e809894bf911e0176ab8e7b1c"
+  in
+  (* Limitation on size of the transaction *)
+  let*@? rejected_transaction =
+    Rpc.send_raw_transaction ~raw_tx:tx sequencer_node
+  in
+  Check.(
+    (rejected_transaction.message
+   = "Transaction data exceeded the allowed size.")
+      string)
+    ~error_msg:"This transaction should be rejected with error msg %R not %L" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5506,7 +5570,8 @@ let register_evm_node ~protocols =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_tx_pool_timeout protocols ;
-  test_tx_pool_address_boundaries protocols
+  test_tx_pool_address_boundaries protocols ;
+  test_tx_pool_transaction_size_exceeded protocols
 
 let protocols = Protocol.all
 
