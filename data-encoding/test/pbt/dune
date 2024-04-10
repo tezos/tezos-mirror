@@ -51,19 +51,19 @@
   (run %{dep:./json_roundtrip_in_binary.exe})))
 
 (rule
- (alias runtest)
+ (alias runtest_js)
  (package data-encoding)
  (action
   (run node %{dep:./test_legacy_compatibility.bc.js})))
 
 (rule
- (alias runtest)
+ (alias runtest_js)
  (package data-encoding)
  (action
   (run node %{dep:./test_classifiers.bc.js})))
 
 (rule
- (alias runtest)
+ (alias runtest_js)
  (package data-encoding)
  (action
   (run node %{dep:./json_roundtrip_in_binary.bc.js})))
