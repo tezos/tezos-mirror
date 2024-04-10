@@ -5,8 +5,7 @@ Version 20 contains a new version (V12) of the protocol environment,
 which is the set of functions that a protocol can call.
 This new version is used by the :doc:`Paris <../protocols/019_paris>`,
 protocol proposal for the successor of Oxford.
-This release contains the Paris A protocol proposal itself, as well as its associated protocol-specific executable binaries (baker, accuser, etc).
-The stable release 20.0 will contain the protocol selected by the ongoing vote, i.e., Paris A or Paris B.
+This release contains the Paris B protocol proposal itself, as well as its associated protocol-specific executable binaries (baker, accuser, etc).
 
 Note that the binaries associated to the Nairobi protocol have been removed as this protocol is now unactive.
 
