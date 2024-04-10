@@ -515,16 +515,18 @@ let changeset_test_evm_compatibility =
     authenticate with Docker Hub provided the environment variable
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
-    ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies ?arch
-    ?when_ ?allow_failure ~__POS__ ~stage ~name script : tezos_job =
+    ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies ?arch ?tags
+    ?when_ ?allow_failure ?parallel ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.6" in
   job
     ?rules
     ?dependencies
     ?artifacts
     ?arch
+    ?tags
     ?when_
     ?allow_failure
+    ?parallel
     ~__POS__
     ~image:Images.docker
     ~variables:

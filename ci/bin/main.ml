@@ -190,7 +190,6 @@ let () =
     | ".gitlab/ci/jobs/doc/documentation.yml"
     | ".gitlab/ci/jobs/doc/documentation:linkcheck.yml"
     | ".gitlab/ci/jobs/doc/oc.install_python.yml"
-    | ".gitlab/ci/jobs/packaging/debian_repository.yml"
     | ".gitlab/ci/jobs/shared/images.yml"
     | ".gitlab/ci/jobs/shared/templates.yml" | ".gitlab/ci/jobs/test/common.yml"
     | ".gitlab/ci/pipelines/before_merging.yml"

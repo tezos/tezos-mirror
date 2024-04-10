@@ -368,12 +368,29 @@ let jobs_unit_tests ~job_build_x86_64_release ~job_build_x86_64_exp_dev_extra
     oc_unit_protocol_compiles;
   ]
 
+(* These are the set of Linux distributions and their release for
+   which we test installation of the deprecated Serokell PPA binary
+   packages. *)
 type install_octez_distribution = Ubuntu_focal | Ubuntu_jammy | Fedora_37
 
 let image_of_distribution = function
   | Ubuntu_focal -> Images.ubuntu_focal
   | Ubuntu_jammy -> Images.ubuntu_jammy
   | Fedora_37 -> Images.fedora_37
+
+(** These are the set of Debian release-architecture combinations for
+    which we build deb packages in the job
+    [job_build_debian_package]. A dependency image will be built once
+    for each combination of [RELEASE] and [TAGS]. *)
+let debian_package_release_matrix =
+  [[("RELEASE", ["unstable"; "bookworm"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+
+(** These are the set of Ubuntu release-architecture combinations for
+    which we build deb packages in the job
+    [job_build_ubuntu_package]. See {!debian_package_release_matrix}
+    for more information. *)
+let ubuntu_package_release_matrix =
+  [[("RELEASE", ["focal"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
 
 let job_tezt ~__POS__ ?rules ?parallel ?(tags = ["gcp_tezt"]) ~name
     ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
@@ -510,6 +527,11 @@ let tezt_tests ?(memory_3k = false) ?(memory_4k = false)
     @@ List.map (fun tag -> TSL_AST.Has_tag tag) positive
     @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
     @ and_)
+
+let build_debian_packages_image =
+  Image.register
+    ~name:"debian_dependencies_image"
+    ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}"
 
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
@@ -887,7 +909,101 @@ let jobs pipeline_type =
               ~dependencies:(Dependent [Artifacts job_opam_prepare]))
       |> jobs_external_once ~path:"packaging/opam_package.yml"
     in
-    job_opam_prepare :: jobs_opam_packages
+    let debian_repository : tezos_job list =
+      let variables add =
+        ( "DEP_IMAGE",
+          "registry.gitlab.com/tezos/tezos/build-$DISTRIBUTION-$RELEASE" )
+        :: add
+      in
+      let changeset_debian_dependencies =
+        Changeset.make
+          [
+            "scripts/version.sh";
+            ".gitlab-ci.yml";
+            "debian-deps-build.Dockerfile";
+          ]
+      in
+      let make_job_docker_build_debian_dependencies ~__POS__ ~name ~matrix
+          ~distribution =
+        job_docker_authenticated
+          ~__POS__
+          ~name
+          ~dependencies:dependencies_needs_trigger
+          ~rules:
+            (make_rules ~changes:changeset_debian_dependencies ~manual:Yes ())
+          ~stage:Stages.build
+          ~variables:(variables [("DISTRIBUTION", distribution)])
+          ~parallel:(Matrix matrix)
+          ~tags:["$TAGS"]
+          [".gitlab/ci/jobs/packaging/build-debian-packages-dependencies.sh"]
+      in
+      let job_docker_build_debian_dependencies : tezos_job =
+        make_job_docker_build_debian_dependencies
+          ~__POS__
+          ~name:"oc.docker-build-debian-dependencies"
+          ~distribution:"debian"
+          ~matrix:debian_package_release_matrix
+      in
+      let job_docker_build_ubuntu_dependencies : tezos_job =
+        make_job_docker_build_debian_dependencies
+          ~__POS__
+          ~name:"oc.docker-build-ubuntu-dependencies"
+          ~distribution:"ubuntu"
+          ~matrix:ubuntu_package_release_matrix
+      in
+      let job_trigger_build_debian_based_packages : tezos_job =
+        job
+          ~__POS__
+          ~name:"oc.build-debian-based-packages"
+          ~image:Images.alpine
+          ~stage:Stages.manual
+          ~dependencies:(Dependent [])
+          ~when_:Manual
+          ["echo 'Trigger build debian packages'"]
+      in
+      let make_job_build_debian_packages ~__POS__ ~name ~matrix ~distribution =
+        job
+          ~__POS__
+          ~name
+          ~image:build_debian_packages_image
+          ~stage:Stages.manual
+          ~variables:(variables [("DISTRIBUTION", distribution)])
+          ~dependencies:
+            (Dependent [Job job_trigger_build_debian_based_packages])
+          ~parallel:(Matrix matrix)
+          ~tags:["$TAGS"]
+          ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+          [".gitlab/ci/jobs/packaging/build-debian-packages.sh"]
+      in
+      let job_build_debian_package : tezos_job =
+        make_job_build_debian_packages
+          ~__POS__
+          ~name:"oc.build-debian"
+          ~distribution:"debian"
+          ~matrix:debian_package_release_matrix
+      in
+      let job_build_ubuntu_package : tezos_job =
+        make_job_build_debian_packages
+          ~__POS__
+          ~name:"oc.build-ubuntu"
+          ~distribution:"ubuntu"
+          ~matrix:ubuntu_package_release_matrix
+      in
+      [
+        job_docker_build_debian_dependencies;
+        job_docker_build_ubuntu_dependencies;
+        job_trigger_build_debian_based_packages;
+        job_build_debian_package;
+        job_build_ubuntu_package;
+      ]
+      |> jobs_external_once ~path:"packaging/debian_repository.yml"
+    in
+    (job_opam_prepare :: jobs_opam_packages)
+    @
+    (* Debian packages can only be built manually on the [Before_merging] pipelines *)
+    match pipeline_type with
+    | Before_merging -> debian_repository
+    | Schedule_extended_test -> []
   in
   (* Dependencies for jobs that should run immediately after jobs
      [job_build_x86_64] in [Before_merging] if they are present
@@ -1165,6 +1281,7 @@ let jobs pipeline_type =
       let install_octez_rules =
         make_rules ~changes:changeset_install_jobs ~manual:Yes ()
       in
+      (* Test installation of the deprecated Serokell PPA binary packages. *)
       let job_install_bin ~__POS__ ~name ?allow_failure ?(rc = false)
           distribution =
         let distribution_string =
