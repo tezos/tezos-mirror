@@ -63,7 +63,7 @@ default:
   interruptible: true
 
 variables:
-  build_deps_image_version: 73427137fb6186c0ba3abd5d93c524023c60fc01
+  build_deps_image_version: 07a7c6694aeb8355724a9fad11c3729143523cd9
   build_deps_image_name: ${GCP_REGISTRY}/tezos/opam-repository
   rust_toolchain_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain
   client_libs_dependencies_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/client-libs-dependencies
