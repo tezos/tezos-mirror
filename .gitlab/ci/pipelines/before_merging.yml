@@ -85,6 +85,7 @@ oc.docker:rust-toolchain:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink.mk
     - etherlink/**/*
     - images/**/*
@@ -214,6 +215,7 @@ oc.build:static-x86_64-linux-binaries:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -246,6 +248,7 @@ oc.build_x86_64-released:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -287,6 +290,7 @@ oc.build_x86_64-exp-dev-extra:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -355,6 +359,7 @@ oc.build_kernels:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink.mk
     - etherlink/**/*
     - images/**/*
@@ -413,6 +418,7 @@ oc.tezt:fetch-records:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -6723,6 +6729,7 @@ misc_opam_checks:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -6772,6 +6779,7 @@ oc.integration:compiler-rejections:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -6799,6 +6807,7 @@ oc.script:test-gen-genesis:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -6853,6 +6862,7 @@ oc.script:test_octez_release_versions:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7078,6 +7088,7 @@ oc.unit:non-proto-x86_64:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7121,6 +7132,7 @@ oc.unit:other-x86_64:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7164,6 +7176,7 @@ oc.unit:proto-x86_64:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7207,6 +7220,7 @@ oc.unit:non-proto-arm64:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7248,6 +7262,7 @@ oc.unit:webassembly-x86_64:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7276,6 +7291,7 @@ oc.unit:js_components:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7308,6 +7324,7 @@ oc.unit:protocol_compiles:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7324,6 +7341,44 @@ oc.unit:protocol_compiles:
   - eval $(opam env)
   script:
   - dune build @runtest_compile_protocol
+
+de.unit:x86_64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - data-encoding/**
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
+de.unit:arm64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - data-encoding/**
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
 
 oc.install_bin_fedora_37:
   image: fedora:37
@@ -7520,6 +7575,7 @@ tezt:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7587,6 +7643,7 @@ tezt-memory-3k:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7653,6 +7710,7 @@ tezt-memory-4k:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7720,6 +7778,7 @@ tezt-time-sensitive:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7786,6 +7845,7 @@ tezt-slow:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7850,6 +7910,7 @@ tezt-flaky:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7917,6 +7978,7 @@ tezt:static-binaries:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*
@@ -7990,6 +8052,7 @@ oc.unified_coverage:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - brassaia/**/*
+    - data-encoding/**/*
     - etherlink/**/*
     - irmin/**/*
     - michelson_test_scripts/**/*

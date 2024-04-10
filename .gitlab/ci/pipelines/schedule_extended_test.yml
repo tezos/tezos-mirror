@@ -6919,6 +6919,32 @@ oc.unit:protocol_compiles:
   script:
   - dune build @runtest_compile_protocol
 
+de.unit:x86_64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
+de.unit:arm64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
 oc.install_bin_fedora_37:
   image: fedora:37
   stage: test

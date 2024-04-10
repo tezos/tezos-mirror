@@ -13,6 +13,7 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 depends: [
   "aches" {= "1.0.0"}
   "aches-lwt" {= "1.0.0"}
+  "afl-persistent" {= "1.4"}
   "alcotest" {= "1.7.0"}
   "angstrom" {= "0.16.0"}
   "asetmap" {= "0.8.1"}
@@ -64,6 +65,7 @@ depends: [
   "conf-which" {= "1"}
   "conf-zlib" {= "1"}
   "cppo" {= "1.6.9"}
+  "crowbar" {= "0.2.1"}
   "crunch" {= "3.3.1"}
   "csexp" {= "1.5.2"}
   "cstruct" {= "6.2.0"}
@@ -71,7 +73,6 @@ depends: [
   "ctypes" {= "0.20.2"}
   "ctypes-foreign" {= "0.18.0"}
   "ctypes_stubs_js" {= "0.1"}
-  "data-encoding" {= "1.0.1"}
   "decompress" {= "1.5.3"}
   "digestif" {= "1.2.0"}
   "dmap" {= "0.5"}
@@ -109,8 +110,6 @@ depends: [
   "js_of_ocaml-compiler" {= "5.7.1"}
   "js_of_ocaml-lwt" {= "5.7.1"}
   "js_of_ocaml-ppx" {= "5.7.1"}
-  "json-data-encoding" {= "1.0.1"}
-  "json-data-encoding-bson" {= "1.0.1"}
   "jsonm" {= "1.0.2"}
   "jst-config" {= "v0.16.0"}
   "lambda-term" {= "3.3.2"}
@@ -235,6 +234,7 @@ depends: [
   "uri" {= "4.4.0"}
   "uri-sexp" {= "4.4.0"}
   "uucp" {= "15.1.0"}
+  "uunf" {= "15.1.0"}
   "uuseg" {= "15.1.0"}
   "uutf" {= "1.0.3"}
   "vector" {= "1.0.0"}
@@ -247,7 +247,11 @@ depends: [
 ]
 conflicts: [
   "checkseum" {= "0.5.0"}
+  "data-encoding"
   "hacl_x25519"
+  "json_data_encoding"
+  "json_data_encoding_browser"
+  "json_data_encoding_bson"
   "result" {< "1.5"}
 ]
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"

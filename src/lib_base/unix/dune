@@ -12,7 +12,7 @@
   octez-libs.hacl
   octez-libs.stdlib
   octez-libs.stdlib-unix
-  data-encoding
+  octez-libs.data-encoding
   uri
   octez-libs.event-logging
   lwt-exit)

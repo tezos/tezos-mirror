@@ -5,7 +5,7 @@
  (name tenderbrute_alpha)
  (public_name octez-protocol-alpha-libs.baking.tenderbrute)
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
   tezos-protocol-alpha.protocol

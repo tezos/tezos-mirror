@@ -31,7 +31,7 @@
   octez-l2-libs.layer2_store
   octez-crawler
   octez-libs.tree-encoding
-  data-encoding
+  octez-libs.data-encoding
   octez-internal-libs.irmin_pack
   octez-internal-libs.irmin_pack.unix
   octez-internal-libs.irmin

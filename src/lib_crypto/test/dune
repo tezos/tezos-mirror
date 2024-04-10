@@ -14,7 +14,7 @@
   zarith
   zarith_stubs_js
   octez-libs.hacl
-  data-encoding
+  octez-libs.data-encoding
   octez-alcotezt
   qcheck-alcotest
   octez-libs.test-helpers)

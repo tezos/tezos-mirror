@@ -11,7 +11,7 @@
   json_roundtrip_in_binary)
  (modes native)
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   zarith
   zarith_stubs_js
   crowbar
@@ -19,30 +19,30 @@
 
 (rule
  (alias runtest)
- (package data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_generated.exe})))
 
 (rule
  (alias runtest)
- (package data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_legacy_compatibility.exe})))
 
 (rule
  (alias runtest)
- (package data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_json_stream.exe})))
 
 (rule
  (alias runtest)
- (package data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_json_stream_sizes.exe})))
 
 (rule
  (alias runtest)
- (package data-encoding)
+ (package octez-libs)
  (action (run %{dep:./test_classifiers.exe})))
 
 (rule
  (alias runtest)
- (package data-encoding)
+ (package octez-libs)
  (action (run %{dep:./json_roundtrip_in_binary.exe})))

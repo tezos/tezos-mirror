@@ -7,5 +7,5 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   ezjsonm
-  json-data-encoding
+  octez-libs.json-data-encoding
   tezt.json))

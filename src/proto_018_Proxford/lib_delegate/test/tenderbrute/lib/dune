@@ -5,7 +5,7 @@
  (name tenderbrute_018_Proxford)
  (public_name octez-protocol-018-Proxford-libs.baking.tenderbrute)
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
   tezos-protocol-018-Proxford.protocol

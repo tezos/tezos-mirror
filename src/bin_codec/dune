@@ -7,7 +7,7 @@
  (package octez-codec)
  (instrumentation (backend bisect_ppx))
  (libraries
-  data-encoding
+  octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
   octez-shell-libs.client-base-unix

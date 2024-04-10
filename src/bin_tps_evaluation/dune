@@ -11,7 +11,7 @@
   caqti
   caqti-dynload
   caqti-lwt.unix
-  data-encoding
+  octez-libs.data-encoding
   lwt
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client.commands
