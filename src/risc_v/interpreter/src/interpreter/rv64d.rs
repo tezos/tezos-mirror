@@ -51,29 +51,56 @@ where
     /// `FCLASS.D` D-type instruction.
     ///
     /// See [Self::run_fclass].
-    pub fn run_fclass_d(&mut self, rs1: FRegister, rd: XRegister) {
+    pub fn run_fclass_d(&mut self, rs1: FRegister, rd: XRegister) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fclass::<Double>(rs1, rd);
+        Ok(())
     }
 
     /// `FEQ.D` R-type instruction.
     ///
     /// See [Self::run_feq].
-    pub fn run_feq_d(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+    pub fn run_feq_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_feq::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FLE.D` R-type instruction.
     ///
     /// See [Self::run_fle].
-    pub fn run_fle_d(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+    pub fn run_fle_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fle::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FLT.D` R-type instruction.
     ///
     /// See [Self::run_flt].
-    pub fn run_flt_d(&mut self, rs1: FRegister, rs2: FRegister, rd: XRegister) {
+    pub fn run_flt_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_flt::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FADD.D` R-type instruction.
@@ -86,6 +113,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fadd::<Double>(rs1, rs2, rm, rd)
     }
 
@@ -99,6 +128,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fsub::<Double>(rs1, rs2, rm, rd)
     }
 
@@ -112,6 +143,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fmul::<Double>(rs1, rs2, rm, rd)
     }
 
@@ -125,6 +158,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fdiv::<Double>(rs1, rs2, rm, rd)
     }
 
@@ -135,6 +170,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         let rval: u64 = self.fregisters.read(rs1).into();
 
         let rm = self.f_rounding_mode(rm)?;
@@ -153,15 +190,31 @@ where
     /// `FMIN.D` R-type instruction.
     ///
     /// See [Self::run_fmin].
-    pub fn run_fmin_d(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+    pub fn run_fmin_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fmin::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FMAX.D` R-type instruction.
     ///
     /// See [Self::run_fmax].
-    pub fn run_fmax_d(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
+    pub fn run_fmax_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fmax::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FMADD.D` instruction.
@@ -175,6 +228,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fmadd::<Double>(rs1, rs2, rs3, rm, rd)
     }
 
@@ -189,6 +244,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fmsub::<Double>(rs1, rs2, rs3, rm, rd)
     }
 
@@ -203,6 +260,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fnmsub::<Double>(rs1, rs2, rs3, rm, rd)
     }
 
@@ -217,6 +276,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fnmadd::<Double>(rs1, rs2, rs3, rm, rd)
     }
 
@@ -229,6 +290,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i32 as i128, Double::from_i128_r)
     }
 
@@ -241,6 +304,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u32 as u128, Double::from_u128_r)
     }
 
@@ -253,6 +318,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i64 as i128, Double::from_i128_r)
     }
 
@@ -265,6 +332,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u128, Double::from_u128_r)
     }
 
@@ -277,6 +346,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_fmt_fmt::<Single, Double>(rs1, rm, rd)
     }
 
@@ -289,6 +360,8 @@ where
         rm: InstrRoundingMode,
         rd: FRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_fmt_fmt::<Double, Single>(rs1, rm, rd)
     }
 
@@ -299,6 +372,8 @@ where
         rm: InstrRoundingMode,
         rd: XRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_fmt_int(
             rs1,
             rm,
@@ -315,6 +390,8 @@ where
         rm: InstrRoundingMode,
         rd: XRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_fmt_int(
             rs1,
             rm,
@@ -331,6 +408,8 @@ where
         rm: InstrRoundingMode,
         rd: XRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_fmt_int(
             rs1,
             rm,
@@ -347,6 +426,8 @@ where
         rm: InstrRoundingMode,
         rd: XRegister,
     ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         self.run_fcvt_fmt_int(
             rs1,
             rm,
@@ -359,22 +440,46 @@ where
     /// `FSGNJ.D` R-type instruction.
     ///
     /// See [Self::run_fsgnj].
-    pub fn run_fsgnj_d(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
-        self.run_fsgnj::<Double>(rs1, rs2, rd)
+    pub fn run_fsgnj_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
+        self.run_fsgnj::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FSGNJN.D` R-type instruction.
     ///
     /// See [Self::run_fsgnjn].
-    pub fn run_fsgnjn_d(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
-        self.run_fsgnjn::<Double>(rs1, rs2, rd)
+    pub fn run_fsgnjn_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
+        self.run_fsgnjn::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FSGNJX.D` R-type instruction.
     ///
     /// See [Self::run_fsgnjx].
-    pub fn run_fsgnjx_d(&mut self, rs1: FRegister, rs2: FRegister, rd: FRegister) {
-        self.run_fsgnjx::<Double>(rs1, rs2, rd)
+    pub fn run_fsgnjx_d(
+        &mut self,
+        rs1: FRegister,
+        rs2: FRegister,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
+        self.run_fsgnjx::<Double>(rs1, rs2, rd);
+        Ok(())
     }
 
     /// `FMV.D.X` D-type instruction
@@ -385,9 +490,12 @@ where
     ///
     /// The bits are not modified in the transfer, the payloads of non-canonical
     /// NaNs are preserved.
-    pub fn run_fmv_d_x(&mut self, rs1: XRegister, rd: FRegister) {
+    pub fn run_fmv_d_x(&mut self, rs1: XRegister, rd: FRegister) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         let rval = self.xregisters.read(rs1).into();
         self.fregisters.write(rd, rval);
+        Ok(())
     }
 
     /// `FMV.X.D` D-type instruction
@@ -397,9 +505,12 @@ where
     ///
     /// The bits are not modified in the transfer, the payloads of non-canonical
     /// NaNs are preserved.
-    pub fn run_fmv_x_d(&mut self, rs1: FRegister, rd: XRegister) {
+    pub fn run_fmv_x_d(&mut self, rs1: FRegister, rd: XRegister) -> Result<(), Exception> {
+        self.check_fs_on()?;
+
         let rval = self.fregisters.read(rs1).into();
         self.xregisters.write(rd, rval);
+        Ok(())
     }
 }
 
@@ -413,6 +524,8 @@ where
     /// Loads a double-precision floating point value from memory into `rd`.
     /// It uses the same address format as integer-base ISA.
     pub fn run_fld(&mut self, imm: i64, rs1: XRegister, rd: FRegister) -> Result<(), Exception> {
+        self.hart.check_fs_on()?;
+
         let val: u64 = self.read_from_bus(imm, rs1)?;
 
         self.hart.fregisters.write(rd, val.into());
@@ -424,6 +537,8 @@ where
     /// Stores a double-precision floating point value into memory from `rs2`.
     /// It uses the same address format as integer-base ISA.
     pub fn run_fsd(&mut self, imm: i64, rs1: XRegister, rs2: FRegister) -> Result<(), Exception> {
+        self.hart.check_fs_on()?;
+
         let val: u64 = self.hart.fregisters.read(rs2).into();
         self.write_to_bus(imm, rs1, val)
     }
@@ -435,6 +550,10 @@ mod tests {
         backend_test, create_backend, create_state,
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
+            csregisters::{
+                xstatus::{self, ExtensionValue},
+                CSRegister,
+            },
             hart_state::{HartState, HartStateLayout},
             registers::{fa2, fa3, parse_fregister, parse_xregister, t0},
             MachineState, MachineStateLayout,
@@ -453,12 +572,16 @@ mod tests {
             let mut backend = create_backend!(HartStateLayout, F);
             let mut state = create_state!(HartState, HartStateLayout, F, backend);
 
+            // Turn fs on
+            let mstatus = xstatus::set_FS(0, ExtensionValue::Dirty);
+            state.csregisters.write(CSRegister::mstatus, mstatus);
+
             state.xregisters.write(rs1, d);
-            state.run_fmv_d_x(rs1, rs1_f);
+            assert!(state.run_fmv_d_x(rs1, rs1_f).is_ok());
 
             assert_eq!(d, state.fregisters.read(rs1_f).into(), "Expected bits to be moved to fregister");
 
-            state.run_fmv_x_d(rs1_f, rs2);
+            assert!(state.run_fmv_x_d(rs1_f, rs2).is_ok());
 
             assert_eq!(d, state.xregisters.read(rs2), "Expected bits to be moved to xregister");
         });
@@ -471,6 +594,10 @@ mod tests {
         {
             let mut backend = create_backend!(MachineStateLayout<T1K>, F);
             let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
+
+            // Turn fs on
+            let mstatus = xstatus::set_FS(0, ExtensionValue::Dirty);
+            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
 
             let mut perform_test = |offset: u64| -> Result<(), Exception> {
                 // Save test values v_i in registers ai
