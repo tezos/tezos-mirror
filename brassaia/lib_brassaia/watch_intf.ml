@@ -39,7 +39,7 @@ module type S = sig
       the new value associated to this key. [None] means the key has been
       removed. *)
 
-  val v : unit -> t
+  val create : unit -> t
   (** Create a watch state. *)
 
   val clear : t -> unit Lwt.t

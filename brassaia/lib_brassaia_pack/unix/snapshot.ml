@@ -55,12 +55,12 @@ module Make (Args : Args) = struct
       contents_pack : read Contents_pack.t;
     }
 
-    let v config contents_pack inode_pack =
+    let init config contents_pack inode_pack =
       (* In order to read from the pack files, we need to open at least two
          files: suffix and control. We just open the file manager for
          simplicity. *)
       let fm = Fm.open_ro config |> Fm.Errs.raise_if_error in
-      let dispatcher = Dispatcher.v fm |> Fm.Errs.raise_if_error in
+      let dispatcher = Dispatcher.init fm |> Fm.Errs.raise_if_error in
       let log_size = Conf.index_log_size config in
       { fm; dispatcher; log_size; inode_pack; contents_pack }
 
@@ -89,7 +89,7 @@ module Make (Args : Args) = struct
             (* If the length is not on disk, the object is in index. *)
             length_of_hash entry_prefix.hash t.inode_pack
       in
-      let key = Pack_key.v_direct ~offset:off ~length entry_prefix.hash in
+      let key = Pack_key.init_direct ~offset:off ~length entry_prefix.hash in
       (key, entry_prefix.kind)
 
     (* Get the childrens offsets and then read their keys at that offset. *)
@@ -319,13 +319,13 @@ module Make (Args : Args) = struct
       let visited h =
         try
           let offset, length = Index.find index h in
-          let key = Pack_key.v_direct ~offset ~length h in
+          let key = Pack_key.init_direct ~offset ~length h in
           key
         with Not_found -> hash_not_found h
       in
       (set_visit, visited, Some (path, index))
 
-    let v ?on_disk log_size contents_pack inode_pack =
+    let init ?on_disk log_size contents_pack inode_pack =
       let set_visit, visited, index =
         match on_disk with
         | None -> save_in_memory ()

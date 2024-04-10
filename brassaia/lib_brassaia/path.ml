@@ -31,7 +31,7 @@ module String_list = struct
     match List.rev l with [] -> None | h :: t -> Some (List.rev t, h)
 
   let map l f = List.map f l
-  let v x = x
+  let init x = x
 
   let pp ppf t =
     let len = List.fold_left (fun acc s -> 1 + acc + String.length s) 1 t in

@@ -43,7 +43,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
   module Inventory : sig
     type t
 
-    val v : int -> (int -> chunk) -> t
+    val init : int -> (int -> chunk) -> t
     val appendable : t -> chunk
 
     val find : off:int63 -> t -> chunk * int63
@@ -89,7 +89,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
 
     exception OpenInventoryError of open_error
 
-    let v num create = { chunks = Array.init num create }
+    let init num create = { chunks = Array.init num create }
     let appendable t = Array.get t.chunks (Array.length t.chunks - 1)
 
     let find ~off t =
@@ -132,7 +132,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
             off_acc := end_offset_of_chunk suffix_off ao;
             { idx = chunk_idx; suffix_off; ao }
       in
-      try Ok (v chunk_num create_chunk)
+      try Ok (init chunk_num create_chunk)
       with OpenInventoryError err ->
         Error (err : open_error :> [> open_error ])
 
@@ -206,14 +206,14 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
       Ao.create_rw ~path ~overwrite ~auto_flush_threshold ~auto_flush_procedure
     in
     let chunk = { idx = chunk_idx; suffix_off = Int63.zero; ao } in
-    let inventory = Inventory.v 1 (Fun.const chunk) in
+    let inventory = Inventory.init 1 (Fun.const chunk) in
     { inventory; root; dead_header_size = 0 }
 
   (** A module to adjust values when mapping from chunks to append-only files *)
   module Ao_shim = struct
     type t = { dead_header_size : int; end_poff : int63 }
 
-    let v ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
+    let init ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
         ~is_appendable =
       let open Result_syntax in
       (* Only use the legacy dead_header_size for legacy chunks. *)
@@ -239,7 +239,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
     let open_chunk ~chunk_idx ~is_legacy ~is_appendable =
       let path = chunk_path ~root ~chunk_idx in
       let* { dead_header_size; end_poff } =
-        Ao_shim.v ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
+        Ao_shim.init ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
           ~is_appendable
       in
       match is_appendable with
@@ -257,7 +257,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
     let open_chunk ~chunk_idx ~is_legacy ~is_appendable =
       let path = chunk_path ~root ~chunk_idx in
       let* { dead_header_size; end_poff } =
-        Ao_shim.v ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
+        Ao_shim.init ~path ~appendable_chunk_poff ~dead_header_size ~is_legacy
           ~is_appendable
       in
       Ao.open_ro ~path ~end_poff ~dead_header_size
@@ -326,7 +326,7 @@ module Make (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
     let open_chunk ~chunk_idx ~is_legacy ~is_appendable =
       let path = chunk_path ~root ~chunk_idx in
       let* { dead_header_size; end_poff } =
-        Ao_shim.v ~path ~appendable_chunk_poff:Int63.zero ~dead_header_size
+        Ao_shim.init ~path ~appendable_chunk_poff:Int63.zero ~dead_header_size
           ~is_legacy ~is_appendable
       in
       match is_appendable with

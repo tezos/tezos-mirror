@@ -124,13 +124,13 @@ module Maker_generic_key (Backend : Maker_generic_key_args) = struct
           let commit_t = (node_t, ct) in
           f contents_t node_t commit_t
 
-        let v config =
-          let* contents = Contents.Backend.v config in
-          let* nodes = Node.Backend.v config in
-          let* commits = Commit.Backend.v config in
+        let init config =
+          let* contents = Contents.Backend.init config in
+          let* nodes = Node.Backend.init config in
+          let* commits = Commit.Backend.init config in
           let nodes = (contents, nodes) in
           let commits = (nodes, commits) in
-          let+ branch = Branch.v config in
+          let+ branch = Branch.init config in
           { contents; nodes; commits; branch; config }
 
         let close t =
@@ -155,7 +155,7 @@ module Maker (CA : Content_addressable.Maker) (AW : Atomic_write.Maker) = struct
       module CA = Content_addressable.Check_closed (CA) (Hash) (Value)
       include Indexable.Of_content_addressable (Hash) (CA)
 
-      let v = CA.v
+      let init = CA.init
     end
   end
 

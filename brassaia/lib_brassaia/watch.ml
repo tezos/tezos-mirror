@@ -147,7 +147,7 @@ struct
         clear_unsafe t;
         Lwt.return_unit)
 
-  let v () =
+  let create () =
     let lock = Lwt_mutex.create () in
     let clean, enqueue = scheduler () in
     {

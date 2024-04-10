@@ -42,8 +42,8 @@ module Make (Args : Gc_args.S) = struct
     latest_gc_target_offset : int63;
   }
 
-  let v ~root ~lower_root ~output ~generation ~unlink ~dispatcher ~fm ~contents
-      ~node ~commit commit_key =
+  let init_and_start ~root ~lower_root ~output ~generation ~unlink ~dispatcher
+      ~fm ~contents ~node ~commit commit_key =
     let open Result_syntax in
     let new_suffix_start_offset, latest_gc_target_offset =
       let state : _ Pack_key.state = Pack_key.inspect commit_key in

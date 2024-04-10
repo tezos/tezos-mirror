@@ -23,7 +23,7 @@ module type S = sig
   type t [@@deriving brassaia]
   (** The type for commit info. *)
 
-  val v : ?author:author -> ?message:message -> int64 -> t
+  val init : ?author:author -> ?message:message -> int64 -> t
   (** Create a new commit info. *)
 
   val date : t -> int64

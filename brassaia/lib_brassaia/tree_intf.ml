@@ -58,7 +58,7 @@ module type S = sig
   type elt = [ `Node of node | `Contents of contents * metadata ]
   (** The type for tree elements. *)
 
-  val v : elt -> t
+  val init : elt -> t
   (** General-purpose constructor for trees. *)
 
   type kinded_hash = [ `Contents of hash * metadata | `Node of hash ]

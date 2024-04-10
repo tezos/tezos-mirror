@@ -19,8 +19,8 @@ module type S = sig
   type key
   type value
 
-  val v : Conf.t -> t Lwt.t
-  (** [v config] initialises a storage layer, with the configuration [config]. *)
+  val init : Conf.t -> t Lwt.t
+  (** [init config] initialises a storage layer with the configuration [config]. *)
 
   val mem : t -> key -> bool Lwt.t
   (** [mem t k] is true iff [k] is present in [t]. *)

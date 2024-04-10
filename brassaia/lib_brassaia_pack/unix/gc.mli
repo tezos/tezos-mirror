@@ -23,7 +23,7 @@ module Make (Args : Gc_args.S) : sig
   type t
   (** A running GC process. *)
 
-  val v :
+  val init_and_start :
     root:string ->
     lower_root:string option ->
     output:[ `External of string | `Root ] ->

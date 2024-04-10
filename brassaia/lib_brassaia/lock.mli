@@ -23,7 +23,7 @@ module type S = sig
   type key
   (** The type for key to be locked. *)
 
-  val v : unit -> t
+  val create : unit -> t
   (** Create a lock manager. *)
 
   val with_lock : t -> key -> (unit -> 'a Lwt.t) -> 'a Lwt.t

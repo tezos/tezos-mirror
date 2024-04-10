@@ -228,11 +228,11 @@ module Make (Args : Gc_args.S) = struct
     Errors.finalise_exn (fun _outcome ->
         Fm.close fm |> Errs.log_if_error "GC: Close File_manager")
     @@ fun () ->
-    let dict = Dict.v fm |> Errs.raise_if_error in
-    let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+    let dict = Dict.init fm |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
     let lru = Lru.create config in
-    let node_store = Node_store.v ~config ~fm ~dict ~dispatcher ~lru in
-    let commit_store = Commit_store.v ~config ~fm ~dict ~dispatcher ~lru in
+    let node_store = Node_store.init ~config ~fm ~dict ~dispatcher ~lru in
+    let commit_store = Commit_store.init ~config ~fm ~dict ~dispatcher ~lru in
 
     (* Step 2. Load commit which will make [commit_key] [Direct] if it's not
        already the case. *)

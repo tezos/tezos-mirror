@@ -280,7 +280,7 @@ struct
       Sys.readdir root
       |> Array.to_list
       |> List.filter (fun filename ->
-             match Brassaia_pack.Layout.Classification.Upper.v filename with
+             match Brassaia_pack.Layout.Classification.Upper.init filename with
              | `Unknown | `Branch | `Control | `Dict | `V1_or_v2_pack -> false
              | `Prefix g | `Mapping g -> g <> generation
              | `Suffix idx ->
@@ -510,13 +510,13 @@ struct
     let make_suffix = Suffix.create_rw ~root ~overwrite ~start_idx:0 in
     let make_index ~flush_callback ~readonly ~throttle ~log_size root =
       (* [overwrite] is ignored for index *)
-      Index.v ~fresh:true ~flush_callback ~readonly ~throttle ~log_size root
+      Index.init ~fresh:true ~flush_callback ~readonly ~throttle ~log_size root
     in
     let make_lower () =
       match lower_root with
       | None -> Ok None
       | Some path ->
-          let* l = Lower.v ~readonly:false ~volume_num:0 path in
+          let* l = Lower.open_volumes ~readonly:false ~volume_num:0 path in
           let+ _ = add_volume_and_update_control l control in
           Some l
     in
@@ -666,14 +666,14 @@ struct
         ~dead_header_size
     in
     let make_index ~flush_callback ~readonly ~throttle ~log_size root =
-      Index.v ~fresh:false ~flush_callback ~readonly ~throttle ~log_size root
+      Index.init ~fresh:false ~flush_callback ~readonly ~throttle ~log_size root
     in
     let make_lower () =
       match lower_root with
       | None -> Ok None
       | Some lower_root ->
           assert (volume_num > 0);
-          let+ l = Lower.v ~readonly:false ~volume_num lower_root in
+          let+ l = Lower.open_volumes ~readonly:false ~volume_num lower_root in
           Some l
     in
     finish_constructing_rw config control ~make_dict ~make_suffix ~make_index
@@ -811,14 +811,14 @@ struct
     let* index =
       let log_size = Conf.index_log_size config in
       let throttle = Conf.merge_throttle config in
-      Index.v ~fresh:false ~readonly:true ~throttle ~log_size root
+      Index.init ~fresh:false ~readonly:true ~throttle ~log_size root
     in
     (* 3. Open lower layer *)
     let* lower =
       match lower_root with
       | None -> Ok None
       | Some path ->
-          let+ l = Lower.v ~readonly:true ~volume_num path in
+          let+ l = Lower.open_volumes ~readonly:true ~volume_num path in
           Some l
     in
     (* 4. return with success *)
@@ -1049,7 +1049,7 @@ struct
     let* index =
       let log_size = Conf.index_log_size config in
       let throttle = Conf.merge_throttle config in
-      Index.v ~fresh:true ~flush_callback:Fun.id ~readonly:false ~throttle
+      Index.init ~fresh:true ~flush_callback:Fun.id ~readonly:false ~throttle
         ~log_size dst_root
     in
     (* Step 5. Add the commit to the index, close the index. *)

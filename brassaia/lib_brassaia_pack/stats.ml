@@ -70,9 +70,9 @@ module Inode = struct
     v.inode_decode_bin <- 0;
     v.inode_encode_bin <- 0
 
-  let init () =
+  let create () =
     let initial_state = create_inode () in
-    Metrics.v ~origin:Inode_stats ~name:"inode_metric" ~initial_state t
+    Metrics.create ~origin:Inode_stats ~name:"inode_metric" ~initial_state t
 
   let export m = Metrics.state m
 
@@ -95,7 +95,7 @@ end
 
 type t = { inode : Inode.stat }
 
-let s = { inode = Inode.init () }
+let s = { inode = Inode.create () }
 let get () = s
 let reset_stats () = Inode.clear s.inode
 let incr_inode_add () = Inode.update ~field:Inode.Inode_add s.inode

@@ -108,7 +108,7 @@ module Maker (Config : Conf.S) = struct
           let info = Commit.Value.info t
           and node = Commit.Value.node t |> XKey.to_hash
           and parents = Commit.Value.parents t |> List.map XKey.to_hash in
-          v ~info ~node ~parents
+          init ~info ~node ~parents
 
         module Info = Schema.Info
 
@@ -121,8 +121,8 @@ module Maker (Config : Conf.S) = struct
         module AW = Atomic_write.Make_persistent (Key) (Val)
         include Atomic_write.Closeable (AW)
 
-        let v ?fresh ?readonly path =
-          AW.v ?fresh ?readonly path >|= make_closeable
+        let init ?fresh ?readonly path =
+          AW.create ?fresh ?readonly path >|= make_closeable
       end
 
       module Slice = Brassaia.Backend.Slice.Make (Contents) (Node) (Commit)
@@ -169,7 +169,7 @@ module Maker (Config : Conf.S) = struct
         let branch_t t = t.branch
         let config t = t.config
 
-        let v config =
+        let init config =
           let root = Brassaia_pack.Conf.root config in
           let fresh = Brassaia_pack.Conf.fresh config in
           let fm =
@@ -187,18 +187,18 @@ module Maker (Config : Conf.S) = struct
                   File_manager.open_rw config |> Errs.raise_if_error
               | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory root)
           in
-          let dict = Dict.v fm |> Errs.raise_if_error in
-          let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+          let dict = Dict.init fm |> Errs.raise_if_error in
+          let dispatcher = Dispatcher.init fm |> Errs.raise_if_error in
           let lru = Lru.create config in
-          let contents = Contents.CA.v ~config ~fm ~dict ~dispatcher ~lru in
-          let node = Node.CA.v ~config ~fm ~dict ~dispatcher ~lru in
-          let commit = Commit.CA.v ~config ~fm ~dict ~dispatcher ~lru in
+          let contents = Contents.CA.init ~config ~fm ~dict ~dispatcher ~lru in
+          let node = Node.CA.init ~config ~fm ~dict ~dispatcher ~lru in
+          let commit = Commit.CA.init ~config ~fm ~dict ~dispatcher ~lru in
           let+ branch =
             let root = Conf.root config in
             let fresh = Conf.fresh config in
             let readonly = Conf.readonly config in
             let path = Brassaia_pack.Layout.V4.branch ~root in
-            Branch.v ~fresh ~readonly path
+            Branch.init ~fresh ~readonly path
           in
           let during_batch = false in
           let running_gc = None in
@@ -261,9 +261,10 @@ module Maker (Config : Conf.S) = struct
             let next_generation = current_generation + 1 in
             let lower_root = Conf.lower_root t.config in
             let* gc =
-              Gc.v ~root ~lower_root ~generation:next_generation ~unlink
-                ~dispatcher:t.dispatcher ~fm:t.fm ~contents:t.contents
-                ~node:t.node ~commit:t.commit ~output commit_key
+              Gc.init_and_start ~root ~lower_root ~generation:next_generation
+                ~unlink ~dispatcher:t.dispatcher ~file_manager:t.file_manager
+                ~contents:t.contents ~node:t.node ~commit:t.commit ~output
+                commit_key
             in
             t.running_gc <- Some { gc; use_auto_finalisation };
             Ok ()
@@ -338,7 +339,7 @@ module Maker (Config : Conf.S) = struct
                        length in their header. *)
                     assert false
                 | Some length ->
-                    let key = Pack_key.v_direct ~offset ~length entry.hash in
+                    let key = Pack_key.init_direct ~offset ~length entry.hash in
                     Some key)
 
           let create_one_commit_store t commit_key path =
@@ -375,7 +376,7 @@ module Maker (Config : Conf.S) = struct
             in
             let branch_path = Brassaia_pack.Layout.V4.branch ~root:path in
             let* branch_store =
-              Branch.v ~fresh:true ~readonly:false branch_path
+              Branch.init ~fresh:true ~readonly:false branch_path
             in
             let* () = Branch.close branch_store in
             Lwt.return_unit
@@ -533,7 +534,7 @@ module Maker (Config : Conf.S) = struct
 
           module Hash = Hash
         end) in
-        let t = Stats.v () in
+        let t = Stats.create () in
         let pred_node repo k =
           X.Node.find (X.Repo.node_t repo) k >|= function
           | None -> Fmt.failwith "key %a not found" pp_key k
@@ -704,7 +705,7 @@ module Maker (Config : Conf.S) = struct
           [%log.debug "Iterate over a tree"];
           let contents = X.Repo.contents_t repo in
           let nodes = X.Repo.node_t repo |> snd in
-          let export = S.Export.v repo.config contents nodes in
+          let export = S.Export.init repo.config contents nodes in
           let f_contents x = f (Blob x) in
           let f_nodes x = f (Inode x) in
           match root_key with
@@ -723,11 +724,11 @@ module Maker (Config : Conf.S) = struct
       module Import = struct
         type process = Import.t
 
-        let v ?on_disk repo =
+        let init ?on_disk repo =
           let contents = X.Repo.contents_t repo in
           let nodes = X.Repo.node_t repo |> snd in
           let log_size = Conf.index_log_size repo.config in
-          Import.v ?on_disk log_size contents nodes
+          Import.init ?on_disk log_size contents nodes
 
         let save_elt process elt =
           match elt with

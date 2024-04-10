@@ -80,7 +80,7 @@ module Maker (K : Brassaia.Hash.S) = struct
     let index_direct _ h = Some h
     let index t h = Lwt.return (index_direct t h)
     let instances = Pool.create ~alloc:(fun name -> { name; t = KMap.empty })
-    let v name = Lwt.return (Pool.take instances name)
+    let init name = Lwt.return (Pool.take instances name)
     let equal_key = Brassaia.Type.(unstage (equal K.t))
 
     let close t =

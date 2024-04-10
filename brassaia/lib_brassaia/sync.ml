@@ -126,7 +126,7 @@ module Make (S : Store.Generic_key.S) = struct
         | `Empty | `Commit _ -> Lwt.return (Ok `Empty)
         | `Branch br -> (
             [%log.debug "Fetching branch %a" pp_branch br];
-            let* g = B.v (S.repo t) in
+            let* g = B.init (S.repo t) in
             B.fetch g ?depth e br >>= function
             | Error _ as e -> Lwt.return e
             | Ok (Some key) -> (
@@ -208,7 +208,7 @@ module Make (S : Store.Generic_key.S) = struct
         | `Commit _ -> Lwt.return (Error `Detached_head)
         | `Branch br -> (
             let* head = S.of_branch (S.repo t) br >>= S.Head.get in
-            let* g = B.v (S.repo t) in
+            let* g = B.init (S.repo t) in
             B.push g ?depth e br >>= function
             | Ok () -> Lwt.return (Ok (`Head head))
             | Error err -> Lwt.return (Error (err :> push_error))))

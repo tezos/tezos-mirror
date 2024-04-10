@@ -42,7 +42,8 @@ module type Sigs = sig
     module Export : sig
       type t
 
-      val v : Brassaia.config -> read Contents_pack.t -> read Inode.Pack.t -> t
+      val init :
+        Brassaia.config -> read Contents_pack.t -> read Inode.Pack.t -> t
 
       val run :
         ?on_disk:[ `Path of string ] ->
@@ -66,7 +67,7 @@ module type Sigs = sig
     module Import : sig
       type t
 
-      val v :
+      val init :
         ?on_disk:[ `Path of string | `Reuse ] ->
         int ->
         read Contents_pack.t ->

@@ -28,7 +28,7 @@ module type S = sig
   type dict
   type dispatcher
 
-  val v :
+  val init :
     config:Brassaia.Backend.Conf.t ->
     fm:file_manager ->
     dict:dict ->

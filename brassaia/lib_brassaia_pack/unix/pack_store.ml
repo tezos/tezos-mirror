@@ -111,7 +111,7 @@ struct
     match Index.find (Fm.index t.fm) hash with
     | None -> None
     | Some (offset, length, kind) ->
-        let key = Pack_key.v_direct ~offset ~length hash in
+        let key = Pack_key.init_direct ~offset ~length hash in
         Some (key, kind)
 
   let index_direct t hash =
@@ -119,7 +119,7 @@ struct
 
   let index t hash = Lwt.return (index_direct t hash)
 
-  let v ~config ~fm ~dict ~dispatcher ~lru =
+  let init ~config ~fm ~dict ~dispatcher ~lru =
     let indexing_strategy = Conf.indexing_strategy config in
     let staging = Tbl.create 127 in
     Fm.register_suffix_consumer fm ~after_flush:(fun () -> Tbl.clear staging);
@@ -289,14 +289,15 @@ struct
       let entry_prefix = { entry_prefix with kind } in
       match Entry_prefix.total_entry_length entry_prefix with
       | Some length ->
-          Pack_key.v_direct ~offset ~length ?volume_identifier entry_prefix.hash
+          Pack_key.init_direct ~offset ~length ?volume_identifier
+            entry_prefix.hash
       | None ->
           (* NOTE: we could store [offset] in this key, but since we know the
              entry doesn't have a length header we'll need to check the index
              when dereferencing this key anyway. {i Not} storing the offset
              avoids doing another failed check in the pack file for the length
              header during [find]. *)
-          Pack_key.v_indexed entry_prefix.hash
+          Pack_key.init_indexed entry_prefix.hash
     in
     key
 
@@ -310,7 +311,7 @@ struct
     else
       let () = Pack_key.set_volume_identifier_exn ~volume_identifier key in
       let key_of_offset = key_of_offset ?volume_identifier t in
-      let key_of_hash = Pack_key.v_indexed in
+      let key_of_hash = Pack_key.init_indexed in
       let dict = Dict.find t.dict in
       let v =
         (* Bytes.unsafe_to_string usage: buf created, uniquely owned; after
@@ -393,7 +394,7 @@ struct
     value_opt
 
   let unsafe_find_no_prefetch t key =
-    let key_of_offset ?volume_identifier:_ _ = Pack_key.v_offset in
+    let key_of_offset ?volume_identifier:_ _ = Pack_key.init_offset in
     find_in_pack_file ~key_of_offset t key
 
   let find t k =
@@ -401,7 +402,7 @@ struct
     Lwt.return v
 
   let integrity_check ~offset ~length hash t =
-    let k = Pack_key.v_direct ~offset ~length hash in
+    let k = Pack_key.init_direct ~offset ~length hash in
     (* TODO: new error for reading gced objects. *)
     match find_in_pack_file ~key_of_offset t k with
     | exception Errors.Pack_error (`Invalid_prefix_read _) ->
@@ -477,7 +478,7 @@ struct
 
       let open Int63.Syntax in
       let len = Int63.to_int (Dispatcher.end_offset t.dispatcher - off) in
-      let key = Pack_key.v_direct ~offset:off ~length:len hash in
+      let key = Pack_key.init_direct ~offset:off ~length:len hash in
       let () =
         let should_index = t.indexing_strategy ~value_length:len kind in
         if should_index then
@@ -491,7 +492,7 @@ struct
     match ensure_unique && use_index with
     | false -> unguarded_append ()
     | true ->
-        let key = Pack_key.v_indexed hash in
+        let key = Pack_key.init_indexed hash in
         if unsafe_mem t key then key else unguarded_append ()
 
   let unsafe_add t hash v =
@@ -526,8 +527,8 @@ struct
   include Inner
   include Indexable.Closeable (Inner)
 
-  let v ~config ~fm ~dict ~dispatcher ~lru =
-    Inner.v ~config ~fm ~dict ~dispatcher ~lru |> make_closeable
+  let init ~config ~fm ~dict ~dispatcher ~lru =
+    Inner.init ~config ~fm ~dict ~dispatcher ~lru |> make_closeable
 
   let cast t = Inner.cast (get_if_open_exn t) |> make_closeable
 

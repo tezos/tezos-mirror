@@ -227,7 +227,7 @@ struct
         let info = commit.info in
         let node = key_of_address commit.node_offset in
         let parents = List.map key_of_address commit.parent_offsets in
-        Commit.v ~info ~node ~parents
+        Commit.init ~info ~node ~parents
     | _ -> assert false
 
   let decode_bin_length =

@@ -35,8 +35,8 @@ end
 module type Of_config = sig
   type 'a t
 
-  val v : Conf.t -> read t Lwt.t
-  (** [v config] is a function returning fresh store handles, with the
+  val init : Conf.t -> read t Lwt.t
+  (** [init config] is a function returning fresh store handles, with the
       configuration [config], which is provided by the backend. *)
 end
 

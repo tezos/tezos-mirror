@@ -128,11 +128,11 @@ let t (type hash) (hash_t : hash Brassaia.Type.t) =
     ~bin:(encode_bin, decode_bin, size_of)
     ~unboxed_bin:(unboxed_encode_bin, unboxed_decode_bin, size_of)
 
-let v_direct ~offset ~length ?volume_identifier hash =
+let init_direct ~offset ~length ?volume_identifier hash =
   State { state = Direct { hash; offset; length; volume_identifier } }
 
-let v_indexed hash = State { state = Indexed hash }
-let v_offset offset = State { state = Offset offset }
+let init_indexed hash = State { state = Indexed hash }
+let init_offset offset = State { state = Offset offset }
 
 module type S = sig
   type hash
@@ -153,10 +153,10 @@ module Make (Hash : Brassaia.Hash.S) = struct
     let hash =
       match hash_of_bin_string buf with Ok x -> x | Error _ -> assert false
     in
-    v_direct ~offset:null_offset ~length:null_length hash
+    init_direct ~offset:null_offset ~length:null_length hash
 
   let unfindable_of_hash hash =
-    v_direct ~offset:null_offset ~length:null_length hash
+    init_direct ~offset:null_offset ~length:null_length hash
 end
 
 module type Store_spec = sig

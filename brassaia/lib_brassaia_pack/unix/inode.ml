@@ -53,7 +53,7 @@ struct
     in
     Inter.Val.of_snapshot ~index v find
 
-  let v = Pack.v
+  let init = Pack.init
   let integrity_check = Pack.integrity_check
   let purge_lru = Pack.purge_lru
   let key_of_offset = Pack.key_of_offset

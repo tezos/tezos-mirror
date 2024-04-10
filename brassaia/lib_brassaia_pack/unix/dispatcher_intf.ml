@@ -21,7 +21,7 @@ module type S = sig
 
   type t
 
-  val v : Fm.t -> (t, [> Fm.Errs.t ]) result
+  val init : Fm.t -> (t, [> Fm.Errs.t ]) result
 
   val read_exn :
     t ->

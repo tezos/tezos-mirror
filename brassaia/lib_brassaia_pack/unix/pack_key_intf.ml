@@ -85,15 +85,15 @@ module type Sigs = sig
 
   val inspect : 'hash t -> 'hash state
 
-  val v_direct :
+  val init_direct :
     offset:int63 ->
     length:int ->
     ?volume_identifier:Lower.volume_identifier ->
     'h ->
     'h t
 
-  val v_indexed : 'h -> 'h t
-  val v_offset : int63 -> 'h t
+  val init_indexed : 'h -> 'h t
+  val init_offset : int63 -> 'h t
 
   val promote_exn :
     offset:int63 ->

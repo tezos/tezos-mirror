@@ -44,7 +44,7 @@ end
 
 open Brassaia.Backend.Conf
 
-let spec = Spec.v "pack"
+let spec = Spec.init "pack"
 
 type merge_throttle = [ `Block_writes | `Overcommit_memory ]
 [@@deriving brassaia]

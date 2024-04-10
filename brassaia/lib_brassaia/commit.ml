@@ -60,7 +60,7 @@ module Maker_generic_key (I : Info.S) = struct
     let info t = t.info
     let compare_commit_key x y = compare_hash (C.to_hash x) (C.to_hash y)
 
-    let v ~info ~node ~parents =
+    let init ~info ~node ~parents =
       let parents = List.fast_sort compare_commit_key parents in
       { node; parents; info }
 
@@ -90,7 +90,7 @@ module Maker_generic_key (I : Info.S) = struct
       let node t = t.node
       let info t = t.info
 
-      let v ~info ~node ~parents =
+      let init ~info ~node ~parents =
         let parents = List.fast_sort compare_hash parents in
         { node; parents; info }
 
@@ -208,11 +208,11 @@ struct
         >>=* fun node ->
         let* node = empty_if_none t node in
         let parents = [ k1; k2 ] in
-        let commit = Val.v ~node ~parents ~info:(info ()) in
+        let commit = Val.init ~node ~parents ~info:(info ()) in
         let* key = add t commit in
         Merge.ok key
 
-  let merge t ~info = Merge.(option (v Key.t (merge_commit info t)))
+  let merge t ~info = Merge.(option (init Key.t (merge_commit info t)))
 end
 
 module Generic_key = struct
@@ -266,10 +266,10 @@ module History (S : Store) = struct
       | None -> Merge.conflict "History.merge"
       | Some x -> Merge.ok x
     in
-    Merge.v S.Key.t f
+    Merge.init S.Key.t f
 
-  let v t ~node ~parents ~info =
-    let commit = S.Val.v ~node ~parents ~info in
+  let init_and_store t ~node ~parents ~info =
+    let commit = S.Val.init ~node ~parents ~info in
     let+ hash = S.add t commit in
     (hash, commit)
 
@@ -622,14 +622,14 @@ module V1 = struct
 
     let t : t Type.t =
       let open Type in
-      record "info" (fun date author message -> v ~author ~message date)
+      record "info" (fun date author message -> init ~author ~message date)
       |+ field "date" int64 (fun t -> date t)
       |+ field "author" (string_of `Int64) (fun t -> author t)
       |+ field "message" (string_of `Int64) (fun t -> message t)
       |> sealr
   end
 
-  module Make (Hash : Hash.S) (C : Generic_key.S with module Info := Info) =
+  module Make (Hash : Hash.S) (Commit : Generic_key.S with module Info := Info) =
   struct
     module K (K : Type.S) = struct
       let h = Type.string_of `Int64
@@ -665,26 +665,29 @@ module V1 = struct
     end
 
     module Node_key = K (struct
-      type t = C.node_key [@@deriving brassaia]
+      type t = Commit.node_key [@@deriving brassaia]
     end)
 
     module Commit_key = K (struct
-      type t = C.commit_key [@@deriving brassaia]
+      type t = Commit.commit_key [@@deriving brassaia]
     end)
 
     type node_key = Node_key.t [@@deriving brassaia]
     type commit_key = Commit_key.t [@@deriving brassaia]
-    type t = { parents : commit_key list; c : C.t }
+    type t = { parents : commit_key list; c : Commit.t }
 
     module Info = Info
 
-    let import c = { c; parents = C.parents c }
+    let import c = { c; parents = Commit.parents c }
     let export t = t.c
-    let node t = C.node t.c
+    let node t = Commit.node t.c
     let parents t = t.parents
-    let info t = C.info t.c
-    let v ~info ~node ~parents = { parents; c = C.v ~node ~parents ~info }
-    let make = v
+    let info t = Commit.info t.c
+
+    let init ~info ~node ~parents =
+      { parents; c = Commit.init ~node ~parents ~info }
+
+    let make = init
 
     let t : t Type.t =
       let open Type in

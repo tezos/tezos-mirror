@@ -20,7 +20,9 @@ module type S = sig
   type t
   type path := string
 
-  val v : version:Version.t option -> fresh:bool -> readonly:bool -> path -> t
+  val open_file :
+    version:Version.t option -> fresh:bool -> readonly:bool -> path -> t
+
   val name : t -> string
   val append : t -> string -> unit
   val set : t -> off:int63 -> string -> unit

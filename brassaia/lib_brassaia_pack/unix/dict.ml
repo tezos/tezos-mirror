@@ -81,7 +81,7 @@ module Make (Fm : File_manager.S) = struct
 
   let default_capacity = 100_000
 
-  let v fm =
+  let init fm =
     let open Result_syntax in
     let cache = Hashtbl.create 997 in
     let index = Hashtbl.create 997 in

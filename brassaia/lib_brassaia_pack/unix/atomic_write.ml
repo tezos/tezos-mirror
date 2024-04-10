@@ -126,11 +126,11 @@ module Make_persistent (K : Brassaia.Type.S) (V : Value.S) = struct
     unsafe_remove t k;
     W.notify t.w k None
 
-  let watches = W.v ()
+  let watches = W.create ()
 
-  let v ?(fresh = false) ?(readonly = false) file =
+  let create ?(fresh = false) ?(readonly = false) file =
     let block =
-      Io_legacy.v ~fresh ~version:(Some current_version) ~readonly file
+      Io_legacy.open_file ~fresh ~version:(Some current_version) ~readonly file
     in
     let cache = Tbl.create 997 in
     let index = Tbl.create 997 in

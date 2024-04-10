@@ -79,7 +79,7 @@ module Make (Store : Store) = struct
     [@@deriving brassaia]
 
     let traverse_index ~root log_size =
-      let index = Index.v_exn ~readonly:true ~fresh:false ~log_size root in
+      let index = Index.init_exn ~readonly:true ~fresh:false ~log_size root in
       let ppf = Format.err_formatter in
       let bar, (progress_contents, progress_nodes, progress_commits) =
         Utils.Object_counter.start ppf
@@ -201,7 +201,7 @@ module Make (Store : Store) = struct
 
     let run ?ppf ~root ~auto_repair ~always ~heads () =
       let conf = conf root always in
-      let* repo = Store.Repo.v conf in
+      let* repo = Store.Repo.init conf in
       let* heads =
         match heads with
         | None -> Store.Repo.heads repo
@@ -259,7 +259,7 @@ module Make (Store : Store) = struct
 
     let run ~root ~heads =
       let conf = conf root in
-      let* repo = Store.Repo.v conf in
+      let* repo = Store.Repo.init conf in
       let* heads =
         match heads with
         | None -> Store.Repo.heads repo
@@ -310,7 +310,7 @@ module Make (Store : Store) = struct
 
     let run ~root ~commit ~dump_blob_paths_to () =
       let conf = conf root in
-      let* repo = Store.Repo.v conf in
+      let* repo = Store.Repo.init conf in
       let* commit =
         match commit with
         | None -> (
@@ -591,7 +591,7 @@ struct
     val maximal_count : max -> int
     val representative : max -> path
 
-    val v :
+    val init :
       ?maximal_count:int -> maximum:int -> representative:path -> unit -> max
 
     val empty_root_node : node
@@ -621,7 +621,7 @@ struct
     let representative { representative; _ } = representative
     let maximal_count { maximal_count; _ } = maximal_count
 
-    let v ?(maximal_count = 1) ~maximum ~representative () =
+    let init ?(maximal_count = 1) ~maximum ~representative () =
       { maximum; maximal_count; representative }
 
     let empty_max = { maximum = 0; maximal_count = 0; representative = [] }
@@ -644,14 +644,14 @@ struct
       else
         let path_to_k = stat_k.representative in
         let new_path_to_pred = step :: path_to_k in
-        v ~maximum:mp ~representative:new_path_to_pred ()
+        init ~maximum:mp ~representative:new_path_to_pred ()
 
     let update_width stat_k width_k max_width =
       if max_width.maximum > width_k then max_width
       else if max_width.maximum = width_k then incr max_width
       else
         let representative = List.hd stat_k.all_paths in
-        v ~maximum:width_k ~representative ()
+        init ~maximum:width_k ~representative ()
 
     let update_path paths_to_k step_k_to_n paths_to_n =
       let new_paths_to_n =
@@ -710,7 +710,7 @@ struct
     mutable max_length : int;
   }
 
-  let v () =
+  let create () =
     let visited = Hashtbl.create 100 in
     let max_width = Metrics.empty_max in
     { visited; max_width; max_length = 0; max_mp = 0 }
@@ -772,7 +772,7 @@ struct
         t.visited (0, [])
     in
     let max_mp =
-      Metrics.v ~maximal_count ~representative ~maximum:t.max_mp ()
+      Metrics.init ~maximal_count ~representative ~maximum:t.max_mp ()
     in
     [%log.app "Max number of path-adjacent nodes = %a" Metrics.pp max_mp];
     (* Count all paths that have max length. *)
@@ -788,7 +788,7 @@ struct
         t.visited (0, [])
     in
     let max_length =
-      Metrics.v ~maximal_count ~representative ~maximum:t.max_length ()
+      Metrics.init ~maximal_count ~representative ~maximum:t.max_length ()
     in
     [%log.app "Max length = %a" Metrics.pp max_length];
     match dump_blob_paths_to with

@@ -20,7 +20,7 @@ module type S = sig
   type key
   type t
 
-  val v : unit -> t
+  val create : unit -> t
   val with_lock : t -> key -> (unit -> 'a Lwt.t) -> 'a Lwt.t
   val stats : t -> int
 end
@@ -38,7 +38,7 @@ module Make (K : Type.S) = struct
   type key = K.t
   type t = { global : Lwt_mutex.t; locks : Lwt_mutex.t KHashtbl.t }
 
-  let v () = { global = Lwt_mutex.create (); locks = KHashtbl.create 1024 }
+  let create () = { global = Lwt_mutex.create (); locks = KHashtbl.create 1024 }
   let stats t = KHashtbl.length t.locks
 
   let lock t key () =

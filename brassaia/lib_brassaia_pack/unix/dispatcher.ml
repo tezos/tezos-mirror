@@ -31,7 +31,7 @@ module Make (Fm : File_manager.S with module Io = Io.Unix) :
 
   type t = { fm : Fm.t }
 
-  let v fm =
+  let init fm =
     let t = { fm } in
     Ok t
 
