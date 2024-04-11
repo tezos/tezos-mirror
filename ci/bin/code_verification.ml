@@ -70,7 +70,6 @@ let opam_rules ~only_marge_bot ?batch_index () =
       ~changes:(Changeset.encode changeset_opam_jobs)
       ~when_
       ();
-    job_rule ~when_:Never ();
   ]
 
 let job_opam_package ?dependencies {name; group; batch_index} : tezos_job =

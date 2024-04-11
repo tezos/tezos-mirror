@@ -448,7 +448,6 @@ opam:prepare:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - trigger
   dependencies: []
@@ -491,7 +490,6 @@ opam:bls12-381:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -555,7 +553,6 @@ opam:octez-accuser-Proxford:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -619,7 +616,6 @@ opam:octez-accuser-PtParisB:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -683,7 +679,6 @@ opam:octez-alcotezt:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -747,7 +742,6 @@ opam:octez-baker-Proxford:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -811,7 +805,6 @@ opam:octez-baker-PtParisB:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -875,7 +868,6 @@ opam:octez-client:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -939,7 +931,6 @@ opam:octez-codec:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1003,7 +994,6 @@ opam:octez-crawler:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1067,7 +1057,6 @@ opam:octez-dac-client:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1131,7 +1120,6 @@ opam:octez-dac-node:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1195,7 +1183,6 @@ opam:octez-dal-node:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1259,7 +1246,6 @@ opam:octez-distributed-internal:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1323,7 +1309,6 @@ opam:octez-distributed-lwt-internal:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1387,7 +1372,6 @@ opam:octez-injector:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1451,7 +1435,6 @@ opam:octez-internal-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1515,7 +1498,6 @@ opam:octez-l2-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1579,7 +1561,6 @@ opam:octez-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1643,7 +1624,6 @@ opam:octez-node:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1707,7 +1687,6 @@ opam:octez-node-config:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1771,7 +1750,6 @@ opam:octez-proto-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1835,7 +1813,6 @@ opam:octez-protocol-000-Ps9mPmXa-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1899,7 +1876,6 @@ opam:octez-protocol-001-PtCJ7pwo-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -1963,7 +1939,6 @@ opam:octez-protocol-002-PsYLVpVv-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2027,7 +2002,6 @@ opam:octez-protocol-003-PsddFKi3-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2091,7 +2065,6 @@ opam:octez-protocol-004-Pt24m4xi-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2155,7 +2128,6 @@ opam:octez-protocol-005-PsBabyM1-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2219,7 +2191,6 @@ opam:octez-protocol-006-PsCARTHA-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2283,7 +2254,6 @@ opam:octez-protocol-007-PsDELPH1-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2347,7 +2317,6 @@ opam:octez-protocol-008-PtEdo2Zk-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2411,7 +2380,6 @@ opam:octez-protocol-009-PsFLoren-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2475,7 +2443,6 @@ opam:octez-protocol-010-PtGRANAD-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2539,7 +2506,6 @@ opam:octez-protocol-011-PtHangz2-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2603,7 +2569,6 @@ opam:octez-protocol-012-Psithaca-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2667,7 +2632,6 @@ opam:octez-protocol-013-PtJakart-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2731,7 +2695,6 @@ opam:octez-protocol-014-PtKathma-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2795,7 +2758,6 @@ opam:octez-protocol-015-PtLimaPt-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 3 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2859,7 +2821,6 @@ opam:octez-protocol-016-PtMumbai-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2923,7 +2884,6 @@ opam:octez-protocol-017-PtNairob-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -2987,7 +2947,6 @@ opam:octez-protocol-018-Proxford-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3051,7 +3010,6 @@ opam:octez-protocol-019-PtParisB-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3115,7 +3073,6 @@ opam:octez-protocol-alpha-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3179,7 +3136,6 @@ opam:octez-protocol-compiler:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3243,7 +3199,6 @@ opam:octez-proxy-server:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3307,7 +3262,6 @@ opam:octez-rpc-process:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3371,7 +3325,6 @@ opam:octez-shell-libs:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3435,7 +3388,6 @@ opam:octez-signer:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3499,7 +3451,6 @@ opam:octez-smart-rollup-node:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3563,7 +3514,6 @@ opam:octez-smart-rollup-node-Proxford:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3627,7 +3577,6 @@ opam:octez-smart-rollup-node-PtNairob:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3691,7 +3640,6 @@ opam:octez-smart-rollup-node-PtParisB:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3755,7 +3703,6 @@ opam:octez-smart-rollup-node-alpha:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3819,7 +3766,6 @@ opam:octez-smart-rollup-node-lib:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3883,7 +3829,6 @@ opam:octez-smart-rollup-wasm-debugger:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 1 minute
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -3947,7 +3892,6 @@ opam:octez-smart-rollup-wasm-debugger-lib:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4011,7 +3955,6 @@ opam:octez-smart-rollup-wasm-debugger-plugin:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4075,7 +4018,6 @@ opam:octez-version:
     if: $CI_PIPELINE_SOURCE == "merge_request_event"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4139,7 +4081,6 @@ opam:tezos-benchmark:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4203,7 +4144,6 @@ opam:tezos-client-demo-counter:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4267,7 +4207,6 @@ opam:tezos-client-genesis:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4331,7 +4270,6 @@ opam:tezos-dac-client-lib:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4395,7 +4333,6 @@ opam:tezos-dac-lib:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4459,7 +4396,6 @@ opam:tezos-dac-node-lib:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 2 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4523,7 +4459,6 @@ opam:tezos-dal-node-lib:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4587,7 +4522,6 @@ opam:tezos-dal-node-services:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4651,7 +4585,6 @@ opam:tezos-openapi:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4715,7 +4648,6 @@ opam:tezos-protocol-000-Ps9mPmXa:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4779,7 +4711,6 @@ opam:tezos-protocol-001-PtCJ7pwo:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4843,7 +4774,6 @@ opam:tezos-protocol-002-PsYLVpVv:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4907,7 +4837,6 @@ opam:tezos-protocol-003-PsddFKi3:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -4971,7 +4900,6 @@ opam:tezos-protocol-004-Pt24m4xi:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 4 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5035,7 +4963,6 @@ opam:tezos-protocol-005-PsBABY5H:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5099,7 +5026,6 @@ opam:tezos-protocol-005-PsBabyM1:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5163,7 +5089,6 @@ opam:tezos-protocol-006-PsCARTHA:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5227,7 +5152,6 @@ opam:tezos-protocol-007-PsDELPH1:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5291,7 +5215,6 @@ opam:tezos-protocol-008-PtEdo2Zk:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5355,7 +5278,6 @@ opam:tezos-protocol-008-PtEdoTez:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5419,7 +5341,6 @@ opam:tezos-protocol-009-PsFLoren:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5483,7 +5404,6 @@ opam:tezos-protocol-010-PtGRANAD:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5547,7 +5467,6 @@ opam:tezos-protocol-011-PtHangz2:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5611,7 +5530,6 @@ opam:tezos-protocol-012-Psithaca:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5675,7 +5593,6 @@ opam:tezos-protocol-013-PtJakart:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5739,7 +5656,6 @@ opam:tezos-protocol-014-PtKathma:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5803,7 +5719,6 @@ opam:tezos-protocol-015-PtLimaPt:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5867,7 +5782,6 @@ opam:tezos-protocol-016-PtMumbai:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 5 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5931,7 +5845,6 @@ opam:tezos-protocol-017-PtNairob:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -5995,7 +5908,6 @@ opam:tezos-protocol-018-Proxford:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -6059,7 +5971,6 @@ opam:tezos-protocol-019-PtParisB:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -6123,7 +6034,6 @@ opam:tezos-protocol-alpha:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -6187,7 +6097,6 @@ opam:tezos-protocol-demo-counter:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -6251,7 +6160,6 @@ opam:tezos-protocol-demo-noops:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -6315,7 +6223,6 @@ opam:tezos-protocol-genesis:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 6 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -6379,7 +6286,6 @@ opam:tezos-proxy-server-config:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
@@ -6443,7 +6349,6 @@ opam:tezt-tezos:
     if: $CI_PIPELINE_SOURCE == "merge_request_event" && $GITLAB_USER_LOGIN == "nomadic-margebot"
     when: delayed
     start_in: 7 minutes
-  - when: never
   needs:
   - opam:prepare
   dependencies:
