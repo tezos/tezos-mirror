@@ -39,6 +39,9 @@ val shards_proofs_cache_size : int
 (** [shard_cache_size] is the size of the cache of not-yet-published shards. *)
 val shard_cache_size : int
 
+(** [slot_cache_size] is the size of the cache of not-yet-published slots. *)
+val slot_cache_size : int
+
 (** The frequency at which we sample the time spent in shards crypto
     verification. *)
 val shards_verification_sampling_frequency : int

@@ -115,6 +115,11 @@ module Shard_proofs_cache = Commitment_indexed_cache
     a slot id to them. *)
 module Shard_cache = Commitment_indexed_cache
 
+(** A cache in which we keep the slots which we have received via RPC
+    but are not yet published so we cannot yet assign a slot id to
+    them. *)
+module Slot_cache = Commitment_indexed_cache
+
 type t = private {
   store : irmin;  (** The Irmin-based part of the store *)
   shards : Shards.t;  (** Shards store *)
@@ -123,6 +128,7 @@ type t = private {
       (* The length of the array is the number of shards per slot *)
   not_yet_published_shards : Cryptobox.share array Shard_cache.t;
       (** Cache of shards *)
+  not_yet_published_slots : Cryptobox.slot Slot_cache.t;  (** Cache of slots *)
 }
 
 (** [cache_shard_proofs store commitment shard_proofs] replaces in the
@@ -133,6 +139,10 @@ val cache_shard_proofs : t -> commitment -> shard_proof array -> unit
 (** [cache_shards store commitment shards] adds [shards] to the shard
     cache with key [commitment]. *)
 val cache_shards : t -> commitment -> Cryptobox.share array -> unit
+
+(** [cache_slot store commitment slot] adds [slot] to the slot cache
+    with key [commitment]. *)
+val cache_slot : t -> commitment -> slot -> unit
 
 val init : Configuration_file.t -> t tzresult Lwt.t
 
