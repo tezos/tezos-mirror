@@ -339,7 +339,7 @@ manifest:master:
   needs:
     - job: "docker:amd64:master"
       artifacts: false
-    - job: "docker:arm64:master"
-      artifacts: false
+    # - job: "docker:arm64:master"
+    #   artifacts: false
   variables:
     OCTEZ_BRANCH: "master"
