@@ -3,11 +3,13 @@
 //
 // SPDX-License-Identifier: MIT
 
+#![allow(clippy::reversed_empty_ranges)]
+
 pub mod instruction;
 
 use crate::machine_state::{
     csregisters::{try_parse_csregister, CSRegister},
-    registers::{parse_fregister, parse_xregister, FRegister, XRegister},
+    registers::{parse_fregister, parse_xregister, x0, x2, FRegister, XRegister},
 };
 use core::ops::Range;
 use instruction::*;
@@ -849,14 +851,54 @@ fn parse_uncompressed_instruction(instr: u32) -> Instr {
     }
 }
 
+macro_rules! cr_instr {
+    ($enum_variant:ident, $instr:expr) => {
+        $enum_variant(CRTypeArgs {
+            rd_rs1: c_rs1p($instr),
+            rs2: c_rdp_rs2p($instr),
+        })
+    };
+}
+
+macro_rules! cc_instr {
+    ($enum_variant:ident, $imm_f:expr, $instr:expr) => {
+        $enum_variant(CIBTypeArgs {
+            rd_rs1: c_rs1p($instr),
+            imm: $imm_f($instr),
+        })
+    };
+}
+
 #[inline(always)]
 const fn c_bits(bytes: u16, pos: usize, n: usize) -> u16 {
     (bytes >> pos) & (!0 >> (16 - n))
 }
 
 #[inline(always)]
-fn c_rd(instr: u16) -> XRegister {
+fn c_rd_rs1(instr: u16) -> XRegister {
     parse_xregister(c_bits(instr, 7, 5) as u32)
+}
+
+#[inline(always)]
+fn c_rs2(instr: u16) -> XRegister {
+    parse_xregister(c_bits(instr, 2, 5) as u32)
+}
+
+/// Encodings for the most used registers for certain compressed instructions
+/// See U:C-16.2
+#[inline(always)]
+fn c_reg_prime(instr: u16, pos: usize) -> u32 {
+    8 + c_bits(instr, pos, 3) as u32
+}
+
+#[inline(always)]
+fn c_rs1p(instr: u16) -> XRegister {
+    parse_xregister(c_reg_prime(instr, 7))
+}
+
+#[inline(always)]
+fn c_rdp_rs2p(instr: u16) -> XRegister {
+    parse_xregister(c_reg_prime(instr, 2))
 }
 
 #[inline(always)]
@@ -869,21 +911,111 @@ fn c_funct3(instr: u16) -> u16 {
     c_bits(instr, 13, 3)
 }
 
+#[inline(always)]
+fn c_q1_10(instr: u16) -> u16 {
+    c_bits(instr, 10, 2)
+}
+
+#[inline(always)]
+fn c_q1_5(instr: u16) -> u16 {
+    c_bits(instr, 5, 2)
+}
+
 fn sign_extend_u16(value: u16, size: usize) -> i64 {
     assert!(size < 16);
     let shift = 16 - size;
     (((value as i16) << shift) >> shift) as i64
 }
 
-#[allow(clippy::reversed_empty_ranges)]
+fn clw_imm(instr: u16) -> i64 {
+    // instr[5] | instr[12:10] | instr[6] | 00
+    let res = instr.bits(5..=5) << 6 | instr.bits(12..=10) << 3 | instr.bits(6..=6) << 2;
+    res as i64
+}
+
+fn cld_imm(instr: u16) -> i64 {
+    // instr[6:5] | instr[12:10] | 000
+    let res = instr.bits(6..=5) << 6 | instr.bits(12..=10) << 3;
+    res as i64
+}
+
 fn ci_imm(instr: u16) -> i64 {
     // instr[12] | instr[6:2]
     let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
-    // Sign-extend the 6-bit value to 64 bits
     sign_extend_u16(res, 6)
 }
 
-#[allow(clippy::reversed_empty_ranges)]
+fn cslli_imm(instr: u16) -> i64 {
+    // instr[12] | instr[6:2]
+    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    res as i64
+}
+
+fn ci_addi16sp_imm(instr: u16) -> i64 {
+    // instr[12] | instr[4:3] | instr[5] | instr[2] | instr[6] | 0000
+    let res = instr.bits(12..=12) << 9
+        | instr.bits(4..=3) << 7
+        | instr.bits(5..=5) << 6
+        | instr.bits(2..=2) << 5
+        | instr.bits(6..=6) << 4;
+    sign_extend_u16(res, 10)
+}
+
+fn ci_lwsp_imm(instr: u16) -> i64 {
+    // instr[3:2] | instr[12] | instr[6:4] | 00
+    let res = instr.bits(3..=2) << 6 | instr.bits(12..=12) << 5 | instr.bits(6..=4) << 2;
+    res as i64
+}
+
+fn ci_ldsp_imm(instr: u16) -> i64 {
+    // instr[4:2] | instr[12] | instr[6:5] | 000
+    let res = instr.bits(4..=2) << 6 | instr.bits(12..=12) << 5 | instr.bits(6..=5) << 3;
+    res as i64
+}
+
+fn css_swsp_imm(instr: u16) -> i64 {
+    // instr[8:7] | instr[12:9] | 00
+    let res = instr.bits(8..=7) << 6 | instr.bits(12..=9) << 2;
+    res as i64
+}
+
+fn css_sdsp_imm(instr: u16) -> i64 {
+    // instr[9:7] | instr[12:10] | 000
+    let res = instr.bits(9..=7) << 6 | instr.bits(12..=10) << 3;
+    res as i64
+}
+
+fn ciw_imm(instr: u16) -> i64 {
+    // instr[10:7] | instr[12:11] | instr[5] | instr[6] | 00
+    let res = instr.bits(10..=7) << 6
+        | instr.bits(12..=11) << 4
+        | instr.bits(5..=5) << 3
+        | instr.bits(6..=6) << 2;
+    res as i64
+}
+
+fn cb_imm(instr: u16) -> i64 {
+    // instr[12] | instr[6:5] | instr[2] | instr[11:10] | instr[4:3] | 0
+    let res = instr.bits(12..=12) << 8
+        | instr.bits(6..=5) << 6
+        | instr.bits(2..=2) << 5
+        | instr.bits(11..=10) << 3
+        | instr.bits(4..=3) << 1;
+    sign_extend_u16(res, 9)
+}
+
+fn cb_shamt_imm(instr: u16) -> i64 {
+    // instr[12] | instr[6:2]
+    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    res as i64
+}
+
+fn cb_andi_imm(instr: u16) -> i64 {
+    // instr[12] | instr[6:2]
+    let res = instr.bits(12..=12) << 5 | instr.bits(6..=2);
+    sign_extend_u16(res, 6)
+}
+
 fn cj_imm(instr: u16) -> i64 {
     // instr[12] | instr[8] | instr[10:9] | instr[6] | instr[7] | instr[2] | instr[11] | instr[5:3] | 0
     let res = instr.bits(12..=12) << 11
@@ -897,24 +1029,148 @@ fn cj_imm(instr: u16) -> i64 {
     sign_extend_u16(res, 12)
 }
 
+const OP_C0: u16 = 0b00;
 const OP_C1: u16 = 0b01;
+const OP_C2: u16 = 0b10;
 
-const C_F3_J: u16 = 0b101;
-const C_F3_ADDI: u16 = 0b000;
+const C_F3_0: u16 = 0b000;
+const C_F3_1: u16 = 0b001;
+const C_F3_2: u16 = 0b010;
+const C_F3_3: u16 = 0b011;
+const C_F3_4: u16 = 0b100;
+const C_F3_5: u16 = 0b101;
+const C_F3_6: u16 = 0b110;
+const C_F3_7: u16 = 0b111;
+
+const C_Q1_0: u16 = 0b00;
+const C_Q1_1: u16 = 0b01;
+const C_Q1_2: u16 = 0b10;
+const C_Q1_3: u16 = 0b11;
 
 fn parse_compressed_instruction(instr: u16) -> Instr {
     use Instr::*;
     match c_opcode(instr) {
+        OP_C0 => match c_funct3(instr) {
+            C_F3_0 => match ciw_imm(instr) {
+                0 => UnknownCompressed { instr },
+                imm => CAddi4spn(CIBTypeArgs {
+                    rd_rs1: c_rdp_rs2p(instr),
+                    imm,
+                }),
+            },
+            C_F3_2 => CLw(ITypeArgs {
+                rd: c_rdp_rs2p(instr),
+                rs1: c_rs1p(instr),
+                imm: clw_imm(instr),
+            }),
+            C_F3_3 => CLd(ITypeArgs {
+                rd: c_rdp_rs2p(instr),
+                rs1: c_rs1p(instr),
+                imm: cld_imm(instr),
+            }),
+            C_F3_6 => CSw(SBTypeArgs {
+                rs1: c_rs1p(instr),
+                rs2: c_rdp_rs2p(instr),
+                imm: clw_imm(instr),
+            }),
+            C_F3_7 => CSd(SBTypeArgs {
+                rs1: c_rs1p(instr),
+                rs2: c_rdp_rs2p(instr),
+                imm: cld_imm(instr),
+            }),
+            _ => UnknownCompressed { instr },
+        },
         OP_C1 => match c_funct3(instr) {
-            C_F3_J => CJ(CJTypeArgs { imm: cj_imm(instr) }),
-            C_F3_ADDI => match (ci_imm(instr), c_rd(instr)) {
+            C_F3_0 => match (ci_imm(instr), c_rd_rs1(instr)) {
                 // "C.ADDI is only valid when rd != x0 and nzimm != 0.
                 // The code points with rd == x0 encode the C.NOP instruction;
                 // the remaining code points with nzimm == 0 encode HINTs."
-                (_, XRegister::x0) => CNop,
+                (_, x0) => CNop,
                 (0, _) => UnknownCompressed { instr },
-                (imm, rd_rs1) => CAddi(CITypeArgs { rd_rs1, imm }),
+                (imm, rd_rs1) => CAddi(CIBTypeArgs { rd_rs1, imm }),
             },
+            C_F3_1 => match (ci_imm(instr), c_rd_rs1(instr)) {
+                (_, x0) => UnknownCompressed { instr },
+                (imm, rd_rs1) => CAddiw(CIBTypeArgs { rd_rs1, imm }),
+            },
+            C_F3_2 => match c_rd_rs1(instr) {
+                x0 => UnknownCompressed { instr },
+                rd_rs1 => CLi(CIBTypeArgs {
+                    rd_rs1,
+                    imm: ci_imm(instr),
+                }),
+            },
+            C_F3_3 => {
+                if instr.bits(6..=2) == 0 && !instr.bit(12) {
+                    return UnknownCompressed { instr };
+                };
+                match c_rd_rs1(instr) {
+                    x2 => CAddi16sp(CJTypeArgs {
+                        imm: ci_addi16sp_imm(instr),
+                    }),
+                    x0 => UnknownCompressed { instr },
+                    rd_rs1 => CLui(CIBTypeArgs {
+                        rd_rs1,
+                        imm: ci_imm(instr) << 12,
+                    }),
+                }
+            }
+            C_F3_4 => match c_q1_10(instr) {
+                C_Q1_0 => cc_instr!(CSrli, cb_shamt_imm, instr),
+                C_Q1_1 => cc_instr!(CSrai, cb_shamt_imm, instr),
+                C_Q1_2 => cc_instr!(CAndi, cb_andi_imm, instr),
+                C_Q1_3 => match (instr.bit(12), c_q1_5(instr)) {
+                    (false, C_Q1_0) => cr_instr!(CSub, instr),
+                    (false, C_Q1_1) => cr_instr!(CXor, instr),
+                    (false, C_Q1_2) => cr_instr!(COr, instr),
+                    (false, C_Q1_3) => cr_instr!(CAnd, instr),
+                    (true, C_Q1_0) => cr_instr!(CSubw, instr),
+                    (true, C_Q1_1) => cr_instr!(CAddw, instr),
+                    _ => UnknownCompressed { instr },
+                },
+                _ => UnknownCompressed { instr },
+            },
+            C_F3_5 => CJ(CJTypeArgs { imm: cj_imm(instr) }),
+            C_F3_6 => cc_instr!(CBeqz, cb_imm, instr),
+            C_F3_7 => cc_instr!(CBnez, cb_imm, instr),
+            _ => UnknownCompressed { instr },
+        },
+        OP_C2 => match c_funct3(instr) {
+            C_F3_0 => match (cslli_imm(instr), c_rd_rs1(instr)) {
+                (_, x0) | (0, _) => UnknownCompressed { instr },
+                (imm, rd_rs1) => CSlli(CIBTypeArgs { rd_rs1, imm }),
+            },
+            C_F3_2 => match c_rd_rs1(instr) {
+                x0 => UnknownCompressed { instr },
+                rd_rs1 => CLwsp(CIBTypeArgs {
+                    rd_rs1,
+                    imm: ci_lwsp_imm(instr),
+                }),
+            },
+            C_F3_3 => match c_rd_rs1(instr) {
+                x0 => UnknownCompressed { instr },
+                rd_rs1 => CLdsp(CIBTypeArgs {
+                    rd_rs1,
+                    imm: ci_ldsp_imm(instr),
+                }),
+            },
+
+            C_F3_4 => match (instr.bit(12), c_rd_rs1(instr), c_rs2(instr)) {
+                (true, x0, x0) => CEbreak,
+                (_, x0, _) => UnknownCompressed { instr },
+                (true, rs1, x0) => CJalr(CRJTypeArgs { rs1 }),
+                (true, rs1, rs2) => CAdd(CRTypeArgs { rd_rs1: rs1, rs2 }),
+                (false, rs1, x0) => CJr(CRJTypeArgs { rs1 }),
+                (false, rs1, rs2) => CMv(CRTypeArgs { rd_rs1: rs1, rs2 }),
+            },
+            C_F3_6 => CSwsp(CSSTypeArgs {
+                rs2: c_rs2(instr),
+                imm: css_swsp_imm(instr),
+            }),
+            C_F3_7 => CSdsp(CSSTypeArgs {
+                rs2: c_rs2(instr),
+                imm: css_sdsp_imm(instr),
+            }),
             _ => UnknownCompressed { instr },
         },
         _ => UnknownCompressed { instr },
@@ -962,7 +1218,10 @@ mod tests {
         instruction::{CsrArgs, ITypeArgs, Instr::*, SBTypeArgs, UJTypeArgs},
         parse_block,
     };
-    use crate::machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*};
+    use crate::{
+        machine_state::{csregisters::CSRegister::mcause, registers::XRegister::*},
+        parser::instruction::CIBTypeArgs,
+    };
 
     // rv64ui-p-addiw
     // 0000000080000000 <_start>:
@@ -1015,17 +1274,16 @@ mod tests {
                 rs1: x0,
                 imm: 21,
             }),
-            UnknownCompressed {
-                instr: u16::from_le_bytes([0x05, 0x64]),
-            },
+            CLui(CIBTypeArgs {
+                rd_rs1: x8,
+                imm: 0x1 << 12,
+            }),
             Addiw(ITypeArgs {
                 rd: x8,
                 rs1: x8,
                 imm: 564,
             }),
-            UnknownCompressed {
-                instr: u16::from_le_bytes([0x12, 0x04]),
-            },
+            CSlli(CIBTypeArgs { rd_rs1: x8, imm: 4 }),
             Lui(UJTypeArgs {
                 rd: x7,
                 imm: 0x12 << 12,
@@ -1053,9 +1311,10 @@ mod tests {
             UnknownCompressed {
                 instr: u16::from_le_bytes([0x1, 0x5]),
             },
-            UnknownCompressed {
-                instr: u16::from_le_bytes([0x64, 0x1b]),
-            },
+            CAddi4spn(CIBTypeArgs {
+                rd_rs1: x9,
+                imm: 444,
+            }),
         ];
         let instructions = parse_block(&bytes);
         assert_eq!(instructions, expected)

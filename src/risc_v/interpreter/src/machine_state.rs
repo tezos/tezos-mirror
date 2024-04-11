@@ -190,10 +190,44 @@ macro_rules! run_amo_instr {
     }};
 }
 
+/// Runs a CR-type compressed instruction
+macro_rules! run_cr_type_instr {
+    ($state: ident, $instr:ident, $args:ident, $run_fn: ident) => {{
+        $state.hart.xregisters.$run_fn($args.rd_rs1, $args.rs2);
+        Ok(ProgramCounterUpdate::Add($instr.width()))
+    }};
+}
+
+/// Runs a CI-type compressed instruction
 macro_rules! run_ci_type_instr {
     ($state: ident, $instr:ident, $args:ident, $run_fn: ident) => {{
         $state.hart.xregisters.$run_fn($args.imm, $args.rd_rs1);
         Ok(ProgramCounterUpdate::Add($instr.width()))
+    }};
+}
+
+/// Runs a CI-type compressed load instruction
+macro_rules! run_ci_load_sp_instr {
+    ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
+        $state
+            .$run_fn($args.imm, $args.rd_rs1)
+            .map(|_| Add($instr.width()))
+    }};
+}
+
+/// Runs a CI-type compressed load instruction
+macro_rules! run_css_instr {
+    ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
+        $state
+            .$run_fn($args.imm, $args.rs2)
+            .map(|_| Add($instr.width()))
+    }};
+}
+
+/// Runs a CB-type compressed instruction
+macro_rules! run_cb_type_instr {
+    ($state: ident, $args: ident, $run_fn: ident) => {{
+        Ok(Set($state.hart.$run_fn($args.imm, $args.rd_rs1)))
     }};
 }
 
@@ -432,12 +466,47 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             }
 
             // RV32C compressed instructions
-            Instr::CAddi(args) => run_ci_type_instr!(self, instr, args, run_caddi),
+            Instr::CLw(args) => run_load_instr!(self, instr, args, run_clw),
+            Instr::CLwsp(args) => run_ci_load_sp_instr!(self, instr, args, run_clwsp),
+            Instr::CSw(args) => run_store_instr!(self, instr, args, run_csw),
+            Instr::CSwsp(args) => run_css_instr!(self, instr, args, run_cswsp),
             Instr::CJ(args) => Ok(Set(self.hart.run_cj(args.imm))),
+            Instr::CJr(args) => Ok(Set(self.hart.run_cjr(args.rs1))),
+            Instr::CJalr(args) => Ok(Set(self.hart.run_cjalr(args.rs1))),
+            Instr::CBeqz(args) => run_cb_type_instr!(self, args, run_cbeqz),
+            Instr::CBnez(args) => run_cb_type_instr!(self, args, run_cbnez),
+            Instr::CLi(args) => run_ci_type_instr!(self, instr, args, run_cli),
+            Instr::CLui(args) => run_ci_type_instr!(self, instr, args, run_clui),
+            Instr::CAddi(args) => run_ci_type_instr!(self, instr, args, run_caddi),
+            Instr::CAddi16sp(args) => {
+                self.hart.xregisters.run_caddi16sp(args.imm);
+                Ok(ProgramCounterUpdate::Add(instr.width()))
+            }
+            Instr::CAddi4spn(args) => run_ci_type_instr!(self, instr, args, run_caddi4spn),
+            Instr::CSlli(args) => run_ci_type_instr!(self, instr, args, run_cslli),
+            Instr::CSrli(args) => run_ci_type_instr!(self, instr, args, run_csrli),
+            Instr::CSrai(args) => run_ci_type_instr!(self, instr, args, run_csrai),
+            Instr::CAndi(args) => run_ci_type_instr!(self, instr, args, run_candi),
+            Instr::CMv(args) => run_cr_type_instr!(self, instr, args, run_cmv),
+            Instr::CAdd(args) => run_cr_type_instr!(self, instr, args, run_cadd),
+            Instr::CAnd(args) => run_cr_type_instr!(self, instr, args, run_cand),
+            Instr::CXor(args) => run_cr_type_instr!(self, instr, args, run_cxor),
+            Instr::COr(args) => run_cr_type_instr!(self, instr, args, run_cor),
+            Instr::CSub(args) => run_cr_type_instr!(self, instr, args, run_csub),
+            Instr::CEbreak => run_syscall_instr!(self, run_cebreak),
             Instr::CNop => {
                 self.run_cnop();
                 Ok(ProgramCounterUpdate::Add(instr.width()))
             }
+
+            // RV64C compressed instructions
+            Instr::CLd(args) => run_load_instr!(self, instr, args, run_cld),
+            Instr::CLdsp(args) => run_ci_load_sp_instr!(self, instr, args, run_cldsp),
+            Instr::CSd(args) => run_store_instr!(self, instr, args, run_csd),
+            Instr::CSdsp(args) => run_css_instr!(self, instr, args, run_csdsp),
+            Instr::CAddiw(args) => run_ci_type_instr!(self, instr, args, run_caddiw),
+            Instr::CAddw(args) => run_cr_type_instr!(self, instr, args, run_caddw),
+            Instr::CSubw(args) => run_cr_type_instr!(self, instr, args, run_csubw),
 
             Instr::Unknown { instr: _ } => Err(Exception::IllegalInstruction),
             Instr::UnknownCompressed { instr: _ } => Err(Exception::IllegalInstruction),

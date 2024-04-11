@@ -184,7 +184,7 @@ where
     }
 
     /// Generic `JALR` w.r.t instruction width
-    fn run_jalr_impl<const INSTR_WIDTH: u64>(
+    pub(super) fn run_jalr_impl<const INSTR_WIDTH: u64>(
         &mut self,
         imm: i64,
         rs1: XRegister,
@@ -233,7 +233,7 @@ where
     }
 
     /// Generic `BEQ` w.r.t. instruction width
-    fn run_beq_impl<const INSTR_WIDTH: u64>(
+    pub(super) fn run_beq_impl<const INSTR_WIDTH: u64>(
         &mut self,
         imm: i64,
         rs1: XRegister,
@@ -259,7 +259,7 @@ where
     }
 
     /// Generic `BNE` w.r.t. instruction width
-    fn run_bne_impl<const INSTR_WIDTH: u64>(
+    pub(super) fn run_bne_impl<const INSTR_WIDTH: u64>(
         &mut self,
         imm: i64,
         rs1: XRegister,
