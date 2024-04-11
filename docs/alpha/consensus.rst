@@ -108,7 +108,7 @@ the initial block. We talk about a *re-proposal* in this case.
 .. _finality_alpha:
 
 Transaction and block finality
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------
 
 A transaction is final as soon as the block including it has a confirmation (that is, a block on top of it).
 Indeed, as hinted above, a block contains the certification (that is, the attestation quorum) for the previous
@@ -123,7 +123,7 @@ confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
 Time between blocks
-~~~~~~~~~~~~~~~~~~~~~~~
+-------------------
 
 The time between blocks represents the difference between the timestamps of the blocks. The timestamp of a block is given by the beginning of the round at which the block has been agreed upon. Thus, the time between blocks depends on the round at which decisions are taken. For
 example, if the decision at the previous level was taken at round 4 and at the current level at round 2, then the current block's delay relative to
@@ -141,7 +141,7 @@ should be taken at round 0, meaning that the time between blocks would be
 .. _active_stake_alpha:
 
 Validator selection: staking balance, active stake, and frozen deposits
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------------------------------------------
 
 Validator selection is based on the stake, as in Emmy*, with the exception that
 it is based on the delegate's *active stake* instead of its *staking
@@ -254,7 +254,7 @@ deposit. However, a delegate can still be over-delegated, and it will be
 rewarded based on its active stake, not on its staking balance.
 
 Economic Incentives
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 As Emmy*, Tenderbake rewards participation in consensus and punishes bad
 behavior. Notable changes however are as follows:
@@ -411,46 +411,6 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
-.. _cs_constants_alpha:
-
-Consensus related protocol parameters
--------------------------------------
-
-.. list-table::
-   :widths: 55 25
-   :header-rows: 1
-
-   * - Parameter name
-     - Parameter value
-   * - ``CONSENSUS_COMMITTEE_SIZE``
-     - 7000
-   * - ``CONSENSUS_THRESHOLD``
-     - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
-   * - ``MINIMAL_BLOCK_DELAY``
-     - 10s
-   * - ``DELAY_INCREMENT_PER_ROUND``
-     - 5s
-   * - ``MINIMAL_PARTICIPATION_RATIO``
-     - 2/3
-   * - ``FROZEN_DEPOSITS_PERCENTAGE``
-     - 10
-   * - ``MAX_SLASHING_PERIOD``
-     - 2 cycles
-   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
-     - 5%
-   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``
-     - 50%
-   * - ``BAKING_REWARD_FIXED_PORTION``
-     - 3.33 tez
-   * - ``BAKING_REWARD_BONUS_PER_SLOT``
-     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001429 tez
-   * - ``ATTESTING_REWARD_PER_SLOT``
-     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000952 tez
-   * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
-     - 5
-
-These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
-
 .. _fitness_alpha:
 
 Fitness
@@ -492,7 +452,45 @@ inner sequences). So the first fitness is smaller than the second one,
 because of the third component, the empty bitstring being smaller than
 any other bitstring.
 
+.. _cs_constants_alpha:
 
+Consensus related protocol parameters
+-------------------------------------
+
+.. list-table::
+   :widths: 55 25
+   :header-rows: 1
+
+   * - Parameter name
+     - Parameter value
+   * - ``CONSENSUS_COMMITTEE_SIZE``
+     - 7000
+   * - ``CONSENSUS_THRESHOLD``
+     - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
+   * - ``MINIMAL_BLOCK_DELAY``
+     - 10s
+   * - ``DELAY_INCREMENT_PER_ROUND``
+     - 5s
+   * - ``MINIMAL_PARTICIPATION_RATIO``
+     - 2/3
+   * - ``FROZEN_DEPOSITS_PERCENTAGE``
+     - 10
+   * - ``MAX_SLASHING_PERIOD``
+     - 2 cycles
+   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``
+     - 5%
+   * - ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_ATTESTATION``
+     - 50%
+   * - ``BAKING_REWARD_FIXED_PORTION``
+     - 3.33 tez
+   * - ``BAKING_REWARD_BONUS_PER_SLOT``
+     - ``bonus / (CONSENSUS_COMMITTEE_SIZE / 3)`` = 0.001429 tez
+   * - ``ATTESTING_REWARD_PER_SLOT``
+     - ``attesting_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.000952 tez
+   * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
+     - 5
+
+The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
 Further External Resources
 --------------------------
