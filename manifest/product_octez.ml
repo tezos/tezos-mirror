@@ -1611,50 +1611,6 @@ let _octez_epoxy_tx_tests =
     ~deps:[octez_epoxy_tx; octez_plonk_test_helpers; octez_aplonk]
     ~dune:(make_plonk_runtest_invocation ~package:"octez-libs")
 
-let octez_dal_config =
-  octez_lib
-    "crypto-dal.dal-config"
-    ~internal_name:"tezos_crypto_dal_octez_dal_config"
-    ~path:"src/lib_crypto_dal/dal_config"
-    ~deps:[data_encoding |> open_]
-    ~js_compatible:true
-
-let octez_crypto_dal =
-  octez_lib
-    "crypto-dal"
-    ~internal_name:"tezos_crypto_dal"
-    ~path:"src/lib_crypto_dal"
-    ~synopsis:"DAL cryptographic primitives"
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        octez_dal_config |> open_;
-        octez_bls12_381_polynomial;
-        lwt_unix;
-        octez_kzg;
-      ]
-
-let _octez_crypto_dal_tests =
-  tezt
-    ["test_dal_cryptobox"]
-    ~path:"src/lib_crypto_dal/test"
-    ~opam:"octez-libs"
-    ~dep_files:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_crypto_dal |> open_;
-        octez_dal_config |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        alcotezt;
-        qcheck_alcotest;
-        octez_bls12_381_polynomial;
-        octez_test_helpers;
-      ]
-
 let octez_event_logging =
   octez_lib
     "event-logging"
@@ -1738,6 +1694,51 @@ let _octez_stdlib_unix_test =
         octez_test_helpers |> open_;
         qcheck_alcotest;
         alcotezt;
+      ]
+
+let octez_dal_config =
+  octez_lib
+    "crypto-dal.dal-config"
+    ~internal_name:"tezos_crypto_dal_octez_dal_config"
+    ~path:"src/lib_crypto_dal/dal_config"
+    ~deps:[data_encoding |> open_]
+    ~js_compatible:true
+
+let octez_crypto_dal =
+  octez_lib
+    "crypto-dal"
+    ~internal_name:"tezos_crypto_dal"
+    ~path:"src/lib_crypto_dal"
+    ~synopsis:"DAL cryptographic primitives"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_stdlib_unix |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        octez_dal_config |> open_;
+        octez_bls12_381_polynomial;
+        lwt_unix;
+        octez_kzg;
+      ]
+
+let _octez_crypto_dal_tests =
+  tezt
+    ["test_dal_cryptobox"]
+    ~path:"src/lib_crypto_dal/test"
+    ~opam:"octez-libs"
+    ~dep_files:["srs_zcash_g1_5"; "srs_zcash_g2_5"]
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_crypto_dal |> open_;
+        octez_dal_config |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        alcotezt;
+        qcheck_alcotest;
+        octez_bls12_381_polynomial;
+        octez_test_helpers;
       ]
 
 let ppx_irmin =
