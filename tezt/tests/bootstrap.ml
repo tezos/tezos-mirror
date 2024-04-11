@@ -142,24 +142,6 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
      blocks since the store does not trigger a merge when there is
      already one merge in progress. However, we do not observe such
      behavior for this test and we do not handle that currently. *)
-
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/1337
-
-     This bug may create flakyness. We avoid it by baking [16] more
-     blocks. *)
-  let bakes_during_kill = 7 + 16 in
-  let last_cycle_being_merged = ref false in
-  let on_starting_merge_event node =
-    Node.on_event node @@ fun Node.{name; value; timestamp = _} ->
-    if name = "start_merging_stores.v0" then
-      let level = JSON.(value |> as_int) in
-      if level = bakes_during_kill + 1 + bakes_before_kill - 16 then
-        last_cycle_being_merged := true
-  in
-  let wait_for_end_merge_event node last_cycle_being_merged =
-    Node.wait_for node "end_merging_stores.v0" @@ fun _json ->
-    if !last_cycle_being_merged then Some () else None
-  in
   let hmode1s = Node.show_history_mode hmode1 in
   let hmode2s = Node.show_history_mode hmode2 in
   Protocol.register_test
@@ -176,6 +158,34 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
         "secondary_" ^ hmode2s;
       ]
   @@ fun protocol ->
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/1337
+
+     This bug may create flakiness. We avoid it by baking [16] more
+     blocks. *)
+  let bakes_during_kill = 7 + 16 in
+  let last_cycle_being_merged = ref false in
+  let on_starting_merge_event node =
+    (* Hardcoding the preserved_cycles for Oxford and
+       preservation_cycles for Alpha and Paris. As soon as Oxford is
+       gone, we should rather get the "blocks_preservation_cycles"
+       protocol parameter -- or hardcode it to 1 for every
+       protocol. *)
+    let preservation_cycles =
+      match protocol with Oxford -> 2 | Paris | Alpha -> 1
+    in
+    (* Here, we assume that we have 8 blocks per cycle -- this is
+       already assumed in the rest of the test. *)
+    let preserved_blocks = preservation_cycles * 8 in
+    Node.on_event node @@ fun Node.{name; value; timestamp = _} ->
+    if name = "start_merging_stores.v0" then
+      let level = JSON.(value |> as_int) in
+      if level = bakes_during_kill + 1 + bakes_before_kill - preserved_blocks
+      then last_cycle_being_merged := true
+  in
+  let wait_for_end_merge_event node last_cycle_being_merged =
+    Node.wait_for node "end_merging_stores.v0" @@ fun _json ->
+    if !last_cycle_being_merged then Some () else None
+  in
   (* Initialize nodes and client. *)
   let* node_1 =
     Node.init [Synchronisation_threshold 0; Connections 1; History_mode hmode1]
