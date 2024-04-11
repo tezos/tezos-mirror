@@ -614,8 +614,8 @@ type docker_build_type = Experimental | Release | Test | Test_manual
 
     If [external_] is set to true (default [false]), then the job is
     also written to an external file. *)
-let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
-    docker_build_type : tezos_job =
+let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
+    tezos_job =
   let arch_string = arch_to_string_alt arch in
   let ci_docker_hub =
     match docker_build_type with
@@ -668,13 +668,6 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
     | _ -> (Stages.build, None, None)
   in
   let name = "oc.docker:" ^ arch_string in
-  let filename_suffix =
-    match docker_build_type with
-    | Release -> "release"
-    | Experimental -> "experimental"
-    | Test -> "test"
-    | Test_manual -> "test_manual"
-  in
   let script =
     (if with_evm_artifacts then
      [
@@ -687,26 +680,22 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?(external_ = false)
     else [])
     @ ["./scripts/ci/docker_release.sh"]
   in
-  let job =
-    job_docker_authenticated
-      ?when_
-      ?allow_failure
-      ?rules
-      ?dependencies
-        (* Docker initialization will always be performed in
-           [docker_rust_toolchain_build.sh] if [with_evm_artifacts]
-           since then [RUST_TOOLCHAIN_ALWAYS_REBUILD] is [true]. *)
-      ~skip_docker_initialization:with_evm_artifacts
-      ~ci_docker_hub
-      ~__POS__
-      ~stage
-      ~arch
-      ~name
-      ~variables
-      script
-  in
-  if external_ then job_external ~directory:"build" ~filename_suffix job
-  else job
+  job_docker_authenticated
+    ?when_
+    ?allow_failure
+    ?rules
+    ?dependencies
+      (* Docker initialization will always be performed in
+         [docker_rust_toolchain_build.sh] if [with_evm_artifacts]
+         since then [RUST_TOOLCHAIN_ALWAYS_REBUILD] is [true]. *)
+    ~skip_docker_initialization:with_evm_artifacts
+    ~ci_docker_hub
+    ~__POS__
+    ~stage
+    ~arch
+    ~name
+    ~variables
+    script
 
 (* Note: here we rely on [$IMAGE_ARCH_PREFIX] to be empty.
    Otherwise, [$DOCKER_IMAGE_TAG] would contain [$IMAGE_ARCH_PREFIX] too.

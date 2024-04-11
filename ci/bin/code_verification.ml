@@ -369,41 +369,6 @@ let jobs pipeline_type =
         | On_changes changes ->
             [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
   in
-  (* Externalization *)
-  let job_external_split ?(before_merging_suffix = "before_merging")
-      ?(scheduled_suffix = "scheduled_extended_test") job =
-    job_external
-      ~filename_suffix:
-        (match pipeline_type with
-        | Before_merging -> before_merging_suffix
-        | Schedule_extended_test -> scheduled_suffix)
-      job
-  in
-  let jobs_external_split ?(before_merging_suffix = "before_merging")
-      ?(scheduled_suffix = "scheduled_extended_test") ~path jobs =
-    let path =
-      sf
-        "%s-%s.yml"
-        path
-        (match pipeline_type with
-        | Before_merging -> before_merging_suffix
-        | Schedule_extended_test -> scheduled_suffix)
-    in
-    jobs_external ~path jobs
-  in
-  (* Used to externalize jobs that are the same on both pipelines. They're only written once.
-     Beware: there is no check that the two jobs are actually identical. *)
-  let job_external_once job =
-    match pipeline_type with
-    | Before_merging -> job_external job
-    | Schedule_extended_test -> job
-  in
-  (* as [job_external_once] but for sets of jobs *)
-  let jobs_external_once ~path jobs =
-    match pipeline_type with
-    | Before_merging -> jobs_external ~path jobs
-    | Schedule_extended_test -> jobs
-  in
   (* Common GitLab CI caches *)
   let cache_kernels = {key = "kernels"; paths = ["cargo/"]} in
   (* Collect coverage trace producing jobs *)
@@ -465,7 +430,6 @@ let jobs pipeline_type =
                  corresponds to the value in scripts/version.sh. *)
               "./scripts/ci/check_alpine_version.sh";
             ]
-          |> job_external
         in
         let make_dependencies ~before_merging ~schedule_extended_test:_ =
           before_merging job_trigger
@@ -496,7 +460,6 @@ let jobs pipeline_type =
           (* Check that .gitlab-ci.yml is up to date. *)
           "make -C ci check";
         ]
-      |> job_external_once
     in
     let job_docker_hadolint =
       job
@@ -512,7 +475,6 @@ let jobs pipeline_type =
         ~image:Images.hadolint
         ~stage:Stages.sanity
         ["hadolint build.Dockerfile"; "hadolint Dockerfile"]
-      |> job_external
     in
     [job_sanity_ci; job_docker_hadolint]
   in
@@ -522,7 +484,6 @@ let jobs pipeline_type =
       ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:Yes ())
       ~dependencies:dependencies_needs_trigger
       ()
-    |> job_external_split
   in
   let job_docker_client_libs_dependencies =
     job_docker_authenticated
@@ -540,7 +501,6 @@ let jobs pipeline_type =
            ~reports:
              (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
            [])
-    |> job_external_split
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
@@ -553,7 +513,6 @@ let jobs pipeline_type =
       ~release:true
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
-    |> job_external_split
   in
   (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
      executables, as well as the tezt test suite used by the subsequent
@@ -566,15 +525,13 @@ let jobs pipeline_type =
       ~release:false
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
-    |> job_external_split
   in
   let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
   let job_build_arm64_release : Tezos_ci.tezos_job =
-    job_build_arm64_release ~rules:build_arm_rules () |> job_external_split
+    job_build_arm64_release ~rules:build_arm_rules ()
   in
   let job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
     job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
-    |> job_external_split
   in
   (* Used in [before_merging] and [schedule_extended_tests].
 
@@ -598,7 +555,6 @@ let jobs pipeline_type =
            ~expire_in:(Duration (Days 3))
            ~when_:Always
            ["selected_tezts.tsl"])
-    |> job_external_once
   in
   let job_build_kernels : tezos_job =
     job
@@ -631,7 +587,7 @@ let jobs pipeline_type =
              "src/risc_v/tests/inline_asm/rv64-inline-asm-tests";
            ])
       ~cache:[cache_kernels; {key = "kernels-sccache"; paths = ["_sccache"]}]
-    |> enable_kernels |> enable_sccache |> job_external_split
+    |> enable_kernels |> enable_sccache
   in
   (* Fetch records for Tezt generated on the last merge request pipeline
          on the most recently merged MR and makes them available in artifacts
@@ -668,7 +624,6 @@ let jobs pipeline_type =
              (* Keep broken records for debugging *)
              "tezt/records/*.json.broken";
            ])
-    |> job_external_split
   in
   let job_static_x86_64_experimental =
     job_build_static_binaries
@@ -681,7 +636,6 @@ let jobs pipeline_type =
       ~dependencies:dependencies_needs_trigger
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
-    |> job_external_split
   in
   let build =
     (* TODO: The code is a bit convulted here because these jobs are
@@ -692,8 +646,8 @@ let jobs pipeline_type =
     let bin_packages_jobs =
       match pipeline_type with
       | Schedule_extended_test ->
-          let job_build_dpkg_amd64 = job_build_dpkg_amd64 () |> job_external in
-          let job_build_rpm_amd64 = job_build_rpm_amd64 () |> job_external in
+          let job_build_dpkg_amd64 = job_build_dpkg_amd64 () in
+          let job_build_rpm_amd64 = job_build_rpm_amd64 () in
           [job_build_dpkg_amd64; job_build_rpm_amd64]
       | Before_merging -> []
     in
@@ -712,7 +666,6 @@ let jobs pipeline_type =
              ~eval_opam:true
              [])
         ["dune build @check"]
-      |> job_external_split
     in
     [
       job_docker_rust_toolchain;
@@ -746,14 +699,12 @@ let jobs pipeline_type =
           "git -C _opam-repo-for-release add packages";
           "git -C _opam-repo-for-release commit -m \"tezos packages\"";
         ]
-      |> job_external_split
     in
     let (jobs_opam_packages : tezos_job list) =
       read_opam_packages
       |> List.map
            (job_opam_package
               ~dependencies:(Dependent [Artifacts job_opam_prepare]))
-      |> jobs_external_once ~path:"packaging/opam_package.yml"
     in
     let debian_repository : tezos_job list =
       let variables add =
@@ -842,7 +793,6 @@ let jobs pipeline_type =
         job_build_debian_package;
         job_build_ubuntu_package;
       ]
-      |> jobs_external_once ~path:"packaging/debian_repository.yml"
     in
     (job_opam_prepare :: jobs_opam_packages)
     @
@@ -889,7 +839,6 @@ let jobs pipeline_type =
              ~expire_in:(Duration (Hours 1))
              ~when_:On_success
              ["_build/default/client-libs/bin_codec_kaitai/codec.exe"])
-      |> job_external_split
     in
     let job_kaitai_e2e_checks =
       job
@@ -921,7 +870,6 @@ let jobs pipeline_type =
           "./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh \
            client-libs/kaitai-struct-files/files 2>/dev/null";
         ]
-      |> job_external_split
     in
     let job_oc_check_lift_limits_patch =
       job
@@ -941,7 +889,6 @@ let jobs pipeline_type =
           "git apply src/bin_tps_evaluation/lift_limits.patch";
           "dune build @src/proto_alpha/lib_protocol/check";
         ]
-      |> job_external_split
     in
     let job_oc_misc_checks : tezos_job =
       job
@@ -970,7 +917,6 @@ let jobs pipeline_type =
         if pipeline_type = Before_merging then
           ["./scripts/ci/lint_check_licenses.sh"]
         else [])
-      |> job_external_split
     in
     let job_misc_opam_checks : tezos_job =
       job
@@ -986,7 +932,6 @@ let jobs pipeline_type =
           (* checks that all deps of opam packages are already installed *)
           "./scripts/opam-check.sh";
         ]
-      |> job_external_split
     in
     let job_semgrep : tezos_job =
       job
@@ -1001,7 +946,6 @@ let jobs pipeline_type =
            locally, check out scripts/semgrep/README.md\"";
           "sh ./scripts/semgrep/lint-all-ocaml-sources.sh";
         ]
-      |> job_external_split
     in
     let jobs_unit : tezos_job list =
       let build_dependencies = function
@@ -1179,7 +1123,6 @@ let jobs pipeline_type =
         oc_unit_js_components;
         oc_unit_protocol_compiles;
       ]
-      |> jobs_external_split ~path:"test/oc.unit"
     in
     let job_oc_integration_compiler_rejections : tezos_job =
       job
@@ -1193,7 +1136,6 @@ let jobs pipeline_type =
              [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         ["dune build @runtest_rejections"]
-      |> job_external_split
     in
     let job_oc_script_test_gen_genesis : tezos_job =
       job
@@ -1206,7 +1148,6 @@ let jobs pipeline_type =
         ~before_script:
           (before_script ~eval_opam:true ["cd scripts/gen-genesis"])
         ["dune build gen_genesis.exe"]
-      |> job_external_split
     in
     let job_oc_script_snapshot_alpha_and_link : tezos_job =
       job
@@ -1224,7 +1165,6 @@ let jobs pipeline_type =
              ~eval_opam:true
              [])
         ["./.gitlab/ci/jobs/test/script:snapshot_alpha_and_link.sh"]
-      |> job_external_split
     in
     let job_oc_script_test_release_versions : tezos_job =
       job
@@ -1244,7 +1184,6 @@ let jobs pipeline_type =
              ~eval_opam:true
              [])
         ["./scripts/test_octez_release_version.sh"]
-      |> job_external_split
     in
     let job_oc_script_b58_prefix =
       job
@@ -1264,7 +1203,6 @@ let jobs pipeline_type =
            --disable=missing-docstring --disable=invalid-name";
           "poetry run pytest scripts/b58_prefix/test_b58_prefix.py";
         ]
-      |> job_external_split
     in
     let job_oc_test_liquidity_baking_scripts : tezos_job =
       job
@@ -1285,7 +1223,6 @@ let jobs pipeline_type =
              ())
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         ["./scripts/ci/test_liquidity_baking_scripts.sh"]
-      |> job_external_split
     in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
@@ -1400,7 +1337,6 @@ let jobs pipeline_type =
           ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
           ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
       ]
-      |> jobs_external_split ~path:"test/install_octez"
     in
     (* Tezt jobs.
 
@@ -1426,68 +1362,17 @@ let jobs pipeline_type =
        do not run in the CI.
 
        For more information on tags, see [src/lib_test/tag.mli]. *)
-    let tezt_dependencies =
-      Dependent
-        [
-          Artifacts job_select_tezts;
-          Artifacts job_build_x86_64_release;
-          Artifacts job_build_x86_64_exp_dev_extra;
-          Artifacts job_build_kernels;
-          Artifacts job_tezt_fetch_records;
-        ]
-    in
-    let job_tezt_flaky : tezos_job =
-      job_tezt
-        ~__POS__
-        ~name:"tezt-flaky"
-        ~tezt_tests:(tezt_tests [Has_tag "flaky"])
-        ~tezt_variant:"-flaky"
-          (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
-             Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
-             '--retry') *)
-        ~retry:2
-        ~tezt_retry:3
-        ~tezt_parallel:1
-        ~dependencies:tezt_dependencies
-        ~rules:
-          (* This job can only be manually triggered when it's
-             artifact dependencies exists, which they do when
-             [changeset_octez] is changed. *)
-          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
-        ()
-      |> enable_coverage_output_artifact |> job_external_split
-    in
-    let job_tezt_slow : tezos_job =
-      job_tezt
-        ~__POS__
-        ~name:"tezt-slow"
-        ~rules:
-          (* See comment for [job_tezt_flaky] *)
-          (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
-        ~tezt_tests:
-          (tezt_tests
-             ~slow:true
-             (* TODO: https://gitlab.com/tezos/tezos/-/issues/7063
-                The deselection of Paris [test_adaptive_issuance_launch.ml]
-                should be removed once the fixes to its slowness has been
-                snapshotted from Alpha. *)
-             [
-               Not
-                 (String_predicate
-                    ( File,
-                      Is
-                        "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
-                    ));
-             ])
-        ~tezt_variant:"-slow"
-        ~retry:2
-        ~tezt_parallel:3
-        ~parallel:(Vector 10)
-        ~dependencies:tezt_dependencies
-        ()
-      |> job_external_split
-    in
     let jobs_tezt =
+      let dependencies =
+        Dependent
+          [
+            Artifacts job_select_tezts;
+            Artifacts job_build_x86_64_release;
+            Artifacts job_build_x86_64_exp_dev_extra;
+            Artifacts job_build_kernels;
+            Artifacts job_tezt_fetch_records;
+          ]
+      in
       let rules = make_rules ~dependent:true ~changes:changeset_octez () in
       let coverage_expiry = Duration (Days 3) in
       let tezt : tezos_job =
@@ -1500,7 +1385,18 @@ let jobs pipeline_type =
           ~tezt_parallel:3
           ~parallel:(Vector 60)
           ~rules
-          ~dependencies:tezt_dependencies
+          ~dependencies
+          ()
+        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_memory_3k : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-memory-3k"
+          ~tezt_tests:(tezt_tests ~memory_3k:true [])
+          ~tezt_variant:"-memory_3k"
+          ~dependencies
+          ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
       in
@@ -1511,18 +1407,7 @@ let jobs pipeline_type =
           ~tezt_tests:(tezt_tests ~memory_4k:true [])
           ~tezt_variant:"-memory_4k"
           ~parallel:(Vector 4)
-          ~dependencies:tezt_dependencies
-          ~rules
-          ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_memory_3k : tezos_job =
-        job_tezt
-          ~__POS__
-          ~name:"tezt-memory-3k"
-          ~tezt_tests:(tezt_tests ~memory_3k:true [])
-          ~tezt_variant:"-memory_3k"
-          ~dependencies:tezt_dependencies
+          ~dependencies
           ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
@@ -1538,10 +1423,60 @@ let jobs pipeline_type =
           ~name:"tezt-time-sensitive"
           ~tezt_tests:(tezt_tests ~time_sensitive:true [])
           ~tezt_variant:"-time_sensitive"
-          ~dependencies:tezt_dependencies
+          ~dependencies
           ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+      in
+      let tezt_slow : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-slow"
+          ~rules:
+            (* See comment for [tezt_flaky] *)
+            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ~tezt_tests:
+            (tezt_tests
+               ~slow:true
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/7063
+                  The deselection of Paris [test_adaptive_issuance_launch.ml]
+                  should be removed once the fixes to its slowness has been
+                  snapshotted from Alpha. *)
+               [
+                 Not
+                   (String_predicate
+                      ( File,
+                        Is
+                          "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
+                      ));
+               ])
+          ~tezt_variant:"-slow"
+          ~retry:2
+          ~tezt_parallel:3
+          ~parallel:(Vector 10)
+          ~dependencies
+          ()
+      in
+      let tezt_flaky : tezos_job =
+        job_tezt
+          ~__POS__
+          ~name:"tezt-flaky"
+          ~tezt_tests:(tezt_tests [Has_tag "flaky"])
+          ~tezt_variant:"-flaky"
+            (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
+               Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
+               '--retry') *)
+          ~retry:2
+          ~tezt_retry:3
+          ~tezt_parallel:1
+          ~dependencies
+          ~rules:
+            (* This job can only be manually triggered when it's
+               artifact dependencies exists, which they do when
+               [changeset_octez] is changed. *)
+            (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
+          ()
+        |> enable_coverage_output_artifact
       in
       let tezt_static_binaries : tezos_job =
         job_tezt
@@ -1565,12 +1500,13 @@ let jobs pipeline_type =
       in
       [
         tezt;
-        tezt_memory_4k;
         tezt_memory_3k;
+        tezt_memory_4k;
         tezt_time_sensitive;
+        tezt_slow;
+        tezt_flaky;
         tezt_static_binaries;
       ]
-      |> jobs_external_split ~path:"test/tezt"
     in
     let jobs_kernels : tezos_job list =
       let make_job_kernel ~__POS__ ~name ~changes script =
@@ -1591,7 +1527,6 @@ let jobs pipeline_type =
           ~name:"test_kernels"
           ~changes:changeset_test_kernels
           ["make -f kernels.mk check"; "make -f kernels.mk test"]
-        |> job_external_split
       in
       let job_test_etherlink_kernel : tezos_job =
         make_job_kernel
@@ -1599,7 +1534,6 @@ let jobs pipeline_type =
           ~name:"test_etherlink_kernel"
           ~changes:changeset_test_etherlink_kernel
           ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
-        |> job_external_split
       in
       let job_test_risc_v_kernels : tezos_job =
         make_job_kernel
@@ -1611,7 +1545,6 @@ let jobs pipeline_type =
             "make -C src/risc_v test";
             "make -C src/risc_v audit";
           ]
-        |> job_external_split
       in
       let job_test_evm_compatibility : tezos_job =
         make_job_kernel
@@ -1626,7 +1559,6 @@ let jobs pipeline_type =
             "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ \
              --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c";
           ]
-        |> job_external_split
       in
       [
         job_test_kernels;
@@ -1648,8 +1580,6 @@ let jobs pipeline_type =
       job_oc_script_test_release_versions;
       job_oc_script_b58_prefix;
       job_oc_test_liquidity_baking_scripts;
-      job_tezt_flaky;
-      job_tezt_slow;
     ]
     @ jobs_kernels @ jobs_unit @ jobs_install_octez @ jobs_tezt
     @
@@ -1666,7 +1596,6 @@ let jobs pipeline_type =
                invalid commits titles in situations where that is allowed. *)
             (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
             ~allow_failure:(With_exit_codes [65])
-          |> job_external
         in
         [job_commit_titles]
     | Schedule_extended_test -> []
@@ -1711,9 +1640,6 @@ let jobs pipeline_type =
             (script_propagate_exit_code "./scripts/ci/report_coverage.sh")
             ~allow_failure:(With_exit_codes [64])
           |> enable_coverage_location |> enable_coverage_report
-          |> job_external
-               ~directory:"coverage"
-               ~filename_suffix:"before_merging"
         in
         [job_unified_coverage]
     | Schedule_extended_test -> []
@@ -1757,7 +1683,6 @@ let jobs pipeline_type =
           ~name:"oc.install_python_bullseye"
           ~image:Images.debian_bullseye;
       ]
-      |> jobs_external_split ~path:"doc/oc.install_python"
     in
     let jobs_documentation : tezos_job list =
       let rules =
@@ -1886,7 +1811,6 @@ let jobs pipeline_type =
         job_build_all;
         job_documentation_linkcheck;
       ]
-      |> jobs_external_split ~path:"doc/documentation"
     in
     jobs_install_python @ jobs_documentation
   in
@@ -1904,7 +1828,6 @@ let jobs pipeline_type =
         let job_docker_amd64_test_manual : Tezos_ci.tezos_job =
           job_docker_build
             ~__POS__
-            ~external_:true
             ~arch:Amd64
             ~dependencies:(Dependent [])
             Test_manual
@@ -1912,7 +1835,6 @@ let jobs pipeline_type =
         let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
           job_docker_build
             ~__POS__
-            ~external_:true
             ~arch:Arm64
             ~dependencies:(Dependent [])
             Test_manual
@@ -1927,7 +1849,6 @@ let jobs pipeline_type =
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
-          |> job_external ~directory:"build" ~filename_suffix:"manual"
         in
         let job_build_rpm_amd64_manual =
           job_build_bin_package
@@ -1939,7 +1860,6 @@ let jobs pipeline_type =
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
-          |> job_external ~directory:"build" ~filename_suffix:"manual"
         in
         [
           job_docker_amd64_test_manual;
@@ -1958,6 +1878,4 @@ let jobs pipeline_type =
      (using {!job_external} or {!jobs_external}) and included by hand
      in the files [.gitlab/ci/pipelines/before_merging.yml] and
      [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
-  ignore
-    (trigger_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual) ;
-  []
+  trigger_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual

@@ -263,39 +263,6 @@ val job :
   string list ->
   tezos_job
 
-(** Generates a job to an external file.
-
-    This function is meant to be used in the transition to CI-in-OCaml.
-    It writes {!header} and the given job to the destination path
-    [.gitlab/ci/jobs/DIRECTORY/NAME(-FILENAME_SUFFIX).yml].
-    Directory defaults to the stage name if not set.
-
-    This allows migrating all the jobs of a given pipeline, and
-    including the generated definition of those jobs in other
-    pipelines where it appears.
-
-    Raises [Failure] if [.gitlab/ci/jobs/DIRECTORY] is not an existing
-    directory. Also [Failure] if destination path has already been
-    used to write another job.
-
-    The returned job is the same as the input, for ease of chaining. *)
-val job_external :
-  ?directory:string -> ?filename_suffix:string -> tezos_job -> tezos_job
-
-(** Generates a set of jobs to the same external file.
-
-    This function is meant to be used in the transition to CI-in-OCaml.
-    It writes {!header} and the given jobs to the file
-    [.gitlab/ci/jobs/PATH].
-
-    The use case is the same as [job_external] but for cases where it
-    is impractical to split a set of jobs into one file per job
-    (e.g. opam package test jobs).
-
-    The returned set of jobs is the same as the input, for ease of
-    chaining. *)
-val jobs_external : path:string -> tezos_job list -> tezos_job list
-
 (** Adds artifacts to a job without overriding, if possible, existing artifacts.
 
     - If the job already has an artifact with [old_name] and [name] is given, then
