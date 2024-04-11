@@ -15,6 +15,11 @@ use self::constants::TICKS_FOR_CRYPTO;
 /// This doesn't apply to inherited constants from the PVM, e.g. maximum
 /// number of reboots.
 pub mod constants {
+
+    /// Maximum of gas allowed for a transaction.
+    /// Comes from the block limit, defined in EIP-1559 as 2 * gas target
+    pub const MAXIMUM_GAS_LIMIT: u64 = 30_000_000;
+
     /// Maximum number of ticks for a kernel run.
     /// Order of magnitude lower than the limit set by the PVM to provide
     /// security margin.

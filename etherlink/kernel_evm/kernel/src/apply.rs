@@ -211,6 +211,7 @@ pub enum Validity {
     InvalidCode,
     InvalidMaxBaseFee,
     InvalidNotEnoughGasForFees,
+    InvalidGasLimitTooHigh,
 }
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/6812
@@ -289,6 +290,16 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         log!(host, Benchmarking, "Transaction status: ERROR_GAS_FEE.");
          return Ok(Validity::InvalidNotEnoughGasForFees)
     };
+
+    // Gas limit max
+    if gas_limit > tick_model::constants::MAXIMUM_GAS_LIMIT {
+        log!(
+            host,
+            Benchmarking,
+            "Transaction status: ERROR_GAS_LIMIT_TOO_HIGH"
+        );
+        return Ok(Validity::InvalidGasLimitTooHigh);
+    }
 
     Ok(Validity::Valid(caller, gas_limit))
 }
