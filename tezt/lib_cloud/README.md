@@ -179,7 +179,7 @@ the docker run locally.
 
 Netdata enables to monitor the machines as well as docker containers.
 
-At the moment, if the monitoring is acivated once the netdata docker won't be
+At the moment, if the monitoring is activated, the netdata docker won't be
 stopped until the VM is being teared down.
 
 ## Website
@@ -293,6 +293,18 @@ exported to the Prometheus instance using the function
      explain why the scenario behaves unexpectedly. We recommend to write your
      scenario so that only the minimum amount of information is shared between
      the daemons.
+
+9. When deploying a large number of VMs, ssh may open too many file descriptors,
+   which can either reach some OS limits or cause broken pipe errors. To avoid
+   this, ssh multiplexing can help. To enable multiplexing, add something along
+   these lines in the ssh config file:
+
+   ```
+   Host *
+    ControlMaster auto
+    ControlPath ~/.ssh/master-%r@%h:%p
+    ControlPersist 120
+   ```
 
 ## Limitations and future work
 
