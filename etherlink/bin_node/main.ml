@@ -1028,12 +1028,13 @@ let replay_command =
   let open Tezos_clic in
   command
     ~desc:"Replay a specific block level."
-    (args5
+    (args6
        data_dir_arg
        preimages_arg
        preimages_endpoint_arg
        rollup_address_arg
-       verbose_arg)
+       verbose_arg
+       kernel_arg)
     (prefixes ["replay"; "blueprint"]
     @@ Tezos_clic.param
          ~name:"level"
@@ -1042,7 +1043,12 @@ let replay_command =
               Lwt.return_ok
               @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
     @@ stop)
-    (fun (data_dir, preimages, preimages_endpoint, smart_rollup_address, verbose)
+    (fun ( data_dir,
+           preimages,
+           preimages_endpoint,
+           smart_rollup_address,
+           verbose,
+           kernel_path )
          l2_level
          () ->
       let open Lwt_result_syntax in
@@ -1063,6 +1069,7 @@ let replay_command =
         | None -> Filename.Infix.(data_dir // "wasm_2_0_0")
       in
       Evm_node_lib_dev.Replay.main
+        ?kernel_path
         ~data_dir
         ~preimages
         ~preimages_endpoint
