@@ -44,10 +44,7 @@ type slot = bytes
     length is not a multiple of the page-size specified in the
     [Cryptobox.parameters] argument. *)
 val get_slot_pages :
-  Cryptobox.t ->
-  Store.Shards.t ->
-  Cryptobox.commitment ->
-  bytes list tzresult Lwt.t
+  Cryptobox.t -> Store.t -> Cryptobox.commitment -> bytes list tzresult Lwt.t
 
 (** [save_shards store commitment shards] stores [shards] onto the [store]
     associated to the given [commitment] *)

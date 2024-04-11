@@ -206,7 +206,7 @@ let get_slot cryptobox store commitment =
       let provided = minimal_number_of_shards - remaining in
       tzfail @@ Missing_shards {provided; required = minimal_number_of_shards}
     else
-      let*! res = Store.Shards.read store commitment shard_id in
+      let*! res = Store.Shards.read store.Store.shards commitment shard_id in
       match res with
       | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
       | Error _ -> loop acc (shard_id + 1) remaining
