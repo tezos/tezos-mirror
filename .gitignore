@@ -154,3 +154,6 @@ terraform.rc
 
 # Terraform lock files
 *.lock.hcl
+
+# Direnv
+.direnv
