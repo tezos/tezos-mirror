@@ -20,6 +20,7 @@ val kernel_logs_directory : data_dir:string -> string
     [simulation] adds a prefix to the event to differenciate the logs.
 *)
 val execute :
+  ?profile:bool ->
   ?kind:Events.kernel_log_kind ->
   data_dir:string ->
   ?log_file:string ->
@@ -77,6 +78,7 @@ type apply_result =
 *)
 val apply_blueprint :
   ?log_file:string ->
+  ?profile:bool ->
   data_dir:string ->
   config:Config.config ->
   t ->

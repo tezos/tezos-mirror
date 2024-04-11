@@ -1003,7 +1003,7 @@ let new_last_known_l1_level l =
 
 let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
 
-let replay ?(alter_evm_state = Lwt_result_syntax.return)
+let replay ?profile ?(alter_evm_state = Lwt_result_syntax.return)
     (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
   let* evm_state =
@@ -1016,6 +1016,7 @@ let replay ?(alter_evm_state = Lwt_result_syntax.return)
       let* blueprint = get_blueprint (Qty number) in
       Evm_state.apply_blueprint
         ~log_file:"replay"
+        ?profile
         ~data_dir
         ~config
         evm_state

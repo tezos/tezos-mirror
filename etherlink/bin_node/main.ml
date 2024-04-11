@@ -190,6 +190,12 @@ let cors_allowed_origins_arg =
 let devmode_arg =
   Tezos_clic.switch ~long:"devmode" ~doc:"The EVM node in development mode." ()
 
+let profile_arg =
+  Tezos_clic.switch
+    ~long:"profile"
+    ~doc:"Profile the execution of the WASM PVM"
+    ()
+
 let keep_everything_arg =
   Tezos_clic.switch
     ~short:'k'
@@ -1028,13 +1034,14 @@ let replay_command =
   let open Tezos_clic in
   command
     ~desc:"Replay a specific block level."
-    (args6
+    (args7
        data_dir_arg
        preimages_arg
        preimages_endpoint_arg
        rollup_address_arg
        verbose_arg
-       kernel_arg)
+       kernel_arg
+       profile_arg)
     (prefixes ["replay"; "blueprint"]
     @@ Tezos_clic.param
          ~name:"level"
@@ -1048,7 +1055,8 @@ let replay_command =
            preimages_endpoint,
            smart_rollup_address,
            verbose,
-           kernel_path )
+           kernel_path,
+           profile )
          l2_level
          () ->
       let open Lwt_result_syntax in
@@ -1069,6 +1077,7 @@ let replay_command =
         | None -> Filename.Infix.(data_dir // "wasm_2_0_0")
       in
       Evm_node_lib_dev.Replay.main
+        ~profile
         ?kernel_path
         ~data_dir
         ~preimages
