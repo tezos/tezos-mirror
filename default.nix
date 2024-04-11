@@ -1,18 +1,15 @@
 # WARNING!
 # This file is provided as a courtesy and comes with no guarantees that it will
 # continue to work in the future.
-let
-  sources = import ./nix/sources.nix;
+{sources ? import ./nix/sources.nix {}}: let
   pkgs = sources.pkgs;
 
   overlays = pkgs.callPackage ./nix/overlays.nix {};
-  tezos-opam-repository = pkgs.callPackage ./nix/tezos-opam-repo.nix {};
-  opam-repository = pkgs.callPackage ./nix/opam-repo.nix {};
 
   packageSet = pkgs.opamPackages.overrideScope' (pkgs.lib.composeManyExtensions [
     # Set the opam-repository which has the package descriptions.
     (final: prev: {
-      repository = prev.repository.override {src = opam-repository;};
+      repository = prev.repository.override {src = sources.opam-repository;};
     })
 
     # First overlay simply picks the package versions from Tezos'
@@ -50,8 +47,8 @@ let
     {}
     ''
       mkdir -p $out/share/zcash-params
-      cp ${tezos-opam-repository}/zcash-params/sapling-output.params $out/share/zcash-params
-      cp ${tezos-opam-repository}/zcash-params/sapling-spend.params $out/share/zcash-params
+      cp ${sources.tezos-opam-repository}/zcash-params/sapling-output.params $out/share/zcash-params
+      cp ${sources.tezos-opam-repository}/zcash-params/sapling-spend.params $out/share/zcash-params
     '';
 
   mkFrameworkFlags = frameworks:
