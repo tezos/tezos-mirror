@@ -6,7 +6,8 @@ stages:
 
 .default_matrix: &default_matrix
     matrix:
-      - ARCH: ["amd64", "arm64"]
+      # - ARCH: ["amd64", "arm64"]
+      - ARCH: ["amd64"]
         OCTEZ_BRANCH: ["octez-v20.0-rc1", "master"]
 
 fmt:
