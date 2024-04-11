@@ -8,6 +8,15 @@
 (** A GitLab CI job annotated with Octez-specific meta-data. *)
 type tezos_job
 
+(** The name of a {!tezos_job} as given to [~name] of {!job}.
+
+    This returns the stem of the job name. Parallel jobs produce
+    multiple job instances ([JOB N/M] for a {!Vector}-parallel job and
+    [JOB: [foo, bar, ...]] for {!Matrix}-parallel jobs) -- the stem of such
+    jobs is [JOB]. For non-parallel jobs, the argument given to
+    [~name] and the stem is equivalent. *)
+val name_of_tezos_job : tezos_job -> string
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)

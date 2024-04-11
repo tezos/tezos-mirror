@@ -45,50 +45,6 @@ type manual =
   | Yes  (** Add rule for manual trigger. *)
   | On_changes of Changeset.t  (** Add manual trigger on certain [changes:] *)
 
-(* [make_rules] makes rules for jobs that are:
-     - automatic in scheduled pipelines;
-     - conditional in [before_merging] pipelines.
-
-     If a job has non-optional dependencies, then [dependent] must be
-     set to [true] to ensure that we only run the job in case previous
-     jobs succeeded (setting [when: on_success]).
-
-     If [label] is set, add rule that selects the job in
-     [Before_merging] pipelines for merge requests with the given
-     label. Rules for manual triggers can be configured using
-     [manual].
-
-     If [label], [changes] and [manual] are omitted, then rules will
-     enable the job [On_success] in the [before_merging]
-     pipeline. This is safe, but prefer specifying a [changes] clause
-     if possible. *)
-let make_rules ?label ?changes ?(manual = No) ?(dependent = false) pipeline_type
-    =
-  match pipeline_type with
-  | Schedule_extended_test ->
-      (* The scheduled pipeline always runs all jobs unconditionally
-         -- unless they are dependent on a previous, non-trigger job, in the
-         pipeline. *)
-      [job_rule ~when_:(if dependent then On_success else Always) ()]
-  | Before_merging -> (
-      (* MR labels can be used to force tests to run. *)
-      (match label with
-      | Some label ->
-          [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
-      | None -> [])
-      (* Modifying some files can force tests to run. *)
-      @ (match changes with
-        | None -> []
-        | Some changes ->
-            [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()])
-      (* For some tests, it can be relevant to have a manual trigger. *)
-      @
-      match manual with
-      | No -> []
-      | Yes -> [job_rule ~when_:Manual ()]
-      | On_changes changes ->
-          [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
-
 type opam_package_group = Executable | All
 
 type opam_package = {
@@ -362,8 +318,56 @@ let build_debian_packages_image =
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
-  let make_rules ?label ?changes ?manual ?dependent () =
-    make_rules ?label ?changes ?manual ?dependent pipeline_type
+  (* [make_rules] makes rules for jobs that are:
+     - automatic in scheduled pipelines;
+     - conditional in [before_merging] pipelines.
+
+     If a job has non-optional dependencies, then [dependent] must be
+     set to [true] to ensure that we only run the job in case previous
+     jobs succeeded (setting [when: on_success]).
+
+     If [label] is set, add rule that selects the job in
+     [Before_merging] pipelines for merge requests with the given
+     label. Rules for manual triggers can be configured using
+     [manual].
+
+     If [label], [changes] and [manual] are omitted, then rules will
+     enable the job [On_success] in the [before_merging] pipeline. This
+     is safe, but prefer specifying a [changes] clause if possible.
+
+     If [margebot_disable] is set to true (default false), this job is
+     disabled when marge-bot triggers the [before_merging] pipeline. *)
+  let make_rules ?label ?changes ?(manual = No) ?(dependent = false)
+      ?(margebot_disable = false) () =
+    match pipeline_type with
+    | Schedule_extended_test ->
+        (* The scheduled pipeline always runs all jobs unconditionally
+           -- unless they are dependent on a previous, non-trigger job, in the
+           pipeline. *)
+        [job_rule ~when_:(if dependent then On_success else Always) ()]
+    | Before_merging -> (
+        (* MR labels can be used to force tests to run. *)
+        (if margebot_disable then
+         [job_rule ~if_:Rules.triggered_by_marge_bot ~when_:Never ()]
+        else [])
+        @ (match label with
+          | Some label ->
+              [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
+          | None -> [])
+        (* Modifying some files can force tests to run. *)
+        @ (match changes with
+          | None -> []
+          | Some changes ->
+              [
+                job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
+              ])
+        (* For some tests, it can be relevant to have a manual trigger. *)
+        @
+        match manual with
+        | No -> []
+        | Yes -> [job_rule ~when_:Manual ()]
+        | On_changes changes ->
+            [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
   in
   (* Externalization *)
   let job_external_split ?(before_merging_suffix = "before_merging")
@@ -402,6 +406,22 @@ let jobs pipeline_type =
   in
   (* Common GitLab CI caches *)
   let cache_kernels = {key = "kernels"; paths = ["cargo/"]} in
+  (* Collect coverage trace producing jobs *)
+  let jobs_with_coverage_output = ref [] in
+  (* Add variables for bisect_ppx output and store the traces as an
+     artifact.
+
+     This function should be applied to test jobs that produce coverage. *)
+  let enable_coverage_output_artifact ?(expire_in = Duration (Days 1)) tezos_job
+      : tezos_job =
+    jobs_with_coverage_output := tezos_job :: !jobs_with_coverage_output ;
+    tezos_job |> enable_coverage_location
+    |> add_artifacts
+         ~expire_in
+         ~name:"coverage-files-$CI_JOB_ID"
+         ~when_:On_success
+         ["$BISECT_FILE"]
+  in
   (* Stages *)
   (* All stages should be empty, as explained below, until the full pipeline is generated. *)
   let trigger_stage, make_dependencies =
@@ -1651,6 +1671,53 @@ let jobs pipeline_type =
         [job_commit_titles]
     | Schedule_extended_test -> []
   in
+  let coverage =
+    match pipeline_type with
+    | Before_merging ->
+        (* Write the name of each job that produces coverage as input for other scripts.
+           Only includes the stem of the name: parallel jobs only appear once.
+           E.g. as [tezt], not [tezt 1/60], [tezt 2/60], etc. *)
+        Base.write_file
+          "script-inputs/ci-coverage-producing-jobs"
+          ~contents:
+            (String.concat
+               "\n"
+               (List.map Tezos_ci.name_of_tezos_job !jobs_with_coverage_output)
+            ^ "\n") ;
+        (* This job fetches coverage files by precedent test stage. It creates
+           the html, summary and cobertura reports. It also provide a coverage %
+           for the merge request. *)
+        let job_unified_coverage : tezos_job =
+          let dependencies = List.rev !jobs_with_coverage_output in
+          job
+            ~__POS__
+            ~image:Images.runtime_e2etest_dependencies
+            ~name:"oc.unified_coverage"
+            ~stage:Stages.test_coverage
+            ~coverage:"/Coverage: ([^%]+%)/"
+            ~rules:
+              (make_rules ~margebot_disable:true ~changes:changeset_octez ())
+            ~variables:
+              [
+                (* This inhibits the Makefile's opam version check, which
+                   this job's opam-less image
+                   ([runtime_e2etest_dependencies]) cannot pass. *)
+                ("TEZOS_WITHOUT_OPAM", "true");
+              ]
+            ~dependencies:(Staged dependencies)
+            (* On the development branches, we compute coverage.
+               TODO: https://gitlab.com/tezos/tezos/-/issues/6173
+               We propagate the exit code to temporarily allow corrupted coverage files. *)
+            (script_propagate_exit_code "./scripts/ci/report_coverage.sh")
+            ~allow_failure:(With_exit_codes [64])
+          |> enable_coverage_location |> enable_coverage_report
+          |> job_external
+               ~directory:"coverage"
+               ~filename_suffix:"before_merging"
+        in
+        [job_unified_coverage]
+    | Schedule_extended_test -> []
+  in
   let doc =
     let jobs_install_python =
       (* Creates a job that tests installation of the python environment in [image] *)
@@ -1891,5 +1958,6 @@ let jobs pipeline_type =
      (using {!job_external} or {!jobs_external}) and included by hand
      in the files [.gitlab/ci/pipelines/before_merging.yml] and
      [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
-  ignore (trigger_stage @ sanity @ build @ packaging @ test @ doc @ manual) ;
+  ignore
+    (trigger_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual) ;
   []
