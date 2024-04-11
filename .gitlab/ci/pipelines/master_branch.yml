@@ -294,12 +294,11 @@ publish_kernel_sdk:
   - gcp
   rules:
   - when: manual
-    allow_failure: false
+    allow_failure: true
   needs:
   - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
-  allow_failure: true
   cache:
     key: kernels
     paths:
