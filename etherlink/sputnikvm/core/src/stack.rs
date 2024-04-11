@@ -13,7 +13,10 @@ impl Stack {
 	/// Create a new stack with given limit.
 	pub fn new(limit: usize) -> Self {
 		Self {
-			data: Vec::new(),
+			// limit is 1024 value, it is cheap in terms of ticks to preallocate 32KB
+			// of memory, and it removes the variance of PUSH and DUP opcodes that
+			// reallocates when the stack is too small.
+			data: Vec::with_capacity(limit),
 			limit,
 		}
 	}
