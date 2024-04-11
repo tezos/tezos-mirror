@@ -230,7 +230,7 @@ module Slots = struct
     KVS.remove_file t file_layout (commitment, slot_size)
 end
 
-module Shard_proofs_cache =
+module Commitment_indexed_cache =
   Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong)
     (struct
       type t = Cryptobox.Commitment.t
@@ -239,6 +239,8 @@ module Shard_proofs_cache =
 
       let hash = Hashtbl.hash
     end)
+
+module Shard_proofs_cache = Commitment_indexed_cache
 
 (** Store context *)
 type t = {

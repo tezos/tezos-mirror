@@ -97,17 +97,18 @@ module Slots : sig
     t -> slot_size:int -> commitment -> unit tzresult Lwt.t
 end
 
-module Shard_proofs_cache : sig
-  (** Shard proofs are not stored on disk because we can recompute
-      them. This computation is quite costly though so we cache the
-      result in memory. *)
-
+module Commitment_indexed_cache : sig
   type 'a t
 
-  (** Returns the element associated to the commitment in the shard proofs cache, or [None] if
-      there is none. *)
+  (** Returns the element associated to the commitment in the cache,
+      or [None] if there is none. *)
   val find_opt : 'a t -> commitment -> 'a option
 end
+
+(** Shard proofs are not stored on disk because we can recompute
+    them. This computation is quite costly though so we cache the
+    result in memory. *)
+module Shard_proofs_cache = Commitment_indexed_cache
 
 type t = private {
   store : irmin;  (** The Irmin-based part of the store *)
