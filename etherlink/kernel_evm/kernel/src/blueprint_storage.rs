@@ -190,6 +190,7 @@ const MAXIMUM_SIZE_OF_DELAYED_TRANSACTION: usize = MAX_INPUT_MESSAGE_SIZE;
 
 /// Possible errors when validating a blueprint
 /// Only used for test, as all errors are handled in the same way
+#[cfg_attr(feature = "benchmark", allow(dead_code))]
 #[derive(Debug, PartialEq)]
 pub enum BlueprintValidity {
     Valid(Blueprint),
@@ -201,6 +202,7 @@ pub enum BlueprintValidity {
 
 /// Check that the parent hash of the [blueprint_with_hashes] is equal
 /// to the current block hash
+#[cfg_attr(feature = "benchmark", allow(dead_code))]
 fn valid_parent_hash<Host: Runtime>(
     host: &Host,
     blueprint_with_hashes: &BlueprintWithDelayedHashes,
@@ -292,7 +294,12 @@ fn parse_and_validate_blueprint<Host: Runtime>(
             }
 
             #[cfg(feature = "benchmark")]
-            fetch_delayed_txs(host, blueprint_with_hashes, delayed_inbox)
+            fetch_delayed_txs(
+                host,
+                blueprint_with_hashes,
+                delayed_inbox,
+                current_blueprint_size,
+            )
         }
     }
 }
