@@ -55,6 +55,18 @@ let committee_cache_size = 50
    1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
 let shards_proofs_cache_size = 1024
 
+(* The size of the shard cache is chosen large enough to enable
+   publishing slots on 5 slot indices.  We need to keep shards in
+   the cache for at least three levels (if the commitment is published
+   immediately, one level to include the publication + 2 levels to
+   finalize it) but a few more levels may be needed if the commitment
+   is not published immediately so we consider a cache large enough to
+   keep the shards for 5 levels. *)
+let shard_cache_size =
+  let number_of_levels_to_keep = 5 in
+  let number_of_slots = 5 in
+  number_of_levels_to_keep * number_of_slots
+
 let shards_verification_sampling_frequency = 100
 
 let amplification_random_delay_min = 1.

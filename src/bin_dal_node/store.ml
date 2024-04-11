@@ -241,6 +241,7 @@ module Commitment_indexed_cache =
     end)
 
 module Shard_proofs_cache = Commitment_indexed_cache
+module Shard_cache = Commitment_indexed_cache
 
 (** Store context *)
 type t = {
@@ -249,6 +250,7 @@ type t = {
   slots : Slots.t;
   in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
       (* The length of the array is the number of shards per slot *)
+  not_yet_published_shards : Cryptobox.share array Shard_cache.t;
 }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
@@ -259,6 +261,9 @@ let cache_shard_proofs node_store commitment shard_proofs =
     node_store.in_memory_shard_proofs
     commitment
     shard_proofs
+
+let cache_shards node_store commitment shards =
+  Shard_cache.replace node_store.not_yet_published_shards commitment shards
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
@@ -277,6 +282,7 @@ let init config =
       store;
       in_memory_shard_proofs =
         Shard_proofs_cache.create Constants.shards_proofs_cache_size;
+      not_yet_published_shards = Shard_cache.create Constants.shard_cache_size;
     }
 
 let tztrace_of_read_error read_err =
