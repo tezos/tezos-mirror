@@ -14,8 +14,11 @@ use crate::{
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{Float, Round, Status, StatusAnd};
-use std::ops::Neg;
+use rustc_apfloat::{Float, FloatConvert, Round, Status, StatusAnd};
+use std::{
+    fmt::{self, Display},
+    ops::Neg,
+};
 
 pub trait FloatExt: Float + Into<FValue> + Copy + Neg + From<FValue> {
     /// The canonical NaN has a positive sign and all
@@ -276,6 +279,91 @@ where
         self.f_arith_3(rs1, rs2, rs3, rm, rd, f)
     }
 
+    /// `FCVT.int.fmt` instruction.
+    ///
+    /// Converts a 32 or 64 bit float, into a 32 or 64 bit integer, with rounding.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fcvt_int_fmt<F: FloatExt, T>(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+        cast: fn(u64) -> T,
+        cvt: fn(T, Round) -> StatusAnd<F>,
+    ) -> Result<(), Exception> {
+        let rval = self.xregisters.read(rs1);
+        let rval = cast(rval);
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        let StatusAnd { status, value } = cvt(rval, rm);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, value.into());
+
+        Ok(())
+    }
+
+    /// `FCVT.fmt.fmt` instruction.
+    ///
+    /// Conversion between f32/f64 values.
+    ///
+    /// Returns `Exception::IllegalInstruction` on an invalid rounding mode.
+    pub(super) fn run_fcvt_fmt_fmt<F: FloatExt + FloatConvert<T>, T: FloatExt>(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        let rval: F = self.fregisters.read(rs1).into();
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        // ignored - all information comes from status.
+        let mut loses_info = false;
+
+        let StatusAnd { status, value } = rval.convert_r(rm, &mut loses_info).map(T::canonicalise);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.fregisters.write(rd, value.into());
+
+        Ok(())
+    }
+
+    pub(super) fn run_fcvt_fmt_int<F: FloatExt, T>(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+        cast: fn(T) -> u64,
+        cvt: fn(F, Round) -> StatusAnd<T>,
+    ) -> Result<(), Exception> {
+        let rval: F = self.fregisters.read(rs1).into();
+
+        let rm = self.f_rounding_mode(rm)?;
+
+        // spec requires returning the same as for +ve infinity for nans,
+        // which differs from impl in rustc_apfloat
+        let rval = if rval.is_nan() { F::INFINITY } else { rval };
+
+        let StatusAnd { status, value } = cvt(rval, rm);
+
+        if status != Status::OK {
+            self.csregisters.set_exception_flag_status(status);
+        }
+
+        self.xregisters.write(rd, cast(value));
+
+        Ok(())
+    }
+
     /// `FSGNJ.*` instruction.
     ///
     /// Writes all the bits of `rs1`, except for the sign bit, to `rd`.
@@ -435,6 +523,20 @@ pub enum RoundingMode {
     RUP,
     /// Round to Nearest, ties to Max Magnitude
     RMM,
+}
+
+impl Display for RoundingMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let res = match self {
+            Self::RNE => "rne",
+            Self::RTZ => "rtz",
+            Self::RDN => "rne",
+            Self::RUP => "rup",
+            Self::RMM => "rmm",
+        };
+
+        f.write_str(res)
+    }
 }
 
 impl TryFrom<CSRValue> for RoundingMode {

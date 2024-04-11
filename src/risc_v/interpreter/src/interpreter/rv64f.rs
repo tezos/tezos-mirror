@@ -226,6 +226,118 @@ where
         self.run_fnmadd::<Single>(rs1, rs2, rs3, rm, rd)
     }
 
+    /// `FCVT.S.W` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_s_w(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i32 as i128, Single::from_i128_r)
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_s_wu(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u32 as u128, Single::from_u128_r)
+    }
+
+    /// `FCVT.S.W` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_s_l(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i64 as i128, Single::from_i128_r)
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_s_lu(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u128, Single::from_u128_r)
+    }
+
+    /// `FCVT.S.W` R-type instruction.
+    pub fn run_fcvt_w_s(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as i32 as u64,
+            |f, rm| Single::to_i128_r(f, 32, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    pub fn run_fcvt_wu_s(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as i32 as u64,
+            |f, rm| Single::to_u128_r(f, 32, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.W` R-type instruction.
+    pub fn run_fcvt_l_s(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as u64,
+            |f, rm| Single::to_i128_r(f, 64, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    pub fn run_fcvt_lu_s(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as u64,
+            |f, rm| Single::to_u128_r(f, 64, rm, &mut false),
+        )
+    }
+
     /// `FSGNJ.S` R-type instruction.
     ///
     /// See [Self::run_fsgnj].

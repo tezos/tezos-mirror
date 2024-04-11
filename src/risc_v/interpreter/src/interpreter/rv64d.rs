@@ -18,7 +18,10 @@ use crate::{
     state_backend as backend,
     traps::Exception,
 };
-use rustc_apfloat::{ieee::Double, Float, Status, StatusAnd};
+use rustc_apfloat::{
+    ieee::{Double, Single},
+    Float, Status, StatusAnd,
+};
 
 impl From<Double> for FValue {
     fn from(f: Double) -> Self {
@@ -215,6 +218,142 @@ where
         rd: FRegister,
     ) -> Result<(), Exception> {
         self.run_fnmadd::<Double>(rs1, rs2, rs3, rm, rd)
+    }
+
+    /// `FCVT.D.W` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_w(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i32 as i128, Double::from_i128_r)
+    }
+
+    /// `FCVT.D.WU` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_wu(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u32 as u128, Double::from_u128_r)
+    }
+
+    /// `FCVT.D.W` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_l(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as i64 as i128, Double::from_i128_r)
+    }
+
+    /// `FCVT.D.WU` R-type instruction.
+    ///
+    /// See [Self::fcvt_int_fmt].
+    pub fn run_fcvt_d_lu(
+        &mut self,
+        rs1: XRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_int_fmt(rs1, rm, rd, |u| u as u128, Double::from_u128_r)
+    }
+
+    /// `FCVT.D.S` R-type instruction.
+    ///
+    /// See [Self::run_fcvt_fmt_fmt].
+    pub fn run_fcvt_d_s(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_fmt::<Single, Double>(rs1, rm, rd)
+    }
+
+    /// `FCVT.S.D` R-type instruction.
+    ///
+    /// See [Self::run_fcvt_fmt_fmt].
+    pub fn run_fcvt_s_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: FRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_fmt::<Double, Single>(rs1, rm, rd)
+    }
+
+    /// `FCVT.S.W` R-type instruction.
+    pub fn run_fcvt_w_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as i32 as u64,
+            |f, rm| Double::to_i128_r(f, 32, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    pub fn run_fcvt_wu_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as i32 as u64,
+            |f, rm| Double::to_u128_r(f, 32, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.W` R-type instruction.
+    pub fn run_fcvt_l_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as u64,
+            |f, rm| Double::to_i128_r(f, 64, rm, &mut false),
+        )
+    }
+
+    /// `FCVT.S.WU` R-type instruction.
+    pub fn run_fcvt_lu_d(
+        &mut self,
+        rs1: FRegister,
+        rm: InstrRoundingMode,
+        rd: XRegister,
+    ) -> Result<(), Exception> {
+        self.run_fcvt_fmt_int(
+            rs1,
+            rm,
+            rd,
+            |u| u as u64,
+            |f, rm| Double::to_u128_r(f, 64, rm, &mut false),
+        )
     }
 
     /// `FSGNJ.D` R-type instruction.
