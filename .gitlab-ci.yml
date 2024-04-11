@@ -127,12 +127,12 @@ release:amd64:master:
 #   variables:
 #     ARCHIVE: "binaries-arm64-v19.0.zip"
 
-release:arm64:octez-v20.0-rc1:
-  stage: deploy
-  extends: .release
-  dependencies: ["build: [arm64, octez-v20.0-rc1]"]
-  variables:
-    ARCHIVE: "binaries-arm64-octez-v20.0-rc1.zip"
+# release:arm64:octez-v20.0-rc1:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [arm64, octez-v20.0-rc1]"]
+#   variables:
+#     ARCHIVE: "binaries-arm64-octez-v20.0-rc1.zip"
 
 # release:arm64:v19.1:
 #   stage: deploy
@@ -142,12 +142,12 @@ release:arm64:octez-v20.0-rc1:
 #     ARCHIVE: "binaries-arm64-v19.1.zip"
 
 
-release:arm64:master:
-  stage: deploy
-  extends: .release
-  dependencies: ["build: [arm64, master]"]
-  variables:
-    ARCHIVE: "binaries-arm64-master.zip"
+# release:arm64:master:
+#   stage: deploy
+#   extends: .release
+#   dependencies: ["build: [arm64, master]"]
+#   variables:
+#     ARCHIVE: "binaries-arm64-master.zip"
 
 
 .docker:
@@ -238,12 +238,12 @@ docker:amd64:master:
 #     ARCH: "arm64"
 #     OCTEZ_BRANCH: "v19.0"
 
-docker:arm64:octez-v20.0-rc1:
-  extends: .docker-push
-  dependencies: ["build: [arm64, octez-v20.0-rc1]"]
-  variables:
-    ARCH: "arm64"
-    OCTEZ_BRANCH: "octez-v20.0-rc1"
+# docker:arm64:octez-v20.0-rc1:
+#   extends: .docker-push
+#   dependencies: ["build: [arm64, octez-v20.0-rc1]"]
+#   variables:
+#     ARCH: "arm64"
+#     OCTEZ_BRANCH: "octez-v20.0-rc1"
 
 # docker:arm64:v19.1:
 #   extends: .docker-push
@@ -252,12 +252,12 @@ docker:arm64:octez-v20.0-rc1:
 #     ARCH: "arm64"
 #     OCTEZ_BRANCH: "v19.1"
 
-docker:arm64:master:
-  extends: .docker-push
-  dependencies: ["build: [arm64, master]"]
-  variables:
-    ARCH: "arm64"
-    OCTEZ_BRANCH: "master"
+# docker:arm64:master:
+#   extends: .docker-push
+#   dependencies: ["build: [arm64, master]"]
+#   variables:
+#     ARCH: "arm64"
+#     OCTEZ_BRANCH: "master"
 
 # Create multiarch manifest 
 .manifest:
