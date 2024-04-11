@@ -1024,6 +1024,51 @@ let reset_command =
           "You must provide the `--force` switch in order to use this command \
            and not accidentally delete data.")
 
+let replay_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Replay a specific block level."
+    (args5
+       data_dir_arg
+       preimages_arg
+       preimages_endpoint_arg
+       rollup_address_arg
+       verbose_arg)
+    (prefixes ["replay"; "blueprint"]
+    @@ Tezos_clic.param
+         ~name:"level"
+         ~desc:"level to replay"
+         (Tezos_clic.parameter (fun () s ->
+              Lwt.return_ok
+              @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
+    @@ stop)
+    (fun (data_dir, preimages, preimages_endpoint, smart_rollup_address, verbose)
+         l2_level
+         () ->
+      let open Lwt_result_syntax in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config =
+          if verbose then Some (make_with_defaults ~verbosity:Debug ())
+          else None
+        in
+        init ?config ()
+      in
+      let smart_rollup_address =
+        Tezos_crypto.Hashed.Smart_rollup_address.to_string smart_rollup_address
+      in
+      let preimages =
+        match preimages with
+        | Some preimages -> preimages
+        | None -> Filename.Infix.(data_dir // "wasm_2_0_0")
+      in
+      Evm_node_lib_dev.Replay.main
+        ~data_dir
+        ~preimages
+        ~preimages_endpoint
+        ~smart_rollup_address
+        l2_level)
+
 (* List of program commands *)
 let commands =
   [
@@ -1036,6 +1081,7 @@ let commands =
     init_from_rollup_node_command;
     dump_to_rlp_command;
     reset_command;
+    replay_command;
   ]
 
 let global_options = Tezos_clic.no_options

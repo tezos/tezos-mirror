@@ -76,6 +76,7 @@ type apply_result =
     {!kernel_logs_directory}.
 *)
 val apply_blueprint :
+  ?log_file:string ->
   data_dir:string ->
   config:Config.config ->
   t ->

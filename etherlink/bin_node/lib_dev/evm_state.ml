@@ -182,7 +182,7 @@ type apply_result =
   | Apply_success of t * block_height * block_hash
   | Apply_failure
 
-let apply_blueprint ~data_dir ~config evm_state
+let apply_blueprint ?log_file ~data_dir ~config evm_state
     (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
@@ -196,6 +196,7 @@ let apply_blueprint ~data_dir ~config evm_state
       ~data_dir
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~config
+      ?log_file
       evm_state
       exec_inputs
   in
