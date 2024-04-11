@@ -97,14 +97,9 @@
    (octez-protocol-018-Proxford-libs.client -> Proxford_machine.real.ml)
    (-> Proxford_machine.no.ml))
   (select
-   PtParisA_machine.ml
-   from
-   (octez-protocol-019-PtParisA-libs.client -> PtParisA_machine.real.ml)
-   (-> PtParisA_machine.no.ml))
-  (select
    PtParisB_machine.ml
    from
-   (octez-protocol-019-PtParisA-libs.client -> PtParisB_machine.real.ml)
+   (octez-protocol-019-PtParisB-libs.client -> PtParisB_machine.real.ml)
    (-> PtParisB_machine.no.ml)))
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
@@ -254,14 +249,6 @@
 (rule
  (action
   (write-file Proxford_machine.no.ml "module M = struct end")))
-
-(rule
- (action
-  (write-file PtParisA_machine.mli "module M : sig end")))
-
-(rule
- (action
-  (write-file PtParisA_machine.no.ml "module M = struct end")))
 
 (rule
  (action
