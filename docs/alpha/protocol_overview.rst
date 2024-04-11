@@ -87,7 +87,7 @@ Blocks, Operations and their Validation
 
 A block consists of a header and operations. A block's header is
 composed of two parts: :ref:`the protocol-agnostic part<shell_header>`
-and :ref:`the protocol-specific part<shell_proto_revisit_alpha>`.
+and :ref:`the protocol-specific part<proto_block_header_alpha>`.
 This separation enables the shell to interact with different
 protocols. Each Tezos economic protocol can specify different kinds of
 operations, which are described further in detail in

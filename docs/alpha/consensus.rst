@@ -451,28 +451,10 @@ Consensus related protocol parameters
 
 These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
-.. _shell_proto_revisit_alpha:
-
-Shell-protocol interaction revisited
-------------------------------------
-
-.. FIXME tezos/tezos#3914:
-
-   Integrate protocol-specific block parts in the blocks and ops
-   entry.
-
-:ref:`Recall<shell_proto_interact_alpha>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
-Namely, these two notions are the protocol-specific header and the fitness.
-As in Emmy*, the protocol-specific header contains the fields:
-
-- ``signature``: a digital signature of the shell and protocol headers (excluding the signature itself)
-- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_alpha>`, used to generate entropy on the chain
-- ``proof_of_work_nonce``: a nonce used to pass a low-difficulty proof-of-work for the block, as a spam prevention measure
-- ``liquidity_baking_toggle_vote``: :ref:`a vote<toggle_alpha>` to continue the Liquidity Baking Subsidy, stop it, or abstain.
-
-There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_alpha>`.
-
 .. _fitness_alpha:
+
+Fitness
+-------
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
 The current version of the fitness is 2 (version 0 was used by Emmy, and version 1 by Emmy+ and Emmy*).
