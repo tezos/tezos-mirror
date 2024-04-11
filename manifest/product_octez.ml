@@ -18,6 +18,9 @@ end)
 
 module String_set = Set.Make (String)
 
+(** [~enabled_if] clause that disables tests in the CI. *)
+let not_in_ci = Dune.[S "="; S "false"; S "%{env:CI=false}"]
+
 let final_protocol_versions =
   let path = "src/lib_protocol_compiler/final_protocol_versions" in
   let ic = open_in path in
@@ -1331,7 +1334,8 @@ let make_plonk_runtest_invocation ~package =
                       run_exe "main" ["-q"];
                       [S "diff?"; S "test-quick.expected"; S "test.output"];
                     ]);
-             ]);
+             ])
+        ~enabled_if:not_in_ci;
       alias_rule "runtest_slow" ~package ~action:(run_exe "main" []);
       alias_rule
         "runtest_slow_with_regression"
@@ -1537,7 +1541,7 @@ let _octez_distributed_plonk_test_main =
        dependencies of distributed plonk have significant load-time,
        we do not integrate it in the main tezt entrypoint using the
        [tezt] function. *)
-    ~enabled_if:Dune.[S "="; S "false"; S "%{env:CI=false}"]
+    ~enabled_if:not_in_ci
     ~opam:"octez-libs"
     ~path:"src/lib_distributed_plonk/test"
     ~deps:
