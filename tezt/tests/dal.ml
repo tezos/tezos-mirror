@@ -1116,16 +1116,17 @@ let test_all_available_slots _protocol parameters cryptobox node client
   in
   unit
 
-(* Tests that DAL attestations are only included in a block if the attestation
-   is from a DAL-committee member. This test may be fail sometimes (with
-   [List.hd] on an empty list), though care was taken to avoid this as much as
-   possible, as it is a bit hard to make sure an attester is in the TB committee
-   but not in the DAL committee).*)
+(* Tests that DAL attestation payloads are only attached if the attestation is
+   from a DAL-committee member. This test creates a new account and registers it
+   as a bakers, and bakes blocks until it reaches a level where the new account
+   is in the TB committee but not in the DAL committee).*)
 let test_slots_attestation_operation_dal_committee_membership_check protocol
     parameters _cryptobox node client _bootstrap_key =
   (* The attestation from the bootstrap account should succeed as the bootstrap
      node has sufficient stake to be in the DAL committee. *)
   let nb_slots = parameters.Dal.Parameters.number_of_slots in
+  let number_of_shards = parameters.cryptobox.number_of_shards in
+  Log.info "number_of_shards = %d" number_of_shards ;
   let* () = bake_for client in
   let* level = Client.level client in
   let* (`OpHash _oph) =
@@ -1148,10 +1149,11 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   (* With [consensus_committee_size = 1024] slots in total, the new baker should
-     get roughly n / 64 = 16 TB slots on average. So the probability that it is
-     on TB committee is high. With [number_of_shards = 32] (which is the minimum
-     possible without changing other parameters), the new baker should be
-     assigned roughly 32/64 = 1/2 shards on average. *)
+     get roughly 1024 / 64 = 16 TB slots on average. So the probability that it
+     is on TB committee is high. With [number_of_shards = 256] (which is the
+     current default), the new baker should be assigned roughly 256 / 64 = 4
+     shards on average. We should encounter relatively quickly a level where it
+     is assigned to no shard. *)
   let stake = Tez.of_mutez_int (Protocol.default_bootstrap_balance / 64) in
   let* new_account = Client.gen_and_show_keys client in
   let* () =
@@ -1174,8 +1176,7 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
     new_account.alias ;
   let* () = bake_for ~count:(num_cycles * blocks_per_cycle) client in
   (* We iterate until we find a level for which the new account has no assigned
-     shard. Recall that the probability to not be assigned a shard is around
-     3/4, so a level is found quickly. *)
+     shard. *)
   let rec iter () =
     let* level = Client.level client in
     let* committee = Dal.Committee.at_level node ~level () in
@@ -1189,8 +1190,8 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
       let* () = bake_for client in
       iter ())
     else (
-      Log.info
-        "We first check that the new account is in the Tenderbake committee" ;
+      Log.info "The new account is not in the DAL committee" ;
+      Log.info "We check that the new account is in the Tenderbake committee" ;
       let* validators =
         Client.RPC.call client
         @@ RPC.get_chain_block_helper_validators ~level ()
@@ -6356,7 +6357,6 @@ let register ~protocols =
     (* We need to set the prevalidator's event level to [`Debug]
        in order to capture the errors thrown in the validation phase. *)
     ~event_sections_levels:[("prevalidator", `Debug)]
-    ~number_of_shards:32
     ~consensus_committee_size:1024
     protocols ;
   scenario_with_layer1_node
