@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -227,6 +228,7 @@ type t = {
   zk_rollup : zk_rollup;
   adaptive_issuance : adaptive_issuance;
   direct_ticket_spending_enable : bool;
+  sponsored_operations_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding
