@@ -658,7 +658,7 @@ let jobs pipeline_type =
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.build
         ~dependencies:dependencies_needs_trigger
-        ~rules:(make_rules ~changes:changeset_ocaml_files ())
+        ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
         ~before_script:
           (before_script
              ~take_ownership:true
@@ -917,6 +917,38 @@ let jobs pipeline_type =
         if pipeline_type = Before_merging then
           ["./scripts/ci/lint_check_licenses.sh"]
         else [])
+    in
+    let job_oc_python_check : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.python_check"
+        ~image:Images.runtime_build_test_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_python_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~init_python_venv:true
+             [])
+        ["./scripts/ci/lint_misc_python_check.sh"]
+    in
+    let job_oc_ocaml_fmt : tezos_job =
+      job
+        ~__POS__
+        ~name:"oc.ocaml_fmt"
+        ~image:Images.runtime_build_dependencies
+        ~stage:Stages.test
+        ~dependencies:dependencies_needs_trigger
+        ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        ["scripts/lint.sh --check-ocamlformat"; "dune build --profile=dev @fmt"]
     in
     let job_misc_opam_checks : tezos_job =
       job
@@ -1572,6 +1604,8 @@ let jobs pipeline_type =
       job_kaitai_e2e_checks;
       job_oc_check_lift_limits_patch;
       job_oc_misc_checks;
+      job_oc_python_check;
+      job_oc_ocaml_fmt;
       job_misc_opam_checks;
       job_semgrep;
       job_oc_integration_compiler_rejections;

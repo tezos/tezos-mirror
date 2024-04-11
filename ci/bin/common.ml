@@ -395,8 +395,11 @@ let changeset_kaitai_e2e_files =
           "client-libs/*kaitai*/**/*";
         ])
 
-let changeset_ocaml_files =
-  Changeset.(changeset_base @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"])
+(** Set of OCaml files for type checking ([dune build @check]). *)
+let changeset_ocaml_check_files =
+  Changeset.(
+    changeset_base
+    @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"])
 
 let changeset_lift_limits_patch =
   Changeset.(
@@ -423,6 +426,14 @@ let changeset_lint_files =
           "client-libs/**/*";
           "etherlink/**/*";
         ])
+
+(** Set of Python files. *)
+let changeset_python_files =
+  Changeset.(changeset_base @ make ["poetry.lock"; "pyproject.toml"; "**/*.py"])
+
+(** Set of OCaml files for formatting ([dune build @fmt]). *)
+let changeset_ocaml_fmt_files =
+  Changeset.(changeset_base @ make ["**/.ocamlformat"; "**/*.ml"; "**/*.mli"])
 
 let changeset_semgrep_files =
   Changeset.(

@@ -293,6 +293,8 @@ ocaml-check:
   - gcp
   rules:
   - changes:
+    - '**/*.ml'
+    - '**/*.mli'
     - .gitlab-ci.yml
     - .gitlab/**/*
     - devtools/**/*
@@ -6720,6 +6722,53 @@ oc.misc_checks:
   - scripts/check_wasm_pvm_regressions.sh check
   - etherlink/scripts/check_evm_store_migrations.sh check
   - ./scripts/ci/lint_check_licenses.sh
+
+oc.python_check:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.py'
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - poetry.lock
+    - pyproject.toml
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - . $HOME/.venv/bin/activate
+  script:
+  - ./scripts/ci/lint_misc_python_check.sh
+
+oc.ocaml_fmt:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.ml'
+    - '**/*.mli'
+    - '**/.ocamlformat'
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - scripts/lint.sh --check-ocamlformat
+  - dune build --profile=dev @fmt
 
 misc_opam_checks:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
