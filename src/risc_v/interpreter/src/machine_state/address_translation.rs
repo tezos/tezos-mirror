@@ -9,7 +9,7 @@ use super::{
     csregisters::{
         fields::FieldValue,
         satp::{self, SvLength, TranslationAlgorithm},
-        CSRValue, CSRegister,
+        xstatus, CSRValue, CSRegister,
     },
     mode::Mode,
     MachineState,
@@ -183,14 +183,39 @@ where
 }
 
 impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M> {
+    /// Get the effective hart mode when addressing memory.
+    /// Section P:M-ISA-1.6.3
+    /// The MPRV (Modify PRiVilege) bit modifies the effective privilege mode, i.e.,
+    /// the privilege level at which loads and stores execute.
+    /// When MPRV=0, loads and stores behave as normal, using the translation and
+    /// protection mechanisms of the current privilege mode. When MPRV=1, load and store memory
+    /// addresses are translated and protected, and endianness is applied,
+    /// as though the current privilege mode were set to MPP.
+    /// Instruction address-translation and protection are unaffected by the setting of MPRV
+    pub fn effective_translation_hart_mode(&self, access_type: &AccessType) -> Mode {
+        let mstatus = self.hart.csregisters.read(CSRegister::mstatus);
+        if xstatus::get_MPRV(mstatus)
+            && (access_type == &AccessType::Store || access_type == &AccessType::Load)
+        {
+            xstatus::get_MPP(mstatus).into()
+        } else {
+            self.hart.mode.read()
+        }
+    }
+
     /// Get the effective translation mode when addressing memory.
     /// [`None`] represents that either `SATP.mode` is a reserved / not implemented mode or
     /// that the system is in `Machine` mode in which case translation is ignored.
-    pub fn effective_translation_mode(&self) -> Option<TranslationAlgorithm> {
+    pub fn effective_translation_alg(
+        &self,
+        access_type: &AccessType,
+    ) -> Option<TranslationAlgorithm> {
         // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
         //    The satp register must be active, i.e.,
         //    the effective privilege mode must be S-mode or U-mode.
-        match self.hart.mode.read() {
+        let mode = self.effective_translation_hart_mode(access_type);
+
+        match mode {
             Mode::User | Mode::Supervisor => (),
             Mode::Machine => return None,
         };
@@ -204,7 +229,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         v_addr: Address,
         access_type: AccessType,
     ) -> Result<Address, Exception> {
-        let mode = self.effective_translation_mode();
+        let mode = self.effective_translation_alg(&access_type);
 
         match mode {
             // An invalid mode should not be writable, but it is treated as BARE

@@ -282,7 +282,9 @@ impl<'a> DebuggerApp<'a> {
     }
 
     fn update_translation_after_step(&mut self, faulting: bool) {
-        let effective_mode = self.interpreter.effective_translation_mode();
+        let effective_mode = self
+            .interpreter
+            .effective_translation_alg(&AccessType::Instruction);
         let satp_val = self.interpreter.read_csregister(CSRegister::satp);
         self.state
             .translation

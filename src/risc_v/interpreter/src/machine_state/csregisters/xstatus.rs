@@ -16,7 +16,10 @@ use super::{
     fields::{FieldProps, FieldValue},
     ones,
 };
-use crate::{create_field, machine_state::csregisters::CSRValue};
+use crate::{
+    create_field,
+    machine_state::{csregisters::CSRValue, mode::Mode},
+};
 
 /// Field in `mstatus` for a boolean value
 impl FieldValue for bool {
@@ -35,6 +38,16 @@ pub enum MPPValue {
     User = 0b00,
     Supervisor = 0b01,
     Machine = 0b11,
+}
+
+impl From<MPPValue> for Mode {
+    fn from(other: MPPValue) -> Mode {
+        match other {
+            MPPValue::User => Mode::User,
+            MPPValue::Supervisor => Mode::Supervisor,
+            MPPValue::Machine => Mode::Machine,
+        }
+    }
 }
 
 impl FieldValue for MPPValue {

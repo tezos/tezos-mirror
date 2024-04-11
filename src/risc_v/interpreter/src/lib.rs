@@ -165,8 +165,11 @@ impl<'a> Interpreter<'a> {
         self.handle_step_result(result, max, should_continue)
     }
 
-    pub fn effective_translation_mode(&self) -> Option<TranslationAlgorithm> {
-        self.machine_state.effective_translation_mode()
+    pub fn effective_translation_alg(
+        &self,
+        access_type: &AccessType,
+    ) -> Option<TranslationAlgorithm> {
+        self.machine_state.effective_translation_alg(access_type)
     }
 
     pub fn read_xregister(&self, reg: XRegister) -> u64 {
