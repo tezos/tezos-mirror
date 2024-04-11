@@ -9,7 +9,7 @@ module Cloud : sig
   type t
 
   (** A wrapper around [Test.register] that can be used to register new tests
-      using VMs provided as a map index by name. Each VM is abstracted via
+      using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module. *)
   val register :
     ?vms:int ->
@@ -36,16 +36,15 @@ module Cloud : sig
   type target = {agent : Agent.t; port : int; app_name : string}
 
   (** [add_prometheus_source ?metric_path ~job_name targets] allows to add a new
-              source of metrics that Prometheus can scrap. By default
-              [metric_path] is [/metrics]. [job_name] is just the name to give
-              for the job that will scrap the metrics. It must be unique. A
-              target enables to define a list of points to scrap. Each point can
-              have a name defined by [app_name]. *)
+      source of metrics that Prometheus can scrap. By default [metric_path] is
+      [/metrics]. [job_name] is just the name to give for the job that will
+      scrap the metrics. It must be unique. A target enables to define a list of
+      points to scrap. Each point can have a name defined by [app_name]. *)
   val add_prometheus_source :
     t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
 end
 
-(* [register ~tags] register a set of jobs that can be used for setting
+(** [register ~tags] register a set of jobs that can be used for setting
    requirements related to cloud scenarios. Some tags can be given for all the
    registered jobs. *)
 val register : tags:string list -> unit

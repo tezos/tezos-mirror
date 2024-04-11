@@ -138,8 +138,10 @@ module VM = struct
         (chdir Path.terraform_vm @ ["output"; "-json"])
     in
     let json = JSON.parse ~origin:"VM.machine_type" output in
-    let zone = JSON.(json |-> "machine_type" |-> "value" |> as_string) in
-    Lwt.return zone
+    let machine_type =
+      JSON.(json |-> "machine_type" |-> "value" |> as_string)
+    in
+    Lwt.return machine_type
 
   let destroy () =
     let* project_id = Gcloud.project_id () in
