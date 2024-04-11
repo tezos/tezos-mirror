@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 20.0~rc1 (TBD)"
+    "version": "Octez 20.0~rc1 (e38cf666)"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -747,9 +747,11 @@
                         },
                         "max_active_rpc_connections": {
                           "description": "The maximum number of active connections per RPC endpoint.",
-                          "type": "integer",
-                          "minimum": -1073741824,
-                          "maximum": 1073741823
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/max_active_rpc_connections"
+                            }
+                          ]
                         }
                       }
                     },
@@ -1291,41 +1293,7 @@
                                   "type": "boolean"
                                 },
                                 "use_mock_srs_for_testing": {
-                                  "nullable": true,
-                                  "oneOf": [
-                                    {
-                                      "title": "Some",
-                                      "type": "object",
-                                      "properties": {
-                                        "redundancy_factor": {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 255
-                                        },
-                                        "page_size": {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 65535
-                                        },
-                                        "slot_size": {
-                                          "type": "integer",
-                                          "minimum": -1073741824,
-                                          "maximum": 1073741823
-                                        },
-                                        "number_of_shards": {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 65535
-                                        }
-                                      },
-                                      "required": [
-                                        "redundancy_factor",
-                                        "page_size",
-                                        "slot_size",
-                                        "number_of_shards"
-                                      ]
-                                    }
-                                  ]
+                                  "type": "boolean"
                                 },
                                 "bootstrap_peers": {
                                   "type": "array",
@@ -1490,41 +1458,7 @@
                       "type": "boolean"
                     },
                     "use_mock_srs_for_testing": {
-                      "nullable": true,
-                      "oneOf": [
-                        {
-                          "title": "Some",
-                          "type": "object",
-                          "properties": {
-                            "redundancy_factor": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 255
-                            },
-                            "page_size": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 65535
-                            },
-                            "slot_size": {
-                              "type": "integer",
-                              "minimum": -1073741824,
-                              "maximum": 1073741823
-                            },
-                            "number_of_shards": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 65535
-                            }
-                          },
-                          "required": [
-                            "redundancy_factor",
-                            "page_size",
-                            "slot_size",
-                            "number_of_shards"
-                          ]
-                        }
-                      ]
+                      "type": "boolean"
                     },
                     "bootstrap_peers": {
                       "type": "array",
@@ -7379,6 +7313,34 @@
                               "required": [
                                 "rc_dev"
                               ]
+                            },
+                            {
+                              "title": "Beta",
+                              "type": "object",
+                              "properties": {
+                                "beta": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              },
+                              "required": [
+                                "beta"
+                              ]
+                            },
+                            {
+                              "title": "Beta_dev",
+                              "type": "object",
+                              "properties": {
+                                "beta_dev": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              },
+                              "required": [
+                                "beta_dev"
+                              ]
                             }
                           ]
                         }
@@ -10001,6 +9963,27 @@
         "title": "64 bit integers",
         "description": "Decimal representation of 64 bit integers",
         "type": "string"
+      },
+      "max_active_rpc_connections": {
+        "title": "max_active_rpc_connections",
+        "description": "The maximum alowed number of RPC connections",
+        "oneOf": [
+          {
+            "title": "unlimited",
+            "description": "There is not limit of the number of RPC connections allowed.",
+            "type": "string",
+            "enum": [
+              "unlimited"
+            ]
+          },
+          {
+            "title": "limited",
+            "description": "The number of maximum RPC connections allowed is limited to the given integer's value.",
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          }
+        ]
       },
       "mempool": {
         "description": "A batch of operation. This format is used to gossip operations between peers.",

@@ -5,8 +5,7 @@ Version 20 contains a new version (V12) of the protocol environment,
 which is the set of functions that a protocol can call.
 This new version is used by the :doc:`Paris <../protocols/019_paris>`,
 protocol proposal for the successor of Oxford.
-This release contains the Paris A protocol proposal itself, as well as its associated protocol-specific executable binaries (baker, accuser, etc).
-The stable release 20.0 will contain the protocol selected by the ongoing vote, i.e., Paris A or Paris B.
+This release contains the Paris B protocol proposal itself, as well as its associated protocol-specific executable binaries (baker, accuser, etc).
 
 Note that the binaries associated to the Nairobi protocol have been removed as this protocol is now unactive.
 
@@ -64,6 +63,7 @@ Starting from Octez v20, a distribution of packages are provided along with each
 - Debian Linux
 - Fedora Linux
 - Rocky Linux
+- Ubuntu
 
 You may now install binaries by downloading their packages from the `Octez release page
 <https://gitlab.com/tezos/tezos/-/releases>`__, browsing to your distribution
