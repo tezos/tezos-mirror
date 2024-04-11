@@ -268,9 +268,11 @@ docker:amd64:master:
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker manifest create ${CI_REGISTRY_IMAGE}/server:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 arm64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/server-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
+    # - docker manifest create ${CI_REGISTRY_IMAGE}/server:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 arm64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/server-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
+    - docker manifest create ${CI_REGISTRY_IMAGE}/server:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/server-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
     - docker manifest push ${CI_REGISTRY_IMAGE}/server:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
-    - docker manifest create ${CI_REGISTRY_IMAGE}/archiver:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 arm64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/archiver-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
+    # - docker manifest create ${CI_REGISTRY_IMAGE}/archiver:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 arm64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/archiver-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
+    - docker manifest create ${CI_REGISTRY_IMAGE}/archiver:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG} `for i in amd64 ; do echo "--amend ${CI_REGISTRY_IMAGE}/archiver-$i:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}" ; done`
     - docker manifest push ${CI_REGISTRY_IMAGE}/archiver:${OCTEZ_BRANCH}-${CI_COMMIT_TAG:=$CI_COMMIT_REF_SLUG}
   rules:
     - if: $CI_REGISTRY_IMAGE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -317,8 +319,8 @@ manifest:octez-v20.0-rc1:
   needs:
     - job: "docker:amd64:octez-v20.0-rc1"
       artifacts: false
-    - job: "docker:arm64:octez-v20.0-rc1"
-      artifacts: false
+    # - job: "docker:arm64:octez-v20.0-rc1"
+    #   artifacts: false
   variables:
     OCTEZ_BRANCH: "octez-v20.0-rc1"
 
