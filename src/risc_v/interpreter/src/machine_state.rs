@@ -508,6 +508,12 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Instr::CAddw(args) => run_cr_type_instr!(self, instr, args, run_caddw),
             Instr::CSubw(args) => run_cr_type_instr!(self, instr, args, run_csubw),
 
+            // RV64DC compressed instructions
+            Instr::CFld(args) => run_load_instr!(self, instr, args, run_cfld),
+            Instr::CFldsp(args) => run_ci_load_sp_instr!(self, instr, args, run_cfldsp),
+            Instr::CFsd(args) => run_store_instr!(self, instr, args, run_cfsd),
+            Instr::CFsdsp(args) => run_css_instr!(self, instr, args, run_cfsdsp),
+
             Instr::Unknown { instr: _ } => Err(Exception::IllegalInstruction),
             Instr::UnknownCompressed { instr: _ } => Err(Exception::IllegalInstruction),
         }

@@ -13,6 +13,7 @@ pub mod rv32m;
 pub mod rv64a;
 pub mod rv64c;
 pub mod rv64d;
+pub mod rv64dc;
 pub mod rv64f;
 pub mod rv64i;
 pub mod rv64m;

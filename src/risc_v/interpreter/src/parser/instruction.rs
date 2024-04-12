@@ -206,8 +206,20 @@ pub struct CIBTypeArgs {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CIBDTypeArgs {
+    pub rd_rs1: FRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct CSSTypeArgs {
     pub rs2: XRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CSSDTypeArgs {
+    pub rs2: FRegister,
     pub imm: i64,
 }
 
@@ -444,6 +456,12 @@ pub enum Instr {
     CSdsp(CSSTypeArgs),
     CAddiw(CIBTypeArgs),
 
+    // RV64DC compressed instructions
+    CFld(FLoadArgs),
+    CFldsp(CIBDTypeArgs),
+    CFsd(FStoreArgs),
+    CFsdsp(CSSDTypeArgs),
+
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
 }
@@ -653,6 +671,10 @@ impl Instr {
             | CSd(_)
             | CSdsp(_)
             | CAddiw(_)
+            | CFld(_)
+            | CFldsp(_)
+            | CFsd(_)
+            | CFsdsp(_)
             | UnknownCompressed { instr: _ } => 2,
         }
     }
@@ -1103,6 +1125,12 @@ impl fmt::Display for Instr {
             CAddiw(args) => ci_instr!(f, "c.addiw", args),
             CAddw(args) => cr_instr!(f, "c.addw", args),
             CSubw(args) => cr_instr!(f, "c.subw", args),
+
+            // RV64DC compressed instructions
+            CFld(args) => write!(f, "c.fld {},{}({})", args.rd, args.imm, args.rs1),
+            CFldsp(args) => c_instr_sp!(f, "c.fldsp", args),
+            CFsd(args) => write!(f, "c.fsd {},{}({})", args.rs2, args.imm, args.rs1),
+            CFsdsp(args) => cs_instr_sp!(f, "c.fsdsp", args),
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
