@@ -121,8 +121,8 @@ redirectcheck:
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) paris
 	$(CHECKXREFS) oxford
+	$(CHECKXREFS) -l paris
 	$(CHECKXREFS) -l alpha
 
 installcheck:
