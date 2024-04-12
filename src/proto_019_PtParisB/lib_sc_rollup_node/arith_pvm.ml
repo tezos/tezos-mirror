@@ -63,6 +63,16 @@ module Impl : Pvm_sig.S = struct
       raise (Invalid_argument "No durable storage for arith PVM")
   end
 
+  module Unsafe_patches = struct
+    (** No unsafe patches for the arith PVM. *)
+    type t = |
+
+    let of_patch (p : Pvm_patches.unsafe_patch) =
+      match p with Increase_max_nb_ticks _ -> assert false
+
+    let apply _state (x : t) = match x with _ -> .
+  end
+
   let new_dissection = Game_helpers.default_new_dissection
 
   let string_of_status = function
