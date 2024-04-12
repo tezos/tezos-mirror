@@ -395,7 +395,15 @@ module Handler = struct
     List.iter_es
       (fun commitment ->
         let*! () = Event.(emit removed_slot_shards commitment) in
-        Store.Shards.remove store.shards commitment)
+        let* () = Store.Shards.remove store.shards commitment in
+        let*! () = Event.(emit removed_slot commitment) in
+        let* () =
+          Store.Slots.remove_slot_by_commitment
+            store.slots
+            ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+            commitment
+        in
+        return_unit)
       commitments
 
   let process_block ctxt cctxt (module Plugin : Dal_plugin.T) plugin_proto
