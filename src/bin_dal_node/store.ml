@@ -224,6 +224,9 @@ module Slots = struct
     | Ok slot -> return_some slot
     | Error [KVS.Missing_stored_kvs_data _] -> return_none
     | Error err -> fail @@ `Decoding_failed (data_kind, err)
+
+  let remove_slot_by_commitment t ~slot_size commitment =
+    KVS.remove_file t file_layout (commitment, slot_size)
 end
 
 module Shard_proofs_cache =
