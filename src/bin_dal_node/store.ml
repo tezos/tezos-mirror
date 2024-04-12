@@ -395,40 +395,6 @@ module Legacy = struct
     end
   end
 
-  let associate_slot_id_with_commitment node_store commitment slot_id =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
-       Improve the implementation of this handler.
-    *)
-    let open Lwt_syntax in
-    let store = node_store.store in
-    let header_path = Path.Commitment.header commitment slot_id in
-    let levels_path = Path.Level.other_header_status slot_id commitment in
-    let* known_levels = Irmin.mem store levels_path in
-    let* known_header = Irmin.mem store header_path in
-    (* An invariant that should hold for the storage. *)
-    assert (known_levels = known_header) ;
-    if known_levels then return_unit
-    else
-      (* The path allows to reconstruct the data. *)
-      let* () =
-        set
-          ~msg:
-            (Path.to_string
-               ~prefix:"associate_slot_id_with_commitment:"
-               header_path)
-          store
-          header_path
-          ""
-      in
-      set
-        ~msg:
-          (Path.to_string
-             ~prefix:"associate_slot_id_with_commitment:"
-             levels_path)
-        store
-        levels_path
-        (encode_header_status `Unseen_or_not_finalized)
-
   let add_slot_headers ~number_of_slots ~block_level slot_headers node_store =
     let module SI = Set.Make (Int) in
     let open Lwt_result_syntax in

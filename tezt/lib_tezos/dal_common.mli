@@ -174,11 +174,6 @@ module RPC : sig
         in case of success. *)
   val post_commitment : Helpers.slot -> commitment RPC_core.t
 
-  (** Call RPC "PATCH /commitments" to associate the given level and index to the slot
-        whose commitment is given. *)
-  val patch_commitment :
-    commitment -> slot_level:int -> slot_index:int -> unit RPC_core.t
-
   (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
         content associated with the given commitment. *)
   val get_commitment_slot : commitment -> Helpers.slot RPC_core.t

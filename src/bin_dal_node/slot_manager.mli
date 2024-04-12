@@ -47,19 +47,6 @@ val add_commitment :
   Cryptobox.t ->
   (Cryptobox.commitment, [Errors.decoding | Errors.other]) result Lwt.t
 
-(** [associate_slot_id_with_commitment node_store cryptobox commitment slot_id]
-    associates a [slot_id] to a [commitment] in [node_store].
-
-    In addition to decoding errors, the function returns [`Not_found]
-    if there is no entry for [commitment] in [node_store].
-*)
-val associate_slot_id_with_commitment :
-  Store.t ->
-  Cryptobox.t ->
-  Cryptobox.commitment ->
-  Types.slot_id ->
-  (unit, [Errors.decoding | Errors.not_found]) result Lwt.t
-
 (** [get_commitment_slot node_store cryptobox commitment] returns the slot
     content associated with the given [commitment] in [node_store].
 

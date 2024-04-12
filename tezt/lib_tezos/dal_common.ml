@@ -219,17 +219,6 @@ module Dal_RPC = struct
           ( json |-> "commitment" |> as_string,
             json |-> "commitment_proof" |> as_string ))
 
-  let patch_commitment commitment ~slot_level ~slot_index =
-    let data : RPC_core.data =
-      Data
-        (`O
-          [
-            ("slot_level", `Float (float_of_int slot_level));
-            ("slot_index", `Float (float_of_int slot_index));
-          ])
-    in
-    make ~data PATCH ["commitments"; commitment] as_empty_object_or_fail
-
   let get_commitment_slot commitment =
     make GET ["commitments"; commitment; "slot"] get_bytes_from_json_string_node
 
