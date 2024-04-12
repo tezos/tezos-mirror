@@ -77,7 +77,7 @@ let set_ready baker =
   trigger_ready baker (Some ())
 
 let handle_raw_stdout baker line =
-  if line =~ rex "^Baker v.+ for .+ started.$" then set_ready baker
+  if line =~ rex "^Baker .+ for .+ started.$" then set_ready baker
 
 let liquidity_baking_votefile ?path vote =
   let votefile =
