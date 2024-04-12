@@ -70,8 +70,8 @@ let find_trusted_setup_files ?(getenv_opt = Sys.getenv_opt)
     @ ["/usr/local/share/dal-trusted-setup"; "/usr/share/dal-trusted-setup"]
   in
   (* Files we are looking for. *)
-  let g1_file = "srs_zcash_g1" in
-  let g2_file = "srs_zcash_g2" in
+  let g1_file = "srsu_zcash_g1" in
+  let g2_file = "srsu_zcash_g2" in
   (* Find the first candidate directory that contains the expected files. *)
   let contains_trusted_setup_files directory =
     file_exists (directory // g1_file) && file_exists (directory // g2_file)

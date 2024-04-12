@@ -796,27 +796,33 @@ module Test = struct
       {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
     in
     let find_srs_files () : (string * string) Error_monad.tzresult =
-      Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
+      Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
     Lwt_main.run
       (Cryptobox.Config.init_prover_dal ~find_srs_files ~srs_size_log2:5 config)
     |> function
     | Ok () -> ()
-    | Error _ -> assert false
+    | Error err ->
+        Format.eprintf "%a\n%!" Error_monad.pp_print_trace err ;
+        assert false
 
   let find_trusted_setup_files_failure () =
     let config : Cryptobox.Config.t =
       {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
     in
     let find_srs_files () : (string * string) Error_monad.tzresult =
-      Ok (path "srs_zcash_g1_5", path "srs_zcash_g2_5")
+      Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
-    Lwt_main.run
-      (Cryptobox.Config.init_prover_dal ~find_srs_files ~srs_size_log2:6 config)
+    Lwt_main.run (Cryptobox.Config.init_prover_dal ~find_srs_files config)
     |> function
     | Error [Cryptobox.Failed_to_load_trusted_setup s] ->
-        if Re.Str.(string_match (regexp "EOF") s 0) then () else assert false
-    | _ -> assert false
+        if
+          Re.Str.(string_match (regexp "EOF") s 0)
+          || Re.Str.(string_match (regexp ".*Unexpected srs size.*") s 0)
+        then ()
+        else assert false
+    | Error _ -> assert false
+    | Ok _ -> assert false
 
   let test_wrong_slot_size =
     let open QCheck2 in

@@ -54,8 +54,8 @@ val ensure_srs_validity :
 
 exception Failed_to_load_trusted_setup of string
 
-(** Returns SRS₁ of size [len] (by default, 2²¹) read from the file given by
-   [path]. May raise [Failed_to_load_trusted_setup] exception *)
+(** Returns {m SRS_{1}} of size [len] (by default, {m 2^{21}}) read from the
+    file given by [path]. May raise [Failed_to_load_trusted_setup] exception *)
 val read_srs :
   ?len:int ->
   srs_g1_path:string ->
@@ -63,6 +63,18 @@ val read_srs :
   unit ->
   ( Kzg.Bls.Srs_g1.t * Kzg.Bls.Srs_g2.t,
     [> `End_of_file of string | `Invalid_point of int] )
+  result
+  Lwt.t
+
+(** Returns {m SRS_{1}} of size [len] (by default, {m 2^{21}}) read from the
+    file given by [path]. May raise [Failed_to_load_trusted_setup] exception *)
+val read_uncompressed_srs :
+  ?len:int ->
+  srsu_g1_path:string ->
+  srsu_g2_path:string ->
+  unit ->
+  ( Kzg.Bls.Srs_g1.t * Kzg.Bls.Srs_g2.t,
+    [> `Close | `Open] Lwt_utils_unix.io_error )
   result
   Lwt.t
 

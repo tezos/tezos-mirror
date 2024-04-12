@@ -69,18 +69,16 @@ let load_parameters parameters =
 
    An integrity check is run to ensure the validity of the files. *)
 (* TODO catch Failed_to_load_trusted_setup *)
-let initialisation_parameters_from_files ~srs_g1_path ~srs_g2_path ~srs_size =
+let initialisation_parameters_from_files ~srsu_g1_path ~srsu_g2_path ~srs_size =
   let open Lwt_syntax in
-  let* srs = Srs.read_srs ~len:srs_size ~srs_g1_path ~srs_g2_path () in
+  let* srs =
+    Srs.read_uncompressed_srs ~len:srs_size ~srsu_g1_path ~srsu_g2_path ()
+  in
   let open Result_syntax in
   Lwt.return
   @@
   match srs with
-  | Error (`End_of_file s) ->
-      tzfail (Failed_to_load_trusted_setup ("EOF: " ^ s))
-  | Error (`Invalid_point p) ->
-      tzfail
-        (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
+  | Error err -> Lwt_utils_unix.tzfail_of_io_error err
   | Ok srs -> return srs
 
 module Inner = struct
@@ -1230,20 +1228,24 @@ module Config = struct
 
   let init_prover_dal ~find_srs_files ?(srs_size_log2 = 21) dal_config =
     let open Lwt_result_syntax in
-    if dal_config.activated then
-      let* initialisation_parameters =
-        if dal_config.use_mock_srs_for_testing then
-          return (Internal_for_tests.parameters_initialisation ())
-        else
-          let*? srs_g1_path, srs_g2_path = find_srs_files () in
-          let* srs_g1, srs_g2 =
-            initialisation_parameters_from_files
-              ~srs_g1_path
-              ~srs_g2_path
-              ~srs_size:(1 lsl srs_size_log2)
+    Lwt.catch
+      (fun () ->
+        if dal_config.activated then
+          let* initialisation_parameters =
+            if dal_config.use_mock_srs_for_testing then
+              return (Internal_for_tests.parameters_initialisation ())
+            else
+              let*? srsu_g1_path, srsu_g2_path = find_srs_files () in
+              let* srs_g1, srs_g2 =
+                initialisation_parameters_from_files
+                  ~srsu_g1_path
+                  ~srsu_g2_path
+                  ~srs_size:(1 lsl srs_size_log2)
+              in
+              return (Prover {is_fake = false; srs_g1; srs_g2})
           in
-          return (Prover {is_fake = false; srs_g1; srs_g2})
-      in
-      Lwt.return (load_parameters initialisation_parameters)
-    else return_unit
+          Lwt.return (load_parameters initialisation_parameters)
+        else return_unit)
+      (fun exn ->
+        tzfail (Failed_to_load_trusted_setup (Printexc.to_string exn)))
 end
