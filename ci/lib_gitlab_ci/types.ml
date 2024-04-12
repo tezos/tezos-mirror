@@ -22,7 +22,10 @@ type time_interval =
 
 type expiration = Duration of time_interval | Never
 
-(** Represents values of the [when:] field in job rules. *)
+(** Represents values of the [when:] field in job rules.
+
+    Note: [Delayed] jobs only run if their dependencies (or subsequent
+    stages for jobs that have no [needs:]) passed. *)
 type when_ = Always | Never | On_success | Manual | Delayed of time_interval
 
 (** Represents values of the [when:] field of jobs. *)
