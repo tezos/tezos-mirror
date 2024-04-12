@@ -8314,7 +8314,7 @@ oc.docker:arm64:
   when: manual
 
 oc.build:dpkg:amd64:
-  image: debian:bookworm
+  image: $DISTRIBUTION
   stage: manual
   tags:
   - gcp
@@ -8351,7 +8351,7 @@ oc.build:dpkg:amd64:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - $DISTRIBUTION/octez-*.deb
+    - packages/
     when: on_success
   parallel:
     matrix:
@@ -8360,7 +8360,7 @@ oc.build:dpkg:amd64:
       - ubuntu:focal
 
 oc.build:rpm:amd64:
-  image: fedora:39
+  image: $DISTRIBUTION
   stage: manual
   tags:
   - gcp
@@ -8394,7 +8394,7 @@ oc.build:rpm:amd64:
     name: ${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - $DISTRIBUTION/octez-*.rpm
+    - packages/
     when: on_success
   parallel:
     matrix:
