@@ -657,7 +657,7 @@ val bake_until_level :
   be different from the target cycle if the "blocks_per_cycle" value changes
   during the execution, for instance because of a protocol migration.
 
-  Fail if the node is already at [target_cycle] or higher. 
+  Fail if the node is already at [target_cycle] or higher.
 
   @param keys See {!bake_for}.
 
