@@ -98,4 +98,17 @@ module type S = sig
         PVM state [state].  *)
     val lookup : state -> string list -> bytes option Lwt.t
   end
+
+  (** Expose unsafe state patching functions for manual intervention.
+      At the moment this feature is only used to increase the maximum number of
+      ticks of the WASM PVM in a non refutable setting.  *)
+  module Unsafe_patches : sig
+    type t
+
+    (** [of_patch p] returns the PVM patch if it has a corresponding one. *)
+    val of_patch : Pvm_patches.unsafe_patch -> t tzresult
+
+    (** [apply state patch] applies the unsafe patch [patch] on the state. *)
+    val apply : state -> t -> state Lwt.t
+  end
 end
