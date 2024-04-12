@@ -130,8 +130,11 @@ module RPC_legacy : sig
 
   type remote_uri_provider = Endpoint.t
 
-  (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
-  val slot_pages : string -> string list RPC_core.t
+  (** [level_slot_pages ~published_level ~slot_index] gets the pages
+      of the slot published at level [published_level] on slot index
+      [slot_index]. *)
+  val level_slot_pages :
+    published_level:int -> slot_index:int -> string list RPC_core.t
 end
 
 module RPC : sig

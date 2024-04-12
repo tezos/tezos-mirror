@@ -1248,7 +1248,9 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node client
   let* _ =
     Dal_RPC.(call dal_node @@ get_published_level_headers published_level)
   in
-  let* pages = Dal_RPC.(call dal_node @@ slot_pages slot_commitment) in
+  let* pages =
+    Dal_RPC.(call dal_node @@ level_slot_pages ~published_level ~slot_index)
+  in
   Check.(
     slot_content = Helpers.(content_of_slot @@ slot_of_pages ~slot_size pages))
     Check.string
@@ -2150,9 +2152,12 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
           (index + 1 = slot_index)
             int
             ~error_msg:"unexpected slot index (current = %L, expected = %R)") ;
-        let slot_commitment = List.nth commitments slot_index in
         let* slot_pages =
-          Dal_RPC.(call dal_node @@ slot_pages slot_commitment)
+          Dal_RPC.(
+            call dal_node
+            @@ level_slot_pages
+                 ~published_level:slots_published_level
+                 ~slot_index)
         in
         let relevant_page = List.nth slot_pages 0 in
         let confirmed_slot_content =
