@@ -1717,6 +1717,12 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
        expected = %R)" ;
   return ()
 
+let test_dal_node_rpc_list _protocol _parameters _cryptobox _node client
+    dal_node =
+  let endpoint = Client.Foreign_endpoint (Dal_node.as_rpc_endpoint dal_node) in
+  let* (_ : string) = Client.rpc_list ~hooks ~endpoint client in
+  unit
+
 let commitment_of_slot cryptobox slot =
   let polynomial =
     Cryptobox.polynomial_from_slot
@@ -6368,6 +6374,12 @@ let register ~protocols =
     ~producer_profiles:[0]
     "dal node shard fetching and slot reconstruction"
     test_dal_node_rebuild_from_shards
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["rpc"]
+    ~regression:true
+    "dal node list RPCs"
+    test_dal_node_rpc_list
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]
