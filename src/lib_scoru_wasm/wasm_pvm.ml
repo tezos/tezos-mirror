@@ -352,7 +352,22 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
     let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
     Wasm_vm.get_wasm_version pvm
 
+  module Unsafe = struct
+    let get_max_nb_ticks tree =
+      let open Lwt_syntax in
+      let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      pvm_state.max_nb_ticks
+
+    let set_max_nb_ticks n tree =
+      let open Lwt_syntax in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let pvm_state = {pvm_state with max_nb_ticks = n} in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+  end
+
   module Internal_for_tests = struct
+    include Unsafe
+
     let get_tick_state tree =
       let open Lwt_syntax in
       let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
@@ -372,12 +387,6 @@ module Make_pvm (Wasm_vm : Wasm_vm_sig.S) (T : Tezos_tree_encoding.TREE) :
       match pvm.tick_state with
       | Stuck error -> Lwt.return_some error
       | _ -> Lwt.return_none
-
-    let set_max_nb_ticks n tree =
-      let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
-      let pvm_state = {pvm_state with max_nb_ticks = n} in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
     let set_maximum_reboots_per_input n tree =
       let open Lwt_syntax in
