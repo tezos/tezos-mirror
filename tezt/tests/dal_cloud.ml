@@ -639,7 +639,8 @@ let init_baker cloud (configuration : configuration) ~bootstrap_node
   in
   Lwt.return {node; dal_node; baker; account; stake}
 
-let init_producer cloud ~bootstrap_node ~dal_bootstrap_node account i agent =
+let init_producer cloud ~bootstrap_node ~dal_bootstrap_node ~number_of_slots
+    account i agent =
   let* node =
     Node.Agent.init
       ~name:(Format.asprintf "producer-node-%i" i)
@@ -667,7 +668,7 @@ let init_producer cloud ~bootstrap_node ~dal_bootstrap_node account i agent =
   let* () =
     Dal_node.init_config
       ~expected_pow:0.
-      ~producer_profiles:[i]
+      ~producer_profiles:[i mod number_of_slots]
       ~peers:[Dal_node.point_str dal_bootstrap_node]
       dal_node
   in
@@ -714,6 +715,8 @@ let init ~configuration cloud next_agent =
           agent)
       (List.combine attesters_agents baker_accounts)
   in
+  let client = Client.create ~endpoint:(Node bootstrap.node) () in
+  let* parameters = Dal_common.Parameters.from_client client in
   let* producers =
     Lwt_list.mapi_p
       (fun i (agent, account) ->
@@ -721,13 +724,12 @@ let init ~configuration cloud next_agent =
           cloud
           ~bootstrap_node:bootstrap.node
           ~dal_bootstrap_node:bootstrap.dal_node
+          ~number_of_slots:parameters.number_of_slots
           account
           i
           agent)
       (List.combine producers_agents producer_accounts)
   in
-  let client = Client.create ~endpoint:(Node bootstrap.node) () in
-  let* parameters = Dal_common.Parameters.from_client client in
   let infos = Hashtbl.create 101 in
   let metrics = Hashtbl.create 101 in
   Hashtbl.replace metrics 1 default_metrics ;
@@ -837,7 +839,7 @@ let benchmark () =
           (* We give to the [init] function a sequence of agents (and cycle if
              they were all consumed). We set their name only if the number of
              agents is the computed one. Otherwise, the user has mentioned
-             explicitely a reduce number of agents and it is not clear how to give
+             explicitely a reduced number of agents and it is not clear how to give
              them proper names. *)
           let set_name agent name =
             if List.length agents = vms then
