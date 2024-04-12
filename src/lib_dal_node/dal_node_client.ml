@@ -50,8 +50,13 @@ let call (cctxt : #cctxt) = cctxt#call_service
 let get_slot cctxt header =
   call cctxt Services.get_commitment_slot ((), header) () ()
 
-let get_slot_pages cctxt header =
-  call cctxt Services.slot_pages ((), header) () ()
+let get_slot_pages cctxt (slot_id : Types.slot_id) =
+  call
+    cctxt
+    Services.slot_pages
+    (((), slot_id.slot_level), slot_id.slot_index)
+    ()
+    ()
 
 let get_page_proof cctxt page_index slot_data =
   call cctxt Services.get_page_proof ((), page_index) () slot_data

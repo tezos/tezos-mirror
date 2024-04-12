@@ -26,10 +26,27 @@
 
 open Tezos_dal_node_services
 
-let handle_slot_pages ctxt (_, commitment) () () =
+let handle_slot_pages ctxt (((), level), slot_index) () () =
   let open Lwt_result_syntax in
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
-  Slot_manager.get_slot_pages cryptobox (Node_context.get_store ctxt) commitment
+  let node_store = Node_context.get_store ctxt in
+  let*! res =
+    Slot_manager.get_commitment_by_published_level_and_index
+      ~level
+      ~slot_index
+      node_store
+  in
+  match res with
+  | Ok commitment ->
+      let* pages =
+        Slot_manager.get_slot_pages cryptobox node_store commitment
+      in
+      return_some pages
+  | Error `Not_found -> return_none
+  | Error (`Decoding_failed _) as res -> Errors.to_tzresult (Lwt.return res)
 
 let register_show_slot_pages ctxt dir =
-  Tezos_rpc.Directory.register dir Services.slot_pages (handle_slot_pages ctxt)
+  Tezos_rpc.Directory.opt_register
+    dir
+    Services.slot_pages
+    (handle_slot_pages ctxt)
