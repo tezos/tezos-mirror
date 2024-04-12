@@ -688,7 +688,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
   let parallel =
     let distributions =
       match target with
-      | Dpkg -> ["debian:bookworm"; "ubuntu:focal"]
+      | Dpkg -> ["debian:bookworm"; "ubuntu:focal"; "ubuntu:jammy"]
       | Rpm -> ["fedora:39"; "rockylinux:9.3"]
     in
     Matrix [[("DISTRIBUTION", distributions)]]
@@ -706,6 +706,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       (match target with
       | Dpkg ->
           [
+            "export DEBIAN_FRONTEND=noninteractive";
             "apt update";
             "apt-get install -y rsync git m4 build-essential patch unzip wget \
              opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev \
