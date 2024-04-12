@@ -375,7 +375,7 @@ module Cli = struct
         Option.value ~default:configuration.cors_origins cors_origins;
       cors_headers =
         Option.value ~default:configuration.cors_headers cors_headers;
-      log_filter = Option.value ~default:default_filter_config log_filter;
+      log_filter = Option.value ~default:configuration.log_filter log_filter;
       proxy = Option.either configuration.proxy proxy;
       sequencer = Option.either configuration.sequencer sequencer;
       observer = Option.either configuration.observer observer;
