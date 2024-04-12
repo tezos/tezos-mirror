@@ -416,16 +416,16 @@ module Legacy = struct
             Types.Slot_id.{slot_level = published_level; slot_index}
           in
           let header_path = Path.Commitment.header commitment index in
-          let*! () =
-            set
-              ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
-              slots_store
-              header_path
-              ""
-          in
           let others_path = Path.Level.other_header_status index commitment in
           match status with
           | Dal_plugin.Succeeded ->
+              let*! () =
+                set
+                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
+                  slots_store
+                  header_path
+                  ""
+              in
               let commitment_path =
                 Path.Level.accepted_header_commitment index
               in
@@ -456,15 +456,7 @@ module Legacy = struct
                   (encode_header_status `Waiting_attestation)
               in
               return (SI.add slot_index waiting)
-          | Dal_plugin.Failed ->
-              let*! () =
-                set
-                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                  slots_store
-                  others_path
-                  (encode_header_status `Not_selected)
-              in
-              return waiting)
+          | Dal_plugin.Failed -> return waiting)
         SI.empty
         slot_headers
     in
