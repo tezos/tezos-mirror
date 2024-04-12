@@ -545,6 +545,11 @@ module Helpers = struct
     |> List.filter (fun str -> not (str = String.empty))
     |> String.concat "\000"
 
+  let slot_of_pages ~slot_size pages =
+    let slot = String.concat "" pages in
+    assert (String.length slot = slot_size) ;
+    slot
+
   let pp_cryptobox_error fmt = function
     | `Fail message -> Format.fprintf fmt "Fail: %s" message
     | `Not_enough_shards message ->

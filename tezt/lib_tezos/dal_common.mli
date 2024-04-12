@@ -61,6 +61,11 @@ module Helpers : sig
      by removing the padding. *)
   val content_of_slot : slot -> string
 
+  (** [slot_of_pages ~slot_size pages] produces a slot from a list of
+      pages. The length of the result is checked against the given
+      [slot_size]. *)
+  val slot_of_pages : slot_size:int -> string list -> slot
+
   val make_cryptobox :
     ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 
