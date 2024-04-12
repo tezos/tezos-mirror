@@ -114,9 +114,9 @@ let singleprocess_reorg =
   let error_events =
     [
       "block_validation_inconsistent_cache.v0";
-      "validation_failure_after_precheck.v0";
-      "precheck_failure.v0";
-      "validation_failed.v0";
+      "application_failure_after_validation.v0";
+      "validation_failure.v0";
+      "application_failure.v0";
     ]
   in
   List.iter

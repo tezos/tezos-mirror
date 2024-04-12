@@ -1017,10 +1017,10 @@ let validate_block w ?force hash block operations =
   let* () = assert_fitness_increases ?force w block in
   let* () = assert_checkpoint w (hash, block.Block_header.shell.level) in
   let*! v =
-    Block_validator.precheck_and_apply
+    Block_validator.validate_and_apply
       ~canceler:(Worker.canceler w)
       ~notify_new_block:(notify_new_block w None)
-      ~precheck_and_notify:true
+      ~validate_and_notify:true
       nv.parameters.block_validator
       nv.chain_db
       hash
@@ -1029,7 +1029,7 @@ let validate_block w ?force hash block operations =
   in
   match v with
   | Valid -> return_unit
-  | Invalid errs | Unapplicable_after_precheck errs -> Lwt.return_error errs
+  | Invalid errs | Inapplicable_after_validation errs -> Lwt.return_error errs
 
 let bootstrapped w =
   let state = Worker.state w in

@@ -51,7 +51,7 @@ type _ request =
       predecessor_resulting_context_hash : Context_hash.t;
       operations : Block_validation.operation list list;
       max_operations_ttl : int;
-      should_precheck : bool;
+      should_validate : bool;
       simulate : bool;
     }
       -> Block_validation.result request
@@ -71,7 +71,7 @@ type _ request =
       operations : Block_validation.operation list list;
     }
       -> (Block_header.shell_header * error Preapply_result.t list) request
-  | Precheck : {
+  | Validate : {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;

@@ -119,19 +119,19 @@ let ignoring_invalid_block =
 let ignoring_valid_block =
   declare_2
     ~section
-    ~name:"ignoring_prechecked_block"
-    ~msg:"ignoring prechecked head {hash} from {peer}"
+    ~name:"ignoring_validated_block"
+    ~msg:"ignoring validated head {hash} from {peer}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
     ~pp2:Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
     ("hash", Block_hash.encoding)
 
-let ignoring_prechecked_invalid_block =
+let ignoring_inapplicable_block =
   declare_2
     ~section
-    ~name:"ignoring_prechecked_invalid_block"
-    ~msg:"ignoring invalid block {hash} from {peer}"
+    ~name:"ignoring_inapplicable_block"
+    ~msg:"ignoring inapplicable block {hash} from {peer}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
     ~pp2:Block_hash.pp

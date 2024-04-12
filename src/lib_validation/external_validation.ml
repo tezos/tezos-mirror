@@ -51,7 +51,7 @@ type _ request =
       predecessor_resulting_context_hash : Context_hash.t;
       operations : Block_validation.operation list list;
       max_operations_ttl : int;
-      should_precheck : bool;
+      should_validate : bool;
       simulate : bool;
     }
       -> Block_validation.result request
@@ -71,7 +71,7 @@ type _ request =
       operations : Block_validation.operation list list;
     }
       -> (Block_header.shell_header * error Preapply_result.t list) request
-  | Precheck : {
+  | Validate : {
       chain_id : Chain_id.t;
       predecessor_block_header : Block_header.t;
       predecessor_block_hash : Block_hash.t;
@@ -101,11 +101,11 @@ type _ request =
 
 let request_pp : type a. Format.formatter -> a request -> unit =
  fun ppf -> function
-  | Apply {block_header; chain_id; should_precheck; _} ->
+  | Apply {block_header; chain_id; should_validate; _} ->
       Format.fprintf
         ppf
         "%s %a for chain %a"
-        (if should_precheck then "precheck and apply block" else "apply block")
+        (if should_validate then "validate and apply block" else "apply block")
         Block_hash.pp_short
         (Block_header.hash block_header)
         Chain_id.pp_short
@@ -118,8 +118,8 @@ let request_pp : type a. Format.formatter -> a request -> unit =
         predecessor_hash
         Chain_id.pp_short
         chain_id
-  | Precheck {hash; _} ->
-      Format.fprintf ppf "precheck block %a" Block_hash.pp_short hash
+  | Validate {hash; _} ->
+      Format.fprintf ppf "validate block %a" Block_hash.pp_short hash
   | Commit_genesis {chain_id} ->
       Format.fprintf
         ppf
@@ -225,7 +225,7 @@ let case_apply tag =
        (req
           "operations"
           (list (list (dynamic_size Block_validation.operation_encoding))))
-       (req "should_precheck" bool)
+       (req "should_validate" bool)
        (req "simulate" bool))
     (function
       | Erequest
@@ -239,7 +239,7 @@ let case_apply tag =
               predecessor_resulting_context_hash;
               max_operations_ttl;
               operations;
-              should_precheck;
+              should_validate;
               simulate;
             }) ->
           Some
@@ -251,7 +251,7 @@ let case_apply tag =
               predecessor_resulting_context_hash,
               max_operations_ttl,
               operations,
-              should_precheck,
+              should_validate,
               simulate )
       | _ -> None)
     (fun ( chain_id,
@@ -262,7 +262,7 @@ let case_apply tag =
            predecessor_resulting_context_hash,
            max_operations_ttl,
            operations,
-           should_precheck,
+           should_validate,
            simulate ) ->
       Erequest
         (Apply
@@ -275,7 +275,7 @@ let case_apply tag =
              predecessor_resulting_context_hash;
              max_operations_ttl;
              operations;
-             should_precheck;
+             should_validate;
              simulate;
            }))
 
@@ -361,11 +361,11 @@ let case_preapply tag =
              operations;
            }))
 
-let case_precheck tag =
+let case_validate tag =
   let open Data_encoding in
   case
     tag
-    ~title:"precheck"
+    ~title:"validate"
     (obj7
        (req "chain_id" Chain_id.encoding)
        (req "predecessor_block_header" (dynamic_size Block_header.encoding))
@@ -378,7 +378,7 @@ let case_precheck tag =
           (list (list (dynamic_size Block_validation.operation_encoding)))))
     (function
       | Erequest
-          (Precheck
+          (Validate
             {
               chain_id;
               predecessor_block_header;
@@ -405,7 +405,7 @@ let case_precheck tag =
            hash,
            operations ) ->
       Erequest
-        (Precheck
+        (Validate
            {
              chain_id;
              predecessor_block_header;
@@ -481,7 +481,7 @@ let request_encoding =
           | Erequest (Reconfigure_event_logging c) -> Some c | _ -> None)
         (fun c -> Erequest (Reconfigure_event_logging c));
       case_preapply (Tag 5);
-      case_precheck (Tag 6);
+      case_validate (Tag 6);
       case_context_gc (Tag 7);
       case_context_split (Tag 8);
     ]
@@ -489,7 +489,7 @@ let request_encoding =
 let result_encoding : type a. a request -> a Data_encoding.t = function
   | Apply _ -> Block_validation.result_encoding
   | Preapply _ -> Block_validation.preapply_result_encoding
-  | Precheck _ -> Data_encoding.unit
+  | Validate _ -> Data_encoding.unit
   | Commit_genesis _ -> Context_hash.encoding
   | Fork_test_chain _ -> Block_header.encoding
   | Context_garbage_collection _ -> Data_encoding.unit
