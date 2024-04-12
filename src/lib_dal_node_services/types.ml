@@ -298,8 +298,7 @@ type slot_set = {slots : bool list; published_level : int32}
 
 type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
-type header_status =
-  [`Waiting_attestation | `Attested | `Unattested | `Not_selected]
+type header_status = [`Waiting_attestation | `Attested | `Unattested]
 
 type shard_index = int
 
@@ -377,12 +376,6 @@ let header_status_encoding : header_status Data_encoding.t =
         (obj1 (req "status" (constant "unattested")))
         (function `Unattested -> Some () | _ -> None)
         (function () -> `Unattested);
-      case
-        ~title:"not_selected"
-        (Tag 3)
-        (obj1 (req "status" (constant "not_selected")))
-        (function `Not_selected -> Some () | _ -> None)
-        (function () -> `Not_selected);
     ]
 
 let slot_header_encoding =

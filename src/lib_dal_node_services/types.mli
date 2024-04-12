@@ -219,9 +219,6 @@ type header_status =
   | `Attested  (** The slot header was included in an L1 block and attested. *)
   | `Unattested
     (** The slot header was included in an L1 block but not timely attested. *)
-  | `Not_selected
-    (** The slot header was included in an L1 block but was not selected as
-          the slot header for that slot index. *)
   ]
 
 (** DAL node can track one or many profiles that correspond to various modes
