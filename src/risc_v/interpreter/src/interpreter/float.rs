@@ -530,7 +530,7 @@ impl Display for RoundingMode {
         let res = match self {
             Self::RNE => "rne",
             Self::RTZ => "rtz",
-            Self::RDN => "rne",
+            Self::RDN => "rdn",
             Self::RUP => "rup",
             Self::RMM => "rmm",
         };
