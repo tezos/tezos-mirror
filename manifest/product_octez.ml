@@ -3251,7 +3251,6 @@ let octez_store_unix =
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_version;
         index;
-        irmin_pack;
         octez_store_shared |> open_;
         octez_protocol_environment |> open_;
         octez_context |> open_;

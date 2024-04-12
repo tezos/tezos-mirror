@@ -26,7 +26,6 @@ depends: [
   "octez-version" { = version }
   "aches-lwt" { >= "1.0.0" }
   "index" { >= "1.6.0" & < "1.7.0" }
-  "octez-internal-libs" { = version }
   "camlzip" { >= "1.11" & < "1.12" }
   "tar"
   "tar-unix" { >= "2.0.1" & < "3.0.0" }
