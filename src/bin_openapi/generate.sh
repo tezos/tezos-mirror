@@ -41,9 +41,9 @@ dal_api_json=$tmp/dal-api.json
 
 # Generated files.
 openapi_json=docs/api/rpc-openapi-dev.json
-proto_openapi_json=docs/api/$protocol_name-openapi-dev.json
-mempool_openapi_json=docs/api/$protocol_name-mempool-openapi-dev.json
-smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi-dev.json
+proto_openapi_json=docs/api/$protocol_name-openapi.json
+mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
+smart_rollup_node_openapi_json=docs/api/$protocol_name-smart-rollup-node-openapi.json
 dal_node_openapi_json=docs/api/dal-node-openapi-dev.json
 
 # Get version number.
