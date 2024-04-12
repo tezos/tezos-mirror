@@ -14,8 +14,12 @@ set -eu
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
-gitlab_octez_debian_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_debian_package_name}/${gitlab_package_version}"
-gitlab_octez_ubuntu_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_package_name}/${gitlab_package_version}"
+
+gitlab_octez_debian_bookworm_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_debian_bookworm_package_name}/${gitlab_package_version}"
+
+gitlab_octez_ubuntu_focal_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_focal_package_name}/${gitlab_package_version}"
+gitlab_octez_ubuntu_jammy_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_ubuntu_jammy_package_name}/${gitlab_package_version}"
+
 gitlab_octez_fedora_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_fedora_package_name}/${gitlab_package_version}"
 gitlab_octez_rockylinux_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_rockylinux_package_name}/${gitlab_package_version}"
 gitlab_octez_source_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_source_package_name}/${gitlab_package_version}"
@@ -72,16 +76,22 @@ for architecture in ${architectures}; do
   cd ..
 done
 
-echo "Upload debian packages"
-for package in ${debian_packages}; do
+echo "Upload debian bookworm packages"
+for package in ${debian_bookworm_packages}; do
   package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_debian_package_url}"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_debian_bookworm_package_url}"
 done
 
-echo "Upload Ubuntu packages"
-for package in ${ubuntu_packages}; do
+echo "Upload Ubuntu focal packages"
+for package in ${ubuntu_focal_packages}; do
   package_name="$(basename "${package}")"
-  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_package_url}"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_focal_package_url}"
+done
+
+echo "Upload Ubuntu jammy packages"
+for package in ${ubuntu_jammy_packages}; do
+  package_name="$(basename "${package}")"
+  gitlab_upload "./${package}" "${package_name}" "${gitlab_octez_ubuntu_jammy_package_url}"
 done
 
 echo "Upload Fedora packages"

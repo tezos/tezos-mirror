@@ -744,8 +744,10 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "make build-deps";
       "eval $(opam env)";
       "make $TARGET";
-      "mkdir $DISTRIBUTION";
-      "mv octez-*.* $DISTRIBUTION/";
+      "DISTRO=$(echo \"$DISTRIBUTION\" | cut -d':' -f1)";
+      "RELEASE=$(echo \"$DISTRIBUTION\" | cut -d':' -f2)";
+      "mkdir -p packages/$DISTRO/$RELEASE";
+      "mv octez-*.* packages/$DISTRO/$RELEASE/";
     ]
 
 let job_build_dpkg_amd64 : unit -> tezos_job =
