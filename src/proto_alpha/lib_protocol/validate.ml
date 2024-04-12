@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1968,6 +1969,11 @@ module Manager = struct
   let assert_zk_rollup_feature_enabled vi =
     error_unless (Constants.zk_rollup_enable vi.ctxt) Zk_rollup_feature_disabled
 
+  let assert_sponsored_operations_feature_enabled vi =
+    error_unless
+      (Constants.sponsored_operations_enable vi.ctxt)
+      Sponsored_transaction_feature_disabled
+
   let consume_decoding_gas remaining_gas lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
     @@ (* Fail early if the operation does not have enough gas to
@@ -2047,6 +2053,7 @@ module Manager = struct
         Dal_apply.validate_publish_commitment vi.ctxt slot_header
     | Zk_rollup_origination _ | Zk_rollup_publish _ | Zk_rollup_update _ ->
         assert_zk_rollup_feature_enabled vi
+    | Host _ -> assert_sponsored_operations_feature_enabled vi
 
   let check_contents (type kind) vi batch_state
       (contents : kind Kind.manager contents) ~consume_gas_for_sig_check

@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1088,7 +1089,8 @@ let balance_update_of_operation_result :
       | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
       | Sc_rollup_timeout_result _ | Sc_rollup_execute_outbox_message_result _
       | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
-      | Zk_rollup_publish_result _ | Zk_rollup_update_result _ ->
+      | Zk_rollup_publish_result _ | Zk_rollup_update_result _ | Host_result _
+        ->
           []
       | Delegation_result {balance_updates; _}
       | Transaction_result
@@ -1209,7 +1211,8 @@ let bake_n_with_origination_results ?baking_mode ?policy n b =
               | Successful_manager_result (Sc_rollup_recover_bond_result _)
               | Successful_manager_result (Zk_rollup_origination_result _)
               | Successful_manager_result (Zk_rollup_publish_result _)
-              | Successful_manager_result (Zk_rollup_update_result _) ->
+              | Successful_manager_result (Zk_rollup_update_result _)
+              | Successful_manager_result (Host_result _) ->
                   origination_results_rev
               | Successful_manager_result (Origination_result x) ->
                   Origination_result x :: origination_results_rev)

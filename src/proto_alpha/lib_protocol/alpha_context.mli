@@ -4455,6 +4455,8 @@ module Kind : sig
 
   type zk_rollup_update = Zk_rollup_update_kind
 
+  type host = Host_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -4479,6 +4481,7 @@ module Kind : sig
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
     | Zk_rollup_update_manager_kind : zk_rollup_update manager
+    | Host_manager_kind : host manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -4687,6 +4690,11 @@ and _ manager_operation =
       update : Zk_rollup.Update.t;
     }
       -> Kind.zk_rollup_update manager_operation
+  | Host : {
+      guest : Signature.Public_key_hash.t;
+      guest_signature : Signature.t;
+    }
+      -> Kind.host manager_operation
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -4890,6 +4898,8 @@ module Operation : sig
 
     val zk_rollup_update_case : Kind.zk_rollup_update Kind.manager case
 
+    val host_case : Kind.host Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -4946,6 +4956,8 @@ module Operation : sig
       val zk_rollup_publish_case : Kind.zk_rollup_publish case
 
       val zk_rollup_update_case : Kind.zk_rollup_update case
+
+      val host_case : Kind.host case
     end
   end
 

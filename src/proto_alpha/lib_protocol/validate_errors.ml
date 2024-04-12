@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1099,6 +1100,7 @@ module Manager = struct
     | Sc_rollup_arith_pvm_disabled
     | Sc_rollup_riscv_pvm_disabled
     | Zk_rollup_feature_disabled
+    | Sponsored_transaction_feature_disabled
 
   let () =
     register_error_kind
@@ -1229,7 +1231,19 @@ module Manager = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" zkru_disabled_description)
       Data_encoding.unit
       (function Zk_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Zk_rollup_feature_disabled)
+      (fun () -> Zk_rollup_feature_disabled) ;
+    let sptx_disabled =
+      "Sponsored transactions will be enabled in a future proposal."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"validate.operation.sponsored_transactions_disabled"
+      ~title:"Sponsored transactions are disabled"
+      ~description:sptx_disabled
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" sptx_disabled)
+      Data_encoding.unit
+      (function Sponsored_transaction_feature_disabled -> Some () | _ -> None)
+      (fun () -> Sponsored_transaction_feature_disabled)
 end
 
 type error += Failing_noop_error
