@@ -130,7 +130,9 @@ end
 module Durable_state =
   Make_durable_state (Make_wrapped_tree (Wasm_2_0_0_proof_format.Tree))
 
-module Impl : Pvm_sig.S = struct
+type unsafe_patch = Increase_max_nb_ticks of int64
+
+module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
   module PVM =
     Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   include PVM
@@ -153,6 +155,29 @@ module Impl : Pvm_sig.S = struct
       Durable_state.lookup state key
   end
 
+  module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
+
+  module Unsafe_patches = struct
+    type t = unsafe_patch
+
+    let of_patch (p : Pvm_patches.unsafe_patch) =
+      match p with
+      | Increase_max_nb_ticks max_nb_ticks ->
+          Ok (Increase_max_nb_ticks max_nb_ticks)
+
+    let apply state (Increase_max_nb_ticks max_nb_ticks) =
+      let open Lwt_syntax in
+      let* registered_max_nb_ticks = Backend.Unsafe.get_max_nb_ticks state in
+      let max_nb_ticks = Z.of_int64 max_nb_ticks in
+      if Z.Compare.(max_nb_ticks < registered_max_nb_ticks) then
+        Format.ksprintf
+          invalid_arg
+          "Decreasing tick limit of WASM PVM from %s to %s is not allowed"
+          (Z.to_string registered_max_nb_ticks)
+          (Z.to_string max_nb_ticks) ;
+      Backend.Unsafe.set_max_nb_ticks max_nb_ticks state
+  end
+
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"
     | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
@@ -166,8 +191,6 @@ module Impl : Pvm_sig.S = struct
     | Waiting_for_reveal Sc_rollup.Reveal_dal_parameters ->
         "Waiting for DAL parameters"
     | Computing -> "Computing"
-
-  module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
 
   let eval_many ~reveal_builtins ~write_debug ~is_reveal_enabled:_ =
     Backend.compute_step_many
