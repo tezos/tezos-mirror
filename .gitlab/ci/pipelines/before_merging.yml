@@ -20,7 +20,7 @@ trigger:
   - ./scripts/ci/check_alpine_version.sh
 
 # Testing purpose
-test_inherited_protected_variable:
+test_protected_variables:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
   stage: trigger
   tags:
@@ -29,6 +29,7 @@ test_inherited_protected_variable:
   script:
     - echo $GCP_REGISTRY
     - echo $CI_COMMIT_REF_PROTECTED
+    - echo $TEST_PROTECTED_VARIABLE
 
 sanity_ci:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
