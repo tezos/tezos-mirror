@@ -28,6 +28,7 @@ test_inherited_protected_variable:
   dependencies: []
   script:
     - echo $GCP_REGISTRY
+    - echo $CI_COMMIT_REF_PROTECTED
 
 sanity_ci:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
