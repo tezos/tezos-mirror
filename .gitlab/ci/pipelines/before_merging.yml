@@ -30,6 +30,7 @@ test_protected_variables:
     - echo $GCP_REGISTRY
     - echo $CI_COMMIT_REF_PROTECTED
     - echo $TEST_PROTECTED_VARIABLE
+    - echo $CI_COMMIT_REF_NAME
 
 sanity_ci:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
