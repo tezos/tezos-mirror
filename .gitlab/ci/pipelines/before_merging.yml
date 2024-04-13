@@ -19,6 +19,16 @@ trigger:
   - ./scripts/ci/check_opam_repository_tag.sh
   - ./scripts/ci/check_alpine_version.sh
 
+# Testing purpose
+test_inherited_protected_variable:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  stage: trigger
+  tags:
+    - gcp
+  dependencies: []
+  script:
+    - echo $GCP_REGISTRY
+
 sanity_ci:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
   stage: sanity
