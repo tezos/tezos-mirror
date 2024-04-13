@@ -27,6 +27,7 @@ test_protected_variables:
     - gcp
   dependencies: []
   script:
+    - echo test
     - echo $GCP_REGISTRY
     - echo $CI_COMMIT_REF_PROTECTED
     - echo $TEST_PROTECTED_VARIABLE
