@@ -27,7 +27,7 @@ test_protected_variables:
     - gcp
   dependencies: []
   script:
-    - echo test
+    - echo Test
     - echo $GCP_REGISTRY
     - echo $GCP_PROTECTED_REGISTRY
     - echo $TEST_PROTECTED_VARIABLE
