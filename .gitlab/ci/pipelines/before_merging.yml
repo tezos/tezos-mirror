@@ -29,8 +29,9 @@ test_protected_variables:
   script:
     - echo test
     - echo $GCP_REGISTRY
-    - echo $CI_COMMIT_REF_PROTECTED
+    - echo $GCP_PROTECTED_REGISTRY
     - echo $TEST_PROTECTED_VARIABLE
+    - echo $CI_COMMIT_REF_PROTECTED
     - echo $CI_COMMIT_REF_NAME
 
 sanity_ci:
