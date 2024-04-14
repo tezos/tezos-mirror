@@ -27,10 +27,10 @@ test_protected_variables:
     - gcp
   dependencies: []
   script:
-    - echo test
+    - echo test v2
     - echo $GCP_REGISTRY
+    - echo $GCP_PROTECTED_REGISTRY
     - echo $CI_COMMIT_REF_PROTECTED
-    - echo $TEST_PROTECTED_VARIABLE
     - echo $CI_COMMIT_REF_NAME
 
 sanity_ci:
