@@ -257,9 +257,6 @@ let preimages_arg =
     ~placeholder:"_evm_installer_preimages"
     Params.string
 
-let uri_parameter =
-  Tezos_clic.parameter (fun () s -> Lwt.return_ok (Uri.of_string s))
-
 let preimages_endpoint_arg =
   Tezos_clic.arg
     ~long:"preimages-endpoint"
@@ -268,27 +265,27 @@ let preimages_endpoint_arg =
       "The address of a service which provides pre-images for the rollup. \
        Missing pre-images will be downloaded remotely if they are not already \
        present on disk."
-    uri_parameter
+    Params.endpoint
 
 let rollup_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"rollup-node-endpoint"
     ~placeholder:"url"
     ~doc:"The address of a rollup node."
-    uri_parameter
+    Params.rollup_node_endpoint
 
 let evm_node_endpoint_arg =
   Tezos_clic.arg
     ~long:"rollup-node-endpoint"
     ~placeholder:"url"
     ~doc:"The address of an EVM node to connect to."
-    uri_parameter
+    Params.evm_node_endpoint
 
 let rollup_node_endpoint_param =
   Tezos_clic.param
     ~name:"rollup-node-endpoint"
     ~desc:"The address of a rollup node."
-    uri_parameter
+    Params.rollup_node_endpoint
 
 let time_between_blocks_arg =
   Tezos_clic.arg
