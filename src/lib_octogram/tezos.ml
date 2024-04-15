@@ -475,7 +475,7 @@ module Start_octez_node = struct
 
   let config_dal_srs node _dal_cryptobox_parameters =
     let config : Tezos_crypto_dal_octez_dal_config.Dal_config.t =
-      {activated = true; use_mock_srs_for_testing = true; bootstrap_peers = []}
+      {activated = true; bootstrap_peers = []}
     in
     Node.Config_file.update
       node

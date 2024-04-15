@@ -566,7 +566,6 @@ let init_bootstrap cloud (configuration : configuration) agent =
   let config : Cryptobox.Config.t =
     {
       activated = true;
-      use_mock_srs_for_testing = false;
       bootstrap_peers = [Dal_node.point_str dal_bootstrap_node];
     }
   in

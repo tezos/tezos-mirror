@@ -169,10 +169,9 @@ let slot_size_param slot_size =
 
 (* Some initialization functions to start needed nodes. *)
 
-let setup_node ?(use_mock_srs_for_testing = true) ?(custom_constants = None)
-    ?(additional_bootstrap_accounts = 0) ~parameters ~protocol
-    ?activation_timestamp ?(event_sections_levels = []) ?(node_arguments = [])
-    ?(dal_bootstrap_peers = []) () =
+let setup_node ?(custom_constants = None) ?(additional_bootstrap_accounts = 0)
+    ~parameters ~protocol ?activation_timestamp ?(event_sections_levels = [])
+    ?(node_arguments = []) ?(dal_bootstrap_peers = []) () =
   (* Temporary setup to initialise the node. *)
   let base = Either.right (protocol, custom_constants) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
@@ -187,11 +186,7 @@ let setup_node ?(use_mock_srs_for_testing = true) ?(custom_constants = None)
   let* () = Node.config_init node [] in
   let* dal_parameters = Dal.Parameters.from_client client in
   let config : Cryptobox.Config.t =
-    {
-      activated = true;
-      use_mock_srs_for_testing;
-      bootstrap_peers = dal_bootstrap_peers;
-    }
+    {activated = true; bootstrap_peers = dal_bootstrap_peers}
   in
   let* () =
     Node.Config_file.update
@@ -230,8 +225,7 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?attestation_threshold ?number_of_shards ?redundancy_factor
     ?commitment_period ?challenge_window ?dal_enable ?event_sections_levels
     ?node_arguments ?activation_timestamp ?dal_bootstrap_peers
-    ?(parameters = []) ?smart_rollup_timeout_period_in_blocks
-    ?use_mock_srs_for_testing f ~protocol =
+    ?(parameters = []) ?smart_rollup_timeout_period_in_blocks f ~protocol =
   let parameters =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -271,7 +265,6 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
 
   let* node, client, dal_parameters =
     setup_node
-      ?use_mock_srs_for_testing
       ?custom_constants
       ?additional_bootstrap_accounts
       ?event_sections_levels
@@ -412,8 +405,8 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?(pvm_name = "arith") ?(dal_enable = true) ?commitment_period
     ?challenge_window ?minimal_block_delay ?delay_increment_per_round
     ?activation_timestamp ?bootstrap_profile ?producer_profiles
-    ?smart_rollup_timeout_period_in_blocks ?use_mock_srs_for_testing
-    ?(regression = true) variant scenario =
+    ?smart_rollup_timeout_period_in_blocks ?(regression = true) variant scenario
+    =
   let description = "Testing DAL rollup and node with L1" in
   test
     ~regression
@@ -425,7 +418,6 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       with_layer1
-        ?use_mock_srs_for_testing
         ~custom_constants
         ?node_arguments
         ?consensus_committee_size
@@ -1827,9 +1819,7 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
   let* () = Node.config_init node2 [] in
   (* We update the configuration because by default on sandbox mode,
      DAL is not activated. *)
-  let config : Cryptobox.Config.t =
-    {activated = true; use_mock_srs_for_testing = true; bootstrap_peers = []}
-  in
+  let config : Cryptobox.Config.t = {activated = true; bootstrap_peers = []} in
   let* () =
     Node.Config_file.update
       node2
@@ -3739,7 +3729,7 @@ let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
 
 (* Create a DAL node whose DAL parameters are not compatible with those in
    [parameters]. For that, the redundancy_factor field is multiplied by 2. *)
-let make_invalid_dal_node ?use_mock_srs_for_testing protocol parameters =
+let make_invalid_dal_node protocol parameters =
   (* Create another L1 node with different DAL parameters. *)
   let* node2, _client2, _xdal_parameters2 =
     let crypto_params = parameters.Dal.Parameters.cryptobox in
@@ -3748,7 +3738,7 @@ let make_invalid_dal_node ?use_mock_srs_for_testing protocol parameters =
       @ redundancy_factor_param (Some (crypto_params.redundancy_factor / 2))
       @ slot_size_param (Some (crypto_params.slot_size / 2))
     in
-    setup_node ?use_mock_srs_for_testing ~protocol ~parameters ()
+    setup_node ~protocol ~parameters ()
   in
   (* Create a second DAL node with node2 and client2 as argument (so different
      DAL parameters compared to dal_node1. *)
@@ -6140,12 +6130,7 @@ let dal_crypto_benchmark () =
       let* result =
         Config.init_prover_dal
           ~find_srs_files:Tezos_base.Dal_srs.find_trusted_setup_files
-          Config.
-            {
-              activated = true;
-              bootstrap_peers = [];
-              use_mock_srs_for_testing = false;
-            }
+          Config.{activated = true; bootstrap_peers = []}
       in
       Log.info "SRS loaded." ;
       let*? config =
@@ -6911,7 +6896,6 @@ let register ~protocols =
     (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
        ~refute_operations_priority:`Faulty_first)
     ~smart_rollup_timeout_period_in_blocks:20
-    ~use_mock_srs_for_testing:false
     ~tags:[Tag.slow]
     protocols ;
 
@@ -6925,7 +6909,6 @@ let register ~protocols =
     (Refutations.scenario_with_two_rollups_a_faulty_dal_node_and_a_correct_one
        ~refute_operations_priority:`Honest_first)
     ~smart_rollup_timeout_period_in_blocks:20
-    ~use_mock_srs_for_testing:false
     ~tags:[Tag.slow]
     protocols ;
 

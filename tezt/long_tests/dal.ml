@@ -96,7 +96,6 @@ let start_l1_node ~protocol ~account ?l1_bootstrap_peer ?dal_bootstrap_peer () =
   let config : Dal.Cryptobox.Config.t =
     {
       activated = true;
-      use_mock_srs_for_testing = true;
       bootstrap_peers =
         (match dal_bootstrap_peer with
         | None -> []

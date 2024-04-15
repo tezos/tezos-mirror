@@ -476,8 +476,6 @@ module Config_file = struct
         (`O
           [
             ("activated", `Bool dal_config.activated);
-            ( "use_mock_srs_for_testing",
-              `Bool dal_config.use_mock_srs_for_testing );
             ( "bootstrap_peers",
               `A
                 (List.map (fun peer -> `String peer) dal_config.bootstrap_peers)

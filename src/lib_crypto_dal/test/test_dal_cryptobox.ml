@@ -820,14 +820,12 @@ module Test = struct
             false)
 
   let find_trusted_setup_files () =
-    let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
-    in
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
     Lwt_main.run
-      (Cryptobox.Config.init_prover_dal ~find_srs_files ~srs_size_log2:5 config)
+      Cryptobox.Config.(
+        init_prover_dal ~find_srs_files ~srs_size_log2:5 default)
     |> function
     | Ok () -> ()
     | Error err ->
@@ -835,13 +833,12 @@ module Test = struct
         assert false
 
   let find_trusted_setup_files_failure () =
-    let config : Cryptobox.Config.t =
-      {activated = true; use_mock_srs_for_testing = false; bootstrap_peers = []}
-    in
     let find_srs_files () : (string * string) Error_monad.tzresult =
       Ok (path "srsu_zcash_g1_5", path "srsu_zcash_g2_5")
     in
-    Lwt_main.run (Cryptobox.Config.init_prover_dal ~find_srs_files config)
+    Lwt_main.run
+      Cryptobox.Config.(
+        init_prover_dal ~find_srs_files ~srs_size_log2:6 default)
     |> function
     | Error [Cryptobox.Failed_to_load_trusted_setup s] ->
         if

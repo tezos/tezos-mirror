@@ -131,11 +131,7 @@ module Publish_slot_header : Benchmark.S = struct
       Lwt_main.run
       @@ Tezos_crypto_dal.Cryptobox.Config.init_prover_dal
            ~find_srs_files:(Fun.const (Ok ("", "")))
-           {
-             activated = true;
-             use_mock_srs_for_testing = true;
-             bootstrap_peers = [];
-           }
+           {activated = true; bootstrap_peers = []}
       |> function
       | Ok () -> ()
       | Error errs ->

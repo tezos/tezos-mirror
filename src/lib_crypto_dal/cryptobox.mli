@@ -581,11 +581,7 @@ end
 
 (** node parameters for the DAL. *)
 module Config : sig
-  type t = Dal_config.t = {
-    activated : bool;
-    use_mock_srs_for_testing : bool;
-    bootstrap_peers : string list;
-  }
+  type t = Dal_config.t = {activated : bool; bootstrap_peers : string list}
 
   val encoding : t Data_encoding.t
 
@@ -594,15 +590,7 @@ module Config : sig
   (** [init_dal find_trusted_setup_files ?(srs_size_log2=21) config] initializes the
      DAL according to the dal configuration [config], a function to find the SRS
      files [find_trusted_setup_files] and the optional log2 of the SRS size
-     [srs_size_log2].
-
-      When [config.use_mock_srs_for_testing = false],
-     [init_dal] loads [initialisation_parameters] from the files at the
-     paths provided by [find_trusted_setup_files ()]. It is important that
-     every time the primitives above are used, they are used with the very
-     same initialization parameters. (To ensure this property, an integrity
-     check is run.) In this case, [init_dal] can take several seconds
-     to run. *)
+     [srs_size_log2]. *)
   val init_verifier_dal : t -> unit Error_monad.tzresult
 
   val init_prover_dal :
