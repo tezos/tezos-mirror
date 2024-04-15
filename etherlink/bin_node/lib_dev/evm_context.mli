@@ -101,3 +101,10 @@ val shutdown : unit -> unit tzresult Lwt.t
 
 (** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
 val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
+
+(** [replay level] replays the [level]th blueprint on top of the expected
+    context.
+
+    Note: this function only goes through the worker to fetch the correct
+    context. *)
+val replay : Ethereum_types.quantity -> Evm_state.apply_result tzresult Lwt.t

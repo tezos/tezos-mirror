@@ -88,6 +88,8 @@ let quantity_encoding =
     (fun q -> Qty (Z.of_string q))
     Data_encoding.string
 
+let pp_quantity fmt (Qty q) = Z.pp_print fmt q
+
 (** Ethereum block level. *)
 type block_height = Block_height of Z.t [@@ocaml.unboxed]
 

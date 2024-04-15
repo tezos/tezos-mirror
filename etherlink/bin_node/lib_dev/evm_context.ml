@@ -95,6 +95,10 @@ module Request = struct
     | Last_known_L1_level : (int32 option, tztrace) t
     | New_last_known_L1_level : int32 -> (unit, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
+    | Evm_state_after : {
+        number : Ethereum_types.quantity;
+      }
+        -> (Evm_state.t option, tztrace) t
 
   type view = View : _ t -> view
 
@@ -178,6 +182,15 @@ module Request = struct
           (obj1 (req "request" (constant "Delayed_inbox_hashes")))
           (function View Delayed_inbox_hashes -> Some () | _ -> None)
           (fun () -> View Delayed_inbox_hashes);
+        case
+          (Tag 9)
+          ~title:"Evm_state_after"
+          (obj2
+             (req "request" (constant "evm_state_after"))
+             (req "number" Ethereum_types.quantity_encoding))
+          (function
+            | View (Evm_state_after {number}) -> Some ((), number) | _ -> None)
+          (fun ((), number) -> View (Evm_state_after {number}));
       ]
 
   let pp ppf view =
@@ -838,6 +851,15 @@ module Handlers = struct
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
         return hashes
+    | Evm_state_after {number} -> (
+        let ctxt = Worker.state self in
+        let* checkpoint = Evm_store.Context_hashes.find ctxt.store number in
+        match checkpoint with
+        | Some checkpoint ->
+            let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
+            let*! evm_state = Irmin_context.PVMState.get context in
+            return_some evm_state
+        | None -> return_none)
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -964,6 +986,13 @@ let blueprints_watcher () = Lwt_watcher.create_stream blueprint_watcher
 
 let blueprint level = worker_wait_for_request (Blueprint {level})
 
+let get_blueprint level =
+  let open Lwt_result_syntax in
+  let* blueprint = blueprint level in
+  match blueprint with
+  | Some blueprint -> return blueprint
+  | None -> failwith "Missing blueprint %a" Ethereum_types.pp_quantity level
+
 let blueprints_range from to_ =
   worker_wait_for_request (Blueprints_range {from; to_})
 
@@ -973,6 +1002,27 @@ let new_last_known_l1_level l =
   worker_add_request ~request:(New_last_known_L1_level l)
 
 let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
+
+let replay (Ethereum_types.Qty number) =
+  let open Lwt_result_syntax in
+  let* evm_state =
+    worker_wait_for_request (Evm_state_after {number = Qty Z.(pred number)})
+  in
+  match evm_state with
+  | Some evm_state ->
+      let*! data_dir, config = execution_config in
+      let* blueprint = get_blueprint (Qty number) in
+      Evm_state.apply_blueprint
+        ~log_file:"replay"
+        ~data_dir
+        ~config
+        evm_state
+        blueprint.blueprint.payload
+  | None ->
+      failwith
+        "Cannot replay blueprint %a: missing context"
+        Ethereum_types.pp_quantity
+        (Qty number)
 
 let shutdown () =
   let open Lwt_result_syntax in
