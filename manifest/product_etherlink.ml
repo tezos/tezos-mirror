@@ -190,6 +190,7 @@ let evm_node_lib_dev =
         octez_layer2_store |> open_;
         octez_smart_rollup_lib |> open_;
         evm_node_migrations;
+        prometheus_app;
       ]
 
 let _octez_evm_node_tests =
