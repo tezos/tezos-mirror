@@ -8,6 +8,7 @@
 (** [main ~data_dir ~preimages ~preimages_endpoint ~smart_rollup_address level]
     replays the [level]th blueprint on top of the expected context. *)
 val main :
+  ?kernel_path:string ->
   data_dir:string ->
   preimages:string ->
   preimages_endpoint:Uri.t option ->
