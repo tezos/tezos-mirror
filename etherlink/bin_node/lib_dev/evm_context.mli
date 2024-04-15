@@ -113,6 +113,7 @@ val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
     Note: this function only goes through the worker to fetch the correct
     context. *)
 val replay :
+  ?profile:bool ->
   ?alter_evm_state:(Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
   Ethereum_types.quantity ->
   Evm_state.apply_result tzresult Lwt.t

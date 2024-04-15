@@ -35,7 +35,7 @@ let patch_kernel ~kernel_path evm_state =
   in
   return evm_state
 
-let main ?kernel_path ~data_dir ~preimages ~preimages_endpoint
+let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     ~smart_rollup_address number =
   let open Lwt_result_syntax in
   let* _init =
@@ -52,7 +52,7 @@ let main ?kernel_path ~data_dir ~preimages ~preimages_endpoint
     | None -> None
     | Some kernel_path -> Some (patch_kernel ~kernel_path)
   in
-  let* apply_result = Evm_context.replay ?alter_evm_state number in
+  let* apply_result = Evm_context.replay ?profile ?alter_evm_state number in
   match apply_result with
   | Apply_success (_, _, hash) ->
       Format.printf

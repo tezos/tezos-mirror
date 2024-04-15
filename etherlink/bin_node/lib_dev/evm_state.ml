@@ -55,7 +55,8 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
+let execute ?(profile = false) ?(kind = Events.Application) ~data_dir
+    ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     evm_state inbox =
   let open Lwt_result_syntax in
@@ -69,16 +70,34 @@ let execute ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
         messages := msg :: !messages ;
         event_kernel_log ~kind ~msg)
   in
-  let* evm_state, _, _, _ =
-    Wasm.Commands.eval
-      ~write_debug
-      ~wasm_entrypoint
-      0l
-      inbox
-      config
-      Inbox
-      evm_state
+  let eval evm_state =
+    if profile then
+      let* evm_state, _, _ =
+        Wasm.Commands.profile
+          ~collapse:false
+          ~with_time:true
+          ~no_reboot:false
+          0l
+          inbox
+          {config with flamecharts_directory = data_dir}
+          Custom_section.FuncMap.empty
+          evm_state
+      in
+      return evm_state
+    else
+      let* evm_state, _, _, _ =
+        Wasm.Commands.eval
+          ~write_debug
+          ~wasm_entrypoint
+          0l
+          inbox
+          config
+          Inbox
+          evm_state
+      in
+      return evm_state
   in
+  let* evm_state = eval evm_state in
   (* The messages are accumulated during the execution and stored
      atomatically at the end to preserve their order. *)
   let*! () =
@@ -182,7 +201,7 @@ type apply_result =
   | Apply_success of t * block_height * block_hash
   | Apply_failure
 
-let apply_blueprint ?log_file ~data_dir ~config evm_state
+let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
     (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
@@ -193,6 +212,7 @@ let apply_blueprint ?log_file ~data_dir ~config evm_state
   let*! (Block_height before_height) = current_block_height evm_state in
   let* evm_state =
     execute
+      ?profile
       ~data_dir
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~config
