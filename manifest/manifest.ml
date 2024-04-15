@@ -1855,22 +1855,23 @@ module Target = struct
     let dune =
       List.fold_right (fun x dune -> Dune.(x :: dune)) runtest_rules dune
     in
+    let prefixes = ["src/"; "tezt/"; "etherlink/"; "irmin/"; "brassaia/"] in
     if
       match release_status with
       | Unreleased -> false
       | Experimental | Released | Auto_opam -> true
     then
       if
-        let prefixes = ["src/"; "tezt/"; "etherlink/"; "irmin/"] in
         not
           (List.exists (fun prefix -> String.starts_with ~prefix path) prefixes)
       then
         invalid_argf
           "A target has the release status %s but is located at %s which is \
-           outside of `src/` or `tezt/`. This is not supported. Move the code \
-           to `src/` or set the release status to %s."
+           outside of %s. This is not supported. Move the code to `src/` or \
+           set the release status to %s."
           (show_release_status release_status)
           path
+          (String.concat ", " prefixes)
           (show_release_status Unreleased) ;
     register_internal
       {
