@@ -551,7 +551,7 @@ let prepare_initial_context_params ?consensus_committee_size
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance ?consensus_rights_delay () =
+    ?adaptive_issuance ?consensus_rights_delay ?sponsored_operations_enable () =
   let open Lwt_result_syntax in
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -624,6 +624,11 @@ let prepare_initial_context_params ?consensus_committee_size
       consensus_rights_delay
   in
 
+  let sponsored_operations_enable =
+    Option.value
+      sponsored_operations_enable
+      ~default:constants.sponsored_operations_enable
+  in
   let constants =
     {
       constants with
@@ -648,6 +653,7 @@ let prepare_initial_context_params ?consensus_committee_size
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
       consensus_rights_delay;
+      sponsored_operations_enable;
     }
   in
   let* () = check_constants_consistency constants in
@@ -681,8 +687,8 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
     ?cycles_per_voting_period ?sc_rollup_arith_pvm_enable
     ?sc_rollup_private_enable ?sc_rollup_riscv_pvm_enable ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold ?dal
-    ?adaptive_issuance (bootstrap_accounts : Parameters.bootstrap_account list)
-    =
+    ?adaptive_issuance ?sponsored_operations_enable
+    (bootstrap_accounts : Parameters.bootstrap_account list) =
   let open Lwt_result_syntax in
   let* constants, shell, hash =
     prepare_initial_context_params
@@ -704,6 +710,7 @@ let genesis ?commitments ?consensus_committee_size ?consensus_threshold
       ?nonce_revelation_threshold
       ?dal
       ?adaptive_issuance
+      ?sponsored_operations_enable
       ()
   in
   let* () =
@@ -809,37 +816,45 @@ let detect_manager_failure :
     type kind. kind Apply_results.operation_metadata -> _ =
   let open Result_syntax in
   let rec detect_manager_failure :
-      type kind. kind Apply_results.contents_result_list -> _ =
+      type kind. hosted:bool -> kind Apply_results.contents_result_list -> _ =
     let open Apply_results in
     let open Apply_operation_result in
     let open Apply_internal_results in
-    let detect_manager_failure_single (type kind)
+    let detect_manager_failure_single (type kind) ~hosted
         (Manager_operation_result
            {operation_result; internal_operation_results; _} :
           kind Kind.manager Apply_results.contents_result) =
       let detect_manager_failure (type kind)
           (result : (kind, _, _) operation_result) =
-        match result with
-        | Applied _ -> return_unit
-        | Skipped _ -> assert false
-        | Backtracked (_, None) ->
-            (* there must be another error for this to happen *)
-            return_unit
-        | Backtracked (_, Some errs) -> fail errs
-        | Failed (_, errs) -> fail errs
+        if hosted then return_unit
+        else
+          match result with
+          | Applied _ -> return_unit
+          | Skipped _ -> assert false
+          | Backtracked (_, None) ->
+              (* there must be another error for this to happen *)
+              return_unit
+          | Backtracked (_, Some errs) -> fail errs
+          | Failed (_, errs) -> fail errs
       in
       let* () = detect_manager_failure operation_result in
       List.iter_e
         (fun (Internal_operation_result (_, r)) -> detect_manager_failure r)
         internal_operation_results
     in
-    function
-    | Single_result (Manager_operation_result _ as res) ->
-        detect_manager_failure_single res
-    | Single_result _ -> return_unit
-    | Cons_result (res, rest) ->
-        let* () = detect_manager_failure_single res in
-        detect_manager_failure rest
+    fun ~hosted -> function
+      | Single_result (Manager_operation_result _ as res) ->
+          detect_manager_failure_single ~hosted res
+      | Single_result _ -> return_unit
+      | Cons_result
+          ( (Manager_operation_result
+               {operation_result = Applied (Host_result _); _} as res),
+            rest ) ->
+          let* () = detect_manager_failure_single ~hosted:false res in
+          detect_manager_failure ~hosted:true rest
+      | Cons_result (res, rest) ->
+          let* () = detect_manager_failure_single ~hosted res in
+          detect_manager_failure ~hosted rest
   in
   fun {contents} -> detect_manager_failure contents
 
@@ -887,7 +902,7 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true)
             match result with
             | No_operation_metadata -> return (state, contents_result)
             | Operation_metadata metadata ->
-                let*? () = detect_manager_failure metadata in
+                let*? () = detect_manager_failure ~hosted:false metadata in
                 return (state, result :: contents_result))
         (vstate, [])
         operations

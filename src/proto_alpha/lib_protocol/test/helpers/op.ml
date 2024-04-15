@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2023 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,13 +32,18 @@ let pack_operation ctxt signature contents =
   Operation.pack
     ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
-let sign ?(watermark = Signature.Generic_operation) sk branch contents =
+let raw_sign ?(watermark = Signature.Generic_operation) sk branch contents =
   let unsigned =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
-      ({branch}, Contents_list contents)
+      ({branch}, contents)
   in
-  let signature = Some (Signature.sign ~watermark sk unsigned) in
+  Signature.sign ~watermark sk unsigned
+
+let sign ?(watermark = Signature.Generic_operation) sk branch contents =
+  let signature =
+    Some (raw_sign ~watermark sk branch (Contents_list contents))
+  in
   ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
 (** Generates the block payload hash based on the hash [pred_hash] of
@@ -1063,3 +1069,45 @@ let zk_rollup_update ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
   in
   let+ account = Context.Contract.manager ctxt src in
   sign account.sk (Context.branch ctxt) to_sign_op
+
+let append_manager_contents content packed_contents =
+  match packed_contents with
+  | Contents_list (Single (Manager_operation _) as op) ->
+      Contents_list (Cons (content, op))
+  | Contents_list (Cons (_, _) as cont_list) ->
+      Contents_list (Cons (content, cont_list))
+  | _ -> assert false
+
+let host ?recompute_counters ?counter ?fee ?gas_limit ?storage_limit ctxt
+    ~(host : Contract.t) ~(guest : Contract.t) ~ops =
+  let open Lwt_result_syntax in
+  let* guest = Context.Contract.manager ctxt guest in
+  let* to_sign_op =
+    manager_operation
+      ~force_reveal:false
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      ~source:host
+      ctxt
+      (Host {guest = guest.pkh; guest_signature = Signature.zero})
+  in
+  match to_sign_op with
+  | Contents_list (Single (Manager_operation _ as op)) ->
+      let* ops = batch_operations ?recompute_counters ~source:host ctxt ops in
+      let {protocol_data = Operation_data {contents; _}; _} = ops in
+      let contents = Contents_list contents in
+      let batch = append_manager_contents op contents in
+      let guest_signature = raw_sign guest.sk (Context.branch ctxt) batch in
+      let (Manager_operation op) = op in
+      let op =
+        Manager_operation
+          {op with operation = Host {guest = guest.pkh; guest_signature}}
+      in
+      let contents = append_manager_contents op contents in
+      let* host_account = Context.Contract.manager ctxt host in
+      return @@ sign host_account.sk (Context.branch ctxt) contents
+  | _ -> assert false
+
+module Micheline = Micheline
