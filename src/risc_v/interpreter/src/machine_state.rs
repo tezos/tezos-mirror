@@ -158,7 +158,7 @@ macro_rules! run_no_args_instr {
 /// Runs a F/D instruction over the hart state, touching both F & X registers.
 macro_rules! run_f_x_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
-        $state.hart.$run_fn($args.rs1, $args.rd);
+        $state.hart.$run_fn($args.rs1, $args.rd)?;
         Ok(Add($instr.width()))
     }};
 
@@ -171,7 +171,7 @@ macro_rules! run_f_x_instr {
 /// Runs a F/D instruction over the hart state, touching both F & fcsr registers.
 macro_rules! run_f_r_instr {
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident) => {{
-        $state.hart.$run_fn($args.rs1, $args.rs2, $args.rd);
+        $state.hart.$run_fn($args.rs1, $args.rs2, $args.rd)?;
         Ok(Add($instr.width()))
     }};
     ($state: ident, $instr: ident, $args: ident, $run_fn: ident, $($field: ident),+) => {{

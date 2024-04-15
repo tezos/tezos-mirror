@@ -8,7 +8,10 @@ pub mod fields;
 pub mod satp;
 pub mod xstatus;
 
-use self::satp::{SvLength, TranslationAlgorithm};
+use self::{
+    satp::{SvLength, TranslationAlgorithm},
+    xstatus::ExtensionValue,
+};
 use super::{bus::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
     machine_state::mode::Mode,
@@ -576,8 +579,7 @@ impl CSRegister {
         const ATOMIC_EXT: u64 = 1 << 0;
         const COMPRESSED_EXT: u64 = 1 << 2;
         const DOUBLE_EXT: u64 = 1 << 3;
-        // TODO: Enable F extension once F instructions are implemented <https://app.asana.com/0/0/1206826205624200/f>
-        // const SINGLE_EXT: u64 = 1 << 5;
+        const SINGLE_EXT: u64 = 1 << 5;
         const RV64I_ISA_EXT: u64 = 1 << 8;
         const MULT_DIV_EXT: u64 = 1 << 12;
         const SUPERVISOR_EXT: u64 = 1 << 18;
@@ -588,8 +590,7 @@ impl CSRegister {
         ATOMIC_EXT |
         COMPRESSED_EXT |
         DOUBLE_EXT |
-        // TODO: Enable F extension once F instructions are implemented <https://app.asana.com/0/0/1206826205624200/f>
-        // SINGLE_EXT |
+        SINGLE_EXT |
         RV64I_ISA_EXT |
         MULT_DIV_EXT |
         SUPERVISOR_EXT |
@@ -965,7 +966,7 @@ impl CSRegister {
 
                 // Set register dirtiness
                 let mstatus = xstatus::set_VS(mstatus, xstatus::ExtensionValue::Initial);
-                let mstatus = xstatus::set_FS(mstatus, xstatus::ExtensionValue::Initial);
+                let mstatus = xstatus::set_FS(mstatus, xstatus::ExtensionValue::Dirty);
                 let mstatus = xstatus::set_XS(mstatus, xstatus::ExtensionValue::Initial);
                 let mstatus = xstatus::set_SD(mstatus, false);
 
@@ -1104,6 +1105,16 @@ fn check_satp_access(csr: CSRegister, tvm_field: bool) -> Result<()> {
     Ok(())
 }
 
+fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
+    use CSRegister::*;
+
+    if matches!(csr, fcsr | frm | fflags) && fs_field == ExtensionValue::Off {
+        Err(Exception::IllegalInstruction)
+    } else {
+        Ok(())
+    }
+}
+
 /// Perform general checks on all read or write operations on a CSR.
 ///
 /// Examples of checks: Privilege checks, SATP trapping
@@ -1112,7 +1123,9 @@ pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> R
     check_privilege(csr, mode)?;
     let mstatus = hart_state.csregisters.read(CSRegister::mstatus);
     let tvm = xstatus::get_TVM(mstatus);
-    check_satp_access(csr, tvm)
+    check_satp_access(csr, tvm)?;
+    let fs = xstatus::get_FS(mstatus);
+    check_fs_access(csr, fs)
 }
 
 /// CSRs
@@ -1384,6 +1397,13 @@ impl<M: backend::Manager> CSRegisters<M> {
             self.write(reg, reg.default_value());
         }
     }
+
+    /// Check whether floating point extension is disabled.
+    pub fn floating_disabled(&self) -> bool {
+        let mstatus = self.read(CSRegister::mstatus);
+
+        xstatus::get_FS(mstatus) == ExtensionValue::Off
+    }
 }
 
 #[cfg(test)]
@@ -1505,8 +1525,11 @@ mod tests {
         let check = |reg: csreg, value| reg.make_value_writable(value).unwrap();
 
         // misa field
-        assert!(check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF) == 0x8000_0000_0014_110D);
-        assert!(check(csreg::misa, 0x0) == 0x8000_0000_0014_110D);
+        assert_eq!(
+            check(csreg::misa, 0xFFFF_FFFF_FFFF_FFFF),
+            0x8000_0000_0014_112D
+        );
+        assert_eq!(check(csreg::misa, 0x0), 0x8000_0000_0014_112D);
 
         // medeleg / mideleg
         assert!(check(csreg::medeleg, 0x0) == 0x0);
@@ -1557,10 +1580,11 @@ mod tests {
             check(csreg::mstatus, 0xFFFF_FFFF_FFFF_FFFF),
             0x8000_003A_007F_FFEA
         );
-        // check sd bit set from XS=00, FS=10, VS=11, and MPP gets changed to 0b00 from 0b01
+        // check sd bit set from XS=00, FS=10, VS=11, and MPP gets changed to 0b00 from 0b01,
+        // and fs gets changed to 11 (dirty)
         assert_eq!(
             check(csreg::mstatus, 0x0FFF_0000_0000_57FF),
-            0x8000_000A_0000_47EA
+            0x8000_000A_0000_67EA
         );
 
         // sstatus
@@ -1574,7 +1598,7 @@ mod tests {
         // check sd bit set from XS=00, FS=10, VS=11
         assert_eq!(
             check(csreg::sstatus, 0x0FFF_0000_0000_57FF),
-            0x8000_0002_0000_4762
+            0x8000_0002_0000_6762
         );
 
         // mnstatus

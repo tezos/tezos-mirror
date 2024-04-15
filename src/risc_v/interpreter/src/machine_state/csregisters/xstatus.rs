@@ -210,13 +210,18 @@ pub fn apply_warl_mstatus(mstatus: CSRValue) -> CSRValue {
     set_MPP(mstatus, mpp)
 }
 
-pub fn apply_warl_sstatus(mstatus: CSRValue) -> CSRValue {
+pub fn apply_warl_sstatus(mut mstatus: CSRValue) -> CSRValue {
     use ExtensionValue::Dirty;
 
     // set sd = (FS==11) OR (XS==11) OR (VS=11)
     let xs = get_XS(mstatus);
     let vs = get_VS(mstatus);
-    let fs = get_FS(mstatus);
+    let mut fs = get_FS(mstatus);
+
+    if fs != ExtensionValue::Off {
+        fs = Dirty;
+        mstatus = set_FS(mstatus, Dirty);
+    }
 
     let mstatus = set_SD(mstatus, xs == Dirty || fs == Dirty || vs == Dirty);
 

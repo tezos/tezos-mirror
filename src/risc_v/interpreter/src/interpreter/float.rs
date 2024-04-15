@@ -507,6 +507,15 @@ where
 
         self.fregisters.write(rd, res.into());
     }
+
+    /// FS bits must not be set to 'Off' in mstatus register.
+    pub(super) fn check_fs_on(&self) -> Result<(), Exception> {
+        if self.csregisters.floating_disabled() {
+            Err(Exception::IllegalInstruction)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// There are 5 supported rounding modes
