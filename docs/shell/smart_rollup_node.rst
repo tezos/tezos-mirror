@@ -194,8 +194,6 @@ First, we need to decide on a mode the rollup node will run:
    rollup node will accept transactions in its queue and batch them on
    the Layer 1.
 
-.. _rollup_batcher:
-
 #. ``batcher`` means that the rollup node will accept transactions in
    its queue and batch them on the Layer 1. In this mode, the rollup
    node follows the Layer 1 chain, but it does not update its state
@@ -303,6 +301,8 @@ throughput rollup, this limitation could slow down the rollup by
 capping the number of L2 messages that the rollup node's batcher
 purpose can inject per block to the maximum size of one L1 operation's
 maximal size (e.g., 32kb on mainnet).
+
+.. _rollup_batcher_keys:
 
 To bypass that limitation and inject multiple
 ``smart_rollup_add_messages`` L1 operations within a single L1 block,

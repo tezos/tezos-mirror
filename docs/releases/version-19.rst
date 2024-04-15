@@ -70,7 +70,7 @@ The keys in the Smart Rollup client use the same format as the Octez client.
 They can be imported with ``octez-client import secret key <sk_uri>``, or by merging the key files
 between the ``octez-client`` base directory and the ``smart-rollup-client-<proto>`` base directory.
 
-The Smart Rollup node now allows multiple :ref:`batcher keys <rollup_batcher>`. Setting multiple
+The Smart Rollup node now allows :ref:`multiple batcher keys <rollup_batcher_keys>`. Setting multiple
 keys for the batching purpose allows to inject multiple operations
 of the same kind per block by the rollup node.
 
