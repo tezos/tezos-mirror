@@ -2290,7 +2290,7 @@ mod test {
     use tezos_ethereum::block::BlockFees;
     use tezos_smart_rollup_mock::MockHost;
 
-    const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000;
+    const DUMMY_ALLOCATED_TICKS: u64 = 1_000_000_000;
 
     fn set_code<'a>(
         handler: &mut EvmHandler<'a, MockHost>,
@@ -4128,7 +4128,7 @@ mod test {
                 logs: vec![],
                 result: Some(vec![]),
                 withdrawals: vec![],
-                estimated_ticks_used: 1531665
+                estimated_ticks_used: 40549308
             }),
             result,
         )

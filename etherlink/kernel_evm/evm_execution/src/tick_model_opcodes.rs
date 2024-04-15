@@ -15,608 +15,1230 @@ use evm::Opcode;
 // Default ticks per gas value
 const DEFAULT_TICKS_PER_GAS: u64 = 10000;
 
-const ARITHMETIC_TICKS_PER_GAS: u64 = 4000;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x00(_gas: u64) -> u64 {
+    let upperbound = 6089;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 6098; Standard deviation: 0
-const MODEL_0X00: u64 = 6098;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x01(_gas: u64) -> u64 {
+    let upperbound = 12672;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 4226; Standard deviation: 0
-const MODEL_0X01: u64 = 4226;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x02(_gas: u64) -> u64 {
+    let upperbound = 15785;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 3159; Standard deviation: 1
-const MODEL_0X02: u64 = 3161;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x03(_gas: u64) -> u64 {
+    let upperbound = 12814;
+    let delta = 119;
+    upperbound + delta
+}
 
-// Average: 4233; Standard deviation: 20
-const MODEL_0X03: u64 = 4273;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x04(_gas: u64) -> u64 {
+    let upperbound = 18196;
+    let delta = 3430;
+    upperbound + delta
+}
 
-// Average: 2915; Standard deviation: 350
-const MODEL_0X04: u64 = 3615;
+// Reusing model for 0x04
+#[inline]
+fn model_0x05(_gas: u64) -> u64 {
+    model_0x04(_gas)
+}
 
-// No data
-const MODEL_0X05: u64 = ARITHMETIC_TICKS_PER_GAS;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x06(_gas: u64) -> u64 {
+    let upperbound = 18198;
+    let delta = 2375;
+    upperbound + delta
+}
 
-// Average: 3641; Standard deviation: 238
-const MODEL_0X06: u64 = 4117;
+// SMOO, approximated for MOD
+#[inline]
+fn model_0x07(_gas: u64) -> u64 {
+    model_0x06(_gas)
+}
 
-// No data
-const MODEL_0X07: u64 = ARITHMETIC_TICKS_PER_GAS;
+// ADDMOO, model from AUB + MOD
+#[inline]
+fn model_0x08(_gas: u64) -> u64 {
+    model_0x01(_gas) + model_0x06(_gas)
+}
 
-// No data
-const MODEL_0X08: u64 = ARITHMETIC_TICKS_PER_GAS;
+// MULMOD, model from MUL + MOD
+#[inline]
+fn model_0x09(_gas: u64) -> u64 {
+    model_0x02(_gas) + model_0x06(_gas)
+}
 
-// No data
-const MODEL_0X09: u64 = ARITHMETIC_TICKS_PER_GAS;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x0a(_gas: u64) -> u64 {
+    let upperbound = 47478;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 4749; Standard deviation: 1
-const MODEL_0X0A: u64 = 4751;
+// SIGNEXTEND, no data, 10 gas, approximated from EXP that uses 5 gas.
+#[inline]
+fn model_0x0b(_gas: u64) -> u64 {
+    model_0x0a(_gas) * 2
+}
 
-// No data
-const MODEL_0X0B: u64 = ARITHMETIC_TICKS_PER_GAS;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x10(_gas: u64) -> u64 {
+    let upperbound = 11811;
+    let delta = 3;
+    upperbound + delta
+}
 
-// Average: 3935; Standard deviation: 1
-const MODEL_0X10: u64 = 3937;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x11(_gas: u64) -> u64 {
+    let upperbound = 11814;
+    let delta = 7;
+    upperbound + delta
+}
 
-// Average: 3936; Standard deviation: 8
-const MODEL_0X11: u64 = 3952;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x12(_gas: u64) -> u64 {
+    let upperbound = 23967;
+    let delta = 107;
+    upperbound + delta
+}
 
-// Average: 7941; Standard deviation: 8
-const MODEL_0X12: u64 = 7957;
+// SGT, approximated for GT
+#[inline]
+fn model_0x13(_gas: u64) -> u64 {
+    model_0x11(_gas)
+}
 
-// Average: 7938; Standard deviation: 0
-const MODEL_0X13: u64 = 7938;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x14(_gas: u64) -> u64 {
+    let upperbound = 16187;
+    let delta = 4535;
+    upperbound + delta
+}
 
-// Average: 5398; Standard deviation: 752
-const MODEL_0X14: u64 = 6902;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x15(_gas: u64) -> u64 {
+    let upperbound = 13299;
+    let delta = 4527;
+    upperbound + delta
+}
 
-// Average: 4435; Standard deviation: 677
-const MODEL_0X15: u64 = 5789;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x16(_gas: u64) -> u64 {
+    let upperbound = 12491;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 4166; Standard deviation: 1
-const MODEL_0X16: u64 = 4168;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x17(_gas: u64) -> u64 {
+    let upperbound = 12494;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 4167; Standard deviation: 1
-const MODEL_0X17: u64 = 4169;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x18(_gas: u64) -> u64 {
+    let upperbound = 12497;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 4168; Standard deviation: 0
-const MODEL_0X18: u64 = 4168;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x19(_gas: u64) -> u64 {
+    let upperbound = 9219;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 3075; Standard deviation: 0
-const MODEL_0X19: u64 = 3075;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x1a(_gas: u64) -> u64 {
+    let upperbound = 75490;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 25166; Standard deviation: 0
-const MODEL_0X1A: u64 = 25166;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x1b(_gas: u64) -> u64 {
+    let upperbound = 36666;
+    let delta = 499;
+    upperbound + delta
+}
 
-// Average: 12163; Standard deviation: 30
-const MODEL_0X1B: u64 = 12223;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x1c(_gas: u64) -> u64 {
+    let upperbound = 40579;
+    let delta = 3154;
+    upperbound + delta
+}
 
-// Average: 11925; Standard deviation: 565
-const MODEL_0X1C: u64 = 13055;
+// SAR, approximated BY SHR
+#[inline]
+fn model_0x1d(_gas: u64) -> u64 {
+    model_0x1c(_gas)
+}
 
-// No data, approximated from SHL (0x1B) and SHR (0x1C)
-const MODEL_0X1D: u64 = 13000;
-
+// Linear regression model with delta
+#[inline]
 fn model_0x20(gas: u64) -> u64 {
-    82325 + 2317 * gas
+    let coef = 3360;
+    let intercept = 39248;
+    let delta = 35274;
+    coef * gas + intercept + delta
 }
 
-// Average: 2922; Standard deviation: 0
-const MODEL_0X30: u64 = 2922;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x30(_gas: u64) -> u64 {
+    let upperbound = 5838;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 1303; Standard deviation: 0
-const MODEL_0X31: u64 = 1303;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x31(_gas: u64) -> u64 {
+    let upperbound = 130222;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 2919; Standard deviation: 0
-const MODEL_0X32: u64 = 2919;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x32(_gas: u64) -> u64 {
+    let upperbound = 5832;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 2927; Standard deviation: 0
-const MODEL_0X33: u64 = 2927;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x33(_gas: u64) -> u64 {
+    let upperbound = 5847;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 3263; Standard deviation: 0
-const MODEL_0X34: u64 = 3263;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x34(_gas: u64) -> u64 {
+    let upperbound = 6520;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 27210; Standard deviation: 42
-const MODEL_0X35: u64 = 27294;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x35(_gas: u64) -> u64 {
+    let upperbound = 81623;
+    let delta = 332;
+    upperbound + delta
+}
 
-// Curated from graphs
-const MODEL_0X36: u64 = 10000;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x36(_gas: u64) -> u64 {
+    let upperbound = 6078;
+    let delta = 0;
+    upperbound + delta
+}
 
+// Linear regression model with delta
+#[inline]
 fn model_0x37(gas: u64) -> u64 {
-    77142 + 234 * gas
+    let coef = 159;
+    let intercept = 102200;
+    let delta = 144193;
+    coef * gas + intercept + delta
 }
-// Average: 2495; Standard deviation: 0
-const MODEL_0X38: u64 = 2495;
 
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x38(_gas: u64) -> u64 {
+    let upperbound = 6084;
+    let delta = 0;
+    upperbound + delta
+}
+
+// NOTE: This model will need more investigation.
+// Linear regression model with delta
+#[inline]
 fn model_0x39(gas: u64) -> u64 {
-    112156 + 198 * gas
+    let coef = 224;
+    let intercept = 98507;
+    let delta = 428497;
+    coef * gas + intercept + delta
 }
 
-// Average: 3272; Standard deviation: 0
-const MODEL_0X3A: u64 = 3272;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x3a(_gas: u64) -> u64 {
+    let upperbound = 6538;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 985; Standard deviation: 98
-const MODEL_0X3B: u64 = 1181;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x3b(_gas: u64) -> u64 {
+    let upperbound = 122188;
+    let delta = 17401;
+    upperbound + delta
+}
 
-// Average: 909; Standard deviation: 0
-const MODEL_0X3C: u64 = 909;
+// Linear regression model with delta
+#[inline]
+fn model_0x3c(gas: u64) -> u64 {
+    let coef = 608;
+    let intercept = 90487;
+    let delta = 0;
+    coef * gas + intercept + delta
+}
 
-// Average: 13698; Standard deviation: 1456
-const MODEL_0X3D: u64 = 16610;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x3d(_gas: u64) -> u64 {
+    let upperbound = 27390;
+    let delta = 0;
+    upperbound + delta
+}
 
+// Linear regression model with delta
+#[inline]
 fn model_0x3e(gas: u64) -> u64 {
-    83270 + 430 * gas
+    let coef = 4004;
+    let intercept = 70083;
+    let delta = 3987;
+    coef * gas + intercept + delta
 }
 
-// No data
-const MODEL_0X3F: u64 = DEFAULT_TICKS_PER_GAS;
-
-// No data
-const MODEL_0X40: u64 = DEFAULT_TICKS_PER_GAS;
-
-// Average: 2951; Standard deviation: 0
-const MODEL_0X41: u64 = 2951;
-
-// Average: 3290; Standard deviation: 0
-const MODEL_0X42: u64 = 3290;
-
-// Average: 3274; Standard deviation: 0
-const MODEL_0X43: u64 = 3274;
-
-// No data
-const MODEL_0X44: u64 = DEFAULT_TICKS_PER_GAS;
-
-// Average: 3407; Standard deviation: 0
-const MODEL_0X45: u64 = 3407;
-
-// Average: 13597; Standard deviation: 0
-const MODEL_0X46: u64 = 13597;
-
-// Average: 25634; Standard deviation: 295
-const MODEL_0X47: u64 = 26224;
-
-// Average: 13600; Standard deviation: 0
-const MODEL_0X48: u64 = 13600;
-
-// Average: 2294; Standard deviation: 0
-const MODEL_0X50: u64 = 2294;
-
-// Average: 16406; Standard deviation: 4
-const MODEL_0X51: u64 = 16414;
-
-fn model_0x52(_: u64) -> u64 {
-    70_000
+// EXTCODEHASH, approximated by EXTCODESIZE with the same gas value and never
+// recomputed.
+#[inline]
+fn model_0x3f(gas: u64) -> u64 {
+    model_0x3b(gas)
 }
 
-fn model_0x53(_: u64) -> u64 {
-    70_000
+// BLOCKHASH, approximated from EXTCODESIZE (which cost 100 gas, whereas
+// BLOCKHASH costs 20).
+#[inline]
+fn model_0x40(_gas: u64) -> u64 {
+    model_0x3b(100)
 }
 
-// Average: 2180; Standard deviation: 57
-const MODEL_0X54: u64 = 2294;
-
-// Manually patched, the model is
-// constant in ticks: 567242 in average, 59454 as standard deviation
-const MODEL_0X55: u64 = 620_000;
-
-// Average: 1100; Standard deviation: 0
-const MODEL_0X56: u64 = 1100;
-
-// Average: 1400; Standard deviation: 36
-const MODEL_0X57: u64 = 1472;
-
-// No data
-const MODEL_0X58: u64 = DEFAULT_TICKS_PER_GAS;
-
-// Average: 2984; Standard deviation: 0
-const MODEL_0X59: u64 = 2984;
-
-// Average: 3564; Standard deviation: 0
-const MODEL_0X5A: u64 = 3564;
-
-// Average: 4538; Standard deviation: 0
-const MODEL_0X5B: u64 = 4538;
-
-// No data
-const MODEL_0X5F: u64 = PUSH_DEFAULT;
-
-// Average: 1871; Standard deviation: 95
-const MODEL_0X60: u64 = 2061;
-
-// Average: 1905; Standard deviation: 303
-const MODEL_0X61: u64 = 2511;
-
-// Average: 1966; Standard deviation: 521
-const MODEL_0X62: u64 = 3008;
-
-// Average: 1974; Standard deviation: 1
-const MODEL_0X63: u64 = 1976;
-
-/// PUSH instruction are from 5F to 7F. For those we have no data for,
-/// we take the maximum value for the PUSH instruction we have.
-const PUSH_DEFAULT: u64 = 2680;
-
-// No data
-const MODEL_0X64: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X65: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X66: u64 = PUSH_DEFAULT;
-
-// Average: 1698; Standard deviation: 491
-const MODEL_0X67: u64 = 2680;
-
-// No data
-const MODEL_0X68: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X69: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X6A: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X6B: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X6C: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X6D: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X6E: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X6F: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X70: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X71: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X72: u64 = PUSH_DEFAULT;
-
-// Average: 1841; Standard deviation: 538
-const MODEL_0X73: u64 = 2917;
-
-// No data
-const MODEL_0X74: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X75: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X76: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X77: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X78: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X79: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X7A: u64 = PUSH_DEFAULT;
-
-// Average: 1875; Standard deviation: 66
-const MODEL_0X7B: u64 = 2007;
-
-// No data
-const MODEL_0X7C: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X7D: u64 = PUSH_DEFAULT;
-
-// No data
-const MODEL_0X7E: u64 = PUSH_DEFAULT;
-
-// Average: 2391; Standard deviation: 15
-const MODEL_0X7F: u64 = 2421;
-
-/// DUP are opcodes 80 to 8f. We use the maximum we have as default value.
-const DUP_DEFAULT: u64 = 1500;
-
-// Average: 1871; Standard deviation: 172
-const MODEL_0X80: u64 = 2215;
-
-// Average: 1874; Standard deviation: 119
-const MODEL_0X81: u64 = 2112;
-
-// Average: 1875; Standard deviation: 85
-const MODEL_0X82: u64 = 2045;
-
-// Average: 1876; Standard deviation: 421
-const MODEL_0X83: u64 = 2718;
-
-// Average: 1877; Standard deviation: 212
-const MODEL_0X84: u64 = 2301;
-
-// Average: 1878; Standard deviation: 51
-const MODEL_0X85: u64 = 1980;
-
-// Average: 1879; Standard deviation: 30
-const MODEL_0X86: u64 = 1939;
-
-// Average: 1880; Standard deviation: 1
-const MODEL_0X87: u64 = 1882;
-
-// Average: 1881; Standard deviation: 1
-const MODEL_0X88: u64 = 1883;
-
-// Average: 1882; Standard deviation: 1
-const MODEL_0X89: u64 = 1884;
-
-// Average: 1883; Standard deviation: 1
-const MODEL_0X8A: u64 = 1885;
-
-// Average: 1884; Standard deviation: 1
-const MODEL_0X8B: u64 = 1886;
-
-// Average: 1885; Standard deviation: 1
-const MODEL_0X8C: u64 = 1887;
-
-// No data
-const MODEL_0X8D: u64 = DUP_DEFAULT;
-
-// No data
-const MODEL_0X8E: u64 = DUP_DEFAULT;
-
-// No data
-const MODEL_0X8F: u64 = DUP_DEFAULT;
-
-/// SWAP opcodes are 90 to 9f. We use maximum as default value.
-const SWAP_DEFAULT: u64 = 1874;
-
-// Average: 1870; Standard deviation: 1
-const MODEL_0X90: u64 = 1872;
-
-// Average: 1871; Standard deviation: 1
-const MODEL_0X91: u64 = 1873;
-
-// Average: 1872; Standard deviation: 1
-const MODEL_0X92: u64 = 1874;
-
-// Average: 1873; Standard deviation: 1
-const MODEL_0X93: u64 = 1875;
-
-// Average: 1874; Standard deviation: 1
-const MODEL_0X94: u64 = 1876;
-
-// Average: 1875; Standard deviation: 1
-const MODEL_0X95: u64 = 1877;
-
-// Average: 1876; Standard deviation: 1
-const MODEL_0X96: u64 = 1878;
-
-// Average: 1877; Standard deviation: 1
-const MODEL_0X97: u64 = 1879;
-
-// Average: 1878; Standard deviation: 1
-const MODEL_0X98: u64 = 1880;
-
-// No data
-const MODEL_0X99: u64 = SWAP_DEFAULT;
-
-// No data
-const MODEL_0X9A: u64 = SWAP_DEFAULT;
-
-// No data
-const MODEL_0X9B: u64 = SWAP_DEFAULT;
-
-// No data
-const MODEL_0X9C: u64 = SWAP_DEFAULT;
-
-// No data
-const MODEL_0X9D: u64 = SWAP_DEFAULT;
-
-// No data
-const MODEL_0X9E: u64 = SWAP_DEFAULT;
-
-// No data
-const MODEL_0X9F: u64 = SWAP_DEFAULT;
-
-// No data, approximated from the other logs (a0 to a4)
-const MODEL_0XA0: u64 = 200;
-
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x41(_gas: u64) -> u64 {
+    let upperbound = 5895;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x42(_gas: u64) -> u64 {
+    let upperbound = 6574;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x43(_gas: u64) -> u64 {
+    let upperbound = 6541;
+    let delta = 0;
+    upperbound + delta
+}
+
+// PREVRANDAO, approximated from NUMBER
+#[inline]
+fn model_0x44(gas: u64) -> u64 {
+    model_0x43(gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x45(_gas: u64) -> u64 {
+    let upperbound = 6807;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x46(_gas: u64) -> u64 {
+    let upperbound = 27187;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x47(_gas: u64) -> u64 {
+    let upperbound = 130927;
+    let delta = 3186;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x48(_gas: u64) -> u64 {
+    let upperbound = 27205;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x50(_gas: u64) -> u64 {
+    let upperbound = 4582;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x51(_gas: u64) -> u64 {
+    let upperbound = 49314;
+    let delta = 57;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x52(_gas: u64) -> u64 {
+    let upperbound = 63417;
+    let delta = 5682;
+    upperbound + delta
+}
+
+// MSTORE8, approximated from MSTORE
+#[inline]
+fn model_0x53(_gas: u64) -> u64 {
+    model_0x52(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x54(_gas: u64) -> u64 {
+    let upperbound = 220163;
+    let delta = 5167;
+    upperbound + delta
+}
+
+// NOTE: this model has non constant gas and a linear regression with a negative
+// coefficient, but the values seems rather packed under the 650K ticks.
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x55(_gas: u64) -> u64 {
+    let upperbound = 631174;
+    let delta = 30657;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x56(_gas: u64) -> u64 {
+    let upperbound = 8788;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x57(_gas: u64) -> u64 {
+    let upperbound = 13986;
+    let delta = 808;
+    upperbound + delta
+}
+
+// PC, overapproximated from POP: it only a value from the runtime so i
+// is completely overapproximated.
+#[inline]
+fn model_0x58(_gas: u64) -> u64 {
+    model_0x50(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x59(_gas: u64) -> u64 {
+    let upperbound = 5959;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x5a(_gas: u64) -> u64 {
+    let upperbound = 7119;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x5b(_gas: u64) -> u64 {
+    let upperbound = 4529;
+    let delta = 0;
+    upperbound + delta
+}
+
+// PUSH0, overapproximated from PUSH1.
+#[inline]
+fn model_0x5f(_gas: u64) -> u64 {
+    model_0x60(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x60(_gas: u64) -> u64 {
+    let upperbound = 5603;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x61(_gas: u64) -> u64 {
+    let upperbound = 5706;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x62(_gas: u64) -> u64 {
+    let upperbound = 5887;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x63(_gas: u64) -> u64 {
+    let upperbound = 5912;
+    let delta = 0;
+    upperbound + delta
+}
+
+// PUSH5, overapproximated from PUSH8.
+#[inline]
+fn model_0x64(_gas: u64) -> u64 {
+    model_0x67(_gas)
+}
+
+// PUSH6, overapproximated from PUSH8.
+#[inline]
+fn model_0x65(_gas: u64) -> u64 {
+    model_0x67(_gas)
+}
+
+// PUSH7, overapproximated from PUSH8.
+#[inline]
+fn model_0x66(_gas: u64) -> u64 {
+    model_0x67(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x67(_gas: u64) -> u64 {
+    let upperbound = 6294;
+    let delta = 0;
+    upperbound + delta
+}
+
+// PUSH9, overapproximated from PUSH10.
+#[inline]
+fn model_0x68(_gas: u64) -> u64 {
+    model_0x69(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x69(_gas: u64) -> u64 {
+    let upperbound = 6566;
+    let delta = 0;
+    upperbound + delta
+}
+
+#[inline]
+fn model_0x6a(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x6b(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x6c(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x6d(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x6e(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x6f(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x70(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x71(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+#[inline]
+fn model_0x72(_gas: u64) -> u64 {
+    model_0x73(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x73(_gas: u64) -> u64 {
+    let upperbound = 6761;
+    let delta = 297;
+    upperbound + delta
+}
+
+#[inline]
+fn model_0x74(_gas: u64) -> u64 {
+    model_0x7b(_gas)
+}
+
+#[inline]
+fn model_0x75(_gas: u64) -> u64 {
+    model_0x7b(_gas)
+}
+
+#[inline]
+fn model_0x76(_gas: u64) -> u64 {
+    model_0x7b(_gas)
+}
+
+#[inline]
+fn model_0x77(_gas: u64) -> u64 {
+    model_0x7b(_gas)
+}
+
+#[inline]
+fn model_0x78(_gas: u64) -> u64 {
+    model_0x7b(_gas)
+}
+
+#[inline]
+fn model_0x79(_gas: u64) -> u64 {
+    model_0x7b(_gas)
+}
+
+#[inline]
+fn model_0x7a(_gas: u64) -> u64 {
+    model_0x7b(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x7b(_gas: u64) -> u64 {
+    let upperbound = 7081;
+    let delta = 274;
+    upperbound + delta
+}
+
+#[inline]
+fn model_0x7c(_gas: u64) -> u64 {
+    model_0x7f(_gas)
+}
+
+#[inline]
+fn model_0x7d(_gas: u64) -> u64 {
+    model_0x7f(_gas)
+}
+
+#[inline]
+fn model_0x7e(_gas: u64) -> u64 {
+    model_0x7f(_gas)
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x7f(_gas: u64) -> u64 {
+    let upperbound = 7163;
+    let delta = 331;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x80(_gas: u64) -> u64 {
+    let upperbound = 5602;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x81(_gas: u64) -> u64 {
+    let upperbound = 5611;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x82(_gas: u64) -> u64 {
+    let upperbound = 5614;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x83(_gas: u64) -> u64 {
+    let upperbound = 5617;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x84(_gas: u64) -> u64 {
+    let upperbound = 5620;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x85(_gas: u64) -> u64 {
+    let upperbound = 5623;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x86(_gas: u64) -> u64 {
+    let upperbound = 5626;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x87(_gas: u64) -> u64 {
+    let upperbound = 5629;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x88(_gas: u64) -> u64 {
+    let upperbound = 5632;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x89(_gas: u64) -> u64 {
+    let upperbound = 5635;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x8a(_gas: u64) -> u64 {
+    let upperbound = 5638;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x8b(_gas: u64) -> u64 {
+    let upperbound = 5641;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x8c(_gas: u64) -> u64 {
+    let upperbound = 5644;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x8d(_gas: u64) -> u64 {
+    let upperbound = 5647;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x8e(_gas: u64) -> u64 {
+    let upperbound = 5650;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x8f(_gas: u64) -> u64 {
+    let upperbound = 5653;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x90(_gas: u64) -> u64 {
+    let upperbound = 5599;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x91(_gas: u64) -> u64 {
+    let upperbound = 5602;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x92(_gas: u64) -> u64 {
+    let upperbound = 5605;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x93(_gas: u64) -> u64 {
+    let upperbound = 5608;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x94(_gas: u64) -> u64 {
+    let upperbound = 5611;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x95(_gas: u64) -> u64 {
+    let upperbound = 5614;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x96(_gas: u64) -> u64 {
+    let upperbound = 5617;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x97(_gas: u64) -> u64 {
+    let upperbound = 5620;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x98(_gas: u64) -> u64 {
+    let upperbound = 5623;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x99(_gas: u64) -> u64 {
+    let upperbound = 5626;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x9a(_gas: u64) -> u64 {
+    let upperbound = 5629;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x9b(_gas: u64) -> u64 {
+    let upperbound = 5632;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x9c(_gas: u64) -> u64 {
+    let upperbound = 5635;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0x9d(_gas: u64) -> u64 {
+    let upperbound = 5638;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Approximated from the other SWAPs, that increase of 3 ticks each time
+#[inline]
+fn model_0x9e(_gas: u64) -> u64 {
+    model_0x9d(_gas) + 3
+}
+
+// Approximated from the other SWAPs, that increase of 3 ticks each time
+#[inline]
+fn model_0x9f(_gas: u64) -> u64 {
+    model_0x9e(_gas) + 3
+}
+
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0xa0(_gas: u64) -> u64 {
+    let upperbound = 79189;
+    let delta = 0;
+    upperbound + delta
+}
+
+// Linear regression model with delta
+#[inline]
 fn model_0xa1(gas: u64) -> u64 {
-    64879 + 17 * gas
+    let coef = 18;
+    let intercept = 65445;
+    let delta = 2453;
+    coef * gas + intercept + delta
 }
 
+// Linear regression model with delta
+#[inline]
 fn model_0xa2(gas: u64) -> u64 {
-    53681 + 22 * gas
+    let coef = 27;
+    let intercept = 45729;
+    let delta = 111963;
+    coef * gas + intercept + delta
 }
 
+// Linear regression model with delta
+#[inline]
 fn model_0xa3(gas: u64) -> u64 {
-    63497 + 12 * gas
+    let coef = 10;
+    let intercept = 67131;
+    let delta = 43;
+    coef * gas + intercept + delta
 }
 
+// Linear regression model with delta
+#[inline]
 fn model_0xa4(gas: u64) -> u64 {
-    31313 + 27 * gas
+    let coef = 27;
+    let intercept = 31611;
+    let delta = 1355;
+    coef * gas + intercept + delta
 }
 
+// Linear regression model with delta
+#[inline]
 fn model_0xf0(gas: u64) -> u64 {
-    39 * gas
+    let coef = 49;
+    let intercept = 6049713;
+    let delta = 32642078;
+    coef * gas + intercept + delta
 }
 
-// Average: 214; Standard deviation: 2285
-const MODEL_0XF1: u64 = 4784;
+// NOTE: CALL could be better optimized potentially.
+// Linear regression model with delta
+#[inline]
+fn model_0xf1(gas: u64) -> u64 {
+    let coef = 556;
+    // Manually craft from:
+    // let intercept = -4086019;
+    // let delta = 51318604;
+    coef * gas + 47232585
+}
 
-// No data, approximated from CALL
-const MODEL_0XF2: u64 = 4784;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0xf2(_gas: u64) -> u64 {
+    let upperbound = 2313960;
+    let delta = 0;
+    upperbound + delta
+}
 
-// Average: 47326; Standard deviation: 545
-const MODEL_0XF3: u64 = 48416;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0xf3(_gas: u64) -> u64 {
+    let upperbound = 52332;
+    let delta = 625;
+    upperbound + delta
+}
 
+// Linear regression model with delta
+#[inline]
 fn model_0xf4(gas: u64) -> u64 {
-    1892717 + 43 * gas
+    let coef = 41;
+    let intercept = 1937715;
+    let delta = 593892;
+    coef * gas + intercept + delta
 }
 
-// Average: 123; Standard deviation: 0
-const MODEL_0XF5: u64 = 123;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0xf5(_gas: u64) -> u64 {
+    let upperbound = 53856587;
+    let delta = 48758846;
+    upperbound + delta
+}
 
-// Average: 3285; Standard deviation: 2365
-const MODEL_0XFA: u64 = 8015;
+// Linear regression model with delta
+#[inline]
+fn model_0xfa(gas: u64) -> u64 {
+    let coef = 8105;
+    // Manually crafted from:
+    // let intercept = -112933;
+    // let delta = 1424;
+    // Set 0 as intercept + delta, otherwise its negactive
+    coef * gas
+}
 
-// Average: 52342; Standard deviation: 0
-const MODEL_0XFD: u64 = 52342;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0xfd(_gas: u64) -> u64 {
+    let upperbound = 52333;
+    let delta = 0;
+    upperbound + delta
+}
 
-// No data
-const MODEL_0XFE: u64 = DEFAULT_TICKS_PER_GAS;
+// INVALID opcode, same as REVERT, overapproximated in practice
+#[inline]
+fn model_0xfe(_gas: u64) -> u64 {
+    model_0xfd(_gas)
+}
 
-// Average: 93; Standard deviation: 0
-const MODEL_0XFF: u64 = 93;
+// Upperbound model, gas is ignored but kept to ease the automatic update from the script
+#[inline]
+fn model_0xff(_gas: u64) -> u64 {
+    let upperbound = 463774;
+    let delta = 0;
+    upperbound + delta
+}
 
 pub fn ticks(opcode: &Opcode, gas: u64) -> u64 {
     match opcode.as_u8() {
-        0x0 => MODEL_0X00, // constant, no gas accounted
-        0x1 => MODEL_0X01 * gas,
-        0x2 => MODEL_0X02 * gas,
-        0x3 => MODEL_0X03 * gas,
-        0x4 => MODEL_0X04 * gas,
-        0x5 => MODEL_0X05 * gas,
-        0x6 => MODEL_0X06 * gas,
-        0x7 => MODEL_0X07 * gas,
-        0x8 => MODEL_0X08 * gas,
-        0x9 => MODEL_0X09 * gas,
-        0xa => MODEL_0X0A * gas,
-        0xb => MODEL_0X0B * gas,
-        0x10 => MODEL_0X10 * gas,
-        0x11 => MODEL_0X11 * gas,
-        0x12 => MODEL_0X12 * gas,
-        0x13 => MODEL_0X13 * gas,
-        0x14 => MODEL_0X14 * gas,
-        0x15 => MODEL_0X15 * gas,
-        0x16 => MODEL_0X16 * gas,
-        0x17 => MODEL_0X17 * gas,
-        0x18 => MODEL_0X18 * gas,
-        0x19 => MODEL_0X19 * gas,
-        0x1a => MODEL_0X1A * gas,
-        0x1b => MODEL_0X1B * gas,
-        0x1c => MODEL_0X1C * gas,
-        0x1d => MODEL_0X1D * gas,
+        0x00 => model_0x00(gas), // constant, no gas accounted
+        0x01 => model_0x01(gas),
+        0x02 => model_0x02(gas),
+        0x03 => model_0x03(gas),
+        0x04 => model_0x04(gas),
+        0x05 => model_0x05(gas),
+        0x06 => model_0x06(gas),
+        0x07 => model_0x07(gas),
+        0x08 => model_0x08(gas),
+        0x09 => model_0x09(gas),
+        0x0a => model_0x0a(gas),
+        0x0b => model_0x0b(gas),
+        0x10 => model_0x10(gas),
+        0x11 => model_0x11(gas),
+        0x12 => model_0x12(gas),
+        0x13 => model_0x13(gas),
+        0x14 => model_0x14(gas),
+        0x15 => model_0x15(gas),
+        0x16 => model_0x16(gas),
+        0x17 => model_0x17(gas),
+        0x18 => model_0x18(gas),
+        0x19 => model_0x19(gas),
+        0x1a => model_0x1a(gas),
+        0x1b => model_0x1b(gas),
+        0x1c => model_0x1c(gas),
+        0x1d => model_0x1d(gas),
         0x20 => model_0x20(gas),
-        0x30 => MODEL_0X30 * gas,
-        0x31 => MODEL_0X31 * gas,
-        0x32 => MODEL_0X32 * gas,
-        0x33 => MODEL_0X33 * gas,
-        0x34 => MODEL_0X34 * gas,
-        0x35 => MODEL_0X35 * gas,
-        0x36 => MODEL_0X36 * gas,
+        0x30 => model_0x30(gas),
+        0x31 => model_0x31(gas),
+        0x32 => model_0x32(gas),
+        0x33 => model_0x33(gas),
+        0x34 => model_0x34(gas),
+        0x35 => model_0x35(gas),
+        0x36 => model_0x36(gas),
         0x37 => model_0x37(gas),
-        0x38 => MODEL_0X38 * gas,
+        0x38 => model_0x38(gas),
         0x39 => model_0x39(gas),
-        0x3a => MODEL_0X3A * gas,
-        0x3b => MODEL_0X3B * gas,
-        0x3c => MODEL_0X3C * gas,
-        0x3d => MODEL_0X3D * gas,
+        0x3a => model_0x3a(gas),
+        0x3b => model_0x3b(gas),
+        0x3c => model_0x3c(gas),
+        0x3d => model_0x3d(gas),
         0x3e => model_0x3e(gas),
-        0x3f => MODEL_0X3F * gas,
-        0x40 => MODEL_0X40 * gas,
-        0x41 => MODEL_0X41 * gas,
-        0x42 => MODEL_0X42 * gas,
-        0x43 => MODEL_0X43 * gas,
-        0x44 => MODEL_0X44 * gas,
-        0x45 => MODEL_0X45 * gas,
-        0x46 => MODEL_0X46 * gas,
-        0x47 => MODEL_0X47 * gas,
-        0x48 => MODEL_0X48 * gas,
-        0x50 => MODEL_0X50 * gas,
-        0x51 => MODEL_0X51 * gas,
+        0x3f => model_0x3f(gas),
+        0x40 => model_0x40(gas),
+        0x41 => model_0x41(gas),
+        0x42 => model_0x42(gas),
+        0x43 => model_0x43(gas),
+        0x44 => model_0x44(gas),
+        0x45 => model_0x45(gas),
+        0x46 => model_0x46(gas),
+        0x47 => model_0x47(gas),
+        0x48 => model_0x48(gas),
+        0x50 => model_0x50(gas),
+        0x51 => model_0x51(gas),
         0x52 => model_0x52(gas),
         0x53 => model_0x53(gas),
-        0x54 => MODEL_0X54 * gas,
-        0x55 => MODEL_0X55, // Manually patched: the model is constant in ticks
-        0x56 => MODEL_0X56 * gas,
-        0x57 => MODEL_0X57 * gas,
-        0x58 => MODEL_0X58 * gas,
-        0x59 => MODEL_0X59 * gas,
-        0x5a => MODEL_0X5A * gas,
-        0x5b => MODEL_0X5B * gas,
-        0x5f => MODEL_0X5F * gas,
-        0x60 => MODEL_0X60 * gas,
-        0x61 => MODEL_0X61 * gas,
-        0x62 => MODEL_0X62 * gas,
-        0x63 => MODEL_0X63 * gas,
-        0x64 => MODEL_0X64 * gas,
-        0x65 => MODEL_0X65 * gas,
-        0x66 => MODEL_0X66 * gas,
-        0x67 => MODEL_0X67 * gas,
-        0x68 => MODEL_0X68 * gas,
-        0x69 => MODEL_0X69 * gas,
-        0x6a => MODEL_0X6A * gas,
-        0x6b => MODEL_0X6B * gas,
-        0x6c => MODEL_0X6C * gas,
-        0x6d => MODEL_0X6D * gas,
-        0x6e => MODEL_0X6E * gas,
-        0x6f => MODEL_0X6F * gas,
-        0x70 => MODEL_0X70 * gas,
-        0x71 => MODEL_0X71 * gas,
-        0x72 => MODEL_0X72 * gas,
-        0x73 => MODEL_0X73 * gas,
-        0x74 => MODEL_0X74 * gas,
-        0x75 => MODEL_0X75 * gas,
-        0x76 => MODEL_0X76 * gas,
-        0x77 => MODEL_0X77 * gas,
-        0x78 => MODEL_0X78 * gas,
-        0x79 => MODEL_0X79 * gas,
-        0x7a => MODEL_0X7A * gas,
-        0x7b => MODEL_0X7B * gas,
-        0x7c => MODEL_0X7C * gas,
-        0x7d => MODEL_0X7D * gas,
-        0x7e => MODEL_0X7E * gas,
-        0x7f => MODEL_0X7F * gas,
-        0x80 => MODEL_0X80 * gas,
-        0x81 => MODEL_0X81 * gas,
-        0x82 => MODEL_0X82 * gas,
-        0x83 => MODEL_0X83 * gas,
-        0x84 => MODEL_0X84 * gas,
-        0x85 => MODEL_0X85 * gas,
-        0x86 => MODEL_0X86 * gas,
-        0x87 => MODEL_0X87 * gas,
-        0x88 => MODEL_0X88 * gas,
-        0x89 => MODEL_0X89 * gas,
-        0x8a => MODEL_0X8A * gas,
-        0x8b => MODEL_0X8B * gas,
-        0x8c => MODEL_0X8C * gas,
-        0x8d => MODEL_0X8D * gas,
-        0x8e => MODEL_0X8E * gas,
-        0x8f => MODEL_0X8F * gas,
-        0x90 => MODEL_0X90 * gas,
-        0x91 => MODEL_0X91 * gas,
-        0x92 => MODEL_0X92 * gas,
-        0x93 => MODEL_0X93 * gas,
-        0x94 => MODEL_0X94 * gas,
-        0x95 => MODEL_0X95 * gas,
-        0x96 => MODEL_0X96 * gas,
-        0x97 => MODEL_0X97 * gas,
-        0x98 => MODEL_0X98 * gas,
-        0x99 => MODEL_0X99 * gas,
-        0x9a => MODEL_0X9A * gas,
-        0x9b => MODEL_0X9B * gas,
-        0x9c => MODEL_0X9C * gas,
-        0x9d => MODEL_0X9D * gas,
-        0x9e => MODEL_0X9E * gas,
-        0x9f => MODEL_0X9F * gas,
-        0xa0 => MODEL_0XA0 * gas,
+        0x54 => model_0x54(gas),
+        0x55 => model_0x55(gas),
+        0x56 => model_0x56(gas),
+        0x57 => model_0x57(gas),
+        0x58 => model_0x58(gas),
+        0x59 => model_0x59(gas),
+        0x5a => model_0x5a(gas),
+        0x5b => model_0x5b(gas),
+        0x5f => model_0x5f(gas),
+        0x60 => model_0x60(gas),
+        0x61 => model_0x61(gas),
+        0x62 => model_0x62(gas),
+        0x63 => model_0x63(gas),
+        0x64 => model_0x64(gas),
+        0x65 => model_0x65(gas),
+        0x66 => model_0x66(gas),
+        0x67 => model_0x67(gas),
+        0x68 => model_0x68(gas),
+        0x69 => model_0x69(gas),
+        0x6a => model_0x6a(gas),
+        0x6b => model_0x6b(gas),
+        0x6c => model_0x6c(gas),
+        0x6d => model_0x6d(gas),
+        0x6e => model_0x6e(gas),
+        0x6f => model_0x6f(gas),
+        0x70 => model_0x70(gas),
+        0x71 => model_0x71(gas),
+        0x72 => model_0x72(gas),
+        0x73 => model_0x73(gas),
+        0x74 => model_0x74(gas),
+        0x75 => model_0x75(gas),
+        0x76 => model_0x76(gas),
+        0x77 => model_0x77(gas),
+        0x78 => model_0x78(gas),
+        0x79 => model_0x79(gas),
+        0x7a => model_0x7a(gas),
+        0x7b => model_0x7b(gas),
+        0x7c => model_0x7c(gas),
+        0x7d => model_0x7d(gas),
+        0x7e => model_0x7e(gas),
+        0x7f => model_0x7f(gas),
+        0x80 => model_0x80(gas),
+        0x81 => model_0x81(gas),
+        0x82 => model_0x82(gas),
+        0x83 => model_0x83(gas),
+        0x84 => model_0x84(gas),
+        0x85 => model_0x85(gas),
+        0x86 => model_0x86(gas),
+        0x87 => model_0x87(gas),
+        0x88 => model_0x88(gas),
+        0x89 => model_0x89(gas),
+        0x8a => model_0x8a(gas),
+        0x8b => model_0x8b(gas),
+        0x8c => model_0x8c(gas),
+        0x8d => model_0x8d(gas),
+        0x8e => model_0x8e(gas),
+        0x8f => model_0x8f(gas),
+        0x90 => model_0x90(gas),
+        0x91 => model_0x91(gas),
+        0x92 => model_0x92(gas),
+        0x93 => model_0x93(gas),
+        0x94 => model_0x94(gas),
+        0x95 => model_0x95(gas),
+        0x96 => model_0x96(gas),
+        0x97 => model_0x97(gas),
+        0x98 => model_0x98(gas),
+        0x99 => model_0x99(gas),
+        0x9a => model_0x9a(gas),
+        0x9b => model_0x9b(gas),
+        0x9c => model_0x9c(gas),
+        0x9d => model_0x9d(gas),
+        0x9e => model_0x9e(gas),
+        0x9f => model_0x9f(gas),
+        0xa0 => model_0xa0(gas),
         0xa1 => model_0xa1(gas),
         0xa2 => model_0xa2(gas),
         0xa3 => model_0xa3(gas),
         0xa4 => model_0xa4(gas),
         0xf0 => model_0xf0(gas),
-        0xf1 => MODEL_0XF1 * gas,
-        0xf2 => MODEL_0XF2 * gas,
-        0xf3 => MODEL_0XF3, // constant, no gas accounted
+        0xf1 => model_0xf1(gas),
+        0xf2 => model_0xf2(gas),
+        0xf3 => model_0xf3(gas),
         0xf4 => model_0xf4(gas),
-        0xf5 => MODEL_0XF5 * gas,
-        0xfa => MODEL_0XFA * gas,
-        0xfd => MODEL_0XFD, // constant, no gas accounted
-        0xfe => MODEL_0XFE * gas,
-        0xff => MODEL_0XFF * gas,
+        0xf5 => model_0xf5(gas),
+        0xfa => model_0xfa(gas),
+        0xfd => model_0xfd(gas),
+        0xfe => model_0xfe(gas),
+        0xff => model_0xff(gas),
         _ => DEFAULT_TICKS_PER_GAS * gas,
     }
 }
