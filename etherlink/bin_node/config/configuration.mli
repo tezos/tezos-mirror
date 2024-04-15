@@ -23,6 +23,22 @@ type time_between_blocks =
           if there are no transactions to include, a block is produced after
            [time_between_blocks]. *)
 
+type blueprints_publisher_config = {
+  max_blueprints_lag : int;
+      (** The maximum advance (in blueprints) the Sequencer accepts to
+          have before trying to send its backlog again. *)
+  max_blueprints_ahead : int;
+      (** The maximum advance (in blueprints) the Sequencer
+          accepts. *)
+  max_blueprints_catchup : int;
+      (** The maximum number of blueprints the Sequencer resends at
+          once. *)
+  catchup_cooldown : int;
+      (** The maximum number of Layer 1 blocks the Sequencer waits
+          after resending its blueprints before trying to catch-up
+          again. *)
+}
+
 type sequencer = {
   preimages : string;  (** Path to the preimages directory. *)
   preimages_endpoint : Uri.t option;
@@ -32,6 +48,7 @@ type sequencer = {
       (** The maximum number of chunks per blueprints. *)
   private_rpc_port : int option;  (** Port for internal RPC services *)
   sequencer : Client_keys.sk_uri;  (** The key used to sign the blueprints. *)
+  blueprints_publisher_config : blueprints_publisher_config;
 }
 
 type observer = {
@@ -91,6 +108,10 @@ val sequencer_config_dft :
   ?max_number_of_chunks:int ->
   ?private_rpc_port:int ->
   sequencer:Client_keys.sk_uri ->
+  ?max_blueprints_lag:int ->
+  ?max_blueprints_ahead:int ->
+  ?max_blueprints_catchup:int ->
+  ?catchup_cooldown:int ->
   unit ->
   sequencer
 
@@ -110,7 +131,6 @@ module Cli : sig
     ?rpc_port:int ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
-    ?log_filter:log_filter_config ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
@@ -124,6 +144,13 @@ module Cli : sig
     ?private_rpc_port:int ->
     ?sequencer_key:Client_keys.sk_uri ->
     ?evm_node_endpoint:Uri.t ->
+    ?log_filter_max_nb_blocks:int ->
+    ?log_filter_max_nb_logs:int ->
+    ?log_filter_chunk_size:int ->
+    ?max_blueprints_lag:int ->
+    ?max_blueprints_ahead:int ->
+    ?max_blueprints_catchup:int ->
+    ?catchup_cooldown:int ->
     unit ->
     t
 
@@ -134,7 +161,6 @@ module Cli : sig
     ?rpc_port:int ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
-    ?log_filter:log_filter_config ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
@@ -148,6 +174,13 @@ module Cli : sig
     ?private_rpc_port:int ->
     ?sequencer_key:Client_keys.sk_uri ->
     ?evm_node_endpoint:Uri.t ->
+    ?max_blueprints_lag:int ->
+    ?max_blueprints_ahead:int ->
+    ?max_blueprints_catchup:int ->
+    ?catchup_cooldown:int ->
+    ?log_filter_max_nb_blocks:int ->
+    ?log_filter_max_nb_logs:int ->
+    ?log_filter_chunk_size:int ->
     unit ->
     t tzresult Lwt.t
 end

@@ -7,10 +7,7 @@
 
 val start :
   rollup_node_endpoint:Uri.t ->
-  max_blueprints_lag:int ->
-  max_blueprints_ahead:int ->
-  max_blueprints_catchup:int ->
-  catchup_cooldown:int ->
+  config:Configuration.blueprints_publisher_config ->
   latest_level_seen:Z.t ->
   unit ->
   unit tzresult Lwt.t

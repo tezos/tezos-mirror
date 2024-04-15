@@ -44,6 +44,9 @@ module Params = struct
 
   let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
 
+  let int64 =
+    Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Int64.of_string s))
+
   let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
@@ -138,36 +141,32 @@ let private_rpc_port_arg =
     Params.int
 
 let maximum_blueprints_lag_arg =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"maximum-blueprints-lag"
     ~placeholder:"LAG"
-    ~default:"500"
     ~doc:
       "The maximum advance (in blueprints) the Sequencer accepts to have \
        before trying to send its backlog again."
     Params.int
 
 let maximum_blueprints_ahead_arg =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"maximum-blueprints-ahead"
     ~placeholder:"AHEAD"
-    ~default:"100"
     ~doc:"The maximum advance (in blueprints) the Sequencer accepts"
     Params.int
 
 let maximum_blueprints_catchup_arg =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"maximum-blueprints-catch-up"
     ~placeholder:"CATCH_UP"
-    ~default:"1_000"
     ~doc:"The maximum number of blueprints the Sequencer resends at once."
     Params.int
 
 let catchup_cooldown_arg =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"catch-up-cooldown"
     ~placeholder:"COOLDOWN"
-    ~default:"10"
     ~doc:
       "The maximum number of Layer 1 blocks the Sequencer waits after \
        resending its blueprints before trying to catch-up again."
@@ -358,30 +357,27 @@ let parent_hash_arg =
          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 
 let tx_pool_timeout_limit_arg =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"tx-pool-timeout-limit"
     ~placeholder:"3_600"
-    ~default:"3_600"
     ~doc:"Transaction timeout limit inside the transaction pool (in seconds)."
-    Params.int
+    Params.int64
 
 let tx_pool_addr_limit_arg =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"tx-pool-addr-limit"
     ~placeholder:"4_000"
-    ~default:"4_000"
     ~doc:"Maximum allowed addresses inside the transaction pool."
-    Params.int
+    Params.int64
 
 let tx_pool_tx_per_addr_limit_arg =
-  Tezos_clic.default_arg
+  Tezos_clic.arg
     ~long:"tx-pool-tx-per-addr-limit"
     ~placeholder:"16"
-    ~default:"16"
     ~doc:
       "Maximum allowed transactions per user address inside the transaction \
        pool."
-    Params.int
+    Params.int64
 
 let sequencer_key_arg =
   Tezos_clic.arg
@@ -390,12 +386,35 @@ let sequencer_key_arg =
     ~placeholder:"edsk..."
     Params.string
 
+let log_filter_max_nb_blocks_arg =
+  Tezos_clic.arg
+    ~long:"max-number-blocks"
+    ~doc:"maximum number of blocks kept in the log."
+    ~placeholder:"100"
+    Params.int
+
+let log_filter_max_nb_logs_arg =
+  Tezos_clic.arg
+    ~long:"max-number-logs"
+    ~doc:"maximum number of logs kept."
+    ~placeholder:"1000"
+    Params.int
+
+let log_filter_chunk_size_arg =
+  Tezos_clic.arg
+    ~long:"chunk-size"
+    ~doc:
+      "Blocks to be filtered are split in chunks, which will be filtered in \
+       sequence. Within each chunk, the block filtering is done concurrently."
+    ~placeholder:"10"
+    Params.int
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in proxy mode"
-    (args8
+    (args11
        data_dir_arg
        devmode_arg
        rpc_addr_arg
@@ -403,7 +422,10 @@ let proxy_command =
        cors_allowed_origins_arg
        cors_allowed_headers_arg
        verbose_arg
-       keep_alive_arg)
+       keep_alive_arg
+       log_filter_max_nb_blocks_arg
+       log_filter_max_nb_logs_arg
+       log_filter_chunk_size_arg)
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -419,7 +441,10 @@ let proxy_command =
            cors_origins,
            cors_headers,
            verbose,
-           keep_alive )
+           keep_alive,
+           log_filter_max_nb_blocks,
+           log_filter_max_nb_logs,
+           log_filter_chunk_size )
          rollup_node_endpoint
          () ->
       let* config =
@@ -431,6 +456,9 @@ let proxy_command =
           ?rpc_port
           ?cors_origins
           ?cors_headers
+          ?log_filter_max_nb_blocks
+          ?log_filter_max_nb_logs
+          ?log_filter_chunk_size
           ~rollup_node_endpoint
           ~verbose
           ()
@@ -468,31 +496,36 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args24
-       data_dir_arg
-       rpc_addr_arg
-       rpc_port_arg
-       private_rpc_port_arg
-       cors_allowed_origins_arg
-       cors_allowed_headers_arg
-       verbose_arg
-       kernel_arg
-       preimages_arg
-       preimages_endpoint_arg
-       time_between_blocks_arg
-       genesis_timestamp_arg
-       maximum_blueprints_lag_arg
-       maximum_blueprints_ahead_arg
-       maximum_blueprints_catchup_arg
-       catchup_cooldown_arg
-       max_number_of_chunks_arg
-       devmode_arg
-       keep_alive_arg
-       wallet_dir_arg
-       tx_pool_timeout_limit_arg
-       tx_pool_addr_limit_arg
-       tx_pool_tx_per_addr_limit_arg
-       (Client_config.password_filename_arg ()))
+    (merge_options
+       (args24
+          data_dir_arg
+          rpc_addr_arg
+          rpc_port_arg
+          private_rpc_port_arg
+          cors_allowed_origins_arg
+          cors_allowed_headers_arg
+          verbose_arg
+          kernel_arg
+          preimages_arg
+          preimages_endpoint_arg
+          time_between_blocks_arg
+          genesis_timestamp_arg
+          maximum_blueprints_lag_arg
+          maximum_blueprints_ahead_arg
+          maximum_blueprints_catchup_arg
+          catchup_cooldown_arg
+          max_number_of_chunks_arg
+          devmode_arg
+          keep_alive_arg
+          wallet_dir_arg
+          tx_pool_timeout_limit_arg
+          tx_pool_addr_limit_arg
+          tx_pool_tx_per_addr_limit_arg
+          (Client_config.password_filename_arg ()))
+       (args3
+          log_filter_max_nb_blocks_arg
+          log_filter_max_nb_logs_arg
+          log_filter_chunk_size_arg))
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -502,30 +535,33 @@ let sequencer_command =
          Params.rollup_node_endpoint
     @@ prefixes ["signing"; "with"]
     @@ Params.sequencer_key @@ stop)
-    (fun ( data_dir,
-           rpc_addr,
-           rpc_port,
-           private_rpc_port,
-           cors_origins,
-           cors_headers,
-           verbose,
-           kernel,
-           preimages,
-           preimages_endpoint,
-           time_between_blocks,
-           genesis_timestamp,
-           max_blueprints_lag,
-           max_blueprints_ahead,
-           max_blueprints_catchup,
-           catchup_cooldown,
-           max_number_of_chunks,
-           devmode,
-           keep_alive,
-           wallet_dir,
-           tx_pool_timeout_limit,
-           tx_pool_addr_limit,
-           tx_pool_tx_per_addr_limit,
-           password_filename )
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             private_rpc_port,
+             cors_origins,
+             cors_headers,
+             verbose,
+             kernel,
+             preimages,
+             preimages_endpoint,
+             time_between_blocks,
+             genesis_timestamp,
+             max_blueprints_lag,
+             max_blueprints_ahead,
+             max_blueprints_catchup,
+             catchup_cooldown,
+             max_number_of_chunks,
+             devmode,
+             keep_alive,
+             wallet_dir,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             password_filename ),
+           ( log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size ) )
          rollup_node_endpoint
          sequencer_str
          () ->
@@ -541,9 +577,9 @@ let sequencer_command =
           ?rpc_port
           ?cors_origins
           ?cors_headers
-          ~tx_pool_timeout_limit:(Int64.of_int tx_pool_timeout_limit)
-          ~tx_pool_addr_limit:(Int64.of_int tx_pool_addr_limit)
-          ~tx_pool_tx_per_addr_limit:(Int64.of_int tx_pool_tx_per_addr_limit)
+          ?tx_pool_timeout_limit
+          ?tx_pool_addr_limit
+          ?tx_pool_tx_per_addr_limit
           ~keep_alive
           ~rollup_node_endpoint
           ~verbose
@@ -553,6 +589,13 @@ let sequencer_command =
           ?max_number_of_chunks
           ?private_rpc_port
           ~sequencer_key
+          ?max_blueprints_lag
+          ?max_blueprints_ahead
+          ?max_blueprints_catchup
+          ?catchup_cooldown
+          ?log_filter_max_nb_blocks
+          ?log_filter_max_nb_logs
+          ?log_filter_chunk_size
           ()
       in
       let*! () =
@@ -579,13 +622,20 @@ let sequencer_command =
       in
       let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       if devmode then
+        let*? sequencer_config =
+          Configuration.sequencer_config_exn configuration
+        in
         Evm_node_lib_dev.Sequencer.main
           ~data_dir
           ~rollup_node_endpoint
-          ~max_blueprints_lag
-          ~max_blueprints_ahead
-          ~max_blueprints_catchup
-          ~catchup_cooldown
+          ~max_blueprints_lag:
+            sequencer_config.blueprints_publisher_config.max_blueprints_lag
+          ~max_blueprints_ahead:
+            sequencer_config.blueprints_publisher_config.max_blueprints_ahead
+          ~max_blueprints_catchup:
+            sequencer_config.blueprints_publisher_config.max_blueprints_catchup
+          ~catchup_cooldown:
+            sequencer_config.blueprints_publisher_config.catchup_cooldown
           ?genesis_timestamp
           ~cctxt:(wallet_ctxt :> Client_context.wallet)
           ~sequencer:sequencer_key
@@ -593,13 +643,20 @@ let sequencer_command =
           ?kernel
           ()
       else
+        let*? sequencer_config =
+          Configuration.sequencer_config_exn configuration
+        in
         Evm_node_lib_prod.Sequencer.main
           ~data_dir
           ~rollup_node_endpoint
-          ~max_blueprints_lag
-          ~max_blueprints_ahead
-          ~max_blueprints_catchup
-          ~catchup_cooldown
+          ~max_blueprints_lag:
+            sequencer_config.blueprints_publisher_config.max_blueprints_lag
+          ~max_blueprints_ahead:
+            sequencer_config.blueprints_publisher_config.max_blueprints_ahead
+          ~max_blueprints_catchup:
+            sequencer_config.blueprints_publisher_config.max_blueprints_catchup
+          ~catchup_cooldown:
+            sequencer_config.blueprints_publisher_config.catchup_cooldown
           ?genesis_timestamp
           ~cctxt:(wallet_ctxt :> Client_context.wallet)
           ~sequencer:sequencer_key

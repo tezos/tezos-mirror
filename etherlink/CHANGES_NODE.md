@@ -4,6 +4,14 @@
 
 ### Features
 
+- Add config for: (!12920)
+  - max blueprints lag
+  - max blueprints ahead
+  - max blueprints catchup
+  - catchup cooldown
+  - log filter max number of blocks
+  - log filter max number of logs
+  - log filter chunk size
 - Generalize 'keep-alive' option to all mode and rpc to the rollup
   node, not only when bootstrapping the proxy mode. 'keep-alive' retry
   rpcs to the rollup node when it fails with a connection
