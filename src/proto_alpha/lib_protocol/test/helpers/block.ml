@@ -1264,11 +1264,13 @@ let current_cycle b =
   let current_level = b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
 
-let last_block_of_cycle b =
-  let blocks_per_cycle = b.constants.blocks_per_cycle in
-  let current_level = b.header.shell.level in
-  let mod_plus_one = Int32.(rem (succ current_level) blocks_per_cycle) in
+let last_level_of_cycle (constants : Constants.Parametric.t) ~level =
+  let blocks_per_cycle = constants.blocks_per_cycle in
+  let mod_plus_one = Int32.(rem (succ level) blocks_per_cycle) in
   Int32.(equal mod_plus_one zero)
+
+let last_block_of_cycle b =
+  last_level_of_cycle b.constants ~level:b.header.shell.level
 
 let bake_until_cycle ?baking_mode ?policy cycle (b : t) =
   let open Lwt_result_syntax in
