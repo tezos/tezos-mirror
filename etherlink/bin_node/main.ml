@@ -530,20 +530,10 @@ let sequencer_command =
          sequencer_str
          () ->
       let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-      let* sequencer =
+      let* sequencer_key =
         Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
       in
       let* configuration =
-        let sequencer =
-          Configuration.sequencer_config_dft
-            ?preimages
-            ?preimages_endpoint
-            ?time_between_blocks
-            ?max_number_of_chunks
-            ?private_rpc_port
-            ~sequencer
-            ()
-        in
         Cli.create_or_read_config
           ~data_dir
           ~devmode
@@ -555,9 +545,14 @@ let sequencer_command =
           ~tx_pool_addr_limit:(Int64.of_int tx_pool_addr_limit)
           ~tx_pool_tx_per_addr_limit:(Int64.of_int tx_pool_tx_per_addr_limit)
           ~keep_alive
-          ~sequencer
           ~rollup_node_endpoint
           ~verbose
+          ?preimages
+          ?preimages_endpoint
+          ?time_between_blocks
+          ?max_number_of_chunks
+          ?private_rpc_port
+          ~sequencer_key
           ()
       in
       let*! () =
@@ -593,7 +588,7 @@ let sequencer_command =
           ~catchup_cooldown
           ?genesis_timestamp
           ~cctxt:(wallet_ctxt :> Client_context.wallet)
-          ~sequencer
+          ~sequencer:sequencer_key
           ~configuration
           ?kernel
           ()
@@ -607,7 +602,7 @@ let sequencer_command =
           ~catchup_cooldown
           ?genesis_timestamp
           ~cctxt:(wallet_ctxt :> Client_context.wallet)
-          ~sequencer
+          ~sequencer:sequencer_key
           ~configuration
           ?kernel
           ())
@@ -652,13 +647,6 @@ let observer_command =
              () ->
   let open Evm_node_lib_dev in
   let* config =
-    let observer =
-      Configuration.observer_config_dft
-        ?preimages
-        ?preimages_endpoint
-        ~evm_node_endpoint
-        ()
-    in
     Cli.create_or_read_config
       ~data_dir
       ~devmode:true
@@ -668,8 +656,10 @@ let observer_command =
       ?cors_origins
       ?cors_headers
       ~rollup_node_endpoint
-      ~observer
       ~verbose
+      ?preimages
+      ?preimages_endpoint
+      ~evm_node_endpoint
       ()
   in
   let*! () =
@@ -1148,29 +1138,6 @@ mode.|}
            force,
            verbose )
          () ->
-      let sequencer =
-        Option.map
-          (fun sequencer ->
-            Configuration.sequencer_config_dft
-              ?preimages
-              ?preimages_endpoint
-              ?time_between_blocks
-              ?max_number_of_chunks
-              ?private_rpc_port
-              ~sequencer
-              ())
-          sequencer_key
-      in
-      let observer =
-        Option.map
-          (fun evm_node_endpoint ->
-            Configuration.observer_config_dft
-              ?preimages
-              ?preimages_endpoint
-              ~evm_node_endpoint
-              ())
-          evm_node_endpoint
-      in
       let* config =
         Configuration.Cli.create_or_read_config
           ~data_dir
@@ -1179,11 +1146,16 @@ mode.|}
           ?cors_origins
           ?cors_headers
           ~keep_alive
-          ?sequencer
-          ?observer
           ~devmode
           ?rollup_node_endpoint
           ~verbose
+          ?preimages
+          ?preimages_endpoint
+          ?time_between_blocks
+          ?max_number_of_chunks
+          ?private_rpc_port
+          ?sequencer_key
+          ?evm_node_endpoint
           ()
       in
       Configuration.save ~force ~data_dir config)

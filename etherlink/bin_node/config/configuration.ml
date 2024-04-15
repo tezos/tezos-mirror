@@ -327,9 +327,33 @@ let observer_config_exn {observer; _} =
 
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-      ~rollup_node_endpoint ~verbose () =
+      ?log_filter ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit ~keep_alive ~rollup_node_endpoint ~verbose
+      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint () =
+    let sequencer =
+      Option.map
+        (fun sequencer ->
+          sequencer_config_dft
+            ?preimages
+            ?preimages_endpoint
+            ?time_between_blocks
+            ?max_number_of_chunks
+            ?private_rpc_port
+            ~sequencer
+            ())
+        sequencer_key
+    in
+    let observer =
+      Option.map
+        (fun evm_node_endpoint ->
+          observer_config_dft
+            ?preimages
+            ?preimages_endpoint
+            ~evm_node_endpoint
+            ())
+        evm_node_endpoint
+    in
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -356,20 +380,85 @@ module Cli = struct
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-      ?rollup_node_endpoint ~verbose configuration =
+      ?cors_headers ?log_filter ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
+      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint configuration =
+    let sequencer =
+      let sequencer_config = configuration.sequencer in
+      match sequencer_config with
+      | Some sequencer_config ->
+          Some
+            {
+              preimages =
+                Option.value ~default:sequencer_config.preimages preimages;
+              preimages_endpoint =
+                Option.either
+                  preimages_endpoint
+                  sequencer_config.preimages_endpoint;
+              time_between_blocks =
+                Option.value
+                  ~default:sequencer_config.time_between_blocks
+                  time_between_blocks;
+              max_number_of_chunks =
+                Option.value
+                  ~default:sequencer_config.max_number_of_chunks
+                  max_number_of_chunks;
+              private_rpc_port =
+                Option.either private_rpc_port sequencer_config.private_rpc_port;
+              sequencer =
+                Option.value ~default:sequencer_config.sequencer sequencer_key;
+            }
+      | None ->
+          Option.map
+            (fun sequencer ->
+              sequencer_config_dft
+                ?preimages
+                ?preimages_endpoint
+                ?time_between_blocks
+                ?max_number_of_chunks
+                ?private_rpc_port
+                ~sequencer
+                ())
+            sequencer_key
+    in
+    let observer =
+      match configuration.observer with
+      | Some observer_config ->
+          Some
+            {
+              preimages =
+                Option.value ~default:observer_config.preimages preimages;
+              preimages_endpoint =
+                Option.either
+                  preimages_endpoint
+                  observer_config.preimages_endpoint;
+              evm_node_endpoint =
+                Option.value
+                  ~default:observer_config.evm_node_endpoint
+                  evm_node_endpoint;
+            }
+      | None ->
+          Option.map
+            (fun evm_node_endpoint ->
+              observer_config_dft
+                ?preimages
+                ?preimages_endpoint
+                ~evm_node_endpoint
+                ())
+            evm_node_endpoint
+    in
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
-      devmode;
+      devmode = devmode || configuration.devmode;
       cors_origins =
         Option.value ~default:configuration.cors_origins cors_origins;
       cors_headers =
         Option.value ~default:configuration.cors_headers cors_headers;
       log_filter = Option.value ~default:configuration.log_filter log_filter;
-      sequencer = Option.either configuration.sequencer sequencer;
-      observer = Option.either configuration.observer observer;
+      sequencer;
+      observer;
       max_active_connections = configuration.max_active_connections;
       tx_pool_timeout_limit =
         Option.value
@@ -392,9 +481,10 @@ module Cli = struct
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-      ?rollup_node_endpoint ~verbose () =
+      ?cors_headers ?log_filter ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
+      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -424,8 +514,13 @@ module Cli = struct
           ?cors_headers
           ?log_filter
           ~keep_alive
-          ?sequencer
-          ?observer
+          ?sequencer_key
+          ?evm_node_endpoint
+          ?preimages
+          ?preimages_endpoint
+          ?time_between_blocks
+          ?max_number_of_chunks
+          ?private_rpc_port
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
@@ -449,8 +544,13 @@ module Cli = struct
           ?cors_headers
           ~keep_alive
           ?log_filter
-          ?sequencer
-          ?observer
+          ?sequencer_key
+          ?evm_node_endpoint
+          ?preimages
+          ?preimages_endpoint
+          ?time_between_blocks
+          ?max_number_of_chunks
+          ?private_rpc_port
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit

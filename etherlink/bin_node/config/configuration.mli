@@ -108,17 +108,22 @@ module Cli : sig
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
-    ?cors_origins:string trace ->
-    ?cors_headers:string trace ->
+    ?cors_origins:string list ->
+    ?cors_headers:string list ->
     ?log_filter:log_filter_config ->
-    ?sequencer:sequencer ->
-    ?observer:observer ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
     rollup_node_endpoint:Uri.t ->
     verbose:bool ->
+    ?preimages:string ->
+    ?preimages_endpoint:Uri.t ->
+    ?time_between_blocks:time_between_blocks ->
+    ?max_number_of_chunks:int ->
+    ?private_rpc_port:int ->
+    ?sequencer_key:Client_keys.sk_uri ->
+    ?evm_node_endpoint:Uri.t ->
     unit ->
     t
 
@@ -130,14 +135,19 @@ module Cli : sig
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?log_filter:log_filter_config ->
-    ?sequencer:sequencer ->
-    ?observer:observer ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     verbose:bool ->
+    ?preimages:string ->
+    ?preimages_endpoint:Uri.t ->
+    ?time_between_blocks:time_between_blocks ->
+    ?max_number_of_chunks:int ->
+    ?private_rpc_port:int ->
+    ?sequencer_key:Client_keys.sk_uri ->
+    ?evm_node_endpoint:Uri.t ->
     unit ->
     t tzresult Lwt.t
 end
