@@ -31,7 +31,7 @@ const-decoder = { version = "0.3.0" }
 rlp = "0.5.2"
 
 # ethereum VM
-evm = { version = "0.39.1", default-features = false }
+evm = { path = "../sputnikvm", default-features = false }
 aurora-engine-modexp = { version = "1.0", default-features = false }
 bn = { package = "substrate-bn", version = "0.6", default-features = false }
 
