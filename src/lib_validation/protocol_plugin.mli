@@ -145,6 +145,19 @@ module type T = sig
         been successfully validated by the protocol. *)
     val fee_needed_to_overtake :
       op_to_overtake:operation -> candidate_op:operation -> int64 option
+
+    (** Protocol context *)
+    type ctxt
+
+    (** Return the protocol context *)
+    val get_context :
+      Tezos_protocol_environment.Context.t ->
+      head:Block_header.shell_header ->
+      ctxt tzresult Lwt.t
+
+    (** Return the sources from the operation *)
+    val sources_from_operation :
+      ctxt -> operation -> Signature.public_key_hash list Lwt.t
   end
 end
 

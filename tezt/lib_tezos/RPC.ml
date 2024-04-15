@@ -475,7 +475,8 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
   make ~query_string GET path Fun.id
 
 let get_chain_mempool_pending_operations ?(chain = "main") ?version ?validated
-    ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
+    ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes
+    ?sources () =
   let query_string =
     Query_arg.opt "version" Fun.id version
     @ Query_arg.opt_bool "validated" validated
@@ -487,6 +488,7 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?validated
         "validation_pass"
         (fun name vp -> (name, string_of_int vp))
         validation_passes
+    @ Query_arg.opt_list "source" (fun name d -> (name, d)) sources
   in
   make
     ~query_string

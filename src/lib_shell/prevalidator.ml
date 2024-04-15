@@ -159,6 +159,7 @@ type 'prevalidation_t parameters = {
     'prevalidation_t tzresult Lwt.t;
       (** Create a new empty prevalidation state, recycling some elements
             of the provided previous prevalidation state. *)
+  chain_store : Store.chain_store;
 }
 
 (** The type needed for the implementation of [Make] below, but
@@ -1007,6 +1008,17 @@ module Make
         | Some validation_pass ->
             List.mem ~equal:Compare.Int.equal validation_pass validation_passes)
 
+  let filter_sources ctxt sources (op : protocol_operation) =
+    let open Lwt_syntax in
+    match (ctxt, sources) with
+    | None, _ | _, [] -> return_true
+    | Some ctxt, sources ->
+        let+ op_sources = Proto.Plugin.sources_from_operation ctxt op in
+        List.exists
+          (fun source ->
+            List.mem ~equal:Signature.Public_key_hash.equal source sources)
+          op_sources
+
   let build_rpc_directory w =
     lazy
       (let open Lwt_result_syntax in
@@ -1085,75 +1097,132 @@ module Make
           !dir
           (Proto_services.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
           (fun pv params () ->
-            let validated =
-              if params#validated then
-                Classification.Sized_map.to_map
-                  pv.shell.classification.validated
-                |> Operation_hash.Map.to_seq
-                |> Seq.filter_map (fun (oph, op) ->
-                       if
-                         filter_validation_passes
-                           params#validation_passes
-                           op.protocol
-                       then Some (oph, op.protocol)
-                       else None)
-                |> List.of_seq
-              else []
+            let open Lwt_syntax in
+            let sources =
+              List.map_e Signature.Public_key_hash.of_b58check params#sources
             in
-            let process_map map =
-              let open Operation_hash in
-              Map.filter_map
-                (fun _oph (op, error) ->
+            match sources with
+            | Error errs -> Tezos_rpc.Answer.fail errs
+            | Ok sources ->
+                let* ctxt =
+                  if sources = [] then Lwt.return_none
+                  else
+                    let* context =
+                      (* prevalidation_t.t contains the context, get_context returns it *)
+                      Prevalidation_t.get_context
+                        pv.shell.parameters.chain_store
+                        ~predecessor:pv.shell.predecessor
+                        ~timestamp:(Time.System.to_protocol pv.shell.timestamp)
+                    in
+                    match context with
+                    | Error errs ->
+                        let* () =
+                          Events.(emit pending_operation_context_error) errs
+                        in
+                        Lwt.return_none
+                    | Ok context -> (
+                        let* ctxt =
+                          Proto.Plugin.get_context
+                            context
+                            ~head:
+                              (Store.Block.header pv.shell.predecessor).shell
+                        in
+                        match ctxt with
+                        | Error errs ->
+                            let* () =
+                              Events.(emit pending_operation_context_error) errs
+                            in
+                            Lwt.return_none
+                        | Ok ctxt -> Lwt.return_some ctxt)
+                in
+                let filter oph protocol res =
+                  let* is_in_sources = filter_sources ctxt sources protocol in
                   if
-                    filter_validation_passes
-                      params#validation_passes
-                      op.protocol
-                  then Some (op.protocol, error)
-                  else None)
-                map
-            in
-            let refused =
-              if params#refused then
-                process_map (Classification.map pv.shell.classification.refused)
-              else Operation_hash.Map.empty
-            in
-            let outdated =
-              if params#outdated then
-                process_map
-                  (Classification.map pv.shell.classification.outdated)
-              else Operation_hash.Map.empty
-            in
-            let branch_refused =
-              if params#branch_refused then
-                process_map
-                  (Classification.map pv.shell.classification.branch_refused)
-              else Operation_hash.Map.empty
-            in
-            let branch_delayed =
-              if params#branch_delayed then
-                process_map
-                  (Classification.map pv.shell.classification.branch_delayed)
-              else Operation_hash.Map.empty
-            in
-            let unprocessed =
-              Operation_hash.Map.filter_map
-                (fun _ {protocol; _} ->
-                  if filter_validation_passes params#validation_passes protocol
-                  then Some protocol
-                  else None)
-                (Pending_ops.operations pv.shell.pending)
-            in
-            let pending_operations =
-              {
-                Proto_services.Mempool.validated;
-                refused;
-                outdated;
-                branch_refused;
-                branch_delayed;
-                unprocessed;
-              }
-            in
-            Tezos_rpc.Answer.return (params#version, pending_operations)) ;
+                    is_in_sources
+                    && filter_validation_passes
+                         params#validation_passes
+                         protocol
+                  then return @@ Some (oph, res)
+                  else return_none
+                in
+                let* validated =
+                  if params#validated then
+                    let filtered_seq =
+                      Lwt_seq.filter_map_s
+                        (fun (oph, op) -> filter oph op.protocol op.protocol)
+                        (Lwt_seq.of_seq
+                           (Classification.Sized_map.to_map
+                              pv.shell.classification.validated
+                           |> Operation_hash.Map.to_seq))
+                    in
+                    Lwt_seq.to_list filtered_seq
+                  else return_nil
+                in
+                let process_map map =
+                  let open Operation_hash in
+                  let seq =
+                    Lwt_seq.filter_map_s
+                      (fun (oph, (op, error)) ->
+                        filter oph op.protocol (op.protocol, error))
+                      (Lwt_seq.of_seq (Map.to_seq map))
+                  in
+                  let* l = Lwt_seq.to_list seq in
+                  return @@ Map.of_seq @@ List.to_seq l
+                in
+                let* refused =
+                  if params#refused then
+                    process_map
+                      (Classification.map pv.shell.classification.refused)
+                  else Lwt.return Operation_hash.Map.empty
+                in
+                let* outdated =
+                  if params#outdated then
+                    process_map
+                      (Classification.map pv.shell.classification.outdated)
+                  else Lwt.return Operation_hash.Map.empty
+                in
+                let* branch_refused =
+                  if params#branch_refused then
+                    process_map
+                      (Classification.map
+                         pv.shell.classification.branch_refused)
+                  else Lwt.return Operation_hash.Map.empty
+                in
+                let* branch_delayed =
+                  if params#branch_delayed then
+                    process_map
+                      (Classification.map
+                         pv.shell.classification.branch_delayed)
+                  else Lwt.return Operation_hash.Map.empty
+                in
+                let* unprocessed =
+                  let open Operation_hash in
+                  Map.fold_s
+                    (fun oph {protocol; _} acc ->
+                      let* is_in_sources =
+                        filter_sources ctxt sources protocol
+                      in
+                      if
+                        is_in_sources
+                        && filter_validation_passes
+                             params#validation_passes
+                             protocol
+                      then return @@ Map.add oph protocol acc
+                      else return acc)
+                    (Pending_ops.operations pv.shell.pending)
+                    Map.empty
+                in
+                let pending_operations =
+                  {
+                    Proto_services.Mempool.validated;
+                    refused;
+                    outdated;
+                    branch_refused;
+                    branch_delayed;
+                    unprocessed;
+                  }
+                in
+                Tezos_rpc.Answer.return (params#version, pending_operations)) ;
       dir :=
         Tezos_rpc.Directory.register
           !dir
@@ -1354,7 +1423,7 @@ module Make
           }
       in
       let classification = Classification.create classification_parameters in
-      let parameters = {limits; tools = Arg.tools; flush} in
+      let parameters = {limits; tools = Arg.tools; chain_store; flush} in
       let shell =
         {
           classification;
