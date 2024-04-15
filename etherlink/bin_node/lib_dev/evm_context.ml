@@ -557,6 +557,7 @@ module State = struct
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
     in
+    let*! () = Lwt_utils_unix.create_dir preimages in
     let* index =
       Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
     in
