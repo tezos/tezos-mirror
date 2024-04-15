@@ -1026,19 +1026,19 @@ let transaction_nonce bytes =
   if String.starts_with ~prefix:"01" bytes then
     (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _])
-    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _; _]) ->
-        let+ nonce = Rlp.decode_z nonce in
-        nonce
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
-  else if String.starts_with ~prefix:"02" bytes then
-    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
-    match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _])
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _]) ->
         let+ nonce = Rlp.decode_z nonce in
         nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _])
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _; _]) ->
+        let+ nonce = Rlp.decode_z nonce in
+        nonce
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else
     (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
@@ -1053,19 +1053,19 @@ let transaction_gas_limit bytes =
   if String.starts_with ~prefix:"01" bytes then
     (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _])
-    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _; _; _; _]) ->
-        let+ gas_limit = Rlp.decode_z gas_limit in
-        gas_limit
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
-  else if String.starts_with ~prefix:"02" bytes then
-    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
-    match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _])
-    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _; _; _; _]) ->
+    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _; _; _]) ->
         let+ gas_limit = Rlp.decode_z gas_limit in
         gas_limit
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _; _; _; _; _]) ->
+        let+ gas_limit = Rlp.decode_z gas_limit in
+        gas_limit
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else
     (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
@@ -1081,16 +1081,16 @@ let transaction_gas_price bytes =
   if String.starts_with ~prefix:"01" bytes then
     (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _])
-    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _; _; _; _]) ->
+    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _])
+    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _; _; _]) ->
         let* gas_price = Rlp.decode_z gas_price in
         return gas_price
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
   else if String.starts_with ~prefix:"02" bytes then
     (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _])
-    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _; _; _]) ->
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _; _; _; _]) ->
         (* Normally, max_priority_fee_per_gas would also be a fee paid per gas in
            addition to base fee per gas.
            This would incentivise miners to include the transaction.
@@ -1101,7 +1101,7 @@ let transaction_gas_price bytes =
            the data availability fee. *)
         let* max_fee_per_gas = Rlp.decode_z max_fee_per_gas in
         return max_fee_per_gas
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else
     (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
