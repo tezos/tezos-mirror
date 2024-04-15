@@ -819,7 +819,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 620000,
+            estimated_ticks_used: 1187236,
         }));
 
         assert_eq!(expected_result, result);
@@ -1026,7 +1026,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 60782,
+            estimated_ticks_used: 64163,
         }));
 
         assert_eq!(expected_result, result);
@@ -1091,7 +1091,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 64708,
+            estimated_ticks_used: 63539,
         }));
 
         assert_eq!(expected_result, result);
@@ -1152,7 +1152,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 52333,
         }));
 
         assert_eq!(expected_result, result);
@@ -1210,7 +1210,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 0,
+            estimated_ticks_used: 63539,
         }));
 
         assert_eq!(expected_result, result);
@@ -1533,7 +1533,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 526736689,
+            estimated_ticks_used: 532678536,
         }));
 
         // assert that call succeeds
@@ -1629,7 +1629,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 539221139,
+            estimated_ticks_used: 532095791,
         }));
 
         // assert that call succeeds
@@ -1753,7 +1753,7 @@ mod test {
             logs: vec![log_record1, log_record2],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 4788726,
+            estimated_ticks_used: 48062519,
         }));
 
         assert_eq!(result, expected_result);
@@ -1861,7 +1861,7 @@ mod test {
             logs: vec![log_record1],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 2670903,
+            estimated_ticks_used: 47793126,
         }));
 
         assert_eq!(result, expected_result);
@@ -1956,7 +1956,7 @@ mod test {
             logs: vec![],
             result: Some(vec![]),
             withdrawals: vec![],
-            estimated_ticks_used: 24928566,
+            estimated_ticks_used: 50578554,
         }));
 
         assert_eq!(result, expected_result);
@@ -2075,7 +2075,7 @@ mod test {
             logs: vec![],
             result: None,
             withdrawals: vec![],
-            estimated_ticks_used: 9763688566,
+            estimated_ticks_used: 50630887,
         }));
 
         assert_eq!(result, expected_result);
@@ -2173,7 +2173,7 @@ mod test {
             logs: vec![],
             result: Some(chain_id_bytes.into()),
             withdrawals: vec![],
-            estimated_ticks_used: 164159,
+            estimated_ticks_used: 166052,
         }));
         assert_eq!(result, expected_result);
     }
@@ -2251,7 +2251,7 @@ mod test {
             logs: vec![],
             result: Some(base_fee_per_gas_bytes.into()),
             withdrawals: vec![],
-            estimated_ticks_used: 164165,
+            estimated_ticks_used: 166070,
         }));
         assert_eq!(result, expected_result);
     }
