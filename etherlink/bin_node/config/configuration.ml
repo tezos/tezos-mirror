@@ -20,7 +20,7 @@ type sequencer = {
   time_between_blocks : time_between_blocks;
   max_number_of_chunks : int;
   private_rpc_port : int option;
-  sequencer : Signature.public_key_hash;
+  sequencer : Client_keys.sk_uri;
 }
 
 type observer = {
@@ -147,7 +147,7 @@ let sequencer_encoding =
         time_between_blocks,
         max_number_of_chunks,
         private_rpc_port,
-        sequencer ))
+        Client_keys.string_of_sk_uri sequencer ))
     (fun ( preimages,
            preimages_endpoint,
            time_between_blocks,
@@ -160,7 +160,7 @@ let sequencer_encoding =
         time_between_blocks;
         max_number_of_chunks;
         private_rpc_port;
-        sequencer;
+        sequencer = Client_keys.sk_uri_of_string sequencer;
       })
     (obj6
        (dft "preimages" string default_preimages)
@@ -174,7 +174,7 @@ let sequencer_encoding =
           "private-rpc-port"
           ~description:"RPC port for private server"
           uint16)
-       (req "sequencer" Signature.Public_key_hash.encoding))
+       (req "sequencer" string))
 
 let observer_encoding =
   let open Data_encoding in

@@ -31,8 +31,7 @@ type sequencer = {
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
   private_rpc_port : int option;  (** Port for internal RPC services *)
-  sequencer : Signature.public_key_hash;
-      (** The key used to sign the blueprints. *)
+  sequencer : Client_keys.sk_uri;  (** The key used to sign the blueprints. *)
 }
 
 type observer = {
@@ -91,7 +90,7 @@ val sequencer_config_dft :
   ?time_between_blocks:time_between_blocks ->
   ?max_number_of_chunks:int ->
   ?private_rpc_port:int ->
-  sequencer:Signature.public_key_hash ->
+  sequencer:Client_keys.sk_uri ->
   unit ->
   sequencer
 
