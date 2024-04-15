@@ -179,6 +179,64 @@ let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
+let resign_hosted_batches ctxt operations =
+  let open Lwt_result_syntax in
+  let rec partition acc curr : packed_contents list -> packed_contents_list list
+      = function
+    | [] ->
+        let batch =
+          match Operation.of_list (List.rev curr) with
+          | Ok x -> x
+          | Error _ -> assert false
+        in
+        List.rev (batch :: acc)
+    | (Contents (Manager_operation {operation = Host _; _}) as op) :: r ->
+        if curr = [] then partition acc [op] r
+        else
+          let batch =
+            match Operation.of_list (List.rev curr) with
+            | Ok x -> x
+            | Error _ -> assert false
+          in
+          partition (batch :: acc) [op] r
+    | (Contents (Manager_operation _) as op) :: r ->
+        partition acc (op :: curr) r
+    | _ -> assert false
+  in
+  let partitions = partition [] [] operations in
+  let resign_partition (Contents_list contents) =
+    match contents with
+    | Cons (Manager_operation ({operation = Host {guest; _}; _} as host_op), r)
+      ->
+        let sponsor_unsigned_contents =
+          Cons
+            ( Manager_operation
+                {
+                  host_op with
+                  operation = Host {guest; guest_signature = Signature.zero};
+                },
+              r )
+        in
+        let* guest_account = Context.Contract.manager ctxt (Implicit guest) in
+        let guest_signature =
+          raw_sign
+            guest_account.sk
+            (Context.branch ctxt)
+            (Contents_list sponsor_unsigned_contents)
+        in
+        return
+          (Operation.to_list
+             (Contents_list
+                (Cons
+                   ( Manager_operation
+                       {host_op with operation = Host {guest; guest_signature}},
+                     r ))))
+    | Single (Manager_operation _ as op) -> return [Contents op]
+    | _ -> assert false
+  in
+  let* l = List.map_es resign_partition partitions in
+  return (List.concat l)
+
 let batch_operations ?(recompute_counters = false) ~source ctxt
     (operations : packed_operation list) =
   let open Lwt_result_wrap_syntax in
@@ -192,19 +250,47 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
   in
   let* operations =
     if recompute_counters then
-      let* counter = Context.Contract.counter ctxt source in
+      let module CounterMap = Signature.Public_key_hash.Map in
+      let* source_counter = Context.Contract.counter ctxt source in
+      let pkh = Context.Contract.pkh in
+      let counter_map =
+        CounterMap.singleton (pkh source) (Manager_counter.succ source_counter)
+      in
+      let return_and_incr_counter map pkh =
+        let* next_counter =
+          CounterMap.find pkh map |> function
+          | None ->
+              let* c = Context.Contract.counter ctxt (Implicit pkh) in
+              return (Manager_counter.succ c)
+          | Some c -> return c
+        in
+        return
+          ( next_counter,
+            CounterMap.add pkh (Manager_counter.succ next_counter) map )
+      in
       (* Update counters and transform into a contents_list *)
-      let _, rev_operations =
-        List.fold_left
-          (fun (counter, acc) -> function
+      let* has_host, _, rev_operations =
+        List.fold_left_es
+          (fun (has_host, counter_map, acc) -> function
             | Contents (Manager_operation m) ->
-                ( Manager_counter.succ counter,
-                  Contents (Manager_operation {m with counter}) :: acc )
-            | x -> (counter, x :: acc))
-          (Manager_counter.succ counter, [])
+                let has_host =
+                  has_host
+                  || match m.operation with Host _ -> true | _ -> false
+                in
+                let* counter, counter_map =
+                  return_and_incr_counter counter_map m.source
+                in
+                return
+                  ( has_host,
+                    counter_map,
+                    Contents (Manager_operation {m with counter}) :: acc )
+            | x -> return (has_host, counter_map, x :: acc))
+          (false, counter_map, [])
           operations
       in
-      return (List.rev rev_operations)
+      let operations = List.rev rev_operations in
+      if has_host then resign_hosted_batches ctxt operations
+      else return operations
     else return operations
   in
   let* account = Context.Contract.manager ctxt source in
