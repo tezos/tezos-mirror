@@ -4,6 +4,11 @@
 
 ### Features
 
+- Add `run <mode>` command and deprecate other commands (!12789). Now
+  the preferred way to run any mode are:
+  - `run proxy`
+  - `run sequencer`
+  - `run observer`
 - Add config for: (!12920)
   - max blueprints lag
   - max blueprints ahead

@@ -449,11 +449,54 @@ let assert_rollup_node_endpoint_equal ~arg ~param =
       ]
   else Ok ()
 
+let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
+    ?cors_headers ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
+    ?log_filter_chunk_size ?rollup_node_endpoint ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~verbose () =
+  let open Lwt_result_syntax in
+  let* config =
+    Cli.create_or_read_config
+      ~data_dir
+      ~devmode
+      ~keep_alive
+      ?rpc_addr
+      ?rpc_port
+      ?cors_origins
+      ?cors_headers
+      ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs
+      ?log_filter_chunk_size
+      ?rollup_node_endpoint
+      ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit
+      ~verbose
+      ()
+  in
+  let*! () =
+    let open Tezos_base_unix.Internal_event_unix in
+    init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
+  in
+  let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
+  let* () =
+    if config.devmode then Evm_node_lib_dev.Proxy.main config
+    else
+      Evm_node_lib_prod.Proxy.main
+        config
+        ~keep_alive
+        ~rollup_node_endpoint:config.rollup_node_endpoint
+  in
+  let wait, _resolve = Lwt.wait () in
+  let* () = wait in
+  return_unit
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
-    ~desc:"Start the EVM node in proxy mode"
+    ~desc:
+      "Start the EVM node in proxy mode. DEPRECATED, please uses the `run \
+       proxy` command."
     common_config_args
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
     @@ param
@@ -488,39 +531,23 @@ let proxy_command =
               ~param:rollup_node_endpoint)
           rollup_node_endpoint_from_arg
       in
-      let* config =
-        Cli.create_or_read_config
-          ~data_dir
-          ~devmode
-          ~keep_alive
-          ?rpc_addr
-          ?rpc_port
-          ?cors_origins
-          ?cors_headers
-          ?log_filter_max_nb_blocks
-          ?log_filter_max_nb_logs
-          ?log_filter_chunk_size
-          ~rollup_node_endpoint
-          ?tx_pool_timeout_limit
-          ?tx_pool_addr_limit
-          ?tx_pool_tx_per_addr_limit
-          ~verbose
-          ()
-      in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
-      in
-      let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
-      let* () =
-        if config.devmode then Evm_node_lib_dev.Proxy.main config
-        else
-          Evm_node_lib_prod.Proxy.main config ~keep_alive ~rollup_node_endpoint
-      in
-
-      let wait, _resolve = Lwt.wait () in
-      let* () = wait in
-      return_unit)
+      start_proxy
+        ~data_dir
+        ~devmode
+        ~keep_alive
+        ?rpc_addr
+        ?rpc_port
+        ?cors_origins
+        ?cors_headers
+        ?log_filter_max_nb_blocks
+        ?log_filter_max_nb_logs
+        ?log_filter_chunk_size
+        ~rollup_node_endpoint
+        ?tx_pool_timeout_limit
+        ?tx_pool_addr_limit
+        ?tx_pool_tx_per_addr_limit
+        ~verbose
+        ())
 
 let register_wallet ?password_filename ~wallet_dir () =
   let wallet_ctxt =
@@ -534,11 +561,107 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
+let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
+    ?rpc_port ?cors_origins ?cors_headers ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
+    ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
+    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ?sequencer_str
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
+    ?log_filter_chunk_size ?genesis_timestamp ?kernel () =
+  let open Lwt_result_syntax in
+  let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
+  let* sequencer_key =
+    Option.map_es
+      (Client_keys.Secret_key.parse_source_string wallet_ctxt)
+      sequencer_str
+  in
+  let* configuration =
+    Cli.create_or_read_config
+      ~data_dir
+      ~devmode
+      ?rpc_addr
+      ?rpc_port
+      ?cors_origins
+      ?cors_headers
+      ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit
+      ~keep_alive
+      ?rollup_node_endpoint
+      ~verbose
+      ?preimages
+      ?preimages_endpoint
+      ?time_between_blocks
+      ?max_number_of_chunks
+      ?private_rpc_port
+      ?sequencer_key
+      ?max_blueprints_lag
+      ?max_blueprints_ahead
+      ?max_blueprints_catchup
+      ?catchup_cooldown
+      ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs
+      ?log_filter_chunk_size
+      ()
+  in
+  let*! () =
+    let open Tezos_base_unix.Internal_event_unix in
+    let config =
+      make_with_defaults
+        ~verbosity:configuration.verbose
+        ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
+          (* Show only above Info rpc_server events, they are not
+             relevant as we do not have a REST-API server. If not
+             set, the daily logs are polluted with these
+             uninformative logs. *)
+        ~daily_logs_section_prefixes:
+          [
+            ("rpc_server", Notice);
+            ("rpc_server", Warning);
+            ("rpc_server", Error);
+            ("rpc_server", Fatal);
+          ]
+        ()
+    in
+    init ~config ()
+  in
+  let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
+  if configuration.devmode then
+    Evm_node_lib_dev.Sequencer.main
+      ~data_dir
+      ?genesis_timestamp
+      ~cctxt:(wallet_ctxt :> Client_context.wallet)
+      ~configuration
+      ?kernel
+      ()
+  else
+    let*? sequencer_config = Configuration.sequencer_config_exn configuration in
+    Evm_node_lib_prod.Sequencer.main
+      ~data_dir
+      ~rollup_node_endpoint:configuration.rollup_node_endpoint
+      ~max_blueprints_lag:
+        sequencer_config.blueprints_publisher_config.max_blueprints_lag
+      ~max_blueprints_ahead:
+        sequencer_config.blueprints_publisher_config.max_blueprints_ahead
+      ~max_blueprints_catchup:
+        sequencer_config.blueprints_publisher_config.max_blueprints_catchup
+      ~catchup_cooldown:
+        sequencer_config.blueprints_publisher_config.catchup_cooldown
+      ?genesis_timestamp
+      ~cctxt:(wallet_ctxt :> Client_context.wallet)
+      ~sequencer:sequencer_config.sequencer
+      ~configuration
+      ?kernel
+      ()
+
 let sequencer_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
-    ~desc:"Start the EVM node in sequencer mode"
+    ~desc:
+      "Start the EVM node in sequencer mode. DEPRECATED, please uses `run \
+       sequencer` command."
     (merge_options
        common_config_args
        (args13
@@ -603,97 +726,81 @@ let sequencer_command =
               ~param:rollup_node_endpoint)
           rollup_node_endpoint_from_arg
       in
-      let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-      let* sequencer_key =
-        Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
-      in
-      let* configuration =
-        Cli.create_or_read_config
-          ~data_dir
-          ~devmode
-          ?rpc_addr
-          ?rpc_port
-          ?cors_origins
-          ?cors_headers
-          ?tx_pool_timeout_limit
-          ?tx_pool_addr_limit
-          ?tx_pool_tx_per_addr_limit
-          ~keep_alive
-          ~rollup_node_endpoint
-          ~verbose
-          ?preimages
-          ?preimages_endpoint
-          ?time_between_blocks
-          ?max_number_of_chunks
-          ?private_rpc_port
-          ~sequencer_key
-          ?max_blueprints_lag
-          ?max_blueprints_ahead
-          ?max_blueprints_catchup
-          ?catchup_cooldown
-          ?log_filter_max_nb_blocks
-          ?log_filter_max_nb_logs
-          ?log_filter_chunk_size
-          ()
-      in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config =
-          make_with_defaults
-            ~verbosity:configuration.verbose
-            ~enable_default_daily_logs_at:
-              Filename.Infix.(data_dir // "daily_logs")
-              (* Show only above Info rpc_server events, they are not
-                 relevant as we do not have a REST-API server. If not
-                 set, the daily logs are polluted with these
-                 uninformative logs. *)
-            ~daily_logs_section_prefixes:
-              [
-                ("rpc_server", Notice);
-                ("rpc_server", Warning);
-                ("rpc_server", Error);
-                ("rpc_server", Fatal);
-              ]
-            ()
-        in
-        init ~config ()
-      in
-      let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
-      if devmode then
-        Evm_node_lib_dev.Sequencer.main
-          ~data_dir
-          ?genesis_timestamp
-          ~cctxt:(wallet_ctxt :> Client_context.wallet)
-          ~configuration
-          ?kernel
-          ()
-      else
-        let*? sequencer_config =
-          Configuration.sequencer_config_exn configuration
-        in
-        Evm_node_lib_prod.Sequencer.main
-          ~data_dir
-          ~rollup_node_endpoint
-          ~max_blueprints_lag:
-            sequencer_config.blueprints_publisher_config.max_blueprints_lag
-          ~max_blueprints_ahead:
-            sequencer_config.blueprints_publisher_config.max_blueprints_ahead
-          ~max_blueprints_catchup:
-            sequencer_config.blueprints_publisher_config.max_blueprints_catchup
-          ~catchup_cooldown:
-            sequencer_config.blueprints_publisher_config.catchup_cooldown
-          ?genesis_timestamp
-          ~cctxt:(wallet_ctxt :> Client_context.wallet)
-          ~sequencer:sequencer_key
-          ~configuration
-          ?kernel
-          ())
+      start_sequencer
+        ?password_filename
+        ~wallet_dir
+        ~data_dir
+        ~devmode
+        ?rpc_addr
+        ?rpc_port
+        ?cors_origins
+        ?cors_headers
+        ?tx_pool_timeout_limit
+        ?tx_pool_addr_limit
+        ?tx_pool_tx_per_addr_limit
+        ~keep_alive
+        ~rollup_node_endpoint
+        ~verbose
+        ?preimages
+        ?preimages_endpoint
+        ?time_between_blocks
+        ?max_number_of_chunks
+        ?private_rpc_port
+        ~sequencer_str
+        ?max_blueprints_lag
+        ?max_blueprints_ahead
+        ?max_blueprints_catchup
+        ?catchup_cooldown
+        ?log_filter_max_nb_blocks
+        ?log_filter_max_nb_logs
+        ?log_filter_chunk_size
+        ?genesis_timestamp
+        ?kernel
+        ())
+
+let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
+    ?cors_origins ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
+    ?preimages_endpoint ?evm_node_endpoint ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
+    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?kernel () =
+  let open Lwt_result_syntax in
+  let open Evm_node_lib_dev in
+  let* config =
+    Cli.create_or_read_config
+      ~data_dir
+      ~devmode
+      ~keep_alive
+      ?rpc_addr
+      ?rpc_port
+      ?cors_origins
+      ?cors_headers
+      ?rollup_node_endpoint
+      ~verbose
+      ?preimages
+      ?preimages_endpoint
+      ?evm_node_endpoint
+      ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit
+      ?log_filter_chunk_size
+      ?log_filter_max_nb_logs
+      ?log_filter_max_nb_blocks
+      ()
+  in
+  let*! () =
+    let open Tezos_base_unix.Internal_event_unix in
+    init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
+  in
+  let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
+  Observer.main ?kernel_path:kernel ~data_dir ~config ()
 
 let observer_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
-    ~desc:"Start the EVM node in observer mode"
+    ~desc:
+      "Start the EVM node in observer mode. DEPRECATED, please uses `run \
+       observer` command."
     (merge_options
        common_config_args
        (args3 kernel_arg preimages_arg preimages_endpoint_arg))
@@ -725,7 +832,6 @@ let observer_command =
              evm_node_endpoint
              rollup_node_endpoint
              () ->
-  let open Evm_node_lib_dev in
   let*? () =
     Option.iter_e
       (fun rollup_node_endpoint_from_arg ->
@@ -734,34 +840,27 @@ let observer_command =
           ~param:rollup_node_endpoint)
       rollup_node_endpoint_from_arg
   in
-  let* config =
-    Cli.create_or_read_config
-      ~data_dir
-      ~devmode
-      ~keep_alive
-      ?rpc_addr
-      ?rpc_port
-      ?cors_origins
-      ?cors_headers
-      ~rollup_node_endpoint
-      ~verbose
-      ?preimages
-      ?preimages_endpoint
-      ~evm_node_endpoint
-      ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit
-      ?log_filter_chunk_size
-      ?log_filter_max_nb_logs
-      ?log_filter_max_nb_blocks
-      ()
-  in
-  let*! () =
-    let open Tezos_base_unix.Internal_event_unix in
-    init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
-  in
-  let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
-  Observer.main ?kernel_path:kernel ~data_dir ~config ()
+  start_observer
+    ~data_dir
+    ~devmode
+    ~keep_alive
+    ?rpc_addr
+    ?rpc_port
+    ?cors_origins
+    ?cors_headers
+    ~verbose
+    ?preimages
+    ~rollup_node_endpoint
+    ?preimages_endpoint
+    ~evm_node_endpoint
+    ?tx_pool_timeout_limit
+    ?tx_pool_addr_limit
+    ?tx_pool_tx_per_addr_limit
+    ?log_filter_chunk_size
+    ?log_filter_max_nb_logs
+    ?log_filter_max_nb_blocks
+    ?kernel
+    ()
 
 let make_prod_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
@@ -1366,12 +1465,192 @@ let make_kernel_config_command =
         ~output
         ())
 
+let proxy_simple_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Start the EVM node in proxy mode."
+    common_config_args
+    (prefixes ["run"; "proxy"] @@ stop)
+    (fun ( data_dir,
+           rpc_addr,
+           rpc_port,
+           devmode,
+           cors_origins,
+           cors_headers,
+           log_filter_max_nb_blocks,
+           log_filter_max_nb_logs,
+           log_filter_chunk_size,
+           keep_alive,
+           rollup_node_endpoint,
+           tx_pool_timeout_limit,
+           tx_pool_addr_limit,
+           tx_pool_tx_per_addr_limit,
+           verbose )
+         () ->
+      start_proxy
+        ~data_dir
+        ~devmode
+        ~keep_alive
+        ?rpc_addr
+        ?rpc_port
+        ?cors_origins
+        ?cors_headers
+        ?log_filter_max_nb_blocks
+        ?log_filter_max_nb_logs
+        ?log_filter_chunk_size
+        ?rollup_node_endpoint
+        ?tx_pool_timeout_limit
+        ?tx_pool_addr_limit
+        ?tx_pool_tx_per_addr_limit
+        ~verbose
+        ())
+
+let sequencer_config_args =
+  Tezos_clic.args14
+    preimages_arg
+    preimages_endpoint_arg
+    time_between_blocks_arg
+    max_number_of_chunks_arg
+    private_rpc_port_arg
+    sequencer_key_arg
+    maximum_blueprints_lag_arg
+    maximum_blueprints_ahead_arg
+    maximum_blueprints_catchup_arg
+    catchup_cooldown_arg
+    genesis_timestamp_arg
+    kernel_arg
+    wallet_dir_arg
+    (Client_config.password_filename_arg ())
+
+let sequencer_simple_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Start the EVM node in sequencer mode"
+    (merge_options common_config_args sequencer_config_args)
+    (prefixes ["run"; "sequencer"] stop)
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose ),
+           ( preimages,
+             preimages_endpoint,
+             time_between_blocks,
+             max_number_of_chunks,
+             private_rpc_port,
+             sequencer_str,
+             max_blueprints_lag,
+             max_blueprints_ahead,
+             max_blueprints_catchup,
+             catchup_cooldown,
+             genesis_timestamp,
+             kernel,
+             wallet_dir,
+             password_filename ) )
+         () ->
+      start_sequencer
+        ?password_filename
+        ~wallet_dir
+        ~data_dir
+        ~devmode
+        ?rpc_addr
+        ?rpc_port
+        ?cors_origins
+        ?cors_headers
+        ?tx_pool_timeout_limit
+        ?tx_pool_addr_limit
+        ?tx_pool_tx_per_addr_limit
+        ~keep_alive
+        ?rollup_node_endpoint
+        ~verbose
+        ?preimages
+        ?preimages_endpoint
+        ?time_between_blocks
+        ?max_number_of_chunks
+        ?private_rpc_port
+        ?sequencer_str
+        ?max_blueprints_lag
+        ?max_blueprints_ahead
+        ?max_blueprints_catchup
+        ?catchup_cooldown
+        ?log_filter_max_nb_blocks
+        ?log_filter_max_nb_logs
+        ?log_filter_chunk_size
+        ?genesis_timestamp
+        ?kernel
+        ())
+
+let observer_run_args =
+  Tezos_clic.args4
+    evm_node_endpoint_arg
+    preimages_arg
+    preimages_endpoint_arg
+    kernel_arg
+
+let observer_simple_command =
+  let open Tezos_clic in
+  command
+    ~desc:"Start the EVM node in sequencer mode"
+    (merge_options common_config_args observer_run_args)
+    (prefixes ["run"; "observer"] stop)
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose ),
+           (evm_node_endpoint, preimages, preimages_endpoint, kernel) )
+         () ->
+      start_observer
+        ~data_dir
+        ~devmode
+        ~keep_alive
+        ?rpc_addr
+        ?rpc_port
+        ?cors_origins
+        ?cors_headers
+        ~verbose
+        ?preimages
+        ?rollup_node_endpoint
+        ?preimages_endpoint
+        ?evm_node_endpoint
+        ?tx_pool_timeout_limit
+        ?tx_pool_addr_limit
+        ?tx_pool_tx_per_addr_limit
+        ?log_filter_chunk_size
+        ?log_filter_max_nb_logs
+        ?log_filter_max_nb_blocks
+        ?kernel
+        ())
+
 (* List of program commands *)
 let commands =
   [
     proxy_command;
+    proxy_simple_command;
     sequencer_command;
+    sequencer_simple_command;
     observer_command;
+    observer_simple_command;
     chunker_command;
     make_upgrade_command;
     make_sequencer_upgrade_command;
