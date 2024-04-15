@@ -127,6 +127,13 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
           State.apply_finalize src_name state
       in
       let state = State.update_delegate src_name delegate_name_opt state in
+      let pred_level = block.header.shell.level in
+      let level = Int32.(succ pred_level) in
+      let activity_cycle =
+        Block.current_cycle_of_level
+          ~blocks_per_cycle:state.constants.blocks_per_cycle
+          ~current_level:level
+      in
       (* update delegate activation status *)
       let state =
         (* if self delegating *)
@@ -135,7 +142,11 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
             ~f:(fun acc_map ->
               String.Map.add
                 src_name
-                {src with last_active_cycle = current_cycle}
+                (Account_helpers.update_activity
+                   src
+                   state.constants
+                   level
+                   activity_cycle)
                 acc_map)
             state
         else state
