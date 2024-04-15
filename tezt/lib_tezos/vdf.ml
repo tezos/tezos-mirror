@@ -61,7 +61,7 @@ let set_ready vdf_baker =
   trigger_ready vdf_baker (Some ())
 
 let handle_raw_stdout vdf_baker line =
-  if line =~ rex "^VDF daemon v.+ for .+ started.$" then set_ready vdf_baker
+  if line =~ rex "^VDF daemon .+ for .+ started.$" then set_ready vdf_baker
 
 let create ~protocol ?name ?color ?event_pipe ?runner node =
   let name = match name with None -> fresh_name () | Some name -> name in

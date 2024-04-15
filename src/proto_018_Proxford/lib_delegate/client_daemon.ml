@@ -118,8 +118,8 @@ module Baker = struct
       in
       let*! () =
         cctxt#message
-          "Baker v%a (%s) for %a started."
-          Tezos_version.Version.pp
+          "Baker %a (%s) for %a started."
+          Tezos_version.Version.pp_simple
           Tezos_version_value.Current_git_info.octez_version
           Tezos_version_value.Current_git_info.abbreviated_commit_hash
           Protocol_hash.pp_short
@@ -150,8 +150,8 @@ module Accuser = struct
     let process () =
       let*! () =
         cctxt#message
-          "Accuser v%a (%s) for %a started."
-          Tezos_version.Version.pp
+          "Accuser %a (%s) for %a started."
+          Tezos_version.Version.pp_simple
           Tezos_version_value.Current_git_info.octez_version
           Tezos_version_value.Current_git_info.abbreviated_commit_hash
           Protocol_hash.pp_short
@@ -192,8 +192,8 @@ module VDF = struct
     let process () =
       let*! () =
         cctxt#message
-          "VDF daemon v%a (%s) for %a started."
-          Tezos_version.Version.pp
+          "VDF daemon %a (%s) for %a started."
+          Tezos_version.Version.pp_simple
           Tezos_version_value.Current_git_info.octez_version
           Tezos_version_value.Current_git_info.abbreviated_commit_hash
           Protocol_hash.pp_short
