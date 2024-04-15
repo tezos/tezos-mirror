@@ -27,10 +27,6 @@ echo "Installing DAL trusted setup in ${DAL_TRUSTED_SETUP}"
 rm -rf "${DAL_TRUSTED_SETUP}"
 mkdir -p "${DAL_TRUSTED_SETUP}"
 
-# FIXME: temporary: This 2 lines to be removed once the dal SRS transition is done
-curl -s -o "${DAL_TRUSTED_SETUP}"/srs_zcash_g1 "${URL}"/srs_filecoin_g1_21
-curl -s -o "${DAL_TRUSTED_SETUP}"/srs_zcash_g2 "${URL}"/srs_filecoin_g2_21
-
 # Download uncompressed g1 SRS
 FILENAME="${DAL_TRUSTED_SETUP}"/srsu_zcash_g1
 curl -s -o "${FILENAME}" "${URL}"/srsu_g1
