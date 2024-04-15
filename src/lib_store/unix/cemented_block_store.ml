@@ -1020,7 +1020,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                 let*! () = Lwt_utils_unix.read_bytes ~len:len_offset fd bytes in
                 let offsets =
                   Data_encoding.Binary.of_bytes_exn
-                    Data_encoding.(Variable.array ~max_length:nb_blocks int31)
+                    Data_encoding.(Variable.array ~max_length:nb_blocks int32)
                     bytes
                 in
                 (* Cursor is now after the offset region *)
@@ -1030,7 +1030,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                     let*! cur_offset = Lwt_unix.lseek fd 0 Unix.SEEK_CUR in
                     let* () =
                       fail_unless
-                        Compare.Int.(cur_offset = offsets.(n))
+                        Compare.Int32.(Int32.of_int cur_offset = offsets.(n))
                         (Inconsistent_cemented_store
                            (Bad_offset
                               {level = n; cycle = Naming.file_path file}))
