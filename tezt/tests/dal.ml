@@ -5792,11 +5792,6 @@ let dal_crypto_benchmark () =
           err
     | Ok x -> f x
   in
-  Log.info "Downloading SRS files..." ;
-  let* () =
-    Process.run (Base.project_root // "scripts/install_dal_trusted_setup.sh") []
-  in
-  Log.info "SRS files downloaded." ;
   let number_of_shards = Cli.get_int ~default:512 "nb_shards" in
   let slot_size = Cli.get_int ~default:126_944 "slot_size" in
   let redundancy_factor = Cli.get_int ~default:8 "redundancy" in
@@ -6159,13 +6154,6 @@ module Refutations = struct
       ~refute_operations_priority _protocol parameters _dal_node _sc_rollup_node
       _sc_rollup_address node client pvm_name =
     (* Initializing the real SRS. *)
-    Log.info "Downloading SRS files..." ;
-    let* () =
-      Process.run
-        (Base.project_root // "scripts/install_dal_trusted_setup.sh")
-        []
-    in
-    Log.info "SRS files downloaded." ;
     let faulty_operator_key = Constant.bootstrap4.public_key_hash in
     let honest_operator_key = Constant.bootstrap5.public_key_hash in
     (* We have two DAL nodes in producer mode *)

@@ -36,7 +36,7 @@ exception Failed_to_write_uncompressed_srs of string
  * The version is string encoded to avoid endianness issues *)
 let magic = "TZ_SRS_U01"
 
-let read_uncompressed_srs ~srsu_g1_path ~srsu_g2_path () =
+let read_uncompressed_srs ?len ~srsu_g1_path ~srsu_g2_path () =
   let open Lwt_syntax in
   let header_sz = String.length magic in
   let do_read ~path ty =
@@ -93,7 +93,7 @@ let read_uncompressed_srs ~srsu_g1_path ~srsu_g2_path () =
     | res -> (
         let of_bin_string = Repr.unstage (Repr.of_bin_string ty) in
         (* Unfortunate copy, we should be able to serialize bigstringaf
-             directly instead *)
+         * directly instead *)
         let res = Lwt_bytes.to_string res in
         match of_bin_string res with
         | Ok srs -> return srs
@@ -105,6 +105,37 @@ let read_uncompressed_srs ~srsu_g1_path ~srsu_g2_path () =
   let open Lwt_result_syntax in
   let* srs_g1 = do_read ~path:srsu_g1_path Srs_g1.t in
   let* srs_g2 = do_read ~path:srsu_g2_path Srs_g2.t in
+  (* Returns a copy of the SRS with only the first [len] points *)
+  let truncate of_array to_array fn_len srs len =
+    (* Get length of the SRS *)
+    let g_len = fn_len srs in
+    if g_len < len then
+      raise
+        (Failed_to_load_trusted_setup
+           (Format.sprintf "Unexpected srs size: %d" g_len))
+    else if g_len > len then
+      (* Truncates the srs if len smaller than file *)
+      (* Note: this also makes some memory copies. *)
+      let arr = to_array srs in
+      let arr = Array.sub arr 0 len in
+      of_array arr
+    else srs
+  in
+  (* Checks the SRS have a sufficient number of points according to [len]
+     and drop points not needed if the serialized SRS contains more than [len] *)
+  let srs_g1, srs_g2 =
+    Option.fold
+      ~none:(srs_g1, srs_g2)
+      ~some:(fun len ->
+        let srs_g1 =
+          truncate Srs_g1.of_array Srs_g1.to_array Srs_g1.size srs_g1 len
+        in
+        let srs_g2 =
+          truncate Srs_g2.of_array Srs_g2.to_array Srs_g2.size srs_g2 len
+        in
+        (srs_g1, srs_g2))
+      len
+  in
   return (srs_g1, srs_g2)
 
 let read_srs ?len ~srs_g1_path ~srs_g2_path () =
@@ -236,6 +267,7 @@ module Internal_for_tests = struct
                (Failed_to_load_trusted_setup
                   (Format.sprintf "Invalid point: %d" i)))
     in
+    let srs_size = Srs_g1.size srs_g1 in
     let*! result =
       write_uncompressed_srs ~srsu_g1_path ~srsu_g2_path (srs_g1, srs_g2)
     in
@@ -243,7 +275,9 @@ module Internal_for_tests = struct
       Result.map_error (fun err -> Lwt_utils_unix.Io_error err) result
     in
     let t1 = Unix.gettimeofday () in
-    let*! r = read_uncompressed_srs ~srsu_g1_path ~srsu_g2_path () in
+    let*! r =
+      read_uncompressed_srs ~len:srs_size ~srsu_g1_path ~srsu_g2_path ()
+    in
     let*? srs_g1', srs_g2' =
       Result.map_error (fun err -> Lwt_utils_unix.Io_error err) r
     in
