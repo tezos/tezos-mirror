@@ -10,8 +10,6 @@
     consuming the blueprints received from [evm_node_endpoint]. *)
 val main :
   ?kernel_path:string ->
-  rollup_node_endpoint:Uri.t ->
-  evm_node_endpoint:Uri.t ->
   data_dir:string ->
   config:Configuration.t ->
   unit ->

@@ -227,19 +227,21 @@ and[@tailrec] stream_loop ~evm_node_endpoint (Qty next_blueprint_number) stream
         stream
   | None -> (main_loop [@tailcall]) ~first_connection:false ~evm_node_endpoint
 
-let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
-    ~(config : Configuration.t) () =
+let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
+  let rollup_node_endpoint = config.rollup_node_endpoint in
+  let*? {evm_node_endpoint; preimages; preimages_endpoint} =
+    Configuration.observer_config_exn config
+  in
   let* smart_rollup_address =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
   in
-  let*? observer_config = Configuration.observer_config_exn config in
   let* _loaded =
     Evm_context.start
       ~data_dir
       ?kernel_path
-      ~preimages:observer_config.preimages
-      ~preimages_endpoint:observer_config.preimages_endpoint
+      ~preimages
+      ~preimages_endpoint
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)

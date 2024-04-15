@@ -179,12 +179,11 @@ let loop_sequencer (sequencer_config : Configuration.sequencer) =
   let now = Helpers.now () in
   loop now
 
-let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
-    ~max_blueprints_ahead ~max_blueprints_catchup ~catchup_cooldown
-    ?(genesis_timestamp = Helpers.now ()) ~cctxt ~sequencer
+let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
+  let {rollup_node_endpoint; keep_alive; _} = configuration in
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address
       ~keep_alive:configuration.keep_alive
@@ -206,13 +205,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
-      ~config:
-        {
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-        }
+      ~config:sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ()
   in
@@ -222,7 +215,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       let* genesis =
         Sequencer_blueprint.create
           ~cctxt
-          ~sequencer_key:sequencer
+          ~sequencer_key:sequencer_config.sequencer
           ~timestamp:genesis_timestamp
           ~smart_rollup_address
           ~transactions:[]
@@ -263,17 +256,13 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       {
         cctxt;
         smart_rollup_address;
-        sequencer_key = sequencer;
+        sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
       }
   in
   let* () =
     Evm_events_follower.start
-      {
-        rollup_node_endpoint;
-        keep_alive = configuration.keep_alive;
-        filter_event = (fun _ -> true);
-      }
+      {rollup_node_endpoint; keep_alive; filter_event = (fun _ -> true)}
   in
   let () =
     Rollup_node_follower.start
