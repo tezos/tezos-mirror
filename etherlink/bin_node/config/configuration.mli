@@ -57,6 +57,7 @@ type t = {
   tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  verbose : Internal_event.level;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -118,6 +119,7 @@ module Cli : sig
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
     rollup_node_endpoint:Uri.t ->
+    verbose:bool ->
     unit ->
     t
 
@@ -136,6 +138,7 @@ module Cli : sig
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
+    verbose:bool ->
     unit ->
     t tzresult Lwt.t
 end

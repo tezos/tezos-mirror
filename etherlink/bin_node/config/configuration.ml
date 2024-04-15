@@ -45,6 +45,7 @@ type t = {
   tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  verbose : Internal_event.level;
 }
 
 let default_filter_config =
@@ -209,6 +210,7 @@ let encoding : t Data_encoding.t =
            tx_pool_tx_per_addr_limit;
            keep_alive;
            rollup_node_endpoint;
+           verbose;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -223,7 +225,8 @@ let encoding : t Data_encoding.t =
         ( tx_pool_addr_limit,
           tx_pool_tx_per_addr_limit,
           keep_alive,
-          Uri.to_string rollup_node_endpoint ) ))
+          Uri.to_string rollup_node_endpoint,
+          verbose ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              devmode,
@@ -237,7 +240,8 @@ let encoding : t Data_encoding.t =
            ( tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              keep_alive,
-             rollup_node_endpoint ) ) ->
+             rollup_node_endpoint,
+             verbose ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -253,6 +257,7 @@ let encoding : t Data_encoding.t =
         tx_pool_tx_per_addr_limit;
         keep_alive;
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
+        verbose;
       })
     (merge_objs
        (obj10
@@ -275,7 +280,7 @@ let encoding : t Data_encoding.t =
                "Transaction timeout limit inside the transaction pool"
              int64
              default_tx_pool_timeout_limit))
-       (obj4
+       (obj5
           (dft
              "tx-pool-addr-limit"
              ~description:
@@ -290,7 +295,8 @@ let encoding : t Data_encoding.t =
              int64
              default_tx_pool_tx_per_addr_limit)
           (dft "keep_alive" bool default_keep_alive)
-          (req "rollup_node_endpoint" string)))
+          (req "rollup_node_endpoint" string)
+          (req "verbose" Internal_event.Level.encoding)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -323,7 +329,7 @@ module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
       ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
       ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-      ~rollup_node_endpoint () =
+      ~rollup_node_endpoint ~verbose () =
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -346,12 +352,13 @@ module Cli = struct
           tx_pool_tx_per_addr_limit;
       keep_alive;
       rollup_node_endpoint;
+      verbose = (if verbose then Debug else Internal_event.Level.default);
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
       ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-      ?rollup_node_endpoint configuration =
+      ?rollup_node_endpoint ~verbose configuration =
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -381,12 +388,13 @@ module Cli = struct
         Option.value
           ~default:configuration.rollup_node_endpoint
           rollup_node_endpoint;
+      verbose = (if verbose then Debug else configuration.verbose);
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
       ?cors_headers ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
       ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
-      ?rollup_node_endpoint () =
+      ?rollup_node_endpoint ~verbose () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -422,6 +430,7 @@ module Cli = struct
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
           ?rollup_node_endpoint
+          ~verbose
           configuration
       in
       return configuration
@@ -446,6 +455,7 @@ module Cli = struct
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
           ~rollup_node_endpoint
+          ~verbose
           ()
       in
       return config

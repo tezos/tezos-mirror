@@ -422,15 +422,6 @@ let proxy_command =
            keep_alive )
          rollup_node_endpoint
          () ->
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let config =
-          if verbose then Some (make_with_defaults ~verbosity:Debug ())
-          else None
-        in
-        init ?config ()
-      in
-      let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
       let* config =
         Cli.create_or_read_config
           ~data_dir
@@ -441,8 +432,14 @@ let proxy_command =
           ?cors_origins
           ?cors_headers
           ~rollup_node_endpoint
+          ~verbose
           ()
       in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
+      in
+      let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
       let* () =
         if config.devmode then
           Evm_node_lib_dev.Proxy.main config ~rollup_node_endpoint
@@ -538,30 +535,6 @@ let sequencer_command =
       in
       let* pk_uri = Client_keys.neuterize sequencer in
       let* sequencer_pkh, _ = Client_keys.public_key_hash pk_uri in
-      let*! () =
-        let open Tezos_base_unix.Internal_event_unix in
-        let verbosity = if verbose then Some Internal_event.Debug else None in
-        let config =
-          make_with_defaults
-            ?verbosity
-            ~enable_default_daily_logs_at:
-              Filename.Infix.(data_dir // "daily_logs")
-              (* Show only above Info rpc_server events, they are not
-                 relevant as we do not have a REST-API server. If not
-                 set, the daily logs are polluted with these
-                 uninformative logs. *)
-            ~daily_logs_section_prefixes:
-              [
-                ("rpc_server", Notice);
-                ("rpc_server", Warning);
-                ("rpc_server", Error);
-                ("rpc_server", Fatal);
-              ]
-            ()
-        in
-        init ~config ()
-      in
-      let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       let* configuration =
         let sequencer =
           Configuration.sequencer_config_dft
@@ -586,8 +559,32 @@ let sequencer_command =
           ~keep_alive
           ~sequencer
           ~rollup_node_endpoint
+          ~verbose
           ()
       in
+      let*! () =
+        let open Tezos_base_unix.Internal_event_unix in
+        let config =
+          make_with_defaults
+            ~verbosity:configuration.verbose
+            ~enable_default_daily_logs_at:
+              Filename.Infix.(data_dir // "daily_logs")
+              (* Show only above Info rpc_server events, they are not
+                 relevant as we do not have a REST-API server. If not
+                 set, the daily logs are polluted with these
+                 uninformative logs. *)
+            ~daily_logs_section_prefixes:
+              [
+                ("rpc_server", Notice);
+                ("rpc_server", Warning);
+                ("rpc_server", Error);
+                ("rpc_server", Fatal);
+              ]
+            ()
+        in
+        init ~config ()
+      in
+      let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       if devmode then
         Evm_node_lib_dev.Sequencer.main
           ~data_dir
@@ -656,14 +653,6 @@ let observer_command =
              rollup_node_endpoint
              () ->
   let open Evm_node_lib_dev in
-  let*! () =
-    let open Tezos_base_unix.Internal_event_unix in
-    let config =
-      if verbose then Some (make_with_defaults ~verbosity:Debug ()) else None
-    in
-    init ?config ()
-  in
-  let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   let* config =
     let observer =
       Configuration.observer_config_dft
@@ -682,8 +671,14 @@ let observer_command =
       ?cors_headers
       ~rollup_node_endpoint
       ~observer
+      ~verbose
       ()
   in
+  let*! () =
+    let open Tezos_base_unix.Internal_event_unix in
+    init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
+  in
+  let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   Observer.main
     ?kernel_path:kernel
     ~rollup_node_endpoint
@@ -1110,7 +1105,7 @@ If the  <sequencer-key> is set then adds the configuration for the sequencer
 mode.
 If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
-    (args18
+    (args19
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -1136,7 +1131,8 @@ mode.|}
           ~long:"force"
           ~short:'f'
           ~doc:"Overwrites the configuration file when it exists."
-          ()))
+          ())
+       verbose_arg)
     (prefixes ["init"; "config"] @@ stop)
     (fun ( data_dir,
            rpc_addr,
@@ -1155,7 +1151,8 @@ mode.|}
            keep_alive,
            password_filename,
            sequencer,
-           force )
+           force,
+           verbose )
          () ->
       let* sequencer =
         let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
@@ -1199,6 +1196,7 @@ mode.|}
           ?observer
           ~devmode
           ?rollup_node_endpoint
+          ~verbose
           ()
       in
       Configuration.save ~force ~data_dir config)
