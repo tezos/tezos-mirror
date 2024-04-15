@@ -29,6 +29,7 @@ open Refutation_game
 module Types = struct
   type state = {
     node_ctxt : Node_context.rw;
+    state_cache : Pvm_plugin_sig.state_cache;
     self : Signature.public_key_hash;
     opponent : Signature.public_key_hash;
     conflict : Game.conflict;
@@ -57,8 +58,10 @@ type worker = Worker.infinite Worker.queue Worker.t
 let table = Worker.create_table Queue
 
 let on_play game
-    Types.{node_ctxt; self; opponent; commitment_period_tick_offset; _} =
-  play node_ctxt ~self ~commitment_period_tick_offset game opponent
+    Types.
+      {node_ctxt; state_cache; self; opponent; commitment_period_tick_offset; _}
+    =
+  play node_ctxt state_cache ~self ~commitment_period_tick_offset game opponent
 
 let on_play_opening conflict (Types.{node_ctxt; _} : Types.state) =
   play_opening_move node_ctxt conflict
@@ -86,10 +89,12 @@ module Handlers = struct
         node_ctxt
         conflict.our_commitment
     in
+    let state_cache = Pvm_plugin_sig.make_state_cache 64 in
     return
       Types.
         {
           node_ctxt;
+          state_cache;
           self;
           opponent = conflict.other;
           conflict;
