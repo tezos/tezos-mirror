@@ -42,6 +42,10 @@
   (!12743)
 - The EVM node will no longer modify its configuration file based on its
   CLI arguments. (!12799)
+- Replace `observer.rollup_node_endpoint`,
+  `proxy.rollup_node_endpoint` and `sequencer.rollup_node_endpoint`
+  with `rollup_node_endpoint` in the configuration. (!12764)
+- Remove `proxy` in the configuration. (!12764)
 
 ### Internal
 

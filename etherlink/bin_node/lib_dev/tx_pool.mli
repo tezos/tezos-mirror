@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer | Observer
+type mode = Proxy | Sequencer | Observer
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
