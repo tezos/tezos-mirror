@@ -1526,8 +1526,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let ok = [slot0; slot1; slot2_b] in
   let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
   let* () =
-    (* There are 4 published slots: slot0, slot1, slot2_a, and slot2_b *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
+    (* There are 3 published slots: slot0, slot1, and slot2_b *)
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   let* slot_headers =
     Dal_RPC.(
@@ -1559,9 +1559,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
   (* slot_2_a is not selected. *)
   let* () =
-    check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ ~expected_status:"not_selected")
-      [slot2_a]
+    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot2_a]
   in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
@@ -1588,7 +1586,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = wait_block_processing3 in
   let* () =
     (* The number of published slots has not changed *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
 
   Log.info "Check that the store is as expected" ;
@@ -1610,9 +1608,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
   (* slot2_a is still not selected. *)
   let* () =
-    check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ ~expected_status:"not_selected")
-      [slot2_a]
+    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot2_a]
   in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
   let* () =
@@ -1631,7 +1627,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       ~number_of_headers:0
   in
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   check_published_level_headers
     ~__LOC__
