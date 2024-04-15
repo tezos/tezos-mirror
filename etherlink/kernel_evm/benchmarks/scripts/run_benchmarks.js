@@ -115,12 +115,9 @@ function push_profiler_sections(output, opcodes, precompiles) {
         if (is_opcode_data) {
             let { opcode, gas, step_result } = parse_data(match[2], match[3]);
             let ticks = parseInt(match[1]);
-            let result = { ticks, gas, step_result };
-            if (opcodes[opcode] == undefined) {
-                opcodes[opcode] = [result]
-            } else {
-                opcodes[opcode].push(result)
-            }
+            let result = { opcode, ticks, gas, step_result };
+            opcodes.push(result)
+
         } else {
             let ticks = parseInt(match[1]);
             let address = match[2].substring(0, 42);
@@ -155,7 +152,7 @@ function run_profiler(path, logs) {
             block_in_progress_store: [],
             block_in_progress_read: [],
             receipt_size: [],
-            opcodes: {},
+            opcodes: [],
             bloom_size: [],
             precompiles: [],
             blueprint_chunks: [],
@@ -433,19 +430,37 @@ function logs_filename(time) {
 function output_filename(time) {
     return path.format({ dir: OUTPUT_DIRECTORY, base: `benchmark_result_${time}.csv` })
 }
+function all_opcodes_dump_filename(time) {
+        return path.format({ dir: OUTPUT_DIRECTORY, base: `dump_opcodes_${time}.json` })
+}
 
-function opcodes_dump_filename(time) {
-    return path.format({ dir: OUTPUT_DIRECTORY, base: `dump_opcodes_${time}.json` })
+function opcodes_dump_filename_csv(benchmark_name, time) {
+    return path.format({ dir: OUTPUT_DIRECTORY, base: `dump_opcodes_${benchmark_name}_${time}.csv` })
 }
 
 function precompiles_filename(time) {
     return path.format({ dir: OUTPUT_DIRECTORY, base: `precompiles_${time}.csv` })
 }
 
-function dump_bench_opcode(filename, benchmark_name, opcodes, is_first) {
+function dump_bench_opcode(filename, opcodes) {
+    let columns = {
+        opcode: "opcode",
+        ticks : "ticks",
+        gas : "gas:",
+        step_result : "step_result"
+    }
+    fs.writeFileSync(
+        filename,
+        csv.stringify(opcodes, { header: false, columns }),
+        { flag: "w" }
+    )
+
+}
+
+function add_dump(filename, specific_dump_filename, is_first) {
     if (!is_first)
         fs.appendFileSync(filename, ",")
-    fs.appendFileSync(filename, `"${benchmark_name}":${JSON.stringify(opcodes)}`);
+    fs.appendFileSync(filename, `"${specific_dump_filename}"`);
 }
 
 const PROFILER_OUTPUT_DIRECTORY = OUTPUT_DIRECTORY + "/profiling"
@@ -475,17 +490,17 @@ async function run_all_benchmarks(benchmark_scripts) {
     ]
     let time = timestamp();
     let output = output_filename(time);
-    let opcodes_dump = opcodes_dump_filename(time);
+    let all_opcodes_dump = all_opcodes_dump_filename(time);
     let precompiles_output = precompiles_filename(time);
     let logs = logs_filename(time)
     console.log(`Output in ${output}`);
-    console.log(`Dumped opcodes in ${opcodes_dump}`);
+    console.log(`Dumped opcodes list in ${all_opcodes_dump}`);
     console.log(`Precompiles in ${precompiles_output}`);
     if(MULTI_BLUEPRINT) console.log(`For every scenario, one tx per blueprint`)
     const precompile_csv_config = { columns: precompiles_field };
     fs.writeFileSync(precompiles_output, csv.stringify([], { header: true, ...precompile_csv_config }));
     fs.writeFileSync(logs, "Logging debugger\n")
-    fs.writeFileSync(opcodes_dump, "{");
+    fs.writeFileSync(all_opcodes_dump, " [");
     console.log(`Full logs in ${logs}`)
     let benchmark_csv_config = Object();
     for (var i = 0; i < benchmark_scripts.length; i++) {
@@ -500,9 +515,13 @@ async function run_all_benchmarks(benchmark_scripts) {
         if (i == 0) benchmark_csv_config = initialize_headers(output, benchmark_log);
         fs.appendFileSync(output, csv.stringify(benchmark_log, benchmark_csv_config))
         fs.appendFileSync(precompiles_output, csv.stringify(run_benchmark_result.precompiles, precompile_csv_config))
-        dump_bench_opcode(opcodes_dump, benchmark_name, run_benchmark_result.opcodes, i == 0);
+
+        let opcodes_dump = opcodes_dump_filename_csv(benchmark_name, time);
+        console.log(`Dumped opcodes in ${opcodes_dump}`);
+        dump_bench_opcode(opcodes_dump, run_benchmark_result.opcodes, all_opcodes_dump, i == 0);
+        add_dump(all_opcodes_dump, opcodes_dump, i == 0)
     }
-    fs.appendFileSync(opcodes_dump, "}");
+    fs.appendFileSync(all_opcodes_dump, "]");
     console.log("Benchmarking complete");
     fs.appendFileSync(logs, "=================================================\nBenchmarking complete.\n")
     execSync("rm transactions.json");
