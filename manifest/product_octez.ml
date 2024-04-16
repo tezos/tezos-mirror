@@ -2895,6 +2895,66 @@ let _brassaia_tests =
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
+let _irmin_data_tests =
+  tezt
+    ["test"; "import"; "test_fixed_size_string_set"]
+    ~path:"irmin/test/irmin/data"
+    ~opam:"tezos_internal_irmin_tests"
+    ~synopsis:"Tezos internal irmin tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_context_sigs;
+        alcotezt;
+        irmin_test_helpers;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
+let _irmin_generic_key_tests =
+  tezt
+    ["test"; "test_store_offset"; "test_inlined_contents"]
+    ~path:"irmin/test/irmin/generic-key"
+    ~opam:"tezos_internal_irmin_tests"
+    ~synopsis:"Tezos internal irmin tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_context_sigs;
+        irmin_test_helpers;
+        irmin_mem;
+        vector;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~preprocess:[pps ppx_irmin_internal]
+
+let _irmin_tests =
+  tezt
+    ["test"; "test_lru"; "test_hash"; "test_tree"; "test_conf"]
+    ~path:"irmin/test/irmin"
+    ~opam:"tezos_internal_irmin_tests"
+    ~synopsis:"Tezos internal irmin tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_context_sigs;
+        octez_context_disk;
+        octez_context_memory;
+        octez_context_encoding;
+        irmin_test_helpers |> open_;
+        alcotezt;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~preprocess:[pps ppx_irmin_internal]
+
 let _irmin_mem_tests =
   tezt
     ["test"; "test_mem"]

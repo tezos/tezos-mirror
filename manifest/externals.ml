@@ -310,6 +310,8 @@ let utop = external_lib "utop" V.(at_least "2.8")
 
 let uutf = external_lib ~js_compatible:true "uutf" V.True
 
+let vector = external_lib "vector" V.True
+
 let vdf =
   external_lib ~js_compatible:true "class_group_vdf" V.(at_least "0.0.4")
 
