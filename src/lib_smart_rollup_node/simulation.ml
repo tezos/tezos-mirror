@@ -89,7 +89,7 @@ let start_simulation node_ctxt ~reveal_map ?log_kernel_debug_file
       return (Context.empty node_ctxt.context)
     else Node_context.checkout_context node_ctxt hash
   in
-  let* ctxt, state =
+  let* state =
     Interpreter.state_of_head (module (val plugin)) node_ctxt ctxt head
   in
   let+ info_per_level = simulate_info_per_level node_ctxt hash in

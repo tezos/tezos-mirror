@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_boot_sector (module Plugin : Protocol_plugin_sig.PARTIAL) block_hash
-    (node_ctxt : _ Node_context.t) =
+let get_boot_sector (module Plugin : Protocol_plugin_sig.PARTIAL)
+    genesis_block_hash (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   match node_ctxt.config.boot_sector_file with
-  | None -> Plugin.Layer1_helpers.get_boot_sector block_hash node_ctxt
+  | None -> Plugin.Layer1_helpers.get_boot_sector genesis_block_hash node_ctxt
   | Some boot_sector_file ->
       let*! boot_sector = Lwt_utils_unix.read_file boot_sector_file in
       let*? boot_sector =
@@ -49,19 +49,27 @@ let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
     state
     (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list)
 
-let genesis_state (module Plugin : Protocol_plugin_sig.PARTIAL) block_hash
-    node_ctxt ctxt =
+type original_genesis_state = Original of Context.pvmstate
+
+let genesis_state (module Plugin : Protocol_plugin_sig.PARTIAL) ?genesis_block
+    node_ctxt =
   let open Lwt_result_syntax in
-  let* boot_sector = get_boot_sector (module Plugin) block_hash node_ctxt in
+  let* genesis_block_hash =
+    match genesis_block with
+    | Some b -> return b
+    | None -> Node_context.hash_of_level node_ctxt node_ctxt.genesis_info.level
+  in
+  let* boot_sector =
+    get_boot_sector (module Plugin) genesis_block_hash node_ctxt
+  in
   let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
-  let*! genesis_state =
+  let*! unpatched_genesis_state =
     Plugin.Pvm.install_boot_sector node_ctxt.kind initial_state boot_sector
   in
   let* genesis_state =
-    apply_unsafe_patches (module Plugin) node_ctxt genesis_state
+    apply_unsafe_patches (module Plugin) node_ctxt unpatched_genesis_state
   in
-  let*! ctxt = Context.PVMState.set ctxt genesis_state in
-  return (ctxt, genesis_state)
+  return (genesis_state, Original unpatched_genesis_state)
 
 let state_of_head plugin node_ctxt ctxt Layer1.{hash; level} =
   let open Lwt_result_syntax in
@@ -69,9 +77,11 @@ let state_of_head plugin node_ctxt ctxt Layer1.{hash; level} =
   match state with
   | None ->
       let genesis_level = node_ctxt.Node_context.genesis_info.level in
-      if level = genesis_level then genesis_state plugin hash node_ctxt ctxt
+      if level = genesis_level then
+        let+ state, _ = genesis_state plugin ~genesis_block:hash node_ctxt in
+        state
       else tzfail (Rollup_node_errors.Missing_PVM_state (hash, level))
-  | Some state -> return (ctxt, state)
+  | Some state -> return state
 
 (** [transition_pvm plugin node_ctxt ctxt predecessor head] runs a PVM at the
     previous state from block [predecessor] by consuming as many messages as
@@ -80,7 +90,7 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
     predecessor Layer1.{hash = _; _} inbox_messages =
   let open Lwt_result_syntax in
   (* Retrieve the previous PVM state from store. *)
-  let* ctxt, predecessor_state =
+  let* predecessor_state =
     state_of_head (module Plugin) node_ctxt ctxt predecessor
   in
   let* eval_result =
@@ -113,8 +123,9 @@ let process_head plugin (node_ctxt : _ Node_context.t) ctxt
   let first_inbox_level = node_ctxt.genesis_info.level |> Int32.succ in
   if head.level >= first_inbox_level then
     transition_pvm plugin node_ctxt ctxt predecessor head inbox_and_messages
-  else if head.Layer1.level = node_ctxt.genesis_info.level then
-    let* ctxt, _state = genesis_state plugin head.hash node_ctxt ctxt in
+  else if head.level = node_ctxt.genesis_info.level then
+    let* state, _ = genesis_state plugin ~genesis_block:head.hash node_ctxt in
+    let*! ctxt = Context.PVMState.set ctxt state in
     return (ctxt, 0, 0L, Z.zero)
   else return (ctxt, 0, 0L, Z.zero)
 
@@ -127,7 +138,7 @@ let start_state_of_block plugin node_ctxt (block : Sc_rollup_block.t) =
   let* ctxt =
     Node_context.checkout_context node_ctxt block.header.predecessor
   in
-  let* _ctxt, state =
+  let* state =
     state_of_head
       plugin
       node_ctxt
