@@ -171,6 +171,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
         })
       last_whitelist_update
   in
+  let unsafe_patches = Pvm_patches.make rollup_address [] in
   let sync = create_sync_info () in
   let node_ctxt =
     {
@@ -185,6 +186,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       lpc = Reference.new_ lpc;
       private_info = Reference.new_ private_info;
       kind;
+      unsafe_patches;
       injector_retention_period = 0;
       block_finality_time = 2;
       lockfile;
@@ -310,6 +312,9 @@ module For_snapshots = struct
         lpc = Reference.new_ lpc;
         private_info = Reference.new_ None;
         kind = metadata.kind;
+        unsafe_patches =
+          (* Only consider hardcoded patches for snapshot validation. *)
+          Pvm_patches.make metadata.rollup_address [];
         injector_retention_period = 0;
         block_finality_time = 2;
         lockfile;
@@ -424,6 +429,7 @@ module Internal_for_tests = struct
         lpc;
         private_info = Reference.new_ None;
         kind;
+        unsafe_patches = Pvm_patches.make rollup_address [];
         injector_retention_period = 0;
         block_finality_time = 2;
         current_protocol;

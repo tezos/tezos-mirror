@@ -112,6 +112,7 @@ type 'a t = {
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Kind.t;  (** Kind of the smart rollup. *)
+  unsafe_patches : Pvm_patches.t;  (** Patches to apply to the PVM. *)
   lockfile : Lwt_unix.file_descr;
       (** A lock file acquired when the node starts. *)
   store : 'a store;  (** The store for the persistent storage. *)
