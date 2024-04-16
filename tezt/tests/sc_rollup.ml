@@ -4650,6 +4650,62 @@ let test_arg_boot_sector_file ~kind =
   let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
   unit
 
+let test_unsafe_genesis_patch ~kind =
+  let commitment_period = 3 in
+  let max_nb_tick = 50_000_000_000_000L in
+  let should_fail = match kind with "wasm_2_0_0" -> false | _ -> true in
+  test_full_scenario
+    ~kind
+    ~commitment_period
+    {
+      variant = None;
+      tags = ["node"; "unsafe_patch"];
+      description =
+        sf
+          "Rollup can%s apply unsafe genesis PVM patches"
+          (if should_fail then "not" else "");
+    }
+  @@ fun _protocol rollup_node rollup _node client ->
+  Log.info "Set patch in configuration" ;
+  let* _ = Sc_rollup_node.config_init rollup_node rollup in
+  Sc_rollup_node.Config_file.update rollup_node (fun config ->
+      let open JSON in
+      put
+        ( "unsafe-pvm-patches",
+          parse
+            ~origin:"increase-tick"
+            (sf {| [ { "increase_max_nb_tick" : "%Ld"} ] |} max_nb_tick) )
+        config) ;
+  () ;
+  let* () = Sc_rollup_node.run ~wait_ready:false rollup_node rollup [] in
+  if should_fail then
+    Sc_rollup_node.check_error
+      ~exit_code:1
+      ~msg:(rex "Patch .* is not supported")
+      rollup_node
+  else
+    let* () = bake_levels (commitment_period + 4) client in
+    let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
+    let* published_commitment =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_local_last_published_commitment ()
+    in
+    let* () =
+      check_published_commitment_in_l1 rollup client published_commitment
+    in
+    let* pvm_max_bytes =
+      Sc_rollup_node.RPC.call rollup_node ~rpc_hooks
+      @@ Sc_rollup_rpc.get_global_block_state ~key:"pvm/max_nb_ticks" ()
+    in
+    let pvm_max =
+      pvm_max_bytes
+      |> Data_encoding.Binary.of_bytes_exn Data_encoding.n
+      |> Z.to_int64
+    in
+    Check.((pvm_max = max_nb_tick) int64)
+      ~error_msg:"PVM max tick should have been increased to %R but is %L" ;
+    unit
+
 let test_bootstrap_smart_rollup_originated =
   register_test
     ~supports:(From_protocol 018)
@@ -5661,7 +5717,8 @@ let register ~kind ~protocols =
     test_consecutive_commitments
     protocols
     ~kind ;
-  test_outbox_message protocols ~kind
+  test_outbox_message protocols ~kind ;
+  test_unsafe_genesis_patch protocols ~kind
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
