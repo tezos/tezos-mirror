@@ -184,6 +184,9 @@ module Handler = struct
             (message_id, err)) ;
         `Invalid
 
+  let is_bootstrap_node ctxt =
+    Node_context.get_profile_ctxt ctxt |> Profile_manager.is_bootstrap_profile
+
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/6439
 
      We should check:
@@ -209,9 +212,7 @@ module Handler = struct
      validity. *)
   let gossipsub_app_messages_validation ctxt cryptobox head_level
       attestation_lag ?message ~message_id () =
-    if
-      Node_context.get_profile_ctxt ctxt |> Profile_manager.is_bootstrap_profile
-    then
+    if is_bootstrap_node ctxt then
       (* 1. As bootstrap nodes advertise their profiles to attester and producer
          nodes, they shouldn't receive messages or messages ids. If this
          happens, received data are considered as spam (invalid), and the remote
@@ -407,6 +408,116 @@ module Handler = struct
         Store.Shards.remove store.shards commitment)
       commitments
 
+  let process_block ctxt cctxt (module Plugin : Dal_plugin.T) plugin_proto
+      proto_parameters cryptobox skip_list_cells_store head_level block_level =
+    let open Lwt_result_syntax in
+    let block = `Level block_level in
+    let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
+    let shell_header = Plugin.block_shell_header block_info in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
+       Note that the first processed block is special: in contrast to
+       the general case, as implemented by this function, the plugin was
+       set before processing the block, by
+       [resolve_plugin_and_set_ready], not after processing the
+       block. *)
+    let* () =
+      may_update_plugin
+        cctxt
+        ctxt
+        ~block
+        ~current_proto:plugin_proto
+        ~block_proto:shell_header.proto_level
+    in
+    let*? block_round = Plugin.get_round shell_header.fitness in
+    let* slot_headers = Plugin.get_published_slot_headers block_info in
+    let* () =
+      if not (is_bootstrap_node ctxt) then
+        let* cells_of_level =
+          Plugin.Skip_list.cells_of_level block_info cctxt
+        in
+        let cells_of_level =
+          List.map
+            (fun (hash, cell) ->
+              ( Dal_proto_types.Skip_list_hash.of_proto
+                  Plugin.Skip_list.hash_encoding
+                  hash,
+                Dal_proto_types.Skip_list_cell.of_proto
+                  Plugin.Skip_list.cell_encoding
+                  cell ))
+            cells_of_level
+        in
+        let* () =
+          Skip_list_cells_store.insert
+            skip_list_cells_store
+            ~attested_level:head_level
+            cells_of_level
+        in
+        Slot_manager.store_slot_headers
+          ~number_of_slots:proto_parameters.Dal_plugin.number_of_slots
+          ~block_level
+          slot_headers
+          (Node_context.get_store ctxt)
+      else return_unit
+    in
+    let* () =
+      (* If a slot header was posted to the L1 and we have the corresponding
+             data, post it to gossipsub.
+
+         FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
+         Should we restrict published slot data to the slots for which
+         we have the producer role?
+      *)
+      List.iter_es
+        (fun (slot_header, status) ->
+          match status with
+          | Dal_plugin.Succeeded ->
+              let Dal_plugin.{slot_index; commitment; published_level} =
+                slot_header
+              in
+              Slot_manager.publish_slot_data
+                ~level_committee:(Node_context.fetch_committee ctxt)
+                (Node_context.get_store ctxt)
+                (Node_context.get_gs_worker ctxt)
+                cryptobox
+                proto_parameters
+                commitment
+                published_level
+                slot_index
+          | Dal_plugin.Failed -> return_unit)
+        slot_headers
+    in
+    let*? attested_slots =
+      Plugin.attested_slot_headers
+        block_info
+        ~number_of_slots:proto_parameters.number_of_slots
+    in
+    let*! () =
+      Slot_manager.update_selected_slot_headers_statuses
+        ~block_level
+        ~attestation_lag:proto_parameters.attestation_lag
+        ~number_of_slots:proto_parameters.number_of_slots
+        attested_slots
+        (Node_context.get_store ctxt)
+    in
+    let* committee = Node_context.fetch_committee ctxt ~level:block_level in
+    let () =
+      Profile_manager.on_new_head
+        (Node_context.get_profile_ctxt ctxt)
+        proto_parameters
+        (Node_context.get_gs_worker ctxt)
+        committee
+    in
+    (* This should be the last modification of this node's (ready) context. *)
+    let*? () =
+      Node_context.update_last_processed_level ctxt ~level:block_level
+    in
+    Dal_metrics.layer1_block_finalized ~block_level ;
+    Dal_metrics.layer1_block_finalized_round ~block_round ;
+    let*! () =
+      Event.(emit layer1_node_final_block (block_level, block_round))
+    in
+    return_unit
+
   (* Monitor heads and store *finalized* published slot headers indexed by block
      hash. A slot header is considered finalized when it is in a block with at
      least two other blocks on top of it, as guaranteed by Tenderbake. Note that
@@ -446,115 +557,16 @@ module Handler = struct
                head_level
                proto_parameters.attestation_lag) ;
           let* () = remove_old_level_shards proto_parameters ctxt head_level in
-          let process_block block_level =
-            let block = `Level block_level in
-            let* block_info =
-              Plugin.block_info cctxt ~block ~metadata:`Always
-            in
-            let shell_header = Plugin.block_shell_header block_info in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
-               Note that the first processed block is special: in contrast to
-               the general case, as implemented by this function, the plugin was
-               set before processing the block, by
-               [resolve_plugin_and_set_ready], not after processing the
-               block. *)
-            let* () =
-              may_update_plugin
-                cctxt
-                ctxt
-                ~block
-                ~current_proto:plugin_proto
-                ~block_proto:shell_header.proto_level
-            in
-            let*? block_round = Plugin.get_round shell_header.fitness in
-            let* slot_headers = Plugin.get_published_slot_headers block_info in
-            let* cells_of_level =
-              Plugin.Skip_list.cells_of_level block_info cctxt
-            in
-            let cells_of_level =
-              List.map
-                (fun (hash, cell) ->
-                  ( Dal_proto_types.Skip_list_hash.of_proto
-                      Plugin.Skip_list.hash_encoding
-                      hash,
-                    Dal_proto_types.Skip_list_cell.of_proto
-                      Plugin.Skip_list.cell_encoding
-                      cell ))
-                cells_of_level
-            in
-            let* () =
-              Skip_list_cells_store.insert
-                skip_list_cells_store
-                ~attested_level:head_level
-                cells_of_level
-            in
-            let* () =
-              Slot_manager.store_slot_headers
-                ~number_of_slots:proto_parameters.number_of_slots
-                ~block_level
-                slot_headers
-                (Node_context.get_store ctxt)
-            in
-            let* () =
-              (* If a slot header was posted to the L1 and we have the corresponding
-                     data, post it to gossipsub.
-
-                 FIXME: https://gitlab.com/tezos/tezos/-/issues/5973
-                 Should we restrict published slot data to the slots for which
-                 we have the producer role?
-              *)
-              List.iter_es
-                (fun (slot_header, status) ->
-                  match status with
-                  | Dal_plugin.Succeeded ->
-                      let Dal_plugin.{slot_index; commitment; published_level} =
-                        slot_header
-                      in
-                      Slot_manager.publish_slot_data
-                        ~level_committee:(Node_context.fetch_committee ctxt)
-                        (Node_context.get_store ctxt)
-                        (Node_context.get_gs_worker ctxt)
-                        cryptobox
-                        proto_parameters
-                        commitment
-                        published_level
-                        slot_index
-                  | Dal_plugin.Failed -> return_unit)
-                slot_headers
-            in
-            let*? attested_slots =
-              Plugin.attested_slot_headers
-                block_info
-                ~number_of_slots:proto_parameters.number_of_slots
-            in
-            let*! () =
-              Slot_manager.update_selected_slot_headers_statuses
-                ~block_level
-                ~attestation_lag:proto_parameters.attestation_lag
-                ~number_of_slots:proto_parameters.number_of_slots
-                attested_slots
-                (Node_context.get_store ctxt)
-            in
-            let* committee =
-              Node_context.fetch_committee ctxt ~level:block_level
-            in
-            let () =
-              Profile_manager.on_new_head
-                (Node_context.get_profile_ctxt ctxt)
-                proto_parameters
-                (Node_context.get_gs_worker ctxt)
-                committee
-            in
-            (* This should be the last modification of this node's (ready) context. *)
-            let*? () =
-              Node_context.update_last_processed_level ctxt ~level:block_level
-            in
-            Dal_metrics.layer1_block_finalized ~block_level ;
-            Dal_metrics.layer1_block_finalized_round ~block_round ;
-            let*! () =
-              Event.(emit layer1_node_final_block (block_level, block_round))
-            in
-            return_unit
+          let process_block =
+            process_block
+              ctxt
+              cctxt
+              (module Plugin)
+              plugin_proto
+              proto_parameters
+              cryptobox
+              skip_list_cells_store
+              head_level
           in
           match last_processed_level with
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6849
