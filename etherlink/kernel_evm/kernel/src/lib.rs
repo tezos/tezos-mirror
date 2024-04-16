@@ -10,7 +10,7 @@ use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
 use crate::stage_one::fetch;
-use crate::storage::read_sequencer_pool_address;
+use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_PATH};
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
 use evm_execution::Config;
@@ -29,10 +29,14 @@ use storage::{
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_ethereum::block::BlockFees;
 use tezos_evm_logging::{log, Level::*};
+use tezos_smart_rollup::michelson::MichelsonUnit;
+use tezos_smart_rollup::outbox::{
+    OutboxMessage, OutboxMessageWhitelistUpdate, OUTBOX_QUEUE,
+};
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_entrypoint::kernel_entry;
-use tezos_smart_rollup_host::runtime::Runtime;
+use tezos_smart_rollup_host::runtime::{Runtime, ValueType};
 
 mod apply;
 mod block;
@@ -73,9 +77,30 @@ pub const CONFIG: Config = Config::shanghai();
 
 const KERNEL_VERSION: &str = env!("GIT_HASH");
 
+fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    if let Some(ValueType::Value) = host.store_has(&PRIVATE_FLAG_PATH)? {
+        log!(
+            host,
+            Info,
+            "Submitting outbox message to make the rollup public."
+        );
+        let whitelist_update: OutboxMessage<_> =
+            OutboxMessage::<MichelsonUnit>::WhitelistUpdate(
+                OutboxMessageWhitelistUpdate { whitelist: None },
+            );
+        OUTBOX_QUEUE.queue_message(host, whitelist_update)?;
+        OUTBOX_QUEUE.flush_queue(host);
+        host.store_delete_value(&PRIVATE_FLAG_PATH)
+            .map_err(Error::from)
+    } else {
+        Ok(())
+    }
+}
+
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
+    switch_to_public_rollup(host)?;
     storage_migration(host)
 }
 
