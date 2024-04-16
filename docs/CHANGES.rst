@@ -192,6 +192,19 @@ Miscellaneous
 - **Breaking change** Multiple occurrence of same argument now
   fails when using ``lib-clic``. (MR :gl:`!12780`)
 
+Version 19.2
+============
+
+Node
+----
+
+- Fixed a cemented block store encoding causing an overflow for cycles above 1Gib.
+
+Smart Rollup node
+-----------------
+
+- Fixed an issue with the way the rollup node computes dissections in the refutation games. (MR :gl:`!12534`)
+
 Version 19.1
 ============
 

@@ -51,7 +51,7 @@ Shell RPCs
 The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
-- `rpc-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
+- `rpc-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi.json>`_
 
 - `rpc-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/rpc-openapi-rc.json>`_
 
@@ -63,14 +63,14 @@ Oxford RPCs
 The OpenAPI specifications for RPCs which are specific to the Oxford (``Proxford``)
 protocol can be found at:
 
-- `oxford-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
+- `oxford-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi.json>`_
 
 - `oxford-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-openapi-rc.json>`_
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Oxford protocol can be found at:
 
-- `oxford-mempool-openapi.json (version 19.1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
+- `oxford-mempool-openapi.json (version 19.2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi.json>`_
 
 - `oxford-mempool-openapi.json (version 20.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-mempool-openapi-rc.json>`_
 
