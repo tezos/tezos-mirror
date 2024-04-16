@@ -12,7 +12,9 @@
   octez-libs.context.sigs
   octez-libs.tezos-context.merkle_proof_encoding
   octez-internal-libs.irmin
-  octez-internal-libs.irmin_pack)
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.brassaia
+  octez-internal-libs.brassaia_pack)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

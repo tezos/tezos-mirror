@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_pack_unix)
+ (public_name octez-internal-libs.brassaia_pack.unix)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  fmt
+  index
+  index.unix
+  octez-internal-libs.brassaia
+  octez-internal-libs.brassaia_pack
+  logs
+  lwt
+  lwt.unix
+  mtime
+  cmdliner
+  optint
+  checkseum
+  checkseum.ocaml
+  rusage)
+ (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
+ (flags
+  (:standard)
+  -w -66-68))
