@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+# SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -82,6 +82,5 @@ data-encoding = ["tezos_data_encoding", "tezos-smart-rollup-encoding/alloc", "te
 storage = ["tezos-smart-rollup-storage"]
 std = ["alloc", "debug_alloc", "tezos-smart-rollup-entrypoint/std"]
 testing = ["crypto", "tezos-smart-rollup-mock"]
-proto-nairobi = ["tezos-smart-rollup-core/proto-nairobi", "tezos-smart-rollup-host/proto-nairobi", "tezos-smart-rollup-mock/proto-nairobi"]
 proto-alpha = ["tezos-smart-rollup-core/proto-alpha", "tezos-smart-rollup-host/proto-alpha", "tezos-smart-rollup-mock/proto-alpha"]
 experimental-host-in-memory-store = ["tezos-smart-rollup-entrypoint/proto-alpha", "tezos-smart-rollup-entrypoint/experimental-host-in-memory-store"]
