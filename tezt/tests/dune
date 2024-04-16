@@ -129,6 +129,7 @@
   brassaia_test_brassaia_generic_key_tezt_lib
   brassaia_test_brassaia_data_tezt_lib
   brassaia_test_brassaia_mem_tezt_lib
+  brassaia_test_brassaia_tezt_lib
   brassaia_test_tezt_lib)
  (link_flags
   (:standard)

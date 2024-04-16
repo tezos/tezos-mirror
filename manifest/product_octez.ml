@@ -3001,6 +3001,28 @@ let _irmin_tests =
       ]
     ~preprocess:[pps ppx_irmin_internal]
 
+let _brassaia_tests =
+  tezt
+    ["test"; "test_lru"; "test_hash"; "test_tree"; "test_conf"]
+    ~path:"brassaia/test/brassaia"
+    ~opam:"tezos_internal_brassaia_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_context_sigs;
+        octez_context_disk;
+        octez_context_memory;
+        octez_context_encoding;
+        brassaia_test_helpers |> open_;
+        alcotezt;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~preprocess:[pps ppx_brassaia_internal]
+
 let _irmin_mem_tests =
   tezt
     ["test"; "test_mem"]
