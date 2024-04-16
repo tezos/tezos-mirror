@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023-2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -20,7 +20,6 @@ use tezos_data_encoding::nom::NomReader;
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
 use crate::michelson::Michelson;
-#[cfg(feature = "proto-alpha")]
 use crate::public_key_hash::PublicKeyHash;
 
 /// Outbox message, sent by the kernel as tezos-encoded bytes.
@@ -32,7 +31,6 @@ pub enum OutboxMessage<Expr: Michelson> {
     #[encoding(tag = 0)]
     AtomicTransactionBatch(OutboxMessageTransactionBatch<Expr>),
     /// Only keys in the whitelist are allowed to stake and publish a commitment.
-    #[cfg(feature = "proto-alpha")]
     #[encoding(tag = 2)]
     WhitelistUpdate(OutboxMessageWhitelistUpdate),
 }
@@ -115,7 +113,6 @@ pub struct OutboxMessageTransaction<Expr: Michelson> {
 /// `(opt "whitelist" Sc_rollup_whitelist_repr.encoding)`
 /// where
 /// `encoding = Data_encoding.(list Signature.Public_key_hash.encoding)`
-#[cfg(feature = "proto-alpha")]
 #[derive(Debug, PartialEq, Eq, HasEncoding, BinWriter, NomReader)]
 pub struct OutboxMessageWhitelistUpdate {
     /// The new contents of the whitelist
@@ -124,7 +121,6 @@ pub struct OutboxMessageWhitelistUpdate {
 }
 
 /// Kinds of invalid whitelists
-#[cfg(feature = "proto-alpha")]
 #[derive(Debug, PartialEq, Eq)]
 pub enum InvalidWhitelist {
     /// If the provided whitelist is the empty list
@@ -133,7 +129,6 @@ pub enum InvalidWhitelist {
     DuplicatedKeys,
 }
 
-#[cfg(feature = "proto-alpha")]
 fn has_unique_elements<T>(iter: T) -> bool
 where
     T: IntoIterator,
@@ -145,7 +140,6 @@ where
 
 /// Returns `Err` on empty list, to not accidentally set the whitelist to
 /// None, thereby making the rollup public.
-#[cfg(feature = "proto-alpha")]
 impl TryFrom<Option<Vec<PublicKeyHash>>> for OutboxMessageWhitelistUpdate {
     type Error = InvalidWhitelist;
 
@@ -178,7 +172,6 @@ mod test {
     const ENCODED_OUTBOX_MESSAGE_PREFIX: [u8; 5] = [0, 0, 0, 0, 152];
 
     // first byte is union tag (currently always `2`)
-    #[cfg(feature = "proto-alpha")]
     const ENCODED_OUTBOX_MESSAGE_WHITELIST_PREFIX: [u8; 1] = [2];
 
     const ENCODED_TRANSACTION_ONE: [u8; 74] = [
@@ -223,7 +216,6 @@ mod test {
     // Format.asprintf "%a"
     // Binary_schema.pp
     // (Binary.describe (list Tezos_crypto.Signature.Public_key_hash.encoding))
-    #[cfg(feature = "proto-alpha")]
     const ENCODED_WHITELIST_UPDATE: [u8; 47] = [
         0xff, // provide whitelist (0x0 for none)
         0x0, 0x0, 0x0, 0x2a, // # bytes in next field
@@ -246,7 +238,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "proto-alpha")]
     fn encode_whitelist_update() {
         let mut bin = vec![];
         whitelist().bin_write(&mut bin).unwrap();
@@ -264,7 +255,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "proto-alpha")]
     fn decode_whitelist_update() {
         let (remaining, decoded) =
             OutboxMessageWhitelistUpdate::nom_read(ENCODED_WHITELIST_UPDATE.as_slice())
@@ -290,7 +280,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "proto-alpha")]
     fn encode_outbox_message_whitelist() {
         let mut expected = ENCODED_OUTBOX_MESSAGE_WHITELIST_PREFIX.to_vec();
         expected.extend_from_slice(ENCODED_WHITELIST_UPDATE.as_slice());
@@ -321,7 +310,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "proto-alpha")]
     fn decode_outbox_message_whitelist() {
         let mut bytes = ENCODED_OUTBOX_MESSAGE_WHITELIST_PREFIX.to_vec();
         bytes.extend_from_slice(ENCODED_WHITELIST_UPDATE.as_slice());
@@ -347,7 +335,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "proto-alpha")]
     fn decode_outbox_message_whitelist_err_on_invalid_prefix() {
         let mut bytes = ENCODED_OUTBOX_MESSAGE_PREFIX.to_vec();
         // prefix too long, missing message
@@ -394,7 +381,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "proto-alpha")]
     fn whitelist() -> OutboxMessageWhitelistUpdate {
         let whitelist = Some(vec![
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
@@ -404,7 +390,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "proto-alpha")]
     fn tryfrom_whitelist() {
         let addr =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap();

@@ -11,6 +11,7 @@
 - Add support for new michelson `Ticket` constructor.
 - Add michelson `nat`.
 - Removes deprecated `proto-nairobi` feature flag.
+- Stabilise `OutboxMessage::WhitelistUpdate`.
 
 ### Installer client/kernel
 
