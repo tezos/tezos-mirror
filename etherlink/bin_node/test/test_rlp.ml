@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,7 +27,7 @@
 (** Testing
     -------
     Component:    Bin_evm_node
-    Invocation:   dune exec etherlink/bin_evm_node/test/main.exe -- --file test_rlp.ml
+    Invocation:   dune exec etherlink/bin_node/test/main.exe -- --file test_rlp.ml
     Subject:      Tests for the RLP encoder/decoder
 *)
 
@@ -137,6 +138,31 @@ let test_canonical_invalid_vectors () =
   let valid_tests = read_test_vector "invalidRLPTest.json" in
   List.iter (fun (testname, rlp, bytes) -> check testname rlp bytes) valid_tests
 
+let test_transaction_data_decoding_pos_invariance _ () =
+  let bs = Bytes.of_string in
+  let expected_data = bs "\x05" in
+  let encoded_data =
+    Rlp.encode
+    @@ Rlp.List
+         [
+           Value (bs "\x00");
+           Value (bs "\x00");
+           Value (bs "\x00");
+           Value (bs "\x00");
+           Value (bs "\x00");
+           Value expected_data;
+           Value (bs "\x00");
+           Value (bs "\x00");
+           Value (bs "\x00");
+         ]
+  in
+  let data =
+    Ethereum_types.transaction_data (Bytes.to_string encoded_data)
+    |> Result.value_f ~default:(fun () -> Test.fail "Decoding failed")
+  in
+  Alcotest.(check bytes) "Expected data should coincide" expected_data data ;
+  Lwt.return_unit
+
 let tests =
   [
     ( "RLP",
@@ -149,4 +175,17 @@ let tests =
       ] );
   ]
 
-let () = Alcotest.run ~__FILE__ "Test RLP encoding" tests
+let lwt_tests =
+  [
+    ( "RLP",
+      [
+        Alcotest_lwt.test_case
+          "test transaction data decoding"
+          `Quick
+          test_transaction_data_decoding_pos_invariance;
+      ] );
+  ]
+
+let () =
+  Alcotest.run ~__FILE__ "Test RLP encoding" tests ;
+  Lwt_main.run @@ Alcotest_lwt.run ~__FILE__ "Test RLP decoding" lwt_tests

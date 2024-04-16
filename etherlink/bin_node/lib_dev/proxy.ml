@@ -113,6 +113,7 @@ let main (config : Configuration.t) ~keep_alive ~rollup_node_endpoint =
         tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit =
           Int64.to_int config.tx_pool_tx_per_addr_limit;
+        max_number_of_chunks = None;
       }
   in
   let () = Rollup_node_follower.start ~proxy:true ~rollup_node_endpoint in

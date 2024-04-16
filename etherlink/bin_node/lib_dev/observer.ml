@@ -262,6 +262,7 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
         tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit =
           Int64.to_int config.tx_pool_tx_per_addr_limit;
+        max_number_of_chunks = None;
       }
   in
 

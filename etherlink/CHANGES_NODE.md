@@ -10,6 +10,8 @@
   (4000 by default). (!12749)
 - The transaction pool has a threshold of simultaneous transactions allowed per user
   (16 by default). (!12749)
+- The transaction pool will reject transactions that can not be contained within
+  the size of a blueprint. (!12834)
 
 
 ### Bug fixes
