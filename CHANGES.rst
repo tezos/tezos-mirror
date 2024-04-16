@@ -208,6 +208,9 @@ Smart Rollup node
 
 - Administrative RPCs to inspect injector queues and clear them. (MR :gl:`!12497`)
 
+- Support for unsafely increasing the WASM PVM's tick limit of a rollup.
+  (MR :gl:`!12907`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
