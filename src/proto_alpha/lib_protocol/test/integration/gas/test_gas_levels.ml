@@ -446,7 +446,7 @@ let make_batch_test_block_one_origination name contract gas_sampler =
 
 let hard_gas_limit_per_operation = 1_040_000
 
-let hard_gas_limit_per_block = 1_733_333
+let hard_gas_limit_per_block = 1_386_666
 
 (** Tests the consumption of all gas in a block, should pass *)
 let test_consume_exactly_all_block_gas () =
