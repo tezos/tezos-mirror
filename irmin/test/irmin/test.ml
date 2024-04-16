@@ -31,7 +31,7 @@ let suite =
   ]
 
 let () =
-  Logs.set_level (Some Debug);
+  Logs.set_level (Some Info);
   Logs.set_reporter (Irmin_test_helpers.Irmin_test.reporter ());
   Random.self_init ();
   Lwt_main.run (Alcotest_lwt.run ~__FILE__ "irmin" suite)
