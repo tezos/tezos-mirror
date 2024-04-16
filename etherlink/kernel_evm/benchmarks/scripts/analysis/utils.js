@@ -13,6 +13,7 @@ module.exports = {
     is_run,
     is_blueprint_reading,
     is_transfer,
+    is_call,
     is_create,
     is_transaction,
     make_lr,
@@ -26,6 +27,11 @@ module.exports = {
 function is_transfer(record) {
     return record.tx_type === "TRANSFER"
 }
+
+function is_call(record) {
+    return record.tx_type === "CALL"
+}
+
 function is_create(record) {
     return record.tx_type === "CREATE"
 }

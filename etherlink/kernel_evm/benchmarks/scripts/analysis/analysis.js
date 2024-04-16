@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-const { is_transfer, is_create, is_transaction, BASE_GAS } = require('./utils')
+const { is_transfer, is_create, is_call, is_transaction, BASE_GAS } = require('./utils')
 const fs = require('fs')
 const block_finalization = require('./block_finalization')
 const tx_register = require('./tx_register')
@@ -16,16 +16,13 @@ module.exports = { init_analysis, check_result, process_record }
 
 function init_analysis() {
     let empty = {
-        // total amount of gas consumed
-        total_gas: 0,
-        // total amount of ticks used in run_transaction_ticks
-        sputnik_ticks: 0,
         pure_transfers_ticks: [],
         init: 0,
         decode: 0,
         signatures: [],
         nb_kernel_run: 0,
         nb_call: 0,
+        nb_create: 0,
         nb_transfer: 0,
         kernel_runs: [],
         block_finalization: [],
@@ -65,12 +62,11 @@ function print_analysis(infos, dir) {
     console.info(`-------------------------------------------------------`)
     console.info(`Benchmark run stats`)
     console.info(`----------------------------------`)
-    console.info(`Total gas in execution: ${pp(infos.total_gas)}`)
-    console.info(`Total ticks in sputnik: ${pp(infos.sputnik_ticks)}`)
     console.info(`Number of tx: ${infos.signatures.length}`)
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
     console.info(`Number of transfers: ${infos.nb_transfer}`)
-    console.info(`Number of create/call: ${infos.nb_call}`)
+    console.info(`Number of call: ${infos.nb_call}`)
+    console.info(`Number of create: ${infos.nb_create}`)
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
@@ -111,7 +107,8 @@ function process_bench_record(record, acc) {
 function process_transaction_record(record, acc) {
     acc.signatures.push(record.signature_verification_ticks)
     if (is_transfer(record)) process_transfer(record, acc)
-    else process_execution(record, acc)
+    else if (is_call(record)) acc.nb_call++
+    else if (is_create(record)) acc.nb_create++
 
     // Adds infos for tx registration analysis
     if (!isNaN(record.tx_size) && !isNaN(record.store_transaction_object_ticks))
@@ -127,27 +124,16 @@ function process_transfer(record, acc) {
     acc.nb_transfer++
 }
 
-
-function process_execution(record, acc) {
-    acc.nb_call++
-    let gas = record.gas_cost - BASE_GAS
-    if (!isNaN(record.gas_cost)) acc.total_gas += gas
-    if (!isNaN(record.sputnik_runtime_ticks)) acc.sputnik_ticks += record.sputnik_runtime_ticks
-}
-
 function check_result(infos, dir) {
-    const tickPerGas = infos.sputnik_ticks / infos.total_gas
     let nb_errors = print_analysis(infos, dir)
     const is_error = nb_errors > 0
     if (is_error) {
         console.info(`-------------------------------------------------------`)
         console.error(`WARNING: too many model underestimation (${nb_errors})`)
         console.info(`-------------------------------------------------------`)
-        return 1
-    } else {
-        console.log(`Global tpg: ${tickPerGas}`)
+        return 1;
     }
-    return 0
+    return 0;
 }
 
 function pp(number) {
