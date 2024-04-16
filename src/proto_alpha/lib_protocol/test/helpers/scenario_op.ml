@@ -145,7 +145,7 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
                 (Account_helpers.update_activity
                    src
                    state.constants
-                   level
+                   ~level
                    activity_cycle)
                 acc_map)
             state

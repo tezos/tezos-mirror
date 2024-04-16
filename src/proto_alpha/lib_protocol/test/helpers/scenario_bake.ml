@@ -286,7 +286,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
     Account_helpers.update_activity
       delegate_account
       state.constants
-      block.header.shell.level
+      ~level:block.header.shell.level
       (Block.current_cycle block)
   in
   let state =
