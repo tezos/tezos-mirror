@@ -43,7 +43,6 @@ default = ["std", "alloc", "crypto"]
 crypto = ["tezos_crypto_rs"]
 alloc = ["thiserror", "tezos_data_encoding"]
 testing = ["crypto", "mockall", "tezos-smart-rollup-core/testing"]
-proto-nairobi = ["tezos-smart-rollup-core/proto-nairobi"]
 proto-alpha = ["tezos-smart-rollup-core/proto-alpha"]
 # Required for 'impl Error for RuntimeError'
 std = []

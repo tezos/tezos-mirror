@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 # SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
 # SPDX-FileCopyrightText: 2023 PK Lab <contact@pklab.io>
+# SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
 #
 # SPDX-License-Identifier: MIT
 
@@ -52,15 +53,9 @@ evm-execution = { path = "./evm_execution" }
 tezos-evm-logging = { path = "./logging" }
 
 # SDK
-tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", features = [
-  "proto-nairobi",
-] }
-tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core", features = [
-  "proto-nairobi",
-] }
-tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host", features = [
-  "proto-nairobi",
-] }
+tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk" }
+tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core"}
+tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host"}
 tezos-smart-rollup-panic-hook = { path = "../../src/kernel_sdk/panic-hook" }
 tezos-smart-rollup-entrypoint = { path = "../../src/kernel_sdk/entrypoint" }
 tezos-smart-rollup-debug = { path = "../../src/kernel_sdk/debug" }
@@ -70,9 +65,7 @@ tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-
   "crypto",
 ] }
 tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
-tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock", features = [
-  "proto-nairobi",
-] }
+tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
 tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
 
 # property based testing
