@@ -18,6 +18,7 @@
   octez-l2-libs.scoru-wasm-fast
   qcheck-alcotest
   octez-alcotezt)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -43,7 +44,6 @@
  (libraries
   src_lib_scoru_wasm_fast_test_tezt_lib
   tezt)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
  (modules main))
 
 (rule

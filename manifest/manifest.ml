@@ -2201,6 +2201,8 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
         ~linkall:true
         ?flags
         ~dune
+        ~preprocess
+        ~preprocessor_deps
         ~product
         tezt_local_test_lib_name)
   in
@@ -2248,8 +2250,8 @@ let register_tezt_targets ~make_tezt_exe =
         with_macos_security_framework;
         flags;
         tezt_local_test_lib;
-        preprocess;
-        preprocessor_deps;
+        preprocess = _;
+        preprocessor_deps = _;
         lib_deps;
         _;
       } =
@@ -2283,8 +2285,6 @@ let register_tezt_targets ~make_tezt_exe =
           ~modules:[exe_name]
           ?opam_with_test
           ?dune_with_test
-          ~preprocess
-          ~preprocessor_deps
           ?flags
           ~dune:
             Dune.

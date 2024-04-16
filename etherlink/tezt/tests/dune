@@ -11,6 +11,7 @@
   tezt-tezos
   tezt_etherlink
   tezos-protocol-alpha.protocol)
+ (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -30,7 +31,6 @@
  (libraries
   etherlink_tezt_tests_tezt_lib
   tezt)
- (preprocess (staged_pps ppx_import ppx_deriving.show))
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
