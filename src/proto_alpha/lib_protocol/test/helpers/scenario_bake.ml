@@ -281,7 +281,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
     else return (block', state)
   in
   let baker_acc = State.find_account baker_name state in
-  (* update baker activity *)
+  (* update baker and attesters activity *)
   let update_activity delegate_account =
     Account_helpers.update_activity
       delegate_account
@@ -289,10 +289,41 @@ let bake ?baker : t -> t tzresult Lwt.t =
       ~level:block.header.shell.level
       (Block.current_cycle block)
   in
+  let* attesters =
+    let open Tezos_raw_protocol_alpha.Alpha_context in
+    let* ctxt = Context.get_alpha_ctxt ?policy (B previous_block) in
+    List.filter_map_es
+      (fun op ->
+        let ({protocol_data = Operation_data protocol_data; _}
+              : packed_operation) =
+          op
+        in
+        match protocol_data.contents with
+        | Single (Attestation {consensus_content; _}) ->
+            let*@ _, owner =
+              Stake_distribution.slot_owner
+                ctxt
+                (Level.from_raw ctxt consensus_content.level)
+                consensus_content.slot
+            in
+            return_some owner.delegate
+        | _ -> return_none)
+      operations
+  in
   let state =
     State.update_map
       ~f:(fun acc_map ->
-        String.Map.add baker_name (update_activity baker_acc) acc_map)
+        let acc_map =
+          String.Map.add baker_name (update_activity baker_acc) acc_map
+        in
+        List.fold_left
+          (fun acc_map delegate_pkh ->
+            let delegate_name, delegate_acc =
+              State.find_account_from_pkh delegate_pkh state
+            in
+            String.Map.add delegate_name (update_activity delegate_acc) acc_map)
+          acc_map
+          attesters)
       state
   in
   let* state =
