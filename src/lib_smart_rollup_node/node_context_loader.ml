@@ -171,7 +171,9 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
         })
       last_whitelist_update
   in
-  let unsafe_patches = Pvm_patches.make rollup_address [] in
+  let unsafe_patches =
+    Pvm_patches.make rollup_address configuration.unsafe_pvm_patches
+  in
   let sync = create_sync_info () in
   let node_ctxt =
     {
@@ -256,6 +258,7 @@ module For_snapshots = struct
           fee_parameters = Configuration.default_fee_parameters;
           mode;
           loser_mode;
+          unsafe_pvm_patches = [];
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
           dac_timeout = None;
@@ -359,6 +362,7 @@ module Internal_for_tests = struct
           fee_parameters = Configuration.default_fee_parameters;
           mode;
           loser_mode;
+          unsafe_pvm_patches = [];
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
           dac_timeout = None;
