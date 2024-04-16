@@ -37,7 +37,8 @@
   test_transfer
   test_voting
   test_zk_rollup
-  test_transfer_ticket))
+  test_transfer_ticket
+  test_host_operation))
 
 (executable
  (name main)
