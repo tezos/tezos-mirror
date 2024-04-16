@@ -1184,7 +1184,7 @@ let get_chain_block_context_smart_rollups_smart_rollup_whitelist
       "whitelist";
     ]
     (fun whitelist ->
-      match JSON.(as_list_opt whitelist) with
+      match JSON.(whitelist |> as_opt |> Option.map as_list) with
       | Some l -> Some (List.map JSON.as_string l)
       | None -> None)
 

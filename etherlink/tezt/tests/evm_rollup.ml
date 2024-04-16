@@ -286,7 +286,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy {devmode = true})
-    ?(force_install_kernel = true) protocol =
+    ?(force_install_kernel = true) ?whitelist protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -368,6 +368,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
   in
   let* sc_rollup_address =
     originate_sc_rollup
+      ?whitelist
       ~keys:[]
       ~kind:pvm_kind
       ~boot_sector:("file:" ^ output)
@@ -436,8 +437,8 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
     }
 
 let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
-    ?minimum_base_fee_per_gas ~setup_mode f =
+    ?challenge_window ?bootstrap_accounts ?whitelist ?da_fee_per_byte
+    ?minimum_base_fee_per_gas ?rollup_operator_key ~setup_mode f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
@@ -462,12 +463,14 @@ let register_test ?config ~title ~tags ?(admin = None) ?uses ?commitment_period
     (fun protocol ->
       let* evm_setup =
         setup_evm_kernel
+          ?whitelist
           ?config
           ?commitment_period
           ?challenge_window
           ?bootstrap_accounts
           ?da_fee_per_byte
           ?minimum_base_fee_per_gas
+          ?rollup_operator_key
           ~admin
           ~setup_mode
           protocol
@@ -493,7 +496,7 @@ let register_proxy ?config ~title ~tags ?uses ?admin ?commitment_period
 
 let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
     ?bootstrap_accounts ?da_fee_per_byte ?minimum_base_fee_per_gas ?config
-    ?time_between_blocks f protocols =
+    ?time_between_blocks ?whitelist ?rollup_operator_key f protocols =
   let register =
     register_test
       ?config
@@ -506,6 +509,8 @@ let register_both ~title ~tags ?uses ?admin ?commitment_period ?challenge_window
       ?bootstrap_accounts
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
+      ?whitelist
+      ?rollup_operator_key
       f
       protocols
   in
@@ -5474,6 +5479,50 @@ let test_tx_pool_transaction_size_exceeded =
     ~error_msg:"This transaction should be rejected with error msg %R not %L" ;
   unit
 
+let test_whitelist_is_executed =
+  let rollup_operator_key = Constant.bootstrap1.public_key_hash in
+  let whitelist = [rollup_operator_key] in
+  let config =
+    `Config
+      [Installer_kernel_config.Set {value = ""; to_ = "/evm/remove_whitelist"}]
+  in
+  let commitment_period = 5 and challenge_window = 5 in
+  register_both
+    ~challenge_window
+    ~commitment_period
+    ~whitelist
+    ~rollup_operator_key
+    ~config
+    ~tags:["evm"; "whitelist"; "update"]
+    ~title:
+      "Check that the kernel submit a whitelist update message when flag is \
+       set."
+  @@ fun ~protocol:_
+             ~evm_setup:{sc_rollup_node; client; node; sc_rollup_address; _} ->
+  let get_whitelist () =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_whitelist
+         sc_rollup_address
+  in
+  let* found_whitelist = get_whitelist () in
+  Check.(
+    (Some whitelist = found_whitelist)
+      (option (list string))
+      ~error_msg:"found %R expected %L") ;
+  let* () =
+    repeat
+      ((commitment_period * challenge_window) + 3)
+      (fun () ->
+        let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* found_whitelist = get_whitelist () in
+  Check.(
+    (None = found_whitelist)
+      (option (list string))
+      ~error_msg:"found %R expected %L") ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5571,7 +5620,8 @@ let register_evm_node ~protocols =
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_tx_pool_timeout protocols ;
   test_tx_pool_address_boundaries protocols ;
-  test_tx_pool_transaction_size_exceeded protocols
+  test_tx_pool_transaction_size_exceeded protocols ;
+  test_whitelist_is_executed protocols
 
 let protocols = Protocol.all
 
