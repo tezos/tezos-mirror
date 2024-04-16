@@ -64,6 +64,7 @@ type t = {
   fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
+  unsafe_pvm_patches : Pvm_patches.unsafe_patch list;
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
   dac_timeout : Z.t option;
@@ -436,6 +437,7 @@ let encoding default_display : t Data_encoding.t =
            fee_parameters;
            mode;
            loser_mode;
+           unsafe_pvm_patches;
            dal_node_endpoint;
            dac_observer_endpoint;
            dac_timeout;
@@ -461,8 +463,12 @@ let encoding default_display : t Data_encoding.t =
             rpc_addr,
             rpc_port,
             acl ),
-          (metrics_addr, reconnection_delay, fee_parameters, mode, loser_mode)
-        ),
+          ( metrics_addr,
+            reconnection_delay,
+            fee_parameters,
+            mode,
+            loser_mode,
+            unsafe_pvm_patches ) ),
         ( ( dal_node_endpoint,
             dac_observer_endpoint,
             dac_timeout,
@@ -487,8 +493,12 @@ let encoding default_display : t Data_encoding.t =
                rpc_addr,
                rpc_port,
                acl ),
-             (metrics_addr, reconnection_delay, fee_parameters, mode, loser_mode)
-           ),
+             ( metrics_addr,
+               reconnection_delay,
+               fee_parameters,
+               mode,
+               loser_mode,
+               unsafe_pvm_patches ) ),
            ( ( dal_node_endpoint,
                dac_observer_endpoint,
                dac_timeout,
@@ -519,6 +529,7 @@ let encoding default_display : t Data_encoding.t =
         fee_parameters;
         mode;
         loser_mode;
+        unsafe_pvm_patches;
         dal_node_endpoint;
         dac_observer_endpoint;
         dac_timeout;
@@ -559,7 +570,7 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Access control list"
                 Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
                 default_acl))
-          (obj5
+          (obj6
              (opt "metrics-addr" ~description:"Metrics address" string)
              (dft
                 "reconnection_delay"
@@ -584,7 +595,14 @@ let encoding default_display : t Data_encoding.t =
                   "If enabled, the rollup node will issue wrong commitments \
                    (for test only!)"
                 Loser_mode.encoding
-                Loser_mode.no_failures)))
+                Loser_mode.no_failures)
+             (dft
+                "unsafe-pvm-patches"
+                ~description:
+                  "Unsafe patches to apply to the PVM. For tests only, don't \
+                   set this value in production."
+                (list Pvm_patches.unsafe_patch_encoding)
+                [])))
        (merge_objs
           (obj9
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
@@ -753,6 +771,7 @@ module Cli = struct
       fee_parameters = Operation_kind.Map.empty;
       mode;
       loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
+      unsafe_pvm_patches = [];
       batcher = default_batcher;
       injector =
         {
