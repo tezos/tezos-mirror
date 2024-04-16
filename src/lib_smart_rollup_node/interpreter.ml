@@ -40,6 +40,15 @@ let get_boot_sector (module Plugin : Protocol_plugin_sig.PARTIAL) block_hash
       in
       return boot_sector
 
+(** Apply potential unsafe patches to the PVM state. *)
+let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
+    (node_ctxt : _ Node_context.t) state =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind)
+    state
+    (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list)
+
 let genesis_state (module Plugin : Protocol_plugin_sig.PARTIAL) block_hash
     node_ctxt ctxt =
   let open Lwt_result_syntax in
@@ -47,6 +56,9 @@ let genesis_state (module Plugin : Protocol_plugin_sig.PARTIAL) block_hash
   let*! initial_state = Plugin.Pvm.initial_state node_ctxt.kind in
   let*! genesis_state =
     Plugin.Pvm.install_boot_sector node_ctxt.kind initial_state boot_sector
+  in
+  let* genesis_state =
+    apply_unsafe_patches (module Plugin) node_ctxt genesis_state
   in
   let*! ctxt = Context.PVMState.set ctxt genesis_state in
   return (ctxt, genesis_state)
@@ -102,8 +114,7 @@ let process_head plugin (node_ctxt : _ Node_context.t) ctxt
   if head.level >= first_inbox_level then
     transition_pvm plugin node_ctxt ctxt predecessor head inbox_and_messages
   else if head.Layer1.level = node_ctxt.genesis_info.level then
-    let* ctxt, state = genesis_state plugin head.hash node_ctxt ctxt in
-    let*! ctxt = Context.PVMState.set ctxt state in
+    let* ctxt, _state = genesis_state plugin head.hash node_ctxt ctxt in
     return (ctxt, 0, 0L, Z.zero)
   else return (ctxt, 0, 0L, Z.zero)
 

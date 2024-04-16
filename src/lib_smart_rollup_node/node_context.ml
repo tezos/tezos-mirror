@@ -106,6 +106,7 @@ type 'a t = {
   injector_retention_period : int;
   block_finality_time : int;
   kind : Kind.t;
+  unsafe_patches : Pvm_patches.t;
   lockfile : Lwt_unix.file_descr;
   store : 'a store;
   context : 'a Context.t;
