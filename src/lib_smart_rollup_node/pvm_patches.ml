@@ -37,3 +37,7 @@ let unsafe_patch_encoding =
         (function Increase_max_nb_ticks ticks -> Some ticks)
         (fun ticks -> Increase_max_nb_ticks ticks);
     ]
+
+let pp_unsafe_patch fmt = function
+  | Increase_max_nb_ticks nb ->
+      Format.fprintf fmt "Increase maximum number of ticks to %#Ld" nb

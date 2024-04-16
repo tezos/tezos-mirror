@@ -76,6 +76,15 @@ module Simple = struct
       ("content_hash", Data_encoding.string)
       ~pp1:Format.pp_print_string
       ~pp2:Format.pp_print_string
+
+  let patching_genesis_state =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_interpreter_patching_genesis_pvm_state"
+      ~msg:"Patching genesis PVM state: {patch}"
+      ~level:Warning
+      ("patch", Pvm_patches.unsafe_patch_encoding)
+      ~pp1:Pvm_patches.pp_unsafe_patch
 end
 
 (** [transition_pvm inbox_level hash tick n] emits the event that a PVM
@@ -98,3 +107,5 @@ let missing_pre_image ~hash = Simple.(emit missing_pre_image) hash
 
 let fetched_incorrect_pre_image ~expected_hash ~content_hash =
   Simple.(emit fetched_incorrect_pre_image) (expected_hash, content_hash)
+
+let patching_genesis_state patch = Simple.(emit patching_genesis_state) patch
