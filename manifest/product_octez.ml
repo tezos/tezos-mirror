@@ -2921,6 +2921,24 @@ let _irmin_data_tests =
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
+let _brassaia_data_tests =
+  tezt
+    ["test"; "import"; "test_fixed_size_string_set"]
+    ~path:"brassaia/test/brassaia/data"
+    ~opam:"tezos_internal_brassaia_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_context_sigs;
+        alcotezt;
+        brassaia_test_helpers;
+        octez_stdlib_unix |> open_;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
 let _irmin_generic_key_tests =
   tezt
     ["test"; "test_store_offset"; "test_inlined_contents"]
