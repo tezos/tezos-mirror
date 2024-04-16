@@ -128,7 +128,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
   | false, Release_tag -> [job_opam_release]
   | _ -> []
 
-(** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
+(** Create an etherlink release tag pipeline. *)
 let etherlink_jobs () =
   let job_produce_docker_artifacts : Tezos_ci.tezos_job =
     job_docker_authenticated
