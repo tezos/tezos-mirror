@@ -158,11 +158,11 @@ let etherlink_jobs () =
   in
   let job_build_dpkg_amd64 = job_build_dpkg_amd64 Etherlink in
   let job_build_rpm_amd64 = job_build_rpm_amd64 Etherlink in
-  let job_produce_docker_artifacts : Tezos_ci.tezos_job =
+  let job_build_docker_kernel : Tezos_ci.tezos_job =
     job_docker_authenticated
       ~__POS__
       ~stage:Stages.prepare_release
-      ~name:"docker:prepare-etherlink-release"
+      ~name:"eth.build:docker:kernel"
       ~artifacts:
         (Gitlab_ci.Util.artifacts
            ~expire_in:(Duration (Hours 1))
@@ -176,7 +176,7 @@ let etherlink_jobs () =
         Artifacts job_static_arm64_release;
         Artifacts job_build_dpkg_amd64;
         Artifacts job_build_rpm_amd64;
-        Job job_produce_docker_artifacts
+        Artifacts job_build_docker_kernel;
       ]
   in
   let job_gitlab_release : Tezos_ci.tezos_job =
@@ -198,6 +198,6 @@ let etherlink_jobs () =
     job_static_arm64_release;
     job_build_dpkg_amd64;
     job_build_rpm_amd64;
-    job_produce_docker_artifacts;
+    job_build_docker_kernel;
     job_gitlab_release;
   ]
