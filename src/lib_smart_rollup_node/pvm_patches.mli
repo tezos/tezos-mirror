@@ -19,6 +19,6 @@ val unsafe_patch_encoding : unsafe_patch Data_encoding.t
 (** Pretty printer for unsafe patches. *)
 val pp_unsafe_patch : Format.formatter -> unsafe_patch -> unit
 
-(** [make address patches] builds the patches from the provided list [patches]
-    and adds the hardcoded PVM patches for the rollup [address]. *)
-val make : Address.t -> unsafe_patch list -> t
+(** [make kind address patches] builds the patches from the provided list
+    [patches] and adds the hardcoded PVM patches for the rollup [address]. *)
+val make : Kind.t -> Address.t -> unsafe_patch list -> t tzresult
