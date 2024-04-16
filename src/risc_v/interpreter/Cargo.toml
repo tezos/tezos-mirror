@@ -30,3 +30,6 @@ hex = "0.4.3"
 rand = "0.8.5"
 proptest = "1.4.0"
 lazy_static = "1.4.0"
+
+[dependencies.tezos-smart-rollup-constants]
+path = "../../kernel_sdk/constants"
