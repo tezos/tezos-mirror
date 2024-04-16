@@ -16,8 +16,8 @@
 
 let () =
   Lwt_main.run
-  @@ Irmin_test_helpers.Irmin_test.Store.run ~__FILE__ "generic-key" ~slow:true
-       ~misc:[] ~sleep:Lwt_unix.sleep
+  @@ Irmin_test_helpers.Irmin_test.Store.run ~__FILE__ "irmin/generic-key"
+       ~slow:true ~misc:[] ~sleep:Lwt_unix.sleep
        [
          (`Quick, Test_store_offset.suite); (`Quick, Test_inlined_contents.suite);
        ]
