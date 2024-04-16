@@ -45,7 +45,9 @@ let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
     (node_ctxt : _ Node_context.t) state =
   let open Lwt_result_syntax in
   List.fold_left_es
-    (Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind)
+    (fun state patch ->
+      let*! () = Interpreter_event.patching_genesis_state patch in
+      Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind state patch)
     state
     (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list)
 
