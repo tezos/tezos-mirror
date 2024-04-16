@@ -128,15 +128,28 @@ let build_commitment (module Plugin : Protocol_plugin_sig.S)
         compressed_state;
       }
 
+let genesis_pvm_state (module Plugin : Protocol_plugin_sig.S)
+    (node_ctxt : _ Node_context.t) ctxt =
+  let open Lwt_result_syntax in
+  match (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list) with
+  | [] -> (
+      let*! pvm_state = Context.PVMState.find ctxt in
+      match pvm_state with
+      | Some pvm_state -> return pvm_state
+      | None -> failwith "PVM state for genesis commitment is not available")
+  | _ ->
+      (* If there are unsafe patches that were applied to the genesis PVM state,
+         we instead recompute the unpatched version to derive the commitment as
+         all the following ones will need to be chained to it. *)
+      let+ _, Original state =
+        Interpreter.genesis_state (module Plugin) node_ctxt
+      in
+      state
+
 let genesis_commitment (module Plugin : Protocol_plugin_sig.S)
     (node_ctxt : _ Node_context.t) ctxt =
   let open Lwt_result_syntax in
-  let*! pvm_state = Context.PVMState.find ctxt in
-  let*? pvm_state =
-    match pvm_state with
-    | Some pvm_state -> Ok pvm_state
-    | None -> error_with "PVM state for genesis commitment is not available"
-  in
+  let* pvm_state = genesis_pvm_state (module Plugin) node_ctxt ctxt in
   let*! compressed_state = Plugin.Pvm.state_hash node_ctxt.kind pvm_state in
   let commitment =
     Octez_smart_rollup.Commitment.
