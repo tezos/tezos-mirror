@@ -727,31 +727,28 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
 
 type bin_package_target = Dpkg | Rpm
 
+let bin_package_image =
+  Image.register ~name:"generic" ~image_path:"$DISTRIBUTION"
+
 let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     ?(stage = Stages.build) ~arch ~target () : tezos_job =
   let arch_string = arch_to_string_alt arch in
   let target_string = match target with Dpkg -> "dpkg" | Rpm -> "rpm" in
-  let image =
-    match target with Dpkg -> Images.debian_bookworm | Rpm -> Images.fedora_39
-  in
+  let image = bin_package_image in
   let parallel =
     let distributions =
       match target with
-      | Dpkg -> ["debian:bookworm"; "ubuntu:focal"]
+      | Dpkg -> ["debian:bookworm"; "ubuntu:focal"; "ubuntu:jammy"]
       | Rpm -> ["fedora:39"; "rockylinux:9.3"]
     in
     Matrix [[("DISTRIBUTION", distributions)]]
   in
   let artifacts =
-    let artifact_path =
-      "$DISTRIBUTION"
-      // ("octez-*." ^ match target with Dpkg -> "deb" | Rpm -> "rpm")
-    in
     artifacts
       ~expire_in:(Duration (Days 1))
       ~when_:On_success
       ~name:"${TARGET}-$ARCH-$CI_COMMIT_REF_SLUG"
-      [artifact_path]
+      ["packages/"]
   in
   let before_script =
     before_script
@@ -759,6 +756,7 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       (match target with
       | Dpkg ->
           [
+            "export DEBIAN_FRONTEND=noninteractive";
             "apt update";
             "apt-get install -y rsync git m4 build-essential patch unzip wget \
              opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev \
@@ -796,8 +794,10 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
       "make build-deps";
       "eval $(opam env)";
       "make $TARGET";
-      "mkdir $DISTRIBUTION";
-      "mv octez-*.* $DISTRIBUTION/";
+      "DISTRO=$(echo \"$DISTRIBUTION\" | cut -d':' -f1)";
+      "RELEASE=$(echo \"$DISTRIBUTION\" | cut -d':' -f2)";
+      "mkdir -p packages/$DISTRO/$RELEASE";
+      "mv octez-*.* packages/$DISTRO/$RELEASE/";
     ]
 
 let job_build_dpkg_amd64 : unit -> tezos_job =
