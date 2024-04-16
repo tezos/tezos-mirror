@@ -972,7 +972,7 @@ let test_slots_attestation_operation_behavior _protocol parameters _cryptobox
        [h4] becomes applied.
      - No slot is confirmed as no slot header is published.
   *)
-  let* now = Node.get_level node in
+  let* now = Node.wait_for_level node 5 in
   let* (`OpHash h1) = attest ~level:2 () in
   let outdated = [h1] in
   Log.info "expected mempool: outdated: h1 = %s" h1 ;
@@ -6840,7 +6840,7 @@ let register ~protocols =
     Amplification.test_amplification_without_lost_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "simple"]
+    ~tags:["gc"; "simple"; "memory_3k"]
     ~producer_profiles:[0]
     ~history_mode:(Dal_node.Custom 15)
     ~number_of_slots:1
@@ -6848,7 +6848,7 @@ let register ~protocols =
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "multi"]
+    ~tags:["gc"; "multi"; "memory_3k"]
     ~bootstrap_profile:true
     ~number_of_slots:1
     "garbage collection of shards for all profiles"
