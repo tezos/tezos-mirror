@@ -66,6 +66,27 @@ module Chain = struct
     {head; confirmed_head}
 end
 
+module Info = struct
+  let init ~devmode ~mode =
+    let commit_hash =
+      Tezos_version_value.Current_git_info.abbreviated_commit_hash
+    in
+    let commit_date = Tezos_version_value.Current_git_info.committer_date in
+    let metric =
+      Gauge.v_labels
+        ~registry
+        ~help:"Information"
+        ~namespace
+        ~subsystem
+        ~label_names:["commit_hash"; "commit_date"; "devmode"; "mode"]
+        "info"
+    in
+    ignore
+      (Gauge.labels
+         metric
+         [commit_hash; commit_date; string_of_bool devmode; mode])
+end
+
 type t = {chain : Chain.t}
 
 let metrics =
