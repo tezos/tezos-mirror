@@ -32,11 +32,12 @@ use exec_env::{
     ExecutionEnvironment, ExecutionEnvironmentState,
 };
 use machine_state::{
-    bus::Address,
+    bus::{Address, Addressable, OutOfBounds},
     csregisters::{satp::TranslationAlgorithm, CSRegister},
     registers::{FRegister, FValue},
     AccessType,
 };
+use state_backend::Elem;
 use std::collections::BTreeMap;
 use traps::Exception;
 use InterpreterResult::*;
@@ -172,6 +173,10 @@ impl<'a> Interpreter<'a> {
         access_type: &AccessType,
     ) -> Option<TranslationAlgorithm> {
         self.machine_state.effective_translation_alg(access_type)
+    }
+
+    pub fn read_bus<E: Elem>(&self, address: Address) -> Result<E, OutOfBounds> {
+        self.machine_state.bus.read(address)
     }
 
     pub fn read_xregister(&self, reg: XRegister) -> u64 {

@@ -30,6 +30,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod errors;
 mod tui;
+mod updates;
 
 const GREEN: Color = tailwind::GREEN.c400;
 const YELLOW: Color = tailwind::YELLOW.c400;
@@ -40,12 +41,13 @@ const GRAY: Color = tailwind::GRAY.c500;
 const SELECTED_STYLE_FG: Color = BLUE;
 const NEXT_STYLE_FG: Color = GREEN;
 const MAX_STEPS: usize = 1_000_000;
+const PC_CONTEXT: u64 = 12;
 
 #[derive(Debug, Clone)]
-struct Instruction<'a> {
+struct Instruction {
     address: u64,
-    text: &'a str,
-    jump: Option<(u64, Option<&'a str>)>,
+    text: String,
+    jump: Option<(u64, Option<String>)>,
 }
 
 enum EffectiveTranslationState {
@@ -145,7 +147,7 @@ struct DebuggerState {
 
 struct ProgramView<'a> {
     state: ListState,
-    instructions: Vec<Instruction<'a>>,
+    instructions: Vec<Instruction>,
     next_instr: usize,
     breakpoints: HashSet<u64>,
     symbols: HashMap<u64, &'a str>,
@@ -178,8 +180,8 @@ macro_rules! fregister_line {
     };
 }
 
-impl<'a> Instruction<'a> {
-    fn new(address: u64, text: &'a str, symbols: &HashMap<u64, &'a str>) -> Self {
+impl Instruction {
+    fn new(address: u64, text: String, symbols: &HashMap<u64, &str>) -> Self {
         let jump = match text
             .split(' ')
             .next()
@@ -188,7 +190,7 @@ impl<'a> Instruction<'a> {
             "jal" | "beq" | "bne" | "blt" | "bge" | "bltu" | "bgeu" => {
                 text.split(',').last().map(|jump_address| {
                     let addr = address.wrapping_add(jump_address.parse::<i64>().unwrap() as u64);
-                    (addr, symbols.get(&addr).copied())
+                    (addr, symbols.get(&addr).map(|s| s.to_string()))
                 })
             }
             _ => None,
@@ -226,7 +228,7 @@ impl<'a> DebuggerApp<'a> {
             program: ProgramView::with_items(
                 program
                     .iter()
-                    .map(|x| Instruction::new(*x.0, x.1, &symbols))
+                    .map(|x| Instruction::new(*x.0, x.1.to_string(), &symbols))
                     .collect::<Vec<Instruction>>(),
                 symbols,
             ),
@@ -253,10 +255,22 @@ impl<'a> DebuggerApp<'a> {
                         Char('s') => self.step(1),
                         Char('b') => self.program.set_breakpoint(),
                         Char('r') => self.step_until_breakpoint(),
-                        Char('j') | Down => self.program.next(),
-                        Char('k') | Up => self.program.previous(),
-                        Char('g') | Home => self.program.go_top(),
-                        Char('G') | End => self.program.go_bottom(),
+                        Char('j') | Down => {
+                            self.program.next();
+                            self.update_selected_context();
+                        }
+                        Char('k') | Up => {
+                            self.program.previous();
+                            self.update_selected_context();
+                        }
+                        Char('g') | Home => {
+                            self.program.go_top();
+                            self.update_selected_context();
+                        }
+                        Char('G') | End => {
+                            self.program.go_bottom();
+                            self.update_selected_context();
+                        }
                         _ => {}
                     }
                 }
@@ -269,54 +283,13 @@ impl<'a> DebuggerApp<'a> {
         Ok(())
     }
 
-    /// Returns the physical program counter, and if the translation algorithm is faulting
-    fn update_pc_after_step(&mut self) -> (Address, bool) {
-        let raw_pc = self.interpreter.read_pc();
-        let res @ (pc, _faulting) = match self.interpreter.translate_instruction_address(raw_pc) {
-            Err(_e) => (self.state.prev_pc, true),
-            Ok(pc) => (pc, false),
-        };
-
-        self.state.prev_pc = pc;
-
-        res
-    }
-
-    fn update_translation_after_step(&mut self, faulting: bool) {
-        let effective_mode = self
-            .interpreter
-            .effective_translation_alg(&AccessType::Instruction);
-        let satp_val = self.interpreter.read_csregister(CSRegister::satp);
-        self.state
-            .translation
-            .update(faulting, effective_mode, satp_val)
-    }
-
-    fn update_after_step(&mut self, result: InterpreterResult) {
-        let (pc, faulting) = self.update_pc_after_step();
-        self.update_translation_after_step(faulting);
-
-        self.program.next_instr = self
-            .program
-            .instructions
-            .iter()
-            .position(|instr| instr.address == pc)
-            .unwrap_or_else(|| {
-                panic!(
-                    "pc {:x} does not correspond to any instruction's address",
-                    pc
-                )
-            });
-        self.program.state.select(Some(self.program.next_instr));
-        self.state.interpreter = result;
-    }
-
     fn step(&mut self, max_steps: usize) {
         let result = self.interpreter.run(max_steps);
         self.update_after_step(result);
     }
 
     fn step_until_breakpoint(&mut self) {
+        // perform at least a step to progress if already on a breakpoint
         self.step(1);
         let result = self.interpreter.step_many(MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
@@ -348,7 +321,10 @@ impl<'a> DebuggerApp<'a> {
                         .selected()
                         .unwrap_or(self.program.next_instr),
                     self.program.breakpoints.contains(&instr.address),
-                    self.program.symbols.get(&instr.address).copied(),
+                    self.program
+                        .symbols
+                        .get(&instr.address)
+                        .map(|s| s.to_string()),
                 )
             })
             .collect();
@@ -732,13 +708,13 @@ impl Widget for &mut DebuggerApp<'_> {
     }
 }
 
-impl<'a> Instruction<'a> {
+impl Instruction {
     fn to_list_item(
         &self,
         next: bool,
         selected: bool,
         breakpoint: bool,
-        symbol: Option<&'a str>,
+        symbol: Option<String>,
     ) -> ListItem {
         let color = if next {
             Style::default()
@@ -770,8 +746,11 @@ impl<'a> Instruction<'a> {
 
         // If the instruction is a jump address and it points to a known symbol,
         // display the address and the symbol
-        if let Some((address, label)) = self.jump {
-            let label = label.map(|x| format!("({})", x)).unwrap_or_default();
+        if let Some((address, label)) = &self.jump {
+            let label = label
+                .as_ref()
+                .map(|x| format!("({})", x))
+                .unwrap_or_default();
             line.push(format!(" # {:x} {}", address, label).into())
         }
 
@@ -794,7 +773,7 @@ impl<'a> Instruction<'a> {
 
 impl<'a> ProgramView<'a> {
     fn with_items(
-        instructions: Vec<Instruction<'a>>,
+        instructions: Vec<Instruction>,
         symbols: HashMap<u64, &'a str>,
     ) -> ProgramView<'a> {
         ProgramView {
@@ -850,5 +829,16 @@ impl<'a> ProgramView<'a> {
 
     fn go_bottom(&mut self) {
         self.state.select(Some(self.instructions.len() - 1));
+    }
+
+    fn partial_update(&mut self, mut new_instructions: Vec<Instruction>) {
+        // Update / Insert new_instructions to existing instructions.
+        self.instructions.retain(|i| {
+            new_instructions
+                .iter()
+                .all(|new_i| i.address != new_i.address)
+        });
+        self.instructions.append(&mut new_instructions);
+        self.instructions.sort_by(|a, b| a.address.cmp(&b.address));
     }
 }
