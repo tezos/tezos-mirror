@@ -111,17 +111,13 @@ module Pipeline : sig
   val workflow_includes :
     unit -> Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list
 
-  (** Writes the set of non-legacy registered pipelines.
+  (** Writes the set of registered pipelines.
 
       The string {!header} will be prepended to each written file. *)
   val write : unit -> unit
 end
 
-(** A facility for registering images for [image:] keywords.
-
-    During the transition from hand-written [.gitlab-ci.yml] to
-    CI-in-OCaml, we write a set of templates corresponding to the
-    registered images, to make them available for hand-written jobs. *)
+(** A facility for registering images for [image:] keywords. *)
 module Image : sig
   (** Represents an image *)
   type t = Gitlab_ci.Types.image
@@ -129,10 +125,10 @@ module Image : sig
   (** Register an image of the given [name] and [image_path]. *)
   val register : name:string -> image_path:string -> t
 
-  (** The name of an image *)
+  (** The [name] of an image *)
   val name : t -> string
 
-  (** Returns the set of registered images as [name, image] tuples. *)
+  (** Returns the set of registered images as [name, image_path] tuples. *)
   val all : unit -> (string * t) list
 end
 
@@ -208,7 +204,7 @@ type git_strategy =
   | Fetch  (** Translates to [fetch]. *)
   | Clone  (** Translates to [clone]. *)
   | No_strategy
-      (** Translates to [].
+      (** Translates to [none].
 
           Renamed to avoid clashes with {!Option.None}. *)
 

@@ -387,7 +387,6 @@ let jobs pipeline_type =
          ["$BISECT_FILE"]
   in
   (* Stages *)
-  (* All stages should be empty, as explained below, until the full pipeline is generated. *)
   let trigger_stage, make_dependencies =
     match pipeline_type with
     | Schedule_extended_test ->
@@ -1944,12 +1943,4 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  (* Empty placeholder: this has the effect of not overwriting the pipeline file in question.
-     Once all the jobs in these pipelines are defined, we will return them here which
-     will cause the pipeline files to contain the definition of all those jobs.
-
-     Until that time, all the jobs are written ot external files
-     (using {!job_external} or {!jobs_external}) and included by hand
-     in the files [.gitlab/ci/pipelines/before_merging.yml] and
-     [.gitlab/ci/pipelines/schedule_extended_test.yml]. *)
   trigger_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual
