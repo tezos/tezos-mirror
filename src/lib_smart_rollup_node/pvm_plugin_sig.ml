@@ -117,6 +117,14 @@ module type S = sig
   val info_per_level_serialized :
     predecessor:Block_hash.t -> predecessor_timestamp:Time.Protocol.t -> string
 
+  module Unsafe : sig
+    val apply_patch :
+      Kind.t ->
+      Context.pvmstate ->
+      Pvm_patches.unsafe_patch ->
+      Context.pvmstate tzresult Lwt.t
+  end
+
   module Wasm_2_0_0 : sig
     (** [decode_durable_state enc tree] decodes a value using the encoder
         [enc] from the provided [tree] *)
