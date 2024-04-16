@@ -33,6 +33,11 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
             let offset = compute_offset(address, branch_address);
             format!("{} {},{}", op, rd, offset)
         }
+        "lr.w" | "lr.w.aq" | "lr.w.rl" | "lr.w.aqrl" | "lr.d" | "lr.d.aq" | "lr.d.rl"
+        | "lr.d.aqrl" => {
+            let args = args.replace(",(", ",zero,(");
+            format!("{} {}", op, args)
+        }
         "c.j" => {
             let offset = compute_offset(address, args);
             format!("{} {}", op, offset)
@@ -48,10 +53,12 @@ fn transform_objdump_instr<'a>(address: &'a str, instr: &'a str, args: &'a str) 
                 _ => format!("{} {},{}", op, rd_rs1, imm),
             }
         }
-        "lr.w" | "lr.w.aq" | "lr.w.rl" | "lr.w.aqrl" | "lr.d" | "lr.d.aq" | "lr.d.rl"
-        | "lr.d.aqrl" => {
-            let args = args.replace(",(", ",zero,(");
-            format!("{} {}", op, args)
+        "c.beqz" | "c.bnez" => {
+            let mut args = args.split(',');
+            let rs1 = args.next().unwrap();
+            let branch_address = args.next().unwrap();
+            let offset = compute_offset(address, branch_address);
+            format!("{} {},{}", op, rs1, offset)
         }
         _ => {
             if args.is_empty() {
@@ -138,7 +145,11 @@ fn parse_encoded(encoded: &str) -> Instr {
 fn check_instructions(fname: &str, instructions: Vec<(String, Instr, String)>) {
     for (address, parsed_instr, objdump_instr) in instructions {
         let printed_instr = parsed_instr.to_string();
-        if printed_instr.starts_with("unknown") || objdump_instr == "unimp" {
+        if printed_instr.starts_with("unknown")
+            || objdump_instr.starts_with('.')
+            || objdump_instr == "unimp"
+            || objdump_instr == "c.unimp"
+        {
             continue;
         }
         assert_eq!(

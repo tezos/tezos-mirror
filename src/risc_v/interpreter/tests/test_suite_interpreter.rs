@@ -169,7 +169,7 @@ test_case!(test_suite_rv64ua_v_amoxor_w, "rv64ua-v-amoxor_w");
 test_case!(test_suite_rv64ua_v_lrsc, "rv64ua-v-lrsc");
 
 // RV64-UC
-test_case!(#[ignore], test_suite_rv64uc_p_rvc, "rv64uc-p-rvc");
+test_case!(test_suite_rv64uc_p_rvc, "rv64uc-p-rvc");
 
 test_case!(#[ignore], test_suite_rv64uc_v_rvc, "rv64uc-v-rvc");
 

@@ -184,13 +184,30 @@ pub struct AmoArgs {
 // Compressed instruction types
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CRTypeArgs {
+    pub rd_rs1: XRegister,
+    pub rs2: XRegister,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CRJTypeArgs {
+    pub rs1: XRegister,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct CJTypeArgs {
     pub imm: i64,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct CITypeArgs {
+pub struct CIBTypeArgs {
     pub rd_rs1: XRegister,
+    pub imm: i64,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CSSTypeArgs {
+    pub rs2: XRegister,
     pub imm: i64,
 }
 
@@ -390,10 +407,42 @@ pub enum Instr {
     // Supervisor Memory-Management
     SFenceVma { asid: XRegister, vaddr: XRegister },
 
-    // RV64C compressed instructions
-    CAddi(CITypeArgs),
+    // RV32C compressed instructions
+    CLw(ITypeArgs),
+    CLwsp(CIBTypeArgs),
+    CSw(SBTypeArgs),
+    CSwsp(CSSTypeArgs),
     CJ(CJTypeArgs),
+    CJr(CRJTypeArgs),
+    CJalr(CRJTypeArgs),
+    CBeqz(CIBTypeArgs),
+    CBnez(CIBTypeArgs),
+    CLi(CIBTypeArgs),
+    CLui(CIBTypeArgs),
+    CAddi(CIBTypeArgs),
+    CAddi16sp(CJTypeArgs),
+    CAddi4spn(CIBTypeArgs),
+    CSlli(CIBTypeArgs),
+    CSrli(CIBTypeArgs),
+    CSrai(CIBTypeArgs),
+    CAndi(CIBTypeArgs),
+    CMv(CRTypeArgs),
+    CAdd(CRTypeArgs),
+    CAnd(CRTypeArgs),
+    COr(CRTypeArgs),
+    CXor(CRTypeArgs),
+    CSub(CRTypeArgs),
+    CAddw(CRTypeArgs),
+    CSubw(CRTypeArgs),
+    CEbreak,
     CNop,
+
+    // RV64C compressed instructions
+    CLd(ITypeArgs),
+    CLdsp(CIBTypeArgs),
+    CSd(SBTypeArgs),
+    CSdsp(CSSTypeArgs),
+    CAddiw(CIBTypeArgs),
 
     Unknown { instr: u32 },
     UnknownCompressed { instr: u16 },
@@ -571,7 +620,40 @@ impl Instr {
             | Unknown { instr: _ } => 4,
 
             // 2 bytes instructions (compressed instructions)
-            CAddi(_) | CJ(_) | CNop | UnknownCompressed { instr: _ } => 2,
+            CLw(_)
+            | CLwsp(_)
+            | CSw(_)
+            | CSwsp(_)
+            | CJ(_)
+            | CJr(_)
+            | CJalr(_)
+            | CBeqz(_)
+            | CBnez(_)
+            | CLi(_)
+            | CLui(_)
+            | CAddi(_)
+            | CAddi16sp(_)
+            | CAddi4spn(_)
+            | CSlli(_)
+            | CSrli(_)
+            | CSrai(_)
+            | CAndi(_)
+            | CMv(_)
+            | CAdd(_)
+            | CAnd(_)
+            | COr(_)
+            | CXor(_)
+            | CSub(_)
+            | CAddw(_)
+            | CSubw(_)
+            | CEbreak
+            | CNop
+            | CLd(_)
+            | CLdsp(_)
+            | CSd(_)
+            | CSdsp(_)
+            | CAddiw(_)
+            | UnknownCompressed { instr: _ } => 2,
         }
     }
 }
@@ -681,6 +763,35 @@ macro_rules! amo_instr {
             $op, bits, $args.rd, $args.rs2, $args.rs1
         )
     }};
+}
+
+macro_rules! cr_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{}", $op, $args.rd_rs1, $args.rs2)
+    };
+}
+
+macro_rules! ci_instr {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{}", $op, $args.rd_rs1, $args.imm)
+    };
+}
+
+macro_rules! ci_instr_hex {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},0x{:x}", $op, $args.rd_rs1, $args.imm)
+    };
+}
+macro_rules! c_instr_sp {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{}(sp)", $op, $args.rd_rs1, $args.imm)
+    };
+}
+
+macro_rules! cs_instr_sp {
+    ($f:expr, $op:expr, $args:expr) => {
+        write!($f, "{} {},{}(sp)", $op, $args.rs2, $args.imm)
+    };
 }
 
 macro_rules! csr_instr {
@@ -951,9 +1062,47 @@ impl fmt::Display for Instr {
             SFenceVma { asid, vaddr } => write!(f, "sfence.vma {vaddr},{asid}"),
 
             // RV32C compressed instructions
+            CLw(args) => i_instr_load!(f, "c.lw", args),
+            CLwsp(args) => c_instr_sp!(f, "c.lwsp", args),
+            CSw(args) => s_instr!(f, "c.sw", args),
+            CSwsp(args) => cs_instr_sp!(f, "c.swsp", args),
             CJ(args) => write!(f, "c.j {}", args.imm),
-            CAddi(args) => write!(f, "c.addi {},{}", args.rd_rs1, args.imm),
+            CJr(args) => write!(f, "c.jr {}", args.rs1),
+            CJalr(args) => write!(f, "c.jalr {}", args.rs1),
+            CBeqz(args) => ci_instr!(f, "c.beqz", args),
+            CBnez(args) => ci_instr!(f, "c.bnez", args),
+            CLi(args) => ci_instr!(f, "c.li", args),
+            CLui(args) => write!(
+                f,
+                "c.lui {},0x{:x}",
+                args.rd_rs1,
+                // For consistency with objdump, upper immediates are shifted down
+                (args.imm >> 12) & ((0b1 << 20) - 1)
+            ),
+            CAddi(args) => ci_instr!(f, "c.addi", args),
+            CAddi16sp(args) => write!(f, "c.addi16sp sp,{}", args.imm),
+            CAddi4spn(args) => write!(f, "c.addi4spn {},sp,{}", args.rd_rs1, args.imm),
+            CSlli(args) => ci_instr_hex!(f, "c.slli", args),
+            CSrli(args) => ci_instr_hex!(f, "c.srli", args),
+            CSrai(args) => ci_instr_hex!(f, "c.srai", args),
+            CAndi(args) => ci_instr!(f, "c.andi", args),
+            CMv(args) => cr_instr!(f, "c.mv", args),
+            CAdd(args) => cr_instr!(f, "c.add", args),
+            CAnd(args) => cr_instr!(f, "c.and", args),
+            COr(args) => cr_instr!(f, "c.or", args),
+            CXor(args) => cr_instr!(f, "c.xor", args),
+            CSub(args) => cr_instr!(f, "c.sub", args),
+            CEbreak => write!(f, "c.ebreak"),
             CNop => write!(f, "c.nop"),
+
+            // RV64C compressed instructions
+            CLd(args) => i_instr_load!(f, "c.ld", args),
+            CLdsp(args) => c_instr_sp!(f, "c.ldsp", args),
+            CSd(args) => s_instr!(f, "c.sd", args),
+            CSdsp(args) => cs_instr_sp!(f, "c.sdsp", args),
+            CAddiw(args) => ci_instr!(f, "c.addiw", args),
+            CAddw(args) => cr_instr!(f, "c.addw", args),
+            CSubw(args) => cr_instr!(f, "c.subw", args),
 
             Unknown { instr } => write!(f, "unknown {:x}", instr),
             UnknownCompressed { instr } => write!(f, "unknown.c {:x}", instr),
