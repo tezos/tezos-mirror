@@ -128,7 +128,7 @@ let start_dal_node l1_node ?(producer_profiles = []) ?(attester_profiles = [])
 let store_slot_to_dal_node ~slot_size dal_node =
   let slot = Dal.Helpers.make_slot "someslot" ~slot_size in
   (* Post a commitment of the slot. *)
-  let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
+  let* commitment, _proof = Dal_RPC.(call dal_node @@ post_slot slot) in
   (* Compute and save the shards of the slot. *)
   let* () =
     Dal_RPC.(call dal_node @@ put_commitment_shards ~with_proof:true commitment)

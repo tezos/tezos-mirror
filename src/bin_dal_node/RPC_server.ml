@@ -77,10 +77,6 @@ module Slots_handlers = struct
       ~none:(function `Not_found -> true | _ -> false)
       r
 
-  let post_commitment ctxt () slot =
-    call_handler2 ctxt (fun store {cryptobox; _} ->
-        Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult)
-
   let get_commitment_slot ctxt commitment () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         Slot_manager.get_commitment_slot store cryptobox commitment
@@ -388,10 +384,6 @@ let register_new :
        Tezos_rpc.Directory.register0
        Services.post_slot
        (Slots_handlers.post_slot ctxt)
-  |> add_service
-       Tezos_rpc.Directory.register0
-       Services.post_commitment
-       (Slots_handlers.post_commitment ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
        Services.get_commitment_slot

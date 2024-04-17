@@ -42,18 +42,6 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
-(** Add the given slot in the node if not already present. The corresponding
-    commitment is returned. See {!val:
-    Slot_manager.add_commitment} for more details. *)
-val post_commitment :
-  < meth : [`POST]
-  ; input : Cryptobox.slot
-  ; output : Cryptobox.commitment
-  ; prefix : unit
-  ; params : unit
-  ; query : unit >
-  service
-
 (** This RPC should be used by a slot producer. It allows to produce a
     commitment, a commitment proof and the shards from a slot. A
     padding is added if the slot is not of the expected size

@@ -37,23 +37,6 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
-let post_commitment :
-    < meth : [`POST]
-    ; input : Cryptobox.slot
-    ; output : Cryptobox.commitment
-    ; prefix : unit
-    ; params : unit
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.post_service
-    ~description:
-      "Add a slot in the node's context if not already present. The \
-       corresponding commitment is returned."
-    ~query:Tezos_rpc.Query.empty
-    ~input:slot_encoding
-    ~output:Cryptobox.Commitment.encoding
-    Tezos_rpc.Path.(open_root / "commitments")
-
 let post_slot :
     < meth : [`POST]
     ; input : string

@@ -170,9 +170,11 @@ module RPC : sig
         the input (and output) is expected to be a list. *)
   val slot_headers_of_json : JSON.t -> slot_header list
 
-  (** Call RPC "POST /commitments" to store a slot and retrun the commitment
-        in case of success. *)
-  val post_commitment : Helpers.slot -> commitment RPC_core.t
+  type commitment_proof = string
+
+  (** Call RPC "POST /slots" to store a slot and return the commitment
+        and its proof in case of success. *)
+  val post_slot : Helpers.slot -> (commitment * commitment_proof) RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
         content associated with the given commitment. *)
@@ -183,8 +185,6 @@ module RPC : sig
         parameters. Note that [with_proof], whose default value is [false], is
         provided as input to the RPC. *)
   val put_commitment_shards : ?with_proof:bool -> commitment -> unit RPC_core.t
-
-  type commitment_proof = string
 
   (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
        associated to a commitment. *)

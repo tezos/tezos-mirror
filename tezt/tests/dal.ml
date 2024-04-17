@@ -1483,7 +1483,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* slot3 = publish Constant.bootstrap5 ~index:5 ~fee:1 "test5" in
   let* slot4 =
     let slot = Helpers.make_slot ~slot_size "never associated to a slot_id" in
-    let* commit = Dal_RPC.(call dal_node @@ post_commitment slot) in
+    let* commit, _proof = Helpers.store_slot dal_node slot in
     return (6, commit)
   in
 
@@ -1714,17 +1714,17 @@ let commitment_of_slot cryptobox slot =
       as commit_error) ->
       Test.fail "%s" (Cryptobox.string_of_commit_error commit_error)
 
-let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
-    _client dal_node =
+let test_dal_node_test_post_slot _protocol parameters cryptobox _node _client
+    dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let mk_slot size =
     Helpers.make_slot ~padding:false ~slot_size (generate_dummy_slot size)
   in
   let failing_post_slot_rpc slot =
-    let* response = Dal_RPC.(call_raw dal_node @@ post_commitment slot) in
+    let* response = Dal_RPC.(call_raw dal_node @@ post_slot slot) in
     return
     @@ RPC_core.check_string_response
-         ~body_rex:"dal.node.invalid_slot_size"
+         ~body_rex:"post_slot_too_large"
          ~code:500
          response
   in
@@ -1733,9 +1733,8 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
   let slot_small = mk_slot (size - 1) in
   let slot_ok = mk_slot size in
   let* () = failing_post_slot_rpc slot_big in
-  let* () = failing_post_slot_rpc slot_small in
-  let* commitment1 = Dal_RPC.(call dal_node @@ post_commitment slot_ok) in
-  let* commitment2 = Dal_RPC.(call dal_node @@ post_commitment slot_ok) in
+  let* commitment1, _proof = Dal_RPC.(call dal_node @@ post_slot slot_ok) in
+  let* commitment2, _proof = Dal_RPC.(call dal_node @@ post_slot slot_ok) in
   (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/4250
      The second RPC call above succeeeds, but the (untested) returned HTTP status
      should likely be 200 and 201 in the first similar RPC call.
@@ -1745,10 +1744,21 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
     ~error_msg:
       "Storing a slot twice should return the same commitment (current = %L, \
        expected = %R)" ;
-  let commitment3 =
+  let* commitment3, _proof = Dal_RPC.(call dal_node @@ post_slot slot_small) in
+  (* The POST /slots RPC accepts slots shorter than the size and pads
+     them.  The content_of_slot helper removes the padding. *)
+  let* padded_slot =
+    Dal_RPC.(call dal_node @@ get_commitment_slot commitment3)
+  in
+  Check.(generate_dummy_slot (size - 1) = Helpers.content_of_slot padded_slot)
+    Check.string
+    ~error_msg:
+      "A slot shorter than the expected size should be padded by the POST \
+       /slots RPC expected %L, got %R." ;
+  let commitment4 =
     Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot_ok
   in
-  Check.(commitment1 = commitment3)
+  Check.(commitment1 = commitment4)
     Check.string
     ~error_msg:
       "The commitment of a stored commitment should match the one computed \
@@ -1768,7 +1778,7 @@ let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
     in
     return @@ RPC_core.check_string_response ~code:404 response
   in
-  let* _commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
+  let* _commitment, _proof = Dal_RPC.(call dal_node @@ post_slot slot) in
   (* commit = _commitment already tested in /POST test. *)
   let* got_slot = Dal_RPC.(call dal_node @@ get_commitment_slot commitment) in
   Check.(Helpers.content_of_slot slot = Helpers.content_of_slot got_slot)
@@ -1819,7 +1829,7 @@ let test_dal_node_test_get_commitment_proof _protocol parameters cryptobox _node
     _client dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
-  let* commitment = Dal_RPC.(call dal_node @@ post_commitment slot) in
+  let* commitment, _proof = Dal_RPC.(call dal_node @@ post_slot slot) in
   let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
   let _, expected_proof =
     Dal.Commitment.dummy_commitment cryptobox (generate_dummy_slot slot_size)
@@ -6319,8 +6329,8 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]
-    "dal node POST /commitments"
-    test_dal_node_test_post_commitments
+    "dal node POST /slots"
+    test_dal_node_test_post_slot
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]

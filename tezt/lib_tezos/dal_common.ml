@@ -119,10 +119,6 @@ module RPC_legacy = struct
 
   let make ?data ?query_string = RPC_core.make ?data ?query_string
 
-  (** [encode_bytes_for_json raw] encodes arbitrary byte sequence as hex string for JSON *)
-  let encode_bytes_to_hex_string raw =
-    "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
-
   let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
 
   let get_bytes_from_json_string_node json =
@@ -188,15 +184,6 @@ module Dal_RPC = struct
     match JSON.as_object t with
     | [] -> ()
     | _ -> JSON.error t "Not an empty object"
-
-  let post_commitment slot =
-    let slot =
-      JSON.parse
-        ~origin:"Dal_common.RPC.post_commitments"
-        (encode_bytes_to_hex_string slot)
-    in
-    let data : RPC_core.data = Data (JSON.unannotate slot) in
-    make ~data POST ["commitments"] JSON.as_string
 
   (* Converts a possibly invalid UTF-8 string into a JSON object using
      Data-encoding's unistring representation. *)
@@ -602,28 +589,12 @@ module Helpers = struct
         ]
         client)
 
-  let store_slot dal_node_or_endpoint ?with_proof slot =
+  let store_slot dal_node_or_endpoint ?with_proof:_ slot =
     let call = function
       | Either.Left node -> Dal_RPC.Local.call node
       | Either.Right endpoint -> Dal_RPC.Remote.call endpoint
     in
-    (* Use the POST /slot RPC except if shard proof computation is
-       explicitly deactivated with with_proof:false *)
-    match with_proof with
-    | None | Some true -> call dal_node_or_endpoint @@ Dal_RPC.post_slot slot
-    | Some false ->
-        let* commitment =
-          call dal_node_or_endpoint @@ Dal_RPC.post_commitment slot
-        in
-        let* () =
-          Dal_RPC.(
-            call dal_node_or_endpoint
-            @@ put_commitment_shards ~with_proof:false commitment)
-        in
-        let* proof =
-          Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
-        in
-        return (commitment, proof)
+    call dal_node_or_endpoint @@ Dal_RPC.post_slot slot
 
   let store_slot_uri dal_node_endpoint ?with_proof slot =
     store_slot (Either.Right dal_node_endpoint) ?with_proof slot
