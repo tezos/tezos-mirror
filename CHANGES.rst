@@ -56,6 +56,10 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- RPC ``/health`` now returns meaningful health related data to asses if the
+  rollup node operates correctly. Old ``/health`` RPC is renamed to ``/ping``.
+  (MR :gl:`!12940`)
+
 - Support for unsafely increasing the WASM PVM's tick limit of a rollup.
   (MR :gl:`!12907`)
 
