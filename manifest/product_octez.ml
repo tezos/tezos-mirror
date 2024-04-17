@@ -1941,6 +1941,13 @@ let brassaia_pack_unix =
     ~preprocess:[pps ppx_brassaia_internal]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
+let _irmin_tezos =
+  octez_internal_lib
+    "irmin_tezos"
+    ~path:"irmin/lib_irmin_tezos"
+    ~deps:[fmt; zarith; digestif; irmin; irmin_pack; irmin_pack_unix]
+    ~preprocess:[pps ppx_irmin_internal]
+
 let irmin_test_helpers =
   octez_internal_lib
     "irmin_test_helpers"
