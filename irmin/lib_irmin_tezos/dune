@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name irmin_tezos)
+ (public_name octez-internal-libs.irmin_tezos)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  fmt
+  zarith
+  digestif
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix)
+ (preprocess (pps octez-internal-libs.ppx_irmin.internal)))

@@ -22,6 +22,7 @@ directory is under the
 | -------- | --------- | -------- |
 | `irmin`    | `./lib_irmin` | [`src/irmin`](https://github.com/mirage/irmin/tree/main/src/irmin) |
 | `irmin_pack`    | `./lib_irmin_pack` | [`src/irmin-pack`](https://github.com/mirage/irmin/tree/main/src/irmin-pack) |
+| `irmin_tezos`    | `./lib_irmin_tezos` | [`src/irmin-tezos`](https://github.com/mirage/irmin/tree/main/src/irmin-tezos) |
 | `ppx_irmin`\*    | `./lib_ppx_irmin` | [`src/ppx_irmin`](https://github.com/mirage/irmin/tree/main/src/ppx_irmin) |
 | `test`\*   | `./test` | NA |
 | `irmin_test_helpers`   | `./test/helpers` | [`src/irmin-test`](https://github.com/mirage/irmin/tree/main/src/irmin-test) |
@@ -38,6 +39,7 @@ purposes that are using the `irmin` libraries.
 | -------- | --------- | -------- |
 | `irmin-mem`    | `./test/irmin-mem` | [`test/irmin-mem`](https://github.com/mirage/irmin/tree/main/test/irmin-mem) |
 | `irmin`    | `./test/irmin` | [`test/irmin`](https://github.com/mirage/irmin/tree/main/test/irmin) |
+| `irmin-tezos`    | `./test/irmin-tezos` | [`test/irmin-tezos`](https://github.com/mirage/irmin/tree/main/test/irmin-tezos) |
 
 
 ## To-do before modifying the code
