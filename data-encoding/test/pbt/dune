@@ -1,6 +1,5 @@
-; For JS tests we need to increase the stack size. So we need this convoluted
-; way to write what would normally just be a tests stanza
-; see https://github.com/dbuenzli/jsonm/pull/20
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
 (executables
  (names
@@ -10,60 +9,40 @@
   test_json_stream_sizes
   test_classifiers
   json_roundtrip_in_binary)
- (modes native js)
- (js_of_ocaml)
- (libraries data_encoding zarith zarith_stubs_js crowbar bigstringaf))
+ (modes native)
+ (libraries
+  data-encoding
+  zarith
+  zarith_stubs_js
+  crowbar
+  bigstringaf))
 
 (rule
  (alias runtest)
  (package data-encoding)
- (action
-  (run %{dep:./test_generated.exe})))
+ (action (run %{dep:./test_generated.exe})))
 
 (rule
  (alias runtest)
  (package data-encoding)
- (action
-  (run %{dep:./test_legacy_compatibility.exe})))
+ (action (run %{dep:./test_legacy_compatibility.exe})))
 
 (rule
  (alias runtest)
  (package data-encoding)
- (action
-  (run %{dep:./test_json_stream.exe})))
+ (action (run %{dep:./test_json_stream.exe})))
 
 (rule
  (alias runtest)
  (package data-encoding)
- (action
-  (run %{dep:./test_json_stream_sizes.exe})))
+ (action (run %{dep:./test_json_stream_sizes.exe})))
 
 (rule
  (alias runtest)
  (package data-encoding)
- (action
-  (run %{dep:./test_classifiers.exe})))
+ (action (run %{dep:./test_classifiers.exe})))
 
 (rule
  (alias runtest)
  (package data-encoding)
- (action
-  (run %{dep:./json_roundtrip_in_binary.exe})))
-
-(rule
- (alias runtest_js)
- (package data-encoding)
- (action
-  (run node %{dep:./test_legacy_compatibility.bc.js})))
-
-(rule
- (alias runtest_js)
- (package data-encoding)
- (action
-  (run node %{dep:./test_classifiers.bc.js})))
-
-(rule
- (alias runtest_js)
- (package data-encoding)
- (action
-  (run node %{dep:./json_roundtrip_in_binary.bc.js})))
+ (action (run %{dep:./json_roundtrip_in_binary.exe})))

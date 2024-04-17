@@ -1,41 +1,78 @@
-(tests
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
  (names
-  test_generated
   test_big_streaming
-  test_mu
+  test_destruct
+  test_generated
   test_list_map
-  test_seq_is_lazy
-  test_destruct)
+  test_mu
+  test_seq_is_lazy)
  (modes native js)
- (libraries json-data-encoding crowbar alcotest)
- (package json-data-encoding))
+ (libraries
+  json-data-encoding
+  crowbar
+  alcotest
+  js_of_ocaml-compiler)
+ (js_of_ocaml))
+
+(rule
+ (alias runtest)
+ (package json-data-encoding)
+ (action (run %{dep:./test_big_streaming.exe})))
+
+(rule
+ (alias runtest)
+ (package json-data-encoding)
+ (action (run %{dep:./test_destruct.exe})))
+
+(rule
+ (alias runtest)
+ (package json-data-encoding)
+ (action (run %{dep:./test_generated.exe})))
+
+(rule
+ (alias runtest)
+ (package json-data-encoding)
+ (action (run %{dep:./test_list_map.exe})))
+
+(rule
+ (alias runtest)
+ (package json-data-encoding)
+ (action (run %{dep:./test_mu.exe})))
+
+(rule
+ (alias runtest)
+ (package json-data-encoding)
+ (action (run %{dep:./test_seq_is_lazy.exe})))
 
 (rule
  (alias runtest_js)
- (action
-  (run node %{dep:./test_generated.bc.js})))
+ (package json-data-encoding)
+ (action (run node %{dep:./test_big_streaming.bc.js})))
 
 (rule
  (alias runtest_js)
- (action
-  (run node %{dep:./test_big_streaming.bc.js})))
+ (package json-data-encoding)
+ (action (run node %{dep:./test_destruct.bc.js})))
 
 (rule
  (alias runtest_js)
- (action
-  (run node %{dep:./test_mu.bc.js})))
+ (package json-data-encoding)
+ (action (run node %{dep:./test_generated.bc.js})))
 
 (rule
  (alias runtest_js)
- (action
-  (run node %{dep:./test_list_map.bc.js})))
+ (package json-data-encoding)
+ (action (run node %{dep:./test_list_map.bc.js})))
 
 (rule
  (alias runtest_js)
- (action
-  (run node %{dep:./test_seq_is_lazy.bc.js})))
+ (package json-data-encoding)
+ (action (run node %{dep:./test_mu.bc.js})))
 
 (rule
  (alias runtest_js)
- (action
-  (run node %{dep:./test_destruct.bc.js})))
+ (package json-data-encoding)
+ (action (run node %{dep:./test_seq_is_lazy.bc.js})))
