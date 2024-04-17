@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::fmt;
 use twiddle::Twiddle;
 
 /// Implementations can be converted to and from a binary [u64] representation
@@ -60,3 +61,41 @@ bits64_builtin!(i8);
 bits64_builtin!(i16);
 bits64_builtin!(i32);
 bits64_builtin!(i64);
+
+/// Helper type for [Bits64] that always inhabits a default value of `WIDTH` bits
+#[derive(Copy, Clone)]
+pub struct ConstantBits<const WIDTH: usize, const VALUE: u64 = 0>;
+
+impl<const WIDTH: usize, const VALUE: u64> Bits64 for ConstantBits<WIDTH, VALUE> {
+    const WIDTH: usize = WIDTH;
+
+    fn from_bits(_value: u64) -> Self {
+        Self
+    }
+
+    fn to_bits(&self) -> u64 {
+        VALUE
+    }
+}
+
+impl<const WIDTH: usize, const VALUE: u64> fmt::Debug for ConstantBits<WIDTH, VALUE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "0b{VALUE:b}/0x{VALUE:x}")
+    }
+}
+
+/// Like [u64] but limited in width
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FixedWidthBits<const WIDTH: usize>(u64);
+
+impl<const WIDTH: usize> Bits64 for FixedWidthBits<WIDTH> {
+    const WIDTH: usize = WIDTH;
+
+    fn from_bits(value: u64) -> Self {
+        Self(value.bits((WIDTH - 1)..=0))
+    }
+
+    fn to_bits(&self) -> u64 {
+        self.0.bits((WIDTH - 1)..=0)
+    }
+}

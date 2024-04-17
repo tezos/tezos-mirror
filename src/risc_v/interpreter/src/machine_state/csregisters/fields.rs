@@ -2,58 +2,191 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub struct FieldProps {
-    pub offset: u64,
-    pub width: u64,
+/// The `csr!` macro generates a type describing a CSR, its value,
+/// associated traits and methods.
+#[macro_export]
+macro_rules! csr {
+    {
+        pub struct $group:ident {
+            $( $name:ident: $type:ty ),+
+            $( , )?
+        }
+    } => {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        pub struct $group(u64);
+        $crate::csr_bits!($group;; $( $name: $type ),+);
+        $crate::csr_debug!($group;; $( $name ),+);
+        $crate::csr_new!($group;; $( $name: $type ),+);
+        $crate::csr_fields!(0;; $group;; $( $name: $type ),+);
+    };
+
+    {
+        struct $group:ident {
+            $( $name:ident: $type:ty ),+
+        }
+    } => {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        struct $group(u64);
+        $crate::csr_bits!($group;; $( $name: $type ),+);
+        $crate::csr_debug!($group;; $( $name ),+);
+        $crate::csr_new!($group;; $( $name: $type ),+);
+        $crate::csr_fields!(0;; $group;; $( $name: $type ),+);
+    };
 }
 
-impl FieldProps {
-    pub const fn new(offset: u64, width: u64) -> Self {
-        Self { offset, width }
+#[macro_export]
+#[doc(hidden)]
+macro_rules! csr_bits {
+    ( $group:ident;; $( $name:ident: $type:ty ),+ ) => {
+        impl $crate::bits::Bits64 for $group {
+            const WIDTH: usize = {{ $crate::csr_width!($($type),+) }};
+
+            #[inline(always)]
+            fn from_bits(value: u64) -> Self {
+                let mut new_self = Self(0);
+                let fake_self = Self(value);
+
+                paste::paste! {
+                    $(
+                        new_self = new_self.[<with_ $name:lower>](
+                            fake_self.[<$name:lower>]()
+                        );
+                    )+
+                }
+
+                new_self
+            }
+
+            #[inline(always)]
+            fn to_bits(&self) -> u64 {
+                self.0
+            }
+        }
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! csr_width {
+    ( $type:ty ) => {
+        <$type>::WIDTH
+    };
+
+    ( $type0:ty, $( $type1:ty ),+ ) => {
+        $crate::csr_width!($type0) + $crate::csr_width!($($type1),+)
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! csr_fields {
+    ( $accum:expr;; $group:ident;; $name:ident: $type:ty ) => {
+        paste::paste! {
+            #[allow(clippy::reversed_empty_ranges, dead_code)]
+            impl $group {
+                pub const [<$name:upper _OFFSET>]: usize = { $accum };
+
+                #[inline(always)]
+                pub fn [<$name:lower>](self) -> $type {
+                    let offset = <$type as $crate::bits::Bits64>::WIDTH.saturating_sub(1);
+                    let bits = twiddle::Twiddle::bits(self.0, ($accum + offset)..=($accum));
+                    <$type as $crate::bits::Bits64>::from_bits(bits)
+                }
+
+                #[inline(always)]
+                pub fn [<with_ $name:lower>](self, value: $type) -> Self {
+                    let offset = <$type as $crate::bits::Bits64>::WIDTH.saturating_sub(1);
+                    let new_self = twiddle::Twiddle::replace(self.0, ($accum + offset)..=($accum), $crate::bits::Bits64::to_bits(&value));
+                    $group(new_self)
+                }
+
+                #[inline(always)]
+                pub fn [<set_ $name:lower>](&mut self, value: $type) -> &mut Self {
+                    let offset = <$type as $crate::bits::Bits64>::WIDTH.saturating_sub(1);
+                    self.0 = twiddle::Twiddle::replace(self.0, ($accum + offset)..=($accum), $crate::bits::Bits64::to_bits(&value));
+                    self
+                }
+            }
+        }
+    };
+
+    ( $accum:expr;; $group:ident;; $name:ident: $type:ty, $( $names:ident: $types:ty ),+ ) => {
+        $crate::csr_fields!($accum;; $group;; $name: $type);
+        $crate::csr_fields!($accum + <$type as $crate::bits::Bits64>::WIDTH;; $group;; $( $names: $types ),+);
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! csr_debug {
+    ( $group:ident;; $( $name:ident ),*) => {
+        impl std::fmt::Debug for $group {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let mut str = f.debug_struct(stringify!($group));
+
+                paste::paste! {
+                    $(
+                        str.field(
+                            stringify!($name),
+                            &self.[<$name:lower>](),
+                        );
+                    )*
+                }
+
+                str.finish()
+            }
+        }
+    };
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! csr_new {
+    ( $group:ident;; $( $name:ident: $type:ty ),* ) => {
+        #[allow(clippy::too_many_arguments, dead_code, non_snake_case)]
+        impl $group {
+            pub fn new(
+                $(
+                    $name: $type,
+                )*
+            ) -> Self {
+                let mut myself = <Self as $crate::bits::Bits64>::from_bits(0u64);
+
+                paste::paste! {
+                    $(
+                        myself = myself.[<with_ $name:lower>]($name);
+                    )*
+                }
+
+                myself
+            }
+        }
+    };
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::bits::{Bits64, ConstantBits};
+
+    csr! {
+        pub struct Test {
+            A: bool,
+            reserved: ConstantBits<1, 1>,
+            C: bool
+        }
+    }
+
+    #[test]
+    fn reserved_works() {
+        let test = Test::from_bits(0u64);
+        assert_eq!(test.to_bits(), 0b010);
+
+        let test = Test::new(true, ConstantBits, false);
+        assert_eq!(test.to_bits(), 0b011);
     }
 }
 
-#[macro_export]
-macro_rules! create_field_constant {
-    ($name:ident, $offset:expr, $width:expr) => {
-        pub const $name: $crate::machine_state::csregisters::fields::FieldProps =
-            $crate::machine_state::csregisters::fields::FieldProps::new($offset, $width);
-    };
-}
-
-#[macro_export]
-macro_rules! create_get_field {
-    ($name:ident, $f_type:ty, $offset:expr, $width:expr) => {
-        paste::paste! { pub fn [<get_ $name>]<I: Into<$crate::machine_state::csregisters::values::CSRRepr>>(reg_value: I) -> $f_type {
-            use $crate::machine_state::csregisters::ones;
-            <$f_type as $crate::bits::Bits64>::from_bits((reg_value.into() >> $offset) & ones($width))
-        } }
-    };
-}
-
-#[macro_export]
-macro_rules! create_set_field {
-    ($name:ident, $f_type:ty, $offset:expr, $width:expr) => {
-        paste::paste! {pub fn [<set_ $name>]<I: Into<$crate::machine_state::csregisters::values::CSRRepr>>(reg_value: I, new_value: $f_type) -> $crate::machine_state::csregisters::values::CSRRepr {
-            use $crate::machine_state::csregisters::ones;
-            use $crate::bits::Bits64;
-
-            // Get only the last width bits
-            let field_bits = new_value.to_bits() & ones($width);
-            // clear the field bits
-            let reg_value = reg_value.into() & !(ones($width) << $offset);
-            // set the field with the new bits
-            reg_value | (field_bits << $offset)
-        } }
-    };
-}
-
-#[macro_export]
-macro_rules! create_field {
-    // offset, width represent the offset in the register and bit width
-    ($field:ident, $f_type:ty, $offset:expr, $width:expr) => {
-        $crate::create_field_constant!($field, $offset, $width);
-        $crate::create_set_field!($field, $f_type, $offset, $width);
-        $crate::create_get_field!($field, $f_type, $offset, $width);
-    };
+/// Normalise the fields for a Control or State register using WARL/WPRI
+pub trait NormaliseFields {
+    fn normalise(self) -> Self;
 }

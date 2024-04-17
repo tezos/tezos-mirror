@@ -375,8 +375,7 @@ mod tests {
         machine_state::{
             bus::{main_memory::tests::T1K, Address},
             csregisters::{
-                values::CSRValue,
-                xstatus::{self, MPPValue, SPPValue},
+                xstatus::{MPPValue, MStatus, SPPValue},
                 CSRRepr, CSRegister,
             },
             hart_state::{HartState, HartStateLayout},
@@ -855,13 +854,13 @@ mod tests {
             assert_eq!(state.csregisters.read::<CSRRepr>(CSRegister::sepc), sepc);
             assert_eq!(state.csregisters.read::<CSRRepr>(CSRegister::mepc), mepc);
 
-            let mstatus: CSRValue = state.csregisters.read(CSRegister::mstatus);
-            let mstatus = xstatus::set_TSR(mstatus, true);
+            let mstatus: MStatus = state.csregisters.read(CSRegister::mstatus);
+            let mstatus = mstatus.with_tsr(true);
             state.csregisters.write(CSRegister::mstatus, mstatus);
             assert_eq!(state.run_sret(), Err(Exception::IllegalInstruction));
 
             // set TSR back to 0
-            let mstatus = xstatus::set_TSR(mstatus, false);
+            let mstatus = mstatus.with_tsr(false);
             state.csregisters.write(CSRegister::mstatus, mstatus);
 
             // TEST: insuficient privilege mode
@@ -870,34 +869,34 @@ mod tests {
 
             // TEST: Use SRET from M-mode, check SPP, SIE, SPIE, MPRV
             state.mode.write(Mode::Machine);
-            let mstatus = xstatus::set_SIE(state.csregisters.read::<CSRValue>(CSRegister::mstatus), true);
-            let mstatus = xstatus::set_SPP(mstatus, SPPValue::User);
+            let mstatus = state.csregisters.read::<MStatus>(CSRegister::mstatus).with_sie(true);
+            let mstatus = mstatus.with_spp(SPPValue::User);
             state.csregisters.write(CSRegister::mstatus, mstatus);
 
             // check pc address
             assert_eq!(state.run_sret(), Ok(sepc));
             // check fields
-            let mstatus: CSRValue = state.csregisters.read(CSRegister::mstatus);
-            assert!(xstatus::get_SPIE(mstatus));
-            assert!(!xstatus::get_SIE(mstatus));
-            assert!(!xstatus::get_MPRV(mstatus));
-            assert_eq!(xstatus::get_SPP(mstatus), SPPValue::User);
+            let mstatus: MStatus = state.csregisters.read(CSRegister::mstatus);
+            assert!(mstatus.spie());
+            assert!(!mstatus.sie());
+            assert!(!mstatus.mprv());
+            assert_eq!(mstatus.spp(), SPPValue::User);
             assert_eq!(state.mode.read(), Mode::User);
 
             // TEST: Call MRET from M-mode, with MPRV true, and MPP Machine to see if MPRV stays the same.
-            let mstatus = xstatus::set_MPIE(mstatus, true);
-            let mstatus = xstatus::set_MPP(mstatus, MPPValue::Machine);
-            let mstatus = xstatus::set_MPRV(mstatus, true);
+            let mstatus = mstatus.with_mpie(true);
+            let mstatus = mstatus.with_mpp(MPPValue::Machine);
+            let mstatus = mstatus.with_mprv(true);
             state.csregisters.write(CSRegister::mstatus, mstatus);
             state.mode.write(Mode::Machine);
             // check pc address
             assert_eq!(state.run_mret(), Ok(mepc));
             // check fields
-            let mstatus: CSRValue = state.csregisters.read(CSRegister::mstatus);
-            assert!(xstatus::get_MPIE(mstatus));
-            assert!(xstatus::get_MIE(mstatus));
-            assert!(xstatus::get_MPRV(mstatus));
-            assert_eq!(xstatus::get_MPP(mstatus), MPPValue::User);
+            let mstatus: MStatus = state.csregisters.read(CSRegister::mstatus);
+            assert!(mstatus.mpie());
+            assert!(mstatus.mie());
+            assert!(mstatus.mprv());
+            assert_eq!(mstatus.mpp(), MPPValue::User);
             assert_eq!(state.mode.read(), Mode::Machine);
         });
     });

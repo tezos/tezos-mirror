@@ -547,11 +547,13 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_test, create_backend, create_state,
+        backend_test,
+        bits::Bits64,
+        create_backend, create_state,
         machine_state::{
             bus::{devices::DEVICES_ADDRESS_SPACE_LENGTH, main_memory::tests::T1K},
             csregisters::{
-                xstatus::{self, ExtensionValue},
+                xstatus::{ExtensionValue, MStatus},
                 CSRegister,
             },
             hart_state::{HartState, HartStateLayout},
@@ -573,7 +575,7 @@ mod tests {
             let mut state = create_state!(HartState, HartStateLayout, F, backend);
 
             // Turn fs on
-            let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
+            let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);
             state.csregisters.write(CSRegister::mstatus, mstatus);
 
             state.xregisters.write(rs1, d);
@@ -596,7 +598,7 @@ mod tests {
             let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
 
             // Turn fs on
-            let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
+            let mstatus = MStatus::from_bits(0u64).with_fs(ExtensionValue::Dirty);
             state.hart.csregisters.write(CSRegister::mstatus, mstatus);
 
             let mut perform_test = |offset: u64| -> Result<(), Exception> {

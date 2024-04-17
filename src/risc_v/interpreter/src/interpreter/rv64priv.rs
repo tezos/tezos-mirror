@@ -2,8 +2,7 @@ use crate::{
     machine_state::{
         bus::{main_memory, Address},
         csregisters::{
-            values::CSRValue,
-            xstatus::{self, MPPValue, SPPValue},
+            xstatus::{MPPValue, MStatus, SPPValue},
             CSRegister,
         },
         hart_state::HartState,
@@ -29,19 +28,19 @@ where
             Mode::Machine => (),
         }
 
-        let mstatus: CSRValue = self.csregisters.read(CSRegister::mstatus);
+        let mstatus: MStatus = self.csregisters.read(CSRegister::mstatus);
         // get MPP
-        let prev_privilege = xstatus::get_MPP(mstatus);
+        let prev_privilege = mstatus.mpp();
         // Set MIE to MPIE
-        let prev_mie = xstatus::get_MPIE(mstatus);
-        let mstatus = xstatus::set_MIE(mstatus, prev_mie);
+        let prev_mie = mstatus.mpie();
+        let mstatus = mstatus.with_mie(prev_mie);
         // set MPIE to 1
-        let mstatus = xstatus::set_MPIE(mstatus, true);
-        // Set MPP to least privilege-mode supported
-        let mstatus = xstatus::set_MPP(mstatus, MPPValue::User);
+        let mstatus = mstatus.with_mpie(true);
+        // Set MPP to least p.with_ivilege-mode supported
+        let mstatus = mstatus.with_mpp(MPPValue::User);
         // Set MPRV to 0 when leaving M-mode. (MPP != M-mode)
         let mstatus = if prev_privilege != MPPValue::Machine {
-            xstatus::set_MPRV(mstatus, false)
+            mstatus.with_mprv(false)
         } else {
             mstatus
         };
@@ -71,22 +70,22 @@ where
         }
         // Section 3.1.6.5
         // SRET raises IllegalInstruction exception when TSR (Trap SRET) bit is on.
-        let mstatus: CSRValue = self.csregisters.read(CSRegister::mstatus);
-        if xstatus::get_TSR(mstatus) {
+        let mstatus: MStatus = self.csregisters.read(CSRegister::mstatus);
+        if mstatus.tsr() {
             return Err(Exception::IllegalInstruction);
         }
         // get SPP
-        let prev_privilege = xstatus::get_SPP(mstatus);
+        let prev_privilege = mstatus.spp();
         // Set SIE to SPIE
-        let prev_sie = xstatus::get_SPIE(mstatus);
-        let mstatus = xstatus::set_SIE(mstatus, prev_sie);
+        let prev_sie = mstatus.spie();
+        let mstatus = mstatus.with_sie(prev_sie);
         // set SPIE to 1
-        let mstatus = xstatus::set_SPIE(mstatus, true);
+        let mstatus = mstatus.with_spie(true);
         // Set SPP to least privilege-mode supported
-        let mstatus = xstatus::set_SPP(mstatus, SPPValue::User);
+        let mstatus = mstatus.with_spp(SPPValue::User);
         // Set MPRV to 0 when leaving M-mode. (SPP != M-mode)
         // Since SPP can only hold User / Supervisor, it is always set to 0
-        let mstatus = xstatus::set_MPRV(mstatus, false);
+        let mstatus = mstatus.with_mprv(false);
 
         // Commit the mstatus
         self.csregisters.write(CSRegister::mstatus, mstatus);
@@ -125,8 +124,8 @@ where
     #[inline(always)]
     pub fn sfence_vma(&self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
         let mode = self.hart.mode.read();
-        let mstatus: CSRValue = self.hart.csregisters.read(CSRegister::mstatus);
-        let tvm = xstatus::get_TVM(mstatus);
+        let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
+        let tvm = mstatus.tvm();
 
         if tvm && mode == Mode::Supervisor {
             return Err(Exception::IllegalInstruction);
@@ -162,10 +161,10 @@ mod tests {
                         bit: bool,
                         result: Result<(), Exception>| {
             state.hart.mode.write(mode);
-            state
-                .hart
-                .csregisters
-                .set_bits(CSRegister::mstatus, (bit as CSRRepr) << xstatus::TVM.offset);
+            state.hart.csregisters.set_bits(
+                CSRegister::mstatus,
+                (bit as CSRRepr) << xstatus::MStatus::TVM_OFFSET,
+            );
             let r = state.sfence_vma(t0, a0);
             assert_eq!(r, result);
         };

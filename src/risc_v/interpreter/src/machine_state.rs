@@ -753,7 +753,10 @@ mod tests {
     use crate::{
         backend_test, create_backend, create_state,
         machine_state::{
-            csregisters::{values::CSRValue, xstatus, CSRRepr, CSRegister},
+            csregisters::{
+                xstatus::{self, MStatus},
+                CSRRepr, CSRegister,
+            },
             mode::Mode,
             registers::{a1, a2, t0, t2},
         },
@@ -873,10 +876,10 @@ mod tests {
             state.step().expect("should not raise environment exception");
             // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
             // even in VECTORED mode, only interrupts
-            let mstatus: CSRValue = state.hart.csregisters.read(CSRegister::mstatus);
+            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
             assert_eq!(state.hart.mode.read(), Mode::Machine);
             assert_eq!(state.hart.pc.read(), mtvec_addr);
-            assert_eq!(xstatus::get_MPP(mstatus), xstatus::MPPValue::Machine);
+            assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mcause), 3);
         });
@@ -917,7 +920,7 @@ mod tests {
             state.hart.csregisters.write(CSRegister::mip, mip);
             state.hart.csregisters.write(CSRegister::mie, mie);
             state.hart.csregisters.write(CSRegister::mideleg, mideleg_val);
-            let mstatus = xstatus::set_MIE(state.hart.csregisters.read::<CSRValue>(CSRegister::mstatus), true);
+            let mstatus = state.hart.csregisters.read::<MStatus>(CSRegister::mstatus).with_mie(true);
             state.hart.csregisters.write(CSRegister::mstatus, mstatus);
             state.hart.mode.write(Mode::Machine);
             // it doesn't really matter where the pc is since we will take an interrupt
@@ -926,11 +929,11 @@ mod tests {
             state.hart.xregisters.write(a2, mtvec_addr + 4 * 11);
             state.run_sw(0, a2, a1).expect("Storing instruction should succeed");
             state.step().expect("should not raise environment exception");
-            let mstatus: CSRValue = state.hart.csregisters.read(CSRegister::mstatus);
+            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
             assert_eq!(state.hart.mode.read(), Mode::Machine);
             assert_eq!(state.hart.pc.read(), mtvec_addr + 4 * 11 + 4);
             // We are coming from the interrupt handler actually
-            assert_eq!(xstatus::get_MPP(mstatus), xstatus::MPPValue::Machine);
+            assert_eq!(mstatus.mpp(), xstatus::MPPValue::Machine);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), init_pc_addr);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mcause), 1 << 63 | 11);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mip), mip ^ 1 << 11);
@@ -964,10 +967,10 @@ mod tests {
             state.step().expect("should not raise environment exception");
             // pc should be stvec_addr since exceptions aren't offsetted
             // even in VECTORED mode, only interrupts
-            let mstatus: CSRValue = state.hart.csregisters.read(CSRegister::mstatus);
+            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
             assert_eq!(state.hart.mode.read(), Mode::Supervisor);
             assert_eq!(state.hart.pc.read(), stvec_addr);
-            assert_eq!(xstatus::get_SPP(mstatus), xstatus::SPPValue::User);
+            assert_eq!(mstatus.spp(), xstatus::SPPValue::User);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), bad_address);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::scause), 1);
         });
@@ -1013,8 +1016,8 @@ mod tests {
             state.hart.csregisters.write(CSRegister::medeleg, medeleg_val);
             state.hart.csregisters.write(CSRegister::mip, mip);
             state.hart.csregisters.write(CSRegister::mie, mie);
-            let mstatus: CSRValue = state.hart.csregisters.read(CSRegister::mstatus);
-            let mstatus = xstatus::set_SIE(mstatus, true);
+            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
+            let mstatus = mstatus.with_sie(true);
             state.hart.csregisters.write(CSRegister::mstatus, mstatus);
             state.hart.mode.write(Mode::User);
             state.hart.pc.write(init_pc_addr);
@@ -1035,12 +1038,12 @@ mod tests {
             state.step().expect("should not raise environment exception");
             // pc should be mtvec_addr since exceptions aren't offset (by VECTORED mode)
             // even in VECTORED mode, only interrupts
-            let mstatus: CSRValue = state.hart.csregisters.read(CSRegister::mstatus);
+            let mstatus: MStatus = state.hart.csregisters.read(CSRegister::mstatus);
             assert_eq!(state.hart.mode.read(), Mode::Machine);
             assert_eq!(state.hart.pc.read(), mtvec_addr);
             // We are coming from the interrupt handler actually
-            assert_eq!(xstatus::get_MPP(mstatus), xstatus::MPPValue::Supervisor);
-            assert_eq!(xstatus::get_SPP(mstatus), xstatus::SPPValue::User);
+            assert_eq!(mstatus.mpp(), xstatus::MPPValue::Supervisor);
+            assert_eq!(mstatus.spp(), xstatus::SPPValue::User);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::sepc), init_pc_addr);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::mepc), stvec_addr + 4 * 9);
             assert_eq!(state.hart.csregisters.read::<CSRRepr>(CSRegister::scause), 1 << 63 | 9);
