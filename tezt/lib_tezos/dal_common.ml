@@ -213,7 +213,7 @@ module Dal_RPC = struct
     make
       ~data
       POST
-      ["slot"]
+      ["slots"]
       JSON.(
         fun json ->
           ( json |-> "commitment" |> as_string,

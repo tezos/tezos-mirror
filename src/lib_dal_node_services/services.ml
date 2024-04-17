@@ -77,7 +77,7 @@ let post_slot :
         obj2
           (req "commitment" Cryptobox.Commitment.encoding)
           (req "commitment_proof" Cryptobox.Commitment_proof.encoding))
-    Tezos_rpc.Path.(open_root / "slot")
+    Tezos_rpc.Path.(open_root / "slots")
 
 let patch_commitment :
     < meth : [`PATCH]
