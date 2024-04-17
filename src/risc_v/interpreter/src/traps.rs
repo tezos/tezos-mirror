@@ -16,7 +16,7 @@
 //! A trap which causes the execution environment to halt the machine.
 //!
 
-use crate::machine_state::{bus::Address, csregisters::CSRValue};
+use crate::machine_state::{bus::Address, csregisters::CSRRepr};
 use std::fmt::Formatter;
 
 /// RISC-V Exceptions (also known as synchronous exceptions)
@@ -109,18 +109,18 @@ pub enum Interrupt {
 
 impl Interrupt {
     /// Bitmask of all supervisor interrupts
-    pub const SUPERVISOR_BIT_MASK: CSRValue = 1
+    pub const SUPERVISOR_BIT_MASK: CSRRepr = 1
         << Interrupt::SupervisorSoftware.exception_code_const()
         | 1 << Interrupt::SupervisorTimer.exception_code_const()
         | 1 << Interrupt::SupervisorExternal.exception_code_const();
 
     /// Bitmask of all machine interrupts
-    pub const MACHINE_BIT_MASK: CSRValue = 1 << Interrupt::MachineSoftware.exception_code_const()
+    pub const MACHINE_BIT_MASK: CSRRepr = 1 << Interrupt::MachineSoftware.exception_code_const()
         | 1 << Interrupt::MachineTimer.exception_code_const()
         | 1 << Interrupt::MachineExternal.exception_code_const();
 
     /// Exception code of interrupts
-    pub const fn exception_code_const(&self) -> CSRValue {
+    pub const fn exception_code_const(&self) -> CSRRepr {
         match self {
             Interrupt::SupervisorSoftware => 1,
             Interrupt::MachineSoftware => 3,
@@ -142,25 +142,25 @@ pub enum TrapKind {
 pub trait TrapContext {
     /// Trap values to be stored in `xtval` registers when taking a trap.
     /// See sections 3.1.16 & 5.1.9
-    fn xtval(&self) -> CSRValue;
+    fn xtval(&self) -> CSRRepr;
 
     /// Code of trap (exception / interrupt) also known as cause, given by tables 3.6 & 5.2
     /// NOTE: This value does NOT include the interrupt bit
-    fn exception_code(&self) -> CSRValue;
+    fn exception_code(&self) -> CSRRepr;
 
     /// xcause value a.k.a. what should be written to `xcause` register.
     /// NOTE: this values DOES include the interrupt bit
-    fn xcause(&self) -> CSRValue;
+    fn xcause(&self) -> CSRRepr;
 
     /// Computes the address pc should be set when entering the trap
-    fn trap_handler_address(&self, xtvec_val: CSRValue) -> Address;
+    fn trap_handler_address(&self, xtvec_val: CSRRepr) -> Address;
 
     /// Obtain the kind that would cause this trap.
     fn kind() -> TrapKind;
 }
 
 impl TrapContext for Exception {
-    fn exception_code(&self) -> CSRValue {
+    fn exception_code(&self) -> CSRRepr {
         match self {
             Exception::InstructionAccessFault(_) => 1,
             Exception::IllegalInstruction => 2,
@@ -176,11 +176,11 @@ impl TrapContext for Exception {
         }
     }
 
-    fn xcause(&self) -> CSRValue {
+    fn xcause(&self) -> CSRRepr {
         self.exception_code()
     }
 
-    fn xtval(&self) -> CSRValue {
+    fn xtval(&self) -> CSRRepr {
         match self {
             Exception::IllegalInstruction
             | Exception::Breakpoint
@@ -196,7 +196,7 @@ impl TrapContext for Exception {
         }
     }
 
-    fn trap_handler_address(&self, xtvec_val: CSRValue) -> Address {
+    fn trap_handler_address(&self, xtvec_val: CSRRepr) -> Address {
         // MODE = xtvec[1:0]
         // BASE[xLEN-1:2] = xtvec[xLEN-1:2]
         xtvec_val & !0b11
@@ -208,20 +208,20 @@ impl TrapContext for Exception {
 }
 
 impl TrapContext for Interrupt {
-    fn xtval(&self) -> CSRValue {
+    fn xtval(&self) -> CSRRepr {
         0
     }
 
-    fn exception_code(&self) -> CSRValue {
+    fn exception_code(&self) -> CSRRepr {
         self.exception_code_const()
     }
 
-    fn xcause(&self) -> CSRValue {
-        let interrupt_bit = 1 << (CSRValue::BITS - 1);
+    fn xcause(&self) -> CSRRepr {
+        let interrupt_bit = 1 << (CSRRepr::BITS - 1);
         interrupt_bit | self.exception_code()
     }
 
-    fn trap_handler_address(&self, xtvec_val: CSRValue) -> Address {
+    fn trap_handler_address(&self, xtvec_val: CSRRepr) -> Address {
         // MODE = xtvec[1:0]
         // BASE[xLEN-1:2] = xtvec[xLEN-1:2]
         let xtvec_mode = xtvec_val & 0b11;

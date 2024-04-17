@@ -9,7 +9,7 @@
 
 use super::{
     fields::{FieldValue, UnsignedValue},
-    CSRValue,
+    CSRRepr,
 };
 use crate::create_field;
 
@@ -17,13 +17,13 @@ use crate::create_field;
 // Section 4.1.11
 /// `satp.MODE = satp[63:60]`
 const SATP_MODE_OFFSET: u64 = 60;
-const MODE_BARE: CSRValue = 0;
-const MODE_SV39: CSRValue = 8;
-const MODE_SV48: CSRValue = 9;
-const MODE_SV57: CSRValue = 10;
+const MODE_BARE: CSRRepr = 0;
+const MODE_SV39: CSRRepr = 8;
+const MODE_SV48: CSRRepr = 9;
+const MODE_SV57: CSRRepr = 10;
 
 /// Default value is BARE mode, (all fields of SATP are zero.)
-pub const DEFAULT_VALUE: CSRValue = MODE_BARE << SATP_MODE_OFFSET;
+pub const DEFAULT_VALUE: CSRRepr = MODE_BARE << SATP_MODE_OFFSET;
 
 /// Which flavour of the address virtualization is used.
 ///
@@ -43,7 +43,7 @@ pub enum TranslationAlgorithm {
 }
 
 impl TranslationAlgorithm {
-    pub const fn enc(&self) -> CSRValue {
+    pub const fn enc(&self) -> CSRRepr {
         match self {
             Self::Bare => MODE_BARE,
             Self::Sv(SvLength::Sv39) => MODE_SV39,
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_satp_rw() {
-        let satp = 8 << 60 | 0xD07 << 44 | 0xABC_DEAD_0BAD;
+        let satp = 8u64 << 60 | 0xD07 << 44 | 0xABC_DEAD_0BAD;
         let mode = get_MODE(satp);
         let asid = get_ASID(satp);
         let ppn = get_PPN(satp);

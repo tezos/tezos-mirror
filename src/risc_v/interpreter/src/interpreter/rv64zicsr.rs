@@ -48,10 +48,10 @@ where
 
         // When `rd = x0`, we don't want to trigger any CSR read effects.
         if rd.is_zero() {
-            self.csregisters.write(csr, value);
+            self.csregisters.write(csr, value.into());
         } else {
-            let old = self.csregisters.replace(csr, value);
-            self.xregisters.write(rd, old);
+            let old = self.csregisters.replace(csr, value.into());
+            self.xregisters.write(rd, old.repr());
         }
         Ok(())
     }
@@ -76,7 +76,7 @@ where
             self.csregisters.set_bits(csr, value)
         };
 
-        self.xregisters.write(rd, old);
+        self.xregisters.write(rd, old.repr());
         Ok(())
     }
 
@@ -100,7 +100,7 @@ where
             self.csregisters.set_bits(csr, imm)
         };
 
-        self.xregisters.write(rd, old);
+        self.xregisters.write(rd, old.repr());
         Ok(())
     }
 
@@ -124,7 +124,7 @@ where
             self.csregisters.clear_bits(csr, value)
         };
 
-        self.xregisters.write(rd, old);
+        self.xregisters.write(rd, old.repr());
         Ok(())
     }
 
@@ -148,7 +148,7 @@ where
             self.csregisters.clear_bits(csr, imm)
         };
 
-        self.xregisters.write(rd, old);
+        self.xregisters.write(rd, old.repr());
         Ok(())
     }
 }

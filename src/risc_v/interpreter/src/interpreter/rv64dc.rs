@@ -102,8 +102,8 @@ mod test {
             let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
 
             // Turn fs on
-            let mstatus = xstatus::set_FS(0, ExtensionValue::Dirty);
-            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
+            let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
+            state.hart.csregisters.write(CSRegister::mstatus, mstatus.into());
 
             let mut perform_test = |offset: i64| -> Result<(), Exception> {
                 state.hart.fregisters.write(fa2, val.into());
@@ -138,8 +138,8 @@ mod test {
             let mut state = create_state!(MachineState, MachineStateLayout<T1K>, F, backend, T1K);
 
             // Turn fs on
-            let mstatus = xstatus::set_FS(0, ExtensionValue::Dirty);
-            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
+            let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
+            state.hart.csregisters.write(CSRegister::mstatus, mstatus.into());
 
             let mut perform_test = |offset: i64| -> Result<(), Exception> {
                 state.hart.fregisters.write(fa2, val.into());

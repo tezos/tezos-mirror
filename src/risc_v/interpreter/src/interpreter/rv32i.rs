@@ -849,20 +849,20 @@ mod tests {
 
             // TEST: TSR trapping
             state.reset(curr_pc);
-            state.csregisters.write(CSRegister::mepc, mepc);
-            state.csregisters.write(CSRegister::sepc, sepc);
+            state.csregisters.write(CSRegister::mepc, mepc.into());
+            state.csregisters.write(CSRegister::sepc, sepc.into());
 
-            assert_eq!(state.csregisters.read(CSRegister::sepc), sepc);
-            assert_eq!(state.csregisters.read(CSRegister::mepc), mepc);
+            assert_eq!(state.csregisters.read(CSRegister::sepc).repr(), sepc);
+            assert_eq!(state.csregisters.read(CSRegister::mepc).repr(), mepc);
 
             let mstatus = state.csregisters.read(CSRegister::mstatus);
             let mstatus = xstatus::set_TSR(mstatus, true);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
+            state.csregisters.write(CSRegister::mstatus, mstatus.into());
             assert_eq!(state.run_sret(), Err(Exception::IllegalInstruction));
 
             // set TSR back to 0
             let mstatus = xstatus::set_TSR(mstatus, false);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
+            state.csregisters.write(CSRegister::mstatus, mstatus.into());
 
             // TEST: insuficient privilege mode
             state.mode.write(Mode::User);
@@ -872,7 +872,7 @@ mod tests {
             state.mode.write(Mode::Machine);
             let mstatus = xstatus::set_SIE(state.csregisters.read(CSRegister::mstatus), true);
             let mstatus = xstatus::set_SPP(mstatus, SPPValue::User);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
+            state.csregisters.write(CSRegister::mstatus, mstatus.into());
 
             // check pc address
             assert_eq!(state.run_sret(), Ok(sepc));
@@ -888,7 +888,7 @@ mod tests {
             let mstatus = xstatus::set_MPIE(mstatus, true);
             let mstatus = xstatus::set_MPP(mstatus, MPPValue::Machine);
             let mstatus = xstatus::set_MPRV(mstatus, true);
-            state.csregisters.write(CSRegister::mstatus, mstatus);
+            state.csregisters.write(CSRegister::mstatus, mstatus.into());
             state.mode.write(Mode::Machine);
             // check pc address
             assert_eq!(state.run_mret(), Ok(mepc));

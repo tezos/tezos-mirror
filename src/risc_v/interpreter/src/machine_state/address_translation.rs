@@ -9,7 +9,7 @@ use super::{
     csregisters::{
         fields::FieldValue,
         satp::{self, SvLength, TranslationAlgorithm},
-        xstatus, CSRValue, CSRegister,
+        xstatus, CSRRepr, CSRegister,
     },
     mode::Mode,
     MachineState,
@@ -71,7 +71,7 @@ impl SvLength {
 fn sv_translate_impl<ML, M>(
     bus: &Bus<ML, M>,
     v_addr: Address,
-    satp: CSRValue,
+    satp: CSRRepr,
     sv_length: SvLength,
     access_type: &AccessType,
 ) -> Result<Address, Exception>
@@ -167,7 +167,7 @@ where
     //    • pa.ppn[LEVELS−1:i] = pte.ppn[LEVELS−1:i].
     let va_page_offset = v_addr::get_PAGE_OFFSET(v_addr);
     let p_addr = (|| {
-        let mut pa = p_addr::set_PAGE_OFFSET(0, va_page_offset);
+        let mut pa = p_addr::set_PAGE_OFFSET(0u64, va_page_offset);
         for idx in 0..i {
             let va_vpn_i = v_addr::get_VPN_IDX(v_addr, &sv_length, idx)?;
             pa = p_addr::set_PPN_IDX(pa, &sv_length, idx, va_vpn_i)?;
@@ -236,7 +236,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             None => Ok(v_addr),
             Some(TranslationAlgorithm::Bare) => Ok(v_addr),
             Some(TranslationAlgorithm::Sv(length)) => {
-                let satp = self.hart.csregisters.read(CSRegister::satp);
+                let satp = self.hart.csregisters.read(CSRegister::satp).repr();
                 sv_translate_impl(&self.bus, v_addr, satp, length, &access_type)
                     .map_err(|_e| access_type.exception(v_addr))
             }

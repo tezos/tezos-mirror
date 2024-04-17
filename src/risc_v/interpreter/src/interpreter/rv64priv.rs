@@ -46,7 +46,7 @@ where
         };
 
         // Commit the mstatus
-        self.csregisters.write(CSRegister::mstatus, mstatus);
+        self.csregisters.write(CSRegister::mstatus, mstatus.into());
 
         // Set the mode after handling mret, according to MPP read initially
         self.mode.write(match prev_privilege {
@@ -56,7 +56,7 @@ where
         });
 
         // set pc to MEPC (we just have to return it)
-        Ok(self.csregisters.read(CSRegister::mepc))
+        Ok(self.csregisters.read(CSRegister::mepc).repr())
     }
 
     /// `SRET` instruction
@@ -88,7 +88,7 @@ where
         let mstatus = xstatus::set_MPRV(mstatus, false);
 
         // Commit the mstatus
-        self.csregisters.write(CSRegister::mstatus, mstatus);
+        self.csregisters.write(CSRegister::mstatus, mstatus.into());
 
         // Set the mode after handling sret, according to SPP read initially
         self.mode.write(match prev_privilege {
@@ -97,7 +97,7 @@ where
         });
 
         // set pc to SEPC (we just have to return it)
-        Ok(self.csregisters.read(CSRegister::sepc))
+        Ok(self.csregisters.read(CSRegister::sepc).repr())
     }
 }
 
@@ -143,7 +143,7 @@ mod tests {
         backend_test, create_backend, create_state,
         machine_state::{
             bus::main_memory::tests::T1K,
-            csregisters::{xstatus, CSRValue, CSRegister},
+            csregisters::{xstatus, CSRRepr, CSRegister},
             mode::Mode,
             registers::{a0, t0},
             MachineState, MachineStateLayout,
@@ -161,10 +161,10 @@ mod tests {
                         bit: bool,
                         result: Result<(), Exception>| {
             state.hart.mode.write(mode);
-            state.hart.csregisters.set_bits(
-                CSRegister::mstatus,
-                (bit as CSRValue) << xstatus::TVM.offset,
-            );
+            state
+                .hart
+                .csregisters
+                .set_bits(CSRegister::mstatus, (bit as CSRRepr) << xstatus::TVM.offset);
             let r = state.sfence_vma(t0, a0);
             assert_eq!(r, result);
         };
