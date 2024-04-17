@@ -1060,8 +1060,7 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_octez ~dependent:true ()
       in
       let job_unit_test ~__POS__ ?(image = Images.runtime_build_dependencies)
-          ?timeout ?parallel_vector ~arch ~name ?(enable_coverage = true)
-          ~make_targets () : tezos_job =
+          ?timeout ?parallel_vector ~arch ~name ~make_targets () : tezos_job =
         let arch_string = arch_to_string arch in
         let script = ["make $MAKE_TARGETS"] in
         let dependencies = build_dependencies arch in
@@ -1084,34 +1083,27 @@ let jobs pipeline_type =
                 Some (Vector n) )
           | None -> (variables, None)
         in
-        let job =
-          job
-            ?timeout
-            ?parallel
-            ~__POS__
-            ~retry:2
-            ~name
-            ~stage:Stages.test
-            ~image
-            ~arch
-            ~dependencies
-            ~rules
-            ~variables
-            ~artifacts:
-              (artifacts
-                 ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
-                 ["test_results"]
-                 ~reports:(reports ~junit:"test_results/*.xml" ())
-                 ~expire_in:(Duration (Days 1))
-                 ~when_:Always)
-            ~before_script:
-              (before_script ~source_version:true ~eval_opam:true [])
-            script
-        in
-        if enable_coverage then
-          job |> enable_coverage_instrumentation
-          |> enable_coverage_output_artifact
-        else job
+        job
+          ?timeout
+          ?parallel
+          ~__POS__
+          ~retry:2
+          ~name
+          ~stage:Stages.test
+          ~image
+          ~arch
+          ~dependencies
+          ~rules
+          ~variables
+          ~artifacts:
+            (artifacts
+               ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
+               ["test_results"]
+               ~reports:(reports ~junit:"test_results/*.xml" ())
+               ~expire_in:(Duration (Days 1))
+               ~when_:Always)
+          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
+          script
       in
       let oc_unit_non_proto_x86_64 =
         job_unit_test
@@ -1121,6 +1113,7 @@ let jobs pipeline_type =
           ~image:Images.runtime_build_test_dependencies
           ~make_targets:["test-nonproto-unit"]
           ()
+        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
       in
       let oc_unit_other_x86_64 =
         (* Runs unit tests for contrib. *)
@@ -1130,6 +1123,7 @@ let jobs pipeline_type =
           ~arch:Amd64
           ~make_targets:["test-other-unit"]
           ()
+        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
       in
       let oc_unit_proto_x86_64 =
         (* Runs unit tests for protocol. *)
@@ -1139,8 +1133,11 @@ let jobs pipeline_type =
           ~arch:Amd64
           ~make_targets:["test-proto-unit"]
           ()
+        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
       in
       let oc_unit_non_proto_arm64 =
+        (* No coverage for arm64 jobs -- the code they test is a
+           subset of that tested by x86_64 unit tests. *)
         job_unit_test
           ~__POS__
           ~name:"oc.unit:non-proto-arm64"
@@ -1148,9 +1145,6 @@ let jobs pipeline_type =
           ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
           ~image:Images.runtime_build_test_dependencies
           ~make_targets:["test-nonproto-unit"; "test-webassembly"]
-            (* No coverage for arm64 jobs -- the code they test is a
-               subset of that tested by x86_64 unit tests. *)
-          ~enable_coverage:false
           ()
       in
       let oc_unit_webassembly_x86_64 =
