@@ -142,16 +142,7 @@ let jobs =
       ~name:"publish_kernel_sdk"
       ~image:Images.rust_toolchain
       ~stage:Stages.manual
-      ~rules:
-        [
-          (* This job is in the last stage {!Stages.manual} so we
-             can disallow failure without blocking the pipeline.
-             Furthermore, unlike other manual jobs, this is not
-             an "optional" job for which failures are
-             tolerated. *)
-          job_rule ~when_:Manual ~allow_failure:No ();
-        ]
-      ~allow_failure:Yes
+      ~rules:[job_rule ~when_:Manual ()]
       ~dependencies:(Dependent [Artifacts job_docker_rust_toolchain])
       ~interruptible:false
       ~variables:
