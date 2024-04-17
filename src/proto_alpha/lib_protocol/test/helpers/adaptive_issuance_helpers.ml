@@ -104,10 +104,10 @@ let finalize_unstake ctxt ?(amount = Tez_helpers.zero) contract =
     contract
     amount
 
-let portion_of_rewards_to_liquid_for_cycle ?policy ctxt cycle pkh rewards =
+let portion_of_rewards_to_liquid_for_cycle ctxt cycle pkh rewards =
   let open Lwt_result_syntax in
   let* {frozen; weighted_delegated} =
-    Context.Delegate.stake_for_cycle ?policy ctxt cycle pkh
+    Context.Delegate.stake_for_cycle ctxt cycle pkh
   in
   let portion =
     Tez_helpers.(ratio weighted_delegated (frozen +! weighted_delegated))

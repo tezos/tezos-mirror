@@ -259,10 +259,7 @@ module NS = struct
         state.constants
           .percentage_of_frozen_deposits_slashed_per_double_attestation
     else
-      let* alpha_ctxt =
-        Context.(
-          get_alpha_ctxt ?policy:state.baking_policy (B block_before_slash))
-      in
+      let* alpha_ctxt = Context.(get_alpha_ctxt (B block_before_slash)) in
       let raw_ctxt =
         Protocol.Alpha_context.Internal_for_tests.to_raw alpha_ctxt
       in

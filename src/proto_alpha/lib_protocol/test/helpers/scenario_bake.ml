@@ -291,7 +291,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
   in
   let* attesters =
     let open Tezos_raw_protocol_alpha.Alpha_context in
-    let* ctxt = Context.get_alpha_ctxt ?policy (B previous_block) in
+    let* ctxt = Context.get_alpha_ctxt (B previous_block) in
     List.filter_map_es
       (fun op ->
         let ({protocol_data = Operation_data protocol_data; _}

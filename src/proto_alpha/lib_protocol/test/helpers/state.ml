@@ -173,7 +173,6 @@ let apply_rewards ~(baker : string) block (state : t) : t tzresult Lwt.t =
     else assert false ;
     let* to_liquid =
       portion_of_rewards_to_liquid_for_cycle
-        ?policy:state.baking_policy
         (B block)
         current_cycle
         pkh
