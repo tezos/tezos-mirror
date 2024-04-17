@@ -159,15 +159,5 @@ let dump_durable_storage ~block ~data_dir ~file =
   in
   let* state = get_wasm_pvm_state plugin ~l2_header data_dir in
   let* instrs = generate_durable_storage ~plugin state in
-  let*? contents =
-    if Filename.check_suffix file ".yaml" then Installer_config.emit_yaml instrs
-    else
-      Ok
-        (Data_encoding.Json.construct Installer_config.encoding instrs
-        |> Data_encoding.Json.to_string)
-  in
-  let*! () =
-    Lwt_io.with_file ~mode:Lwt_io.Output file (fun oc ->
-        Lwt_io.write_from_string_exactly oc contents 0 (String.length contents))
-  in
+  let* () = Installer_config.to_file instrs ~output:file in
   return_unit

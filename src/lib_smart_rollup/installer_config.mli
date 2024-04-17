@@ -29,6 +29,8 @@ type instr = Set of {value : string; to_ : string}
 (* A configuration is a list of instructions. *)
 type t = instr list
 
+val make : key:string -> value:string -> instr
+
 val pp : Format.formatter -> t -> unit
 
 val instr_encoding : instr Data_encoding.t
@@ -46,3 +48,7 @@ val generate_yaml : t -> Yaml.yaml tzresult
 (** [emit_yaml instrs] generates the YAML representation of [instrs] in textual
     format. *)
 val emit_yaml : t -> string tzresult
+
+(** [to_file instrs ~output] writes the instructions into a file,
+    either in JSON or YAML depending on the extension of [output]. *)
+val to_file : t -> output:string -> unit tzresult Lwt.t

@@ -75,17 +75,16 @@ module Installer_kernel_config = struct
   type t = instr list
 
   let instr_to_yaml = function
-    | Move {from; to_} -> sf {|  - move:
-      from: %s
-      to: %s
-|} from to_
-    | Reveal {hash; to_} -> sf {|  - reveal: %s
+    | Move {from; to_} -> sf {|- move:
+    from: %s
     to: %s
+|} from to_
+    | Reveal {hash; to_} -> sf {|- reveal: %s
+  to: %s
 |} hash to_
-    | Set {value; to_} ->
-        sf {|  - set:
-      value: %s
-      to: %s
+    | Set {value; to_} -> sf {|- set:
+    value: %s
+    to: %s
 |} value to_
 
   let to_yaml t =
@@ -157,7 +156,9 @@ let prepare_installer_kernel_with_arbitrary_file ?runner ~preimages_dir ?config
                   ""
                   (List.map Installer_kernel_config.instr_to_yaml config)
               in
-              Base.write_file setup_file ~contents:(base_config ^ new_contents) ;
+              let contents = base_config ^ new_contents in
+              Log.info "installer config:\n%s" contents ;
+              Base.write_file setup_file ~contents ;
               setup_file
         in
         ["--setup-file"; setup_file]

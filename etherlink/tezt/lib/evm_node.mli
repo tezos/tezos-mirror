@@ -287,3 +287,26 @@ val chunk_data :
   string list Lwt.t
 
 val wait_termination : t -> unit Lwt.t
+
+(** [make_kernel_installer_config ~output ()] create the config needed for the
+    evm kernel used by the installer *)
+val make_kernel_installer_config :
+  ?kernel_root_hash:string ->
+  ?chain_id:int ->
+  ?bootstrap_balance:Wei.t ->
+  ?bootstrap_accounts:string list ->
+  ?sequencer:string ->
+  ?delayed_bridge:string ->
+  ?ticketer:string ->
+  ?administrator:string ->
+  ?sequencer_governance:string ->
+  ?kernel_governance:string ->
+  ?kernel_security_governance:string ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?da_fee_per_byte:Wei.t ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?sequencer_pool_address:string ->
+  output:string ->
+  unit ->
+  (Process.t, unit) Runnable.t

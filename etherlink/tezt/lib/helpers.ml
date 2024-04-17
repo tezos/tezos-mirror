@@ -258,3 +258,5 @@ let send_n_transactions ~sc_rollup_node ~client ~evm_node ?wait_for_blocks txs =
          ~transaction_hash:first_hash)
   in
   return (requests, receipt, hashes)
+
+let default_bootstrap_account_balance = Wei.of_eth_int 9999

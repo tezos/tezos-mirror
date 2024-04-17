@@ -4,6 +4,9 @@
 
 ### Features
 
+- Add command "make kernel installer config <file>" that generates a
+  configuration file filled with all the values given in
+  argument. (!12764)
 - The transaction pool is now removing any transaction that was included more
   than a defined threshold ago (one hour by default). (!12741)
 - The transaction pool imposes a limit of users permitted simultaneously

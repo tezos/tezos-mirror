@@ -1198,6 +1198,91 @@ mode.|}
       in
       Configuration.save ~force ~data_dir config)
 
+let config_key_arg ~name ~placeholder =
+  let open Lwt_result_syntax in
+  let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
+  let doc = Format.sprintf "value for %s in the installer config" name in
+  Tezos_clic.arg ~long ~doc ~placeholder
+  @@ Tezos_clic.parameter (fun _ s -> return (name, s))
+
+let bootstrap_account_arg =
+  let long = "bootstrap-account" in
+  let doc = Format.sprintf "add a bootstrap account in the installer config." in
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..."
+  @@ Tezos_clic.parameter (fun _ address ->
+         Lwt.return_ok @@ Evm_node_lib_dev.Helpers.normalize_addr address)
+
+let make_kernel_config_command =
+  let open Tezos_clic in
+  let open Lwt_result_syntax in
+  command
+    ~desc:"Transforms the JSON list of instructions to a RLP list"
+    (args16
+       (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
+       (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
+       (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
+       (config_key_arg ~name:"delayed_bridge" ~placeholder:"kt1...")
+       (config_key_arg ~name:"ticketer" ~placeholder:"kt1...")
+       (config_key_arg ~name:"admin" ~placeholder:"kt1..")
+       (config_key_arg ~name:"sequencer_governance" ~placeholder:"kt1...")
+       (config_key_arg ~name:"kernel_governance" ~placeholder:"kt1...")
+       (config_key_arg ~name:"kernel_security_governance" ~placeholder:"kt1...")
+       (config_key_arg ~name:"minimum_base_fee_per_gas" ~placeholder:"111...")
+       (config_key_arg ~name:"da_fee_per_byte" ~placeholder:"111...")
+       (config_key_arg ~name:"delayed_inbox_timeout" ~placeholder:"111...")
+       (config_key_arg ~name:"delayed_inbox_min_levels" ~placeholder:"111...")
+       (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
+       (Tezos_clic.default_arg
+          ~long:"boostrap-balance"
+          ~doc:"boolance of boostrap account"
+          ~default:"9999000000000000000000"
+          ~placeholder:"9999000000000000000000"
+       @@ Tezos_clic.parameter (fun _ s -> return @@ Z.of_string s))
+       bootstrap_account_arg)
+    (prefixes ["make"; "kernel"; "installer"; "config"]
+    @@ Tezos_clic.param
+         ~name:"kernel config file"
+         ~desc:"file path where the config will be written to"
+         Params.string
+    @@ stop)
+    (fun ( kernel_root_hash,
+           chain_id,
+           sequencer,
+           delayed_bridge,
+           ticketer,
+           admin,
+           sequencer_governance,
+           kernel_governance,
+           kernel_security_governance,
+           minimum_base_fee_per_gas,
+           da_fee_per_byte,
+           delayed_inbox_timeout,
+           delayed_inbox_min_levels,
+           sequencer_pool_address,
+           boostrap_balance,
+           bootstrap_accounts )
+         output
+         () ->
+      Evm_node_lib_dev.Kernel_config.make
+        ?kernel_root_hash
+        ?chain_id
+        ?sequencer
+        ?delayed_bridge
+        ?ticketer
+        ?admin
+        ?sequencer_governance
+        ?kernel_governance
+        ?kernel_security_governance
+        ?minimum_base_fee_per_gas
+        ?da_fee_per_byte
+        ?delayed_inbox_timeout
+        ?delayed_inbox_min_levels
+        ?sequencer_pool_address
+        ~boostrap_balance
+        ?bootstrap_accounts
+        ~output
+        ())
+
 (* List of program commands *)
 let commands =
   [
@@ -1212,6 +1297,7 @@ let commands =
     reset_command;
     replay_command;
     init_config_command;
+    make_kernel_config_command;
   ]
 
 let global_options = Tezos_clic.no_options
