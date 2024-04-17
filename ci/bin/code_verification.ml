@@ -272,7 +272,6 @@ let job_tezt ~__POS__ ?rules ?parallel ?(tags = ["gcp_tezt"]) ~name
        ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
        tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
        ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
-      "if [ -n \"${BISECT_FILE:-}\" ]; then ./scripts/ci/merge_coverage.sh; fi";
     ]
 
 (** Tezt tag selector string.
@@ -381,6 +380,7 @@ let jobs pipeline_type =
       : tezos_job =
     jobs_with_coverage_output := tezos_job :: !jobs_with_coverage_output ;
     tezos_job |> enable_coverage_location
+    |> append_script ["./scripts/ci/merge_coverage.sh"]
     |> add_artifacts
          ~expire_in
          ~name:"coverage-files-$CI_JOB_ID"
@@ -1063,10 +1063,7 @@ let jobs pipeline_type =
           ?timeout ?parallel_vector ~arch ~name ?(enable_coverage = true)
           ~make_targets () : tezos_job =
         let arch_string = arch_to_string arch in
-        let script =
-          ["make $MAKE_TARGETS"]
-          @ if enable_coverage then ["./scripts/ci/merge_coverage.sh"] else []
-        in
+        let script = ["make $MAKE_TARGETS"] in
         let dependencies = build_dependencies arch in
         let variables =
           [
