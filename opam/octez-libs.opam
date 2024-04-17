@@ -55,7 +55,6 @@ depends: [
   "uutf"
   "lwt-exit"
   "ringo" { >= "1.0.0" }
-  "qcheck-core" {with-test}
   "octez-internal-libs" { = version }
   "conf-rust"
   "integers"
@@ -68,6 +67,7 @@ depends: [
   "cohttp-lwt-unix" { >= "5.2.0" }
   "resto-cohttp-server" { >= "1.2" }
   "resto-acl" { >= "1.2" }
+  "qcheck-core" {with-test}
   "bigstring" {with-test}
 ]
 x-opam-monorepo-opam-provided: [

@@ -2638,8 +2638,17 @@ let octez_gossipsub =
       ]
 
 let _octez_gossipsub_test =
-  test
-    "test_gossipsub"
+  tezt
+    [
+      "test_gossipsub";
+      "test_integration_worker";
+      "test_message_cache";
+      "test_pbt";
+      "test_unit";
+      "test_gossipsub_shared";
+      "gossipsub_pbt_generators";
+      "default_limits";
+    ]
     ~path:"src/lib_gossipsub/test"
     ~opam:"octez-libs"
     ~deps:
