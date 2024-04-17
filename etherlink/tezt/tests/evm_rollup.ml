@@ -399,7 +399,7 @@ let setup_evm_kernel ?(setup_kernel_root_hash = true) ?config
           (Evm_node.Sequencer
              {
                initial_kernel = output;
-               preimage_dir = preimages_dir;
+               preimage_dir = Some preimages_dir;
                private_rpc_port;
                time_between_blocks;
                sequencer = sequencer.alias;
@@ -4516,7 +4516,8 @@ let test_migrate_proxy_to_sequencer_future =
       Evm_node.Sequencer
         {
           initial_kernel = kernel;
-          preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0";
+          preimage_dir =
+            Some (Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0");
           private_rpc_port = Some (Port.fresh ());
           time_between_blocks = Some Nothing;
           sequencer = sequencer_key.alias;
@@ -4681,7 +4682,8 @@ let test_migrate_proxy_to_sequencer_past =
       Evm_node.Sequencer
         {
           initial_kernel = kernel;
-          preimage_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0";
+          preimage_dir =
+            Some (Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0");
           private_rpc_port = Some (Port.fresh ());
           time_between_blocks = Some Nothing;
           sequencer = sequencer_key.alias;

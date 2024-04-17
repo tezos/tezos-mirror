@@ -47,6 +47,16 @@ let uses _protocol =
 
 open Helpers
 
+let check_kernel_version ~evm_node ~equal expected =
+  let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
+  if equal then
+    Check.((kernel_version = expected) string)
+      ~error_msg:"Expected kernelVersion to be %R, got %L"
+  else
+    Check.((kernel_version <> expected) string)
+      ~error_msg:"Expected kernelVersion to be different than %R" ;
+  return kernel_version
+
 let base_fee_for_hardcoded_tx = Wei.to_wei_z @@ Z.of_int 21000
 
 let arb_da_fee_for_delayed_inbox = Wei.of_eth_int 10_000
@@ -193,7 +203,7 @@ let setup_sequencer ?(devmode = true) ?config ?genesis_timestamp
     Evm_node.Sequencer
       {
         initial_kernel = output;
-        preimage_dir = preimages_dir;
+        preimage_dir = Some preimages_dir;
         private_rpc_port;
         time_between_blocks;
         sequencer = sequencer.alias;
@@ -1972,16 +1982,6 @@ let test_migration_from_ghostnet =
       ~max_blueprints_lag:0
   in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let check_kernel_version ~evm_node ~equal expected =
-    let*@ kernel_version = Rpc.tez_kernelVersion evm_node in
-    if equal then
-      Check.((kernel_version = expected) string)
-        ~error_msg:"Expected kernelVersion to be %R, got %L"
-    else
-      Check.((kernel_version <> expected) string)
-        ~error_msg:"Expected kernelVersion to be different than %R" ;
-    return kernel_version
-  in
   (* Check kernelVersion. *)
   let* _kernel_version =
     check_kernel_version
@@ -2755,6 +2755,94 @@ let test_reset =
        reset." ;
   unit
 
+let test_preimages_endpoint =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "preimages_endpoint"]
+    ~title:"Sequencer an use remote server to get preimages"
+    ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
+  @@ fun protocol ->
+  let* {
+         sc_rollup_node;
+         l1_contracts;
+         sc_rollup_address;
+         client;
+         sequencer;
+         proxy;
+         _;
+       } =
+    setup_sequencer
+      ~sequencer:Constant.bootstrap1
+      ~time_between_blocks:Nothing
+      protocol
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = Evm_node.terminate sequencer in
+  (* Prepares the sequencer without [preimages-dir], to force the use of
+     preimages endpoint. *)
+  let sequencer_mode_without_preimages_dir =
+    match Evm_node.mode sequencer with
+    | Evm_node.Sequencer mode ->
+        Evm_node.Sequencer {mode with preimage_dir = None}
+    | _ -> assert false
+  in
+  let new_sequencer =
+    Evm_node.create
+      ~mode:sequencer_mode_without_preimages_dir
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      new_sequencer
+      sc_rollup_node
+  in
+  (* Sends an upgrade with new preimages. *)
+  let* () =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~activation_timestamp:"0"
+  in
+  let* _ =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  in
+  (* Create a file server that serves the preimages. *)
+  let provider_port = Port.fresh () in
+  let served = ref false in
+  Sc_rollup_helpers.serve_files
+    ~name:"preimages_server"
+    ~port:provider_port
+    ~root:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
+    ~on_request:(fun _ -> served := true)
+  @@ fun () ->
+  let preimages_endpoint =
+    sf "http://%s:%d" Constant.default_host provider_port
+  in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      new_sequencer
+  in
+  (* Produce a block so the sequencer sees the event. *)
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rpc.produce_block new_sequencer in
+  Check.is_true
+    !served
+    ~error_msg:"The sequencer should have used the file server" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -2794,4 +2882,5 @@ let () =
   test_stage_one_reboot protocols ;
   test_blueprint_is_limited_in_size protocols ;
   test_blueprint_limit_with_delayed_inbox protocols ;
-  test_reset protocols
+  test_reset protocols ;
+  test_preimages_endpoint protocols

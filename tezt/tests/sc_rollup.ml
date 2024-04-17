@@ -2700,37 +2700,6 @@ let test_reveals_4k =
   in
   Lwt.choose [sync; failure]
 
-(** Run simple http server on [port] that servers static files in the [root] directory. *)
-let serve_files ?(on_request = fun _ -> ()) ~name ~port ~root f =
-  let server =
-    Cohttp_lwt_unix.Server.make () ~callback:(fun _conn request _body ->
-        match request.meth with
-        | `GET ->
-            let fname =
-              Cohttp.Path.resolve_local_file
-                ~docroot:root
-                ~uri:(Cohttp.Request.uri request)
-            in
-            Log.debug ~prefix:name "Request file %s@." fname ;
-            on_request fname ;
-            Cohttp_lwt_unix.Server.respond_file ~fname ()
-        | _ ->
-            Cohttp_lwt_unix.Server.respond_error
-              ~status:`Method_not_allowed
-              ~body:"Static file server only answers GET"
-              ())
-  in
-  let stop, stopper = Lwt.task () in
-  let serve =
-    Cohttp_lwt_unix.Server.create ~stop ~mode:(`TCP (`Port port)) server
-  in
-  let stopper () =
-    Log.debug ~prefix:name "Stopping" ;
-    Lwt.wakeup_later stopper () ;
-    serve
-  in
-  Lwt.finalize f stopper
-
 let test_reveals_fetch_remote =
   let kind = "arith" in
   test_full_scenario

@@ -36,7 +36,7 @@ type mode =
     }
   | Sequencer of {
       initial_kernel : string;
-      preimage_dir : string;
+      preimage_dir : string option;
       private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;
       sequencer : string;
@@ -464,9 +464,8 @@ let run_args evm_node =
           sequencer;
           "--initial-kernel";
           initial_kernel;
-          "--preimages-dir";
-          preimage_dir;
         ]
+        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
         @ Cli_arg.optional_arg
             "maximum-blueprints-lag"
