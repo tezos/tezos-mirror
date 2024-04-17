@@ -535,10 +535,7 @@ module Delegate = struct
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
-  let is_forbidden ?policy ctxt pkh =
-    let open Lwt_result_syntax in
-    let* ctxt = get_alpha_ctxt ?policy ctxt in
-    return (Delegate.is_forbidden_delegate ctxt pkh)
+  let is_forbidden ctxt pkh = Plugin.RPC.Staking.is_forbidden rpc_ctxt ctxt pkh
 
   let stake_for_cycle ?policy ctxt cycle pkh =
     let open Lwt_result_wrap_syntax in

@@ -4508,15 +4508,11 @@ module Staking = struct
       return @@ Some (delegator_pkh, staked_balance)
     else return_none
 
-  let check_is_forbidden ctxt pkh =
-    let open Lwt_result_syntax in
-    return @@ Delegate.is_forbidden_delegate ctxt pkh
-
   let register () =
+    let open Lwt_result_syntax in
     Registration.register1 ~chunked:false S.is_forbidden (fun ctxt pkh () () ->
-        check_is_forbidden ctxt pkh) ;
+        return @@ Delegate.is_forbidden_delegate ctxt pkh) ;
     Registration.register1 ~chunked:true S.stakers (fun ctxt pkh () () ->
-        let open Lwt_result_syntax in
         let* () = Delegates.check_delegate_registered ctxt pkh in
         let*! delegators = Delegate.delegated_contracts ctxt pkh in
         List.filter_map_es
@@ -4526,6 +4522,9 @@ module Staking = struct
 
   let stakers ctxt block pkh =
     RPC_context.make_call1 S.stakers ctxt block pkh () ()
+
+  let is_forbidden ctxt block pkh =
+    RPC_context.make_call1 S.is_forbidden ctxt block pkh () ()
 end
 
 module S = struct
