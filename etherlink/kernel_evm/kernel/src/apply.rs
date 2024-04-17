@@ -33,6 +33,7 @@ use tezos_smart_rollup_encoding::outbox::OutboxMessageTransaction;
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
+use crate::configuration::Limits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::inbox::{Deposit, Transaction, TransactionContent};
@@ -224,6 +225,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     block_constant: &BlockConstants,
     effective_gas_price: U256,
     is_delayed: bool,
+    limits: &Limits,
 ) -> Result<Validity, Error> {
     // Chain id is correct.
     if transaction.chain_id.is_some()
@@ -292,7 +294,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     };
 
     // Gas limit max
-    if gas_limit > tick_model::constants::MAXIMUM_GAS_LIMIT {
+    if gas_limit > limits.maximum_gas_limit {
         log!(
             host,
             Benchmarking,
@@ -334,6 +336,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     allocated_ticks: u64,
     retriable: bool,
     is_delayed: bool,
+    limits: &Limits,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
@@ -343,6 +346,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         block_constants,
         effective_gas_price,
         is_delayed,
+        limits,
     )? {
         Validity::Valid(caller, gas_limit) => (caller, gas_limit),
         _reason => {
@@ -621,6 +625,7 @@ pub fn apply_transaction<Host: Runtime>(
     retriable: bool,
     ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
+    limits: &Limits,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
@@ -632,6 +637,7 @@ pub fn apply_transaction<Host: Runtime>(
             allocated_ticks,
             retriable,
             false,
+            limits,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
@@ -642,6 +648,7 @@ pub fn apply_transaction<Host: Runtime>(
             allocated_ticks,
             retriable,
             true,
+            limits,
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
@@ -692,7 +699,7 @@ pub fn apply_transaction<Host: Runtime>(
 mod tests {
     use std::vec;
 
-    use crate::{apply::Validity, fees::gas_for_fees};
+    use crate::{apply::Validity, configuration::Limits, fees::gas_for_fees};
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use tezos_ethereum::{
@@ -807,6 +814,7 @@ mod tests {
             &block_constants,
             gas_price,
             false,
+            &Limits::default(),
         );
         assert_eq!(
             Validity::Valid(address, 21000),
@@ -841,6 +849,7 @@ mod tests {
             &block_constants,
             gas_price,
             false,
+            &Limits::default(),
         );
         assert_eq!(
             Validity::InvalidPrePay,
@@ -875,6 +884,7 @@ mod tests {
             &block_constants,
             gas_price,
             false,
+            &Limits::default(),
         );
         assert_eq!(
             Validity::InvalidSignature,
@@ -911,6 +921,7 @@ mod tests {
             &block_constants,
             gas_price,
             false,
+            &Limits::default(),
         );
         assert_eq!(
             Validity::InvalidNonce,
@@ -945,6 +956,7 @@ mod tests {
             &block_constants,
             gas_price,
             false,
+            &Limits::default(),
         );
         assert_eq!(
             Validity::InvalidChainId,
@@ -979,6 +991,7 @@ mod tests {
             &block_constants,
             gas_price,
             false,
+            &Limits::default(),
         );
         assert_eq!(
             Validity::InvalidMaxBaseFee,
@@ -1014,6 +1027,7 @@ mod tests {
             &block_constants,
             gas_price,
             false,
+            &Limits::default(),
         );
         assert_eq!(
             Validity::InvalidNotEnoughGasForFees,
@@ -1028,6 +1042,7 @@ mod tests {
             &block_constants,
             gas_price,
             true,
+            &Limits::default(),
         );
         assert!(
             matches!(

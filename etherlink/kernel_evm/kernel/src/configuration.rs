@@ -2,9 +2,11 @@ use crate::{
     delayed_inbox::DelayedInbox,
     storage::{
         read_admin, read_delayed_transaction_bridge, read_kernel_governance,
-        read_kernel_security_governance, read_sequencer_governance, read_ticketer,
+        read_kernel_security_governance, read_maximum_allowed_ticks,
+        read_maximum_gas_per_transaction, read_sequencer_governance, read_ticketer,
         sequencer,
     },
+    tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
@@ -37,9 +39,24 @@ impl std::fmt::Display for ConfigurationMode {
     }
 }
 
+pub struct Limits {
+    pub maximum_allowed_ticks: u64,
+    pub maximum_gas_limit: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            maximum_allowed_ticks: MAX_ALLOWED_TICKS,
+            maximum_gas_limit: MAXIMUM_GAS_LIMIT,
+        }
+    }
+}
+
 pub struct Configuration {
     pub tezos_contracts: TezosContracts,
     pub mode: ConfigurationMode,
+    pub limits: Limits,
 }
 
 impl Default for Configuration {
@@ -47,6 +64,7 @@ impl Default for Configuration {
         Self {
             tezos_contracts: TezosContracts::default(),
             mode: ConfigurationMode::Proxy,
+            limits: Limits::default(),
         }
     }
 }
@@ -135,9 +153,22 @@ fn fetch_tezos_contracts(host: &mut impl Runtime) -> TezosContracts {
     }
 }
 
+pub fn fetch_limits(host: &mut impl Runtime) -> Limits {
+    let maximum_allowed_ticks =
+        read_maximum_allowed_ticks(host).unwrap_or(MAX_ALLOWED_TICKS);
+
+    let maximum_gas_limit =
+        read_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
+
+    Limits {
+        maximum_allowed_ticks,
+        maximum_gas_limit,
+    }
+}
+
 pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let tezos_contracts = fetch_tezos_contracts(host);
-
+    let limits = fetch_limits(host);
     let sequencer = sequencer(host).unwrap_or_default();
     match sequencer {
         Some(sequencer) => {
@@ -158,16 +189,21 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                         delayed_inbox: Box::new(delayed_inbox),
                         sequencer,
                     },
+                    limits,
                 },
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
-                    Configuration::default()
+                    Configuration {
+                        limits,
+                        ..Configuration::default()
+                    }
                 }
             }
         }
         None => Configuration {
             tezos_contracts,
             mode: ConfigurationMode::Proxy,
+            limits,
         },
     }
 }

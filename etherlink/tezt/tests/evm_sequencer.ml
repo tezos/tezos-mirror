@@ -2411,8 +2411,27 @@ let test_stage_one_reboot =
        L1 level"
     ~uses
   @@ fun protocol ->
+  let config =
+    let legacy_tick_limit = 11_000_000_000L in
+    let legacy_safety_margin = 2_000_000_000L in
+    let legacy_max_allowed_ticks =
+      Int64.sub legacy_tick_limit legacy_safety_margin
+    in
+    let max_allowed_ticks_le = Bytes.make 8 '\000' in
+    Bytes.set_int64_le max_allowed_ticks_le 0 legacy_max_allowed_ticks ;
+    `Config
+      Sc_rollup_helpers.Installer_kernel_config.
+        [
+          Set
+            {
+              value = Hex.(of_bytes max_allowed_ticks_le |> show);
+              to_ = "/evm/maximum_allowed_ticks";
+            };
+        ]
+  in
   let* {sc_rollup_node; client; sc_rollup_address; _} =
     setup_sequencer
+      ~config
       ~sequencer:Constant.bootstrap1
       ~time_between_blocks:Nothing
       protocol

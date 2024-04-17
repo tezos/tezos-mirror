@@ -100,10 +100,11 @@ pub mod constants {
 /// Estimation of the number of ticks the kernel can safely spend in the
 /// execution of the opcodes.
 pub fn estimate_remaining_ticks_for_transaction_execution(
+    max_allowed_ticks: u64,
     ticks: u64,
     tx_data_size: u64,
 ) -> u64 {
-    constants::MAX_ALLOWED_TICKS
+    max_allowed_ticks
         .saturating_sub(TICKS_FOR_CRYPTO)
         .saturating_sub(ticks_of_transaction_overhead(tx_data_size))
         .saturating_sub(ticks)

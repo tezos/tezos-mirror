@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::blueprint_storage::store_sequencer_blueprint;
-use crate::configuration::TezosContracts;
+use crate::configuration::{fetch_limits, TezosContracts};
 use crate::delayed_inbox::DelayedInbox;
 use crate::parsing::{
     Input, InputResult, Parsable, ProxyInput, SequencerInput, SequencerParsingContext,
@@ -20,7 +20,7 @@ use crate::storage::{
     remove_chunked_transaction, remove_sequencer, store_l1_level,
     store_last_info_per_level_timestamp, store_transaction_chunk,
 };
-use crate::tick_model::constants::{MAX_ALLOWED_TICKS, TICKS_FOR_BLUEPRINT_INTERCEPT};
+use crate::tick_model::constants::TICKS_FOR_BLUEPRINT_INTERCEPT;
 use crate::tick_model::maximum_ticks_for_sequencer_chunk;
 use crate::upgrade::*;
 use crate::Error;
@@ -567,10 +567,13 @@ pub fn read_sequencer_inbox<Host: Runtime>(
     // variable remains true, that means that the inbox was already consumed
     // during this kernel run.
     let mut inbox_is_empty = true;
+    let limits = fetch_limits(host);
     let mut parsing_context = SequencerParsingContext {
         sequencer,
         delayed_bridge,
-        allocated_ticks: MAX_ALLOWED_TICKS.saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
+        allocated_ticks: limits
+            .maximum_allowed_ticks
+            .saturating_sub(TICKS_FOR_BLUEPRINT_INTERCEPT),
     };
     loop {
         // Checks there will be enough ticks to handle at least another chunk of

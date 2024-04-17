@@ -4269,7 +4269,26 @@ let test_regression_block_hash_gen =
   unit
 
 let test_reboot_out_of_ticks =
+  let config =
+    let legacy_tick_limit = 11_000_000_000L in
+    let legacy_safety_margin = 2_000_000_000L in
+    let legacy_max_allowed_ticks =
+      Int64.sub legacy_tick_limit legacy_safety_margin
+    in
+    let max_allowed_ticks_le = Bytes.make 8 '\000' in
+    Bytes.set_int64_le max_allowed_ticks_le 0 legacy_max_allowed_ticks ;
+    `Config
+      Sc_rollup_helpers.Installer_kernel_config.
+        [
+          Set
+            {
+              value = Hex.(of_bytes max_allowed_ticks_le |> show);
+              to_ = "/evm/maximum_allowed_ticks";
+            };
+        ]
+  in
   register_proxy
+    ~config
     ~tags:["evm"; "reboot"; "loop"; "out_of_ticks"]
     ~title:
       "Check that the kernel can handle transactions that take too many ticks \
@@ -4848,12 +4867,31 @@ let test_call_recursive_contract_estimate_gas =
   unit
 
 let test_transaction_exhausting_ticks_is_rejected =
+  let config =
+    let legacy_tick_limit = 11_000_000_000L in
+    let legacy_safety_margin = 2_000_000_000L in
+    let legacy_max_allowed_ticks =
+      Int64.sub legacy_tick_limit legacy_safety_margin
+    in
+    let max_allowed_ticks_le = Bytes.make 8 '\000' in
+    Bytes.set_int64_le max_allowed_ticks_le 0 legacy_max_allowed_ticks ;
+    `Config
+      Sc_rollup_helpers.Installer_kernel_config.
+        [
+          Set
+            {
+              value = Hex.(of_bytes max_allowed_ticks_le |> show);
+              to_ = "/evm/maximum_allowed_ticks";
+            };
+        ]
+  in
   register_both
     ~tags:["evm"; "loop"; "out_of_ticks"; "rejected"]
     ~title:
       "Check that the node will reject a transaction that wouldn't fit in a \
        kernel run."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~config
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs =
