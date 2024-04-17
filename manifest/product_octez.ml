@@ -2094,6 +2094,7 @@ let octez_base_unix =
         data_encoding |> open_;
         uri;
         octez_event_logging |> open_;
+        lwt_exit;
       ]
     ~inline_tests:ppx_expect
 

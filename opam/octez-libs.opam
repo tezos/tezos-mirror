@@ -53,6 +53,7 @@ depends: [
   "mtime" { >= "2.0.0" }
   "conf-libev"
   "uutf"
+  "lwt-exit"
   "ringo" { >= "1.0.0" }
   "qcheck-core" {with-test}
   "octez-internal-libs" { = version }

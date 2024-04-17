@@ -99,6 +99,8 @@ type _ request =
       Tezos_base_unix.Internal_event_unix.Configuration.t
       -> unit request
 
+val name : string
+
 val request_pp : Format.formatter -> 'a request -> unit
 
 val magic : Bytes.t
@@ -111,12 +113,12 @@ val request_encoding : packed_request Data_encoding.t
 
 val result_encoding : 'a request -> 'a Data_encoding.t
 
-val send : Lwt_io.output_channel -> 'a Data_encoding.t -> 'a -> unit Lwt.t
+val reconfigure_event_logging_request :
+  Tezos_base.Internal_event_config.t -> unit request
 
-val recv : Lwt_io.input_channel -> 'a Data_encoding.t -> 'a Lwt.t
+val internal_events : parameters -> Tezos_base.Internal_event_config.t
 
-val recv_result :
-  Lwt_io.input_channel -> 'a Data_encoding.t -> 'a tzresult Lwt.t
+val terminate_request : packed_request
 
 (** The prefix for the validation socket filename.
 
@@ -130,13 +132,5 @@ val socket_path_prefix : string
     [pid] is the process ID of the validator process. *)
 val socket_path : socket_dir:string -> pid:int -> string
 
-val create_socket_listen :
-  canceler:Lwt_canceler.t ->
-  max_requests:int ->
-  socket_path:string ->
-  Lwt_unix.file_descr tzresult Lwt.t
-
-val create_socket_connect :
-  canceler:Lwt_canceler.t ->
-  socket_path:string ->
-  Lwt_unix.file_descr tzresult Lwt.t
+val command_line_args :
+  parameters -> socket_dir:string -> string option * string list
