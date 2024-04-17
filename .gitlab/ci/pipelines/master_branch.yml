@@ -128,25 +128,7 @@ oc.docker:amd64:
   tags:
   - gcp
   rules:
-  - if: $CI_COMMIT_BRANCH == "master"
-    when: always
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - Dockerfile
-    - Makefile
-    - build.Dockerfile
-    - dune
-    - dune-project
-    - dune-workspace
-    - kernels.mk
-    - opam
-    - script-inputs/**/*
-    - scripts/**/*
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
-    when: on_success
+  - when: always
   dependencies: []
   before_script: []
   script:
@@ -170,25 +152,7 @@ oc.docker:arm64:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_COMMIT_BRANCH == "master"
-    when: always
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - Dockerfile
-    - Makefile
-    - build.Dockerfile
-    - dune
-    - dune-project
-    - dune-workspace
-    - kernels.mk
-    - opam
-    - script-inputs/**/*
-    - scripts/**/*
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
-    when: on_success
+  - when: always
   dependencies: []
   before_script:
   - ./scripts/ci/docker_initialize.sh
@@ -255,7 +219,7 @@ publish:documentation:
     - src/**/*
     - tezt/**/*
     - vendors/**/*
-    when: on_success
+    when: always
   needs: []
   dependencies: []
   interruptible: false

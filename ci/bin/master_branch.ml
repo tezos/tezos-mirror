@@ -21,34 +21,33 @@ open Gitlab_ci.Util
 open Tezos_ci
 
 let jobs =
+  (* Like in the {!Schedule_extended_test} variant of
+     {!Code_verification} pipelines, we'd like to run as many jobs as
+     possible in [master_branch] pipelines. Therefore, the default
+     [when_] should be [Always] for jobs without dependencies.
+
+     [changes:] clauses can be used on [master_branch] pipelines. In
+     push pipelines like this one, [changes:]-clauses match against
+     the diff of the branch's [HEAD] between two pushes. That is, the
+     the difference between the previous state and the new state of
+     the branch. In the case of the [master] branch, this is just the
+     contents of the most recently merged MR. For more info on
+     [changes:] in different pipelines, see
+     {{:https://docs.gitlab.com/ee/ci/jobs/job_troubleshooting.html#jobs-or-pipelines-run-unexpectedly-when-using-changes}
+     GitLab Docs: Jobs or pipelines run unexpectedly when using changes}. *)
+  let rules_always = [job_rule ~when_:Always ()] in
   let job_docker_rust_toolchain =
     job_docker_rust_toolchain
       ~__POS__ (* Always rebuild on master to reduce risk of tampering *)
       ~always_rebuild:true
-      ~rules:[job_rule ~when_:Always ()]
+      ~rules:rules_always
       ()
   in
-  let rules_octez_docker_changes_or_master =
-    [
-      job_rule ~if_:Rules.on_master ~when_:Always ();
-      job_rule
-        ~changes:(Changeset.encode changeset_octez_docker_changes_or_master)
-        ();
-    ]
-  in
   let job_docker_amd64_experimental : tezos_job =
-    job_docker_build
-      ~__POS__
-      ~rules:rules_octez_docker_changes_or_master
-      ~arch:Amd64
-      Experimental
+    job_docker_build ~__POS__ ~rules:rules_always ~arch:Amd64 Experimental
   in
   let job_docker_arm64_experimental : tezos_job =
-    job_docker_build
-      ~__POS__
-      ~rules:rules_octez_docker_changes_or_master
-      ~arch:Arm64
-      Experimental
+    job_docker_build ~__POS__ ~rules:rules_always ~arch:Arm64 Experimental
   in
   let job_docker_merge_manifests =
     job_docker_merge_manifests
@@ -65,18 +64,10 @@ let jobs =
       ~job_docker_arm64:job_docker_arm64_experimental
   in
   let job_static_arm64 =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Arm64
-      ~rules:[job_rule ~when_:Always ()]
-      ()
+    job_build_static_binaries ~__POS__ ~arch:Arm64 ~rules:rules_always ()
   in
   let job_static_x86_64 =
-    job_build_static_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~rules:[job_rule ~when_:Always ()]
-      ()
+    job_build_static_binaries ~__POS__ ~arch:Amd64 ~rules:rules_always ()
   in
   let job_unified_coverage_default : tezos_job =
     job
@@ -124,11 +115,14 @@ let jobs =
              {|chmod 400 ~/.ssh/id_ed25519|};
            ])
       ~interruptible:false
+        (* We publish documentation [Always] -- the job has no
+           dependencies and so [On_success] is actually equivalent to
+           [Always], but the latter is more explicit. *)
       ~rules:
         [
           job_rule
             ~changes:(Changeset.encode changeset_octez_docs)
-            ~when_:On_success
+            ~when_:Always
             ();
         ]
       ["./scripts/ci/doc_publish.sh"]
