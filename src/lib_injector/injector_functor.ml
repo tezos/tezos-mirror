@@ -1493,6 +1493,10 @@ module Make (Parameters : PARAMETERS) = struct
     (* Don't shutdown L1 monitoring otherwise worker shutdown hangs *)
     List.iter_p (fun (_signer, w) -> Worker.shutdown w) workers
 
+  let running_worker_tags () =
+    Worker.list table
+    |> List.map (fun (tags, _w) -> Tags.to_seq tags |> List.of_seq)
+
   let op_status_in_worker state l1_hash =
     match Op_queue.find_opt state.queue l1_hash with
     | Some op -> Some (Pending op.operation)

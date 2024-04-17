@@ -326,6 +326,9 @@ module type S = sig
   (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t
 
+  (** List of currently running injectors with their respective tags. *)
+  val running_worker_tags : unit -> tag list list
+
   (** The status of an operation in the injector. *)
   val operation_status : Inj_operation.Id.t -> status option
 
