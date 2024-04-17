@@ -409,23 +409,42 @@ let log_filter_chunk_size_arg =
     ~placeholder:"10"
     Params.int
 
+let common_config_args =
+  Tezos_clic.args15
+    data_dir_arg
+    rpc_addr_arg
+    rpc_port_arg
+    devmode_arg
+    cors_allowed_origins_arg
+    cors_allowed_headers_arg
+    log_filter_max_nb_blocks_arg
+    log_filter_max_nb_logs_arg
+    log_filter_chunk_size_arg
+    keep_alive_arg
+    rollup_node_endpoint_arg
+    tx_pool_timeout_limit_arg
+    tx_pool_addr_limit_arg
+    tx_pool_tx_per_addr_limit_arg
+    verbose_arg
+
+let assert_rollup_node_endpoint_equal ~arg ~param =
+  if arg <> param then
+    Error
+      [
+        error_of_fmt
+          "parameter rollup node endpoint %s is different to arg rollup node \
+           endpoint %s"
+          (Uri.to_string param)
+          (Uri.to_string arg);
+      ]
+  else Ok ()
+
 let proxy_command =
   let open Tezos_clic in
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in proxy mode"
-    (args11
-       data_dir_arg
-       devmode_arg
-       rpc_addr_arg
-       rpc_port_arg
-       cors_allowed_origins_arg
-       cors_allowed_headers_arg
-       verbose_arg
-       keep_alive_arg
-       log_filter_max_nb_blocks_arg
-       log_filter_max_nb_logs_arg
-       log_filter_chunk_size_arg)
+    common_config_args
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -435,18 +454,30 @@ let proxy_command =
          Params.rollup_node_endpoint
     @@ stop)
     (fun ( data_dir,
-           devmode,
            rpc_addr,
            rpc_port,
+           devmode,
            cors_origins,
            cors_headers,
-           verbose,
-           keep_alive,
            log_filter_max_nb_blocks,
            log_filter_max_nb_logs,
-           log_filter_chunk_size )
+           log_filter_chunk_size,
+           keep_alive,
+           rollup_node_endpoint_from_arg,
+           tx_pool_timeout_limit,
+           tx_pool_addr_limit,
+           tx_pool_tx_per_addr_limit,
+           verbose )
          rollup_node_endpoint
          () ->
+      let*? () =
+        Option.iter_e
+          (fun rollup_node_endpoint_from_arg ->
+            assert_rollup_node_endpoint_equal
+              ~arg:rollup_node_endpoint_from_arg
+              ~param:rollup_node_endpoint)
+          rollup_node_endpoint_from_arg
+      in
       let* config =
         Cli.create_or_read_config
           ~data_dir
@@ -460,6 +491,9 @@ let proxy_command =
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ~rollup_node_endpoint
+          ?tx_pool_timeout_limit
+          ?tx_pool_addr_limit
+          ?tx_pool_tx_per_addr_limit
           ~verbose
           ()
       in
@@ -496,15 +530,10 @@ let sequencer_command =
   command
     ~desc:"Start the EVM node in sequencer mode"
     (merge_options
-       (args24
-          data_dir_arg
-          rpc_addr_arg
-          rpc_port_arg
-          private_rpc_port_arg
-          cors_allowed_origins_arg
-          cors_allowed_headers_arg
-          verbose_arg
+       common_config_args
+       (args13
           kernel_arg
+          private_rpc_port_arg
           preimages_arg
           preimages_endpoint_arg
           time_between_blocks_arg
@@ -514,17 +543,8 @@ let sequencer_command =
           maximum_blueprints_catchup_arg
           catchup_cooldown_arg
           max_number_of_chunks_arg
-          devmode_arg
-          keep_alive_arg
           wallet_dir_arg
-          tx_pool_timeout_limit_arg
-          tx_pool_addr_limit_arg
-          tx_pool_tx_per_addr_limit_arg
-          (Client_config.password_filename_arg ()))
-       (args3
-          log_filter_max_nb_blocks_arg
-          log_filter_max_nb_logs_arg
-          log_filter_chunk_size_arg))
+          (Client_config.password_filename_arg ())))
     (prefixes ["run"; "sequencer"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -537,11 +557,20 @@ let sequencer_command =
     (fun ( ( data_dir,
              rpc_addr,
              rpc_port,
-             private_rpc_port,
+             devmode,
              cors_origins,
              cors_headers,
-             verbose,
-             kernel,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint_from_arg,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose ),
+           ( kernel,
+             private_rpc_port,
              preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -551,19 +580,19 @@ let sequencer_command =
              max_blueprints_catchup,
              catchup_cooldown,
              max_number_of_chunks,
-             devmode,
-             keep_alive,
              wallet_dir,
-             tx_pool_timeout_limit,
-             tx_pool_addr_limit,
-             tx_pool_tx_per_addr_limit,
-             password_filename ),
-           ( log_filter_max_nb_blocks,
-             log_filter_max_nb_logs,
-             log_filter_chunk_size ) )
+             password_filename ) )
          rollup_node_endpoint
          sequencer_str
          () ->
+      let*? () =
+        Option.iter_e
+          (fun rollup_node_endpoint_from_arg ->
+            assert_rollup_node_endpoint_equal
+              ~arg:rollup_node_endpoint_from_arg
+              ~param:rollup_node_endpoint)
+          rollup_node_endpoint_from_arg
+      in
       let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
       let* sequencer_key =
         Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
@@ -655,17 +684,9 @@ let observer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in observer mode"
-    (args10
-       data_dir_arg
-       rpc_addr_arg
-       rpc_port_arg
-       cors_allowed_origins_arg
-       cors_allowed_headers_arg
-       verbose_arg
-       kernel_arg
-       preimages_arg
-       preimages_endpoint_arg
-       keep_alive_arg)
+    (merge_options
+       common_config_args
+       (args3 kernel_arg preimages_arg preimages_endpoint_arg))
     (prefixes ["run"; "observer"; "with"; "endpoint"]
     @@ param
          ~name:"evm-node-endpoint"
@@ -675,24 +696,38 @@ let observer_command =
          Params.evm_node_endpoint
     @@ prefixes ["and"; "rollup"; "node"; "endpoint"]
     @@ rollup_node_endpoint_param @@ stop)
-  @@ fun ( data_dir,
-           rpc_addr,
-           rpc_port,
-           cors_origins,
-           cors_headers,
-           verbose,
-           kernel,
-           preimages,
-           preimages_endpoint,
-           keep_alive )
+  @@ fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint_from_arg,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose ),
+           (kernel, preimages, preimages_endpoint) )
              evm_node_endpoint
              rollup_node_endpoint
              () ->
   let open Evm_node_lib_dev in
+  let*? () =
+    Option.iter_e
+      (fun rollup_node_endpoint_from_arg ->
+        assert_rollup_node_endpoint_equal
+          ~arg:rollup_node_endpoint_from_arg
+          ~param:rollup_node_endpoint)
+      rollup_node_endpoint_from_arg
+  in
   let* config =
     Cli.create_or_read_config
       ~data_dir
-      ~devmode:true
+      ~devmode
       ~keep_alive
       ?rpc_addr
       ?rpc_port
@@ -703,6 +738,12 @@ let observer_command =
       ?preimages
       ?preimages_endpoint
       ~evm_node_endpoint
+      ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit
+      ?tx_pool_tx_per_addr_limit
+      ?log_filter_chunk_size
+      ?log_filter_max_nb_logs
+      ?log_filter_max_nb_blocks
       ()
   in
   let*! () =
@@ -1130,62 +1171,81 @@ If the  <sequencer-key> is set then adds the configuration for the sequencer
 mode.
 If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
-    (args17
-       data_dir_arg
-       rpc_addr_arg
-       rpc_port_arg
-       private_rpc_port_arg
-       cors_allowed_origins_arg
-       cors_allowed_headers_arg
-       preimages_arg
-       preimages_endpoint_arg
-       rollup_node_endpoint_arg
-       evm_node_endpoint_arg
-       time_between_blocks_arg
-       max_number_of_chunks_arg
-       devmode_arg
-       keep_alive_arg
-       (Tezos_clic.arg
-          ~long:"sequencer-key"
-          ~doc:"key to sign the blueprints in sequencer mode."
-          ~placeholder:"<alias|tz1..>"
-          (Client_keys.sk_uri_parameter ()))
-       (Tezos_clic.switch
-          ~long:"force"
-          ~short:'f'
-          ~doc:"Overwrites the configuration file when it exists."
-          ())
-       verbose_arg)
+    (merge_options
+       common_config_args
+       (args13
+          (* sequencer and observer config*)
+          preimages_arg
+          preimages_endpoint_arg
+          time_between_blocks_arg
+          max_number_of_chunks_arg
+          private_rpc_port_arg
+          sequencer_key_arg
+          maximum_blueprints_lag_arg
+          maximum_blueprints_ahead_arg
+          maximum_blueprints_catchup_arg
+          catchup_cooldown_arg
+          evm_node_endpoint_arg
+          (* others option *)
+          wallet_dir_arg
+          (Tezos_clic.switch
+             ~long:"force"
+             ~short:'f'
+             ~doc:"Overwrites the configuration file when it exists."
+             ())))
     (prefixes ["init"; "config"] @@ stop)
-    (fun ( data_dir,
-           rpc_addr,
-           rpc_port,
-           private_rpc_port,
-           cors_origins,
-           cors_headers,
-           preimages,
-           preimages_endpoint,
-           rollup_node_endpoint,
-           evm_node_endpoint,
-           time_between_blocks,
-           max_number_of_chunks,
-           devmode,
-           keep_alive,
-           sequencer_key,
-           force,
-           verbose )
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose ),
+           ( preimages,
+             preimages_endpoint,
+             time_between_blocks,
+             max_number_of_chunks,
+             private_rpc_port,
+             sequencer_str,
+             max_blueprints_lag,
+             max_blueprints_ahead,
+             max_blueprints_catchup,
+             catchup_cooldown,
+             evm_node_endpoint,
+             wallet_dir,
+             force ) )
          () ->
+      let* sequencer_key =
+        Option.map_es
+          (fun str ->
+            let wallet_ctxt = register_wallet ~wallet_dir () in
+            Client_keys.Secret_key.parse_source_string wallet_ctxt str)
+          sequencer_str
+      in
       let* config =
-        Configuration.Cli.create_or_read_config
+        Cli.create_or_read_config
           ~data_dir
           ?rpc_addr
           ?rpc_port
+          ~devmode
           ?cors_origins
           ?cors_headers
+          ?log_filter_max_nb_blocks
+          ?log_filter_max_nb_logs
+          ?log_filter_chunk_size
           ~keep_alive
-          ~devmode
           ?rollup_node_endpoint
-          ~verbose
+          ?tx_pool_timeout_limit
+          ?tx_pool_addr_limit
+          ?tx_pool_tx_per_addr_limit
           ?preimages
           ?preimages_endpoint
           ?time_between_blocks
@@ -1193,6 +1253,11 @@ mode.|}
           ?private_rpc_port
           ?sequencer_key
           ?evm_node_endpoint
+          ?max_blueprints_lag
+          ?max_blueprints_ahead
+          ?max_blueprints_catchup
+          ?catchup_cooldown
+          ~verbose
           ()
       in
       Configuration.save ~force ~data_dir config)
