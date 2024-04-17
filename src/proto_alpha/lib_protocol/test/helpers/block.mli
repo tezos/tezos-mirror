@@ -356,6 +356,8 @@ val current_cycle_of_level :
 
 val current_cycle : block -> Cycle.t
 
+val last_level_of_cycle : Constants.Parametric.t -> level:int32 -> bool
+
 val last_block_of_cycle : block -> bool
 
 (** Given a block [b] at level [l] bakes enough blocks to complete a cycle,

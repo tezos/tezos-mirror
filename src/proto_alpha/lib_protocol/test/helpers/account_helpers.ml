@@ -539,3 +539,8 @@ let current_total_frozen_deposits_with_limits account_state =
     ~limit_of_staking_over_baking:
       account_state.parameters.limit_of_staking_over_baking
     account_state.frozen_deposits
+
+let update_activity account constants ~level current_cycle =
+  if not (Block.last_level_of_cycle constants ~level) then
+    {account with last_active_cycle = current_cycle}
+  else {account with last_active_cycle = Cycle.succ current_cycle}
