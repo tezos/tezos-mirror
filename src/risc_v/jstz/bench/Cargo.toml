@@ -1,0 +1,24 @@
+[package]
+name = "inbox-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.clap]
+version = "4.4.6"
+features = ["derive"]
+
+[dependencies.serde]
+version = "1.0.197"
+features = ["derive"]
+
+[dependencies.hex]
+version = "0.4.3"
+features = ["serde"]
+
+[dependencies]
+jstz_crypto.workspace = true
+jstz_proto.workspace = true
+base64 = "0.22.0"
+http = "1.1.0"
+bincode = "1.3.3"
+serde_json = "1.0.115"
