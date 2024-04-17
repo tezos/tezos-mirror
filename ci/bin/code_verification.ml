@@ -385,7 +385,8 @@ let jobs pipeline_type =
          ~expire_in
          ~name:"coverage-files-$CI_JOB_ID"
          ~when_:On_success
-         ["$BISECT_FILE"]
+         (* Store merged .coverage files or [.corrupt.json] files. *)
+         ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
   in
   (* Stages *)
   let trigger_stage, make_dependencies =

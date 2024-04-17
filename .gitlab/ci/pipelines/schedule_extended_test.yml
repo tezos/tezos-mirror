@@ -6759,7 +6759,7 @@ oc.unit:non-proto-x86_64:
     expire_in: 1 day
     paths:
     - test_results
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: test_results/*.xml
     when: always
@@ -6792,7 +6792,7 @@ oc.unit:other-x86_64:
     expire_in: 1 day
     paths:
     - test_results
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: test_results/*.xml
     when: always
@@ -6825,7 +6825,7 @@ oc.unit:proto-x86_64:
     expire_in: 1 day
     paths:
     - test_results
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: test_results/*.xml
     when: always
@@ -7088,7 +7088,7 @@ tezt:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7145,7 +7145,7 @@ tezt-memory-3k:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7201,7 +7201,7 @@ tezt-memory-4k:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7258,7 +7258,7 @@ tezt-time-sensitive:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7367,7 +7367,7 @@ tezt-flaky:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
