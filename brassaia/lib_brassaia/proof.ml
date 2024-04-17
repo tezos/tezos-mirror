@@ -69,7 +69,7 @@ struct
   let before t = t.before
   let after t = t.after
   let state t = t.state
-  let v ~before ~after state = { after; before; state }
+  let init ~before ~after state = { after; before; state }
 end
 
 type bad_stream_exn =

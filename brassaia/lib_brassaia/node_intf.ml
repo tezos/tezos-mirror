@@ -293,8 +293,8 @@ module type Graph = sig
   val empty : [> write ] t -> node_key Lwt.t
   (** The empty node. *)
 
-  val v : [> write ] t -> (step * value) list -> node_key Lwt.t
-  (** [v t n] is a new node containing [n]. *)
+  val init : [> write ] t -> (step * value) list -> node_key Lwt.t
+  (** [init t n] is a new node containing [n]. *)
 
   val list : [> read ] t -> node_key -> (step * value) list Lwt.t
   (** [list t n] is the contents of the node [n]. *)

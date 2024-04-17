@@ -236,7 +236,7 @@ module Make (P : Backend.S) = struct
 
     let info_is_empty i = i.ptr = Ptr_none && i.value = None
 
-    let v =
+    let init =
       let open Type in
       variant "Node.Contents.v" (fun key value pruned (v : v) ->
           match v with
@@ -366,7 +366,7 @@ module Make (P : Backend.S) = struct
 
     let t =
       let of_v v = of_v ~env:(Env.empty ()) v in
-      Type.map ~equal ~compare v of_v (fun t -> t.v)
+      Type.map ~equal ~compare init of_v (fun t -> t.v)
 
     let merge : t Merge.t =
       let f ~old x y =
@@ -385,7 +385,7 @@ module Make (P : Backend.S) = struct
             | Ok None -> Error (`Conflict "empty contents")
             | Error _ as e -> e)
       in
-      Merge.v t f
+      Merge.init t f
 
     let fold ~force ~cache ~path f_value f_tree t acc =
       match force with
@@ -1598,7 +1598,7 @@ module Make (P : Backend.S) = struct
             | Ok None -> Error (`Conflict "empty map")
             | Error _ as e -> e)
       in
-      k (Merge.v t f)
+      k (Merge.init t f)
 
     and merge_elt : type r. (elt Merge.t, r) cont =
      fun k ->
@@ -1633,7 +1633,7 @@ module Make (P : Backend.S) = struct
                 Merge.(f m ~old x y) >>=* fun n -> Merge.ok (`Node n))
         | _ -> Merge.conflict "add/add values"
       in
-      k (Merge.seq [ Merge.default elt_t; Merge.v elt_t f ])
+      k (Merge.seq [ Merge.default elt_t; Merge.init elt_t f ])
 
     let merge_elt = merge_elt (fun x -> x)
   end
@@ -1692,7 +1692,7 @@ module Make (P : Backend.S) = struct
     let c = Contents.of_value ~env c in
     `Contents (c, metadata)
 
-  let v : elt -> t = function
+  let init : elt -> t = function
     | `Contents (c, metadata) -> of_contents ~metadata c
     | `Node n -> `Node n
 
@@ -2264,7 +2264,7 @@ module Make (P : Backend.S) = struct
       | Ok t -> Merge.ok t
       | Error e -> Lwt.return (Error e)
     in
-    Merge.v t f
+    Merge.init t f
 
   let entries path tree =
     let rec aux acc = function
@@ -2779,7 +2779,7 @@ module Make (P : Backend.S) = struct
     (* [env] will be purged when leaving the scope, that should avoid any memory
        leaks *)
     let kinded_hash = Node.weaken_value kinded_key in
-    (Proof.v ~before:kinded_hash ~after proof, result)
+    (Proof.init ~before:kinded_hash ~after proof, result)
 
   let produce_stream repo kinded_key f =
     Env.with_stream_produce @@ fun env ~to_stream ->
@@ -2789,7 +2789,7 @@ module Make (P : Backend.S) = struct
     clear tree;
     let proof = to_stream () in
     let kinded_hash = Node.weaken_value kinded_key in
-    (Proof.v ~before:kinded_hash ~after proof, result)
+    (Proof.init ~before:kinded_hash ~after proof, result)
 
   let verify_proof_exn p f =
     Env.with_set_consume @@ fun env ~stop_deserialise ->

@@ -52,7 +52,7 @@ module Spec = struct
 
   let all = Hashtbl.create 8
 
-  let v name =
+  let init name =
     let keys = M.empty in
     if Hashtbl.mem all name then
       Fmt.failwith "Config spec already exists: %s" name;

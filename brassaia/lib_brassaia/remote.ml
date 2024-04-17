@@ -19,7 +19,7 @@ include Remote_intf
 module None (H : Type.S) (R : Type.S) = struct
   type t = unit
 
-  let v _ = Lwt.return_unit
+  let init _ = Lwt.return_unit
 
   type endpoint = unit
   type commit = H.t

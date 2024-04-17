@@ -23,7 +23,7 @@ module Log = (val Logs.src_log src : Logs.LOG)
 module Conf = struct
   include Brassaia.Backend.Conf
 
-  let spec = Spec.v "mem"
+  let spec = Spec.init "mem"
   let root config = find_root config |> Option.value ~default:"."
 end
 
@@ -40,7 +40,7 @@ module Read_only (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
 
   let new_instance root = { t = KMap.empty; root }
 
-  let v =
+  let init =
     let cache : (string, 'a t) Hashtbl.t = Hashtbl.create 0 in
     fun config ->
       let root = Conf.root config in
@@ -95,11 +95,11 @@ module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Type.S) = struct
   type value = RO.value
   type watch = W.watch
 
-  let watches = W.v ()
-  let lock = L.v ()
+  let watches = W.create ()
+  let lock = L.create ()
 
-  let v config =
-    let* t = RO.v config in
+  let init config =
+    let* t = RO.init config in
     Lwt.return { t; w = watches; lock }
 
   let close t = W.clear t.w >>= fun () -> RO.close t.t

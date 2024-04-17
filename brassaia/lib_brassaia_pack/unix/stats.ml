@@ -34,10 +34,10 @@ module Pack_store = struct
       from_pack_indexed = 0;
     }
 
-  let init () =
+  let create () =
     let initial_state = create_pack_store () in
-    Metrics.v ~origin:Pack_store_stats ~name:"pack_store_metric" ~initial_state
-      t
+    Metrics.create ~origin:Pack_store_stats ~name:"pack_store_metric"
+      ~initial_state t
 
   let clear m =
     let v = Metrics.state m in
@@ -125,9 +125,9 @@ module Index = struct
     s.lru_hits <- 0;
     s.lru_misses <- 0
 
-  let init () =
+  let create () =
     let initial_state = create_index () in
-    Metrics.v ~origin:Index_stats ~name:"index_metric" ~initial_state t
+    Metrics.create ~origin:Index_stats ~name:"index_metric" ~initial_state t
 
   let report index =
     let modifier = Metrics.Replace (fun _ -> Stats_intf.Index.S.get ()) in
@@ -156,9 +156,10 @@ module File_manager = struct
   (* NOTE type [stat] is an abstract type in stats.mli *)
   type stat = t Metrics.t
 
-  let init () : stat =
+  let create () : stat =
     let initial_state = create () in
-    Metrics.v ~origin:File_manager ~name:"file_manager_metric" ~initial_state t
+    Metrics.create ~origin:File_manager ~name:"file_manager_metric"
+      ~initial_state t
 
   (* [export] reveals the [t] contained in the [Metrics.t] container *)
   let export : stat -> t = fun m -> Metrics.state m
@@ -208,10 +209,10 @@ module Latest_gc = struct
      [t] is [stats option].
      [stat] is the [Metrics] wrapper around [t] *)
 
-  let init : unit -> stat =
+  let create : unit -> stat =
    fun () ->
     let initial_state = None in
-    Metrics.v ~origin:Latest_gc ~name:"latest_gc_metric" ~initial_state t
+    Metrics.create ~origin:Latest_gc ~name:"latest_gc_metric" ~initial_state t
 
   let clear : stat -> unit =
    fun m -> Metrics.update m (Metrics.Replace (fun _ -> None))
@@ -257,10 +258,10 @@ type t = {
 
 let s =
   {
-    pack_store = Pack_store.init ();
-    index = Index.init ();
-    file_manager = File_manager.init ();
-    latest_gc = Latest_gc.init ();
+    pack_store = Pack_store.create ();
+    index = Index.create ();
+    file_manager = File_manager.create ();
+    latest_gc = Latest_gc.create ();
   }
 
 let reset_stats () =

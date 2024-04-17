@@ -61,7 +61,7 @@ end
 
 module type Args = sig
   module File_manager : File_manager.S
-  module Dispatcher : Dispatcher.S with module Fm = File_manager
+  module Dispatcher : Dispatcher.S with module File_manager = File_manager
   module Hash : Brassaia.Hash.S
   module Index : Pack_index.S with type key := Hash.t
   module Inode : Inode.S with type hash := Hash.t
@@ -129,7 +129,7 @@ end = struct
       [%log.app
         "Beginning index reconstruction with parameters: { log_size = %d }"
           log_size];
-      let index = Index.v_exn ~fresh:true ~readonly:false ~log_size dest in
+      let index = Index.init_exn ~fresh:true ~readonly:false ~log_size dest in
       index
 
     let iter_pack_entry ~always index key data =
@@ -151,7 +151,7 @@ end = struct
       [%log.app
         "Beginning index checking with parameters: { log_size = %d }" log_size];
       let index =
-        Index.v_exn ~fresh:false ~readonly:true ~log_size (Conf.root config)
+        Index.init_exn ~fresh:false ~readonly:true ~log_size (Conf.root config)
       in
       (index, ref 0)
 
@@ -178,7 +178,7 @@ end = struct
       [%log.app
         "Beginning index checking with parameters: { log_size = %d }" log_size];
       let root = Conf.root config in
-      let index = Index.v_exn ~fresh:false ~readonly:false ~log_size root in
+      let index = Index.init_exn ~fresh:false ~readonly:false ~log_size root in
       (index, ref 0)
 
     let iter_pack_entry ~always (index, idx_ref) key data =
@@ -384,11 +384,11 @@ end = struct
           (iter_pack_entry ~always v, finalise v, "Checking and fixing index")
     in
     let run_duration = Mtime_clock.counter () in
-    let fm = File_manager.open_ro config |> Errs.raise_if_error in
-    let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+    let file_manager = File_manager.open_ro config |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
     let total = Dispatcher.end_offset dispatcher in
     let ingest_data progress =
-      if File_manager.gc_allowed fm then
+      if File_manager.gc_allowed file_manager then
         ingest_data_file_after_v3 ~initial_buffer_size dispatcher
           iter_pack_entry ~progress
       else
@@ -404,7 +404,7 @@ end = struct
       Progress.(with_reporter bar) ingest_data
     in
     finalise ();
-    File_manager.close fm |> Errs.raise_if_error;
+    File_manager.close file_manager |> Errs.raise_if_error;
     let run_duration = Mtime_clock.count run_duration in
     let store_stats fmt =
       Fmt.pf fmt "Store statistics:@,  @[<v 0>%a@]" Stats.pp stats

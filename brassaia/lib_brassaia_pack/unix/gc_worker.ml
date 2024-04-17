@@ -21,10 +21,10 @@ exception Pack_error = Errors.Pack_error
 
 module Make (Args : Gc_args.S) = struct
   open Args
-  module Io = Fm.Io
-  module Lower = Fm.Lower
-  module Sparse = Dispatcher.Fm.Sparse
-  module Ao = Append_only_file.Make (Fm.Io) (Errs)
+  module Io = File_manager.Io
+  module Lower = File_manager.Lower
+  module Sparse = Dispatcher.File_manager.Sparse
+  module Ao = Append_only_file.Make (File_manager.Io) (Errs)
 
   let string_of_key = Brassaia.Type.to_string key_t
 
@@ -224,15 +224,20 @@ module Make (Args : Gc_args.S) = struct
       report_old_file_sizes ~root ~generation:(generation - 1) stats |> ignore
     in
 
-    let fm = Fm.open_ro config |> Errs.raise_if_error in
+    let file_manager = File_manager.open_ro config |> Errs.raise_if_error in
     Errors.finalise_exn (fun _outcome ->
-        Fm.close fm |> Errs.log_if_error "GC: Close File_manager")
+        File_manager.close file_manager
+        |> Errs.log_if_error "GC: Close File_manager")
     @@ fun () ->
-    let dict = Dict.v fm |> Errs.raise_if_error in
-    let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+    let dict = Dict.init file_manager |> Errs.raise_if_error in
+    let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
     let lru = Lru.create config in
-    let node_store = Node_store.v ~config ~fm ~dict ~dispatcher ~lru in
-    let commit_store = Commit_store.v ~config ~fm ~dict ~dispatcher ~lru in
+    let node_store =
+      Node_store.init ~config ~file_manager ~dict ~dispatcher ~lru
+    in
+    let commit_store =
+      Commit_store.init ~config ~file_manager ~dict ~dispatcher ~lru
+    in
 
     (* Step 2. Load commit which will make [commit_key] [Direct] if it's not
        already the case. *)
@@ -314,7 +319,7 @@ module Make (Args : Gc_args.S) = struct
       stats :=
         Gc_stats.Worker.finish_current_step !stats
           "suffix: calculate new values";
-      let suffix = Fm.suffix fm in
+      let suffix = File_manager.suffix file_manager in
       let soff = Dispatcher.soff_of_offset dispatcher new_suffix_start_offset in
       assert (Int63.Syntax.(soff >= Int63.zero));
       (* Step 6.1. Calculate chunks that we have GCed. *)
@@ -322,10 +327,10 @@ module Make (Args : Gc_args.S) = struct
         type chunk = { idx : int; end_suffix_off : int63 }
       end in
       let removable_chunks =
-        match Fm.Suffix.chunk_num suffix with
+        match File_manager.Suffix.chunk_num suffix with
         | 1 -> [] (* We never remove a single chunk. *)
         | _ ->
-            Fm.Suffix.fold_chunks
+            File_manager.Suffix.fold_chunks
               (fun ~acc ~idx ~start_suffix_off ~end_suffix_off ~is_appendable ->
                 (* Remove chunks that end at or before our new split point.
                    This will leave the chunk that starts with (or contains) the
@@ -344,7 +349,7 @@ module Make (Args : Gc_args.S) = struct
       (* Step 6.2. Calculate the new chunk starting idx. *)
       let chunk_start_idx =
         match removable_chunks with
-        | [] -> Fm.Suffix.start_idx suffix
+        | [] -> File_manager.Suffix.start_idx suffix
         | last_removed_chunk :: _ -> succ last_removed_chunk.idx
       in
       (* Step 6.3. Calculate new dead bytes at the beginning of the suffix. *)
@@ -378,7 +383,7 @@ module Make (Args : Gc_args.S) = struct
 
     (* Step 7. If we have a lower, archive the removed chunks *)
     let modified_volume =
-      match Fm.gc_destination fm with
+      match File_manager.gc_destination file_manager with
       | `Delete -> None
       | `Archive lower ->
           [%log.debug "GC: archiving into lower"];

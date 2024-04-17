@@ -77,7 +77,7 @@ module Check_closed (M : Maker) (Hash : Hash.S) (Value : Type.S) = struct
   module CA = M (Hash) (Value)
   include Check_closed_store (CA)
 
-  let v conf =
-    let+ t = CA.v conf in
+  let init conf =
+    let+ t = CA.init conf in
     { closed = ref false; t }
 end

@@ -28,9 +28,9 @@ module type S = sig
   type dict
   type dispatcher
 
-  val v :
+  val init :
     config:Brassaia.Backend.Conf.t ->
-    fm:file_manager ->
+    file_manager:file_manager ->
     dict:dict ->
     dispatcher:dispatcher ->
     lru:Lru.t ->
@@ -90,19 +90,19 @@ module type Sigs = sig
   module type S = S
 
   module Make
-      (Fm : File_manager.S)
-      (Dict : Dict.S with module Fm = Fm)
-      (Dispatcher : Dispatcher.S with module Fm = Fm)
-      (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
+      (File_manager : File_manager.S)
+      (Dict : Dict.S with module File_manager = File_manager)
+      (Dispatcher : Dispatcher.S with module File_manager = File_manager)
+      (Hash : Brassaia.Hash.S with type t = File_manager.Index.key)
       (Val : Pack_value.Persistent
                with type hash := Hash.t
                 and type key := Hash.t Pack_key.t)
-      (Errs : Io_errors.S with module Io = Fm.Io) :
+      (Errs : Io_errors.S with module Io = File_manager.Io) :
     S
       with type key = Hash.t Pack_key.t
        and type hash = Hash.t
        and type value = Val.t
-       and type file_manager = Fm.t
+       and type file_manager = File_manager.t
        and type dispatcher = Dispatcher.t
        and type dict = Dict.t
 end

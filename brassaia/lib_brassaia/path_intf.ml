@@ -26,7 +26,7 @@ module type S = sig
   val empty : t
   (** The empty path. *)
 
-  val v : step list -> t
+  val init : step list -> t
   (** Create a path from a list of steps. *)
 
   val is_empty : t -> bool

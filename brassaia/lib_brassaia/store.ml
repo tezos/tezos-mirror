@@ -166,14 +166,14 @@ module Make (B : Backend.S) = struct
       |+ field "value" B.Commit.Val.t (fun t -> t.v)
       |> sealr
 
-    let v ?(clear = true) r ~info ~parents tree =
+    let init ?(clear = true) r ~info ~parents tree =
       B.Repo.batch r @@ fun contents_t node_t commit_t ->
       let* node =
         match Tree.destruct tree with
         | `Node t -> Tree.export ~clear r contents_t node_t t
         | `Contents _ -> Lwt.fail_invalid_arg "cannot add contents at the root"
       in
-      let v = B.Commit.Val.v ~info ~node ~parents in
+      let v = B.Commit.Val.init ~info ~node ~parents in
       let+ key = B.Commit.add commit_t v in
       { r; key; v }
 
@@ -232,7 +232,7 @@ module Make (B : Backend.S) = struct
   module Repo = struct
     type t = repo
 
-    let v = B.Repo.v
+    let init = B.Repo.init
     let config = B.Repo.config
     let close = B.Repo.close
     let branch_t t = B.Repo.branch_t t
@@ -724,7 +724,7 @@ module Make (B : Backend.S) = struct
     aux 0
 
   let root_tree = function
-    | `Node _ as n -> Tree.v n
+    | `Node _ as n -> Tree.init n
     | `Contents _ -> assert false
 
   let add_commit t old_head ((c, _) as tree) =
@@ -802,7 +802,7 @@ module Make (B : Backend.S) = struct
           let info = info () in
           let parents = match parents with None -> s.parents | Some p -> p in
           let parents = List.map Commit.key parents in
-          let* c = Commit.v ~clear (repo t) ~info ~parents root in
+          let* c = Commit.init ~clear (repo t) ~info ~parents root in
           let* r = add_commit t s.head (c, root_tree (Tree.destruct root)) in
           Lwt.return (Ok (Some c, r))
 

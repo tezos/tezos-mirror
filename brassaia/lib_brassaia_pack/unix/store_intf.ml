@@ -268,8 +268,8 @@ module type S = sig
     module Import : sig
       type process
 
-      val v : ?on_disk:[ `Path of string | `Reuse ] -> repo -> process
-      (** [v ?on_disk repo] create a [snaphot] instance. The traversal requires
+      val init : ?on_disk:[ `Path of string | `Reuse ] -> repo -> process
+      (** [init ?on_disk repo] create a [snaphot] instance. The traversal requires
           an index to keep track of visited elements.
 
           - if [on_disk] is not specified, the index is in memory.

@@ -17,21 +17,25 @@
 open! Import
 include Dict_intf
 
-module Make (Fm : File_manager.S) = struct
-  module Fm = Fm
+module Make (File_manager : File_manager.S) = struct
+  module File_manager = File_manager
 
   type t = {
     capacity : int;
     cache : (string, int) Hashtbl.t;
     index : (int, string) Hashtbl.t;
-    fm : Fm.t;
+    file_manager : File_manager.t;
     mutable last_refill_offset : int63;
   }
 
   module File = struct
-    let append_exn t = Fm.Dict.append_exn (Fm.dict t.fm)
-    let offset t = Fm.Dict.end_poff (Fm.dict t.fm)
-    let read_to_string t = Fm.Dict.read_to_string (Fm.dict t.fm)
+    let append_exn t =
+      File_manager.Dict.append_exn (File_manager.dict t.file_manager)
+
+    let offset t = File_manager.Dict.end_poff (File_manager.dict t.file_manager)
+
+    let read_to_string t =
+      File_manager.Dict.read_to_string (File_manager.dict t.file_manager)
   end
 
   type nonrec int32 = int32 [@@deriving brassaia ~to_bin_string ~decode_bin]
@@ -81,16 +85,23 @@ module Make (Fm : File_manager.S) = struct
 
   let default_capacity = 100_000
 
-  let v fm =
+  let init file_manager =
     let open Result_syntax in
     let cache = Hashtbl.create 997 in
     let index = Hashtbl.create 997 in
     let last_refill_offset = Int63.zero in
     let t =
-      { capacity = default_capacity; index; cache; fm; last_refill_offset }
+      {
+        capacity = default_capacity;
+        index;
+        cache;
+        file_manager;
+        last_refill_offset;
+      }
     in
     let* () = refill t in
-    Fm.register_dict_consumer fm ~after_reload:(fun () -> refill t);
+    File_manager.register_dict_consumer file_manager ~after_reload:(fun () ->
+        refill t);
     Ok t
 
   let close _ = ()

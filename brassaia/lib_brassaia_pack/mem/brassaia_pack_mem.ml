@@ -20,7 +20,7 @@ module Atomic_write (K : Brassaia.Type.S) (V : Brassaia.Hash.S) = struct
   module AW = Brassaia_mem.Atomic_write (K) (V)
   include AW
 
-  let v () = AW.v (Brassaia_mem.config ())
+  let init () = AW.init (Brassaia_mem.config ())
   let flush _t = ()
 end
 
@@ -34,7 +34,7 @@ struct
   module Indexable_mem = Pack.Make (Value)
   include Brassaia_pack.Indexable.Closeable (Indexable_mem)
 
-  let v x = Indexable_mem.v x >|= make_closeable
+  let init x = Indexable_mem.init x >|= make_closeable
 end
 
 module Maker (Config : Brassaia_pack.Conf.S) = struct
@@ -79,7 +79,7 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
           module CA = Pack.Make (Inter.Raw)
           include Brassaia_pack.Inode.Make (H) (XKey) (Value) (Inter) (CA)
 
-          let v = CA.v
+          let init = CA.init
         end
 
         include
@@ -122,7 +122,7 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
         module AW = Atomic_write (Key) (Val)
         include Brassaia_pack.Atomic_write.Closeable (AW)
 
-        let v () = AW.v () >|= make_closeable
+        let init () = AW.init () >|= make_closeable
       end
 
       module Slice = Brassaia.Backend.Slice.Make (Contents) (Node) (Commit)
@@ -152,12 +152,12 @@ module Maker (Config : Brassaia_pack.Conf.S) = struct
                       let commit : 'a Commit.t = (node, commit) in
                       f contents node commit)))
 
-        let v config =
+        let init config =
           let root = Brassaia_pack.Conf.root config in
-          let* contents = Contents.Indexable.v root in
-          let* node = Node.Indexable.v root in
-          let* commit = Commit.Indexable.v root in
-          let+ branch = Branch.v () in
+          let* contents = Contents.Indexable.init root in
+          let* node = Node.Indexable.init root in
+          let* commit = Commit.Indexable.init root in
+          let+ branch = Branch.init () in
           { contents; node; commit; branch; config }
 
         let close t =

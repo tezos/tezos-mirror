@@ -116,7 +116,7 @@ module Json_value = struct
   let rec merge_object ~old x y =
     let open Merge.Infix in
     let m =
-      Merge.(alist Type.string t (fun _key -> option (v t merge_value)))
+      Merge.(alist Type.string t (fun _key -> option (init t merge_value)))
     in
     Merge.(f m ~old x y) >>=* fun x -> Merge.ok (`O x)
 
@@ -161,7 +161,7 @@ module Json_value = struct
     | None, `O a, `O b -> merge_object ~old:(fun () -> Merge.ok None) a b
     | _, _, _ -> Merge.conflict "Conflicting JSON datatypes"
 
-  let merge_json = Merge.(v t merge_value)
+  let merge_json = Merge.(init t merge_value)
   let merge = Merge.(option merge_json)
 end
 

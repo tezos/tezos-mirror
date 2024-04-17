@@ -17,11 +17,11 @@
 open! Import
 
 module type S = sig
-  module Fm : File_manager.S with module Io = Io.Unix
+  module File_manager : File_manager.S with module Io = Io.Unix
   module Async : Async.S
-  module Dict : Dict.S with module Fm = Fm
-  module Errs : Io_errors.S with module Io = Fm.Io
-  module Dispatcher : Dispatcher.S with module Fm = Fm
+  module Dict : Dict.S with module File_manager = File_manager
+  module Errs : Io_errors.S with module Io = File_manager.Io
+  module Dispatcher : Dispatcher.S with module File_manager = File_manager
 
   type hash
   type key = hash Pack_key.t [@@deriving brassaia]
@@ -48,9 +48,9 @@ module type S = sig
   module Node_store : sig
     type 'a t
 
-    val v :
+    val init :
       config:Brassaia.Backend.Conf.t ->
-      fm:Fm.t ->
+      file_manager:File_manager.t ->
       dict:Dict.t ->
       dispatcher:Dispatcher.t ->
       lru:Lru.t ->
@@ -77,7 +77,7 @@ module type S = sig
     Pack_store.S
       with type value = Commit_value.t
        and type key = key
-       and type file_manager = Fm.t
+       and type file_manager = File_manager.t
        and type dict = Dict.t
        and type dispatcher = Dispatcher.t
        and type hash = hash

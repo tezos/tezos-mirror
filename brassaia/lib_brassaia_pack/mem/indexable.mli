@@ -28,6 +28,6 @@ module Maker (K : Brassaia.Hash.S) : sig
          and type key = K.t
          and type value = Val.t
 
-    val v : string -> read t Lwt.t
+    val init : string -> read t Lwt.t
   end
 end

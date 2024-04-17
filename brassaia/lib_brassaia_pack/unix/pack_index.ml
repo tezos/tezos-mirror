@@ -64,14 +64,14 @@ module Make (K : Brassaia.Hash.S) = struct
   include Index
   module Io = Io.Unix
 
-  let v_exn =
+  let init_exn =
     let cache = None in
     Index.v ?cache
 
-  let v ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size root =
+  let init ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size root =
     try
       Ok
-        (v_exn ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size
+        (init_exn ?flush_callback ?fresh ?readonly ?throttle ?lru_size ~log_size
            root)
     with
     | I.RO_not_allowed ->

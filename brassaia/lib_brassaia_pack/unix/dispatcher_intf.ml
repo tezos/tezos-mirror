@@ -17,11 +17,11 @@
 open Import
 
 module type S = sig
-  module Fm : File_manager.S
+  module File_manager : File_manager.S
 
   type t
 
-  val v : Fm.t -> (t, [> Fm.Errs.t ]) result
+  val init : File_manager.t -> (t, [> File_manager.Errs.t ]) result
 
   val read_exn :
     t ->
@@ -100,6 +100,6 @@ end
 module type Sigs = sig
   module type S = S
 
-  module Make (Fm : File_manager.S with module Io = Io.Unix) :
-    S with module Fm = Fm
+  module Make (File_manager : File_manager.S with module Io = Io.Unix) :
+    S with module File_manager = File_manager
 end

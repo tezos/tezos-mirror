@@ -29,7 +29,7 @@ functor
     type key = S.key
     type value = S.value
 
-    let v = S.v
+    let init = S.init
     let mem = S.mem
     let find = S.find
     let close = S.close
@@ -90,11 +90,11 @@ functor
     type value = S.value
     type watch = W.watch
 
-    let watches = W.v ()
-    let lock = L.v ()
+    let watches = W.create ()
+    let lock = L.create ()
 
-    let v config =
-      let* t = S.v config in
+    let init config =
+      let* t = S.init config in
       Lwt.return { t; w = watches; l = lock }
 
     let find { t; _ } = S.find t

@@ -100,7 +100,7 @@ module Suite = struct
       | S (module S) -> (module S : Generic_key)
     in
     let open Lwt.Syntax in
-    let* repo = Store.Repo.v config in
+    let* repo = Store.Repo.init config in
     let* branches = Store.Repo.branches repo in
     let* () = Lwt_list.iter_p (Store.Branch.remove repo) branches in
     Store.Repo.close repo
@@ -141,7 +141,7 @@ module Make_helpers (S : Generic_key) = struct
   let info message =
     let date = Int64.of_float 0. in
     let author = Printf.sprintf "TESTS" in
-    S.Info.v ~author ~message date
+    S.Info.init ~author ~message date
 
   let infof fmt = Fmt.kstr (fun str () -> info str) fmt
 
@@ -175,31 +175,32 @@ module Make_helpers (S : Generic_key) = struct
 
   let n1 ~repo =
     let* kv1 = kv1 ~repo in
-    with_node repo (fun t -> Graph.v t [ ("x", normal kv1) ])
+    with_node repo (fun t -> Graph.init t [ ("x", normal kv1) ])
 
   let n2 ~repo =
     let* kn1 = n1 ~repo in
-    with_node repo (fun t -> Graph.v t [ ("b", `Node kn1) ])
+    with_node repo (fun t -> Graph.init t [ ("b", `Node kn1) ])
 
   let n3 ~repo =
     let* kn2 = n2 ~repo in
-    with_node repo (fun t -> Graph.v t [ ("a", `Node kn2) ])
+    with_node repo (fun t -> Graph.init t [ ("a", `Node kn2) ])
 
   let n4 ~repo =
     let* kn1 = n1 ~repo in
     let* kv2 = kv2 ~repo in
-    let* kn4 = with_node repo (fun t -> Graph.v t [ ("x", normal kv2) ]) in
+    let* kn4 = with_node repo (fun t -> Graph.init t [ ("x", normal kv2) ]) in
     let* kn5 =
-      with_node repo (fun t -> Graph.v t [ ("b", `Node kn1); ("c", `Node kn4) ])
+      with_node repo (fun t ->
+          Graph.init t [ ("b", `Node kn1); ("c", `Node kn4) ])
     in
-    with_node repo (fun t -> Graph.v t [ ("a", `Node kn5) ])
+    with_node repo (fun t -> Graph.init t [ ("a", `Node kn5) ])
 
   let r1 ~repo =
     let* kn2 = n2 ~repo in
     S.Tree.of_key repo (`Node kn2) >>= function
     | None -> Alcotest.fail "r1"
     | Some tree ->
-        S.Commit.v repo ~info:S.Info.empty ~parents:[] (tree :> S.tree)
+        S.Commit.init repo ~info:S.Info.empty ~parents:[] (tree :> S.tree)
 
   let r2 ~repo =
     let* kn3 = n3 ~repo in
@@ -207,7 +208,7 @@ module Make_helpers (S : Generic_key) = struct
     S.Tree.of_key repo (`Node kn3) >>= function
     | None -> Alcotest.fail "r2"
     | Some t3 ->
-        S.Commit.v repo ~info:S.Info.empty
+        S.Commit.init repo ~info:S.Info.empty
           ~parents:[ S.Commit.key kr1 ]
           (t3 :> S.tree)
 
@@ -232,7 +233,7 @@ module Make_helpers (S : Generic_key) = struct
         let config = generate_random_root x.config in
         config_ptr := Some config;
         let* () = x.init ~config in
-        let* repo = S.Repo.v config in
+        let* repo = S.Repo.init config in
         repo_ptr := Some repo;
         let* () = test repo in
         let* () =

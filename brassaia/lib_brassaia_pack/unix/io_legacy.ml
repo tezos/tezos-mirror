@@ -141,7 +141,7 @@ module Unix : S = struct
     Raw.Header_prefix.set raw header;
     raw
 
-  let v ~version ~fresh ~readonly file =
+  let open_file ~version ~fresh ~readonly file =
     let get_version () =
       match version with
       | Some v -> v
@@ -151,7 +151,7 @@ module Unix : S = struct
              = %s })"
             file
     in
-    let v ~offset ~version raw =
+    let create ~offset ~version raw =
       {
         version;
         file;
@@ -172,7 +172,7 @@ module Unix : S = struct
             ~flags:[ O_CREAT; mode; O_CLOEXEC ]
             ~version ~offset:Int63.zero file
         in
-        v ~offset:Int63.zero ~version raw
+        create ~offset:Int63.zero ~version raw
     | true ->
         let x = Unix.openfile file Unix.[ O_EXCL; mode; O_CLOEXEC ] 0o644 in
         let raw = Raw.v x in
@@ -185,7 +185,7 @@ module Unix : S = struct
             }
           in
           Raw.Header_prefix.set raw header;
-          v ~offset:Int63.zero ~version raw)
+          create ~offset:Int63.zero ~version raw)
         else
           let actual_version =
             let v_string = Raw.Version.get raw in
@@ -198,7 +198,7 @@ module Unix : S = struct
               raise (Version.Invalid { expected = v; found = actual_version })
           | _ -> ());
           let offset = Raw.Offset.get raw in
-          v ~offset ~version:actual_version raw
+          create ~offset ~version:actual_version raw
 
   let close t = Raw.close t.raw
   let exists file = Sys.file_exists file

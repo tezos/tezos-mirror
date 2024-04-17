@@ -171,8 +171,8 @@ module type S = sig
       [state p]'s hash is [before p], and [state p] contains the minimal
       information for the computation to reach [after p]. *)
 
-  val v : before:kinded_hash -> after:kinded_hash -> 'a -> 'a t
-  (** [v ~before ~after p] proves that the state advanced from [before] to
+  val init : before:kinded_hash -> after:kinded_hash -> 'a -> 'a t
+  (** [init ~before ~after p] proves that the state advanced from [before] to
       [after]. [p]'s hash is [before], and [p] contains the minimal information
       for the computation to reach [after]. *)
 

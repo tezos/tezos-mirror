@@ -67,8 +67,8 @@ type 'a f = old:'a promise -> 'a -> 'a -> ('a, conflict) result Lwt.t
 type 'a t
 (** The type for merge combinators. *)
 
-val v : 'a Type.t -> 'a f -> 'a t
-(** [v dt f] create a merge combinator. *)
+val init : 'a Type.t -> 'a f -> 'a t
+(** [init dt f] creates a merge combinator. *)
 
 val f : 'a t -> 'a f
 (** [f m] is [m]'s merge function. *)

@@ -123,7 +123,7 @@ module Classification = struct
       | `Unknown ]
     [@@deriving brassaia]
 
-    let v s : t =
+    let init s : t =
       match String.split_on_char '.' s with
       | [ "store"; "pack" ] -> `V1_or_v2_pack
       | [ "store"; "branches" ] -> `Branch
@@ -144,7 +144,7 @@ module Classification = struct
     type t = [ `Mapping | `Data | `Control | `Control_tmp of int | `Unknown ]
     [@@deriving brassaia]
 
-    let v s : t =
+    let open_volume s : t =
       match String.split_on_char '.' s with
       | [ "volume"; "control" ] -> `Control
       | [ "volume"; g; "control" ] when is_number g ->

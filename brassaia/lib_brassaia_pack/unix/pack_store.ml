@@ -32,19 +32,19 @@ module Table (K : Brassaia.Hash.S) = Hashtbl.Make (struct
 end)
 
 module Make_without_close_checks
-    (Fm : File_manager.S)
+    (File_manager : File_manager.S)
     (Dict : Dict.S)
-    (Dispatcher : Dispatcher.S with module Fm = Fm)
-    (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
+    (Dispatcher : Dispatcher.S with module File_manager = File_manager)
+    (Hash : Brassaia.Hash.S with type t = File_manager.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)
-    (Errs : Io_errors.S with module Io = Fm.Io) =
+    (Errs : Io_errors.S with module Io = File_manager.Io) =
 struct
   module Tbl = Table (Hash)
-  module Control = Fm.Control
-  module Suffix = Fm.Suffix
-  module Index = Fm.Index
+  module Control = File_manager.Control
+  module Suffix = File_manager.Suffix
+  module Index = File_manager.Index
   module Key = Pack_key.Make (Hash)
 
   module Lru = struct
@@ -54,7 +54,7 @@ struct
     let find t k = find t k |> Val.of_kinded
   end
 
-  type file_manager = Fm.t
+  type file_manager = File_manager.t
   type dict = Dict.t
   type dispatcher = Dispatcher.t
 
@@ -62,7 +62,7 @@ struct
     lru : Lru.t;
     staging : Val.t Tbl.t;
     indexing_strategy : Brassaia_pack.Indexing_strategy.t;
-    fm : Fm.t;
+    file_manager : File_manager.t;
     dict : Dict.t;
     dispatcher : Dispatcher.t;
   }
@@ -74,7 +74,7 @@ struct
   let get_location t k =
     match Pack_key.inspect k with
     | Indexed hash -> (
-        match Index.find (Fm.index t.fm) hash with
+        match Index.find (File_manager.index t.file_manager) hash with
         | None -> raise Dangling_hash
         | Some (off, len, _kind) ->
             Pack_key.promote_exn k ~offset:off ~length:len;
@@ -108,10 +108,10 @@ struct
 
   let index_direct_with_kind t hash =
     [%log.debug "index %a" pp_hash hash];
-    match Index.find (Fm.index t.fm) hash with
+    match Index.find (File_manager.index t.file_manager) hash with
     | None -> None
     | Some (offset, length, kind) ->
-        let key = Pack_key.v_direct ~offset ~length hash in
+        let key = Pack_key.init_direct ~offset ~length hash in
         Some (key, kind)
 
   let index_direct t hash =
@@ -119,12 +119,14 @@ struct
 
   let index t hash = Lwt.return (index_direct t hash)
 
-  let v ~config ~fm ~dict ~dispatcher ~lru =
+  let init ~config ~file_manager ~dict ~dispatcher ~lru =
     let indexing_strategy = Conf.indexing_strategy config in
     let staging = Tbl.create 127 in
-    Fm.register_suffix_consumer fm ~after_flush:(fun () -> Tbl.clear staging);
-    Fm.register_prefix_consumer fm ~after_reload:(fun () -> Ok (Lru.clear lru));
-    { lru; staging; indexing_strategy; fm; dict; dispatcher }
+    File_manager.register_suffix_consumer file_manager ~after_flush:(fun () ->
+        Tbl.clear staging);
+    File_manager.register_prefix_consumer file_manager ~after_reload:(fun () ->
+        Ok (Lru.clear lru));
+    { lru; staging; indexing_strategy; file_manager; dict; dispatcher }
 
   module Entry_prefix = struct
     type t = {
@@ -196,7 +198,7 @@ struct
      object. *)
   let gced t buf =
     let kind = Pack_value.Kind.of_magic_exn (Bytes.get buf Hash.hash_size) in
-    match (kind, Fm.gc_behaviour t.fm) with
+    match (kind, File_manager.gc_behaviour t.file_manager) with
     | kind, `Delete -> kind = Pack_value.Kind.Dangling_parent_commit
     | _, `Archive -> false
 
@@ -231,7 +233,7 @@ struct
            isn't (yet) valid. If we're a read-only instance, the key may
            become valid on [reload]; otherwise we know that this key wasn't
            constructed for this store. *)
-        (if not (Control.readonly (Fm.control t.fm)) then
+        (if not (Control.readonly (File_manager.control t.file_manager)) then
          let io_offset = Dispatcher.end_offset t.dispatcher in
          invalid_read "invalid key %a checked for membership (IO offset = %a)"
            pp_key k Int63.pp io_offset);
@@ -289,14 +291,15 @@ struct
       let entry_prefix = { entry_prefix with kind } in
       match Entry_prefix.total_entry_length entry_prefix with
       | Some length ->
-          Pack_key.v_direct ~offset ~length ?volume_identifier entry_prefix.hash
+          Pack_key.init_direct ~offset ~length ?volume_identifier
+            entry_prefix.hash
       | None ->
           (* NOTE: we could store [offset] in this key, but since we know the
              entry doesn't have a length header we'll need to check the index
              when dereferencing this key anyway. {i Not} storing the offset
              avoids doing another failed check in the pack file for the length
              header during [find]. *)
-          Pack_key.v_indexed entry_prefix.hash
+          Pack_key.init_indexed entry_prefix.hash
     in
     key
 
@@ -310,7 +313,7 @@ struct
     else
       let () = Pack_key.set_volume_identifier_exn ~volume_identifier key in
       let key_of_offset = key_of_offset ?volume_identifier t in
-      let key_of_hash = Pack_key.v_indexed in
+      let key_of_hash = Pack_key.init_indexed in
       let dict = Dict.find t.dict in
       let v =
         (* Bytes.unsafe_to_string usage: buf created, uniquely owned; after
@@ -332,7 +335,7 @@ struct
          * become valid on [reload]; otherwise we know that this key wasn't
          * constructed for this store. *)
         let io_offset = Dispatcher.end_offset t.dispatcher in
-        match Control.readonly (Fm.control t.fm) with
+        match Control.readonly (File_manager.control t.file_manager) with
         | false ->
             invalid_read
               "attempt to dereference invalid key %a (IO offset = %a)" pp_key
@@ -393,7 +396,7 @@ struct
     value_opt
 
   let unsafe_find_no_prefetch t key =
-    let key_of_offset ?volume_identifier:_ _ = Pack_key.v_offset in
+    let key_of_offset ?volume_identifier:_ _ = Pack_key.init_offset in
     find_in_pack_file ~key_of_offset t key
 
   let find t k =
@@ -401,7 +404,7 @@ struct
     Lwt.return v
 
   let integrity_check ~offset ~length hash t =
-    let k = Pack_key.v_direct ~offset ~length hash in
+    let k = Pack_key.init_direct ~offset ~length hash in
     (* TODO: new error for reading gced objects. *)
     match find_in_pack_file ~key_of_offset t k with
     | exception Errors.Pack_error (`Invalid_prefix_read _) ->
@@ -424,14 +427,14 @@ struct
       "[pack] calling batch directory on a store is not recommended. Use \
        repo.batch instead."];
     let on_success res =
-      Fm.flush t.fm |> Errs.raise_if_error;
+      File_manager.flush t.file_manager |> Errs.raise_if_error;
       Lwt.return res
     in
     let on_fail exn =
       [%log.info
         "[pack] batch failed. calling flush. (%s)" (Printexc.to_string exn)];
       let () =
-        match Fm.flush t.fm with
+        match File_manager.flush t.file_manager with
         | Ok () -> ()
         | Error err ->
             [%log.err
@@ -459,7 +462,7 @@ struct
             Some offset
         | Indexed hash -> (
             (* TODO: Why don't we promote the key here? *)
-            match Index.find (Fm.index t.fm) hash with
+            match Index.find (File_manager.index t.file_manager) hash with
             | None ->
                 Stats.incr_appended_hashes ();
                 None
@@ -472,16 +475,18 @@ struct
 
       (* [encode_bin] will most likely call [append] several time. One of these
          call may trigger an auto flush. *)
-      let append = Suffix.append_exn (Fm.suffix t.fm) in
+      let append = Suffix.append_exn (File_manager.suffix t.file_manager) in
       Val.encode_bin ~offset_of_key ~dict hash v append;
 
       let open Int63.Syntax in
       let len = Int63.to_int (Dispatcher.end_offset t.dispatcher - off) in
-      let key = Pack_key.v_direct ~offset:off ~length:len hash in
+      let key = Pack_key.init_direct ~offset:off ~length:len hash in
       let () =
         let should_index = t.indexing_strategy ~value_length:len kind in
         if should_index then
-          Index.add ~overcommit (Fm.index t.fm) hash (off, len, kind)
+          Index.add ~overcommit
+            (File_manager.index t.file_manager)
+            hash (off, len, kind)
       in
       Tbl.add t.staging hash v;
       Lru.add t.lru off v;
@@ -491,7 +496,7 @@ struct
     match ensure_unique && use_index with
     | false -> unguarded_append ()
     | true ->
-        let key = Pack_key.v_indexed hash in
+        let key = Pack_key.init_indexed hash in
         if unsafe_mem t key then key else unguarded_append ()
 
   let unsafe_add t hash v =
@@ -511,23 +516,24 @@ struct
 end
 
 module Make
-    (Fm : File_manager.S)
+    (File_manager : File_manager.S)
     (Dict : Dict.S)
-    (Dispatcher : Dispatcher.S with module Fm = Fm)
-    (Hash : Brassaia.Hash.S with type t = Fm.Index.key)
+    (Dispatcher : Dispatcher.S with module File_manager = File_manager)
+    (Hash : Brassaia.Hash.S with type t = File_manager.Index.key)
     (Val : Pack_value.Persistent
              with type hash := Hash.t
               and type key := Hash.t Pack_key.t)
-    (Errs : Io_errors.S with module Io = Fm.Io) =
+    (Errs : Io_errors.S with module Io = File_manager.Io) =
 struct
   module Inner =
-    Make_without_close_checks (Fm) (Dict) (Dispatcher) (Hash) (Val) (Errs)
+    Make_without_close_checks (File_manager) (Dict) (Dispatcher) (Hash) (Val)
+      (Errs)
 
   include Inner
   include Indexable.Closeable (Inner)
 
-  let v ~config ~fm ~dict ~dispatcher ~lru =
-    Inner.v ~config ~fm ~dict ~dispatcher ~lru |> make_closeable
+  let init ~config ~file_manager ~dict ~dispatcher ~lru =
+    Inner.init ~config ~file_manager ~dict ~dispatcher ~lru |> make_closeable
 
   let cast t = Inner.cast (get_if_open_exn t) |> make_closeable
 

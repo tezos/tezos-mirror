@@ -108,7 +108,7 @@ module Maker (Config : Conf.S) = struct
           let info = Commit.Value.info t
           and node = Commit.Value.node t |> XKey.to_hash
           and parents = Commit.Value.parents t |> List.map XKey.to_hash in
-          v ~info ~node ~parents
+          init ~info ~node ~parents
 
         module Info = Schema.Info
 
@@ -121,8 +121,8 @@ module Maker (Config : Conf.S) = struct
         module AW = Atomic_write.Make_persistent (Key) (Val)
         include Atomic_write.Closeable (AW)
 
-        let v ?fresh ?readonly path =
-          AW.v ?fresh ?readonly path >|= make_closeable
+        let init ?fresh ?readonly path =
+          AW.create ?fresh ?readonly path >|= make_closeable
       end
 
       module Slice = Brassaia.Backend.Slice.Make (Contents) (Node) (Commit)
@@ -130,7 +130,7 @@ module Maker (Config : Conf.S) = struct
 
       module Gc = Gc.Make (struct
         module Async = Async.Unix
-        module Fm = File_manager
+        module File_manager = File_manager
         module Errs = Errs
         module Dict = Dict
         module Dispatcher = Dispatcher
@@ -155,7 +155,7 @@ module Maker (Config : Conf.S) = struct
           node : read Node.CA.t;
           commit : read Commit.CA.t;
           branch : Branch.t;
-          fm : File_manager.t;
+          file_manager : File_manager.t;
           dict : Dict.t;
           dispatcher : Dispatcher.t;
           mutable during_batch : bool;
@@ -169,10 +169,10 @@ module Maker (Config : Conf.S) = struct
         let branch_t t = t.branch
         let config t = t.config
 
-        let v config =
+        let init config =
           let root = Brassaia_pack.Conf.root config in
           let fresh = Brassaia_pack.Conf.fresh config in
-          let fm =
+          let file_manager =
             let readonly = Brassaia_pack.Conf.readonly config in
             if readonly then File_manager.open_ro config |> Errs.raise_if_error
             else
@@ -187,18 +187,26 @@ module Maker (Config : Conf.S) = struct
                   File_manager.open_rw config |> Errs.raise_if_error
               | (`File | `Other), _ -> Errs.raise_error (`Not_a_directory root)
           in
-          let dict = Dict.v fm |> Errs.raise_if_error in
-          let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
+          let dict = Dict.init file_manager |> Errs.raise_if_error in
+          let dispatcher =
+            Dispatcher.init file_manager |> Errs.raise_if_error
+          in
           let lru = Lru.create config in
-          let contents = Contents.CA.v ~config ~fm ~dict ~dispatcher ~lru in
-          let node = Node.CA.v ~config ~fm ~dict ~dispatcher ~lru in
-          let commit = Commit.CA.v ~config ~fm ~dict ~dispatcher ~lru in
+          let contents =
+            Contents.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+          in
+          let node =
+            Node.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+          in
+          let commit =
+            Commit.CA.init ~config ~file_manager ~dict ~dispatcher ~lru
+          in
           let+ branch =
             let root = Conf.root config in
             let fresh = Conf.fresh config in
             let readonly = Conf.readonly config in
             let path = Brassaia_pack.Layout.V4.branch ~root in
-            Branch.v ~fresh ~readonly path
+            Branch.init ~fresh ~readonly path
           in
           let during_batch = false in
           let running_gc = None in
@@ -208,7 +216,7 @@ module Maker (Config : Conf.S) = struct
             node;
             commit;
             branch;
-            fm;
+            file_manager;
             dict;
             during_batch;
             running_gc;
@@ -216,13 +224,18 @@ module Maker (Config : Conf.S) = struct
             lru;
           }
 
-        let flush t = File_manager.flush ?hook:None t.fm |> Errs.raise_if_error
-        let fsync t = File_manager.fsync t.fm |> Errs.raise_if_error
-        let reload t = File_manager.reload t.fm |> Errs.raise_if_error
+        let flush t =
+          File_manager.flush ?hook:None t.file_manager |> Errs.raise_if_error
+
+        let fsync t = File_manager.fsync t.file_manager |> Errs.raise_if_error
+        let reload t = File_manager.reload t.file_manager |> Errs.raise_if_error
 
         module Gc = struct
-          let is_allowed { fm; _ } = File_manager.gc_allowed fm
-          let behaviour { fm; _ } = File_manager.gc_behaviour fm
+          let is_allowed { file_manager; _ } =
+            File_manager.gc_allowed file_manager
+
+          let behaviour { file_manager; _ } =
+            File_manager.gc_behaviour file_manager
 
           let cancel t =
             match t.running_gc with
@@ -257,13 +270,14 @@ module Maker (Config : Conf.S) = struct
                 Error (`Gc_disallowed "Store does not support GC")
               else Ok ()
             in
-            let current_generation = File_manager.generation t.fm in
+            let current_generation = File_manager.generation t.file_manager in
             let next_generation = current_generation + 1 in
             let lower_root = Conf.lower_root t.config in
             let* gc =
-              Gc.v ~root ~lower_root ~generation:next_generation ~unlink
-                ~dispatcher:t.dispatcher ~fm:t.fm ~contents:t.contents
-                ~node:t.node ~commit:t.commit ~output commit_key
+              Gc.init_and_start ~root ~lower_root ~generation:next_generation
+                ~unlink ~dispatcher:t.dispatcher ~file_manager:t.file_manager
+                ~contents:t.contents ~node:t.node ~commit:t.commit ~output
+                commit_key
             in
             t.running_gc <- Some { gc; use_auto_finalisation };
             Ok ()
@@ -316,7 +330,7 @@ module Maker (Config : Conf.S) = struct
                 Lwt.return_unit
 
           let latest_gc_target t =
-            let pl = File_manager.(Control.payload (control t.fm)) in
+            let pl = File_manager.(Control.payload (control t.file_manager)) in
             match pl.status with
             | From_v1_v2_post_upgrade _ | Used_non_minimal_indexing_strategy
             | No_gc_yet ->
@@ -338,7 +352,7 @@ module Maker (Config : Conf.S) = struct
                        length in their header. *)
                     assert false
                 | Some length ->
-                    let key = Pack_key.v_direct ~offset ~length entry.hash in
+                    let key = Pack_key.init_direct ~offset ~length entry.hash in
                     Some key)
 
           let create_one_commit_store t commit_key path =
@@ -370,12 +384,13 @@ module Maker (Config : Conf.S) = struct
               Brassaia.Backend.Conf.add t.config Conf.Key.root path
             in
             let () =
-              File_manager.create_one_commit_store t.fm config gced commit_key
+              File_manager.create_one_commit_store t.file_manager config gced
+                commit_key
               |> Errs.raise_if_error
             in
             let branch_path = Brassaia_pack.Layout.V4.branch ~root:path in
             let* branch_store =
-              Branch.v ~fresh:true ~readonly:false branch_path
+              Branch.init ~fresh:true ~readonly:false branch_path
             in
             let* () = Branch.close branch_store in
             Lwt.return_unit
@@ -394,7 +409,7 @@ module Maker (Config : Conf.S) = struct
             if t.during_batch then Error `Split_forbidden_during_batch
             else Ok ()
           in
-          File_manager.split t.fm
+          File_manager.split t.file_manager
 
         let split_exn repo = split repo |> Errs.raise_if_error
 
@@ -405,7 +420,7 @@ module Maker (Config : Conf.S) = struct
             if Gc.is_finished t = false then
               Errs.raise_error `Add_volume_forbidden_during_gc
           in
-          File_manager.add_volume t.fm |> Errs.raise_if_error
+          File_manager.add_volume t.file_manager |> Errs.raise_if_error
 
         let batch t f =
           [%log.debug "[pack] batch start"];
@@ -426,7 +441,7 @@ module Maker (Config : Conf.S) = struct
               let s = Mtime_clock.count c0 |> Mtime.span_to_s in
               [%log.info "[pack] batch completed in %.6fs" s];
               t.during_batch <- false;
-              File_manager.flush t.fm |> Errs.raise_if_error;
+              File_manager.flush t.file_manager |> Errs.raise_if_error;
               let* _ = try_finalise () in
               Lwt.return res
             in
@@ -436,7 +451,7 @@ module Maker (Config : Conf.S) = struct
                 "[pack] batch failed. calling flush. (%s)"
                   (Printexc.to_string exn)];
               let () =
-                match File_manager.flush t.fm with
+                match File_manager.flush t.file_manager with
                 | Ok () -> ()
                 | Error err ->
                     [%log.err
@@ -453,7 +468,7 @@ module Maker (Config : Conf.S) = struct
           (* Step 1 - Kill the gc process if it is running *)
           let _ = Gc.cancel t in
           (* Step 2 - Close the files *)
-          let () = File_manager.close t.fm |> Errs.raise_if_error in
+          let () = File_manager.close t.file_manager |> Errs.raise_if_error in
           Branch.close t.branch >>= fun () ->
           (* Step 3 - Close the in-memory abstractions *)
           Dict.close t.dict;
@@ -490,7 +505,7 @@ module Maker (Config : Conf.S) = struct
         | `Node -> X.Node.CA.integrity_check ~offset ~length k nodes
         | `Commit -> X.Commit.CA.integrity_check ~offset ~length k commits
       in
-      let index = File_manager.index t.fm in
+      let index = File_manager.index t.file_manager in
       Integrity_checks.check_always ?ppf ~auto_repair ~check index
 
     let integrity_check_minimal ?ppf ?heads t =
@@ -533,7 +548,7 @@ module Maker (Config : Conf.S) = struct
 
           module Hash = Hash
         end) in
-        let t = Stats.v () in
+        let t = Stats.create () in
         let pred_node repo k =
           X.Node.find (X.Repo.node_t repo) k >|= function
           | None -> Fmt.failwith "key %a not found" pp_key k
@@ -693,7 +708,7 @@ module Maker (Config : Conf.S) = struct
         module Hash = H
         module Inode = X.Node.CA
         module Contents_pack = X.Contents.CA
-        module Fm = File_manager
+        module File_manager = File_manager
         module Dispatcher = Dispatcher
       end)
 
@@ -704,7 +719,7 @@ module Maker (Config : Conf.S) = struct
           [%log.debug "Iterate over a tree"];
           let contents = X.Repo.contents_t repo in
           let nodes = X.Repo.node_t repo |> snd in
-          let export = S.Export.v repo.config contents nodes in
+          let export = S.Export.init repo.config contents nodes in
           let f_contents x = f (Blob x) in
           let f_nodes x = f (Inode x) in
           match root_key with
@@ -723,11 +738,11 @@ module Maker (Config : Conf.S) = struct
       module Import = struct
         type process = Import.t
 
-        let v ?on_disk repo =
+        let init ?on_disk repo =
           let contents = X.Repo.contents_t repo in
           let nodes = X.Repo.node_t repo |> snd in
           let log_size = Conf.index_log_size repo.config in
-          Import.v ?on_disk log_size contents nodes
+          Import.init ?on_disk log_size contents nodes
 
         let save_elt process elt =
           match elt with
@@ -747,7 +762,7 @@ module Maker (Config : Conf.S) = struct
       module Index = Index
       module File_manager = File_manager
 
-      let file_manager (repo : X.Repo.t) = repo.fm
+      let file_manager (repo : X.Repo.t) = repo.file_manager
 
       module Dict = Dict
 
