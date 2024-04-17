@@ -99,6 +99,19 @@ type sync_result =
       percentage_done : float;
     }
 
+type l1_health = {
+  connection : [`Connected | `Disconnected | `Reconnecting];
+  blocks_late : int32;
+  last_seen_head : (Block_hash.t * int32 * Time.Protocol.t) option;
+}
+
+type health = {
+  healthy : bool;
+  degraded : bool;
+  l1 : l1_health;
+  active_workers : (string * [`Running | `Crashed of error]) list;
+}
+
 type version = {
   version : string;
   store_version : string;
@@ -124,6 +137,60 @@ module Encodings = struct
          (req "version" string)
          (req "store_version" string)
          (req "context_version" string)
+
+  let l1_health =
+    conv
+      (fun {connection; blocks_late; last_seen_head} ->
+        (connection, blocks_late, last_seen_head))
+      (fun (connection, blocks_late, last_seen_head) ->
+        {connection; blocks_late; last_seen_head})
+    @@ obj3
+         (req
+            "connection"
+            (string_enum
+               [
+                 ("connected", `Connected);
+                 ("reconnecting", `Reconnecting);
+                 ("disconnected", `Disconnected);
+               ]))
+         (req "blocks_late" int32)
+         (opt
+            "last_seen_head"
+            (obj3
+               (req "hash" Block_hash.encoding)
+               (req "level" int32)
+               (req "timestamp" Time.Protocol.encoding)))
+
+  let health =
+    conv
+      (fun {healthy; degraded; l1; active_workers} ->
+        (healthy, degraded, l1, active_workers))
+      (fun (healthy, degraded, l1, active_workers) ->
+        {healthy; degraded; l1; active_workers})
+    @@ obj4
+         (req "healthy" bool)
+         (req "degraded" bool)
+         (req "l1" l1_health)
+         (req
+            "active_workers"
+            (list
+               (tup2
+                  string
+                  (union
+                     [
+                       case
+                         (Tag 0)
+                         ~title:"running"
+                         (constant "running")
+                         (function `Running -> Some () | _ -> None)
+                         (fun () -> `Running);
+                       case
+                         (Tag 1)
+                         ~title:"crashed"
+                         (obj1 (req "crashed" error_encoding))
+                         (function `Crashed e -> Some e | _ -> None)
+                         (fun e -> `Crashed e);
+                     ]))))
 
   let commitment_with_hash =
     obj2
@@ -730,6 +797,13 @@ module Root = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.unit
       (path / "ping")
+
+  let health =
+    Tezos_rpc.Service.get_service
+      ~description:"Returns health status information for the rollup node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.health
+      (path / "health")
 
   let version =
     Tezos_rpc.Service.get_service
