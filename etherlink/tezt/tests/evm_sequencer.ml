@@ -150,7 +150,8 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir protocol =
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction protocol
+    =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -178,6 +179,8 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
       ?delayed_inbox_timeout
       ?delayed_inbox_min_levels
       ?sequencer_pool_address
+      ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction
       ~bootstrap_accounts
       ~output:output_config
       ()
@@ -2411,29 +2414,11 @@ let test_stage_one_reboot =
        L1 level"
     ~uses
   @@ fun protocol ->
-  let config =
-    let legacy_tick_limit = 11_000_000_000L in
-    let legacy_safety_margin = 2_000_000_000L in
-    let legacy_max_allowed_ticks =
-      Int64.sub legacy_tick_limit legacy_safety_margin
-    in
-    let max_allowed_ticks_le = Bytes.make 8 '\000' in
-    Bytes.set_int64_le max_allowed_ticks_le 0 legacy_max_allowed_ticks ;
-    `Config
-      Sc_rollup_helpers.Installer_kernel_config.
-        [
-          Set
-            {
-              value = Hex.(of_bytes max_allowed_ticks_le |> show);
-              to_ = "/evm/maximum_allowed_ticks";
-            };
-        ]
-  in
   let* {sc_rollup_node; client; sc_rollup_address; _} =
     setup_sequencer
-      ~config
       ~sequencer:Constant.bootstrap1
       ~time_between_blocks:Nothing
+      ~maximum_allowed_ticks:9_000_000_000L
       protocol
   in
   let* chunks =

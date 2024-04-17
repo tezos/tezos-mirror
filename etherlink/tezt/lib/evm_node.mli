@@ -307,6 +307,8 @@ val make_kernel_installer_config :
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
   ?sequencer_pool_address:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t

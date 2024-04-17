@@ -22,7 +22,8 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
     ?sequencer ?delayed_bridge ?ticketer ?admin ?sequencer_governance
     ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?sequencer_pool_address ~output () =
+    ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -37,6 +38,11 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
         |> List.flatten
   in
   let le_int_bytes i = Z.of_string i |> Z.to_bits in
+  let le_int64_bytes i =
+    let b = Bytes.make 8 '\000' in
+    Bytes.set_int64_le b 0 (Int64.of_string i) ;
+    String.of_bytes b
+  in
   let instrs =
     make_instr
       ~convert:(fun s -> Hex.to_bytes_exn (`Hex s) |> Bytes.to_string)
@@ -62,6 +68,8 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
           let addr = Helpers.normalize_addr addr in
           Hex.to_bytes_exn (`Hex addr) |> String.of_bytes)
         sequencer_pool_address
+    @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
+    @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ bootstrap_accounts
   in
   Installer_config.to_file instrs ~output

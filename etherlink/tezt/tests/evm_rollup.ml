@@ -284,7 +284,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy {devmode = true})
-    ?(force_install_kernel = true) ?whitelist protocol =
+    ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks protocol =
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
   in
@@ -341,6 +341,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ?sequencer_governance:
           (Option.bind l1_contracts (fun {sequencer_governance; _} ->
                sequencer_governance))
+        ?maximum_allowed_ticks
         ~output:output_config
         ()
     in
@@ -433,8 +434,8 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
 
 let register_test ~title ~tags ?additional_config ?admin ?uses
     ?commitment_period ?challenge_window ?bootstrap_accounts ?whitelist
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ?rollup_operator_key ~setup_mode
-    f =
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ?rollup_operator_key
+    ?maximum_allowed_ticks ~setup_mode f =
   let extra_tag =
     match setup_mode with
     | Setup_proxy _ -> "proxy"
@@ -467,6 +468,7 @@ let register_test ~title ~tags ?additional_config ?admin ?uses
           ?da_fee_per_byte
           ?minimum_base_fee_per_gas
           ?rollup_operator_key
+          ?maximum_allowed_ticks
           ~admin
           ~setup_mode
           protocol
@@ -474,8 +476,8 @@ let register_test ~title ~tags ?additional_config ?admin ?uses
       f ~protocol ~evm_setup)
 
 let register_proxy ~title ~tags ?uses ?admin ?commitment_period
-    ?challenge_window ?bootstrap_accounts ?minimum_base_fee_per_gas f protocols
-    =
+    ?challenge_window ?bootstrap_accounts ?minimum_base_fee_per_gas
+    ?maximum_allowed_ticks f protocols =
   register_test
     ~title
     ~tags
@@ -485,6 +487,7 @@ let register_proxy ~title ~tags ?uses ?admin ?commitment_period
     ?challenge_window
     ?bootstrap_accounts
     ?minimum_base_fee_per_gas
+    ?maximum_allowed_ticks
     f
     protocols
     ~setup_mode:(Setup_proxy {devmode = true})
@@ -492,7 +495,7 @@ let register_proxy ~title ~tags ?uses ?admin ?commitment_period
 let register_both ~title ~tags ?uses ?additional_config ?admin
     ?commitment_period ?challenge_window ?bootstrap_accounts ?da_fee_per_byte
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
-    ?rollup_operator_key f protocols =
+    ?rollup_operator_key ?maximum_allowed_ticks f protocols =
   let register =
     register_test
       ~title
@@ -507,6 +510,7 @@ let register_both ~title ~tags ?uses ?additional_config ?admin
       ?minimum_base_fee_per_gas
       ?whitelist
       ?rollup_operator_key
+      ?maximum_allowed_ticks
       f
       protocols
   in
@@ -4269,31 +4273,13 @@ let test_regression_block_hash_gen =
   unit
 
 let test_reboot_out_of_ticks =
-  let config =
-    let legacy_tick_limit = 11_000_000_000L in
-    let legacy_safety_margin = 2_000_000_000L in
-    let legacy_max_allowed_ticks =
-      Int64.sub legacy_tick_limit legacy_safety_margin
-    in
-    let max_allowed_ticks_le = Bytes.make 8 '\000' in
-    Bytes.set_int64_le max_allowed_ticks_le 0 legacy_max_allowed_ticks ;
-    `Config
-      Sc_rollup_helpers.Installer_kernel_config.
-        [
-          Set
-            {
-              value = Hex.(of_bytes max_allowed_ticks_le |> show);
-              to_ = "/evm/maximum_allowed_ticks";
-            };
-        ]
-  in
   register_proxy
-    ~config
     ~tags:["evm"; "reboot"; "loop"; "out_of_ticks"]
     ~title:
       "Check that the kernel can handle transactions that take too many ticks \
        for a single run"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~maximum_allowed_ticks:9_000_000_000L
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs =
@@ -4867,31 +4853,13 @@ let test_call_recursive_contract_estimate_gas =
   unit
 
 let test_transaction_exhausting_ticks_is_rejected =
-  let config =
-    let legacy_tick_limit = 11_000_000_000L in
-    let legacy_safety_margin = 2_000_000_000L in
-    let legacy_max_allowed_ticks =
-      Int64.sub legacy_tick_limit legacy_safety_margin
-    in
-    let max_allowed_ticks_le = Bytes.make 8 '\000' in
-    Bytes.set_int64_le max_allowed_ticks_le 0 legacy_max_allowed_ticks ;
-    `Config
-      Sc_rollup_helpers.Installer_kernel_config.
-        [
-          Set
-            {
-              value = Hex.(of_bytes max_allowed_ticks_le |> show);
-              to_ = "/evm/maximum_allowed_ticks";
-            };
-        ]
-  in
   register_both
     ~tags:["evm"; "loop"; "out_of_ticks"; "rejected"]
     ~title:
       "Check that the node will reject a transaction that wouldn't fit in a \
        kernel run."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~config
+    ~maximum_allowed_ticks:9_000_000_000L
   @@ fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; client; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs =
