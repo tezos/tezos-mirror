@@ -122,9 +122,26 @@ let get_next_baker_by_account pkh block =
       round,
       WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
 
+(* Returns the first baker able to bake that is not in the list of excluded keys. *)
 let get_next_baker_excluding excludes block =
   let open Lwt_result_wrap_syntax in
   let* bakers = Plugin.RPC.Baking_rights.get rpc_ctxt block in
+  let* baker_opt =
+    List.find_es
+      (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
+        let* info = Plugin.RPC.Delegates.info rpc_ctxt block consensus_key in
+        let* forbidden =
+          Plugin.RPC.Staking.is_forbidden rpc_ctxt block consensus_key
+        in
+        return
+        @@ ((not info.deactivated) && (not forbidden)
+           && not
+                (List.mem
+                   ~equal:Signature.Public_key_hash.equal
+                   consensus_key
+                   excludes)))
+      bakers
+  in
   let {
     Plugin.RPC.Baking_rights.delegate = pkh;
     consensus_key;
@@ -132,15 +149,7 @@ let get_next_baker_excluding excludes block =
     round;
     _;
   } =
-    WithExceptions.Option.get ~loc:__LOC__
-    @@ List.find
-         (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
-           not
-             (List.mem
-                ~equal:Signature.Public_key_hash.equal
-                consensus_key
-                excludes))
-         bakers
+    WithExceptions.Option.get ~loc:__LOC__ baker_opt
   in
   let*?@ round = Round.to_int round in
   return
