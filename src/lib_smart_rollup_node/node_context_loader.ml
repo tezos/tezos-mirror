@@ -179,6 +179,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     {
       config = configuration;
       cctxt = (cctxt :> Client_context.full);
+      degraded = Reference.new_ false;
       dal_cctxt;
       dac_client;
       data_dir;
@@ -310,6 +311,7 @@ module For_snapshots = struct
       {
         config;
         cctxt = (cctxt :> Client_context.full);
+        degraded = Reference.new_ false;
         dal_cctxt = None;
         dac_client = None;
         data_dir;
@@ -427,6 +429,7 @@ module Internal_for_tests = struct
       {
         config;
         cctxt = (cctxt :> Client_context.full);
+        degraded = Reference.new_ false;
         dal_cctxt = None;
         dac_client = None;
         data_dir;
