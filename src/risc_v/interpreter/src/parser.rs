@@ -880,8 +880,18 @@ fn c_rd_rs1(instr: u16) -> XRegister {
 }
 
 #[inline(always)]
+fn c_f_rd_rs1(instr: u16) -> FRegister {
+    parse_fregister(c_bits(instr, 7, 5) as u32)
+}
+
+#[inline(always)]
 fn c_rs2(instr: u16) -> XRegister {
     parse_xregister(c_bits(instr, 2, 5) as u32)
+}
+
+#[inline(always)]
+fn c_f_rs2(instr: u16) -> FRegister {
+    parse_fregister(c_bits(instr, 2, 5) as u32)
 }
 
 /// Encodings for the most used registers for certain compressed instructions
@@ -899,6 +909,11 @@ fn c_rs1p(instr: u16) -> XRegister {
 #[inline(always)]
 fn c_rdp_rs2p(instr: u16) -> XRegister {
     parse_xregister(c_reg_prime(instr, 2))
+}
+
+#[inline(always)]
+fn c_f_rdp_rs2p(instr: u16) -> FRegister {
+    parse_fregister(c_reg_prime(instr, 2))
 }
 
 #[inline(always)]
@@ -1051,6 +1066,11 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
     use Instr::*;
     match c_opcode(instr) {
         OP_C0 => match c_funct3(instr) {
+            C_F3_1 => CFld(FLoadArgs {
+                rd: c_f_rdp_rs2p(instr),
+                rs1: c_rs1p(instr),
+                imm: cld_imm(instr),
+            }),
             C_F3_0 => match ciw_imm(instr) {
                 0 => UnknownCompressed { instr },
                 imm => CAddi4spn(CIBTypeArgs {
@@ -1066,6 +1086,11 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
             C_F3_3 => CLd(ITypeArgs {
                 rd: c_rdp_rs2p(instr),
                 rs1: c_rs1p(instr),
+                imm: cld_imm(instr),
+            }),
+            C_F3_5 => CFsd(FStoreArgs {
+                rs1: c_rs1p(instr),
+                rs2: c_f_rdp_rs2p(instr),
                 imm: cld_imm(instr),
             }),
             C_F3_6 => CSw(SBTypeArgs {
@@ -1140,6 +1165,10 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
                 (_, x0) | (0, _) => UnknownCompressed { instr },
                 (imm, rd_rs1) => CSlli(CIBTypeArgs { rd_rs1, imm }),
             },
+            C_F3_1 => CFldsp(CIBDTypeArgs {
+                rd_rs1: c_f_rd_rs1(instr),
+                imm: ci_ldsp_imm(instr),
+            }),
             C_F3_2 => match c_rd_rs1(instr) {
                 x0 => UnknownCompressed { instr },
                 rd_rs1 => CLwsp(CIBTypeArgs {
@@ -1163,6 +1192,10 @@ fn parse_compressed_instruction(instr: u16) -> Instr {
                 (false, rs1, x0) => CJr(CRJTypeArgs { rs1 }),
                 (false, rs1, rs2) => CMv(CRTypeArgs { rd_rs1: rs1, rs2 }),
             },
+            C_F3_5 => CFsdsp(CSSDTypeArgs {
+                rs2: c_f_rs2(instr),
+                imm: css_sdsp_imm(instr),
+            }),
             C_F3_6 => CSwsp(CSSTypeArgs {
                 rs2: c_rs2(instr),
                 imm: css_swsp_imm(instr),
