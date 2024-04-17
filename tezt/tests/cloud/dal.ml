@@ -782,7 +782,6 @@ let produce_slot t level i =
     let* _ =
       Dal_common.Helpers.publish_and_store_slot
         ~dont_wait:true
-        ~with_proof:true
         producer.client
         producer.dal_node
         producer.account

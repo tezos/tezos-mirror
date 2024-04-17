@@ -1277,9 +1277,7 @@ let () =
 let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
     slot_producer_dal_node source ~index ~wait_slot
     ~number_of_extra_blocks_to_bake content =
-  let* commitment, proof =
-    Helpers.store_slot ~with_proof:true slot_producer_dal_node content
-  in
+  let* commitment, proof = Helpers.store_slot slot_producer_dal_node content in
   let p = wait_slot commitment in
   let* (`OpHash ophash) =
     publish_commitment
@@ -1317,11 +1315,10 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
   let* () = p in
   return (level, commitment)
 
-let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client node
-    dal_node source ~index ~content ~attestation_lag ~number_of_slots =
+let publish_store_and_attest_slot ?counter ?force ?fee client node dal_node
+    source ~index ~content ~attestation_lag ~number_of_slots =
   let* _commitment =
     Helpers.publish_and_store_slot
-      ?with_proof
       ?counter
       ?force
       ?fee
@@ -1792,7 +1789,7 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
     dal_node =
   let* commitment, proof =
     Helpers.(
-      store_slot dal_node ~with_proof:true
+      store_slot dal_node
       @@ make_slot
            ~slot_size:parameters.Dal_common.Parameters.cryptobox.slot_size
            "content1")
@@ -2684,9 +2681,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     in
     let* () = publish source ~index slot_content in
     let* _commitment, _proof =
-      Helpers.(
-        store_slot ~with_proof:false dal_node
-        @@ make_slot ~slot_size slot_content)
+      Helpers.(store_slot dal_node @@ make_slot ~slot_size slot_content)
     in
     Log.info "Slot with %d index (normally) published at level %d" index level ;
     unit
@@ -2823,7 +2818,6 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
       level ;
     let promise =
       Helpers.publish_and_store_slot
-        ~with_proof:true
         ~force:true
         ~counter:!counter
         l1_client
@@ -3668,7 +3662,6 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
     let slot_size = crypto_params.slot_size in
     let slot_content = generate_dummy_slot slot_size in
     Helpers.publish_and_store_slot
-      ~with_proof:true
       client
       dal_node1
       Constant.bootstrap1
@@ -3825,7 +3818,6 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
         let account = Account.Bootstrap.keys.(slot_index) in
         let* _slot_commitment =
           Helpers.publish_and_store_slot
-            ~with_proof:true
             client
             dal_node1
             account
@@ -3880,12 +3872,7 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
      messages. *)
   let slot_index = 0 in
   let* commitment =
-    Helpers.publish_and_store_slot
-      ~with_proof:true
-      client
-      dal_node1
-      account1
-      ~index:slot_index
+    Helpers.publish_and_store_slot client dal_node1 account1 ~index:slot_index
     @@ Helpers.make_slot ~slot_size slot_content
   in
 
