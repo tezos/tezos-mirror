@@ -100,7 +100,7 @@ module Admin_directory = Make_directory (struct
 end)
 
 let () =
-  Root_directory.register0 Rollup_node_services.Root.health
+  Root_directory.register0 Rollup_node_services.Root.ping
   @@ fun _node_ctxt () () -> Lwt_result_syntax.return_unit
 
 let () =

@@ -723,13 +723,13 @@ module Root = struct
     let prefix = root
   end)
 
-  let health =
+  let ping =
     Tezos_rpc.Service.get_service
       ~description:
         "Returns an empty response if the rollup node can answer requests"
       ~query:Tezos_rpc.Query.empty
       ~output:Data_encoding.unit
-      (path / "health")
+      (path / "ping")
 
   let version =
     Tezos_rpc.Service.get_service
