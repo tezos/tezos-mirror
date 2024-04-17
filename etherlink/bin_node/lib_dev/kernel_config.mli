@@ -25,6 +25,8 @@ val make :
   ?delayed_inbox_timeout:string * string ->
   ?delayed_inbox_min_levels:string * string ->
   ?sequencer_pool_address:string * string ->
+  ?maximum_allowed_ticks:string * string ->
+  ?maximum_gas_per_transaction:string * string ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

@@ -420,7 +420,7 @@ pub fn clear_all_blueprint<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
 mod tests {
 
     use super::*;
-    use crate::configuration::TezosContracts;
+    use crate::configuration::{Limits, TezosContracts};
     use crate::delayed_inbox::Hash;
     use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
     use crate::Timestamp;
@@ -450,6 +450,7 @@ mod tests {
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
             },
+            limits: Limits::default(),
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);

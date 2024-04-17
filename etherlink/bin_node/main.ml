@@ -1217,7 +1217,7 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args16
+    (args18
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
        (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
@@ -1232,6 +1232,10 @@ let make_kernel_config_command =
        (config_key_arg ~name:"delayed_inbox_timeout" ~placeholder:"111...")
        (config_key_arg ~name:"delayed_inbox_min_levels" ~placeholder:"111...")
        (config_key_arg ~name:"sequencer_pool_address" ~placeholder:"0x...")
+       (config_key_arg ~name:"maximum_allowed_ticks" ~placeholder:"11000...")
+       (config_key_arg
+          ~name:"maximum_gas_per_transaction"
+          ~placeholder:"30000...")
        (Tezos_clic.default_arg
           ~long:"boostrap-balance"
           ~doc:"boolance of boostrap account"
@@ -1259,6 +1263,8 @@ let make_kernel_config_command =
            delayed_inbox_timeout,
            delayed_inbox_min_levels,
            sequencer_pool_address,
+           maximum_allowed_ticks,
+           maximum_gas_per_transaction,
            boostrap_balance,
            bootstrap_accounts )
          output
@@ -1278,6 +1284,8 @@ let make_kernel_config_command =
         ?delayed_inbox_timeout
         ?delayed_inbox_min_levels
         ?sequencer_pool_address
+        ?maximum_allowed_ticks
+        ?maximum_gas_per_transaction
         ~boostrap_balance
         ?bootstrap_accounts
         ~output

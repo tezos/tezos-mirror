@@ -9,6 +9,7 @@ use crate::apply::{
     apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
 };
 use crate::blueprint_storage::{drop_blueprint, read_next_blueprint};
+use crate::configuration::Limits;
 use crate::error::Error;
 use crate::event::Event;
 use crate::indexable_storage::IndexableStorage;
@@ -16,7 +17,6 @@ use crate::internal_storage::InternalRuntime;
 use crate::safe_storage::{KernelRuntime, SafeStorage};
 use crate::storage;
 use crate::storage::init_account_index;
-use crate::tick_model::constants::MAX_ALLOWED_TICKS;
 use crate::tick_model::{maximum_ticks_per_blueprint, ticks_for_next_blueprint};
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -73,6 +73,7 @@ fn compute<Host: Runtime>(
     is_first_block_of_reboot: bool,
     ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
+    limits: &Limits,
 ) -> Result<ComputationResult, anyhow::Error> {
     log!(
         host,
@@ -88,6 +89,7 @@ fn compute<Host: Runtime>(
 
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
+            limits.maximum_allowed_ticks,
             block_in_progress.estimated_ticks_in_run,
             data_size,
         );
@@ -128,6 +130,7 @@ fn compute<Host: Runtime>(
             retriable,
             ticketer,
             sequencer_pool_address,
+            limits,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
@@ -177,8 +180,12 @@ fn compute<Host: Runtime>(
     Ok(ComputationResult::Finished)
 }
 
-fn has_enough_ticks_for_next_blueprint(tick_counter: &TickCounter) -> bool {
-    maximum_ticks_per_blueprint() < MAX_ALLOWED_TICKS.saturating_sub(tick_counter.c)
+fn has_enough_ticks_for_next_blueprint(
+    tick_counter: &TickCounter,
+    limits: &Limits,
+) -> bool {
+    maximum_ticks_per_blueprint()
+        < limits.maximum_allowed_ticks.saturating_sub(tick_counter.c)
 }
 
 enum BlueprintParsing {
@@ -198,7 +205,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
 ) -> Result<BlueprintParsing, anyhow::Error> {
     // The size of a blueprint will be limited by the sum of the size of 512kB,
     // if we cannot read it during this kernel_run, we simply abort and enforce a reboot.
-    if !has_enough_ticks_for_next_blueprint(tick_counter) {
+    if !has_enough_ticks_for_next_blueprint(tick_counter, &config.limits) {
         return Ok(BlueprintParsing::RebootNeeded);
     }
 
@@ -257,6 +264,7 @@ fn compute_bip<Host: KernelRuntime>(
     first_block_of_reboot: &mut bool,
     ticketer: &Option<ContractKt1Hash>,
     sequencer_pool_address: Option<H160>,
+    limits: &Limits,
 ) -> anyhow::Result<ComputationResult> {
     let result = compute(
         host,
@@ -269,6 +277,7 @@ fn compute_bip<Host: KernelRuntime>(
         *first_block_of_reboot,
         ticketer,
         sequencer_pool_address,
+        limits,
     )?;
     match result {
         ComputationResult::RebootNeeded => {
@@ -410,6 +419,7 @@ pub fn produce<Host: Runtime>(
                 &mut first_block_of_reboot,
                 &config.tezos_contracts.ticketer,
                 sequencer_pool_address,
+                &config.limits,
             ) {
                 Ok(ComputationResult::Finished) => promote_block(
                     &mut safe_host,
@@ -491,6 +501,7 @@ pub fn produce<Host: Runtime>(
             &mut first_block_of_reboot,
             &config.tezos_contracts.ticketer,
             sequencer_pool_address,
+            &config.limits,
         ) {
             Ok(ComputationResult::Finished) => {
                 promote_block(&mut safe_host, &outbox_queue, false, processed_blueprint)?
@@ -1321,8 +1332,8 @@ mod tests {
         let mut block_in_progress =
             BlockInProgress::new(U256::from(1), U256::from(1), transactions);
         // run is almost full wrt ticks
-        block_in_progress.estimated_ticks_in_run =
-            tick_model::constants::MAX_TICKS - 1000;
+        let limits = Limits::default();
+        block_in_progress.estimated_ticks_in_run = limits.maximum_allowed_ticks - 1000;
 
         // act
         let result = compute(
@@ -1336,6 +1347,7 @@ mod tests {
             true,
             &None,
             None,
+            &limits,
         )
         .expect("Should safely ask for a reboot");
 
@@ -1607,11 +1619,22 @@ mod tests {
 
         host.reboot_left().expect("should be some reboot left");
 
+        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let limits = Limits {
+            maximum_allowed_ticks: 9_000_000_000,
+            ..Limits::default()
+        };
+
+        let mut configuration = Configuration {
+            limits,
+            ..Configuration::default()
+        };
+
         let computation_result = produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
             None,
         )
         .expect("Should have produced");
@@ -1681,11 +1704,21 @@ mod tests {
 
         store_blueprints(&mut host, proposals);
 
+        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let limits = Limits {
+            maximum_allowed_ticks: 9_000_000_000,
+            ..Limits::default()
+        };
+
+        let mut configuration = Configuration {
+            limits,
+            ..Configuration::default()
+        };
         let computation_result = produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
             None,
         )
         .expect("Should have produced");
@@ -1804,12 +1837,6 @@ mod tests {
         )
         .unwrap();
 
-        // sanity check: no current block
-        assert!(
-            storage::read_current_block_number(&host).is_err(),
-            "Should not have found current block number"
-        );
-
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
@@ -1841,11 +1868,26 @@ mod tests {
 
         store_inbox_blueprint(&mut host, blueprint(proposals_first_reboot)).unwrap();
 
+        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let limits = Limits {
+            maximum_allowed_ticks: 9_000_000_000,
+            ..Limits::default()
+        };
+
+        let mut configuration = Configuration {
+            limits,
+            ..Configuration::default()
+        };
+        // sanity check: no current block
+        assert!(
+            storage::read_current_block_number(&host).is_err(),
+            "Should not have found current block number"
+        );
         produce(
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
             None,
         )
         .expect("Should have produced");
@@ -1865,7 +1907,7 @@ mod tests {
             &mut host,
             DUMMY_CHAIN_ID,
             dummy_block_fees(),
-            &mut Configuration::default(),
+            &mut configuration,
             None,
         )
         .expect("Should have produced");

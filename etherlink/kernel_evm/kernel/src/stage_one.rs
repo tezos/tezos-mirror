@@ -125,6 +125,7 @@ pub fn fetch<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use crate::configuration::Limits;
     use primitive_types::U256;
     use tezos_crypto_rs::hash::HashTrait;
     use tezos_data_encoding::types::Bytes;
@@ -169,6 +170,7 @@ mod tests {
                 delayed_inbox: Box::new(delayed_inbox),
                 sequencer,
             },
+            limits: Limits::default(),
         }
     }
 
@@ -180,6 +182,7 @@ mod tests {
                 ..contracts
             },
             mode: ConfigurationMode::Proxy,
+            limits: Limits::default(),
         }
     }
 

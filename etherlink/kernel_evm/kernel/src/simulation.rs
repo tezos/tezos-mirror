@@ -8,6 +8,7 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
+use crate::configuration::fetch_limits;
 use crate::fees::{simulation_add_gas_for_fees, tx_execution_gas_limit};
 use crate::{error::Error, error::StorageError, storage};
 
@@ -54,6 +55,7 @@ const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
     is allocated. Try reducing its gas consumption or splitting the call in
     multiple steps, if possible.";
 const GAS_LIMIT_TOO_LOW: &str = "Gas limit too low.";
+const GAS_LIMIT_TOO_HIGH: &str = "Gas limit (for execution) is too high.";
 
 // Redefined Result as we cannot implement Decodable and Encodable traits on Result
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -247,8 +249,10 @@ impl Evaluation {
         let precompiles = precompiles::precompile_set::<Host>();
         let default_caller = H160::zero();
         let tx_data_size = self.data.len() as u64;
+        let limits = fetch_limits(host);
         let allocated_ticks =
             tick_model::estimate_remaining_ticks_for_transaction_execution(
+                limits.maximum_allowed_ticks,
                 0,
                 tx_data_size,
             );
@@ -363,8 +367,10 @@ impl TxValidation {
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
         let precompiles = precompiles::precompile_set::<Host>();
         let tx_data_size = transaction.data.len() as u64;
+        let limits = fetch_limits(host);
         let allocated_ticks =
             tick_model::estimate_remaining_ticks_for_transaction_execution(
+                limits.maximum_allowed_ticks,
                 0,
                 tx_data_size,
             );
@@ -372,6 +378,10 @@ impl TxValidation {
         let Ok(gas_limit) = tx_execution_gas_limit(transaction, &block_fees, false) else {
             return Self::to_error(GAS_LIMIT_TOO_LOW);
         };
+
+        if gas_limit > limits.maximum_gas_limit {
+            return Self::to_error(GAS_LIMIT_TOO_HIGH);
+        }
 
         match run_transaction(
             host,

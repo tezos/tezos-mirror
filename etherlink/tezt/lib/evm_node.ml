@@ -780,7 +780,7 @@ let make_kernel_installer_config ?kernel_root_hash ?chain_id ?bootstrap_balance
     ?sequencer_governance ?kernel_governance ?kernel_security_governance
     ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
-    ~output () =
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ~output () =
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
     @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
@@ -812,6 +812,14 @@ let make_kernel_installer_config ?kernel_root_hash ?chain_id ?bootstrap_balance
         "sequencer-pool-address"
         Fun.id
         sequencer_pool_address
+    @ Cli_arg.optional_arg
+        "maximum-allowed-ticks"
+        Int64.to_string
+        maximum_allowed_ticks
+    @ Cli_arg.optional_arg
+        "maximum-gas-per-transaction"
+        Int64.to_string
+        maximum_gas_per_transaction
     @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
     @
     match bootstrap_accounts with

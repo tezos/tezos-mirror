@@ -48,6 +48,12 @@ pub const KERNEL_SECURITY_GOVERNANCE: RefPath =
     RefPath::assert_from(b"/evm/kernel_security_governance");
 pub const DELAYED_BRIDGE: RefPath = RefPath::assert_from(b"/evm/delayed_bridge");
 
+pub const MAXIMUM_ALLOWED_TICKS: RefPath =
+    RefPath::assert_from(b"/evm/maximum_allowed_ticks");
+
+pub const MAXIMUM_GAS_PER_TRANSACTION: RefPath =
+    RefPath::assert_from(b"/evm/maximum_gas_per_transaction");
+
 // Path to the block in progress, used between reboots
 const EVM_BLOCK_IN_PROGRESS: RefPath =
     RefPath::assert_from(b"/evm/world_state/blocks/in_progress");
@@ -828,6 +834,14 @@ pub fn read_kernel_security_governance<Host: Runtime>(
     host: &mut Host,
 ) -> Option<ContractKt1Hash> {
     read_b58_kt1(host, &KERNEL_SECURITY_GOVERNANCE.into())
+}
+
+pub fn read_maximum_allowed_ticks<Host: Runtime>(host: &mut Host) -> Option<u64> {
+    read_u64(host, &MAXIMUM_ALLOWED_TICKS).ok()
+}
+
+pub fn read_maximum_gas_per_transaction<Host: Runtime>(host: &mut Host) -> Option<u64> {
+    read_u64(host, &MAXIMUM_GAS_PER_TRANSACTION).ok()
 }
 
 pub fn get_and_increment_deposit_nonce<Host: Runtime>(

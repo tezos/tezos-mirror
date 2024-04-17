@@ -340,7 +340,7 @@ mod tests {
     use std::str::FromStr;
 
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
-    use crate::configuration::Configuration;
+    use crate::configuration::{Configuration, Limits};
     use crate::fees;
     use crate::{
         blueprint::Blueprint,
@@ -528,12 +528,23 @@ mod tests {
 
         let block_fees = dummy_block_fees();
 
+        // Set the tick limit to 11bn ticks - 2bn, which is the old limit minus the safety margin.
+        let limits = Limits {
+            maximum_allowed_ticks: 9_000_000_000,
+            ..Limits::default()
+        };
+
+        let mut configuration = Configuration {
+            limits,
+            ..Configuration::default()
+        };
+
         // If the upgrade is started, it should raise an error
         let computation_result = crate::block::produce(
             &mut host,
             DUMMY_CHAIN_ID,
             block_fees,
-            &mut Configuration::default(),
+            &mut configuration,
             None,
         )
         .expect("Should have produced");
