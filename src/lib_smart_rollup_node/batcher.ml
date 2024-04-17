@@ -379,3 +379,9 @@ let message_status msg_id =
   let+ w = Result.map_error TzTrace.make (Lazy.force worker) in
   let state = Worker.state w in
   message_status state msg_id
+
+let worker_status () =
+  match Lwt.state worker_promise with
+  | Lwt.Return _ -> `Running
+  | Lwt.Fail exn -> `Crashed (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> `Not_running

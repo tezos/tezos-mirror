@@ -87,3 +87,6 @@ val cement_commitments : unit -> unit tzresult Lwt.t
 
 (** Stop worker for publishing and cementing commitments. *)
 val shutdown : unit -> unit Lwt.t
+
+(** Returns the status of the publisher worker. *)
+val worker_status : unit -> [`Running | `Not_running | `Crashed of error]

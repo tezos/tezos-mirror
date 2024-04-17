@@ -248,3 +248,9 @@ let shutdown () =
         List.iter_s (fun (_opponent, player) -> Player.shutdown player) games
       in
       Worker.shutdown w
+
+let worker_status () =
+  match Lwt.state worker_promise with
+  | Lwt.Return _ -> `Running
+  | Lwt.Fail exn -> `Crashed (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> `Not_running

@@ -568,3 +568,9 @@ let shutdown () =
       (* There is no publisher, nothing to do *)
       Lwt.return_unit
   | Ok w -> Worker.shutdown w
+
+let worker_status () =
+  match Lwt.state worker_promise with
+  | Lwt.Return _ -> `Running
+  | Lwt.Fail exn -> `Crashed (Error_monad.error_of_exn exn)
+  | Lwt.Sleep -> `Not_running
