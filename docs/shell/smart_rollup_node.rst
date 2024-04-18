@@ -1050,17 +1050,23 @@ reboots for each Tezos level.
 A call to ``kernel_run`` cannot take an arbitrary amount of time to
 complete, because diverging computations are not compatible with the
 optimistic rollup infrastructure of Tezos.
-To dodge the halting
-problem, the reference interpreter of WASM (used during the refutation game)
-enforces a bound on the number of ticks used in a call to
-``kernel_run``. Once the maximum number of ticks is reached, the
-execution of ``kernel_run`` is trapped (*i.e.*, interrupted with an
-error).
-In turn, the fast execution engine does not enforce this time limit. Hence,
-it is the responsibility of the kernel developer to implement a ``kernel_run`` which does not exceed its tick budget.
+It is the responsibility of the kernel developers to ensure the computation
+time necessary to track their rollup is bounded and reasonable, for two
+reasons:
 
+1. If a kernel requires more time than the time between two Tezos blocks, then
+   a rollup node is doomed to lag behind the Layer 1 chain it is tracking.
+2. If a single ``kernel_run`` takes too much time to compute, then it becomes
+   difficult to protect the resulting commitment. This is because the WASM PVM
+   interpreter has not been optimized for speed but for producing small
+   execution step proofs.
 
-The current bound is set to 11,000,000,000 ticks.
+Kernel developers are expected to design their kernel such that it addresses
+these two constraints.
+
+The WASM PVM does enforce a limit on the number of ticks available per
+``kernel_run``, but it is arbitrary high enough (50 trillion) that it becomes
+virtually impossible to exceed it.
 ``octez-smart-rollup-wasm-debugger`` is probably the best tool available to
 verify the ``kernel_run`` function does not take more ticks than authorized.
 

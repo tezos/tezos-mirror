@@ -105,7 +105,7 @@ let () =
 module V2_0_0 = struct
   let current_version = Wasm_2_0_0.v4
 
-  let ticks_per_snapshot = Z.of_int64 11_000_000_000L
+  let ticks_per_snapshot = Z.of_int64 50_000_000_000_000L
 
   let outbox_validity_period = 241_920l
 

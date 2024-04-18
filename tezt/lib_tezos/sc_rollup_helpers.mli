@@ -395,3 +395,5 @@ val serve_files :
   root:string ->
   (unit -> 'a Lwt.t) ->
   'a Lwt.t
+
+val ticks_per_snapshot : Protocol.t -> int
