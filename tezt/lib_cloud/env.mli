@@ -9,8 +9,8 @@
     variables. Those values are lazy so that they are evaluated within
     a test and fail if one environment variable is missing. *)
 
-(** Value of the environment variable [TF_WORKSPACE]. *)
-val workspace : string Lazy.t
+(** Value of the environment variable [TEZT_CLOUD_BASENAME]. *)
+val tezt_cloud : string Lazy.t
 
 (** Path to the ssh private key that will be used with the docker
     image. Depends on [workspace]. *)

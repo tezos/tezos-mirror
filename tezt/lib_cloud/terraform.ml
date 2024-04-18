@@ -64,16 +64,16 @@ end
 
 module VM = struct
   let init () =
-    (* If this is the first time the workspace is used, it needs to be created.
+    (* If this is the first time the tezt_cloud is used, it needs to be created.
        For all the other cases, terraform will fail, hence we forget the error
        (yeah, this is a bit ugly). This must be run before `terraform init`. *)
-    let workspace = Lazy.force Env.workspace in
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
     let* _ =
       Process.spawn
         ~name
         ~color
         "terraform"
-        (chdir Path.terraform_vm @ ["workspace"; "new"; workspace])
+        (chdir Path.terraform_vm @ ["workspace"; "new"; tezt_cloud])
       |> Process.wait
     in
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])

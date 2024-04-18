@@ -67,8 +67,8 @@ module Remote = struct
         wait_docker_running ~zone ~vm_name
 
   let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~number_of_vms () =
-    let workspace = Lazy.force Env.workspace in
-    let docker_registry = Format.asprintf "%s-docker-registry" workspace in
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
+    let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud in
     let machine_type = Cli.machine_type in
     let* () = Terraform.Docker_registry.init () in
     let* () = Terraform.VM.init () in
@@ -82,7 +82,7 @@ module Remote = struct
     in
     let names =
       Seq.ints 1 |> Seq.take number_of_vms
-      |> Seq.map (fun i -> Format.asprintf "%s-%03d" workspace i)
+      |> Seq.map (fun i -> Format.asprintf "%s-%03d" tezt_cloud i)
       |> List.of_seq
     in
     let* zone = Terraform.VM.zone () in
@@ -158,15 +158,15 @@ module Localhost = struct
        docker image. *)
     let* () = Terraform.Docker_registry.init () in
     let* docker_registry = Terraform.Docker_registry.get_docker_registry () in
-    let workspace = Lazy.force Env.workspace in
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
     let image_name =
-      Format.asprintf "%s/%s:%s" docker_registry workspace "latest"
+      Format.asprintf "%s/%s:%s" docker_registry tezt_cloud "latest"
     in
     let names = Hashtbl.create 11 in
     let processes =
       Seq.ints 0 |> Seq.take number_of_vms
       |> Seq.map (fun i ->
-             let name = Format.asprintf "%s-%03d" workspace (i + 1) in
+             let name = Format.asprintf "%s-%03d" tezt_cloud (i + 1) in
              let start = base_port + (i * ports_per_vm) |> string_of_int in
              let stop =
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
