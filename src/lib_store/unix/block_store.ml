@@ -31,8 +31,6 @@ let default_block_cache_limit = 1_000
 
 type merge_status = Not_running | Running | Merge_failed of tztrace
 
-type status = Naming.block_store_status = Idle | Merging
-
 type block_store = {
   chain_dir : [`Chain_dir] Naming.directory;
   readonly : bool;
@@ -42,7 +40,7 @@ type block_store = {
   mutable rw_floating_block_store : Floating_block_store.t;
   caboose : block_descriptor Stored_data.t;
   savepoint : block_descriptor Stored_data.t;
-  status_data : status Stored_data.t;
+  status_data : block_store_status Stored_data.t;
   block_cache : Block_repr.t Block_lru_cache.t;
   mutable gc_callback : (Block_hash.t -> unit tzresult Lwt.t) option;
   mutable split_callback : (unit -> unit tzresult Lwt.t) option;
@@ -55,13 +53,6 @@ type block_store = {
 type t = block_store
 
 type key = Block of (Block_hash.t * int)
-
-let status_encoding =
-  let open Data_encoding in
-  conv
-    (function Idle -> false | Merging -> true)
-    (function false -> Idle | true -> Merging)
-    Data_encoding.bool
 
 let status_to_string = function Idle -> "idle" | Merging -> "merging"
 

@@ -25,6 +25,16 @@
 
 (** {1 Global types used in the store library} *)
 
+(** The type used to describe the status of the store i.e. whether we are 
+    in the merging process or not *)
+type block_store_status = Idle | Merging
+
+(** Equality function for {!block_store_status} *)
+val status_equal : block_store_status -> block_store_status -> bool
+
+(** Encoding for {!block_store_status} *)
+val block_store_status_encoding : block_store_status Data_encoding.t
+
 (** The type used to describe a block pointer i.e. its hash and level. *)
 type block_descriptor = Block_hash.t * int32
 
