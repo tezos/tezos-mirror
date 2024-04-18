@@ -236,14 +236,11 @@ let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
       | Found_boot_sector boot_sector -> return boot_sector
       | _ -> missing_boot_sector ())
 
-let find_whitelist cctxt rollup_address =
+let find_whitelist cctxt ?block rollup_address =
+  let block = match block with Some b -> `Hash (b, 0) | None -> `Head 0 in
   Plugin.RPC.Sc_rollup.whitelist
     (new Protocol_client_context.wrap_full (cctxt :> Client_context.full))
-    ( cctxt#chain,
-      `Head 0
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/6152
-         Rollup node: investigate use cctxt#block instead of `Head 0 in RPC calls*)
-    )
+    (cctxt#chain, block)
     rollup_address
 
 let find_last_whitelist_update cctxt rollup_address =
