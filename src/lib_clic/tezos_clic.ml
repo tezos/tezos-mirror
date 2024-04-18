@@ -1474,6 +1474,18 @@ let find_command tree initial_arguments =
           traverse nts arguments' (parameter :: acc)
     | TPrefix {stop = Some cmd; _}, [] ->
         return (cmd, empty_args_dict, initial_arguments)
+    | ( TPrefix {stop = Some (Command {options; _} as command); _},
+        (hd :: _ as remaining) )
+      when String.length hd > 0 && hd.[0] = '-' -> (
+        let* args_dict, unparsed =
+          make_args_dict_filter ~command options remaining
+        in
+        match unparsed with
+        | [] -> return (command, args_dict, initial_arguments)
+        | hd :: _ ->
+            if String.length hd > 0 && hd.[0] = '-' then
+              tzfail (Unknown_option (hd, Some command))
+            else tzfail (Extra_arguments (unparsed, command)))
     | TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _) ->
         tzfail (Unterminated_command (initial_arguments, gather_assoc prefix))
     | TPrefix {prefix; _}, hd_arg :: tl -> (
