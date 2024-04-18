@@ -1880,10 +1880,29 @@ module Manager = struct
           let* () = check_batch_tail_sanity source counter rest in
           return (source, None, counter)
 
+  let assert_sponsored_operations_feature_enabled vi =
+    error_unless
+      (Constants.sponsored_operations_enable vi.ctxt)
+      Sponsored_transaction_feature_disabled
+
+  let rec check_for_hosted_ops :
+      type kind. _ -> kind Kind.manager contents_list -> unit tzresult =
+   fun vi contents_list ->
+    let open Result_syntax in
+    match contents_list with
+    | Single (Manager_operation {operation = Host _; _}) ->
+        assert_sponsored_operations_feature_enabled vi
+    | Single (Manager_operation _) -> return_unit
+    | Cons (Manager_operation {operation = Host _; _}, _) ->
+        assert_sponsored_operations_feature_enabled vi
+    | Cons (Manager_operation _, rest) -> check_for_hosted_ops vi rest
+
   (** Check a few simple properties of the batch, and return the
       initial {!batch_state} and the contract public key.
 
       Invariants checked:
+
+      - The feature flag for sponsored operations.
 
       - All operations in a batch have the same source.
 
@@ -1905,6 +1924,7 @@ module Manager = struct
   let check_sanity_and_find_public_key vi
       (contents_list : _ Kind.manager contents_list) =
     let open Lwt_result_syntax in
+    let*? () = check_for_hosted_ops vi contents_list in
     let*? source, revealed_key, first_counter = check_batch contents_list in
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
@@ -1968,11 +1988,6 @@ module Manager = struct
 
   let assert_zk_rollup_feature_enabled vi =
     error_unless (Constants.zk_rollup_enable vi.ctxt) Zk_rollup_feature_disabled
-
-  let assert_sponsored_operations_feature_enabled vi =
-    error_unless
-      (Constants.sponsored_operations_enable vi.ctxt)
-      Sponsored_transaction_feature_disabled
 
   let consume_decoding_gas remaining_gas lexpr =
     record_trace Gas_quota_exceeded_init_deserialize

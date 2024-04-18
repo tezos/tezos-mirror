@@ -125,6 +125,43 @@ type gas_limit =
 (** Pretty printer for gas_limit type. *)
 val pp_gas_limit : Format.formatter -> gas_limit -> unit
 
+(** Packs a manager operation into a contents list.
+
+    @param force_reveal Prepends the operation to reveal [source]'s
+      public key if the latter has not been revealed yet. Disabled
+      by default (i.e., set to [false]).
+
+    @param counter Specifies the expected current counter, meaning
+      that the operation's counter will actually be [counter + 1].
+      Defaults to the correct current counter for [source] in the
+      context.
+
+    @param fee Specifies the fee. Defaults to [Tez.zero].
+
+    @param gas_limit Specifies the gas limit. Defaults to a high
+      limit of around 50_000 gas units.
+
+    @param storage_limit Specifies the storage limit. Defaults to
+      [Z.of_int 60_000].
+
+    @param public_key The actual [source] written in the operation
+      will be the hash of [public_key]. Defaults to the public key
+      that corresponds to the [source] argument.
+
+    @param source Used to retrieve defaults values of [counter] and
+      [public_key]. *)
+val manager_operation :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  ?public_key:public_key ->
+  source:Contract.t ->
+  Context.t ->
+  'a manager_operation ->
+  packed_contents_list tzresult Lwt.t
+
 val transaction :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
