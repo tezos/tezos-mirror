@@ -19,6 +19,7 @@ const commander = require('commander');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 const transfer_prototype_json = require('./transfer_prototype.json');
 const create_prototype_json = require('./create_prototype.json');
@@ -112,7 +113,7 @@ const print_list = function (src, mode, blueprint_number) {
 
 function temporary_data_file(data) {
     const tmp_dir = os.tmpdir();
-    const tmp_file = path.join(tmp_dir, "chunker_data");
+    const tmp_file = path.join(tmp_dir, `chunker_data_${uuidv4()}`);
 
     fs.writeFileSync(tmp_file, data);
     return tmp_file;
