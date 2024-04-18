@@ -4681,19 +4681,25 @@ let test_arg_boot_sector_file ~kind =
   let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
   unit
 
-let test_unsafe_genesis_patch ~kind =
+let test_unsafe_genesis_patch ~private_ ~kind =
   let commitment_period = 3 in
   let max_nb_tick = 50_000_000_000_000L in
-  let should_fail = match kind with "wasm_2_0_0" -> false | _ -> true in
+  let unsupported_pvm = match kind with "wasm_2_0_0" -> false | _ -> true in
+  let should_fail = unsupported_pvm || not private_ in
+  let operator = Constant.bootstrap1.public_key_hash in
+  let whitelist = if private_ then Some [operator] else None in
   test_full_scenario
     ~kind
     ~commitment_period
+    ~supports:(Protocol.From_protocol 018)
+    ?whitelist
     {
       variant = None;
       tags = ["node"; "unsafe_patch"];
       description =
         sf
-          "Rollup can%s apply unsafe genesis PVM patches"
+          "Rollup (%s) can%s apply unsafe genesis PVM patches"
+          (if private_ then "private" else "public")
           (if should_fail then "not" else "");
     }
   @@ fun _protocol rollup_node rollup _node client ->
@@ -4710,10 +4716,13 @@ let test_unsafe_genesis_patch ~kind =
   () ;
   let* () = Sc_rollup_node.run ~wait_ready:false rollup_node rollup [] in
   if should_fail then
-    Sc_rollup_node.check_error
-      ~exit_code:1
-      ~msg:(rex "Patch .* is not supported")
-      rollup_node
+    let msg =
+      if unsupported_pvm then rex "Patch .* is not supported"
+      else if not private_ then
+        rex "Unsafe PVM patches can only be applied in private rollups"
+      else assert false
+    in
+    Sc_rollup_node.check_error ~exit_code:1 ~msg rollup_node
   else
     let* () = bake_levels (commitment_period + 4) client in
     let* _ = Sc_rollup_node.wait_sync ~timeout:10. rollup_node in
@@ -5749,7 +5758,8 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_outbox_message protocols ~kind ;
-  test_unsafe_genesis_patch protocols ~kind
+  test_unsafe_genesis_patch protocols ~private_:true ~kind ;
+  test_unsafe_genesis_patch protocols ~private_:false ~kind
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
