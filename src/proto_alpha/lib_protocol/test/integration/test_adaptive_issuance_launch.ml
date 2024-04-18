@@ -466,7 +466,7 @@ let test_does_not_launch_without_feature_flag threshold vote_duration =
 
 (* Test that with force_activation feature flag set, the feature activates
    without waiting for the activation vote *)
-let test_launch_without_vote =
+let test_launch_without_vote () =
   let open Lwt_result_wrap_syntax in
   (* Initialize the state with a single delegate. *)
   let constants =
@@ -552,7 +552,7 @@ let () =
   register_test
     ~title:
       "Launch with force_activation feature flag set activates AI immediately"
-  @@ fun () -> test_launch_without_vote
+    test_launch_without_vote
 
 let () =
   register_test
