@@ -244,6 +244,13 @@ let build_raw_rpc_directory_without_validator
         (Tezos_rpc.Service.subst0 s)
         (fun block p q -> f block p q)
   in
+  let opt_register0 s f =
+    dir :=
+      Tezos_rpc.Directory.opt_register
+        !dir
+        (Tezos_rpc.Service.subst0 s)
+        (fun block p q -> f block p q)
+  in
   let register1 s f =
     dir :=
       Tezos_rpc.Directory.register
@@ -665,7 +672,7 @@ let build_raw_rpc_directory_without_validator
           let*! v = Context_ops.merkle_tree_v2 context leaf_kind path in
           return_some v) ;
   (* info *)
-  register0 S.info (fun (chain_store, block) q () ->
+  opt_register0 S.info (fun (chain_store, block) q () ->
       let chain_id = Store.Chain.chain_id chain_store in
       let hash = Store.Block.hash block in
       let header = Store.Block.header block in
@@ -675,49 +682,14 @@ let build_raw_rpc_directory_without_validator
           Proto.block_header_data_encoding
           header.protocol_data
       in
+      let with_metadata =
+        with_metadata ~force_metadata:q#force_metadata ~metadata:q#metadata
+      in
       let* metadata =
         let*! metadata = block_metadata chain_store block in
         return (Option.of_result metadata)
       in
-      let* operations =
-        let with_metadata =
-          with_metadata ~force_metadata:q#force_metadata ~metadata:q#metadata
-        in
-        match with_metadata with
-        | Some `Always -> (
-            let ops = Store.Block.operations block in
-            let* metadata = Store.Block.get_block_metadata chain_store block in
-            let ops_metadata = metadata.operations_metadata in
-            let* ops_metadata =
-              (* Iter through the operations metadata to check if some are
-                 considered as too large. *)
-              if
-                List.exists
-                  (fun v ->
-                    List.exists
-                      (fun v -> v = Block_validation.Too_large_metadata)
-                      v)
-                  ops_metadata
-              then
-                (* The metadatas are stored but contains some too large
-                   metadata, we need te recompute them *)
-                force_operation_metadata chain_id chain_store block
-              else return ops_metadata
-            in
-            List.map2_e
-              ~when_different_lengths:()
-              (List.map2
-                 ~when_different_lengths:()
-                 (convert_with_metadata chain_id))
-              ops
-              ops_metadata
-            |> function
-            | Ok v -> return v
-            | Error () -> fail_with_exn Not_found)
-        | Some `Never -> operations_without_metadata chain_store block
-        | None -> operations chain_store block
-      in
-      return
+      let make_block_info operations =
         ( q#version,
           {
             Block_services.hash;
@@ -725,7 +697,48 @@ let build_raw_rpc_directory_without_validator
             header = {shell; protocol_data};
             metadata;
             operations;
-          } )) ;
+          } )
+      in
+      match (with_metadata, metadata) with
+      | Some `Always, None -> return_none
+      | Some `Always, Some _metadata -> (
+          let ops = Store.Block.operations block in
+          let* block_metadata_from_store =
+            Store.Block.get_block_metadata chain_store block
+          in
+          let ops_metadata = block_metadata_from_store.operations_metadata in
+          let* ops_metadata =
+            (* Iter through the operations metadata to check if some are
+               considered as too large. *)
+            if
+              List.exists
+                (fun v ->
+                  List.exists
+                    (fun v -> v = Block_validation.Too_large_metadata)
+                    v)
+                ops_metadata
+            then
+              (* The metadatas are stored but contains some too large
+                 metadata, we need te recompute them *)
+              force_operation_metadata chain_id chain_store block
+            else return ops_metadata
+          in
+          List.map2_e
+            ~when_different_lengths:()
+            (List.map2
+               ~when_different_lengths:()
+               (convert_with_metadata chain_id))
+            ops
+            ops_metadata
+          |> function
+          | Ok operations -> return_some (make_block_info operations)
+          | Error () -> return_none)
+      | Some `Never, _ ->
+          let* operations = operations_without_metadata chain_store block in
+          return_some (make_block_info operations)
+      | None, _ ->
+          let* operations = operations chain_store block in
+          return_some (make_block_info operations)) ;
   (* helpers *)
   register0
     S.Helpers.Preapply.operations
