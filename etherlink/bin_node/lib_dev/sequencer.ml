@@ -67,23 +67,32 @@ let install_finalizer_seq server private_server =
   let* () = Blueprints_publisher.shutdown () in
   return_unit
 
-let callback_log server conn req body =
+let callback server dir =
   let open Cohttp in
   let open Lwt_syntax in
-  let path = Request.uri req |> Uri.path in
-  if path = "/metrics" then
-    let* response = Metrics.Metrics_server.callback conn req body in
-    Lwt.return (`Response response)
-  else
-    let uri = req |> Request.uri |> Uri.to_string in
-    let meth = req |> Request.meth |> Code.string_of_method in
-    let* body_str = body |> Cohttp_lwt.Body.to_string in
-    let* () = Events.callback_log ~uri ~meth ~body:body_str in
-    Tezos_rpc_http_server.RPC_server.resto_callback
-      server
-      conn
-      req
-      (Cohttp_lwt.Body.of_string body_str)
+  let callback_log conn req body =
+    let path = Request.uri req |> Uri.path in
+    if path = "/metrics" then
+      let* response = Metrics.Metrics_server.callback conn req body in
+      Lwt.return (`Response response)
+    else
+      let uri = req |> Request.uri |> Uri.to_string in
+      let meth = req |> Request.meth |> Code.string_of_method in
+      let* body_str = body |> Cohttp_lwt.Body.to_string in
+      let* () = Events.callback_log ~uri ~meth ~body:body_str in
+      Tezos_rpc_http_server.RPC_server.resto_callback
+        server
+        conn
+        req
+        (Cohttp_lwt.Body.of_string body_str)
+  in
+  let update_metrics uri meth =
+    Prometheus.Summary.(time (labels Metrics.Rpc.metrics [uri; meth]) Sys.time)
+  in
+  Tezos_rpc_http_server.RPC_middleware.rpc_metrics_transform_callback
+    ~update_metrics
+    dir
+    callback_log
 
 let start_server
     Configuration.
@@ -133,7 +142,7 @@ let start_server
           ~max_active_connections
           ~host
           server
-          ~callback:(callback_log server)
+          ~callback:(callback server directory)
           node
       in
       let*! () =
@@ -145,7 +154,6 @@ let start_server
                 ~max_active_connections
                 ~host
                 private_server
-                ~callback:(callback_log private_server)
                 (`TCP (`Port private_rpc_port))
             in
             Events.private_server_is_ready
