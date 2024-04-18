@@ -28,6 +28,11 @@ variable "docker_registry_name" {
   default     = "docker-registry"
 }
 
+variable "docker_image_name" {
+  type        = string
+  description = "The docker image name"
+}
+
 variable "base_port" {
   type        = number
   description = "First open port by the firewall"
@@ -93,7 +98,7 @@ module "gce-container" {
   source  = "terraform-google-modules/container-vm/google"
   version = "~> 3.0"
 
-  container = { image = "${local.artifact_registry}/${var.project_id}/${var.docker_registry_name}/${terraform.workspace}" }
+  container = { image = "${local.artifact_registry}/${var.project_id}/${var.docker_registry_name}/${var.docker_image_name}" }
 }
 
 # When running a VM, it must be associated with a Virtual Private

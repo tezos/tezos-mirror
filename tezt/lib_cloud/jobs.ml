@@ -97,7 +97,10 @@ let destroy_vms ~tags =
   @@ fun () ->
   let tezt_cloud = Lazy.force Env.tezt_cloud in
   Log.info "Tezt_Cloud found with value: %s" tezt_cloud ;
-  Terraform.VM.destroy ()
+  (* TODO: Destroy machines per workspace. *)
+  let* () = Terraform.VM.destroy () in
+  let* () = Terraform.VM.Workspace.select "default" in
+  Terraform.VM.Workspace.destroy ()
 
 let prometheus_import ~tags =
   Test.register

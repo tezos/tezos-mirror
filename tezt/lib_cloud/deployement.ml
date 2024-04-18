@@ -71,6 +71,8 @@ module Remote = struct
     let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud in
     let machine_type = Cli.machine_type in
     let* () = Terraform.Docker_registry.init () in
+    let* () = Terraform.VM.Workspace.init [tezt_cloud] in
+    let* () = Terraform.VM.Workspace.select tezt_cloud in
     let* () = Terraform.VM.init () in
     let* () =
       Terraform.VM.deploy
@@ -135,7 +137,8 @@ module Remote = struct
           (Printexc.to_string exn)) ;
     if Cli.destroy then (
       Log.report "Destroying VMs, this may take a while..." ;
-      Terraform.VM.destroy ())
+      let* () = Terraform.VM.destroy () in
+      Terraform.VM.Workspace.destroy ())
     else (
       Log.report
         "No VM destroyed! Don't forget to destroy them when you are done with \

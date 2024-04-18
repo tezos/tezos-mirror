@@ -16,6 +16,14 @@ module Docker_registry : sig
 end
 
 module VM : sig
+  module Workspace : sig
+    val init : string list -> unit Lwt.t
+
+    val select : string -> unit Lwt.t
+
+    val destroy : unit -> unit Lwt.t
+  end
+
   val init : unit -> unit Lwt.t
 
   val deploy :
