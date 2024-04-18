@@ -29,6 +29,8 @@ mod rpc_encoding;
 mod server;
 mod shutdown;
 
+mod types;
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
