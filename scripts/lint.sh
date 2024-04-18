@@ -41,6 +41,7 @@ source_directories=(src docs/doc_gen tezt devtools contrib etherlink client-libs
 license_check_exclude=$(
   cat << EOF
 .*_generated.ml
+src/lib_protocol_environment/sigs/.*
 EOF
 )
 
