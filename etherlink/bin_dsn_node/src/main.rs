@@ -29,6 +29,7 @@ mod rpc_encoding;
 mod server;
 mod shutdown;
 
+mod rpc_helpers;
 mod types;
 
 #[derive(Parser)]
