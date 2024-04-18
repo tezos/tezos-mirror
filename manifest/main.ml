@@ -29,6 +29,7 @@ open Manifest
 module Externals = Externals
 open Externals
 module Internals = Internals
+module Data_encoding = Product_data_encoding
 module Octez = Product_octez
 open Octez
 module Client_libs = Product_client_libs
@@ -92,7 +93,7 @@ let () =
       tezt_cloud |> open_;
       Octez.tezt_risc_v_sandbox;
       tezt_tx_kernel;
-      data_encoding;
+      Data_encoding.data_encoding;
       octez_base;
       octez_base_unix;
       octez_stdlib_unix;
