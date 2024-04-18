@@ -1,7 +1,5 @@
-[package]
-name = "jstz"
-version = "0.0.0"
-edition = "2021"
+[workspace]
+members = ["kernel"]
 
 [patch.crates-io]
 tezos-smart-rollup = { path = "../../kernel_sdk/sdk" }
@@ -22,7 +20,7 @@ boa_macros = { git = "https://github.com/trilitech/boa.git", branch = "sam.finch
 boa_parser = { git = "https://github.com/trilitech/boa.git", branch = "sam.finch@/context/expose-instruction-count" }
 boa_profiler = { git = "https://github.com/trilitech/boa.git", branch = "sam.finch@/context/expose-instruction-count" }
 
-[dependencies.tezos-smart-rollup]
+[workspace.dependencies.tezos-smart-rollup]
 version = "0.2.2"
 default-features = false
 features = [
@@ -34,6 +32,6 @@ features = [
   "experimental-host-in-memory-store",
 ]
 
-[dependencies.jstz_kernel]
+[workspace.dependencies.jstz_kernel]
 git = "https://github.com/trilitech/jstz.git"
 rev = "3b04f3226e8feebd1ea44cf11d11e018c8e8df5e"

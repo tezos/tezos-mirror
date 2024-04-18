@@ -1,0 +1,8 @@
+[package]
+name = "jstz"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+tezos-smart-rollup.workspace = true
+jstz_kernel.workspace = true
