@@ -74,14 +74,6 @@ val on_new_head :
 (** [get_profiles node_store] returns the list of profiles that the node tracks *)
 val get_profiles : t -> Types.profiles
 
-(** See {!Services.get_attestable_slots} *)
-val get_attestable_slots :
-  shard_indices:int list ->
-  Store.t ->
-  Dal_plugin.proto_parameters ->
-  attested_level:int32 ->
-  (Types.attestable_slots, [Errors.decoding | Errors.other]) result Lwt.t
-
 (* Returns the number of previous blocks for which we want to keep the shards
    in the storage, depending on the profile of the node (3 months for observer
    & slot producer, twice attestation lag for attester) *)
