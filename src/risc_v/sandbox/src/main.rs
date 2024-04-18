@@ -3,12 +3,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use cli::Options;
+use cli::{DebugOptions, ExitMode, RunOptions, RvemuOptions};
 use risc_v_interpreter::{
-    machine_state::mode::Mode,
-    traps::EnvironException,
-    Interpreter,
-    InterpreterResult::{self},
+    machine_state::mode::Mode, traps::EnvironException, Interpreter, InterpreterResult,
 };
 use rvemu::emulator::Emulator;
 use std::{error::Error, path::Path};
@@ -29,7 +26,7 @@ fn format_status(result: &InterpreterResult) -> String {
     use InterpreterResult::*;
     match result {
         Exit { code: 0, .. } => "Ok (exit code = 0)".to_string(),
-        Exit { code, .. } => format!("Failed with exit code {}", code),
+        Exit { code, .. } => format!("Failed with exit code = {}", code),
         Running(_) => "Timeout".to_string(),
         Exception(exc, _) => format!("{}", exception_to_error(exc)),
     }
@@ -40,19 +37,24 @@ pub fn exception_to_error(exc: &EnvironException) -> Box<dyn Error> {
     format!("{:?}", exc).into()
 }
 
-fn run(opts: Options) -> Result<(), Box<dyn Error>> {
-    let contents = std::fs::read(&opts.input)?;
+fn run(opts: RunOptions) -> Result<(), Box<dyn Error>> {
+    let contents = std::fs::read(&opts.common.input)?;
     let mut backend = Interpreter::create_backend();
-    let mut interpreter = Interpreter::new(&mut backend, &contents, None, posix_exit_mode(&opts))?;
+    let mut interpreter = Interpreter::new(
+        &mut backend,
+        &contents,
+        None,
+        posix_exit_mode(&opts.common.posix_exit_mode),
+    )?;
 
-    match interpreter.run(opts.max_steps) {
+    match interpreter.run(opts.common.max_steps) {
         InterpreterResult::Exit { code: 0, .. } => Ok(()),
         result => Err(format_status(&result).into()),
     }
 }
 
-fn debug(opts: Options) -> Result<(), Box<dyn Error>> {
-    let path = Path::new(&opts.input);
+fn debug(opts: DebugOptions) -> Result<(), Box<dyn Error>> {
+    let path = Path::new(&opts.common.input);
     let fname = path
         .file_name()
         .ok_or("Invalid program path")?
@@ -62,32 +64,29 @@ fn debug(opts: Options) -> Result<(), Box<dyn Error>> {
     Ok(debugger::DebuggerApp::launch(
         fname,
         &contents,
-        match opts.posix_exit_mode {
-            cli::ExitMode::User => Mode::User,
-            cli::ExitMode::Supervisor => Mode::Supervisor,
-            cli::ExitMode::Machine => Mode::Machine,
-        },
+        posix_exit_mode(&opts.common.posix_exit_mode),
     )?)
 }
 
-fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
+fn rvemu(opts: RvemuOptions) -> Result<(), Box<dyn Error>> {
     let mut emu = Emulator::new();
 
     // Load the ELF binary into the emulator.
-    let contents = std::fs::read(&opts.input)?;
+    let contents = std::fs::read(&opts.common.input)?;
 
     rvemu_boot::setup_boot(&mut emu, &contents, opts.initrd)?;
 
     // Rollup metadata
+    let inbox_opt = opts.common.inbox;
     let meta = rvemu_syscall::RollupMetadata {
-        origination_level: opts.origination_level,
-        address: SmartRollupAddress::from_b58check(opts.address.as_str()).unwrap(),
+        origination_level: inbox_opt.origination_level,
+        address: SmartRollupAddress::from_b58check(inbox_opt.address.as_str()).unwrap(),
     };
 
     // Prepare inbox
     let mut inbox = inbox::InboxBuilder::new();
 
-    if let Some(inbox_file) = opts.inbox_file {
+    if let Some(inbox_file) = inbox_opt.file {
         inbox.load_from_file(&inbox_file)?;
     } else {
         inbox
@@ -123,7 +122,7 @@ fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
 
     let mut prev_pc = emu.cpu.pc;
 
-    while inbox.none_count() < 2 || opts.keep_going {
+    while inbox.none_count() < 2 || inbox_opt.keep_going {
         emu.cpu.devices_increment();
 
         if let Some(interrupt) = emu.cpu.check_pending_interrupt() {
@@ -177,11 +176,11 @@ fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn posix_exit_mode(opts: &Options) -> Mode {
-    match opts.posix_exit_mode {
-        cli::ExitMode::User => Mode::User,
-        cli::ExitMode::Supervisor => Mode::Supervisor,
-        cli::ExitMode::Machine => Mode::Machine,
+fn posix_exit_mode(exit_mode: &ExitMode) -> Mode {
+    match exit_mode {
+        ExitMode::User => Mode::User,
+        ExitMode::Supervisor => Mode::Supervisor,
+        ExitMode::Machine => Mode::Machine,
     }
 }
 

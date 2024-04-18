@@ -3,31 +3,20 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{cli::Options, format_status, posix_exit_mode};
+use crate::{bench::data::SimpleBenchData, cli::BenchOptions, format_status, posix_exit_mode};
 use risc_v_interpreter::{Interpreter, InterpreterResult};
-use std::{error::Error, fmt::Display, time::Duration};
+use std::error::Error;
 
-struct SimpleBenchData {
-    duration: Duration,
-    steps: usize,
-}
-
-impl Display for SimpleBenchData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let f_duration = format!("Duration: {:?}", self.duration);
-        let f_steps = format!("Steps:    {}", self.steps);
-        write!(f, "Simple bench data:\n {}\n {}", f_duration, f_steps)
-    }
-}
+mod data;
 
 /// A single run of the given `interpreter`.
 /// Provides basic benchmark data and interpreter result.
 fn bench_simple(
     interpreter: &mut Interpreter,
-    opts: Options,
+    opts: BenchOptions,
 ) -> (SimpleBenchData, InterpreterResult) {
     let start = quanta::Instant::now();
-    let res = interpreter.run(opts.max_steps);
+    let res = interpreter.run(opts.common.max_steps);
     let duration = start.elapsed();
 
     use InterpreterResult::*;
@@ -36,15 +25,20 @@ fn bench_simple(
         Running(steps) => steps,
         Exception(_exc, steps) => steps,
     };
-    let data = SimpleBenchData { duration, steps };
+    let data = SimpleBenchData::new(duration, steps);
 
     (data, res)
 }
 
-pub fn bench(opts: Options) -> Result<(), Box<dyn Error>> {
-    let contents = std::fs::read(&opts.input)?;
+pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
+    let contents = std::fs::read(&opts.common.input)?;
     let mut backend = Interpreter::create_backend();
-    let mut interpreter = Interpreter::new(&mut backend, &contents, None, posix_exit_mode(&opts))?;
+    let mut interpreter = Interpreter::new(
+        &mut backend,
+        &contents,
+        None,
+        posix_exit_mode(&opts.common.posix_exit_mode),
+    )?;
 
     let (bench_data, result) = bench_simple(&mut interpreter, opts);
 

@@ -3,8 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::fmt::{self};
-
 use crate::{
     interpreter::float::RoundingMode,
     machine_state::{
@@ -12,6 +10,7 @@ use crate::{
         registers::{FRegister, XRegister},
     },
 };
+use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct RTypeArgs {
