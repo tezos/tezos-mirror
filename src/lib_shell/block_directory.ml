@@ -157,7 +157,75 @@ let with_metadata ~force_metadata ~metadata =
   | _, Some `Never -> Some `Never
   | _, None -> None
 
-let build_raw_rpc_directory (module Proto : Block_services.PROTO)
+let build_raw_rpc_directory_with_validator (module Proto : Block_services.PROTO)
+    (module Next_proto : Registered_protocol.T) =
+  let open Lwt_result_syntax in
+  let dir : (Store.chain_store * Store.Block.block) Tezos_rpc.Directory.t ref =
+    ref Tezos_rpc.Directory.empty
+  in
+  let register0 s f =
+    dir :=
+      Tezos_rpc.Directory.register
+        !dir
+        (Tezos_rpc.Service.subst0 s)
+        (fun block p q -> f block p q)
+  in
+  let module Block_services = Block_services.Make (Proto) (Next_proto) in
+  let module S = Block_services.S in
+  (* helpers *)
+  register0 S.Helpers.Preapply.block (fun (chain_store, block) q p ->
+      let timestamp =
+        match q#timestamp with
+        | None -> Time.System.to_protocol (Time.System.now ())
+        | Some time -> time
+      in
+      let protocol_data =
+        Data_encoding.Binary.to_bytes_exn
+          Next_proto.block_header_data_encoding
+          p.protocol_data
+      in
+      let operations =
+        List.map
+          (fun operations ->
+            let operations =
+              List.map
+                (fun op ->
+                  let proto =
+                    Data_encoding.Binary.to_bytes_exn
+                      Next_proto
+                      .operation_data_encoding_with_legacy_attestation_name
+                      op.Next_proto.protocol_data
+                  in
+                  (op, {Operation.shell = op.shell; proto}))
+                operations
+            in
+            let operations =
+              if q#sort_operations then
+                List.sort
+                  (fun (op, ops) (op', ops') ->
+                    let oph, oph' = (Operation.hash ops, Operation.hash ops') in
+                    Next_proto.compare_operations (oph, op) (oph', op'))
+                  operations
+              else operations
+            in
+            List.map snd operations)
+          p.operations
+      in
+      let* bv =
+        try return (Block_validator.running_worker ())
+        with _ -> failwith "Block validator is not running"
+      in
+      Block_validator.preapply
+        bv
+        chain_store
+        ~predecessor:block
+        ~timestamp
+        ~protocol_data
+        operations) ;
+  !dir
+
+let build_raw_rpc_directory_without_validator
+    (module Proto : Block_services.PROTO)
     (module Next_proto : Registered_protocol.T) =
   let open Lwt_result_syntax in
   let dir : (Store.chain_store * Store.Block.block) Tezos_rpc.Directory.t ref =
@@ -659,55 +727,6 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
             operations;
           } )) ;
   (* helpers *)
-  register0 S.Helpers.Preapply.block (fun (chain_store, block) q p ->
-      let timestamp =
-        match q#timestamp with
-        | None -> Time.System.to_protocol (Time.System.now ())
-        | Some time -> time
-      in
-      let protocol_data =
-        Data_encoding.Binary.to_bytes_exn
-          Next_proto.block_header_data_encoding
-          p.protocol_data
-      in
-      let operations =
-        List.map
-          (fun operations ->
-            let operations =
-              List.map
-                (fun op ->
-                  let proto =
-                    Data_encoding.Binary.to_bytes_exn
-                      Next_proto
-                      .operation_data_encoding_with_legacy_attestation_name
-                      op.Next_proto.protocol_data
-                  in
-                  (op, {Operation.shell = op.shell; proto}))
-                operations
-            in
-            let operations =
-              if q#sort_operations then
-                List.sort
-                  (fun (op, ops) (op', ops') ->
-                    let oph, oph' = (Operation.hash ops, Operation.hash ops') in
-                    Next_proto.compare_operations (oph, op) (oph', op'))
-                  operations
-              else operations
-            in
-            List.map snd operations)
-          p.operations
-      in
-      let* bv =
-        try return (Block_validator.running_worker ())
-        with _ -> failwith "Block validator is not running"
-      in
-      Block_validator.preapply
-        bv
-        chain_store
-        ~predecessor:block
-        ~timestamp
-        ~protocol_data
-        operations) ;
   register0
     S.Helpers.Preapply.operations
     (fun (chain_store, block) params ops ->
@@ -839,7 +858,7 @@ let get_protocol hash =
   | None -> raise Not_found
   | Some protocol -> protocol
 
-let get_directory chain_store block =
+let get_directory chain_store block ~with_validator =
   let open Lwt_syntax in
   let* o = Store.Chain.get_rpc_directory chain_store block in
   match o with
@@ -849,13 +868,20 @@ let get_directory chain_store block =
         Store.Block.protocol_hash_exn chain_store block
       in
       let (module Next_proto) = get_protocol next_protocol_hash in
-      let build_fake_rpc_directory () =
-        build_raw_rpc_directory
-          (module Block_services.Fake_protocol)
-          (module Next_proto)
-      in
       if Store.Block.is_genesis chain_store (Store.Block.hash block) then
-        Lwt.return (build_fake_rpc_directory ())
+        let dir =
+          build_raw_rpc_directory_without_validator
+            (module Block_services.Fake_protocol)
+            (module Next_proto)
+        in
+        if with_validator then
+          let dir_with_validator =
+            build_raw_rpc_directory_with_validator
+              (module Block_services.Fake_protocol)
+              (module Next_proto)
+          in
+          Lwt.return (Tezos_rpc.Directory.merge dir dir_with_validator)
+        else Lwt.return dir
       else
         let* (module Proto) =
           let* o = Store.Block.read_predecessor_opt chain_store block in
@@ -888,7 +914,21 @@ let get_directory chain_store block =
         | Some dir -> Lwt.return dir
         | None ->
             let dir =
-              build_raw_rpc_directory (module Proto) (module Next_proto)
+              let dir_without_validator =
+                build_raw_rpc_directory_without_validator
+                  (module Proto)
+                  (module Next_proto)
+              in
+              if with_validator then
+                let dir_with_validator =
+                  build_raw_rpc_directory_with_validator
+                    (module Proto)
+                    (module Next_proto)
+                in
+                Tezos_rpc.Directory.merge
+                  dir_without_validator
+                  dir_with_validator
+              else dir_without_validator
             in
             let* () =
               Store.Chain.set_rpc_directory
@@ -899,12 +939,22 @@ let get_directory chain_store block =
             in
             Lwt.return dir)
 
-let build_rpc_directory chain_store block =
+let build_rpc_directory_with_validator chain_store block =
   let open Lwt_syntax in
   let* o = Store.Chain.block_of_identifier_opt chain_store block in
   match o with
   | None -> Lwt.fail Not_found
   | Some b ->
-      let* dir = get_directory chain_store b in
+      let* dir = get_directory ~with_validator:true chain_store b in
+      Lwt.return
+        (Tezos_rpc.Directory.map (fun _ -> Lwt.return (chain_store, b)) dir)
+
+let build_rpc_directory_without_validator chain_store block =
+  let open Lwt_syntax in
+  let* o = Store.Chain.block_of_identifier_opt chain_store block in
+  match o with
+  | None -> Lwt.fail Not_found
+  | Some b ->
+      let* dir = get_directory ~with_validator:false chain_store b in
       Lwt.return
         (Tezos_rpc.Directory.map (fun _ -> Lwt.return (chain_store, b)) dir)
