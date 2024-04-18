@@ -56,10 +56,10 @@ macro_rules! create_field_constant {
 #[macro_export]
 macro_rules! create_get_field {
     ($name:ident, $f_type:ty, $offset:expr, $width:expr) => {
-        paste::paste! { pub fn [<get_ $name>] (reg_value: CSRValue) -> $f_type {
+        paste::paste! { pub fn [<get_ $name>]<I: Into<$crate::machine_state::csregisters::values::CSRRepr>>(reg_value: I) -> $f_type {
             use $crate::machine_state::csregisters::ones;
             use $crate::machine_state::csregisters::fields::FieldValue;
-            <$f_type>::new((reg_value >> $offset) & ones($width))
+            <$f_type>::new((reg_value.into() >> $offset) & ones($width))
         } }
     };
 }
@@ -67,13 +67,13 @@ macro_rules! create_get_field {
 #[macro_export]
 macro_rules! create_set_field {
     ($name:ident, $f_type:ty, $offset:expr, $width:expr) => {
-        paste::paste! {pub fn [<set_ $name>] (reg_value: CSRValue, new_value: $f_type) -> CSRValue {
+        paste::paste! {pub fn [<set_ $name>]<I: Into<$crate::machine_state::csregisters::values::CSRRepr>>(reg_value: I, new_value: $f_type) -> $crate::machine_state::csregisters::values::CSRRepr {
             use $crate::machine_state::csregisters::ones;
             use $crate::machine_state::csregisters::fields::FieldValue;
             // Get only the last width bits
             let field_bits = new_value.raw_bits() & ones($width);
             // clear the field bits
-            let reg_value = reg_value & !(ones($width) << $offset);
+            let reg_value = reg_value.into() & !(ones($width) << $offset);
             // set the field with the new bits
             reg_value | (field_bits << $offset)
         } }

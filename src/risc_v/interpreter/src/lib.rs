@@ -31,7 +31,7 @@ use exec_env::{
 };
 use machine_state::{
     bus::Address,
-    csregisters::{satp::TranslationAlgorithm, CSRValue, CSRegister},
+    csregisters::{satp::TranslationAlgorithm, CSRRepr, CSRegister},
     registers::{FRegister, FValue},
     AccessType,
 };
@@ -180,8 +180,8 @@ impl<'a> Interpreter<'a> {
         self.machine_state.hart.fregisters.read(reg)
     }
 
-    pub fn read_csregister(&self, reg: CSRegister) -> CSRValue {
-        self.machine_state.hart.csregisters.read(reg)
+    pub fn read_csregister(&self, reg: CSRegister) -> CSRRepr {
+        self.machine_state.hart.csregisters.read(reg).repr()
     }
 
     pub fn read_pc(&self) -> u64 {

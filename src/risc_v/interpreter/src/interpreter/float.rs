@@ -6,7 +6,7 @@
 
 use crate::{
     machine_state::{
-        csregisters::{CSRValue, CSRegister, CSRegisters},
+        csregisters::{CSRRepr, CSRegister, CSRegisters},
         hart_state::HartState,
         registers::{FRegister, FValue, XRegister},
     },
@@ -451,7 +451,9 @@ where
     pub(super) fn f_rounding_mode(&self, rm: InstrRoundingMode) -> Result<Round, Exception> {
         let rm = match rm {
             InstrRoundingMode::Static(rm) => rm,
-            InstrRoundingMode::Dynamic => self.csregisters.read(CSRegister::frm).try_into()?,
+            InstrRoundingMode::Dynamic => {
+                self.csregisters.read(CSRegister::frm).repr().try_into()?
+            }
         };
 
         Ok(rm.into())
@@ -548,10 +550,10 @@ impl Display for RoundingMode {
     }
 }
 
-impl TryFrom<CSRValue> for RoundingMode {
+impl TryFrom<CSRRepr> for RoundingMode {
     type Error = Exception;
 
-    fn try_from(value: CSRValue) -> Result<Self, Self::Error> {
+    fn try_from(value: CSRRepr) -> Result<Self, Self::Error> {
         match value {
             0b000 => Ok(Self::RNE),
             0b001 => Ok(Self::RTZ),

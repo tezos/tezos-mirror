@@ -16,7 +16,7 @@ use crate::{
     create_field,
     machine_state::{
         bus::Address,
-        csregisters::{fields::UnsignedValue, satp::SvLength, CSRValue},
+        csregisters::{fields::UnsignedValue, satp::SvLength, CSRRepr},
     },
 };
 use std::ops::RangeInclusive;
@@ -43,7 +43,7 @@ fn get_raw_vpn_i_range(sv_length: &SvLength, index: usize) -> Option<RangeInclus
 create_field!(PAGE_OFFSET, UnsignedValue, 0, PAGE_OFFSET_WIDTH as u64);
 
 /// Obtain VPN[index] from a virtual address specified by `sv_length` Standard.
-pub fn get_VPN_IDX(v_addr: Address, sv_length: &SvLength, index: usize) -> Option<CSRValue> {
+pub fn get_VPN_IDX(v_addr: Address, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
     let bit_range = get_raw_vpn_i_range(sv_length, index)?;
     let (start, end) = (
         bit_range.start() + PAGE_OFFSET_WIDTH,

@@ -16,7 +16,7 @@ use crate::{
     create_field,
     machine_state::{
         bus::Address,
-        csregisters::{fields::UnsignedValue, satp::SvLength, CSRValue},
+        csregisters::{fields::UnsignedValue, satp::SvLength},
     },
 };
 use std::ops::RangeInclusive;
@@ -83,7 +83,7 @@ mod tests {
     use crate::machine_state::csregisters::{
         fields::{FieldValue, UnsignedValue},
         satp::SvLength,
-        CSRValue,
+        CSRRepr,
     };
     use proptest::proptest;
 
@@ -100,8 +100,8 @@ mod tests {
         )| {
             use crate::machine_state::address_translation::physical_address as pa;
 
-            let run_tests = |sv_length, ppn_vals: Vec<CSRValue>, args| {
-                let mut addr = pa::set_PAGE_OFFSET(0, UnsignedValue::new(offset));
+            let run_tests = |sv_length, ppn_vals: Vec<CSRRepr>, args| {
+                let mut addr = pa::set_PAGE_OFFSET(0u64, UnsignedValue::new(offset));
                 for (idx, &ppn_idx) in ppn_vals.iter().enumerate() {
                     addr = pa::set_PPN_IDX(addr, sv_length, idx, ppn_idx).unwrap();
                 }

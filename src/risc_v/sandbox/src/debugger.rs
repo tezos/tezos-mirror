@@ -18,7 +18,7 @@ use risc_v_interpreter::{
             self,
             satp::{self, SvLength, TranslationAlgorithm},
             xstatus::{ExtensionValue, MPPValue, SPPValue},
-            CSRValue, CSRegister,
+            CSRRepr, CSRegister,
         },
         mode::Mode,
         registers, AccessType,
@@ -91,7 +91,7 @@ impl TranslationState {
         &mut self,
         faulting: bool,
         effective_mode: Option<TranslationAlgorithm>,
-        satp_val: CSRValue,
+        satp_val: CSRRepr,
     ) {
         self.effective = if faulting {
             EffectiveTranslationState::Faulting

@@ -94,11 +94,13 @@ impl<M: backend::Manager> HartState<M> {
         };
 
         // Setting xepc allows the trap handler to resume the previous computation
-        self.csregisters.write(xepc_reg, return_pc);
+        self.csregisters.write(xepc_reg, return_pc.into());
 
         // The trap handler wants to know what caused the trap
-        self.csregisters.write(xcause_reg, trap_source.xcause());
-        self.csregisters.write(xtval_reg, trap_source.xtval());
+        self.csregisters
+            .write(xcause_reg, trap_source.xcause().into());
+        self.csregisters
+            .write(xtval_reg, trap_source.xtval().into());
 
         // Configure machine status for the trap handler
         let mstatus = self.csregisters.read(CSRegister::mstatus);
@@ -141,12 +143,12 @@ impl<M: backend::Manager> HartState<M> {
                 )
             }
         };
-        self.csregisters.write(CSRegister::mstatus, mstatus);
+        self.csregisters.write(CSRegister::mstatus, mstatus.into());
 
         // Escalate the privilege to the corresponding mode
         self.mode.write(trap_mode.as_mode());
 
-        trap_source.trap_handler_address(self.csregisters.read(xtvec_reg))
+        trap_source.trap_handler_address(self.csregisters.read(xtvec_reg).repr())
     }
 }
 

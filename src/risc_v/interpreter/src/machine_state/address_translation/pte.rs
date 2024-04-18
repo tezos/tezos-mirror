@@ -14,7 +14,7 @@
 use super::physical_address;
 use crate::{
     create_field,
-    machine_state::csregisters::{fields::FieldValue, satp::SvLength, CSRValue},
+    machine_state::csregisters::{fields::FieldValue, satp::SvLength, CSRRepr},
 };
 use twiddle::Twiddle;
 
@@ -27,7 +27,7 @@ pub struct PPNField {
 
 impl PPNField {
     /// Obtain `PPN[index]` from a PPN field of a page table entry.
-    pub fn get_ppn_i(&self, sv_length: &SvLength, index: usize) -> Option<CSRValue> {
+    pub fn get_ppn_i(&self, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
         let bit_range = physical_address::get_raw_ppn_i_range(sv_length, index)?;
         Some(self.raw_bits.bits(bit_range))
     }

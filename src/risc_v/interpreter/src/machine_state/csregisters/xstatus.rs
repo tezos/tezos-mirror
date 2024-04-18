@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{
     create_field,
-    machine_state::{csregisters::CSRValue, mode::Mode},
+    machine_state::{csregisters::CSRRepr, mode::Mode},
 };
 
 /// Field in `mstatus` for a boolean value
@@ -171,11 +171,11 @@ create_field!(MNPV, bool, 7, 1);
 // When 1 - Non-maskable interrupts are enabled (and all other interrupts behave as normal)
 create_field!(NMIE, bool, 3, 1);
 
-const fn field_mask(field_data: FieldProps) -> CSRValue {
+const fn field_mask(field_data: FieldProps) -> CSRRepr {
     ones(field_data.width) << field_data.offset
 }
 
-pub const SSTATUS_FIELDS_MASK: CSRValue = field_mask(SD)
+pub const SSTATUS_FIELDS_MASK: CSRRepr = field_mask(SD)
     | field_mask(UXL)
     | field_mask(MXR)
     | field_mask(SUM)
@@ -187,7 +187,7 @@ pub const SSTATUS_FIELDS_MASK: CSRValue = field_mask(SD)
     | field_mask(SPIE)
     | field_mask(SIE);
 
-pub const MSTATUS_FIELDS_MASK: CSRValue = SSTATUS_FIELDS_MASK
+pub const MSTATUS_FIELDS_MASK: CSRRepr = SSTATUS_FIELDS_MASK
     | field_mask(MBE)
     | field_mask(SBE)
     | field_mask(SXL)
@@ -199,7 +199,7 @@ pub const MSTATUS_FIELDS_MASK: CSRValue = SSTATUS_FIELDS_MASK
     | field_mask(MPIE)
     | field_mask(MIE);
 
-pub fn apply_warl_mstatus(mstatus: CSRValue) -> CSRValue {
+pub fn apply_warl_mstatus(mstatus: CSRRepr) -> CSRRepr {
     let mstatus = apply_warl_sstatus(mstatus);
 
     // set SXL as 64 (our implementation fixes MXL, SXL, UXL as 64)
@@ -210,7 +210,7 @@ pub fn apply_warl_mstatus(mstatus: CSRValue) -> CSRValue {
     set_MPP(mstatus, mpp)
 }
 
-pub fn apply_warl_sstatus(mut mstatus: CSRValue) -> CSRValue {
+pub fn apply_warl_sstatus(mut mstatus: CSRRepr) -> CSRRepr {
     use ExtensionValue::Dirty;
 
     // set sd = (FS==11) OR (XS==11) OR (VS=11)
@@ -229,7 +229,7 @@ pub fn apply_warl_sstatus(mut mstatus: CSRValue) -> CSRValue {
     set_UXL(mstatus, XLenValue::MXL64)
 }
 
-pub fn apply_warl_mnstatus(mnstatus: CSRValue) -> CSRValue {
+pub fn apply_warl_mnstatus(mnstatus: CSRRepr) -> CSRRepr {
     // Since we don't support virtualization mode it is read-only 0 WARL
     let mnstatus = set_MNPV(mnstatus, false);
 
