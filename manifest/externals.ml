@@ -98,7 +98,7 @@ let data_encoding =
     ~js_compatible:true
     ~main_module:"Data_encoding"
     "data-encoding"
-    V.(at_least "1.0.1" && less_than "1.1")
+    V.(exactly "1.0.1")
 
 let digestif = external_lib "digestif" V.True
 
@@ -150,10 +150,7 @@ let ipaddr =
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
 let json_data_encoding =
-  external_lib
-    ~js_compatible:true
-    "json-data-encoding"
-    V.(at_least "1.0.1" && less_than "1.1")
+  external_lib ~js_compatible:true "json-data-encoding" V.(exactly "1.0.1")
 
 let jsonm = external_lib "jsonm" V.True
 
