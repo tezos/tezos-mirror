@@ -13,10 +13,11 @@ script_inputs_dir="$src_dir/script-inputs"
 binaries="$(cat "$script_inputs_dir/released-executables")"
 
 # these variables are used in the script scripts/ci/create_gitlab_package.sh
-debian_packages="$(find debian:bookworm/ -maxdepth 1 -name octez-\*.deb)"
-ubuntu_packages="$(find ubuntu:focal/ -maxdepth 1 -name octez-\*.deb)"
-fedora_packages="$(find fedora:39/ -maxdepth 1 -name octez-\*.rpm)"
-rockylinux_packages="$(find rockylinux:9.3/ -maxdepth 1 -name octez-\*.rpm)"
+debian_bookworm_packages="$(find packages/debian/bookworm/ -maxdepth 1 -name octez-\*.deb)"
+ubuntu_focal_packages="$(find packages/ubuntu/focal/ -maxdepth 1 -name octez-\*.deb)"
+ubuntu_jammy_packages="$(find packages/ubuntu/jammy/ -maxdepth 1 -name octez-\*.deb)"
+fedora_packages="$(find packages/fedora/39/ -maxdepth 1 -name octez-\*.rpm)"
+rockylinux_packages="$(find packages/rockylinux/9.3/ -maxdepth 1 -name octez-\*.rpm)"
 
 octez_source_content="$script_inputs_dir/octez-source-content"
 
@@ -56,8 +57,9 @@ fi
 ### Compute GitLab generic package names
 
 gitlab_octez_binaries_package_name="octez-binaries-${gitlab_release_no_v}"
-gitlab_octez_debian_package_name="octez-debian-${gitlab_release_no_v}"
-gitlab_octez_ubuntu_package_name="octez-ubuntu-${gitlab_release_no_v}"
+gitlab_octez_debian_bookworm_package_name="octez-debian-bookworm-${gitlab_release_no_v}"
+gitlab_octez_ubuntu_focal_package_name="octez-ubuntu-focal-${gitlab_release_no_v}"
+gitlab_octez_ubuntu_jammy_package_name="octez-ubuntu-jammy-${gitlab_release_no_v}"
 gitlab_octez_fedora_package_name="octez-fedora-${gitlab_release_no_v}"
 gitlab_octez_rockylinux_package_name="octez-rockylinux-${gitlab_release_no_v}"
 gitlab_octez_source_package_name="octez-source-${gitlab_release_no_v}"
