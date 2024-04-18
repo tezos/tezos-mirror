@@ -1948,6 +1948,13 @@ let irmin_tezos =
     ~deps:[fmt; zarith; digestif; irmin; irmin_pack; irmin_pack_unix]
     ~preprocess:[pps ppx_irmin_internal]
 
+let _brassaia_tezos =
+  octez_internal_lib
+    "brassaia_tezos"
+    ~path:"brassaia/lib_brassaia_tezos"
+    ~deps:[fmt; zarith; digestif; brassaia; brassaia_pack; brassaia_pack_unix]
+    ~preprocess:[pps ppx_brassaia_internal]
+
 let irmin_test_helpers =
   octez_internal_lib
     "irmin_test_helpers"
