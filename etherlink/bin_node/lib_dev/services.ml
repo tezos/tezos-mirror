@@ -114,36 +114,29 @@ let encode :
 let build :
     type input output.
     (module METHOD with type input = input and type output = output) ->
-    f:
-      (input option ->
-      (output, string * Ethereum_types.hash option) Either.t tzresult Lwt.t) ->
+    f:(input option -> (output, Rpc_errors.t) Result.t tzresult Lwt.t) ->
     Data_encoding.json option ->
     JSONRPC.value Lwt.t =
  fun (module Method) ~f parameters ->
   let open Lwt_syntax in
-  let decoded = Option.map (decode (module Method)) parameters in
-  let+ v = f decoded in
-  match v with
-  | Error err ->
-      let message = Format.asprintf "%a" pp_print_trace err in
-      Error JSONRPC.{code = -32000; message; data = None}
-  | Ok value -> (
-      match value with
-      | Left output -> Ok (encode (module Method) output)
-      | Right (message, data) ->
-          let data =
-            Option.map
-              (Data_encoding.Json.construct Ethereum_types.hash_encoding)
-              data
-          in
-          Error JSONRPC.{code = -32000; message; data})
+  Lwt.catch
+    (fun () ->
+      let decoded = Option.map (decode (module Method)) parameters in
+      let+ v = f decoded in
+      match v with
+      | Error err ->
+          Error
+            (Rpc_errors.internal_error
+            @@ Format.asprintf "%a" pp_print_trace err)
+      | Ok value -> Result.map (encode (module Method)) value)
+    (fun exn ->
+      Lwt.return_error @@ Rpc_errors.invalid_request @@ Printexc.to_string exn)
 
-let rpc_ok result = Lwt_result_syntax.return (Either.Left result)
+let rpc_ok result = Lwt_result.return @@ Ok result
 
-let rpc_error ?data message =
-  Lwt_result_syntax.return (Either.Right (message, data))
+let rpc_error err = Lwt_result.return @@ Error err
 
-let missing_parameter () = rpc_error "Missing parameters"
+let missing_parameter () = rpc_error Rpc_errors.invalid_input
 
 let expect_input input f =
   match input with None -> missing_parameter () | Some v -> f v
@@ -158,24 +151,8 @@ let dispatch_request (config : Configuration.t)
   let open Ethereum_types in
   let*! value =
     match map_method_name method_ with
-    | Unknown ->
-        Lwt.return
-          (Error
-             JSONRPC.
-               {
-                 code = -3200;
-                 message = "Method not found";
-                 data = Some (`String method_);
-               })
-    | Unsupported ->
-        Lwt.return
-          (Error
-             JSONRPC.
-               {
-                 code = -3200;
-                 message = "Method not supported";
-                 data = Some (`String method_);
-               })
+    | Unknown -> Lwt.return_error (Rpc_errors.method_not_found method_)
+    | Unsupported -> Lwt.return_error (Rpc_errors.method_not_supported method_)
     (* Ethereum JSON-RPC API methods we support *)
     | Method (Accounts.Method, module_) ->
         let f (_ : unit option) = rpc_ok [] in
@@ -334,9 +311,9 @@ let dispatch_request (config : Configuration.t)
           match tx_hash with
           | Ok tx_hash -> rpc_ok tx_hash
           | Error reason ->
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
-              rpc_error reason
+              rpc_error (Rpc_errors.transaction_rejected reason None)
         in
+
         build_with_input ~f module_ parameters
     | Method (Eth_call.Method, module_) ->
         let f (call, _) =
@@ -344,10 +321,13 @@ let dispatch_request (config : Configuration.t)
           match call_result with
           | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
           | Ok (Ok {value = None; gas_used = _}) -> rpc_ok (hash_of_string "")
-          | Ok (Error reason) -> rpc_error ~data:reason "execution reverted"
+          | Ok (Error reason) ->
+              rpc_error
+              @@ Rpc_errors.transaction_rejected
+                   "execution reverted"
+                   (Some reason)
           | Error reason ->
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
-              rpc_error reason
+              rpc_error (Rpc_errors.transaction_rejected reason None)
         in
         build_with_input ~f module_ parameters
     | Method (Get_estimate_gas.Method, module_) ->
@@ -357,11 +337,13 @@ let dispatch_request (config : Configuration.t)
           | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
           | Ok (Ok {value = _; gas_used = None}) ->
               rpc_error
-                "Simulation failed before execution, cannot estimate gas."
-          | Ok (Error reason) -> rpc_error ~data:reason "execution reverted"
-          | Error reason ->
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/6229 *)
-              rpc_error reason
+                (Rpc_errors.limit_exceeded
+                   "Simulation failed before execution, cannot estimate gas."
+                   None)
+          | Ok (Error reason) ->
+              rpc_error
+              @@ Rpc_errors.limit_exceeded "execution reverted" (Some reason)
+          | Error reason -> rpc_error (Rpc_errors.limit_exceeded reason None)
         in
         build_with_input ~f module_ parameters
     | Method (Txpool_content.Method, module_) ->
