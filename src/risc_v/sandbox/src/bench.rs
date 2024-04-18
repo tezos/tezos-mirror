@@ -8,6 +8,7 @@ use risc_v_interpreter::{Interpreter, InterpreterResult};
 use std::error::Error;
 
 mod data;
+mod stats;
 
 /// A single run of the given `interpreter`.
 /// Provides basic benchmark data and interpreter result.
