@@ -42,14 +42,29 @@ let get_boot_sector (module Plugin : Protocol_plugin_sig.PARTIAL)
 
 (** Apply potential unsafe patches to the PVM state. *)
 let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
-    (node_ctxt : _ Node_context.t) state =
+    ~genesis_block_hash (node_ctxt : _ Node_context.t) state =
   let open Lwt_result_syntax in
-  List.fold_left_es
-    (fun state patch ->
-      let*! () = Interpreter_event.patching_genesis_state patch in
-      Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind state patch)
-    state
-    (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list)
+  match (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list) with
+  | [] -> return state
+  | patches ->
+      let* whitelist =
+        Plugin.Layer1_helpers.find_whitelist
+          node_ctxt.cctxt
+          ~block:genesis_block_hash
+          node_ctxt.config.sc_rollup_address
+      in
+      let private_rollup = whitelist <> None in
+      let*? () =
+        error_unless
+          private_rollup
+          Rollup_node_errors.Cannot_patch_pvm_of_public_rollup
+      in
+      List.fold_left_es
+        (fun state patch ->
+          let*! () = Interpreter_event.patching_genesis_state patch in
+          Plugin.Pvm.Unsafe.apply_patch node_ctxt.kind state patch)
+        state
+        patches
 
 type original_genesis_state = Original of Context.pvmstate
 
@@ -69,7 +84,11 @@ let genesis_state (module Plugin : Protocol_plugin_sig.PARTIAL) ?genesis_block
     Plugin.Pvm.install_boot_sector node_ctxt.kind initial_state boot_sector
   in
   let* genesis_state =
-    apply_unsafe_patches (module Plugin) node_ctxt unpatched_genesis_state
+    apply_unsafe_patches
+      (module Plugin)
+      node_ctxt
+      ~genesis_block_hash
+      unpatched_genesis_state
   in
   return (genesis_state, Original unpatched_genesis_state)
 

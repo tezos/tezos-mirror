@@ -77,6 +77,8 @@ type error +=
 
 type error += Operator_not_in_whitelist
 
+type error += Cannot_patch_pvm_of_public_rollup
+
 type error += Operator_has_no_staked
 
 type error += Exit_bond_recovered_bailout_mode
@@ -431,6 +433,20 @@ let () =
     Data_encoding.unit
     (function Operator_not_in_whitelist -> Some () | _ -> None)
     (fun () -> Operator_not_in_whitelist) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.cannot_patch_pvm_of_public_rollup"
+    ~title:"Cannot patch PVM of public rollup"
+    ~description:"Unsafe PVM patches can only be applied in private rollups."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "Unsafe PVM patches can only be applied in private rollups, i.e. in \
+         non publicly refutable settings.")
+    `Permanent
+    Data_encoding.unit
+    (function Cannot_patch_pvm_of_public_rollup -> Some () | _ -> None)
+    (fun () -> Cannot_patch_pvm_of_public_rollup) ;
 
   register_error_kind
     ~id:"sc_rollup.node.operator_has_no_staked"
