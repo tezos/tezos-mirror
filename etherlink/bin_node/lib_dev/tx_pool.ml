@@ -117,7 +117,7 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
-type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer | Observer
+type mode = Proxy | Sequencer | Observer
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);
@@ -454,7 +454,7 @@ let pop_and_inject_transactions state =
   | Sequencer ->
       failwith
         "Internal error: the sequencer is not supposed to use this function"
-  | Observer | Proxy _ ->
+  | Observer | Proxy ->
       (* We over approximate the number of transactions to pop in proxy and
          observer mode to the maximum size an L1 block can hold. If the proxy
          sends more, they won't be applied at the next level. For the observer,
@@ -505,7 +505,7 @@ module Handlers = struct
           Worker.Queue.push_request w Request.Pop_and_inject_transactions
         in
         return_unit
-    | Sequencer | Proxy _ -> return_unit
+    | Sequencer | Proxy -> return_unit
 
   let on_request :
       type r request_error.

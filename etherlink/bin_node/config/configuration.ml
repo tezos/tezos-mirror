@@ -12,12 +12,9 @@ type log_filter_config = {
   chunk_size : int;
 }
 
-type proxy = {rollup_node_endpoint : Uri.t}
-
 type time_between_blocks = Nothing | Time_between_blocks of float
 
 type sequencer = {
-  rollup_node_endpoint : Uri.t;
   preimages : string;
   preimages_endpoint : Uri.t option;
   time_between_blocks : time_between_blocks;
@@ -39,7 +36,6 @@ type t = {
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
-  proxy : proxy option;
   sequencer : sequencer option;
   observer : observer option;
   max_active_connections :
@@ -48,6 +44,7 @@ type t = {
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
+  rollup_node_endpoint : Uri.t;
 }
 
 let default_filter_config =
@@ -72,8 +69,6 @@ let default_cors_headers = []
 let default_max_active_connections =
   Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.default
 
-let default_proxy = {rollup_node_endpoint = Uri.empty}
-
 let default_preimages =
   Filename.Infix.(default_data_dir // "_evm_installer_preimages")
 
@@ -96,10 +91,8 @@ let default_tx_pool_addr_limit = Int64.of_int 4000
 let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 
 let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
-    ?max_number_of_chunks ?private_rpc_port ~rollup_node_endpoint ~sequencer ()
-    =
+    ?max_number_of_chunks ?private_rpc_port ~sequencer () =
   {
-    rollup_node_endpoint;
     preimages = Option.value ~default:default_preimages preimages;
     preimages_endpoint;
     time_between_blocks =
@@ -137,25 +130,12 @@ let encoding_time_between_blocks : time_between_blocks Data_encoding.t =
        (function None -> Nothing | Some f -> Time_between_blocks f)
        (option float)
 
-let proxy_encoding =
-  let open Data_encoding in
-  conv
-    (fun ({rollup_node_endpoint} : proxy) -> Uri.to_string rollup_node_endpoint)
-    (fun rollup_node_endpoint ->
-      {rollup_node_endpoint = Uri.of_string rollup_node_endpoint})
-    (obj1
-       (dft
-          "rollup_node_endpoint"
-          string
-          (Uri.to_string default_proxy.rollup_node_endpoint)))
-
 let sequencer_encoding =
   let open Data_encoding in
   conv
     (fun {
            preimages;
            preimages_endpoint;
-           rollup_node_endpoint;
            time_between_blocks;
            max_number_of_chunks;
            private_rpc_port;
@@ -163,14 +143,12 @@ let sequencer_encoding =
          } ->
       ( preimages,
         preimages_endpoint,
-        Uri.to_string rollup_node_endpoint,
         time_between_blocks,
         max_number_of_chunks,
         private_rpc_port,
         sequencer ))
     (fun ( preimages,
            preimages_endpoint,
-           rollup_node_endpoint,
            time_between_blocks,
            max_number_of_chunks,
            private_rpc_port,
@@ -178,16 +156,14 @@ let sequencer_encoding =
       {
         preimages;
         preimages_endpoint;
-        rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
         time_between_blocks;
         max_number_of_chunks;
         private_rpc_port;
         sequencer;
       })
-    (obj7
+    (obj6
        (dft "preimages" string default_preimages)
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
-       (req "rollup_node_endpoint" string)
        (dft
           "time_between_blocks"
           encoding_time_between_blocks
@@ -225,7 +201,6 @@ let encoding : t Data_encoding.t =
            cors_origins;
            cors_headers;
            log_filter;
-           proxy;
            sequencer;
            observer;
            max_active_connections;
@@ -233,6 +208,7 @@ let encoding : t Data_encoding.t =
            tx_pool_addr_limit;
            tx_pool_tx_per_addr_limit;
            keep_alive;
+           rollup_node_endpoint;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -240,28 +216,28 @@ let encoding : t Data_encoding.t =
           cors_origins,
           cors_headers,
           log_filter,
-          proxy,
           sequencer,
           observer,
-          max_active_connections ),
-        ( tx_pool_timeout_limit,
-          tx_pool_addr_limit,
+          max_active_connections,
+          tx_pool_timeout_limit ),
+        ( tx_pool_addr_limit,
           tx_pool_tx_per_addr_limit,
-          keep_alive ) ))
+          keep_alive,
+          Uri.to_string rollup_node_endpoint ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              devmode,
              cors_origins,
              cors_headers,
              log_filter,
-             proxy,
              sequencer,
              observer,
-             max_active_connections ),
-           ( tx_pool_timeout_limit,
-             tx_pool_addr_limit,
+             max_active_connections,
+             tx_pool_timeout_limit ),
+           ( tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
-             keep_alive ) ) ->
+             keep_alive,
+             rollup_node_endpoint ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -269,7 +245,6 @@ let encoding : t Data_encoding.t =
         cors_origins;
         cors_headers;
         log_filter;
-        proxy;
         sequencer;
         observer;
         max_active_connections;
@@ -277,6 +252,7 @@ let encoding : t Data_encoding.t =
         tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit;
         keep_alive;
+        rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
       })
     (merge_objs
        (obj10
@@ -286,21 +262,20 @@ let encoding : t Data_encoding.t =
           (dft "cors_origins" (list string) default_cors_origins)
           (dft "cors_headers" (list string) default_cors_headers)
           (dft "log_filter" log_filter_config_encoding default_filter_config)
-          (opt "proxy" proxy_encoding)
           (opt "sequencer" sequencer_encoding)
           (opt "observer" observer_encoding)
           (dft
              "max_active_connections"
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
-             default_max_active_connections))
-       (obj4
+             default_max_active_connections)
           (dft
              "tx-pool-timeout-limit"
              ~description:
                "Transaction timeout limit inside the transaction pool"
              int64
-             default_tx_pool_timeout_limit)
+             default_tx_pool_timeout_limit))
+       (obj4
           (dft
              "tx-pool-addr-limit"
              ~description:
@@ -314,7 +289,8 @@ let encoding : t Data_encoding.t =
                 transaction pool."
              int64
              default_tx_pool_tx_per_addr_limit)
-          (dft "keep_alive" bool default_keep_alive)))
+          (dft "keep_alive" bool default_keep_alive)
+          (req "rollup_node_endpoint" string)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -337,9 +313,6 @@ let load ~data_dir =
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
-let proxy_config_exn {proxy; _} =
-  Option.to_result ~none:(error_missing_config ~name:"proxy") proxy
-
 let sequencer_config_exn {sequencer; _} =
   Option.to_result ~none:(error_missing_config ~name:"sequencer") sequencer
 
@@ -348,8 +321,9 @@ let observer_config_exn {observer; _} =
 
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ?proxy ?sequencer ?observer ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive () =
+      ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
+      ~rollup_node_endpoint () =
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
@@ -357,7 +331,6 @@ module Cli = struct
       cors_origins = Option.value ~default:default_cors_origins cors_origins;
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter = Option.value ~default:default_filter_config log_filter;
-      proxy;
       sequencer;
       observer;
       max_active_connections = default_max_active_connections;
@@ -372,12 +345,13 @@ module Cli = struct
           ~default:default_tx_pool_tx_per_addr_limit
           tx_pool_tx_per_addr_limit;
       keep_alive;
+      rollup_node_endpoint;
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?proxy ?sequencer ?observer
-      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-      ~keep_alive configuration =
+      ?cors_headers ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
+      ?rollup_node_endpoint configuration =
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -387,7 +361,6 @@ module Cli = struct
       cors_headers =
         Option.value ~default:configuration.cors_headers cors_headers;
       log_filter = Option.value ~default:configuration.log_filter log_filter;
-      proxy = Option.either configuration.proxy proxy;
       sequencer = Option.either configuration.sequencer sequencer;
       observer = Option.either configuration.observer observer;
       max_active_connections = configuration.max_active_connections;
@@ -404,12 +377,16 @@ module Cli = struct
           ~default:configuration.tx_pool_tx_per_addr_limit
           tx_pool_tx_per_addr_limit;
       keep_alive = configuration.keep_alive || keep_alive;
+      rollup_node_endpoint =
+        Option.value
+          ~default:configuration.rollup_node_endpoint
+          rollup_node_endpoint;
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?proxy ?sequencer ?observer
-      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-      ~keep_alive () =
+      ?cors_headers ?log_filter ?sequencer ?observer ?tx_pool_timeout_limit
+      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~keep_alive
+      ?rollup_node_endpoint () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -439,16 +416,21 @@ module Cli = struct
           ?cors_headers
           ?log_filter
           ~keep_alive
-          ?proxy
           ?sequencer
           ?observer
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
+          ?rollup_node_endpoint
           configuration
       in
       return configuration
     else
+      let*? rollup_node_endpoint =
+        Option.to_result
+          ~none:(error_missing_config ~name:"rollup_node_endpoint")
+          rollup_node_endpoint
+      in
       let config =
         create
           ~devmode
@@ -458,12 +440,12 @@ module Cli = struct
           ?cors_headers
           ~keep_alive
           ?log_filter
-          ?proxy
           ?sequencer
           ?observer
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
+          ~rollup_node_endpoint
           ()
       in
       return config

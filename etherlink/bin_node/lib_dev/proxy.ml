@@ -84,7 +84,7 @@ let main (config : Configuration.t) ~rollup_node_endpoint =
       {
         rollup_node = (module Rollup_node_rpc);
         smart_rollup_address;
-        mode = Proxy {rollup_node_endpoint};
+        mode = Proxy;
         tx_timeout_limit = config.tx_pool_timeout_limit;
         tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit =

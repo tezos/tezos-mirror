@@ -276,7 +276,7 @@ let rollup_node_endpoint_arg =
 
 let evm_node_endpoint_arg =
   Tezos_clic.arg
-    ~long:"rollup-node-endpoint"
+    ~long:"evm-node-endpoint"
     ~placeholder:"url"
     ~doc:"The address of an EVM node to connect to."
     Params.evm_node_endpoint
@@ -440,7 +440,7 @@ let proxy_command =
           ?rpc_port
           ?cors_origins
           ?cors_headers
-          ~proxy:{rollup_node_endpoint}
+          ~rollup_node_endpoint
           ()
       in
       let* () =
@@ -570,7 +570,6 @@ let sequencer_command =
             ?time_between_blocks
             ?max_number_of_chunks
             ?private_rpc_port
-            ~rollup_node_endpoint
             ~sequencer:sequencer_pkh
             ()
         in
@@ -586,6 +585,7 @@ let sequencer_command =
           ~tx_pool_tx_per_addr_limit:(Int64.of_int tx_pool_tx_per_addr_limit)
           ~keep_alive
           ~sequencer
+          ~rollup_node_endpoint
           ()
       in
       if devmode then
@@ -680,6 +680,7 @@ let observer_command =
       ?rpc_port
       ?cors_origins
       ?cors_headers
+      ~rollup_node_endpoint
       ~observer
       ()
   in
@@ -1105,8 +1106,8 @@ let init_config_command =
       {|Create an initial config with default value.
 If the <rollup-node-endpoint> is set then adds the configuration for the proxy
 mode.
-If the <rollup-node-endpoint> and the <sequencer-key> are set then adds the
-configuration for the sequencer mode.
+If the  <sequencer-key> is set then adds the configuration for the sequencer
+mode.
 If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (args18
@@ -1156,11 +1157,6 @@ mode.|}
            sequencer,
            force )
          () ->
-      let proxy =
-        Option.map
-          (fun rollup_node_endpoint -> Configuration.{rollup_node_endpoint})
-          rollup_node_endpoint
-      in
       let* sequencer =
         let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
         let* sequencer_pk_opt =
@@ -1168,8 +1164,8 @@ mode.|}
             (Client_keys.Public_key_hash.parse_source_string wallet_ctxt)
             sequencer
         in
-        match (rollup_node_endpoint, sequencer_pk_opt) with
-        | Some rollup_node_endpoint, Some sequencer ->
+        match sequencer_pk_opt with
+        | Some sequencer ->
             return_some
             @@ Configuration.sequencer_config_dft
                  ?preimages
@@ -1177,10 +1173,9 @@ mode.|}
                  ?time_between_blocks
                  ?max_number_of_chunks
                  ?private_rpc_port
-                 ~rollup_node_endpoint
                  ~sequencer
                  ()
-        | _, _ -> return_none
+        | _ -> return_none
       in
       let observer =
         Option.map
@@ -1200,10 +1195,10 @@ mode.|}
           ?cors_origins
           ?cors_headers
           ~keep_alive
-          ?proxy
           ?sequencer
           ?observer
           ~devmode
+          ?rollup_node_endpoint
           ()
       in
       Configuration.save ~force ~data_dir config)

@@ -15,8 +15,6 @@ type log_filter_config = {
       See [get_logs] for more details. *)
 }
 
-type proxy = {rollup_node_endpoint : Uri.t}
-
 type time_between_blocks =
   | Nothing  (** Does not produce any block if not forced by the private RPC *)
   | Time_between_blocks of float
@@ -26,9 +24,6 @@ type time_between_blocks =
            [time_between_blocks]. *)
 
 type sequencer = {
-  rollup_node_endpoint : Uri.t;
-      (** Rollup node endpoint used to make blueprints available and
-          monitor the delayed inbox. *)
   preimages : string;  (** Path to the preimages directory. *)
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
@@ -53,7 +48,6 @@ type t = {
   cors_origins : string list;
   cors_headers : string list;
   log_filter : log_filter_config;
-  proxy : proxy option;
   sequencer : sequencer option;
   observer : observer option;
   max_active_connections :
@@ -62,6 +56,7 @@ type t = {
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
+  rollup_node_endpoint : Uri.t;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -79,10 +74,6 @@ val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
 (** [load ~data_dir] loads a proxy configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t
 
-(** [proxy_config_exn config] returns the proxy config of [config] or
-    fails *)
-val proxy_config_exn : t -> proxy tzresult
-
 (** [sequencer_config_exn config] returns the sequencer config of
     [config] or fails *)
 val sequencer_config_exn : t -> sequencer tzresult
@@ -99,7 +90,6 @@ val sequencer_config_dft :
   ?time_between_blocks:time_between_blocks ->
   ?max_number_of_chunks:int ->
   ?private_rpc_port:int ->
-  rollup_node_endpoint:Uri.t ->
   sequencer:Signature.public_key_hash ->
   unit ->
   sequencer
@@ -121,13 +111,13 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?log_filter:log_filter_config ->
-    ?proxy:proxy ->
     ?sequencer:sequencer ->
     ?observer:observer ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
+    rollup_node_endpoint:Uri.t ->
     unit ->
     t
 
@@ -139,13 +129,13 @@ module Cli : sig
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?log_filter:log_filter_config ->
-    ?proxy:proxy ->
     ?sequencer:sequencer ->
     ?observer:observer ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
     keep_alive:bool ->
+    ?rollup_node_endpoint:Uri.t ->
     unit ->
     t tzresult Lwt.t
 end
