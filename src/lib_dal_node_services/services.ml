@@ -123,25 +123,6 @@ let get_page_proof :
     ~output:Cryptobox.page_proof_encoding
     Tezos_rpc.Path.(open_root / "pages" /: Tezos_rpc.Arg.int / "proof")
 
-let put_commitment_shards :
-    < meth : [`PUT]
-    ; input : with_proof
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * Cryptobox.commitment
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.put_service
-    ~description:
-      "Compute and save the shards of the slot associated to the given \
-       commitment. If the input's flag is true, the shard proofs are also \
-       computed."
-    ~query:Tezos_rpc.Query.empty
-    ~input:with_proof_encoding
-    ~output:Data_encoding.unit
-    Tezos_rpc.Path.(
-      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "shards")
-
 let get_commitment_by_published_level_and_index :
     < meth : [`GET]
     ; input : unit

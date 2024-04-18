@@ -97,18 +97,6 @@ val get_page_proof :
   ; query : unit >
   service
 
-(** Compute and save the shards of the slot associated to the given
-    commitment. If the input's flag is true, the proofs associated with the
-    computed shards are also computed and stored in memory. *)
-val put_commitment_shards :
-  < meth : [`PUT]
-  ; input : Types.with_proof
-  ; output : unit
-  ; prefix : unit
-  ; params : unit * Cryptobox.commitment
-  ; query : unit >
-  service
-
 (** Return the accepted commitment associated to the given slot index and
     published at the given level, if any. *)
 val get_commitment_by_published_level_and_index :

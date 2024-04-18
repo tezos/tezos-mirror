@@ -177,12 +177,6 @@ module RPC : sig
         content associated with the given commitment. *)
   val get_commitment_slot : commitment -> Helpers.slot RPC_core.t
 
-  (** Call RPC "PUT /commitments/<commitment>/shards" to compute and store the
-        shards of the slot whose commitment is given, using the current DAL
-        parameters. Note that [with_proof], whose default value is [false], is
-        provided as input to the RPC. *)
-  val put_commitment_shards : ?with_proof:bool -> commitment -> unit RPC_core.t
-
   (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
        associated to a commitment. *)
   val get_commitment_proof : commitment -> commitment_proof RPC_core.t
