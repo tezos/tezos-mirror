@@ -17,15 +17,9 @@
 module Test_node =
   Brassaia_test_helpers.Brassaia_test.Node.Make (Brassaia.Node.Generic_key.Make)
 
-let lift_suite_to_lwt :
-    unit Alcotest.test_case list -> unit Alcotest_lwt.test_case list =
-  List.map (fun (n, s, f) -> (n, s, Fun.const (Lwt.wrap f)))
-
-let suite =
+let suite_lwt =
   [
-    ("lru", Test_lru.suite |> lift_suite_to_lwt);
     ("tree", Test_tree.suite);
-    ("node", Test_node.suite |> lift_suite_to_lwt);
     ("hash", Test_hash.suite);
     ("conf", Test_conf.suite);
   ]
@@ -34,4 +28,12 @@ let () =
   Logs.set_level (Some Info);
   Logs.set_reporter (Brassaia_test_helpers.Brassaia_test.reporter ());
   Random.self_init ();
-  Lwt_main.run (Alcotest_lwt.run ~__FILE__ "brassaia" suite)
+  Lwt_main.run (Alcotest_lwt.run ~__FILE__ "brassaia" suite_lwt)
+
+let suite = [ ("lru", Test_lru.suite); ("node", Test_node.suite) ]
+
+let () =
+  Logs.set_level (Some Info);
+  Logs.set_reporter (Brassaia_test_helpers.Brassaia_test.reporter ());
+  Random.self_init ();
+  Alcotest.run ~__FILE__ "brassaia" suite
