@@ -49,6 +49,32 @@ docker:hadolint-before_merging:
   - hadolint build.Dockerfile
   - hadolint Dockerfile
 
+nix:
+  image: nixos/nix
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.nix'
+    - flake.lock
+    - scripts/version.sh
+    when: on_success
+  dependencies: []
+  cache:
+    key: nix-store
+    paths:
+    - /nix/store
+  before_script:
+  - mkdir -p ~/.config/nix
+  - echo 'extra-experimental-features = flakes nix-command' > ~/.config/nix/nix.conf
+  script:
+  - nix run .#ci-check-version-sh-lock
+  artifacts:
+    paths:
+    - flake.lock
+    when: on_failure
+
 oc.docker:rust-toolchain:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
   stage: build
