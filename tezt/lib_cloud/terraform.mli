@@ -19,6 +19,8 @@ module VM : sig
   module Workspace : sig
     val init : string list -> unit Lwt.t
 
+    val get : unit -> string list Lwt.t
+
     val select : string -> unit Lwt.t
 
     val destroy : unit -> unit Lwt.t
@@ -38,7 +40,7 @@ module VM : sig
 
   val zone : unit -> string Lwt.t
 
-  val destroy : unit -> unit Lwt.t
+  val destroy : string list -> unit Lwt.t
 end
 
 module State_bucket : sig

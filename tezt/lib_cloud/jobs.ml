@@ -97,9 +97,9 @@ let destroy_vms ~tags =
   @@ fun () ->
   let tezt_cloud = Lazy.force Env.tezt_cloud in
   Log.info "Tezt_Cloud found with value: %s" tezt_cloud ;
-  (* TODO: Destroy machines per workspace. *)
-  let* () = Terraform.VM.destroy () in
   let* () = Terraform.VM.Workspace.select "default" in
+  let* workspaces = Terraform.VM.Workspace.get () in
+  let* () = Terraform.VM.destroy workspaces in
   Terraform.VM.Workspace.destroy ()
 
 let prometheus_import ~tags =
@@ -185,7 +185,7 @@ let clean_up_vms ~tags =
 
 let simple ~tags =
   Cloud.register
-    ~vms:2
+    ~vms:[{machine_type = Cli.machine_type}; {machine_type = Cli.machine_type}]
     ~__FILE__
     ~tags:("simple" :: "health" :: tags)
     ~title:"Simple health check to check local configuration"

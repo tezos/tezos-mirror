@@ -23,7 +23,9 @@ module Docker_registry = struct
 
   let deploy () =
     let* project_id = Gcloud.project_id () in
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
     Process.run
+      ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
       ~name
       ~color
       "terraform"
@@ -36,8 +38,10 @@ module Docker_registry = struct
         ])
 
   let get_docker_registry () =
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
     let* output =
       Process.run_and_read_stdout
+        ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
         ~name
         ~color
         "terraform"
@@ -50,8 +54,10 @@ module Docker_registry = struct
     Lwt.return registry_name
 
   let get_hostname () =
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
     let* output =
       Process.run_and_read_stdout
+        ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
         ~name
         ~color
         "terraform"
@@ -63,9 +69,23 @@ module Docker_registry = struct
 end
 
 module VM = struct
+  (* A VM is deployed under a workspace. A single tezt cloud environment can use
+     multiple workspaces all prefixed by the current tezt cloud environment. *)
   module Workspace = struct
+    let select workspace =
+      Process.run
+        ~name
+        ~color
+        "terraform"
+        (chdir Path.terraform_vm @ ["workspace"; "select"; workspace])
+
+    (* Return all the workspaces associated with the current tezt cloud
+       environment. *)
     let get () =
       let tezt_cloud = Lazy.force Env.tezt_cloud in
+      (* We select the default workspace to be sure we can parse correctly the
+         output. *)
+      let* () = select "default" in
       let* output =
         Process.run_and_read_stdout
           ~name
@@ -79,6 +99,8 @@ module VM = struct
              String.starts_with ~prefix:tezt_cloud workspace)
       |> Lwt.return
 
+    (* Create workspaces that will be used for the experiment. Delete the ones
+       that won't be used. *)
     let init workspaces =
       let* existing_workspaces = get () in
       let to_create =
@@ -99,21 +121,8 @@ module VM = struct
       (* We want to ensure the last workspace created will not be the
          one selected by default. Instead it should be set when
          deploying the machines. *)
-      let* () =
-        Process.run
-          ~name
-          ~color
-          "terraform"
-          (chdir Path.terraform_vm @ ["workspace"; "select"; "default"])
-      in
+      let* () = select "default" in
       unit
-
-    let select workspace =
-      Process.run
-        ~name
-        ~color
-        "terraform"
-        (chdir Path.terraform_vm @ ["workspace"; "select"; workspace])
 
     let destroy () =
       let* workspaces = get () in
@@ -198,25 +207,28 @@ module VM = struct
     in
     Lwt.return machine_type
 
-  let destroy () =
+  let destroy workspaces =
     let* project_id = Gcloud.project_id () in
     let* machine_type = machine_type () in
     let docker_image_name = Lazy.force Env.tezt_cloud in
-    Process.run
-      ~name
-      ~color
-      "terraform"
-      (chdir Path.terraform_vm
-      @ [
-          "destroy";
-          "--auto-approve";
-          "--var";
-          Format.asprintf "project_id=%s" project_id;
-          "--var";
-          Format.asprintf "machine_type=%s" machine_type;
-          "--var";
-          Format.asprintf "docker_image_name=%s" docker_image_name;
-        ])
+    workspaces
+    |> Lwt_list.iter_s (fun workspace ->
+           let* () = Workspace.select workspace in
+           Process.run
+             ~name
+             ~color
+             "terraform"
+             (chdir Path.terraform_vm
+             @ [
+                 "destroy";
+                 "--auto-approve";
+                 "--var";
+                 Format.asprintf "project_id=%s" project_id;
+                 "--var";
+                 Format.asprintf "machine_type=%s" machine_type;
+                 "--var";
+                 Format.asprintf "docker_image_name=%s" docker_image_name;
+               ]))
 end
 
 module State_bucket = struct
@@ -229,8 +241,10 @@ module State_bucket = struct
       (chdir Path.terraform_state_bucket @ ["init"])
 
   let deploy () =
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
     let* project_id = Gcloud.project_id () in
     Process.run
+      ~env:(String_map.singleton "TF_WORKSPACE" tezt_cloud)
       ~name
       ~color
       "terraform"

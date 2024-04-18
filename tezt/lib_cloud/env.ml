@@ -8,11 +8,11 @@
 let tezt_cloud =
   (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
   Lazy.from_fun @@ fun () ->
-  match Sys.getenv_opt "TEZT_CLOUD_BASENAME" with
+  match Sys.getenv_opt "TEZT_CLOUD" with
   | None ->
       Test.fail
-        "The environment variable 'TEZT_CLOUD_BASENAME' is not defined. See \
-         README for more information why this variable must be defined."
+        "The environment variable 'TEZT_CLOUD' is not defined. See README for \
+         more information why this variable must be defined."
   | Some value -> value
 
 let ssh_private_key =

@@ -53,7 +53,7 @@ Run the following commands:
 7. (optional) `gcloud auth configure-docker europe-west1-docker.pkg.dev`:
    Authorize the artifact registry used by this project.
 
-Please set an environment variable `TF_WORKSPACE` which will be used to identify
+Please set an environment variable `TEZT_CLOUD` which will be used to identify
 the resources you deploy onto the cloud. The value should be unique for the
 given project. We recommend using a similar username as the one you use on
 Gitlab.
@@ -97,7 +97,7 @@ below.
 Terraform maintains a state of the deployed resources that are *owned* by
 `terraform`.  A standard way to store them is to use a GCP bucket.
 
-Once your `TF_WORKSPACE` value is set and you have the appropriate
+Once your `TEZT_CLOUD` value is set and you have the appropriate
 rights, you should be able to create the bucket using:
 
 ```bash
@@ -109,7 +109,7 @@ dune exec tezt/tests/main.exe -- terraform state deploy bucket -v
 A docker registry is needed so that, during initialisation of the VMs,
 the docker image can be pulled from the cloud.
 
-Once your `TF_WORKSPACE` value is set and you have the appropriate
+Once your `TEZT_CLOUD` value is set and you have the appropriate
 rights, you should be able to create the registry using:
 
 ```bash
@@ -274,7 +274,7 @@ exported to the Prometheus instance using the function
 
    where:
    - `ssh-key` is the one you generated above
-   - `workspace` is the content of the `$TF_WORKSPACE` variable
+   - `workspace` is the content of the `$TEZT_CLOUD` variable
    - `XYZ` is the counter of the VM
    - `zone` is the zone of the VM (default is `europe-west1-b`)
 

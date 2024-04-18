@@ -80,7 +80,7 @@ provider "google" {
 
 # A service account must be associated with a VM
 resource "google_service_account" "default" {
-  account_id   = "${terraform.workspace}-service-account-id"
+  account_id   = "${terraform.workspace}-id"
   display_name = "${terraform.workspace} service Account"
 }
 
@@ -231,5 +231,6 @@ output "zone" {
 
 output "machine_type" {
   description = "Machine type"
-  value       = var.machine_type
+  # All the instances have the same machine type
+  value = module.umig.instances_details[0].machine_type
 }

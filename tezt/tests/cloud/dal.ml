@@ -44,6 +44,13 @@ module Cli = struct
       ~description:"Specify the number of DAL producers for this test"
       1
 
+  let producer_machine_type =
+    Clap.optional_string
+      ~section
+      ~long:"producer-machine-type"
+      ~description:"Machine type used for the DAL producers"
+      ()
+
   let protocol =
     let protocol_typ =
       let parse string =
@@ -79,6 +86,7 @@ type configuration = {
   dal_node_producer : int;
   protocol : Protocol.t;
   producer_spreading_factor : int;
+  producer_machine_type : string option;
 }
 
 type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
@@ -690,17 +698,17 @@ let init_producer cloud ~bootstrap_node ~dal_bootstrap_node ~number_of_slots
   let is_ready = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {client; node; dal_node; account; is_ready}
 
-let init ~configuration cloud next_agent =
+let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
-  let* producers_agents =
-    List.init configuration.dal_node_producer (fun i ->
-        let name = Format.asprintf "producer-%d" i in
-        next_agent ~name)
-    |> Lwt.all
-  in
   let* attesters_agents =
     List.init (List.length configuration.stake) (fun i ->
         let name = Format.asprintf "attester-%d" i in
+        next_agent ~name)
+    |> Lwt.all
+  in
+  let* producers_agents =
+    List.init configuration.dal_node_producer (fun i ->
+        let name = Format.asprintf "producer-%d" i in
         next_agent ~name)
     |> Lwt.all
   in
@@ -825,11 +833,27 @@ let configuration =
   let dal_node_producer = Cli.producers in
   let protocol = Cli.protocol in
   let producer_spreading_factor = Cli.producer_spreading_factor in
-  {stake; dal_node_producer; protocol; producer_spreading_factor}
+  let producer_machine_type = Cli.producer_machine_type in
+  {
+    stake;
+    dal_node_producer;
+    protocol;
+    producer_spreading_factor;
+    producer_machine_type;
+  }
 
 let benchmark () =
   let vms =
     1 + List.length configuration.stake + configuration.dal_node_producer
+  in
+  let vms =
+    List.init vms (fun i ->
+        if i < List.length configuration.stake + 1 then
+          Cloud.default_vm_configuration
+        else
+          match configuration.producer_machine_type with
+          | None -> Cloud.default_vm_configuration
+          | Some machine_type -> {machine_type})
   in
   Cloud.register
     ~vms
@@ -846,7 +870,7 @@ let benchmark () =
              explicitely a reduced number of agents and it is not clear how to give
              them proper names. *)
           let set_name agent name =
-            if List.length agents = vms then
+            if List.length agents = List.length vms then
               Cloud.set_agent_name cloud agent name
             else Lwt.return_unit
           in
