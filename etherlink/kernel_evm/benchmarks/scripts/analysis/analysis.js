@@ -4,15 +4,48 @@
 
 const { is_transfer, is_create, is_call, is_transaction, BASE_GAS } = require('./utils')
 const fs = require('fs')
+const path = require('path')
+const pdf_utils = require('./pdf_utils')
 const block_finalization = require('./block_finalization')
 const tx_register = require('./tx_register')
 const tx_overhead = require('./tx_overhead')
 const queue = require('./queue')
 
+const tmp = require("tmp");
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+const PDFDocument = require('pdfkit');
+
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
 
 module.exports = { init_analysis, check_result, process_record }
+function savePdfToFile(pdf , fileName )  {
+    // shameless steal https://stackoverflow.com/questions/63613058/why-node-pdfkit-creates-occasionally-a-corrupted-file-in-my-code
+    return new Promise((resolve, reject) => {
+
+        // To determine when the PDF has finished being written successfully
+        // we need to confirm the following 2 conditions:
+        //
+        //   1. The write stream has been closed
+        //   2. PDFDocument.end() was called syncronously without an error being thrown
+
+        let pendingStepCount = 2;
+
+        const stepFinished = () => {
+            if (--pendingStepCount == 0) {
+                resolve();
+            }
+        };
+
+        const writeStream = fs.createWriteStream(fileName);
+        writeStream.on('close', stepFinished);
+        pdf.pipe(writeStream);
+
+        pdf.end();
+
+        stepFinished();
+    });
+}
 
 function init_analysis() {
     let empty = {
@@ -34,7 +67,12 @@ function init_analysis() {
     return empty
 }
 
-function print_analysis(infos, dir) {
+async function print_analysis({filename, report, analysis_acc}, dir) {
+    let infos = analysis_acc;
+
+    const doc = new PDFDocument();
+    pdf_utils.output_msg(`Data: ${path.basename(filename)}`, doc);
+
     console.info(`-------------------------------------------------------`)
     console.info(`Block Finalization Analysis`)
     console.info(`----------------------------------`)
@@ -70,8 +108,8 @@ function print_analysis(infos, dir) {
     console.info(`Number of kernel run: ${infos.nb_kernel_run}`)
     console.info(`Number of blocks: ${infos.block_finalization.length}`)
     console.info(`-------------------------------------------------------`)
+    await savePdfToFile(doc, report);
     return error_block_finalization + error_register + error_queue
-
 }
 
 function process_record(record, acc) {
@@ -124,8 +162,9 @@ function process_transfer(record, acc) {
     acc.nb_transfer++
 }
 
-function check_result(infos, dir) {
-    let nb_errors = print_analysis(infos, dir)
+
+async function check_result(infos, dir) {
+    let nb_errors = await print_analysis(infos, dir)
     const is_error = nb_errors > 0
     if (is_error) {
         console.info(`-------------------------------------------------------`)

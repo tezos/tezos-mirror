@@ -68,7 +68,7 @@ async function processFile(filename, { analysis_acc, graph_acc, sanity_acc }) {
     let analysis_acc = analysis.init_analysis();
     let graph_acc = graphs.init_graphs();
     let sanity_acc = sanity.init_sanity();
-    let infos = { analysis_acc, graph_acc, sanity_acc };
+    let infos = { filename: args[0], report: "benchmark_report.pdf", analysis_acc, graph_acc, sanity_acc };
 
     let files = list_files(args[0]);
     console.log(`Processing ${files.length} files`)
@@ -77,7 +77,7 @@ async function processFile(filename, { analysis_acc, graph_acc, sanity_acc }) {
     // process files in ||
     await Promise.all(files.map((filename) => processFile(filename, infos)))
 
-    let exit_status = analysis.check_result(infos.analysis_acc, OUTPUT_DIRECTORY)
+    let exit_status = await analysis.check_result(infos, OUTPUT_DIRECTORY)
     sanity.print_summary(infos.sanity_acc, OUTPUT_DIRECTORY)
     await graphs.draw_tick_per_gas(infos.graph_acc, OUTPUT_DIRECTORY)
     process.exit(exit_status)

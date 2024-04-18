@@ -7,6 +7,7 @@ const MLR = require("ml-regression-multivariate-linear")
 const path = require('node:path')
 const fs = require('fs');
 const csv = require('csv-stringify/sync');
+const pdfUtils = require('./pdf_utils');
 
 module.exports = {
     is_scenario,
@@ -77,9 +78,9 @@ function print_lr(lr, var_name = "size") {
     else return "no linear regression available"
 }
 
-function print_summary_errors(data, compute_error, prefix = "") {
+function print_summary_errors(data, compute_error, prefix = "", doc = null) {
     if(data.length === 0){
-        console.log(`[WARNING] no data for ${prefix}`)
+        pdfUtils.output_msg(`[WARNING] no data for ${prefix}`, doc)
         return 0;
     }
     let max_error_current = 0;
@@ -89,8 +90,8 @@ function print_summary_errors(data, compute_error, prefix = "") {
         if (error > 0) nb_error += 1
         if (!isNaN(error)) max_error_current = Math.max(max_error_current, error)
     }
-    console.log(`${prefix} sample size: ${data.length}` )
-    console.log(`${prefix} nb of errors: ${nb_error} ; maximum error: ${max_error_current} ticks`)
+    pdfUtils.output_msg(`${prefix} sample size: ${data.length}` , doc)
+    pdfUtils.output_msg(`${prefix} nb of errors: ${nb_error} ; maximum error: ${max_error_current} ticks`, doc)
     return nb_error
 }
 
