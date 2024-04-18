@@ -1473,7 +1473,7 @@ dependencies = [
  "lru",
  "paste",
  "stability",
- "strum 0.26.1",
+ "strum 0.26.2",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -1547,7 +1547,7 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "rustc_apfloat",
- "strum 0.26.1",
+ "strum 0.26.2",
  "tezos-smart-rollup-constants",
  "thiserror",
  "twiddle",
@@ -1575,6 +1575,7 @@ dependencies = [
  "rvemu",
  "serde",
  "serde_json",
+ "strum 0.26.2",
  "tezos-smart-rollup-constants",
  "tezos-smart-rollup-encoding",
  "tezos_crypto_rs",
@@ -1845,11 +1846,11 @@ checksum = "7318c509b5ba57f18533982607f24070a55d353e90d4cae30c467cdb2ad5ac5c"
 
 [[package]]
 name = "strum"
-version = "0.26.1"
+version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "723b93e8addf9aa965ebe2d11da6d7540fa2283fcea14b3371ff055f7ba13f5f"
+checksum = "5d8cec3501a5194c432b2b7976db6b7d10ec95c253208b45f83f7136aa985e29"
 dependencies = [
- "strum_macros 0.26.1",
+ "strum_macros 0.26.2",
 ]
 
 [[package]]
@@ -1866,9 +1867,9 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.26.1"
+version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a3417fc93d76740d974a01654a09777cb500428cc874ca9f45edfe0c4d4cd18"
+checksum = "c6cf59daf282c0a494ba14fd21610a0325f9f90ec9d1231dea26bcb1d696c946"
 dependencies = [
  "heck 0.4.1",
  "proc-macro2",
