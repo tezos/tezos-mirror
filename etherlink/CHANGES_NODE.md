@@ -20,11 +20,28 @@
   (16 by default). (!12749)
 - The transaction pool will reject transactions that can not be contained within
   the size of a blueprint. (!12834)
-
+- The new command `replay blueprint` allows to replay a given blueprint with
+  arbitrary kernels. (!12850, !12854, !12855)
+- The new command `init config` allows to initialize a new configuration file
+  for an EVM node. (!12798)
+- Observers now try to reconnect to their EVM endpoint if necessary. (!12772)
 
 ### Bug fixes
 
+- The blueprints streaming RPC accepts to start from the next blueprint level.
+  (!12753)
+- The RPC `eth_getLogs` now fails when a request exceeds its limits (in blocks
+  range or log numbers). (!12905)
+- Observers do not stop when the rollup node they are connected to advertise a
+  blueprint application for a level in the future. (!12753)
+
 ### Breaking changes
+
+- The `mode` field of the configuration file has been removed, and replaced
+  with `proxy`, `sequencer` and `observer` to configure each mode individually.
+  (!12743)
+- The EVM node will no longer modify its configuration file based on its
+  CLI arguments. (!12799)
 
 ### Internal
 
