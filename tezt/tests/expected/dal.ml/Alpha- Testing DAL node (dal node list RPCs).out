@@ -3,9 +3,6 @@
 
 Available services:
   
-  - POST /commitments
-      Add a slot in the node's context if not already present. The
-      corresponding commitment is returned. 
   + commitments/<DAL_commitment>/
     - GET /commitments/<DAL_commitment>/headers
         Return the known headers for the slot whose commitment is given. 
