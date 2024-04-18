@@ -94,7 +94,7 @@ Available services:
       node's store. 
   - GET /shard/<DAL_commitment>/<int>
       Fetch shard as bytes 
-  - POST /slot
+  - POST /slots
       Post a slot to the DAL node, computes its commitment and commitment
       proof, then computes the correspoding shards with their proof. The
       result of this RPC can be directly used to publish a slot header. 
