@@ -175,21 +175,47 @@ let global_current_tezos_level :
     ~output:Data_encoding.(option int32)
     (open_root / "global" / "tezos_level")
 
-let call_service ~base ?(media_types = Media_type.all_media_types) a b c d =
+let rpc_timeout = 300.
+
+(** [retry_connection f] retries the connection using [f]. If an error
+    happens in [f] and it has lost the connection, the rpc is
+    retried *)
+let retry_connection (f : Uri.t -> 'a tzresult Lwt.t) endpoint :
+    'a tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let rec retry ~delay () =
+    let*! result = f endpoint in
+    match result with
+    | Error err when is_connection_error err ->
+        let*! () = Events.retrying_connect ~endpoint ~delay in
+        let*! () = Lwt_unix.sleep delay in
+        let next_delay = delay *. 2. in
+        let delay = Float.min next_delay 30. in
+        retry ~delay ()
+    | res -> Lwt.return res
+  in
+  retry ~delay:1. ()
+
+let call_service ~base ?(media_types = Media_type.all_media_types) rpc b c input
+    =
   let open Lwt_result_syntax in
   let*! res =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_service
       media_types
       ~base
-      a
+      rpc
       b
       c
-      d
+      input
   in
   match res with
   | Ok res -> return res
   | Error trace when is_connection_error trace -> fail (Lost_connection :: trace)
   | Error trace -> fail trace
+
+let call_service ~keep_alive ~base ?media_types rpc b c input =
+  let f base = call_service ~base ?media_types rpc b c input in
+  if keep_alive then retry_connection f base else f base
 
 let make_streamed_call ~rollup_node_endpoint =
   let open Lwt_result_syntax in
@@ -213,14 +239,21 @@ let make_streamed_call ~rollup_node_endpoint =
   return (stream, close)
 
 let publish :
+    keep_alive:bool ->
     rollup_node_endpoint:Uri.t ->
     [< `External of string] list ->
     unit tzresult Lwt.t =
- fun ~rollup_node_endpoint inputs ->
+ fun ~keep_alive ~rollup_node_endpoint inputs ->
   let open Lwt_result_syntax in
   let inputs = List.map (function `External s -> s) inputs in
   let* _answer =
-    call_service ~base:rollup_node_endpoint batcher_injection () () inputs
+    call_service
+      ~keep_alive
+      ~base:rollup_node_endpoint
+      batcher_injection
+      ()
+      ()
+      inputs
   in
   return_unit
 
@@ -244,10 +277,11 @@ let durable_state_subkeys :
 
 (** [smart_rollup_address base] asks for the smart rollup node's
     address, using the endpoint [base]. *)
-let smart_rollup_address base =
+let smart_rollup_address ~keep_alive base =
   let open Lwt_result_syntax in
   let*! answer =
     call_service
+      ~keep_alive
       ~base
       ~media_types:[Media_type.octet_stream]
       smart_rollup_address
@@ -259,10 +293,17 @@ let smart_rollup_address base =
   | Ok address -> return (Bytes.to_string address)
   | Error trace -> fail trace
 
-let oldest_known_l1_level base =
+let oldest_known_l1_level ~keep_alive base =
   let open Lwt_result_syntax in
   let*! answer =
-    call_service ~base ~media_types:[Media_type.octet_stream] gc_info () () ()
+    call_service
+      ~keep_alive
+      ~base
+      ~media_types:[Media_type.octet_stream]
+      gc_info
+      ()
+      ()
+      ()
   in
   match answer with
   | Ok (_last_gc_level, first_available_level, _last_context_split) ->
@@ -271,10 +312,11 @@ let oldest_known_l1_level base =
 
 (** [tezos_level base] asks for the smart rollup node's
     latest l1 level, using the endpoint [base]. *)
-let tezos_level base =
+let tezos_level ~keep_alive base =
   let open Lwt_result_syntax in
   let* level_opt =
     call_service
+      ~keep_alive
       ~base
       ~media_types:[Media_type.octet_stream]
       global_current_tezos_level

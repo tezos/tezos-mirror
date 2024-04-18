@@ -435,6 +435,7 @@ let proxy_command =
         Cli.create_or_read_config
           ~data_dir
           ~devmode
+          ~keep_alive
           ?rpc_addr
           ?rpc_port
           ?cors_origins
@@ -444,7 +445,7 @@ let proxy_command =
       in
       let* () =
         if config.devmode then
-          Evm_node_lib_dev.Proxy.main config ~keep_alive ~rollup_node_endpoint
+          Evm_node_lib_dev.Proxy.main config ~rollup_node_endpoint
         else
           Evm_node_lib_prod.Proxy.main config ~keep_alive ~rollup_node_endpoint
       in
@@ -470,7 +471,7 @@ let sequencer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in sequencer mode"
-    (args23
+    (args24
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -489,6 +490,7 @@ let sequencer_command =
        catchup_cooldown_arg
        max_number_of_chunks_arg
        devmode_arg
+       keep_alive_arg
        wallet_dir_arg
        tx_pool_timeout_limit_arg
        tx_pool_addr_limit_arg
@@ -521,6 +523,7 @@ let sequencer_command =
            catchup_cooldown,
            max_number_of_chunks,
            devmode,
+           keep_alive,
            wallet_dir,
            tx_pool_timeout_limit,
            tx_pool_addr_limit,
@@ -581,6 +584,7 @@ let sequencer_command =
           ~tx_pool_timeout_limit:(Int64.of_int tx_pool_timeout_limit)
           ~tx_pool_addr_limit:(Int64.of_int tx_pool_addr_limit)
           ~tx_pool_tx_per_addr_limit:(Int64.of_int tx_pool_tx_per_addr_limit)
+          ~keep_alive
           ~sequencer
           ()
       in
@@ -618,7 +622,7 @@ let observer_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Start the EVM node in observer mode"
-    (args9
+    (args10
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -627,7 +631,8 @@ let observer_command =
        verbose_arg
        kernel_arg
        preimages_arg
-       preimages_endpoint_arg)
+       preimages_endpoint_arg
+       keep_alive_arg)
     (prefixes ["run"; "observer"; "with"; "endpoint"]
     @@ param
          ~name:"evm-node-endpoint"
@@ -645,7 +650,8 @@ let observer_command =
            verbose,
            kernel,
            preimages,
-           preimages_endpoint )
+           preimages_endpoint,
+           keep_alive )
              evm_node_endpoint
              rollup_node_endpoint
              () ->
@@ -669,6 +675,7 @@ let observer_command =
     Cli.create_or_read_config
       ~data_dir
       ~devmode:true
+      ~keep_alive
       ?rpc_addr
       ?rpc_port
       ?cors_origins
@@ -1102,7 +1109,7 @@ If the <rollup-node-endpoint> and the <sequencer-key> are set then adds the
 configuration for the sequencer mode.
 If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
-    (args17
+    (args18
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -1117,6 +1124,7 @@ mode.|}
        max_number_of_chunks_arg
        devmode_arg
        wallet_dir_arg
+       keep_alive_arg
        (Client_config.password_filename_arg ())
        (Tezos_clic.arg
           ~long:"sequencer-key"
@@ -1143,6 +1151,7 @@ mode.|}
            max_number_of_chunks,
            devmode,
            wallet_dir,
+           keep_alive,
            password_filename,
            sequencer,
            force )
@@ -1190,6 +1199,7 @@ mode.|}
           ?rpc_port
           ?cors_origins
           ?cors_headers
+          ~keep_alive
           ?proxy
           ?sequencer
           ?observer

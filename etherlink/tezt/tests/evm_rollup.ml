@@ -4228,14 +4228,14 @@ let test_keep_alive =
       let* () = Evm_node.wait_for_ready evm_node in
       (* The EVM node should respond to RPCs. *)
       let*@ _block_number = Rpc.block_number evm_node in
-      (* Stop the rollup node, the EVM node no longer properly respond to RPCs. *)
+      (* Stop the rollup node, the EVM node will loop retrying
+         RPCs. *)
       let* () = Sc_rollup_node.terminate sc_rollup_node in
-      let*@? error = Rpc.block_number evm_node in
-      Check.(error.message =~ rex "the communication was lost")
-        ~error_msg:
-          "The RPC was supposed to failed because of lost communication" ;
-      (* Restart the EVM node, do the same RPC. *)
+      let block_number = Rpc.block_number evm_node in
+      let* () = Evm_node.wait_for_retrying_connect evm_node in
+      (* Restart the EVM node, and check RPC. *)
       let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
+      let*@ _block_number = block_number in
       let*@ _block_number = Rpc.block_number evm_node in
       unit)
 

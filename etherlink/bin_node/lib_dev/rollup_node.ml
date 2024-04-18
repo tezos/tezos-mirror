@@ -32,11 +32,14 @@ open Transaction_format
 module MakeBackend (Base : sig
   val base : Uri.t
 
+  val keep_alive : bool
+
   val smart_rollup_address : string
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
     let read path =
       call_service
+        ~keep_alive:Base.keep_alive
         ~base:Base.base
         durable_state_value
         ((), Block_id.Head)
@@ -74,7 +77,13 @@ end) : Services_backend_sig.Backend = struct
          We do not wish to follow the message's inclusion, and thus, ignore
          the resulted ids. *)
       let* _answer =
-        call_service ~base:Base.base batcher_injection () () messages
+        call_service
+          ~keep_alive:Base.keep_alive
+          ~base:Base.base
+          batcher_injection
+          ()
+          ()
+          messages
       in
       return_unit
   end
@@ -82,7 +91,15 @@ end) : Services_backend_sig.Backend = struct
   module SimulatorBackend = struct
     let simulate_and_read ~input =
       let open Lwt_result_syntax in
-      let* json = call_service ~base:Base.base simulation () () input in
+      let* json =
+        call_service
+          ~keep_alive:Base.keep_alive
+          ~base:Base.base
+          simulation
+          ()
+          ()
+          input
+      in
       let eval_result =
         Data_encoding.Json.destruct Simulation.Encodings.eval_result json
       in
@@ -96,6 +113,8 @@ end
 
 module Make (Base : sig
   val base : Uri.t
+
+  val keep_alive : bool
 
   val smart_rollup_address : string
 end) =

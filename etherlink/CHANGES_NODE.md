@@ -4,9 +4,14 @@
 
 ### Features
 
+- Generalize 'keep-alive' option to all mode and rpc to the rollup
+  node, not only when bootstrapping the proxy mode. 'keep-alive' retry
+  rpcs to the rollup node when it fails with a connection
+  error. (!12800)
 - Add command "make kernel installer config <file>" that generates a
   configuration file filled with all the values given in
   argument. (!12764)
+- Add a 'keep_alive' line in the configuration. (!12800)
 - The transaction pool is now removing any transaction that was included more
   than a defined threshold ago (one hour by default). (!12741)
 - The transaction pool imposes a limit of users permitted simultaneously
