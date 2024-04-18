@@ -5,7 +5,10 @@
 
 use cli::Options;
 use risc_v_interpreter::{
-    machine_state::mode::Mode, traps::EnvironException, Interpreter, InterpreterResult::*,
+    machine_state::mode::Mode,
+    traps::EnvironException,
+    Interpreter,
+    InterpreterResult::{self},
 };
 use rvemu::emulator::Emulator;
 use std::{error::Error, path::Path};
@@ -14,6 +17,7 @@ use tezos_smart_rollup_encoding::{
     michelson::MichelsonUnit, public_key_hash::PublicKeyHash, smart_rollup::SmartRollupAddress,
 };
 
+mod bench;
 mod cli;
 mod debugger;
 mod devicetree;
@@ -21,23 +25,29 @@ mod inbox;
 mod rvemu_boot;
 mod rvemu_syscall;
 
+fn format_status(result: &InterpreterResult) -> String {
+    use InterpreterResult::*;
+    match result {
+        Exit { code: 0, .. } => "Ok (exit code = 0)".to_string(),
+        Exit { code, .. } => format!("Failed with exit code {}", code),
+        Running(_) => "Timeout".to_string(),
+        Exception(exc, _) => format!("{}", exception_to_error(exc)),
+    }
+}
+
 /// Convert a RISC-V exception into an error.
-pub fn exception_to_error(exc: EnvironException) -> Box<dyn Error> {
+pub fn exception_to_error(exc: &EnvironException) -> Box<dyn Error> {
     format!("{:?}", exc).into()
 }
 
 fn run(opts: Options) -> Result<(), Box<dyn Error>> {
     let contents = std::fs::read(&opts.input)?;
     let mut backend = Interpreter::create_backend();
-    let mut interpreter = Interpreter::new(&mut backend, &contents, None, posix_exit_mode(opts))?;
+    let mut interpreter = Interpreter::new(&mut backend, &contents, None, posix_exit_mode(&opts))?;
 
-    const MAX_STEPS: usize = 1000000;
-
-    match interpreter.run(MAX_STEPS) {
-        Exit { code: 0, .. } => Ok(()),
-        Exit { code, .. } => Err(format!("Failed with exit code {}", code).into()),
-        Running(_) => Err("Timeout".into()),
-        Exception(exc, _) => Err(exception_to_error(exc)),
+    match interpreter.run(opts.max_steps) {
+        InterpreterResult::Exit { code: 0, .. } => Ok(()),
+        result => Err(format_status(&result).into()),
     }
 }
 
@@ -167,7 +177,7 @@ fn rvemu(opts: Options) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn posix_exit_mode(opts: Options) -> Mode {
+fn posix_exit_mode(opts: &Options) -> Mode {
     match opts.posix_exit_mode {
         cli::ExitMode::User => Mode::User,
         cli::ExitMode::Supervisor => Mode::Supervisor,
@@ -181,5 +191,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         cli::Mode::Rvemu(opts) => rvemu(opts),
         cli::Mode::Run(opts) => run(opts),
         cli::Mode::Debug(opts) => debug(opts),
+        cli::Mode::Bench(opts) => bench::bench(opts),
     }
 }

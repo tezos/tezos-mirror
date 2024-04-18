@@ -14,6 +14,8 @@ pub enum Mode {
     Debug(Options),
     /// Run a program using rvemu
     Rvemu(Options),
+    /// Benchmark a binary
+    Bench(Options),
 }
 
 #[derive(Clone, ValueEnum, Debug)]
@@ -62,6 +64,9 @@ pub struct Options {
     /// Path to the file containing inbox messages
     #[arg(long)]
     pub inbox_file: Option<Box<Path>>,
+
+    #[arg(long, default_value_t = 1_000_000)]
+    pub max_steps: usize,
 }
 
 /// Parse the command-line arguments.
