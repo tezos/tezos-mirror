@@ -40,7 +40,7 @@ module Autostake : sig
 
   (** Runs the autostake operations at cycle end. Does nothing if
       [enabled = false]. *)
-  val run_at_cycle_end : Block.t -> State.t -> State.t tzresult
+  val run_at_cycle_end : Block.t -> State.t -> State.t tzresult Lwt.t
 end
 
 module Delayed_slashing : sig

@@ -89,6 +89,12 @@ let transfer src_name dst_name amount : (t, t) scenarios =
       let state = State.apply_transfer amount src_name dst_name state in
       return (state, [operation]))
 
+let current_cycle block =
+  (* operation will be baked in next block *)
+  let predecessor_cycle = Block.current_cycle block in
+  if Block.last_block_of_cycle block then Cycle.succ predecessor_cycle
+  else predecessor_cycle
+
 (** Set delegate for src. If [delegate_name_opt = None], then unset current delegate *)
 let set_delegate src_name delegate_name_opt : (t, t) scenarios =
   exec_op (fun (block, state) ->
@@ -111,7 +117,7 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
       let is_not_changing_delegate =
         Option.equal String.equal delegate_name_opt src.delegate
       in
-      let current_cycle = Block.current_cycle block in
+      let current_cycle = current_cycle block in
       let* operation =
         Op.delegation ~fee:Tez.zero (B block) src.contract delegate_pkh_opt
       in
@@ -167,7 +173,7 @@ let stake src_name stake_value : (t, t) scenarios =
       (* Stake applies finalize *before* the stake *)
       let state = State.apply_finalize src_name state in
       let amount = quantity_to_tez src.liquid stake_value in
-      let current_cycle = Block.current_cycle block in
+      let current_cycle = current_cycle block in
       let* operation = stake (B block) src.contract amount in
       let state = State.apply_stake amount current_cycle src_name state in
       return (state, [operation]))
@@ -189,7 +195,7 @@ let unstake src_name unstake_value : (t, t) scenarios =
       in
       let amount = quantity_to_tez stake_balance unstake_value in
       let* operation = unstake (B block) src.contract amount in
-      let cycle = Block.current_cycle block in
+      let cycle = current_cycle block in
       let balance = balance_of_account src_name state.account_map in
       let state =
         if Q.(equal balance.staked_b zero) then state

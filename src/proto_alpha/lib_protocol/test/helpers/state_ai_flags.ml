@@ -92,7 +92,7 @@ module Autostake = struct
       Tez.pp
       (Tez_helpers.of_mutez amount)
 
-  let apply_autostake ~name ~old_cycle
+  let apply_autostake (block : Block.t) ~name ~old_cycle
       ({
          pkh;
          contract = _;
@@ -110,7 +110,7 @@ module Autostake = struct
          last_active_cycle;
        } :
         account_state) state =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     (* TODO: use Protocol.Constants_storage.tolerated_inactivity_period *)
     let tolerated_inactivity_period =
       (2 * state.constants.consensus_rights_delay) + 1
@@ -121,84 +121,103 @@ module Autostake = struct
         name
         (Option.value ~default:"None" delegate) ;
       return state)
-    else if
-      Cycle.(old_cycle = add last_active_cycle tolerated_inactivity_period)
-    then
-      return
-      @@ update_map
-           ~f:(apply_unstake (Cycle.succ old_cycle) Tez.max_tez name)
-           state
-    else if
-      Cycle.(old_cycle > add last_active_cycle tolerated_inactivity_period)
-    then return state
     else
-      let* current_liquid_delegated = liquid_delegated ~name state in
-      let current_frozen = Frozen_tez.total_current frozen_deposits in
-      let current_unstaked_frozen_delegated =
-        Unstaked_frozen.sum_current unstaked_frozen
+      let* ({grace_period; _} : Context.Delegate.info) =
+        Context.Delegate.info (B block) pkh
       in
-      let current_unstaked_final_delegated =
-        Unstaked_finalizable.total unstaked_finalizable
+      let model_grace_period =
+        Cycle.add last_active_cycle tolerated_inactivity_period
       in
-      let power =
-        Tez.(
-          current_liquid_delegated +! current_frozen
-          +! current_unstaked_frozen_delegated
-          +! current_unstaked_final_delegated
-          |> to_mutez |> Z.of_int64)
-      in
-      let optimal =
-        Tez.of_z
-          (Z.cdiv
-             power
-             (Z.of_int (state.constants.limit_of_delegation_over_baking + 1)))
-      in
-      let autostaked =
-        Int64.(sub (Tez.to_mutez optimal) (Tez.to_mutez current_frozen))
-      in
-      let state = State.apply_unslashable (Cycle.succ old_cycle) name state in
-      let state = State.apply_finalize name state in
-      (* stake or unstake *)
-      let new_state =
-        if autostaked > 0L then (
-          log_model_autostake ~optimal name pkh old_cycle "stake" autostaked ;
-          State.apply_stake
-            Tez.(min liquid (of_mutez autostaked))
-            (Cycle.succ old_cycle)
-            name
+      Log.debug
+        "Model Autostaking for %s: current cycle is  %a, grace cycle is %a, \
+         last_active_cycle is %a (grace %a)@."
+        name
+        Cycle.pp
+        old_cycle
+        Cycle.pp
+        grace_period
+        Cycle.pp
+        last_active_cycle
+        Cycle.pp
+        model_grace_period ;
+
+      if Cycle.(old_cycle = model_grace_period) then (
+        Log.debug "Model Autostaking: %s, deactivation -> unstaking all@." name ;
+        return
+        @@ update_map
+             ~f:(apply_unstake (Cycle.succ old_cycle) Tez.max_tez name)
+             state)
+      else if Cycle.(old_cycle > model_grace_period) then (
+        Log.debug "Model Autostaking: %s, ignored (inactive)@." name ;
+        return state)
+      else
+        let*? current_liquid_delegated = liquid_delegated ~name state in
+        let current_frozen = Frozen_tez.total_current frozen_deposits in
+        let current_unstaked_frozen_delegated =
+          Unstaked_frozen.sum_current unstaked_frozen
+        in
+        let current_unstaked_final_delegated =
+          Unstaked_finalizable.total unstaked_finalizable
+        in
+        let power =
+          Tez.(
+            current_liquid_delegated +! current_frozen
+            +! current_unstaked_frozen_delegated
+            +! current_unstaked_final_delegated
+            |> to_mutez |> Z.of_int64)
+        in
+        let optimal =
+          Tez.of_z
+            (Z.cdiv
+               power
+               (Z.of_int (state.constants.limit_of_delegation_over_baking + 1)))
+        in
+        let autostaked =
+          Int64.(sub (Tez.to_mutez optimal) (Tez.to_mutez current_frozen))
+        in
+        let state = State.apply_unslashable (Cycle.succ old_cycle) name state in
+        let state = State.apply_finalize name state in
+        (* stake or unstake *)
+        let new_state =
+          if autostaked > 0L then (
+            log_model_autostake ~optimal name pkh old_cycle "stake" autostaked ;
+            State.apply_stake
+              Tez.(min liquid (of_mutez autostaked))
+              (Cycle.succ old_cycle)
+              name
+              state)
+          else if autostaked < 0L then (
+            log_model_autostake
+              ~optimal
+              name
+              pkh
+              old_cycle
+              "unstake"
+              (Int64.neg autostaked) ;
+            State.apply_unstake
+              (Cycle.succ old_cycle)
+              (Tez_helpers.of_mutez Int64.(neg autostaked))
+              name
+              state)
+          else (
+            log_model_autostake
+              ~optimal
+              name
+              pkh
+              old_cycle
+              "only finalize"
+              autostaked ;
             state)
-        else if autostaked < 0L then (
-          log_model_autostake
-            ~optimal
-            name
-            pkh
-            old_cycle
-            "unstake"
-            (Int64.neg autostaked) ;
-          State.apply_unstake
-            (Cycle.succ old_cycle)
-            (Tez_helpers.of_mutez Int64.(neg autostaked))
-            name
-            state)
-        else (
-          log_model_autostake
-            ~optimal
-            name
-            pkh
-            old_cycle
-            "only finalize"
-            autostaked ;
-          state)
-      in
-      return new_state
+        in
+        return new_state
 
   let run_at_cycle_end block state =
-    let open Result_syntax in
+    let open Lwt_result_syntax in
     if enabled block state then
       let current_cycle = Block.current_cycle block in
-      String.Map.fold_e
+      String.Map.fold_es
         (fun name account state ->
-          apply_autostake ~name ~old_cycle:current_cycle account state)
+          apply_autostake block ~name ~old_cycle:current_cycle account state)
         state.account_map
         state
     else return state
