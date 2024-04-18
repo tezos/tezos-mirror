@@ -23,6 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* block_store_status *)
+
+type block_store_status = Idle | Merging
+
+let status_equal s1 s2 =
+  match (s1, s2) with
+  | Idle, Idle -> true
+  | Merging, Merging -> true
+  | Idle, Merging | Merging, Idle -> false
+
+let block_store_status_encoding =
+  let open Data_encoding in
+  conv
+    (function Idle -> false | Merging -> true)
+    (function false -> Idle | true -> Merging)
+    bool
+
+(* block_descriptor *)
+
 type block_descriptor = Block_hash.t * int32
 
 let block_descriptor_equal (bh1, lvl1) (bh2, lvl2) =
@@ -34,6 +53,8 @@ let block_descriptor_encoding =
 
 let pp_block_descriptor fmt (hash, level) =
   Format.fprintf fmt "%a (level: %ld)" Block_hash.pp hash level
+
+(* chain_config *)
 
 type chain_config = {
   history_mode : History_mode.t;
@@ -57,6 +78,8 @@ let chain_config_encoding =
        (req "history_mode" History_mode.encoding)
        (req "genesis" Genesis.encoding)
        (varopt "expiration" Time.Protocol.encoding))
+
+(* invalid_block *)
 
 type invalid_block = {level : int32; errors : Error_monad.error list}
 
