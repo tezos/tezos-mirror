@@ -25,7 +25,7 @@ let suffix_mem repo e =
     | `c -> Store.S.Internal.suffix_commit_mem repo k
     | `n -> Store.S.Internal.suffix_node_mem repo k
     | `b -> Store.S.Internal.suffix_contents_mem repo k
-  with Irmin_pack_unix.Pack_store.Invalid_read _ ->
+  with Brassaia_pack_unix.Pack_store.Invalid_read _ ->
     (* In RW mode, [mem] will raise an exception if the offset of the key is
        out of the bounds of the pack file *)
     false
@@ -59,7 +59,7 @@ type phase_flush =
   | S2_after_flush_dict
   | S3_after_flush_suffix
   | S4_after_flush
-[@@deriving irmin ~pp]
+[@@deriving brassaia ~pp]
 
 let write1_dict model =
   Model.preload_dict model;
@@ -156,7 +156,7 @@ type phase_reload =
   | S3_after_reload_control
   | S4_after_reload_suffix
   | S5_after_reload
-[@@deriving irmin ~pp]
+[@@deriving brassaia ~pp]
 
 let write1_index model =
   Model.preload_index model;

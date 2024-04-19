@@ -17,7 +17,7 @@
 open! Import
 open Common
 module S = Test_gc.Store
-module Dispatcher = Irmin_pack_unix.Dispatcher.Make (File_manager)
+module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
 
 let root = Filename.concat "_build" "test-dispatcher"
 let src = Logs.Src.create "tests.dispatcher" ~doc:"Test dispatcher"
@@ -78,10 +78,10 @@ let check_hex msg buf expected =
 let test_read () =
   let* config = setup_store () in
   let fm = File_manager.open_ro config |> Errs.raise_if_error in
-  let dsp = Dispatcher.v fm |> Errs.raise_if_error in
+  let dsp = Dispatcher.init fm |> Errs.raise_if_error in
   let _ =
     Alcotest.check_raises "cannot read node_1"
-      (Irmin_pack_unix.Errors.Pack_error
+      (Brassaia_pack_unix.Errors.Pack_error
          (`Invalid_sparse_read (`Before, Int63.of_int 30)))
       (fun () ->
         let buf = Bytes.create node_1.len in

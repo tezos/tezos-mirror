@@ -16,6 +16,6 @@
 
 let () =
   Lwt_main.run
-  @@ Irmin_test_helpers.Irmin_test.Store.run ~__FILE__ "irmin-pack"
+  @@ Brassaia_test_helpers.Brassaia_test.Store.run ~__FILE__ "brassaia-pack"
        ~misc:Test_pack.misc ~sleep:Lwt_unix.sleep
        (List.map (fun s -> (`Quick, s)) Test_pack.suite)

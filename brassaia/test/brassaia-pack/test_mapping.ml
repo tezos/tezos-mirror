@@ -16,9 +16,9 @@
 
 open! Import
 module Int63 = Optint.Int63
-module Io = Irmin_pack_unix.Io.Unix
-module Errs = Irmin_pack_unix.Io_errors.Make (Io)
-module Sparse_file = Irmin_pack_unix.Sparse_file.Make (Io)
+module Io = Brassaia_pack_unix.Io.Unix
+module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
+module Sparse_file = Brassaia_pack_unix.Sparse_file.Make (Io)
 
 let test_dir = Filename.concat "_build" "test-pack-mapping"
 
@@ -30,9 +30,9 @@ let rec make_string_seq len () =
 
 (** Call the [Mapping_file] routines to process [pairs] *)
 let process_on_disk pairs =
-  let mapping = Irmin_pack.Layout.V5.mapping ~root:test_dir ~generation:1 in
+  let mapping = Brassaia_pack.Layout.V5.mapping ~root:test_dir ~generation:1 in
   Io.unlink mapping |> ignore;
-  let data = Irmin_pack.Layout.V5.prefix ~root:test_dir ~generation:1 in
+  let data = Brassaia_pack.Layout.V5.prefix ~root:test_dir ~generation:1 in
   Io.unlink data |> ignore;
   let sparse = Sparse_file.Ao.create ~mapping ~data |> Errs.raise_if_error in
   List.iter

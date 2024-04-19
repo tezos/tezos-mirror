@@ -25,22 +25,22 @@ module Log = (val Logs.src_log src : Logs.LOG)
 let index_log_size = Some 1_000
 
 module S = struct
-  module Maker = Irmin_pack_unix.Maker (Conf)
+  module Maker = Brassaia_pack_unix.Maker (Conf)
   include Maker.Make (Schema)
 end
 
 let config ?(readonly = false) ?(fresh = true) root =
-  Irmin_pack.config ~readonly ?index_log_size ~fresh root
+  Brassaia_pack.config ~readonly ?index_log_size ~fresh root
 
 let info () = S.Info.empty
 
 let open_ro_after_rw_closed () =
   rm_dir root;
-  let* rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
+  let* rw = S.Repo.init (config ~readonly:false ~fresh:true root) in
   let* t = S.main rw in
   let tree = S.Tree.singleton [ "a" ] "x" in
   S.set_tree_exn ~parents:[] ~info t [] tree >>= fun () ->
-  let* ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
+  let* ro = S.Repo.init (config ~readonly:true ~fresh:false root) in
   S.Repo.close rw >>= fun () ->
   let* t = S.main ro in
   let* c = S.Head.get t in
@@ -76,14 +76,14 @@ let ro_reload_after_add () =
         Alcotest.(check (option string)) "RO find" (Some v) x
   in
   rm_dir root;
-  let* rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
-  let* ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
+  let* rw = S.Repo.init (config ~readonly:false ~fresh:true root) in
+  let* ro = S.Repo.init (config ~readonly:true ~fresh:false root) in
   let tree = S.Tree.singleton [ "a" ] "x" in
-  let* c1 = S.Commit.v rw ~parents:[] ~info:(info ()) tree in
+  let* c1 = S.Commit.init rw ~parents:[] ~info:(info ()) tree in
   S.reload ro;
   check ro c1 "a" "x" >>= fun () ->
   let tree = S.Tree.singleton [ "a" ] "y" in
-  let* c2 = S.Commit.v rw ~parents:[] ~info:(info ()) tree in
+  let* c2 = S.Commit.init rw ~parents:[] ~info:(info ()) tree in
   check ro c1 "a" "x" >>= fun () ->
   let* () =
     S.Commit.of_hash ro (S.Commit.hash c2) >|= function
@@ -97,19 +97,19 @@ let ro_reload_after_add () =
 let ro_reload_after_close () =
   let binding f = f [ "a" ] "x" in
   rm_dir root;
-  let* rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
-  let* ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
+  let* rw = S.Repo.init (config ~readonly:false ~fresh:true root) in
+  let* ro = S.Repo.init (config ~readonly:true ~fresh:false root) in
   let tree = binding (S.Tree.singleton ?metadata:None) in
-  let* c1 = S.Commit.v rw ~parents:[] ~info:(info ()) tree in
+  let* c1 = S.Commit.init rw ~parents:[] ~info:(info ()) tree in
   S.Repo.close rw >>= fun () ->
   S.reload ro;
   binding (check_binding ro c1) >>= fun () -> S.Repo.close ro
 
 let ro_batch () =
-  let* rw = S.Repo.v (config ~readonly:false ~fresh:true root) in
-  let* ro = S.Repo.v (config ~readonly:true ~fresh:false root) in
+  let* rw = S.Repo.init (config ~readonly:false ~fresh:true root) in
+  let* ro = S.Repo.init (config ~readonly:true ~fresh:false root) in
   Alcotest.check_raises_lwt "Read-only store throws RO_not_allowed exception"
-    Irmin_pack_unix.Errors.RO_not_allowed (fun () ->
+    Brassaia_pack_unix.Errors.RO_not_allowed (fun () ->
       S.Backend.Repo.batch ro (fun _ _ _ -> Lwt.return_unit))
   >>= fun () ->
   S.Repo.close ro >>= fun () -> S.Repo.close rw

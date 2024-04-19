@@ -28,23 +28,24 @@ let check_iter = Test_hashes.check_iter
 let wrong_depth = 100
 
 module Inode_modules
-    (Conf : Irmin_pack.Conf.S)
-    (Schema : Irmin.Schema.S) (Contents : sig
+    (Conf : Brassaia_pack.Conf.S)
+    (Schema : Brassaia.Schema.S) (Contents : sig
       val foo : Schema.Contents.t
       val bar : Schema.Contents.t
     end) =
 struct
-  module Key = Irmin_pack_unix.Pack_key.Make (Schema.Hash)
+  module Key = Brassaia_pack_unix.Pack_key.Make (Schema.Hash)
 
   module Node =
-    Irmin.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path) (Schema.Metadata)
+    Brassaia.Node.Generic_key.Make_v2 (Schema.Hash) (Schema.Path)
+      (Schema.Metadata)
       (Key)
       (Key)
 
-  module Index = Irmin_pack_unix.Index.Make (Schema.Hash)
+  module Index = Brassaia_pack_unix.Index.Make (Schema.Hash)
 
   module Inter =
-    Irmin_pack.Inode.Make_internal (Conf) (Schema.Hash) (Key) (Node)
+    Brassaia_pack.Inode.Make_internal (Conf) (Schema.Hash) (Key) (Node)
 
   module Inter_mock = struct
     include Inter
@@ -56,43 +57,43 @@ struct
     end
   end
 
-  module Io = Irmin_pack_unix.Io.Unix
-  module Errs = Irmin_pack_unix.Io_errors.Make (Io)
-  module File_manager = Irmin_pack_unix.File_manager.Make (Io) (Index) (Errs)
-  module Dict = Irmin_pack_unix.Dict.Make (File_manager)
-  module Dispatcher = Irmin_pack_unix.Dispatcher.Make (File_manager)
+  module Io = Brassaia_pack_unix.Io.Unix
+  module Errs = Brassaia_pack_unix.Io_errors.Make (Io)
+  module File_manager = Brassaia_pack_unix.File_manager.Make (Io) (Index) (Errs)
+  module Dict = Brassaia_pack_unix.Dict.Make (File_manager)
+  module Dispatcher = Brassaia_pack_unix.Dispatcher.Make (File_manager)
 
   module Pack =
-    Irmin_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
+    Brassaia_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Inter.Raw)
       (Errs)
 
   module Pack_mock =
-    Irmin_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
+    Brassaia_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Inter_mock.Raw)
       (Errs)
 
   module Inode =
-    Irmin_pack_unix.Inode.Make_persistent (Schema.Hash) (Node) (Inter) (Pack)
+    Brassaia_pack_unix.Inode.Make_persistent (Schema.Hash) (Node) (Inter) (Pack)
 
   module Inode_mock =
-    Irmin_pack_unix.Inode.Make_persistent (Schema.Hash) (Node) (Inter_mock)
+    Brassaia_pack_unix.Inode.Make_persistent (Schema.Hash) (Node) (Inter_mock)
       (Pack_mock)
 
   module Contents_value =
-    Irmin_pack.Pack_value.Of_contents (Conf) (Schema.Hash) (Key)
+    Brassaia_pack.Pack_value.Of_contents (Conf) (Schema.Hash) (Key)
       (Schema.Contents)
 
   module Contents_store =
-    Irmin_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
+    Brassaia_pack_unix.Pack_store.Make (File_manager) (Dict) (Dispatcher)
       (Schema.Hash)
       (Contents_value)
       (Errs)
 
   module Context_make
-      (Inode : Irmin_pack_unix.Inode.Persistent
+      (Inode : Brassaia_pack_unix.Inode.Persistent
                  with type file_manager = File_manager.t
                   and type dict = Dict.t
                   and type dispatcher = Dispatcher.t) =
@@ -100,27 +101,28 @@ struct
     type t = {
       store : read Inode.t;
       store_contents : read Contents_store.t;
-      fm : File_manager.t;
+      file_manager : File_manager.t;
       (* Two contents values that are guaranteed to be read by {!store}: *)
       foo : Key.t;
       bar : Key.t;
     }
 
     let config ~indexing_strategy ~readonly ~fresh name =
-      let module Index = Irmin_pack.Indexing_strategy in
+      let module Index = Brassaia_pack.Indexing_strategy in
       let indexing_strategy =
         if indexing_strategy = `always then Index.always else Index.minimal
       in
-      Irmin_pack.Conf.init ~fresh ~readonly ~indexing_strategy ~lru_size:0 name
+      Brassaia_pack.Conf.init ~fresh ~readonly ~indexing_strategy ~lru_size:0
+        name
 
-    (* TODO : remove duplication with irmin_pack/ext.ml *)
-    let get_fm config =
-      let readonly = Irmin_pack.Conf.readonly config in
+    (* TODO : remove duplication with brassaia_pack/ext.ml *)
+    let get_file_manager config =
+      let readonly = Brassaia_pack.Conf.readonly config in
 
       if readonly then File_manager.open_ro config |> Errs.raise_if_error
       else
-        let fresh = Irmin_pack.Conf.fresh config in
-        let root = Irmin_pack.Conf.root config in
+        let fresh = Brassaia_pack.Conf.fresh config in
+        let root = Brassaia_pack.Conf.root config in
         (* make sure the parent dir exists *)
         let () =
           match Sys.is_directory (Filename.dirname root) with
@@ -141,13 +143,13 @@ struct
       [%log.app "Constructing a fresh context for use by the test"];
       rm_dir root;
       let config = config ~indexing_strategy ~readonly:false ~fresh:true root in
-      let fm = get_fm config in
-      let dict = Dict.v fm |> Errs.raise_if_error in
-      let dispatcher = Dispatcher.v fm |> Errs.raise_if_error in
-      let lru = Irmin_pack_unix.Lru.create config in
-      let store = Inode.v ~config ~fm ~dict ~dispatcher ~lru in
+      let file_manager = get_file_manager config in
+      let dict = Dict.init file_manager |> Errs.raise_if_error in
+      let dispatcher = Dispatcher.init file_manager |> Errs.raise_if_error in
+      let lru = Brassaia_pack_unix.Lru.create config in
+      let store = Inode.init ~config ~file_manager ~dict ~dispatcher ~lru in
       let store_contents =
-        Contents_store.v ~config ~fm ~dict ~dispatcher ~lru
+        Contents_store.init ~config ~file_manager ~dict ~dispatcher ~lru
       in
       let+ foo, bar =
         Contents_store.batch store_contents (fun writer ->
@@ -156,10 +158,10 @@ struct
             Lwt.return (foo, bar))
       in
       [%log.app "Test context constructed"];
-      { store; store_contents; fm; foo; bar }
+      { store; store_contents; file_manager; foo; bar }
 
     let close t =
-      File_manager.close t.fm |> Errs.raise_if_error;
+      File_manager.close t.file_manager |> Errs.raise_if_error;
       (* closes dict, inodes and contents store. *)
       Lwt.return_unit
   end
@@ -169,7 +171,7 @@ struct
 end
 
 module Conf = struct
-  let entries = 2
+  let nb_entries = 2
   let stable_hash = 3
   let contents_length_header = Some `Varint
   let inode_child_order = `Seeded_hash
@@ -186,11 +188,11 @@ open S
 open Schema
 
 type pred = [ `Contents of Key.t | `Inode of Key.t | `Node of Key.t ]
-[@@deriving irmin]
+[@@deriving brassaia]
 
-let pp_pred = Irmin.Type.pp pred_t
+let pp_pred = Brassaia.Type.pp pred_t
 
-module H_contents = Irmin.Hash.Typed (Hash) (Schema.Contents)
+module H_contents = Brassaia.Hash.Typed (Hash) (Schema.Contents)
 
 let normal x = `Contents (x, Metadata.default)
 let node x = `Node x
@@ -235,14 +237,14 @@ module Inode_permutations_generator = struct
   (** [gen_step Inter index_list] uses brute force to generate a step such that
       [Inter.Val.index ~depth:i] maps to the ith index in the [index_list]. *)
   let gen_step :
-      (module Irmin_pack.Inode.Internal with type Val.step = Path.step) ->
+      (module Brassaia_pack.Inode.Internal with type Val.step = Path.step) ->
       int list ->
       Path.step =
     let tbl = Hashtbl.create 10 in
     let max_brute_force_iterations = 100 in
     let letters_per_step = (max_brute_force_iterations + 25) / 26 in
     fun inter indices ->
-      let module Inter = (val inter : Irmin_pack.Inode.Internal
+      let module Inter = (val inter : Brassaia_pack.Inode.Internal
                             with type Val.step = Path.step)
       in
       let rec aux i =
@@ -342,7 +344,7 @@ let check_node msg v t =
   check_hash msg hash hash'
 
 let check_hardcoded_hash msg h v =
-  h |> Irmin.Type.of_string Inode.Val.hash_t |> function
+  h |> Brassaia.Type.of_string Inode.Val.hash_t |> function
   | Error (`Msg str) -> Alcotest.failf "hash of string failed: %s" str
   | Ok hash -> check_hash msg hash (Inter.Val.hash_exn v)
 
@@ -368,7 +370,7 @@ let integrity_check ?(stable = true) v =
   Alcotest.(check bool) "check stable" (Inter.Val.stable v) stable;
   if not (Inter.Val.integrity_check v) then
     Alcotest.failf "node does not satisfy stability invariants %a"
-      (Irmin.Type.pp Inode.Val.t)
+      (Brassaia.Type.pp Inode.Val.t)
       v
 
 (** Test add to inodes. *)
@@ -483,7 +485,7 @@ let test_remove_inodes () =
     lazily loads subtrees, this won't be caught here. *)
 let test_representation_uniqueness_maxdepth_3 () =
   let module P = Inode_permutations_generator in
-  let p = P.v ~entries:Conf.entries ~maxdepth_of_test:3 in
+  let p = P.v ~entries:Conf.nb_entries ~maxdepth_of_test:3 in
   let f steps tree s =
     (* [steps, tree] is one of the known pair built using [Val.v]. Let's try to
        add or remove [s] from it and see if something breaks. *)
@@ -516,7 +518,7 @@ let test_truncated_inodes ~indexing_strategy =
   let to_truncated inode =
     let encode, decode =
       let t = Inode.Val.t in
-      Irmin.Type.(encode_bin t |> unstage, decode_bin t |> unstage)
+      Brassaia.Type.(encode_bin t |> unstage, decode_bin t |> unstage)
     in
     let encode inode =
       let buf = Buffer.create 0 in
@@ -682,12 +684,12 @@ let test_intermediate_inode_as_root () =
 let test_concrete_inodes ~indexing_strategy =
   let* t = Context.get_store ~indexing_strategy () in
   let { Context.foo; bar; _ } = t in
-  let pp_concrete = Irmin.Type.pp_json ~minify:false Inter.Val.Concrete.t in
-  let result_t = Irmin.Type.result Inode.Val.t Inter.Val.Concrete.error_t in
+  let pp_concrete = Brassaia.Type.pp_json ~minify:false Inter.Val.Concrete.t in
+  let result_t = Brassaia.Type.result Inode.Val.t Inter.Val.Concrete.error_t in
   let testable =
     Alcotest.testable
-      (Irmin.Type.pp_json ~minify:false result_t)
-      Irmin.Type.(unstage (equal result_t))
+      (Brassaia.Type.pp_json ~minify:false result_t)
+      Brassaia.Type.(unstage (equal result_t))
   in
   let check v =
     let len = Inter.Val.length v in
@@ -760,7 +762,7 @@ let test_concrete_inodes () =
 
 module Inode_tezos = struct
   module S =
-    Inode_modules (Conf) (Irmin_tezos.Schema)
+    Inode_modules (Conf) (Brassaia_tezos.Schema)
       (struct
         let foo = Bytes.make 10 '0'
         let bar = Bytes.make 10 '1'
@@ -782,10 +784,10 @@ module Inode_tezos = struct
     let v = S.Inode.Val.of_list [ ("x", normal foo); ("z", normal foo) ] in
     let h = S.Inter.Val.hash_exn v in
     let hash_to_bin_string =
-      Irmin.Type.(unstage (to_bin_string S.Inode.Val.hash_t))
+      Brassaia.Type.(unstage (to_bin_string S.Inode.Val.hash_t))
     in
     let key_to_bin_string =
-      Irmin.Type.(unstage (to_bin_string S.Inode.Key.t))
+      Brassaia.Type.(unstage (to_bin_string S.Inode.Key.t))
     in
     let hex_of_h = h |> hash_to_bin_string |> hex_encode in
     let hex_of_foo = foo |> key_to_bin_string |> hex_encode in
@@ -829,7 +831,7 @@ module Inode_tezos = struct
     in
     let h = S.Inter.Val.hash_exn v in
     let to_bin_string_hash =
-      Irmin.Type.(unstage (to_bin_string S.Inode.Val.hash_t))
+      Brassaia.Type.(unstage (to_bin_string S.Inode.Val.hash_t))
     in
     let hex_of_h = h |> to_bin_string_hash |> Hex.of_string |> Hex.show in
     let checks =
@@ -864,10 +866,10 @@ module Child_ordering = struct
       by the user). *)
 
   module Step = struct
-    type t = Schema.Path.step [@@deriving irmin ~short_hash]
+    type t = Schema.Path.step [@@deriving brassaia ~short_hash]
 
     module Hash =
-      Irmin.Hash.Typed
+      Brassaia.Hash.Typed
         (Schema.Hash)
         (struct
           type nonrec t = t
@@ -875,19 +877,19 @@ module Child_ordering = struct
           let t = t
         end)
 
-    type nonrec hash = Hash.t [@@deriving irmin ~to_bin_string]
+    type nonrec hash = Hash.t [@@deriving brassaia ~to_bin_string]
 
     let hash : t -> string = fun s -> hash_to_bin_string (Hash.hash s)
   end
 
-  module type S = Irmin_pack.Inode.Child_ordering with type step := Step.t
+  module type S = Brassaia_pack.Inode.Child_ordering with type step := Step.t
 
-  let make ?entries:(entries' = Irmin_tezos.Conf.entries)
-      (t : Irmin_pack.Conf.inode_child_order) : (module S) =
+  let make ?entries:(entries' = Brassaia_tezos.Conf.nb_entries)
+      (t : Brassaia_pack.Conf.inode_child_order) : (module S) =
     let module Conf = struct
-      include Irmin_tezos.Conf
+      include Brassaia_tezos.Conf
 
-      let entries = entries'
+      let nb_entries = entries'
       let inode_child_order = t
     end in
     let module T = Inode_modules (Conf) (Schema) (String_contents) in
@@ -907,7 +909,7 @@ module Child_ordering = struct
           "Expected [Max_depth %d] to be raised, but got a computed index of \
            %d instead"
           depth index
-    | exception Irmin_pack.Inode.Max_depth _ -> ()
+    | exception Brassaia_pack.Inode.Max_depth _ -> ()
 
   (* Get the bit at index [n] in a string: *)
   let get_bit str n =
@@ -921,7 +923,7 @@ module Child_ordering = struct
     chosen_bit
 
   let test_seeded_hash _switch () =
-    let entries = Irmin_tezos.Conf.entries in
+    let entries = Brassaia_tezos.Conf.nb_entries in
     let reference ~depth step =
       abs (Step.short_hash ~seed:depth step) mod entries
     in

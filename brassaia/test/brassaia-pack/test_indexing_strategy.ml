@@ -23,13 +23,13 @@ let src =
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module Store = struct
-  module Maker = Irmin_pack_unix.Maker (Conf)
+  module Maker = Brassaia_pack_unix.Maker (Conf)
   include Maker.Make (Schema)
 end
 
 let config ~indexing_strategy ?(readonly = false) ?(fresh = false) () =
   let root = Filename.concat "_build" "test_indexing_strategy" in
-  Irmin_pack.config ~readonly ~indexing_strategy ~fresh root
+  Brassaia_pack.config ~readonly ~indexing_strategy ~fresh root
 
 let test_unique_when_switched () =
   let value = "Welt" in
@@ -40,7 +40,7 @@ let test_unique_when_switched () =
     | `Contents contents_key -> Lwt.return contents_key
   in
   let get_direct_key key =
-    match Irmin_pack_unix.Pack_key.inspect key with
+    match Brassaia_pack_unix.Pack_key.inspect key with
     | Direct { offset; hash; length; _ } -> (offset, hash, length)
     | _ -> assert false
   in
@@ -56,9 +56,9 @@ let test_unique_when_switched () =
 
   (* 1. open store with always indexing, verify same offsets *)
   let* repo =
-    Store.Repo.v
-    @@ config ~indexing_strategy:Irmin_pack.Indexing_strategy.always ~fresh:true
-         ()
+    Store.Repo.init
+    @@ config ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
+         ~fresh:true ()
   in
   let* store = Store.main repo in
   let* first_key =
@@ -84,8 +84,8 @@ let test_unique_when_switched () =
 
   (* 2. re-open store with minimal indexing, verify new offset *)
   let* repo =
-    Store.Repo.v
-    @@ config ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
+    Store.Repo.init
+    @@ config ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
          ~fresh:false ()
   in
   let* store = Store.main repo in

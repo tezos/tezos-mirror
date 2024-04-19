@@ -14,21 +14,21 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-open Irmin.Perms
+open Brassaia.Perms
 module Int63 = Optint.Int63
-module Dict : Irmin_pack_unix.Dict.S
-module I = Irmin_pack_unix.Index
-module Conf : Irmin_pack.Conf.S
+module Dict : Brassaia_pack_unix.Dict.S
+module I = Brassaia_pack_unix.Index
+module Conf : Brassaia_pack.Conf.S
 
 module File_manager :
-  Irmin_pack_unix.File_manager.S with module Io = Irmin_pack_unix.Io.Unix
+  Brassaia_pack_unix.File_manager.S with module Io = Brassaia_pack_unix.Io.Unix
 
 module Errs :
-  Irmin_pack_unix.Io_errors.S with module Io = Irmin_pack_unix.Io.Unix
+  Brassaia_pack_unix.Io_errors.S with module Io = Brassaia_pack_unix.Io.Unix
 
 module Schema :
-  Irmin.Schema.Extended
-    with type Hash.t = Irmin.Hash.SHA1.t
+  Brassaia.Schema.Extended
+    with type Hash.t = Brassaia.Hash.SHA1.t
      and type Path.step = string
      and type Path.t = string list
      and type Branch.t = string
@@ -51,18 +51,18 @@ module Alcotest : sig
   include module type of Alcotest
 
   val int63 : Int63.t testable
-  val kind : Irmin_pack.Pack_value.Kind.t testable
+  val kind : Brassaia_pack.Pack_value.Kind.t testable
   val hash : Schema.Hash.t testable
 
   val check_raises_pack_error :
     string ->
-    (Irmin_pack_unix.Errors.base_error -> bool) ->
+    (Brassaia_pack_unix.Errors.base_error -> bool) ->
     (unit -> _ Lwt.t) ->
     unit Lwt.t
 
   val check_raises_lwt : string -> exn -> (unit -> _ Lwt.t) -> unit Lwt.t
-  val check_repr : 'a Irmin.Type.t -> string -> 'a -> 'a -> unit
-  val testable_repr : 'a Irmin.Type.t -> 'a Alcotest.testable
+  val check_repr : 'a Brassaia.Type.t -> string -> 'a -> 'a -> unit
+  val testable_repr : 'a Brassaia.Type.t -> 'a Alcotest.testable
 end
 
 module Alcotest_lwt : sig
@@ -73,11 +73,11 @@ module Alcotest_lwt : sig
       switch. *)
 end
 
-module Index : module type of Irmin_pack_unix.Index.Make (Schema.Hash)
-module Key : Irmin_pack_unix.Pack_key.S with type hash = Schema.Hash.t
+module Index : module type of Brassaia_pack_unix.Index.Make (Schema.Hash)
+module Key : Brassaia_pack_unix.Pack_key.S with type hash = Schema.Hash.t
 
 module Pack :
-  Irmin_pack_unix.Pack_store.S
+  Brassaia_pack_unix.Pack_store.S
     with type hash = Schema.Hash.t
      and type key = Key.t
      and type value = string
@@ -89,14 +89,14 @@ end) : sig
   val fresh_name : string -> string
   (** [fresh_name typ] is a clean directory for a resource of type [typ]. *)
 
-  type d = { name : string; fm : File_manager.t; dict : Dict.t }
+  type d = { name : string; file_manager : File_manager.t; dict : Dict.t }
 
   val get_dict : ?name:string -> readonly:bool -> fresh:bool -> unit -> d
   val close_dict : d -> unit
 
   type t = {
     name : string;
-    fm : File_manager.t;
+    file_manager : File_manager.t;
     index : Index.t;
     pack : read Pack.t;
     dict : Dict.t;

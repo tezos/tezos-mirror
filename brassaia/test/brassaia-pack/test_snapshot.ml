@@ -24,14 +24,14 @@ let src = Logs.Src.create "tests.snapshot" ~doc:"Tests"
 module Log = (val Logs.src_log src : Logs.LOG)
 
 module S = struct
-  module Maker = Irmin_pack_unix.Maker (Conf)
+  module Maker = Brassaia_pack_unix.Maker (Conf)
   include Maker.Make (Schema)
 end
 
 let check_key = Alcotest.check_repr Key.t
 
 let config ?(readonly = false) ?(fresh = true) ~indexing_strategy root =
-  Irmin_pack.config ~readonly ?index_log_size ~fresh ~indexing_strategy root
+  Brassaia_pack.config ~readonly ?index_log_size ~fresh ~indexing_strategy root
 
 let info = S.Info.empty
 
@@ -56,8 +56,8 @@ let read_mbytes rbuf b =
   let string = read_string rbuf ~len:(Bytes.length b) in
   Bytes.blit_string string 0 b 0 (Bytes.length b)
 
-let encode_bin_snapshot = Irmin.Type.(unstage (encode_bin S.Snapshot.t))
-let decode_bin_snapshot = Irmin.Type.(unstage (decode_bin S.Snapshot.t))
+let encode_bin_snapshot = Brassaia.Type.(unstage (encode_bin S.Snapshot.t))
+let decode_bin_snapshot = Brassaia.Type.(unstage (decode_bin S.Snapshot.t))
 
 let encode_with_size buf snapshot_inode =
   let size = ref 0 in
@@ -78,7 +78,7 @@ let decode_with_size rbuf =
 
 let restore repo ?on_disk buf =
   let on_disk = (on_disk :> [ `Path of string | `Reuse ] option) in
-  let snapshot = S.Snapshot.Import.v ?on_disk repo in
+  let snapshot = S.Snapshot.Import.init ?on_disk repo in
   let total = String.length buf in
   let total_visited = ref 0 in
   let rbuf = ref (buf, 0) in
@@ -96,7 +96,7 @@ let restore repo ?on_disk buf =
   Lwt.return result
 
 let test ~repo_export ~repo_import ?on_disk tree expected_visited =
-  let* commit = S.Commit.v repo_export ~parents:[] ~info tree in
+  let* commit = S.Commit.init repo_export ~parents:[] ~info tree in
   let tree = S.Commit.tree commit in
   let root_key = S.Tree.key tree |> Option.get in
   let buf = Buffer.create 0 in
@@ -128,10 +128,12 @@ let test_in_memory ~indexing_strategy () =
   rm_dir root_export;
   rm_dir root_import;
   let* repo_export =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
   in
   let* repo_import =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
   in
   let test = test ~repo_export ~repo_import in
   let tree1 = S.Tree.singleton [ "a" ] "x" in
@@ -142,20 +144,22 @@ let test_in_memory ~indexing_strategy () =
   S.Repo.close repo_import
 
 let test_in_memory_minimal =
-  test_in_memory ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
+  test_in_memory ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
 
 let test_in_memory_always =
-  test_in_memory ~indexing_strategy:Irmin_pack.Indexing_strategy.always
+  test_in_memory ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
 
 let test_on_disk ~indexing_strategy () =
   rm_dir root_export;
   rm_dir root_import;
   let index_on_disk = Filename.concat root_import "index_on_disk" in
   let* repo_export =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
   in
   let* repo_import =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
   in
   let test = test ~repo_export ~repo_import in
   let* tree2 = tree2 () in
@@ -164,10 +168,10 @@ let test_on_disk ~indexing_strategy () =
   S.Repo.close repo_import
 
 let test_on_disk_minimal =
-  test_on_disk ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
+  test_on_disk ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal
 
 let test_on_disk_always =
-  test_on_disk ~indexing_strategy:Irmin_pack.Indexing_strategy.always
+  test_on_disk ~indexing_strategy:Brassaia_pack.Indexing_strategy.always
 
 let start_gc repo commit =
   let commit_key = S.Commit.key commit in
@@ -187,15 +191,15 @@ let test_gc ~repo_export ~repo_import ?on_disk expected_visited =
     let t = S.Tree.singleton [ "b"; "a" ] "x0" in
     S.Tree.add t [ "a"; "b" ] "x1"
   in
-  let* c1 = S.Commit.v repo_export ~parents:[] ~info tree1 in
+  let* c1 = S.Commit.init repo_export ~parents:[] ~info tree1 in
   let k1 = S.Commit.key c1 in
   let* tree2 = S.Tree.add tree1 [ "a"; "c" ] "x2" in
-  let* _ = S.Commit.v repo_export ~parents:[ k1 ] ~info tree2 in
+  let* _ = S.Commit.init repo_export ~parents:[ k1 ] ~info tree2 in
   let* tree3 =
     let* t = S.Tree.remove tree1 [ "a"; "b" ] in
     S.Tree.add t [ "a"; "d" ] "x3"
   in
-  let* c3 = S.Commit.v repo_export ~parents:[ k1 ] ~info tree3 in
+  let* c3 = S.Commit.init repo_export ~parents:[ k1 ] ~info tree3 in
   (* call gc on last commit *)
   let* () = start_gc repo_export c3 in
   let* () = finalise_gc repo_export in
@@ -220,16 +224,18 @@ let test_gc ~repo_export ~repo_import ?on_disk expected_visited =
   in
   Lwt.return_unit
 
-let indexing_strategy = Irmin_pack.Indexing_strategy.minimal
+let indexing_strategy = Brassaia_pack.Indexing_strategy.minimal
 
 let test_gced_store_in_memory () =
   rm_dir root_export;
   rm_dir root_import;
   let* repo_export =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
   in
   let* repo_import =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
   in
   let* () = test_gc ~repo_export ~repo_import 5 in
   let* () = S.Repo.close repo_export in
@@ -240,10 +246,12 @@ let test_gced_store_on_disk () =
   rm_dir root_import;
   let index_on_disk = Filename.concat root_import "index_on_disk" in
   let* repo_export =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
   in
   let* repo_import =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
   in
   let* () =
     test_gc ~repo_export ~repo_import ~on_disk:(`Path index_on_disk) 5
@@ -256,15 +264,16 @@ let test_export_import_reexport () =
   rm_dir root_import;
   (* export a snapshot. *)
   let* repo_export =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_export)
   in
   let tree = S.Tree.singleton [ "a" ] "y" in
-  let* parent_commit = S.Commit.v repo_export ~parents:[] ~info tree in
+  let* parent_commit = S.Commit.init repo_export ~parents:[] ~info tree in
   let parent_key =
-    Irmin_pack_unix.Pack_key.v_indexed (S.Commit.hash parent_commit)
+    Brassaia_pack_unix.Pack_key.init_indexed (S.Commit.hash parent_commit)
   in
   let tree = S.Tree.singleton [ "a" ] "x" in
-  let* _ = S.Commit.v repo_export ~parents:[ parent_key ] ~info tree in
+  let* _ = S.Commit.init repo_export ~parents:[ parent_key ] ~info tree in
   let root_key = S.Tree.key tree |> Option.get in
   let buf = Buffer.create 0 in
   let* _ = S.Snapshot.export repo_export (encode_with_size buf) ~root_key in
@@ -273,13 +282,14 @@ let test_export_import_reexport () =
      a new store, with the key parent of type Indexed. *)
   rm_dir root_export;
   let* repo_import =
-    S.Repo.v (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
+    S.Repo.init
+      (config ~readonly:false ~fresh:true ~indexing_strategy root_import)
   in
   let* _, key = Buffer.contents buf |> restore repo_import in
   let key = Option.get key in
   let* tree = S.Tree.of_key repo_import (`Node key) in
   let tree = Option.get tree in
-  let* commit = S.Commit.v repo_import ~info ~parents:[ parent_key ] tree in
+  let* commit = S.Commit.init repo_import ~info ~parents:[ parent_key ] tree in
   let commit_key = S.Commit.key commit in
   let commit_hash = S.Commit.hash commit in
   (* export the gc-based snapshot in a clean root_export. *)
@@ -287,7 +297,7 @@ let test_export_import_reexport () =
   let* () = S.Repo.close repo_import in
   (* open the new store and check that everything is readable. *)
   let* repo_export =
-    S.Repo.v
+    S.Repo.init
       (config ~readonly:false ~fresh:false ~indexing_strategy root_export)
   in
   let* commit = S.Commit.of_hash repo_export commit_hash in

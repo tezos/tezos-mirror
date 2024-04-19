@@ -33,7 +33,7 @@ let fresh_name =
 let create_v1_test_env () =
   let ( / ) = Filename.concat in
   let root_archive =
-    "irmin" / "test" / "irmin-pack" / "data" / "version_1_large"
+    "brassaia" / "test" / "brassaia-pack" / "data" / "version_1_large"
   in
   let root_local_build = "_build" / "test-v1-gc" in
   setup_test_env ~root_archive ~root_local_build;
@@ -42,7 +42,7 @@ let create_v1_test_env () =
 let create_from_v2_always_test_env () =
   let ( / ) = Filename.concat in
   let root_archive =
-    "irmin" / "test" / "irmin-pack" / "data" / "version_2_to_3_always"
+    "brassaia" / "test" / "brassaia-pack" / "data" / "version_2_to_3_always"
   in
   let root_local_build = "_build" / "test-from-v2-always-gc" in
   setup_test_env ~root_archive ~root_local_build;
@@ -51,7 +51,7 @@ let create_from_v2_always_test_env () =
 let create_test_env () =
   let ( / ) = Filename.concat in
   let root_archive =
-    "irmin" / "test" / "irmin-pack" / "data" / "version_3_minimal"
+    "brassaia" / "test" / "brassaia-pack" / "data" / "version_3_minimal"
   in
   let root_local_build = "_build" / "test-gc" in
   setup_test_env ~root_archive ~root_local_build;
@@ -61,7 +61,7 @@ let tc name f = Alcotest_lwt.test_case name `Quick (fun _switch () -> f ())
 
 module Store = struct
   module S = struct
-    module Maker = Irmin_pack_unix.Maker (Conf)
+    module Maker = Brassaia_pack_unix.Maker (Conf)
     include Maker.Make (Schema)
   end
 
@@ -73,9 +73,9 @@ module Store = struct
   }
 
   let config ~lru_size ~readonly ~fresh ?lower_root root =
-    Irmin_pack.config ~readonly ?lower_root
-      ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal ~fresh ~lru_size
-      root
+    Brassaia_pack.config ~readonly ?lower_root
+      ~indexing_strategy:Brassaia_pack.Indexing_strategy.minimal ~fresh
+      ~lru_size root
 
   let info = S.Info.empty
 
@@ -98,7 +98,7 @@ module Store = struct
 
   let commit ?(info = info) t =
     let parents = List.map S.Commit.key t.parents in
-    let+ h = S.Commit.v t.repo ~info ~parents t.tree in
+    let+ h = S.Commit.init t.repo ~info ~parents t.tree in
     S.Tree.clear t.tree;
     h
 
@@ -129,7 +129,9 @@ module Store = struct
     if fresh then (
       rm_dir root;
       Option.iter rm_dir lower_root);
-    let+ repo = S.Repo.v (config ~readonly ~fresh ~lru_size ~lower_root root) in
+    let+ repo =
+      S.Repo.init (config ~readonly ~fresh ~lru_size ~lower_root root)
+    in
     let tree = S.Tree.empty () in
     { root; repo; tree; parents = [] }
 
@@ -137,8 +139,8 @@ module Store = struct
     config ~lru_size:0 ~readonly:false ~fresh:true ~lower_root:None root
 
   let init_with_config config =
-    let+ repo = S.Repo.v config in
-    let root = Irmin_pack.Conf.root config in
+    let+ repo = S.Repo.init config in
+    let root = Brassaia_pack.Conf.root config in
     let tree = S.Tree.empty () in
     { root; repo; tree; parents = [] }
 
@@ -177,7 +179,7 @@ module Store = struct
     (t, h)
 
   let commit_1_different_author t =
-    let info = S.Info.v ~author:"someone" Int64.zero in
+    let info = S.Info.init ~author:"someone" Int64.zero in
     let* t = set t [ "a"; "b" ] "Novembre" in
     let* t = set t [ "a"; "c" ] "Juin" in
     let+ h = commit ~info t in
@@ -187,7 +189,7 @@ end
 include Store
 
 let lru_hits () =
-  let open Irmin_pack_unix.Stats in
+  let open Brassaia_pack_unix.Stats in
   let { pack_store; _ } = get () in
   let pack_store_t = Pack_store.export pack_store in
   pack_store_t.from_lru
@@ -547,7 +549,7 @@ module Gc_common (B : Gc_backend) = struct
     S.Repo.close ro_t.repo
 
   (** Check that gc works when the lru caches some objects that are delete by
-      consequent commits. See https://github.com/mirage/irmin/issues/1920. *)
+      consequent commits. See https://github.com/mirage/brassaia/issues/1920. *)
   let gc_lru () =
     let check t c =
       S.Commit.of_key t.repo (S.Commit.key c) >>= function
@@ -579,7 +581,7 @@ module Gc_common (B : Gc_backend) = struct
     let* t, c1 = commit_1 t in
     let* _ =
       Alcotest.check_raises_lwt "Should not call gc in batch"
-        (Irmin_pack_unix.Errors.Pack_error `Gc_forbidden_during_batch)
+        (Brassaia_pack_unix.Errors.Pack_error `Gc_forbidden_during_batch)
         (fun () ->
           S.Backend.Repo.batch t.repo (fun _ _ _ ->
               let* () = start_gc t c1 in
@@ -658,7 +660,7 @@ module Gc_common (B : Gc_backend) = struct
 
   (** Check Gc stats. *)
   let gc_stats () =
-    let check_stats (stats : Irmin_pack_unix.Stats.Latest_gc.stats) =
+    let check_stats (stats : Brassaia_pack_unix.Stats.Latest_gc.stats) =
       let objects_traversed = stats.worker.objects_traversed |> Int63.to_int in
       Alcotest.(check int) "objects_traversed" objects_traversed 8;
       let files =
@@ -666,7 +668,7 @@ module Gc_common (B : Gc_backend) = struct
       in
       let compare a b = String.compare (fst a) (fst b) in
       Alcotest.(
-        check (Irmin_test_helpers.Common.slist (pair string int) compare))
+        check (Brassaia_test_helpers.Common.slist (pair string int) compare))
         "test"
         [
           ("mapping", 72);
@@ -798,7 +800,7 @@ module Gc_archival = struct
     [%log.debug "Run GC on commit that is now in lower"];
     let* head = S.Head.get main in
     let () =
-      match Irmin_pack_unix.Pack_key.inspect (S.Commit.key head) with
+      match Brassaia_pack_unix.Pack_key.inspect (S.Commit.key head) with
       | Direct { volume_identifier; _ } ->
           Alcotest.(check bool)
             "after migration, head is in lower"
@@ -1196,7 +1198,7 @@ module Split = struct
 
   let load_commit t h =
     let hash =
-      match Irmin.Type.(of_string Schema.Hash.t) h with
+      match Brassaia.Type.(of_string Schema.Hash.t) h with
       | Error (`Msg s) -> Alcotest.failf "failed hash_of_string %s" s
       | Ok hash -> hash
     in
@@ -1397,7 +1399,7 @@ module Split = struct
     let* t, _c1 = commit_1 t in
     let f () = S.split t.repo in
     Alcotest.check_raises "split should raise disallowed exception"
-      (Irmin_pack_unix.Errors.Pack_error `Split_disallowed) f;
+      (Brassaia_pack_unix.Errors.Pack_error `Split_disallowed) f;
     Alcotest.(
       check bool "is_split_allowed should be false" false
         (S.is_split_allowed t.repo));

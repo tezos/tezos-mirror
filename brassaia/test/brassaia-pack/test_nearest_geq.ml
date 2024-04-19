@@ -1,6 +1,6 @@
-open Irmin_pack_unix
+open Brassaia_pack_unix
 
-type geq = int option [@@deriving irmin ~pp ~equal]
+type geq = int option [@@deriving brassaia ~pp ~equal]
 
 let geq = Alcotest.testable pp_geq equal_geq
 

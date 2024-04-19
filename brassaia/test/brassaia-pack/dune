@@ -2,27 +2,27 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name irmin_test_irmin_pack_tezt_lib)
+ (name brassaia_test_brassaia_pack_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-libs.tezos-context.memory
-  octez-internal-libs.irmin
-  octez-internal-libs.irmin_test_helpers
-  octez-internal-libs.irmin_pack
-  octez-internal-libs.irmin_pack.unix
-  octez-internal-libs.irmin_tezos
+  octez-internal-libs.brassaia
+  octez-internal-libs.brassaia_test_helpers
+  octez-internal-libs.brassaia_pack
+  octez-internal-libs.brassaia_pack.unix
+  octez-internal-libs.brassaia_tezos
   octez-libs.test-helpers
   octez-alcotezt
   fpath
   tezt)
- (preprocess (pps octez-internal-libs.ppx_irmin.internal))
+ (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
-  -open Irmin_test_helpers
+  -open Brassaia_test_helpers
   -open Tezos_test_helpers
   -open Octez_alcotezt
   -open Tezt
@@ -54,13 +54,13 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  irmin_test_irmin_pack_tezt_lib
+  brassaia_test_brassaia_pack_tezt_lib
   tezt)
  (modules main))
 
 (rule
  (alias runtest)
- (package tezos_internal_irmin_tests)
+ (package tezos_internal_brassaia_tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

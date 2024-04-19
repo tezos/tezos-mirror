@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-val suite : Irmin_test.Suite.t list
+val suite : Brassaia_test.Suite.t list
 val misc : (string * unit Alcotest_lwt.test_case list) list

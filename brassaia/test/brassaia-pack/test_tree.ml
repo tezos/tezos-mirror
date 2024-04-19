@@ -21,7 +21,7 @@ let root = Filename.concat "_build" "test-tree"
 let src = Logs.Src.create "tests.tree" ~doc:"Tests"
 
 module Log = (val Logs.src_log src : Logs.LOG)
-module Hash = Irmin.Hash.SHA1
+module Hash = Brassaia.Hash.SHA1
 
 type ('key, 'value) op =
   | Add of 'key * 'value
@@ -30,14 +30,14 @@ type ('key, 'value) op =
   | Find_tree of 'key
   | Length of 'key * int
 
-module Make (Conf : Irmin_pack.Conf.S) = struct
+module Make (Conf : Brassaia_pack.Conf.S) = struct
   module Store = struct
-    module Maker = Irmin_pack_unix.Maker (Conf)
+    module Maker = Brassaia_pack_unix.Maker (Conf)
     include Maker.Make (Schema)
   end
 
   let config ?(readonly = false) ?(fresh = true) root =
-    Irmin_pack.config ~readonly ?index_log_size ~fresh root
+    Brassaia_pack.config ~readonly ?index_log_size ~fresh root
 
   let info () = Store.Info.empty
 
@@ -46,7 +46,7 @@ module Make (Conf : Irmin_pack.Conf.S) = struct
   type context = { repo : Store.repo; tree : Store.tree }
 
   let export_tree_to_store tree =
-    let* repo = Store.Repo.v (config ~fresh:true root) in
+    let* repo = Store.Repo.init (config ~fresh:true root) in
     let* store = Store.empty repo in
     let* () = Store.set_tree_exn ~info store [] tree in
     let+ tree = Store.tree store in
@@ -63,7 +63,7 @@ module Make (Conf : Irmin_pack.Conf.S) = struct
     let zero = String.make 10 '0' in
     List.init n (fun n ->
         let h = Store.Contents.hash (string_of_int n) in
-        let h = Irmin.Type.to_string Store.Hash.t h in
+        let h = Brassaia.Type.to_string Store.Hash.t h in
         ([ h ], zero))
 
   let init_tree bindings =
@@ -115,15 +115,15 @@ module Make (Conf : Irmin_pack.Conf.S) = struct
 
   let tree_proof_t = Tree.Proof.t Tree.Proof.tree_t
   let stream_proof_t = Tree.Proof.t Tree.Proof.stream_t
-  let bin_of_proof = Irmin.Type.(unstage (to_bin_string tree_proof_t))
-  let proof_of_bin = Irmin.Type.(unstage (of_bin_string tree_proof_t))
-  let bin_of_stream = Irmin.Type.(unstage (to_bin_string stream_proof_t))
+  let bin_of_proof = Brassaia.Type.(unstage (to_bin_string tree_proof_t))
+  let proof_of_bin = Brassaia.Type.(unstage (of_bin_string tree_proof_t))
+  let bin_of_stream = Brassaia.Type.(unstage (to_bin_string stream_proof_t))
 end
 
 module Default = Make (Conf)
 open Default
 
-type bindings = string list list [@@deriving irmin]
+type bindings = string list list [@@deriving brassaia]
 
 let equal_ordered_slist ~msg l1 l2 = Alcotest.check_repr bindings_t msg l1 l2
 
@@ -134,7 +134,7 @@ let fold ~order ~force t ~init ~f =
 
 let equal_slist ~msg l1 l2 =
   Alcotest.(
-    check (Irmin_test_helpers.Common.slist (list string) Stdlib.compare))
+    check (Brassaia_test_helpers.Common.slist (list string) Stdlib.compare))
     msg l1 l2
 
 let steps =
@@ -411,7 +411,7 @@ let test_deeper_proof () =
   test_proofs ctxt ops
 
 module Binary = Make (struct
-  let entries = 2
+  let nb_entries = 2
   let stable_hash = 2
   let inode_child_order = `Hash_bits
   let contents_length_header = Some `Varint
@@ -492,7 +492,7 @@ let test_large_proofs () =
     [ a; b; c; d ]
 
 module Custom = Make (struct
-  let entries = 2
+  let nb_entries = 2
   let stable_hash = 2
 
   let index ~depth step =
@@ -506,18 +506,18 @@ end)
 
 module P = Custom.Tree.Proof
 
-let pp_proof = Irmin.Type.pp (P.t P.tree_t)
-let pp_stream = Irmin.Type.pp (P.t P.stream_t)
+let pp_proof = Brassaia.Type.pp (P.t P.tree_t)
+let pp_stream = Brassaia.Type.pp (P.t P.stream_t)
 
 let check_hash h s =
-  let s' = Irmin.Type.(to_string Hash.t) h in
+  let s' = Brassaia.Type.(to_string Hash.t) h in
   Alcotest.(check string) "check hash" s s'
 
 let check_contents_hash h s =
   match h with
   | `Node _ -> Alcotest.failf "Expected kinded hash to be contents"
   | `Contents (h, ()) ->
-      let s' = Irmin.Type.(to_string Hash.t) h in
+      let s' = Brassaia.Type.(to_string Hash.t) h in
       Alcotest.(check string) "check hash" s s'
 
 let test_extenders () =
@@ -543,7 +543,7 @@ let test_extenders () =
     | Ok (_, ()) -> ()
     | Error e ->
         Alcotest.failf "check_proof: %a"
-          (Irmin.Type.pp Custom.Tree.verifier_error_t)
+          (Brassaia.Type.pp Custom.Tree.verifier_error_t)
           e
   in
   let* () = Lwt_list.iter_s check_proof [ bindings; bindings2; bindings3 ] in
@@ -558,7 +558,7 @@ let test_extenders () =
     | Ok (_, ()) -> ()
     | Error e ->
         Alcotest.failf "check_stream: %a"
-          (Irmin.Type.pp Custom.Tree.verifier_error_t)
+          (Brassaia.Type.pp Custom.Tree.verifier_error_t)
           e
   in
   Lwt_list.iter_s check_stream [ bindings; bindings2; bindings3 ]
@@ -568,7 +568,7 @@ let test_hardcoded_stream () =
     [ ([ "00100" ], "x"); ([ "00101" ], "y"); ([ "00110" ], "z") ]
   in
   let fail elt =
-    Alcotest.failf "Unexpected elt in stream %a" (Irmin.Type.pp P.elt_t) elt
+    Alcotest.failf "Unexpected elt in stream %a" (Brassaia.Type.pp P.elt_t) elt
   in
   let* ctxt = Custom.init_tree bindings in
   let key = Custom.Tree.key ctxt.tree |> Option.get in
@@ -614,11 +614,11 @@ let test_hardcoded_proof () =
     [ ([ "00000" ], "x"); ([ "00001" ], "y"); ([ "00010" ], "z") ]
   in
   let fail_with_tree elt =
-    Alcotest.failf "Unexpected elt in proof %a" (Irmin.Type.pp P.tree_t) elt
+    Alcotest.failf "Unexpected elt in proof %a" (Brassaia.Type.pp P.tree_t) elt
   in
   let fail_with_inode_tree elt =
     Alcotest.failf "Unexpected elt in proof %a"
-      (Irmin.Type.pp P.inode_tree_t)
+      (Brassaia.Type.pp P.inode_tree_t)
       elt
   in
   let* ctxt = Custom.init_tree bindings in
@@ -671,11 +671,11 @@ let test_proof_exn _ =
   let hash = Tree.hash tree in
 
   let stream_all =
-    P.v ~before:(`Node hash) ~after:(`Node hash)
+    P.init ~before:(`Node hash) ~after:(`Node hash)
       (List.to_seq [ stream_elt3; stream_elt2; stream_elt1 ])
   in
   let stream_short =
-    P.v ~before:(`Node hash) ~after:(`Node hash)
+    P.init ~before:(`Node hash) ~after:(`Node hash)
       (List.to_seq [ stream_elt3; stream_elt2 ])
   in
   let f_all t =
@@ -719,13 +719,13 @@ let test_proof_exn _ =
 
 let test_reexport_node () =
   let* tree = Store.Tree.add (Store.Tree.empty ()) [ "foo"; "a" ] "a" in
-  let* repo1 = Store.Repo.v (config ~fresh:true root) in
+  let* repo1 = Store.Repo.init (config ~fresh:true root) in
   let* _ =
     Store.Backend.Repo.batch repo1 (fun c n _ -> Store.save_tree repo1 c n tree)
   in
   let* () = Store.Repo.close repo1 in
   (* Re-export the same tree using a different repo. *)
-  let* repo2 = Store.Repo.v (config ~fresh:false root) in
+  let* repo2 = Store.Repo.init (config ~fresh:false root) in
   let* _ =
     Alcotest.check_raises_lwt "re-export tree from another repo"
       (Failure "Can't export the node key from another repo") (fun () ->
@@ -734,7 +734,7 @@ let test_reexport_node () =
   in
   let* () = Store.Repo.close repo2 in
   (* Re-export a fresh tree using a different repo. *)
-  let* repo2 = Store.Repo.v (config ~fresh:false root) in
+  let* repo2 = Store.Repo.init (config ~fresh:false root) in
   let* tree = Store.Tree.add (Store.Tree.empty ()) [ "foo"; "a" ] "a" in
   let _ = Store.Tree.hash tree in
   let* c1 = Store.Tree.get_tree tree [ "foo" ] in
