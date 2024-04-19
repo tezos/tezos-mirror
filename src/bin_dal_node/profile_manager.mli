@@ -35,9 +35,6 @@ val is_bootstrap_profile : t -> bool
 (** The empty profile manager context. *)
 val empty : t
 
-(** The bootstrap profile. *)
-val bootstrap_profile : t
-
 (** [add_operator_profiles t proto_parameters gs_worker operator_profiles]
     registers operator profiles (attester or producer).
     If the current profile is a bootstrap profile, it will return [None] as bootstrap
@@ -46,7 +43,7 @@ val add_operator_profiles :
   t ->
   Dal_plugin.proto_parameters ->
   Gossipsub.Worker.t ->
-  Types.operator_profiles ->
+  Types.operator_profile ->
   t option
 
 (** [add_profiles t proto_parameters gs_worker profiles] registers [profiles].

@@ -229,25 +229,16 @@ type header_status =
         block. *)
   ]
 
-(** Profiles that operate on shards/slots. *)
-type operator_profile =
-  | Attester of Tezos_crypto.Signature.public_key_hash
-      (** [Attester pkh] downloads all shards assigned to [pkh].
-            Used by bakers to attest availability of their assigned shards. *)
-  | Producer of {slot_index : int}
-      (** [Producer {slot_index}] produces/publishes slot for slot index [slot_index]. *)
-  | Observer of {slot_index : int}
-      (** [Observer {slot_index}] observes slot for slot index
-          [slot_index]: collects the shards corresponding to some slot
-          index, reconstructs slots when enough shards are seen, and
-          republishes missing shards. *)
+(** An operator DAL node can play three different roles:
+    - attester for some pkh: checks that the shards assigned to this pkh are published
+    - slot producer for some slot index: splits slots into shards and publishes the shards
+    - slot observer for some slot index: collects the shards
+    corresponding to some slot index, reconstructs slots when enough
+    shards are seen, and republishes missing shards.
 
-(** List of operator profiles. It may contain dupicates as it represents profiles
-      provided by the user in unprocessed form. *)
-type operator_profiles = operator_profile list
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6958
-   Unify the {profiles} type with the one from `src/bin_dal_node/profile_manager.ml` *)
+    A single DAL node can play several of these roles at once. We call a profile the
+    set of roles played by a DAL node and represent it as a triple of sets. *)
+type operator_profile
 
 (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in. *)
@@ -257,8 +248,39 @@ type profiles =
       network.  Note that bootstrap nodes are incompatible with
       attester/producer/observer profiles as bootstrap nodes are
       expected to connect to all the meshes with degree 0. *)
-  | Operator of operator_profiles
+  | Operator of operator_profile
   | Random_observer
+
+val empty_operator_profile : operator_profile
+
+val empty_operator : profiles
+
+val is_empty : operator_profile -> bool
+
+val is_producer : operator_profile -> bool
+
+val is_attester : operator_profile -> bool
+
+val is_observer : operator_profile -> bool
+
+val producer_slot_out_of_bounds : int -> operator_profile -> int option
+
+val is_observed_slot : int -> operator_profile -> bool
+
+val get_all_slot_indexes : operator_profile -> int list
+
+val make_operator_profile :
+  ?attesters:Signature.Public_key_hash.t list ->
+  ?producers:int list ->
+  ?observers:int list ->
+  unit ->
+  operator_profile
+
+val merge_operators :
+  ?on_new_attester:(Signature.Public_key_hash.t -> unit) ->
+  operator_profile ->
+  operator_profile ->
+  operator_profile
 
 (* Merge the two sets of profiles. In case of incompatibility (that is, case
    [Bootstrap] vs the other kinds), the profiles from [higher_prio] take

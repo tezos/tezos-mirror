@@ -115,7 +115,7 @@ let default =
     endpoint = default_endpoint;
     metrics_addr = default_metrics_addr;
     history_mode = default_history_mode;
-    profiles = Operator [];
+    profiles = Types.empty_operator;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -254,7 +254,7 @@ let encoding : t Data_encoding.t =
              "profiles"
              ~description:"The Octez DAL node profiles"
              Types.profiles_encoding
-             (Operator []))))
+             Types.empty_operator)))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

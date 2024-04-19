@@ -75,13 +75,7 @@ let init_cryptobox config dal_config
     match config.Configuration_file.profiles with
     | Types.Bootstrap -> false
     | Types.Random_observer -> true
-    | Types.Operator l ->
-        List.exists
-          (function
-            | Types.Attester _ -> false
-            | Producer _ -> true
-            | Observer _ -> true)
-          l
+    | Types.Operator p -> Types.(is_observer p || is_producer p)
   in
   let* () =
     if prover_srs then
@@ -627,12 +621,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
       match
         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
       with
-      | Operator profile_list
-        when List.exists
-               (function
-                 | Types.Observer {slot_index = index} -> index = slot_index
-                 | _ -> false)
-               profile_list ->
+      | Operator profile when Types.is_observed_slot slot_index profile ->
           Amplificator.try_amplification
             node_store
             commitment

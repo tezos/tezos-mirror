@@ -123,20 +123,18 @@ module Term = struct
       & opt (some endpoint_arg) None
       & info ~docs ~doc ~docv:"URI" ["endpoint"])
 
-  let operator_profile_printer fmt = function
-    | Types.Attester pkh ->
-        Format.fprintf fmt "%a" Signature.Public_key_hash.pp pkh
-    | Producer {slot_index} -> Format.fprintf fmt "%d" slot_index
-    | Observer {slot_index} -> Format.fprintf fmt "%d" slot_index
+  let attester_profile_printer = Signature.Public_key_hash.pp
+
+  let observer_producer_profile_printer = Format.pp_print_int
 
   let attester_profile_arg =
     let open Cmdliner in
     let decoder string =
       match Signature.Public_key_hash.of_b58check_opt string with
       | None -> Error (`Msg "Unrecognized profile")
-      | Some pkh -> Types.Attester pkh |> Result.ok
+      | Some pkh -> Ok pkh
     in
-    Arg.conv (decoder, operator_profile_printer)
+    Arg.conv (decoder, attester_profile_printer)
 
   let producer_profile_arg =
     let open Cmdliner in
@@ -151,9 +149,9 @@ module Term = struct
       match int_of_string_opt string with
       | None -> error ()
       | Some i when i < 0 -> error ()
-      | Some slot_index -> Types.Producer {slot_index} |> Result.ok
+      | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, operator_profile_printer)
+    Arg.conv (decoder, observer_producer_profile_printer)
 
   let observer_profile_arg =
     let open Cmdliner in
@@ -168,9 +166,9 @@ module Term = struct
       match int_of_string_opt string with
       | None -> error ()
       | Some i when i < 0 -> error ()
-      | Some slot_index -> Types.Observer {slot_index} |> Result.ok
+      | Some slot_index -> Ok slot_index
     in
-    Arg.conv (decoder, operator_profile_printer)
+    Arg.conv (decoder, observer_producer_profile_printer)
 
   let attester_profile =
     let open Cmdliner in
@@ -364,11 +362,14 @@ let make ~run =
           history_mode;
         }
     in
-    match (bootstrap_flag, attesters @ producers @ observers) with
-    | false, [] -> run None
-    | true, [] -> run @@ Some Types.Bootstrap
-    | false, operator_profiles -> run @@ Some (Operator operator_profiles)
-    | true, _ :: _ ->
+    let profiles =
+      Types.make_operator_profile ~attesters ~producers ~observers ()
+    in
+    match (bootstrap_flag, profiles) with
+    | false, profiles when Types.is_empty profiles -> run None
+    | true, profiles when Types.is_empty profiles -> run @@ Some Types.Bootstrap
+    | false, profiles -> run @@ Some (Operator profiles)
+    | true, _ ->
         `Error
           ( false,
             "A bootstrap node cannot also be an attester or a slot producer." )

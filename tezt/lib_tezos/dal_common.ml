@@ -245,29 +245,37 @@ module Dal_RPC = struct
       ]
       JSON.as_string
 
-  let json_of_operator_profile = function
-    | Attester pkh ->
-        `O [("kind", `String "attester"); ("public_key_hash", `String pkh)]
-    | Producer slot_index ->
-        `O
-          [
-            ("kind", `String "producer");
-            ("slot_index", `Float (float_of_int slot_index));
-          ]
-    | Observer slot_index ->
-        `O
-          [
-            ("kind", `String "observer");
-            ("slot_index", `Float (float_of_int slot_index));
-          ]
+  let json_of_operator_profile list =
+    let attesters, producers, observers =
+      List.fold_left
+        (fun (attesters, producers, observers) -> function
+          | Attester pkh -> (`String pkh :: attesters, producers, observers)
+          | Producer slot_index ->
+              ( attesters,
+                `Float (float_of_int slot_index) :: producers,
+                observers )
+          | Observer slot_index ->
+              ( attesters,
+                producers,
+                `Float (float_of_int slot_index) :: observers ))
+        ([], [], [])
+        list
+    in
+    `O
+      [
+        ("attesters", `A (List.rev attesters));
+        ("producers", `A (List.rev producers));
+        ("observers", `A (List.rev observers));
+      ]
 
   let operator_profile_of_json json =
     let open JSON in
-    match json |-> "kind" |> as_string with
-    | "attester" -> Attester (json |-> "public_key_hash" |> as_string)
-    | "producer" -> Producer (json |-> "slot_index" |> as_int)
-    | "observer" -> Observer (json |-> "slot_index" |> as_int)
-    | _ -> failwith "invalid case"
+    let attesters = json |-> "attesters" |> as_list |> List.map as_string in
+    let producers = json |-> "producers" |> as_list |> List.map as_int in
+    let observers = json |-> "observers" |> as_list |> List.map as_int in
+    List.map (fun pkh -> Attester pkh) attesters
+    @ List.map (fun i -> Producer i) producers
+    @ List.map (fun i -> Observer i) observers
 
   let profiles_of_json json =
     let open JSON in
@@ -275,17 +283,13 @@ module Dal_RPC = struct
     | "bootstrap" -> Bootstrap
     | "operator" ->
         let operator_profiles =
-          List.map
-            operator_profile_of_json
-            (json |-> "operator_profiles" |> as_list)
+          operator_profile_of_json (json |-> "operator_profiles")
         in
         Operator operator_profiles
     | _ -> failwith "invalid case"
 
   let patch_profiles profiles =
-    let data : RPC_core.data =
-      Data (`A (List.map json_of_operator_profile profiles))
-    in
+    let data : RPC_core.data = Data (json_of_operator_profile profiles) in
     make ~data PATCH ["profiles"] as_empty_object_or_fail
 
   let get_profiles () = make GET ["profiles"] profiles_of_json
