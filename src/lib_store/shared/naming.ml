@@ -155,8 +155,8 @@ let block_store_status_file dir =
   make_encoded_file
     dir
     ~filename:"status"
-    block_store_status_encoding
-    status_equal
+    Block_store_status.encoding
+    Block_store_status.equal
 
 let cemented_blocks_dir dir = mk_dir dir "cemented"
 

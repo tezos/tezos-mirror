@@ -134,7 +134,7 @@ val caboose_file :
   [`Chain_dir] directory -> ([`Caboose], block_descriptor) encoded_file
 
 val block_store_status_file :
-  [`Chain_dir] directory -> ([`Status], block_store_status) encoded_file
+  [`Chain_dir] directory -> ([`Status], Block_store_status.t) encoded_file
 
 val cemented_blocks_dir :
   [< `Chain_dir | `Snapshot_dir | `Snapshot_tmp_dir | `Tar_archive] directory ->
