@@ -10,7 +10,8 @@ print_help() {
 
   # display help
   usage
-  echo "Launches the evm-benchmark docker image. [args] are passed on to the benchmark script." 1>&2
+  echo "Launches the evm-benchmark script in parallel. All bench script have their \
+own job. [args] are passed on to the benchmark script." 1>&2
   echo 1>&2
   echo "options:" 1>&2
   echo "-o      specify output directory (default ./$(basename "$OUTPUT"))" 1>&2
@@ -40,5 +41,18 @@ while getopts "hj:o:" options; do
     ;;
   esac
 done
-NB_LINES=$(jq "length" etherlink/kernel_evm/benchmarks/scripts/benchmarks_list.json)
-seq 0 "$NB_LINES" | time parallel --eta -j"$JOBS" --results "$OUTPUT/"bench-{}-out "node ./etherlink/kernel_evm/benchmarks/scripts/run_benchmarks.js -o $OUTPUT --nth {}"
+
+# discard parsed options and flag
+shift $((OPTIND - 1))
+
+# finding the script
+SCRIPT=./etherlink/kernel_evm/benchmarks/scripts/run_benchmarks.js
+if [ ! -f "$SCRIPT" ]; then
+  SCRIPT=$(find . -name run_benchmarks.js)
+fi
+
+# finding the nb of bench
+BENCH_LIST=$(find . -name benchmarks_list.json)
+NB_LINES=$(jq "length" "$BENCH_LIST")
+
+seq 0 "$NB_LINES" | time parallel --eta -j"$JOBS" --results "$OUTPUT/"bench-{}-out "node $SCRIPT -o $OUTPUT --nth {} $*"
