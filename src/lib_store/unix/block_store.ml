@@ -40,7 +40,7 @@ type block_store = {
   mutable rw_floating_block_store : Floating_block_store.t;
   caboose : block_descriptor Stored_data.t;
   savepoint : block_descriptor Stored_data.t;
-  status_data : block_store_status Stored_data.t;
+  status_data : Block_store_status.t Stored_data.t;
   block_cache : Block_repr.t Block_lru_cache.t;
   mutable gc_callback : (Block_hash.t -> unit tzresult Lwt.t) option;
   mutable split_callback : (unit -> unit tzresult Lwt.t) option;
@@ -53,8 +53,6 @@ type block_store = {
 type t = block_store
 
 type key = Block of (Block_hash.t * int)
-
-let status_to_string = function Idle -> "idle" | Merging -> "merging"
 
 let cemented_block_store {cemented_store; _} = cemented_store
 
@@ -87,8 +85,6 @@ let write_caboose {caboose; _} v =
   return_unit
 
 let genesis_block {genesis_block; _} = genesis_block
-
-let write_status {status_data; _} status = Stored_data.write status_data status
 
 (** [global_predecessor_lookup chain_block_store hash pow_nth] retrieves
     the 2^[pow_nth] predecessor's hash from the block with corresponding
@@ -1387,11 +1383,12 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
       let*! store_status = status block_store in
       let* () =
         fail_unless
-          (store_status = Idle)
-          (Cannot_merge_store {status = status_to_string store_status})
+          (Block_store_status.is_idle store_status)
+          (Cannot_merge_store
+             {status = Format.asprintf "%a" Block_store_status.pp store_status})
       in
       (* Mark the store's status as Merging *)
-      let* () = write_status block_store Merging in
+      let* () = Block_store_status.set_merge_status block_store.status_data in
       let new_head_lpbl =
         Block_repr.last_preserved_block_level new_head_metadata
       in
@@ -1474,7 +1471,10 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                         let* () = finalizer new_head_lpbl in
                         (* The merge operation succeeded, the store is now idle. *)
                         block_store.merging_thread <- None ;
-                        let* () = write_status block_store Idle in
+                        let* () =
+                          Block_store_status.set_idle_status
+                            block_store.status_data
+                        in
                         return_unit))
                   (fun () ->
                     Lwt_mutex.unlock block_store.merge_mutex ;
@@ -1550,7 +1550,7 @@ let merge_temporary_floating block_store =
   let*! rw = Floating_block_store.init chain_dir ~readonly:false RW in
   block_store.ro_floating_block_stores <- [ro] ;
   block_store.rw_floating_block_store <- rw ;
-  write_status block_store Idle
+  Block_store_status.set_idle_status block_store.status_data
 
 (* Removes the potentially leftover temporary files from the cementing
    of cycles. *)
@@ -1582,12 +1582,11 @@ let may_recover_merge block_store =
   let* () =
     Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
         Lwt_mutex.with_lock block_store.merge_mutex (fun () ->
-            let*! d = Stored_data.get block_store.status_data in
-            match d with
-            | Idle -> return_unit
-            | Merging ->
-                let*! () = Store_events.(emit recover_merge ()) in
-                merge_temporary_floating block_store))
+            let*! status = Stored_data.get block_store.status_data in
+            if Block_store_status.is_idle status then return_unit
+            else
+              let*! () = Store_events.(emit recover_merge ()) in
+              merge_temporary_floating block_store))
   in
   (* Try to clean temporary file anyway. *)
   let*! () = may_clean_cementing_artifacts block_store in
@@ -1623,7 +1622,7 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   let* status_data =
     Stored_data.init
       (Naming.block_store_status_file chain_dir)
-      ~initial_data:Idle
+      ~initial_data:Block_store_status.create_idle_status
   in
   let block_cache =
     Block_lru_cache.create
@@ -1654,7 +1653,9 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
     if not readonly then may_recover_merge block_store else return_unit
   in
   let*! status = Stored_data.get status_data in
-  let* () = fail_unless (status = Idle) Cannot_load_degraded_store in
+  let* () =
+    fail_unless (Block_store_status.is_idle status) Cannot_load_degraded_store
+  in
   return block_store
 
 let create ?block_cache_limit chain_dir ~genesis_block =

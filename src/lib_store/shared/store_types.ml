@@ -25,20 +25,36 @@
 
 (* block_store_status *)
 
-type block_store_status = Idle | Merging
+module Block_store_status = struct
+  type t = Idle | Merging
 
-let status_equal s1 s2 =
-  match (s1, s2) with
-  | Idle, Idle -> true
-  | Merging, Merging -> true
-  | Idle, Merging | Merging, Idle -> false
+  let set_idle_status status_data = Stored_data.write status_data Idle
 
-let block_store_status_encoding =
-  let open Data_encoding in
-  conv
-    (function Idle -> false | Merging -> true)
-    (function false -> Idle | true -> Merging)
-    bool
+  let set_merge_status status_data = Stored_data.write status_data Merging
+
+  let is_idle = function Idle -> true | Merging -> false
+
+  let is_merging = function Idle -> false | Merging -> true
+
+  let create_idle_status = Idle
+
+  let equal s1 s2 =
+    match (s1, s2) with
+    | Idle, Idle -> true
+    | Merging, Merging -> true
+    | Idle, Merging | Merging, Idle -> false
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (function Idle -> false | Merging -> true)
+      (function false -> Idle | true -> Merging)
+      bool
+
+  let pp ppf = function
+    | Idle -> Format.fprintf ppf "Idle"
+    | Merging -> Format.fprintf ppf "Merging"
+end
 
 (* block_descriptor *)
 
