@@ -342,7 +342,7 @@ export class Simulator {
     if (cycle < this.config.chain.ai_activation_cycle) {
       return bigRat.zero;
     }
-    if (this.#storage_issuance_bonus[cycle] != null) {
+    if (this.#storage_issuance_bonus[cycle]) {
       return bigRat(this.#storage_issuance_bonus[cycle]);
     }
     const previous_bonus = this.dynamic_rate_for_next_cycle(cycle - 1);
