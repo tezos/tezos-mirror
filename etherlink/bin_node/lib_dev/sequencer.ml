@@ -206,10 +206,13 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
-      ~max_blueprints_lag
-      ~max_blueprints_ahead
-      ~max_blueprints_catchup
-      ~catchup_cooldown
+      ~config:
+        {
+          max_blueprints_lag;
+          max_blueprints_ahead;
+          max_blueprints_catchup;
+          catchup_cooldown;
+        }
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ()
   in

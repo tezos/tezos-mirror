@@ -14,6 +14,13 @@ type log_filter_config = {
 
 type time_between_blocks = Nothing | Time_between_blocks of float
 
+type blueprints_publisher_config = {
+  max_blueprints_lag : int;
+  max_blueprints_ahead : int;
+  max_blueprints_catchup : int;
+  catchup_cooldown : int;
+}
+
 type sequencer = {
   preimages : string;
   preimages_endpoint : Uri.t option;
@@ -21,6 +28,7 @@ type sequencer = {
   max_number_of_chunks : int;
   private_rpc_port : int option;
   sequencer : Client_keys.sk_uri;
+  blueprints_publisher_config : blueprints_publisher_config;
 }
 
 type observer = {
@@ -48,8 +56,12 @@ type t = {
   verbose : Internal_event.level;
 }
 
-let default_filter_config =
-  {max_nb_blocks = 100; max_nb_logs = 1000; chunk_size = 10}
+let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
+  {
+    max_nb_blocks = Option.value ~default:100 max_nb_blocks;
+    max_nb_logs = Option.value ~default:1000 max_nb_logs;
+    chunk_size = Option.value ~default:10 chunk_size;
+  }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
 
@@ -91,8 +103,31 @@ let default_tx_pool_addr_limit = Int64.of_int 4000
 
 let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 
+let default_max_blueprints_lag = 50
+
+let default_max_blueprints_ahead = 100
+
+let default_max_blueprints_catchup = 50
+
+let default_catchup_cooldown = 1
+
 let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
-    ?max_number_of_chunks ?private_rpc_port ~sequencer () =
+    ?max_number_of_chunks ?private_rpc_port ~sequencer ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown () =
+  let blueprints_publisher_config =
+    {
+      max_blueprints_lag =
+        Option.value ~default:default_max_blueprints_lag max_blueprints_lag;
+      max_blueprints_ahead =
+        Option.value ~default:default_max_blueprints_ahead max_blueprints_ahead;
+      max_blueprints_catchup =
+        Option.value
+          ~default:default_max_blueprints_catchup
+          max_blueprints_catchup;
+      catchup_cooldown =
+        Option.value ~default:default_catchup_cooldown catchup_cooldown;
+    }
+  in
   {
     preimages = Option.value ~default:default_preimages preimages;
     preimages_endpoint;
@@ -102,6 +137,7 @@ let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
       Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
     private_rpc_port;
     sequencer;
+    blueprints_publisher_config;
   }
 
 let observer_config_dft ?preimages ?preimages_endpoint ~evm_node_endpoint () =
@@ -113,6 +149,7 @@ let observer_config_dft ?preimages ?preimages_endpoint ~evm_node_endpoint () =
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
+  let default_filter_config = default_filter_config () in
   conv
     (fun {max_nb_blocks; max_nb_logs; chunk_size} ->
       (max_nb_blocks, max_nb_logs, chunk_size))
@@ -131,6 +168,35 @@ let encoding_time_between_blocks : time_between_blocks Data_encoding.t =
        (function None -> Nothing | Some f -> Time_between_blocks f)
        (option float)
 
+let blueprints_publisher_config_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           max_blueprints_lag;
+           max_blueprints_ahead;
+           max_blueprints_catchup;
+           catchup_cooldown;
+         } ->
+      ( max_blueprints_lag,
+        max_blueprints_ahead,
+        max_blueprints_catchup,
+        catchup_cooldown ))
+    (fun ( max_blueprints_lag,
+           max_blueprints_ahead,
+           max_blueprints_catchup,
+           catchup_cooldown ) ->
+      {
+        max_blueprints_lag;
+        max_blueprints_ahead;
+        max_blueprints_catchup;
+        catchup_cooldown;
+      })
+    (obj4
+       (dft "max_blueprints_lag" int31 default_max_blueprints_lag)
+       (dft "max_blueprints_ahead" int31 default_max_blueprints_ahead)
+       (dft "max_blueprints_catchup" int31 default_max_blueprints_catchup)
+       (dft "catchup_cooldown" int31 default_catchup_cooldown))
+
 let sequencer_encoding =
   let open Data_encoding in
   conv
@@ -141,19 +207,22 @@ let sequencer_encoding =
            max_number_of_chunks;
            private_rpc_port;
            sequencer;
+           blueprints_publisher_config;
          } ->
       ( preimages,
         preimages_endpoint,
         time_between_blocks,
         max_number_of_chunks,
         private_rpc_port,
-        Client_keys.string_of_sk_uri sequencer ))
+        Client_keys.string_of_sk_uri sequencer,
+        blueprints_publisher_config ))
     (fun ( preimages,
            preimages_endpoint,
            time_between_blocks,
            max_number_of_chunks,
            private_rpc_port,
-           sequencer ) ->
+           sequencer,
+           blueprints_publisher_config ) ->
       {
         preimages;
         preimages_endpoint;
@@ -161,8 +230,9 @@ let sequencer_encoding =
         max_number_of_chunks;
         private_rpc_port;
         sequencer = Client_keys.sk_uri_of_string sequencer;
+        blueprints_publisher_config;
       })
-    (obj6
+    (obj7
        (dft "preimages" string default_preimages)
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
        (dft
@@ -174,7 +244,8 @@ let sequencer_encoding =
           "private-rpc-port"
           ~description:"RPC port for private server"
           uint16)
-       (req "sequencer" string))
+       (req "sequencer" string)
+       (req "blueprints_publisher_config" blueprints_publisher_config_encoding))
 
 let observer_encoding =
   let open Data_encoding in
@@ -266,7 +337,10 @@ let encoding : t Data_encoding.t =
           (dft "devmode" bool default_devmode)
           (dft "cors_origins" (list string) default_cors_origins)
           (dft "cors_headers" (list string) default_cors_headers)
-          (dft "log_filter" log_filter_config_encoding default_filter_config)
+          (dft
+             "log_filter"
+             log_filter_config_encoding
+             (default_filter_config ()))
           (opt "sequencer" sequencer_encoding)
           (opt "observer" observer_encoding)
           (dft
@@ -327,10 +401,12 @@ let observer_config_exn {observer; _} =
 
 module Cli = struct
   let create ~devmode ?rpc_addr ?rpc_port ?cors_origins ?cors_headers
-      ?log_filter ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ~keep_alive ~rollup_node_endpoint ~verbose
-      ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint () =
+      ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+      ~keep_alive ~rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
+      ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
+      ?sequencer_key ?evm_node_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -340,6 +416,10 @@ module Cli = struct
             ?time_between_blocks
             ?max_number_of_chunks
             ?private_rpc_port
+            ?max_blueprints_lag
+            ?max_blueprints_ahead
+            ?max_blueprints_catchup
+            ?catchup_cooldown
             ~sequencer
             ())
         sequencer_key
@@ -354,13 +434,20 @@ module Cli = struct
             ())
         evm_node_endpoint
     in
+    let log_filter =
+      default_filter_config
+        ?max_nb_blocks:log_filter_max_nb_blocks
+        ?max_nb_logs:log_filter_max_nb_logs
+        ?chunk_size:log_filter_chunk_size
+        ()
+    in
     {
       rpc_addr = Option.value ~default:default_rpc_addr rpc_addr;
       rpc_port = Option.value ~default:default_rpc_port rpc_port;
       devmode;
       cors_origins = Option.value ~default:default_cors_origins cors_origins;
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
-      log_filter = Option.value ~default:default_filter_config log_filter;
+      log_filter;
       sequencer;
       observer;
       max_active_connections = default_max_active_connections;
@@ -380,14 +467,40 @@ module Cli = struct
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
       ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint configuration =
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
       | Some sequencer_config ->
+          let blueprints_publisher_config =
+            let blueprints_publisher_config =
+              sequencer_config.blueprints_publisher_config
+            in
+            {
+              max_blueprints_lag =
+                Option.value
+                  ~default:blueprints_publisher_config.max_blueprints_lag
+                  max_blueprints_lag;
+              max_blueprints_ahead =
+                Option.value
+                  ~default:blueprints_publisher_config.max_blueprints_ahead
+                  max_blueprints_ahead;
+              max_blueprints_catchup =
+                Option.value
+                  ~default:blueprints_publisher_config.max_blueprints_catchup
+                  max_blueprints_catchup;
+              catchup_cooldown =
+                Option.value
+                  ~default:blueprints_publisher_config.catchup_cooldown
+                  catchup_cooldown;
+            }
+          in
           Some
             {
               preimages =
@@ -408,6 +521,7 @@ module Cli = struct
                 Option.either private_rpc_port sequencer_config.private_rpc_port;
               sequencer =
                 Option.value ~default:sequencer_config.sequencer sequencer_key;
+              blueprints_publisher_config;
             }
       | None ->
           Option.map
@@ -418,6 +532,10 @@ module Cli = struct
                 ?time_between_blocks
                 ?max_number_of_chunks
                 ?private_rpc_port
+                ?max_blueprints_lag
+                ?max_blueprints_ahead
+                ?max_blueprints_catchup
+                ?catchup_cooldown
                 ~sequencer
                 ())
             sequencer_key
@@ -448,6 +566,22 @@ module Cli = struct
                 ())
             evm_node_endpoint
     in
+    let log_filter =
+      {
+        max_nb_blocks =
+          Option.value
+            ~default:configuration.log_filter.max_nb_blocks
+            log_filter_max_nb_blocks;
+        max_nb_logs =
+          Option.value
+            ~default:configuration.log_filter.max_nb_logs
+            log_filter_max_nb_logs;
+        chunk_size =
+          Option.value
+            ~default:configuration.log_filter.chunk_size
+            log_filter_chunk_size;
+      }
+    in
     {
       rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
       rpc_port = Option.value ~default:configuration.rpc_port rpc_port;
@@ -456,7 +590,7 @@ module Cli = struct
         Option.value ~default:configuration.cors_origins cors_origins;
       cors_headers =
         Option.value ~default:configuration.cors_headers cors_headers;
-      log_filter = Option.value ~default:configuration.log_filter log_filter;
+      log_filter;
       sequencer;
       observer;
       max_active_connections = configuration.max_active_connections;
@@ -481,10 +615,13 @@ module Cli = struct
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins
-      ?cors_headers ?log_filter ?tx_pool_timeout_limit ?tx_pool_addr_limit
+      ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
       ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint () =
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -512,7 +649,6 @@ module Cli = struct
           ?rpc_port
           ?cors_origins
           ?cors_headers
-          ?log_filter
           ~keep_alive
           ?sequencer_key
           ?evm_node_endpoint
@@ -521,11 +657,18 @@ module Cli = struct
           ?time_between_blocks
           ?max_number_of_chunks
           ?private_rpc_port
+          ?max_blueprints_lag
+          ?max_blueprints_ahead
+          ?max_blueprints_catchup
+          ?catchup_cooldown
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
           ?rollup_node_endpoint
           ~verbose
+          ?log_filter_max_nb_blocks
+          ?log_filter_max_nb_logs
+          ?log_filter_chunk_size
           configuration
       in
       return configuration
@@ -543,7 +686,6 @@ module Cli = struct
           ?cors_origins
           ?cors_headers
           ~keep_alive
-          ?log_filter
           ?sequencer_key
           ?evm_node_endpoint
           ?preimages
@@ -551,11 +693,18 @@ module Cli = struct
           ?time_between_blocks
           ?max_number_of_chunks
           ?private_rpc_port
+          ?max_blueprints_lag
+          ?max_blueprints_ahead
+          ?max_blueprints_catchup
+          ?catchup_cooldown
           ?tx_pool_timeout_limit
           ?tx_pool_addr_limit
           ?tx_pool_tx_per_addr_limit
           ~rollup_node_endpoint
           ~verbose
+          ?log_filter_max_nb_blocks
+          ?log_filter_max_nb_logs
+          ?log_filter_chunk_size
           ()
       in
       return config

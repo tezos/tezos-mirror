@@ -7,11 +7,8 @@
 
 type parameters = {
   rollup_node_endpoint : Uri.t;
-  max_blueprints_lag : int;
-  max_blueprints_ahead : int;
-  max_blueprints_catchup : int;
-  catchup_cooldown : int;
   latest_level_seen : Z.t;
+  config : Configuration.blueprints_publisher_config;
 }
 
 type state = {
@@ -173,10 +170,13 @@ module Handlers = struct
   let on_launch _self ()
       ({
          rollup_node_endpoint;
-         max_blueprints_lag;
-         max_blueprints_ahead;
-         max_blueprints_catchup;
-         catchup_cooldown;
+         config =
+           {
+             max_blueprints_lag;
+             max_blueprints_ahead;
+             max_blueprints_catchup;
+             catchup_cooldown;
+           };
          latest_level_seen;
        } :
         Types.parameters) =
@@ -238,21 +238,13 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~max_blueprints_lag ~max_blueprints_ahead
-    ~max_blueprints_catchup ~catchup_cooldown ~latest_level_seen () =
+let start ~rollup_node_endpoint ~config ~latest_level_seen () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
-      {
-        rollup_node_endpoint;
-        max_blueprints_lag;
-        max_blueprints_ahead;
-        max_blueprints_catchup;
-        catchup_cooldown;
-        latest_level_seen;
-      }
+      {rollup_node_endpoint; config; latest_level_seen}
       (module Handlers)
   in
   let*! () = Blueprint_events.publisher_is_ready () in
