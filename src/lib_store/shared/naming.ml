@@ -151,12 +151,12 @@ let caboose_file dir =
     block_descriptor_encoding
     Store_types.block_descriptor_equal
 
-let block_store_status_file dir =
+let legacy_block_store_status_file dir =
   make_encoded_file
     dir
     ~filename:"status"
-    Block_store_status.encoding
-    Block_store_status.equal
+    Block_store_status.Legacy.encoding
+    Block_store_status.Legacy.equal
 
 let cemented_blocks_dir dir = mk_dir dir "cemented"
 

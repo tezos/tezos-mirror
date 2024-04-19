@@ -1613,7 +1613,8 @@ module Chain = struct
               (* We mark the merge as on-going to prevent the merge from
                  being triggered and to update on-disk values. *)
               return_true
-          | Not_running when not @@ Block_store_status.is_idle store_status ->
+          | Not_running
+            when not @@ Block_store_status.Legacy.is_idle store_status ->
               (* Degenerate case, do the same as the Merge_failed case *)
               let*! () = Store_events.(emit notify_merge_error []) in
               return_true
