@@ -229,58 +229,16 @@ type header_status =
         block. *)
   ]
 
-(** An operator DAL node can play three different roles:
-    - attester for some pkh: checks that the shards assigned to this pkh are published
-    - slot producer for some slot index: splits slots into shards and publishes the shards
-    - slot observer for some slot index: collects the shards
-    corresponding to some slot index, reconstructs slots when enough
-    shards are seen, and republishes missing shards.
-
-    A single DAL node can play several of these roles at once. We call a profile the
-    set of roles played by a DAL node and represent it as a triple of sets. *)
-type operator_profile
-
 (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in. *)
 type profiles =
   | Bootstrap
       (** The bootstrap profile facilitates peer discovery in the DAL
-      network.  Note that bootstrap nodes are incompatible with
-      attester/producer/observer profiles as bootstrap nodes are
-      expected to connect to all the meshes with degree 0. *)
-  | Operator of operator_profile
+          network.  Note that bootstrap nodes are incompatible with
+          attester/producer/observer profiles as bootstrap nodes are
+          expected to connect to all the meshes with degree 0. *)
+  | Operator of Operator_profile.t
   | Random_observer
-
-val empty_operator_profile : operator_profile
-
-val empty_operator : profiles
-
-val is_empty : operator_profile -> bool
-
-val is_producer : operator_profile -> bool
-
-val is_attester : operator_profile -> bool
-
-val is_observer : operator_profile -> bool
-
-val producer_slot_out_of_bounds : int -> operator_profile -> int option
-
-val is_observed_slot : int -> operator_profile -> bool
-
-val get_all_slot_indexes : operator_profile -> int list
-
-val make_operator_profile :
-  ?attesters:Signature.Public_key_hash.t list ->
-  ?producers:int list ->
-  ?observers:int list ->
-  unit ->
-  operator_profile
-
-val merge_operators :
-  ?on_new_attester:(Signature.Public_key_hash.t -> unit) ->
-  operator_profile ->
-  operator_profile ->
-  operator_profile
 
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)
@@ -317,8 +275,6 @@ val header_status_encoding : header_status Data_encoding.t
 val profiles_encoding : profiles Data_encoding.t
 
 val with_proof_encoding : with_proof Data_encoding.t
-
-val operator_profile_encoding : operator_profile Data_encoding.t
 
 val attestable_slots_encoding : attestable_slots Data_encoding.t
 

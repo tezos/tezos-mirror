@@ -362,12 +362,10 @@ let make ~run =
           history_mode;
         }
     in
-    let profiles =
-      Types.make_operator_profile ~attesters ~producers ~observers ()
-    in
+    let profiles = Operator_profile.make ~attesters ~producers ~observers () in
     match (bootstrap_flag, profiles) with
-    | false, profiles when Types.is_empty profiles -> run None
-    | true, profiles when Types.is_empty profiles ->
+    | false, profiles when Operator_profile.is_empty profiles -> run None
+    | true, profiles when Operator_profile.is_empty profiles ->
         run @@ Some Profile_manager.bootstrap
     | false, profiles -> run @@ Some (Profile_manager.operator profiles)
     | true, _ ->

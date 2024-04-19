@@ -157,7 +157,7 @@ val get_published_level_headers :
     is incompatible with other profiles. *)
 val patch_profiles :
   < meth : [`PATCH]
-  ; input : Types.operator_profile
+  ; input : Operator_profile.t
   ; output : unit
   ; prefix : unit
   ; params : unit

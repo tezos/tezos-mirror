@@ -45,7 +45,8 @@ val empty : t
 
 val bootstrap : t
 
-val operator : Types.operator_profile -> t
+(** [operator op] returns an operator with the profile described by [op] *)
+val operator : Operator_profile.t -> t
 
 (** Merge the two sets of profiles. In case of incompatibility (that is, case
    [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
@@ -60,7 +61,7 @@ val add_operator_profiles :
   t ->
   Dal_plugin.proto_parameters ->
   Gossipsub.Worker.t ->
-  Types.operator_profile ->
+  Operator_profile.t ->
   t option
 
 (** [add_profiles t proto_parameters gs_worker profiles] registers [profiles].

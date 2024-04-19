@@ -313,66 +313,7 @@ type slot_header = {
   status : header_status;
 }
 
-module Slot_set = Set.Make (Int)
-module Pkh_set = Signature.Public_key_hash.Set
-
-type operator_profile = {
-  producers : Slot_set.t;
-  attesters : Pkh_set.t;
-  observers : Slot_set.t;
-}
-
-type profiles = Bootstrap | Operator of operator_profile | Random_observer
-
-let empty_operator_profile =
-  {
-    producers = Slot_set.empty;
-    attesters = Pkh_set.empty;
-    observers = Slot_set.empty;
-  }
-
-let empty_operator = Operator empty_operator_profile
-
-let is_producer {producers; _} = not (Slot_set.is_empty producers)
-
-let is_attester {attesters; _} = not (Pkh_set.is_empty attesters)
-
-let is_observer {observers; _} = not (Slot_set.is_empty observers)
-
-let is_empty op =
-  (not (is_observer op)) && (not (is_attester op)) && not (is_producer op)
-
-let producer_slot_out_of_bounds number_of_slots op =
-  Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) op.producers
-
-let is_observed_slot slot_index {observers; _} =
-  Slot_set.mem slot_index observers
-
-let get_all_slot_indexes {producers; observers; _} =
-  Slot_set.(union producers observers |> to_seq) |> List.of_seq
-
-let merge_operators ?(on_new_attester = fun _ -> ()) op1 op2 =
-  let ( @ ) = Slot_set.union in
-  let ( @. ) =
-    Pkh_set.iter
-      (fun pkh ->
-        if not (Pkh_set.mem pkh op1.attesters) then on_new_attester pkh)
-      op2.attesters ;
-    Pkh_set.union
-  in
-  {
-    producers = op1.producers @ op2.producers;
-    attesters = op1.attesters @. op2.attesters;
-    observers = op1.observers @ op2.observers;
-  }
-
-let make_operator_profile ?(attesters = []) ?(producers = []) ?(observers = [])
-    () =
-  {
-    producers = Slot_set.of_list producers;
-    observers = Slot_set.of_list observers;
-    attesters = Pkh_set.of_list attesters;
-  }
+type profiles = Bootstrap | Operator of Operator_profile.t | Random_observer
 
 type with_proof = {with_proof : bool}
 
@@ -465,24 +406,6 @@ let slot_header_encoding =
           (obj1 (req "commitment" Cryptobox.Commitment.encoding))
           header_status_encoding))
 
-let operator_profile_encoding =
-  let open Data_encoding in
-  conv
-    (fun {producers; observers; attesters} ->
-      ( Slot_set.elements producers,
-        Slot_set.elements observers,
-        Pkh_set.elements attesters ))
-    (fun (producers, observers, attesters) ->
-      {
-        producers = Slot_set.of_list producers;
-        observers = Slot_set.of_list observers;
-        attesters = Pkh_set.of_list attesters;
-      })
-    (obj3
-       (req "producers" (list int31))
-       (req "observers" (list int31))
-       (req "attesters" (list Signature.Public_key_hash.encoding)))
-
 let profiles_encoding =
   let open Data_encoding in
   union
@@ -498,7 +421,7 @@ let profiles_encoding =
         (Tag 2)
         (obj2
            (req "kind" (constant "operator"))
-           (req "operator_profiles" operator_profile_encoding))
+           (req "operator_profiles" Operator_profile.encoding))
         (function
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)

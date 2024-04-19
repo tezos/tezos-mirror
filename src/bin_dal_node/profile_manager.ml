@@ -27,7 +27,7 @@
 (** A profile context stores profile-specific data used by the daemon.  *)
 type t = Types.profiles
 
-let empty = Types.(empty_operator)
+let empty = Types.Operator Operator_profile.empty
 
 let encoding = Types.profiles_encoding
 
@@ -38,7 +38,7 @@ let operator operator_profile = Types.Operator operator_profile
 let is_empty = function
   | Types.Bootstrap -> false
   | Random_observer -> false
-  | Operator profile -> Types.is_empty profile
+  | Operator profile -> Operator_profile.is_empty profile
 
 let is_bootstrap_profile = function
   | Types.Bootstrap -> true
@@ -47,20 +47,20 @@ let is_bootstrap_profile = function
 let is_prover_profile = function
   | Types.Bootstrap -> false
   | Types.Random_observer -> true
-  | Types.Operator p -> Types.(is_observer p || is_producer p)
+  | Types.Operator p -> Operator_profile.(is_observer p || is_producer p)
 
 let merge_profiles ~lower_prio ~higher_prio =
   match (lower_prio, higher_prio) with
   | Types.Bootstrap, Types.Bootstrap -> Types.Bootstrap
   | Operator _, Bootstrap -> Bootstrap
   | Bootstrap, Operator op -> Operator op
-  | Operator op1, Operator op2 -> Operator (Types.merge_operators op1 op2)
+  | Operator op1, Operator op2 -> Operator (Operator_profile.merge op1 op2)
   | Random_observer, Random_observer -> Random_observer
   | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
   | (Operator _ | Bootstrap), Random_observer -> Random_observer
 
 let add_operator_profiles t proto_parameters gs_worker
-    (operator_profiles : Types.operator_profile) =
+    (operator_profiles : Operator_profile.t) =
   match t with
   | Types.Bootstrap -> None
   | Operator operator_sets ->
@@ -73,7 +73,7 @@ let add_operator_profiles t proto_parameters gs_worker
       Some
         Types.(
           Operator
-            (Types.merge_operators
+            (Operator_profile.merge
                ~on_new_attester
                operator_sets
                operator_profiles))
@@ -90,7 +90,7 @@ let add_profiles t proto_parameters gs_worker = function
         t
         proto_parameters
         gs_worker
-        (Types.make_operator_profile ~observers:[slot_index] ())
+        (Operator_profile.make ~observers:[slot_index] ())
   | Operator operator_profiles ->
       add_operator_profiles t proto_parameters gs_worker operator_profiles
 
@@ -103,7 +103,7 @@ let validate_slot_indexes t ~number_of_slots =
         "Profile_manager.add_operator_profiles: random observer should have a \
          slot index assigned at this point"
   | Operator o -> (
-      match Types.producer_slot_out_of_bounds number_of_slots o with
+      match Operator_profile.producer_slot_out_of_bounds number_of_slots o with
       | Some slot_index ->
           tzfail (Errors.Invalid_slot_index {slot_index; number_of_slots})
       | None -> return_unit)
@@ -146,7 +146,7 @@ let on_new_head t proto_parameters gs_worker committee =
       (* The topics associated to observers and producers can change
          if there new active bakers. However, for attesters, new slots
          are not created on new head, only on a new protocol. *)
-      let slots = Types.get_all_slot_indexes op in
+      let slots = Operator_profile.get_all_slot_indexes op in
       join_topics_for_operator gs_worker committee slots
 
 let get_profiles t =
@@ -176,7 +176,7 @@ let get_default_shard_store_period proto_parameters t =
      during attestation lag period *)
   | Random_observer -> rollup_period
   | Operator op ->
-      if Types.(is_producer op || is_observer op) then rollup_period
+      if Operator_profile.(is_producer op || is_observer op) then rollup_period
       else attestation_period
   | Bootstrap -> attestation_period
 
