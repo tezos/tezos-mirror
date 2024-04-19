@@ -546,7 +546,9 @@ export class Simulator {
 
     const delegated = this.total_delegated_balance(cycle - 1);
 
-    const staked = this.total_staked_balance(cycle);
+    const staked = this.total_staked_balance(
+      cycle + this.config.proto.consensus_rights_delay,
+    );
 
     if (this.is_ai_activated(cycle)) {
       const ratio_for_delegated = bigRat(delegated).divide(
