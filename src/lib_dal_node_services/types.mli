@@ -231,7 +231,7 @@ type header_status =
 
 (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in. *)
-type profiles =
+type profile =
   | Bootstrap
       (** The bootstrap profile facilitates peer discovery in the DAL
           network.  Note that bootstrap nodes are incompatible with
@@ -272,7 +272,7 @@ val slot_id_encoding : slot_id Data_encoding.t
 
 val header_status_encoding : header_status Data_encoding.t
 
-val profiles_encoding : profiles Data_encoding.t
+val profile_encoding : profile Data_encoding.t
 
 val with_proof_encoding : with_proof Data_encoding.t
 

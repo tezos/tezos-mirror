@@ -168,7 +168,7 @@ val patch_profiles :
 val get_profiles :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.profiles
+  ; output : Types.profile
   ; prefix : unit
   ; params : unit
   ; query : unit >

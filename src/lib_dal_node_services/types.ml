@@ -313,7 +313,7 @@ type slot_header = {
   status : header_status;
 }
 
-type profiles = Bootstrap | Operator of Operator_profile.t | Random_observer
+type profile = Bootstrap | Operator of Operator_profile.t | Random_observer
 
 type with_proof = {with_proof : bool}
 
@@ -406,7 +406,7 @@ let slot_header_encoding =
           (obj1 (req "commitment" Cryptobox.Commitment.encoding))
           header_status_encoding))
 
-let profiles_encoding =
+let profile_encoding =
   let open Data_encoding in
   union
     [

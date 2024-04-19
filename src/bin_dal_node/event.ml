@@ -90,7 +90,7 @@ let failed_to_persist_profiles =
     ~name:"failed_to_persist_profiles"
     ~msg:"failed to persist the profiles to the config file"
     ~level:Error
-    ("profiles", Types.profiles_encoding)
+    ("profiles", Types.profile_encoding)
     ("error", Error_monad.trace_encoding)
 
 let fetched_slot =

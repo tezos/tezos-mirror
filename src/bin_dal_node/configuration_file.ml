@@ -67,7 +67,7 @@ type t = {
   network_name : string;
   endpoint : Uri.t;
   metrics_addr : P2p_point.Id.t;
-  profiles : Profile_manager.t;
+  profile : Profile_manager.t;
   history_mode : history_mode;
 }
 
@@ -115,7 +115,7 @@ let default =
     endpoint = default_endpoint;
     metrics_addr = default_metrics_addr;
     history_mode = default_history_mode;
-    profiles = Profile_manager.empty;
+    profile = Profile_manager.empty;
   }
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -154,7 +154,7 @@ let encoding : t Data_encoding.t =
            endpoint;
            metrics_addr;
            history_mode;
-           profiles;
+           profile;
          } ->
       ( ( data_dir,
           rpc_addr,
@@ -166,7 +166,7 @@ let encoding : t Data_encoding.t =
           network_name,
           endpoint,
           metrics_addr ),
-        (history_mode, profiles) ))
+        (history_mode, profile) ))
     (fun ( ( data_dir,
              rpc_addr,
              listen_addr,
@@ -177,7 +177,7 @@ let encoding : t Data_encoding.t =
              network_name,
              endpoint,
              metrics_addr ),
-           (history_mode, profiles) ) ->
+           (history_mode, profile) ) ->
       {
         data_dir;
         rpc_addr;
@@ -190,7 +190,7 @@ let encoding : t Data_encoding.t =
         endpoint;
         metrics_addr;
         history_mode;
-        profiles;
+        profile;
       })
     (merge_objs
        (obj10

@@ -145,7 +145,7 @@ module Dal_RPC = struct
 
   type operator_profiles = operator_profile list
 
-  type profiles = Bootstrap | Operator of operator_profiles
+  type profile = Bootstrap | Operator of operator_profiles
 
   type slot_header = {
     slot_level : int;
@@ -626,7 +626,7 @@ end
 module Check = struct
   open Dal_RPC
 
-  let profiles_typ : profiles Check.typ =
+  let profiles_typ : profile Check.typ =
     let pp_operator_profile ppf = function
       | Attester pkh -> Format.fprintf ppf "Attester %s" pkh
       | Producer slot_index -> Format.fprintf ppf "Producer %d" slot_index

@@ -33,20 +33,20 @@ let merge
         public_addr;
         endpoint;
         metrics_addr;
-        profiles;
+        profile;
         peers;
         history_mode;
       } configuration =
-  let profiles =
-    match profiles with
-    | None -> configuration.Configuration_file.profiles
+  let profile =
+    match profile with
+    | None -> configuration.Configuration_file.profile
     | Some from_cli ->
         (* Note that the profile from the CLI is prioritized over
            the profile provided in the config file. *)
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
            Improve profile configuration UX for when we have conflicting CLI and config file. *)
         Profile_manager.merge_profiles
-          ~lower_prio:configuration.profiles
+          ~lower_prio:configuration.profile
           ~higher_prio:from_cli
   in
   {
@@ -57,7 +57,7 @@ let merge
     public_addr = Option.value ~default:configuration.public_addr public_addr;
     expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
     endpoint = Option.value ~default:configuration.endpoint endpoint;
-    profiles;
+    profile;
     metrics_addr = Option.value ~default:configuration.metrics_addr metrics_addr;
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;

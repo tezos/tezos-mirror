@@ -72,7 +72,7 @@ let init_cryptobox config dal_config
      We should load the verifier SRS by default.
   *)
   let prover_srs =
-    Profile_manager.is_prover_profile config.Configuration_file.profiles
+    Profile_manager.is_prover_profile config.Configuration_file.profile
   in
   let* () =
     if prover_srs then
@@ -252,20 +252,20 @@ module Handler = struct
             Profile_manager.empty
             proto_parameters
             (Node_context.get_gs_worker ctxt)
-            config.Configuration_file.profiles
+            config.Configuration_file.profile
       | Some loaded_profile ->
           (* The profiles from the loaded context are prioritized over the
              profiles provided in the config file. *)
-          let merged_profiles =
+          let merged_profile =
             Profile_manager.merge_profiles
-              ~lower_prio:config.Configuration_file.profiles
+              ~lower_prio:config.Configuration_file.profile
               ~higher_prio:loaded_profile
           in
           Profile_manager.add_profiles
             Profile_manager.empty
             proto_parameters
             (Node_context.get_gs_worker ctxt)
-            merged_profiles
+            merged_profile
     in
     match pctxt_opt with
     | None -> fail Errors.[Profile_incompatibility]
@@ -680,7 +680,7 @@ let run ~data_dir configuration_override =
              startup. *)
           peers = points;
           endpoint;
-          profiles;
+          profile;
           listen_addr;
           public_addr;
           _;
@@ -713,7 +713,7 @@ let run ~data_dir configuration_override =
     in
     let open Worker_parameters in
     let limits =
-      if Profile_manager.is_bootstrap_profile profiles then
+      if Profile_manager.is_bootstrap_profile profile then
         (* Bootstrap nodes should always have a mesh size of zero.
            so all grafts are responded with prunes with PX. See:
            https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
@@ -759,7 +759,7 @@ let run ~data_dir configuration_override =
     let* p2p_config = p2p_config config in
     Gossipsub.Transport_layer.create
       ~public_addr
-      ~is_bootstrap_peer:(profiles = Profile_manager.bootstrap)
+      ~is_bootstrap_peer:(profile = Profile_manager.bootstrap)
       p2p_config
       p2p_limits
       ~network_name

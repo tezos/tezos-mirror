@@ -228,7 +228,7 @@ let patch_profiles :
 let get_profiles :
     < meth : [`GET]
     ; input : unit
-    ; output : profiles
+    ; output : profile
     ; prefix : unit
     ; params : unit
     ; query : unit >
@@ -236,7 +236,7 @@ let get_profiles :
   Tezos_rpc.Service.get_service
     ~description:"Return the list of current profiles tracked by the DAL node."
     ~query:Tezos_rpc.Query.empty
-    ~output:Types.profiles_encoding
+    ~output:Types.profile_encoding
     Tezos_rpc.Path.(open_root / "profiles")
 
 let get_assigned_shard_indices :

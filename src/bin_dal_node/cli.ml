@@ -334,7 +334,7 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  profiles : Profile_manager.t option;
+  profile : Profile_manager.t option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
   history_mode : Configuration_file.history_mode option;
@@ -346,7 +346,7 @@ let make ~run =
   let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
       endpoint metrics_addr attesters producers observers bootstrap_flag peers
       history_mode =
-    let run profiles =
+    let run profile =
       run
         subcommand
         {
@@ -356,14 +356,14 @@ let make ~run =
           listen_addr;
           public_addr;
           endpoint;
-          profiles;
+          profile;
           metrics_addr;
           peers;
           history_mode;
         }
     in
-    let profiles = Operator_profile.make ~attesters ~producers ~observers () in
-    match (bootstrap_flag, profiles) with
+    let profile = Operator_profile.make ~attesters ~producers ~observers () in
+    match (bootstrap_flag, profile) with
     | false, profiles when Operator_profile.is_empty profiles -> run None
     | true, profiles when Operator_profile.is_empty profiles ->
         run @@ Some Profile_manager.bootstrap

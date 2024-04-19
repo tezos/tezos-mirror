@@ -25,11 +25,11 @@
 (*****************************************************************************)
 
 (** A profile context stores profile-specific data used by the daemon.  *)
-type t = Types.profiles
+type t = Types.profile
 
 let empty = Types.Operator Operator_profile.empty
 
-let encoding = Types.profiles_encoding
+let encoding = Types.profile_encoding
 
 let bootstrap = Types.Bootstrap
 
