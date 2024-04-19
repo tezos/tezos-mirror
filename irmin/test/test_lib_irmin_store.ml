@@ -35,17 +35,19 @@ type t = {
 }
 
 let wrap_context_init f _ =
-  Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
-      let root = Filename.concat base_dir "context" in
-      let* index = Context.init root in
-      let*!! genesis =
-        Context.commit_genesis index ~chain_id ~time:genesis_time
-          ~protocol:genesis_protocol
-      in
-      let* block2 = create_block index genesis block2_actions in
-      let* block3a = create_block index block2 block3a_actions in
-      let* block3b = create_block index block2 block3b_actions in
-      f { index; block2; block3a; block3b })
+  let base_dir = Tezt.Temp.dir "tezos_test_" in
+  let root = Filename.concat base_dir "context" in
+  let* index = Context.init root in
+  let*!! genesis =
+    Context.commit_genesis index ~chain_id ~time:genesis_time
+      ~protocol:genesis_protocol
+  in
+  let* block2 = create_block index genesis block2_actions in
+  let* block3a = create_block index block2 block3a_actions in
+  let* block3b = create_block index block2 block3b_actions in
+  let* r = f { index; block2; block3a; block3b } in
+  let* () = Context.close index in
+  return r
 
 let c = function None -> None | Some s -> Some (Bytes.to_string s)
 
