@@ -156,6 +156,12 @@ val cemented_block_level_index : t -> Cemented_block_level_index.t
     index. *)
 val cemented_block_hash_index : t -> Cemented_block_hash_index.t
 
+(** [may_synchronize_indexes cemented_store] updates a RO index
+    instance to allow concurrent access to the value added by a RW
+    instance. This operation is expected to be cheap (~10us) and has
+    no effect on RW instances. *)
+val may_synchronize_indexes : t -> unit
+
 (** [load_table ~cemented_blocks_dir] reads the [cemented_blocks_dir]
     directory and instantiate the cemented blocks chunks files. *)
 val load_table :

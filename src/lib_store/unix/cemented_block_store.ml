@@ -69,6 +69,7 @@ type t = {
   cemented_block_hash_index : Cemented_block_hash_index.t;
   mutable cemented_blocks_files : cemented_blocks_file array option;
   metadata_fd_cache : metadata_handler Metadata_fd_cache.t;
+  readonly : bool;
 }
 
 type chunk_iterator = {
@@ -100,6 +101,12 @@ let cemented_block_level_index {cemented_block_level_index; _} =
 let cemented_block_hash_index {cemented_block_hash_index; _} =
   cemented_block_hash_index
 
+let may_synchronize_indexes
+    {cemented_block_level_index; cemented_block_hash_index; readonly; _} =
+  if readonly then
+    let () = Cemented_block_level_index.sync cemented_block_level_index in
+    Cemented_block_hash_index.sync cemented_block_hash_index
+
 (* The log_size corresponds to the maximum size of the memory zone
    allocated in memory before flushing it onto the disk. It is
    basically a cache which is use for the index. The cache size is
@@ -129,7 +136,7 @@ let init_metadata_fd_cache () =
   in
   Metadata_fd_cache.create destroyer default_metadata_fd_cache_size
 
-let create ~log_size cemented_blocks_dir =
+let create ~log_size ~readonly cemented_blocks_dir =
   let open Lwt_result_syntax in
   protect (fun () ->
       let cemented_blocks_dir_path = Naming.dir_path cemented_blocks_dir in
@@ -178,6 +185,7 @@ let create ~log_size cemented_blocks_dir =
           cemented_block_hash_index;
           cemented_blocks_files;
           metadata_fd_cache;
+          readonly;
         }
       in
       return cemented_store)
@@ -320,6 +328,7 @@ let load ~readonly ~log_size cemented_blocks_dir =
       cemented_block_hash_index;
       cemented_blocks_files;
       metadata_fd_cache;
+      readonly;
     }
   in
   return cemented_store
@@ -340,7 +349,7 @@ let init ?(log_size = default_index_log_size) chain_dir ~readonly =
           (Failed_to_init_cemented_block_store cemented_blocks_dir_path)
       in
       load ~readonly ~log_size cemented_blocks_dir
-  | false -> create ~log_size cemented_blocks_dir
+  | false -> create ~log_size ~readonly cemented_blocks_dir
 
 let close cemented_store =
   (try
