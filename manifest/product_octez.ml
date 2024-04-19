@@ -1948,6 +1948,13 @@ let irmin_tezos =
     ~deps:[fmt; zarith; digestif; irmin; irmin_pack; irmin_pack_unix]
     ~preprocess:[pps ppx_irmin_internal]
 
+let brassaia_tezos =
+  octez_internal_lib
+    "brassaia_tezos"
+    ~path:"brassaia/lib_brassaia_tezos"
+    ~deps:[fmt; zarith; digestif; brassaia; brassaia_pack; brassaia_pack_unix]
+    ~preprocess:[pps ppx_brassaia_internal]
+
 let irmin_test_helpers =
   octez_internal_lib
     "irmin_test_helpers"
@@ -3070,6 +3077,20 @@ let _irmin_tezos_tests =
       [
         irmin_test_helpers;
         irmin_tezos;
+        octez_test_helpers |> open_;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+
+let _brassaia_tezos_tests =
+  tezt
+    ["tezt_main"; "generate"]
+    ~path:"brassaia/test/brassaia-tezos"
+    ~opam:"tezos_internal_brassaia_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        brassaia_test_helpers;
+        brassaia_tezos;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
