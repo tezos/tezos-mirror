@@ -533,8 +533,6 @@ let sequencer_command =
       let* sequencer =
         Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
       in
-      let* pk_uri = Client_keys.neuterize sequencer in
-      let* sequencer_pkh, _ = Client_keys.public_key_hash pk_uri in
       let* configuration =
         let sequencer =
           Configuration.sequencer_config_dft
@@ -543,7 +541,7 @@ let sequencer_command =
             ?time_between_blocks
             ?max_number_of_chunks
             ?private_rpc_port
-            ~sequencer:sequencer_pkh
+            ~sequencer
             ()
         in
         Cli.create_or_read_config
@@ -899,13 +897,13 @@ let make_sequencer_upgrade_command =
          sequencer_str
          () ->
       let wallet_ctxt = register_wallet ~wallet_dir () in
-      let* _pk_uri, sequencer_pk_opt =
+      let* _pk_uri, sequencer_sk_opt =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
       in
       let*? sequencer =
         Option.to_result
           ~none:[error_of_fmt "invalid format or unknown public key."]
-          sequencer_pk_opt
+          sequencer_sk_opt
       in
       let* payload =
         if devmode then
@@ -1105,7 +1103,7 @@ If the  <sequencer-key> is set then adds the configuration for the sequencer
 mode.
 If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
-    (args19
+    (args17
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -1119,14 +1117,12 @@ mode.|}
        time_between_blocks_arg
        max_number_of_chunks_arg
        devmode_arg
-       wallet_dir_arg
        keep_alive_arg
-       (Client_config.password_filename_arg ())
        (Tezos_clic.arg
           ~long:"sequencer-key"
           ~doc:"key to sign the blueprints in sequencer mode."
           ~placeholder:"<alias|tz1..>"
-          Params.string)
+          (Client_keys.sk_uri_parameter ()))
        (Tezos_clic.switch
           ~long:"force"
           ~short:'f'
@@ -1147,32 +1143,23 @@ mode.|}
            time_between_blocks,
            max_number_of_chunks,
            devmode,
-           wallet_dir,
            keep_alive,
-           password_filename,
-           sequencer,
+           sequencer_key,
            force,
            verbose )
          () ->
-      let* sequencer =
-        let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-        let* sequencer_pk_opt =
-          Option.map_es
-            (Client_keys.Public_key_hash.parse_source_string wallet_ctxt)
-            sequencer
-        in
-        match sequencer_pk_opt with
-        | Some sequencer ->
-            return_some
-            @@ Configuration.sequencer_config_dft
-                 ?preimages
-                 ?preimages_endpoint
-                 ?time_between_blocks
-                 ?max_number_of_chunks
-                 ?private_rpc_port
-                 ~sequencer
-                 ()
-        | _ -> return_none
+      let sequencer =
+        Option.map
+          (fun sequencer ->
+            Configuration.sequencer_config_dft
+              ?preimages
+              ?preimages_endpoint
+              ?time_between_blocks
+              ?max_number_of_chunks
+              ?private_rpc_port
+              ~sequencer
+              ())
+          sequencer_key
       in
       let observer =
         Option.map

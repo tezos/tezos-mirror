@@ -50,6 +50,7 @@ let evm_node_config =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_client_base |> open_;
         octez_rpc_http |> open_;
         octez_rpc_http_server;
         octez_stdlib_unix |> open_;

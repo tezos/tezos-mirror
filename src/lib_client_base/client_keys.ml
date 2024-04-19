@@ -114,6 +114,10 @@ let make_pk_uri (x : Uri.t) : pk_uri tzresult =
 
 type sk_uri = Uri.t
 
+let string_of_sk_uri sk_uri = Uri.to_string sk_uri
+
+let sk_uri_of_string str = Uri.of_string str
+
 module CompareUri = Compare.Make (struct
   type t = Uri.t
 

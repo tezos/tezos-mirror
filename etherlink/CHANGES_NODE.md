@@ -50,6 +50,9 @@
   `proxy.rollup_node_endpoint` and `sequencer.rollup_node_endpoint`
   with `rollup_node_endpoint` in the configuration. (!12764)
 - Remove `proxy` in the configuration. (!12764)
+- `sequencer.sequencer` in the configuration now is the secret key
+   instead of the public key hash (e.g. "unencrypted:<edsk...>",
+   "encrypted:...", "tcp://...", ). (!12918)
 
 ### Internal
 

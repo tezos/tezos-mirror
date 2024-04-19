@@ -417,6 +417,10 @@ module V_latest :
 
 include module type of V_latest
 
+val string_of_sk_uri : sk_uri -> string
+
+val sk_uri_of_string : string -> sk_uri
+
 (**/**)
 
 val make_pk_uri : Uri.t -> pk_uri tzresult
