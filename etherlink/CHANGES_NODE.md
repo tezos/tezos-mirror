@@ -12,6 +12,10 @@
   configuration file filled with all the values given in
   argument. (!12764)
 - Add a 'keep_alive' line in the configuration. (!12800)
+- Add a `verbose` line for logs in the configuration. It sets the
+  verbose level of the logs ( `debug`, `info`, `notice`, `warning`,
+  `error`, `fatal`). Command line option `--verbose` set it `debug`,
+  by default it's `info`. (!12917)
 - The transaction pool is now removing any transaction that was included more
   than a defined threshold ago (one hour by default). (!12741)
 - The transaction pool imposes a limit of users permitted simultaneously
