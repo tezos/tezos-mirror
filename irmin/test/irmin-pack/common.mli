@@ -61,15 +61,7 @@ module Alcotest : sig
     unit Lwt.t
 
   val check_raises_lwt : string -> exn -> (unit -> _ Lwt.t) -> unit Lwt.t
-
-  val check_repr :
-    ?pos:Source_code_position.pos ->
-    'a Irmin.Type.t ->
-    string ->
-    'a ->
-    'a ->
-    unit
-
+  val check_repr : 'a Irmin.Type.t -> string -> 'a -> 'a -> unit
   val testable_repr : 'a Irmin.Type.t -> 'a Alcotest.testable
 end
 

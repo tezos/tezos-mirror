@@ -74,7 +74,8 @@ module Util = struct
 
   (** More specific utils from here *)
 
-  let v1_store_archive_dir = "test" / "irmin-pack" / "data" / "version_1"
+  let v1_store_archive_dir =
+    "irmin" / "test" / "irmin-pack" / "data" / "version_1"
 
   (** Find the project root, that contains the v1_store_archive_dir *)
   let project_root () =
@@ -94,8 +95,8 @@ module Util = struct
   let io_get_version ~root : [ `V1 | `V2 | `V3 | `V4 | `V5 ] =
     File_manager.version ~root |> Errs.raise_if_error
 
-  let alco_check_version ~pos ~expected ~actual =
-    Alcotest.check_repr ~pos Irmin_pack.Version.t "" expected actual
+  let alco_check_version ~pos:_ ~expected ~actual =
+    Alcotest.check_repr Irmin_pack.Version.t "" expected actual
 end
 
 open Util
@@ -128,7 +129,6 @@ let test_RO_no_migration () : unit Lwt.t =
   [%log.info "Executing test_RO_no_migration"];
   let open With_existing_store () in
   assert (io_get_version ~root:tmp_dir = `V1);
-
   let* () =
     Alcotest.check_raises_lwt "open V1 store in RO"
       (Irmin_pack_unix.Errors.Pack_error `Migration_needed) (fun () ->

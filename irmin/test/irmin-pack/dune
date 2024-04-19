@@ -1,70 +1,69 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
- (name test_pack)
+ (name irmin_test_irmin_pack_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  octez-libs.tezos-context.memory
+  octez-internal-libs.irmin
+  octez-internal-libs.irmin_test_helpers
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin_tezos
+  octez-libs.test-helpers
+  octez-alcotezt
+  fpath
+  tezt)
+ (preprocess (pps octez-internal-libs.ppx_irmin.internal))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Irmin_test_helpers
+  -open Tezos_test_helpers
+  -open Octez_alcotezt
+  -open Tezt
+  -open Tezt.Base)
  (modules
-  test_pack
-  test_readonly
+  common
+  test
+  test_async
+  test_corrupted
+  test_dispatcher
   test_existing_stores
-  test_inode
-  test_tree
-  test_hashes
-  import
-  test_pack_version_bump
-  test_snapshot
-  test_upgrade
-  test_gc
   test_flush_reload
-  test_ranges
+  test_gc
+  test_hashes
+  test_indexing_strategy
+  test_inode
+  test_lower
   test_mapping
   test_nearest_geq
-  test_dispatcher
-  test_corrupted
-  test_async
-  test_indexing_strategy
-  test_lower)
- (libraries
-  alcotest
-  fmt
-  common
-  index
-  irmin
-  irmin-test
-  irmin-pack
-  irmin-pack.mem
-  irmin-tezos
-  logs
-  lwt
-  lwt.unix
-  fpath
-  hex)
- (preprocess
-  (pps ppx_irmin.internal)))
+  test_pack
+  test_pack_version_bump
+  test_readonly
+  test_ranges
+  test_snapshot
+  test_tree
+  test_upgrade))
 
 (executable
- (name test)
- (modules test)
- (libraries irmin irmin-test test_pack))
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  irmin_test_irmin_pack_tezt_lib
+  tezt)
+ (modules main))
 
 (rule
  (alias runtest)
- ;; Attached to `irmin-tezos` to avoid a cyclic dependency with `irmin-pack`
- (package irmin-tezos)
- (action
-  (run ./test.exe -q --color=always)))
+ (package tezos_internal_irmin_tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe})))
 
-(library
- (name common)
- (modules common)
- (libraries
-  alcotest
-  index
-  irmin
-  irmin-test
-  irmin-pack
-  irmin-pack.unix
-  irmin-tezos
-  logs
-  lwt
-  hex
-  fpath)
- (preprocess
-  (pps ppx_irmin.internal)))
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -32,21 +32,27 @@ let fresh_name =
 
 let create_v1_test_env () =
   let ( / ) = Filename.concat in
-  let root_archive = "test" / "irmin-pack" / "data" / "version_1_large" in
+  let root_archive =
+    "irmin" / "test" / "irmin-pack" / "data" / "version_1_large"
+  in
   let root_local_build = "_build" / "test-v1-gc" in
   setup_test_env ~root_archive ~root_local_build;
   root_local_build
 
 let create_from_v2_always_test_env () =
   let ( / ) = Filename.concat in
-  let root_archive = "test" / "irmin-pack" / "data" / "version_2_to_3_always" in
+  let root_archive =
+    "irmin" / "test" / "irmin-pack" / "data" / "version_2_to_3_always"
+  in
   let root_local_build = "_build" / "test-from-v2-always-gc" in
   setup_test_env ~root_archive ~root_local_build;
   root_local_build
 
 let create_test_env () =
   let ( / ) = Filename.concat in
-  let root_archive = "test" / "irmin-pack" / "data" / "version_3_minimal" in
+  let root_archive =
+    "irmin" / "test" / "irmin-pack" / "data" / "version_3_minimal"
+  in
   let root_local_build = "_build" / "test-gc" in
   setup_test_env ~root_archive ~root_local_build;
   root_local_build
@@ -659,7 +665,8 @@ module Gc_common (B : Gc_backend) = struct
         List.map (fun (f, s) -> (f, Int63.to_int s)) stats.worker.files
       in
       let compare a b = String.compare (fst a) (fst b) in
-      Alcotest.(check (slist (pair string int) compare))
+      Alcotest.(
+        check (Irmin_test_helpers.Common.slist (pair string int) compare))
         "test"
         [
           ("mapping", 72);

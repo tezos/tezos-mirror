@@ -218,7 +218,7 @@ module Alcotest = struct
   let testable_repr t =
     Alcotest.testable (Irmin.Type.pp t) Irmin.Type.(unstage (equal t))
 
-  let check_repr ?pos t = Alcotest.check ?pos (testable_repr t)
+  let check_repr t = Alcotest.check (testable_repr t)
   let kind = testable_repr Irmin_pack.Pack_value.Kind.t
   let hash = testable_repr Schema.Hash.t
 end

@@ -133,7 +133,9 @@ let fold ~order ~force t ~init ~f =
     t init
 
 let equal_slist ~msg l1 l2 =
-  Alcotest.(check (slist (list string) Stdlib.compare)) msg l1 l2
+  Alcotest.(
+    check (Irmin_test_helpers.Common.slist (list string) Stdlib.compare))
+    msg l1 l2
 
 let steps =
   ["00"; "01"; "02"; "03"; "05"; "06"; "07"; "09"; "0a"; "0b"; "0c";
@@ -573,7 +575,7 @@ let test_hardcoded_stream () =
   let f t =
     let path = [ "00100" ] in
     let+ v = Custom.Tree.get t path in
-    Alcotest.(check ~pos:__POS__ string) "" (List.assoc path bindings) v;
+    Alcotest.(check string) "" (List.assoc path bindings) v;
     (t, ())
   in
   let* p, () = Custom.Tree.produce_stream ctxt.repo key f in

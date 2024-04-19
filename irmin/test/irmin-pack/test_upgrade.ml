@@ -18,13 +18,21 @@ open! Import
 open Common
 
 let ( / ) = Filename.concat
-let archive_v2_minimal = "test" / "irmin-pack" / "data" / "version_2_minimal"
-let archive_v2_always = "test" / "irmin-pack" / "data" / "version_2_always"
-let archive_v3_minimal = "test" / "irmin-pack" / "data" / "version_3_minimal"
-let archive_v3_always = "test" / "irmin-pack" / "data" / "version_3_always"
+
+let archive_v2_minimal =
+  "irmin" / "test" / "irmin-pack" / "data" / "version_2_minimal"
+
+let archive_v2_always =
+  "irmin" / "test" / "irmin-pack" / "data" / "version_2_always"
+
+let archive_v3_minimal =
+  "irmin" / "test" / "irmin-pack" / "data" / "version_3_minimal"
+
+let archive_v3_always =
+  "irmin" / "test" / "irmin-pack" / "data" / "version_3_always"
 
 let archive_v3_minimal_gced =
-  "test" / "irmin-pack" / "data" / "version_3_minimal_gced"
+  "irmin" / "test" / "irmin-pack" / "data" / "version_3_minimal_gced"
 
 let root_local_build = "_build" / "test-upgrade"
 

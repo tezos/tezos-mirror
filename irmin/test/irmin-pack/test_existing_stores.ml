@@ -34,7 +34,7 @@ let archive =
 
 let root_v1_archive, root_v1, tmp =
   let open Fpath in
-  ( v "test" / "irmin-pack" / "data" / "version_1" |> to_string,
+  ( v "irmin" / "test" / "irmin-pack" / "data" / "version_1" |> to_string,
     v "_build" / "test_pack_version_1" |> to_string,
     v "_build" / "test_index_reconstruct" |> to_string )
 
@@ -169,7 +169,7 @@ end
 module Test_corrupted_stores = struct
   let root_archive, root =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "corrupted" |> to_string,
+    ( v "irmin" / "test" / "irmin-pack" / "data" / "corrupted" |> to_string,
       v "_build" / "test_integrity" |> to_string )
 
   let setup_env () = setup_test_env ~root_archive ~root_local_build:root
@@ -199,7 +199,8 @@ module Test_corrupted_stores = struct
 
   let root_archive, root_local_build =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "version_3_minimal" |> to_string,
+    ( v "irmin" / "test" / "irmin-pack" / "data" / "version_3_minimal"
+      |> to_string,
       v "_build" / "test_corrupt_minimal" |> to_string )
 
   let setup_env () = setup_test_env ~root_archive ~root_local_build
@@ -261,7 +262,7 @@ end
 module Test_corrupted_inode = struct
   let root_archive, root =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "corrupted_inode" |> to_string,
+    ( v "irmin" / "test" / "irmin-pack" / "data" / "corrupted_inode" |> to_string,
       v "_build" / "test_integrity_inode" |> to_string )
 
   let setup_test_env () = setup_test_env ~root_archive ~root_local_build:root
@@ -295,7 +296,8 @@ end
 module Test_traverse_gced = struct
   let root_archive, root_local_build =
     let open Fpath in
-    ( v "test" / "irmin-pack" / "data" / "version_3_minimal" |> to_string,
+    ( v "irmin" / "test" / "irmin-pack" / "data" / "version_3_minimal"
+      |> to_string,
       v "_build" / "test_reconstruct" |> to_string )
 
   let setup_test_env () = setup_test_env ~root_archive ~root_local_build

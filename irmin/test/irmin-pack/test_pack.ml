@@ -445,13 +445,14 @@ module Branch = struct
     let* v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo" (Some x) v;
     let* br = Branch.list t in
-    Alcotest.(check (slist string compare)) "branches" branches br;
+    Alcotest.(check (Irmin_test_helpers.Common.slist string compare))
+      "branches" branches br;
     Branch.remove t "foo" >>= fun () ->
     let* t = Branch.v ~fresh:false name in
     let* v = Branch.find t "foo" in
     Alcotest.(check (option hash)) "foo none" None v;
     let* br = Branch.list t in
-    Alcotest.(check (slist string compare))
+    Alcotest.(check (Irmin_test_helpers.Common.slist string compare))
       "branches"
       (List.filter (( <> ) "foo") branches)
       br;

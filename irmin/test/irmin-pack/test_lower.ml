@@ -336,7 +336,7 @@ module Store_tc = struct
   let test_migrate_v2 () =
     let ( / ) = Filename.concat in
     let root_archive =
-      "test" / "irmin-pack" / "data" / "version_2_to_3_always"
+      "irmin" / "test" / "irmin-pack" / "data" / "version_2_to_3_always"
     in
     let root = "_build" / "test_lower_migrate_v2" in
     setup_test_env ~root_archive ~root_local_build:root;
@@ -349,7 +349,9 @@ module Store_tc = struct
   let test_migrate_v3 () =
     (* minimal indexing *)
     let ( / ) = Filename.concat in
-    let root_archive = "test" / "irmin-pack" / "data" / "version_3_minimal" in
+    let root_archive =
+      "irmin" / "test" / "irmin-pack" / "data" / "version_3_minimal"
+    in
     let root = "_build" / "test_lower_migrate_v3_minimal" in
     setup_test_env ~root_archive ~root_local_build:root;
     let lower_root = root / "lower" in
@@ -360,7 +362,9 @@ module Store_tc = struct
 
     (* always indexing *)
     let ( / ) = Filename.concat in
-    let root_archive = "test" / "irmin-pack" / "data" / "version_3_always" in
+    let root_archive =
+      "irmin" / "test" / "irmin-pack" / "data" / "version_3_always"
+    in
     let root = "_build" / "test_lower_migrate_v3_always" in
     setup_test_env ~root_archive ~root_local_build:root;
     let lower_root = root / "lower" in
