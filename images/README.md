@@ -86,14 +86,17 @@ script will build the Octez Docker Distribution with the *released*
 set of executables (see `scripts-inputs/released-executables`) and
 without EVM artifacts.
 
-Building the Octez Docker distribution requires the
-[tezos/opam-repository](https://gitlab.com/tezos/opam-repository)
-build-deps images as input. By default, build-deps images of version
-`opam_repository_tag` in `scripts/version.sh` is pulled. To use a
-custom version, for instance when building the build-deps images
-locally, see the parameters `--build-deps-image-name` and
-`--build-deps-image-version` of the script
-`./scripts/create_docker_image.sh`.
+Building the Octez Docker distribution requires the build-deps images
+as input. The definition of these input images can be found in
+`images/opam-repository`, and they can be built locally using
+`./images/create_opam_repository_images.sh.`
+
+By default, the script `./scripts/create_docker_image.sh` looks for a
+version of the build-deps images that corresponds to the current state
+of the checkout (see `images/image_tag.sh` for more info). To use a
+custom version, for instance the build-deps images built in a specific
+pipeline, see the parameters `--build-deps-image-name` and
+`--build-deps-image-version`.
 
 To build the Octez Docker Distribution with EVM artifacts, pass
 `--docker-target with-evm-artifacts` to
@@ -108,9 +111,55 @@ create one. Then specify the `--rust-toolchain-image-name` and
 `./scripts/create_docker_image.sh` accordingly.
 
 For more info on how to configure:
- - including naming of the built images in the Octez Docker distribution;
- - the input images used;
- - the contents of the distribution, and
- - the configuration of the version number reported by included executables;
+ - naming of the built images in the Octez Docker distribution,
+ - input images used,
+ - contents of the distribution, and
+ - configuration of the version number reported by included executables,
 
 see `./scripts/create_docker_image.sh --help`.
+
+## Using `opam-repository` build-deps images from tezos/tezos CI
+
+Like the Octez Docker distribution, the base images are also built in
+the tezos/tezos CI. By default, `./scripts/create_docker_image.sh` is
+configured to pull the build-deps images from the CI if they cannot be
+found locally.
+
+## Using local `opam-repository`  base images
+
+First, build the build-deps `opam-repository` images locally:
+
+```
+$ ./images/create_opam_repository_images.sh
+```
+
+The newly built images will use the same naming scheme as the images
+built in the tezos/tezos CI. Therefore, you can now simply rebuild the
+Octez Docker distribution and it will automatically use the locally
+built build-deps images:
+
+```
+$ ./scripts/create_docker_image.sh
+```
+
+To make this more explicit, run:
+
+```
+$ ./images/create_opam_repository_images.sh \
+    --image-base octez-local-build-deps \
+    --tag-suffix ""
+$ ./scripts/create_docker_image.sh \
+    --build-deps-image-name octez-local-build-deps \
+    --build-deps-image-version "amd64"
+```
+
+The first command will create the set of build-deps images on the following naming scheme:
+
+ - `octez-local-build-deps/runtime-dependencies:amd64`
+ - `octez-local-build-deps/runtime-prebuild-dependencies:amd64`
+ - ...
+
+(These images are always tagged by architecture, and the architecture defaults to amd64).
+
+The parameters to the second command instructs
+`create_docker_image.sh` to use these images as build-deps.
