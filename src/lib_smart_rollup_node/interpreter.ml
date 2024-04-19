@@ -47,6 +47,11 @@ let apply_unsafe_patches (module Plugin : Protocol_plugin_sig.PARTIAL)
   match (node_ctxt.unsafe_patches :> Pvm_patches.unsafe_patch list) with
   | [] -> return state
   | patches ->
+      let*? () =
+        error_unless
+          node_ctxt.config.apply_unsafe_patches
+          (Rollup_node_errors.Needs_apply_unsafe_flag patches)
+      in
       let* whitelist =
         Plugin.Layer1_helpers.find_whitelist
           node_ctxt.cctxt
