@@ -30,7 +30,10 @@ cd "$src_dir"
 
 image_directory="${1:-}"
 if [ ! -f "${image_directory}/inputs" ]; then
-  echo "Argument must be a sub-folder in 'images/' containing an 'inputs' file."
+  echo "Argument must be a path in 'images/' containing an 'inputs' file, i.e. one of:"
+  find "${images_dir}" -mindepth 2 -maxdepth 2 -name inputs -exec dirname \{\} \; | while read -r image_dir; do
+    echo "${image_dir#"${src_dir}"/}"
+  done
   exit 1
 fi
 
