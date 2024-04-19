@@ -65,7 +65,7 @@ let install_finalizer server =
   let* () = Tx_pool.shutdown () in
   Evm_context.shutdown ()
 
-let main (config : Configuration.t) ~rollup_node_endpoint =
+let main ({keep_alive; rollup_node_endpoint; _} as config : Configuration.t) =
   let open Lwt_result_syntax in
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address
@@ -75,7 +75,7 @@ let main (config : Configuration.t) ~rollup_node_endpoint =
   let module Rollup_node_rpc = Rollup_node.Make (struct
     let base = rollup_node_endpoint
 
-    let keep_alive = config.keep_alive
+    let keep_alive = keep_alive
 
     let smart_rollup_address = smart_rollup_address
   end) in

@@ -469,8 +469,7 @@ let proxy_command =
       in
       let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
       let* () =
-        if config.devmode then
-          Evm_node_lib_dev.Proxy.main config ~rollup_node_endpoint
+        if config.devmode then Evm_node_lib_dev.Proxy.main config
         else
           Evm_node_lib_prod.Proxy.main config ~keep_alive ~rollup_node_endpoint
       in
@@ -622,23 +621,10 @@ let sequencer_command =
       in
       let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
       if devmode then
-        let*? sequencer_config =
-          Configuration.sequencer_config_exn configuration
-        in
         Evm_node_lib_dev.Sequencer.main
           ~data_dir
-          ~rollup_node_endpoint
-          ~max_blueprints_lag:
-            sequencer_config.blueprints_publisher_config.max_blueprints_lag
-          ~max_blueprints_ahead:
-            sequencer_config.blueprints_publisher_config.max_blueprints_ahead
-          ~max_blueprints_catchup:
-            sequencer_config.blueprints_publisher_config.max_blueprints_catchup
-          ~catchup_cooldown:
-            sequencer_config.blueprints_publisher_config.catchup_cooldown
           ?genesis_timestamp
           ~cctxt:(wallet_ctxt :> Client_context.wallet)
-          ~sequencer:sequencer_key
           ~configuration
           ?kernel
           ()
@@ -724,13 +710,7 @@ let observer_command =
     init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
-  Observer.main
-    ?kernel_path:kernel
-    ~rollup_node_endpoint
-    ~evm_node_endpoint
-    ~data_dir
-    ~config
-    ()
+  Observer.main ?kernel_path:kernel ~data_dir ~config ()
 
 let make_prod_messages ~kind ~smart_rollup_address data =
   let open Lwt_result_syntax in
