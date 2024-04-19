@@ -45,7 +45,7 @@ let merge
            the profile provided in the config file. *)
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
            Improve profile configuration UX for when we have conflicting CLI and config file. *)
-        Types.merge_profiles
+        Profile_manager.merge_profiles
           ~lower_prio:configuration.profiles
           ~higher_prio:from_cli
   in

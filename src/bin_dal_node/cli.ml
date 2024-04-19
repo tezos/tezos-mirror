@@ -334,7 +334,7 @@ type options = {
   listen_addr : P2p_point.Id.t option;
   public_addr : P2p_point.Id.t option;
   endpoint : Uri.t option;
-  profiles : Types.profiles option;
+  profiles : Profile_manager.t option;
   metrics_addr : P2p_point.Id.t option;
   peers : string list;
   history_mode : Configuration_file.history_mode option;
@@ -367,8 +367,9 @@ let make ~run =
     in
     match (bootstrap_flag, profiles) with
     | false, profiles when Types.is_empty profiles -> run None
-    | true, profiles when Types.is_empty profiles -> run @@ Some Types.Bootstrap
-    | false, profiles -> run @@ Some (Operator profiles)
+    | true, profiles when Types.is_empty profiles ->
+        run @@ Some Profile_manager.bootstrap
+    | false, profiles -> run @@ Some (Profile_manager.operator profiles)
     | true, _ ->
         `Error
           ( false,

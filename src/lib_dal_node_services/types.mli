@@ -282,11 +282,6 @@ val merge_operators :
   operator_profile ->
   operator_profile
 
-(* Merge the two sets of profiles. In case of incompatibility (that is, case
-   [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
-   priority. *)
-val merge_profiles : lower_prio:profiles -> higher_prio:profiles -> profiles
-
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)
 type slot_header = {

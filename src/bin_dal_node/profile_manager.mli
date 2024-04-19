@@ -32,8 +32,25 @@ type t
 (** [is_bootstrap_profile t] returns [true] if the node has a bootstrap profile. *)
 val is_bootstrap_profile : t -> bool
 
+(** [is_prover_profile profile] returns [true] if producing proofs is part of
+    the activity of the provided [profile]. This is the case for observer and
+    slot producers but bootstrap and attester profiles never need to produce
+    proofs. *)
+val is_prover_profile : t -> bool
+
+val encoding : t Data_encoding.t
+
 (** The empty profile manager context. *)
 val empty : t
+
+val bootstrap : t
+
+val operator : Types.operator_profile -> t
+
+(** Merge the two sets of profiles. In case of incompatibility (that is, case
+   [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
+   priority. *)
+val merge_profiles : lower_prio:t -> higher_prio:t -> t
 
 (** [add_operator_profiles t proto_parameters gs_worker operator_profiles]
     registers operator profiles (attester or producer).
@@ -50,11 +67,7 @@ val add_operator_profiles :
     If the current profiles are incompatible with provided [profiles], it
     returns [None]. *)
 val add_profiles :
-  t ->
-  Dal_plugin.proto_parameters ->
-  Gossipsub.Worker.t ->
-  Types.profiles ->
-  t option
+  t -> Dal_plugin.proto_parameters -> Gossipsub.Worker.t -> t -> t option
 
 (** Checks that each producer profile only refers to slot indexes strictly
     smaller than [number_of_slots]. This may not be the case when the profile

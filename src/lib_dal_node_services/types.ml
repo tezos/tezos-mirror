@@ -366,16 +366,6 @@ let merge_operators ?(on_new_attester = fun _ -> ()) op1 op2 =
     observers = op1.observers @ op2.observers;
   }
 
-let merge_profiles ~lower_prio ~higher_prio =
-  match (lower_prio, higher_prio) with
-  | Bootstrap, Bootstrap -> Bootstrap
-  | Operator _, Bootstrap -> Bootstrap
-  | Bootstrap, Operator op -> Operator op
-  | Operator op1, Operator op2 -> Operator (merge_operators op1 op2)
-  | Random_observer, Random_observer -> Random_observer
-  | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
-  | (Operator _ | Bootstrap), Random_observer -> Random_observer
-
 let make_operator_profile ?(attesters = []) ?(producers = []) ?(observers = [])
     () =
   {

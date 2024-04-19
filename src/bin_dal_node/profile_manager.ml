@@ -31,6 +31,10 @@ let empty = Types.(empty_operator)
 
 let encoding = Types.profiles_encoding
 
+let bootstrap = Types.Bootstrap
+
+let operator operator_profile = Types.Operator operator_profile
+
 let is_empty = function
   | Types.Bootstrap -> false
   | Random_observer -> false
@@ -39,6 +43,21 @@ let is_empty = function
 let is_bootstrap_profile = function
   | Types.Bootstrap -> true
   | Random_observer | Operator _ -> false
+
+let is_prover_profile = function
+  | Types.Bootstrap -> false
+  | Types.Random_observer -> true
+  | Types.Operator p -> Types.(is_observer p || is_producer p)
+
+let merge_profiles ~lower_prio ~higher_prio =
+  match (lower_prio, higher_prio) with
+  | Types.Bootstrap, Types.Bootstrap -> Types.Bootstrap
+  | Operator _, Bootstrap -> Bootstrap
+  | Bootstrap, Operator op -> Operator op
+  | Operator op1, Operator op2 -> Operator (Types.merge_operators op1 op2)
+  | Random_observer, Random_observer -> Random_observer
+  | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
+  | (Operator _ | Bootstrap), Random_observer -> Random_observer
 
 let add_operator_profiles t proto_parameters gs_worker
     (operator_profiles : Types.operator_profile) =
