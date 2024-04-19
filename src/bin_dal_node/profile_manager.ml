@@ -47,7 +47,7 @@ let is_bootstrap_profile = function
 let is_prover_profile = function
   | Types.Bootstrap -> false
   | Types.Random_observer -> true
-  | Types.Operator p -> Operator_profile.(is_observer p || is_producer p)
+  | Types.Operator p -> Operator_profile.(has_observer p || has_producer p)
 
 let merge_profiles ~lower_prio ~higher_prio =
   match (lower_prio, higher_prio) with
@@ -176,7 +176,8 @@ let get_default_shard_store_period proto_parameters t =
      during attestation lag period *)
   | Random_observer -> rollup_period
   | Operator op ->
-      if Operator_profile.(is_producer op || is_observer op) then rollup_period
+      if Operator_profile.(has_producer op || has_observer op) then
+        rollup_period
       else attestation_period
   | Bootstrap -> attestation_period
 

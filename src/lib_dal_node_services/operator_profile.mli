@@ -43,17 +43,17 @@ val empty : t
 
 val is_empty : t -> bool
 
-(** [is_attester operator] returns true if there is a public key in the
+(** [has_attester operator] returns true if there is a public key in the
     attester field of [operator] *)
-val is_attester : t -> bool
+val has_attester : t -> bool
 
-(** [is_producer operator] returns true if there is a slot index in the
+(** [has_producer operator] returns true if there is a slot index in the
     producer field of [operator] *)
-val is_producer : t -> bool
+val has_producer : t -> bool
 
-(** [is_observer operator] returns true if there is a slot index in the
+(** [has_observer operator] returns true if there is a slot index in the
     observer field of [operator] *)
-val is_observer : t -> bool
+val has_observer : t -> bool
 
 (** [producer_slot_out_of_bounds n op] returns the first slot index that for
     producer that is not between 0 and n - 1; it returns [None] if no slot

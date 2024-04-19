@@ -35,14 +35,14 @@ let empty =
     observers = Slot_set.empty;
   }
 
-let is_producer {producers; _} = not (Slot_set.is_empty producers)
+let has_producer {producers; _} = not (Slot_set.is_empty producers)
 
-let is_attester {attesters; _} = not (Pkh_set.is_empty attesters)
+let has_attester {attesters; _} = not (Pkh_set.is_empty attesters)
 
-let is_observer {observers; _} = not (Slot_set.is_empty observers)
+let has_observer {observers; _} = not (Slot_set.is_empty observers)
 
 let is_empty op =
-  (not (is_observer op)) && (not (is_attester op)) && not (is_producer op)
+  (not (has_observer op)) && (not (has_attester op)) && not (has_producer op)
 
 let producer_slot_out_of_bounds number_of_slots op =
   Slot_set.find_first (fun i -> i < 0 || i >= number_of_slots) op.producers
