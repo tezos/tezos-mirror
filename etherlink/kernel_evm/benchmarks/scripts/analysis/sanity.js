@@ -60,6 +60,10 @@ function check_bench_all_record(record, acc) {
     if (isNaN(record.nb_tx)) record_error(acc, `missing nb txs`)
     if (isNaN(record.nb_msg)) record_error(acc, `missing nb messages`)
     if (isNaN(record.blueprint_chunks)) record_error(acc, `missing nb of blueprint chunks`)
+    if (isNaN(record.delayed_inputs)) record_error(acc, `missing nb of blueprint chunks`)
+    if(parseInt(record.blueprint_chunks) === 0
+        && parseInt(record.delayed_inputs) === 0)
+        record_error(acc, `no blueprint chunk nor delayed input`)
 }
 
 // record linked to a kernel_run
