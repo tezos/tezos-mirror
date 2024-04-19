@@ -188,7 +188,7 @@ val caboose : block_store -> block_descriptor Lwt.t
 
 val write_caboose : block_store -> block_descriptor -> unit tzresult Lwt.t
 
-val status : block_store -> Block_store_status.t Lwt.t
+val status : block_store -> Block_store_status.Legacy.t Lwt.t
 
 val genesis_block : block_store -> Block_repr.t
 
