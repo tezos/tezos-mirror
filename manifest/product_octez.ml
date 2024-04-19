@@ -4656,13 +4656,20 @@ let octez_risc_v_api =
     ~deps:[octez_risc_v]
     ~dune:Dune.[[S "copy_files"; S "../../risc_v/api/octez_risc_v_api.*"]]
 
-let _octez_risc_v_api_test =
+let octez_risc_v_pvm =
+  public_lib
+    "octez-risc-v-pvm"
+    ~path:"src/lib_risc_v/pvm"
+    ~synopsis:"RISC-V PVM"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_risc_v_api]
+
+let _octez_risc_v_pvm_test =
   tezt
     ["test_main"]
-    ~path:"src/lib_risc_v/api/test"
-    ~opam:"octez-risc-v-api-test"
+    ~path:"src/lib_risc_v/pvm/test"
+    ~opam:"octez-risc-v-pvm-test"
     ~synopsis:"Tests for RISC-V OCaml API"
-    ~deps:[alcotezt; octez_risc_v_api]
+    ~deps:[alcotezt; octez_risc_v_pvm]
 
 let octez_layer2_store =
   octez_l2_lib
@@ -4682,6 +4689,7 @@ let octez_layer2_store =
         octez_context_encoding;
         octez_context_sigs;
         octez_context_helpers;
+        octez_risc_v_pvm;
       ]
     ~linkall:true
     ~conflicts:[Conflicts.checkseum]
@@ -6998,6 +7006,7 @@ let hash = Protocol.hash
             octez_smart_rollup_node_lib |> open_;
             octez_scoru_wasm;
             octez_scoru_wasm_fast;
+            octez_risc_v_pvm |> if_ N.(number >= 020);
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             octez_version_value;
           ]

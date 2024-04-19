@@ -42,6 +42,9 @@ octez-protocol-019-PtParisB-libs	all	2
 octez-protocol-alpha-libs	all	2
 octez-protocol-compiler	exec	6
 octez-proxy-server	exec	1
+octez-risc-v	all	7
+octez-risc-v-api	all	7
+octez-risc-v-pvm	all	6
 octez-rpc-process	all	4
 octez-shell-libs	all	6
 octez-signer	exec	4
@@ -62,7 +65,7 @@ tezos-dac-client-lib	all	4
 tezos-dac-lib	all	4
 tezos-dac-node-lib	all	2
 tezos-dal-node-lib	all	4
-tezos-dal-node-services	all	6
+tezos-dal-node-services	all	7
 tezos-openapi	all	7
 tezos-protocol-000-Ps9mPmXa	all	4
 tezos-protocol-001-PtCJ7pwo	all	4
