@@ -77,7 +77,9 @@ type error +=
 
 type error += Operator_not_in_whitelist
 
-type error += Cannot_patch_pvm_of_public_rollup
+type error +=
+  | Cannot_patch_pvm_of_public_rollup
+  | Needs_apply_unsafe_flag of Pvm_patches.unsafe_patch list
 
 type error += Operator_has_no_staked
 
@@ -447,6 +449,25 @@ let () =
     Data_encoding.unit
     (function Cannot_patch_pvm_of_public_rollup -> Some () | _ -> None)
     (fun () -> Cannot_patch_pvm_of_public_rollup) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.needs_apply_unsafe_flag"
+    ~title:"Needs --apply-unsafe-patches flag for this rollup"
+    ~description:"Needs --apply-unsafe-patches flag for this rollup."
+    ~pp:(fun ppf patches ->
+      Format.fprintf
+        ppf
+        "This rollup requires the application of the following unsafe PVM \
+         patches: @[<v 2>%a.@,\
+         @]The rollup node must be started with option --apply-unsafe-patches \
+         to allow the application of these patches."
+        (Format.pp_print_list Pvm_patches.pp_unsafe_patch)
+        patches)
+    `Permanent
+    Data_encoding.(
+      obj1 (req "patches" (list Pvm_patches.unsafe_patch_encoding)))
+    (function Needs_apply_unsafe_flag p -> Some p | _ -> None)
+    (fun p -> Needs_apply_unsafe_flag p) ;
 
   register_error_kind
     ~id:"sc_rollup.node.operator_has_no_staked"
