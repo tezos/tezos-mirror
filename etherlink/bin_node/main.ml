@@ -195,6 +195,16 @@ let profile_arg =
     ~doc:"Profile the execution of the WASM PVM"
     ()
 
+let omit_delayed_tx_events_arg =
+  Tezos_clic.switch
+    ~long:"omit-delayed-tx-events"
+    ~doc:
+      "Don't populate the delayed transactions in the store of the EVM node. \
+       This is necessary when creating the data dir for an observer EVM node \
+       because delayed transactions are going to be fetched from the \
+       sequencer."
+    ()
+
 let keep_everything_arg =
   Tezos_clic.switch
     ~short:'k'
@@ -999,12 +1009,13 @@ let init_from_rollup_node_command =
   command
     ~desc:
       "initialises the EVM node data-dir using the data-dir of a rollup node."
-    (args2 data_dir_arg devmode_arg)
+    (args3 data_dir_arg devmode_arg omit_delayed_tx_events_arg)
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
-    (fun (data_dir, devmode) rollup_node_data_dir () ->
+    (fun (data_dir, devmode, omit_delayed_tx_events) rollup_node_data_dir () ->
       if devmode then
         Evm_node_lib_dev.Evm_context.init_from_rollup_node
+          ~omit_delayed_tx_events
           ~data_dir
           ~rollup_node_data_dir
       else

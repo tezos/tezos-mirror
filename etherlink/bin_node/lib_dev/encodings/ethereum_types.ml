@@ -1263,15 +1263,20 @@ module Delayed_transaction = struct
       (fun (kind, hash, raw) -> {kind; hash; raw})
       (tup3 encoding_kind hash_encoding (string' Hex))
 
-  let of_rlp_content hash rlp_content =
+  let of_rlp_content ?(transaction_tag = "\x03") hash rlp_content =
     match rlp_content with
     | Rlp.(List [Value tag; content]) -> (
         match (Bytes.to_string tag, content) with
-        (* This is a bit counter intuitive but what we decode is actually
-           the TransactionContent, which is Ethereum|Deposit|DelayedTransaction.
+        (* The new delayed transaction event actually contains the
+           TransactionContent, which is Ethereum|Deposit|DelayedTransaction.
            Transaction cannot be in the delayed inbox by construction, therefore
-           we care only about Deposit and DelayedTransaction. *)
-        | "\x03", Rlp.Value raw_tx ->
+           we care only about Deposit and DelayedTransaction.
+
+           However, we use this function to decode actual delayed inbox item
+           when we initialize from a rollup-node. They contain the same
+           payload but have a different tag for transaction.
+        *)
+        | tag, Rlp.Value raw_tx when tag = transaction_tag ->
             let hash =
               raw_tx |> Bytes.to_string |> hash_raw_tx |> Hex.of_string
               |> Hex.show |> hash_of_string

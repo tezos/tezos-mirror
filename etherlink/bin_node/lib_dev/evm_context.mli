@@ -30,11 +30,16 @@ val start :
   unit ->
   init_status tzresult Lwt.t
 
-(** [init_from_rollup_node ~data_dir ~rollup_node_data_dir]
-    initialises the irmin context and metadata of the evm using the
-    latest known evm state of the given rollup node. *)
+(** [init_from_rollup_node ~omit_delayed_tx_events ~data_dir
+    ~rollup_node_data_dir] initialises the irmin context and metadata
+    of the evm using the latest known evm state of the given rollup
+    node. if [omit_delayed_tx_events] dont populate the delayed tx
+    event from the state into the db. *)
 val init_from_rollup_node :
-  data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
+  omit_delayed_tx_events:bool ->
+  data_dir:string ->
+  rollup_node_data_dir:string ->
+  unit tzresult Lwt.t
 
 (** [reset ~data_dir ~l2_level] reset the sequencer storage to
     [l2_level]. {b Warning: b} Data will be lost ! *)
