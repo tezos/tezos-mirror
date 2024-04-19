@@ -757,6 +757,9 @@ export class Delegate {
   }
 
   set_third_party_staked_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
     this.#storage_third_party_staked_balance_mask[cycle] = value;
     this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
