@@ -102,7 +102,7 @@ impl TranslationState {
             }
         };
 
-        self.base = satp::get_PPN(satp_val).value();
+        self.base = satp::get_PPN(satp_val);
 
         self.mode = match satp::get_MODE(satp_val) {
             None => SATPModeState::Invalid,

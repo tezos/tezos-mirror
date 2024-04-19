@@ -13,8 +13,9 @@
 
 use super::physical_address;
 use crate::{
+    bits::Bits64,
     create_field,
-    machine_state::csregisters::{fields::FieldValue, satp::SvLength, CSRRepr},
+    machine_state::csregisters::{satp::SvLength, CSRRepr},
 };
 use twiddle::Twiddle;
 
@@ -33,12 +34,14 @@ impl PPNField {
     }
 }
 
-impl FieldValue for PPNField {
-    fn new(value: u64) -> Self {
+impl Bits64 for PPNField {
+    const WIDTH: usize = 44;
+
+    fn from_bits(value: u64) -> Self {
         PPNField { raw_bits: value }
     }
 
-    fn raw_bits(&self) -> u64 {
+    fn to_bits(&self) -> u64 {
         self.raw_bits
     }
 }

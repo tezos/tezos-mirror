@@ -12,25 +12,12 @@
 // Allow non snake case for setters & getters
 #![allow(non_snake_case)]
 
-use super::{
-    fields::{FieldProps, FieldValue},
-    ones,
-};
+use super::{fields::FieldProps, ones};
 use crate::{
+    bits::Bits64,
     create_field,
     machine_state::{csregisters::CSRRepr, mode::Mode},
 };
-
-/// Field in `mstatus` for a boolean value
-impl FieldValue for bool {
-    fn new(value: u64) -> Self {
-        (value & 1) == 1
-    }
-
-    fn raw_bits(&self) -> u64 {
-        *self as u64
-    }
-}
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 #[repr(u8)]
@@ -50,8 +37,10 @@ impl From<MPPValue> for Mode {
     }
 }
 
-impl FieldValue for MPPValue {
-    fn new(value: u64) -> Self {
+impl Bits64 for MPPValue {
+    const WIDTH: usize = 2;
+
+    fn from_bits(value: u64) -> Self {
         match value & 0b11 {
             0b00 => MPPValue::User,
             0b01 => MPPValue::Supervisor,
@@ -62,7 +51,7 @@ impl FieldValue for MPPValue {
         }
     }
 
-    fn raw_bits(&self) -> u64 {
+    fn to_bits(&self) -> u64 {
         *self as u8 as u64
     }
 }
@@ -74,8 +63,10 @@ pub enum SPPValue {
     Supervisor = 0b1,
 }
 
-impl FieldValue for SPPValue {
-    fn new(value: u64) -> Self {
+impl Bits64 for SPPValue {
+    const WIDTH: usize = 1;
+
+    fn from_bits(value: u64) -> Self {
         match value & 1 {
             0b0 => SPPValue::User,
             0b1 => SPPValue::Supervisor,
@@ -83,7 +74,7 @@ impl FieldValue for SPPValue {
         }
     }
 
-    fn raw_bits(&self) -> u64 {
+    fn to_bits(&self) -> u64 {
         *self as u8 as u64
     }
 }
@@ -96,12 +87,14 @@ pub enum XLenValue {
     MXL128 = 0b11,
 }
 
-impl FieldValue for XLenValue {
-    fn raw_bits(&self) -> u64 {
+impl Bits64 for XLenValue {
+    const WIDTH: usize = 2;
+
+    fn to_bits(&self) -> u64 {
         *self as u8 as u64
     }
 
-    fn new(value: u64) -> Self {
+    fn from_bits(value: u64) -> Self {
         match value & 0b11 {
             0b01 => XLenValue::MXL32,
             0b10 => XLenValue::MXL64,
@@ -122,8 +115,10 @@ pub enum ExtensionValue {
     Dirty = 0b11,
 }
 
-impl FieldValue for ExtensionValue {
-    fn new(value: u64) -> Self {
+impl Bits64 for ExtensionValue {
+    const WIDTH: usize = 2;
+
+    fn from_bits(value: u64) -> Self {
         match value & 0b11 {
             0b00 => ExtensionValue::Off,
             0b01 => ExtensionValue::Initial,
@@ -133,7 +128,7 @@ impl FieldValue for ExtensionValue {
         }
     }
 
-    fn raw_bits(&self) -> u64 {
+    fn to_bits(&self) -> u64 {
         *self as u8 as u64
     }
 }
@@ -248,32 +243,33 @@ pub fn sstatus_from_mstatus(mstatus: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::csregisters::xstatus::{
-        ExtensionValue, FieldValue, MPPValue, SPPValue, XLenValue,
+    use crate::{
+        bits::Bits64,
+        machine_state::csregisters::xstatus::{ExtensionValue, MPPValue, SPPValue, XLenValue},
     };
 
     #[test]
     fn test_status_fields() {
-        let field = bool::new(0xF0F0_0000_AAAA_0001);
+        let field = bool::from_bits(0xF0F0_0000_AAAA_0001);
         assert!(field);
 
-        let field = bool::new(0x0002);
+        let field = bool::from_bits(0x0002);
         assert!(!field);
 
-        let field = ExtensionValue::new(0b1111_0010);
+        let field = ExtensionValue::from_bits(0b1111_0010);
         assert_eq!(field, ExtensionValue::Clean);
-        assert_eq!(field.raw_bits(), 0b10);
+        assert_eq!(field.to_bits(), 0b10);
 
-        let field = XLenValue::new(0b01);
+        let field = XLenValue::from_bits(0b01);
         assert_eq!(field, XLenValue::MXL32);
-        assert_eq!(field.raw_bits(), 0b01);
+        assert_eq!(field.to_bits(), 0b01);
 
-        let field = MPPValue::new(0b1010);
+        let field = MPPValue::from_bits(0b1010);
         assert_eq!(field, MPPValue::User);
-        assert_eq!(field.raw_bits(), 0b00);
+        assert_eq!(field.to_bits(), 0b00);
 
-        let field = SPPValue::new(0b111);
+        let field = SPPValue::from_bits(0b111);
         assert_eq!(field, SPPValue::Supervisor);
-        assert_eq!(field.raw_bits(), 0b1);
+        assert_eq!(field.to_bits(), 0b1);
     }
 }
