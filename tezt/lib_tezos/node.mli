@@ -111,6 +111,19 @@ type tls_config = {certificate_path : string; key_path : string}
 (** Tezos node states. *)
 type t
 
+(** This placeholder aims to handle the activation of the external RPC
+    process for the Tezt nodes. Indeed, the external RPC process is an
+    important feature that is not activated by default in the node and
+    thus not tested on the CI. The tests on master are thus not
+    testing the feature. To test the external RPC process anyway, a
+    scheduled pipeline is launched every week, with the feature
+    enabled, running all tests.
+    When the scheduled pipeline is launched, the TZ_SCHEDULE_KIND
+    environment variable is set to "EXTENDED_RPC_TESTS" to turn on the
+    external RPC process. Look for the [ci/bin/rpc_pipeline.ml] file
+    for more details. *)
+val enable_external_rpc_process : bool
+
 (** Create a node.
 
     This function just creates the [t] value, it does not call
