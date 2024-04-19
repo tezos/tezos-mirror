@@ -137,6 +137,37 @@ module Rpc = struct
       "calls"
 end
 
+module Tx_pool = struct
+  let () =
+    CollectorRegistry.register_lwt
+      registry
+      MetricInfo.
+        {
+          name =
+            MetricName.v (String.concat "_" [namespace; subsystem; "tx_pool"]);
+          help = "Metrics about transaction pool content";
+          metric_type = Gauge;
+          label_names = [LabelName.v "kind"];
+        }
+      (fun () ->
+        let open Lwt_syntax in
+        let+ size_info = Tx_pool.size_info () in
+        let number_of_addresses, number_of_transactions =
+          match size_info with
+          | Ok {number_of_addresses; number_of_transactions} ->
+              ( Int.to_float number_of_addresses,
+                Int.to_float number_of_transactions )
+          | Error _ -> (0., 0.)
+        in
+        LabelSetMap.of_list
+          [
+            ( ["number_of_addresses"],
+              [Prometheus.Sample_set.sample number_of_addresses] );
+            ( ["number_of_transactions"],
+              [Prometheus.Sample_set.sample number_of_transactions] );
+          ])
+end
+
 type t = {chain : Chain.t; block : Block.t}
 
 let metrics =

@@ -61,3 +61,7 @@ val unlock_transactions : unit -> unit tzresult Lwt.t
 
 (** [is_locked] checks if the pools is locked. *)
 val is_locked : unit -> bool tzresult Lwt.t
+
+type size_info = {number_of_addresses : int; number_of_transactions : int}
+
+val size_info : unit -> size_info tzresult Lwt.t
