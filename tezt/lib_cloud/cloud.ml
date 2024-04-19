@@ -133,7 +133,9 @@ let register ?vms ~__FILE__ ~title ~tags ?seed f =
                  address)) ;
       let* website =
         if Cli.website then
-          let* website = Web.start ~port:Cli.website_port ~agents in
+          let* website =
+            Web.start ~port:Cli.website_port ~deployement ~agents
+          in
           Lwt.return_some website
         else Lwt.return_none
       in

@@ -128,60 +128,80 @@ let clean_up_vms ~tags =
     ~title:"Clean ups VMs manually"
     ~tags:("clean" :: "up" :: tags)
   @@ fun () ->
-  let* () = Terraform.VM.init () in
-  let* points = Terraform.VM.points () in
-  let n = List.length points in
-  let tezt_cloud = Lazy.force Env.tezt_cloud in
-  let names =
-    Seq.ints 1 |> Seq.take n
-    |> Seq.map (fun i -> Format.asprintf "%s-%03d" tezt_cloud i)
-    |> List.of_seq
-  in
-  let* zone = Terraform.VM.zone () in
-  (* We restart the main docker image and kill/remove all the other ones. *)
-  let* () =
-    names
-    |> Lwt_list.iter_p (fun vm_name ->
-           let*! output =
-             Gcloud.compute_ssh
-               ~zone
-               ~vm_name
-               "docker"
-               ["ps"; "--format"; "{{.Names}}"]
-           in
-           let images_name =
-             String.split_on_char '\n' output
-             |> List.filter (fun str -> str <> "")
-           in
-           let main_image, other_images =
-             List.partition (fun str -> str <> "netdata") images_name
-           in
-           if List.length main_image <> 1 then
-             Test.fail
-               "Unexpected setting. All the docker images found: %s. There \
-                should only be one image which is not 'netdata' in this list"
-               (String.concat ";" images_name) ;
-           let main_image = List.hd main_image in
-           let*! _ =
-             Gcloud.compute_ssh ~zone ~vm_name "docker" ["stop"; main_image]
-           in
-           let*! _ =
-             Gcloud.compute_ssh ~zone ~vm_name "docker" ["start"; main_image]
-           in
-           let* () =
-             other_images
-             |> Lwt_list.iter_p (fun image ->
-                    let*! _ =
-                      Gcloud.compute_ssh ~zone ~vm_name "docker" ["kill"; image]
-                    in
-                    let*! _ =
-                      Gcloud.compute_ssh ~zone ~vm_name "docker" ["rm"; image]
-                    in
-                    Lwt.return_unit)
-           in
-           Lwt.return_unit)
-  in
-  unit
+  let* workspaces = Terraform.VM.Workspace.get () in
+  workspaces
+  |> Lwt_list.iter_s (fun workspace ->
+         let* () = Terraform.VM.Workspace.select workspace in
+         let* () = Terraform.VM.init () in
+         let* points = Terraform.VM.points () in
+         let n = List.length points in
+         let names =
+           Seq.ints 1 |> Seq.take n
+           |> Seq.map (fun i -> Format.asprintf "%s-%03d" workspace i)
+           |> List.of_seq
+         in
+         let* zone = Terraform.VM.zone () in
+         (* We restart the main docker image and kill/remove all the other ones. *)
+         let* () =
+           names
+           |> Lwt_list.iter_p (fun vm_name ->
+                  let*! output =
+                    Gcloud.compute_ssh
+                      ~zone
+                      ~vm_name
+                      "docker"
+                      ["ps"; "--format"; "{{.Names}}"]
+                  in
+                  let images_name =
+                    String.split_on_char '\n' output
+                    |> List.filter (fun str -> str <> "")
+                  in
+                  let main_image, other_images =
+                    List.partition (fun str -> str <> "netdata") images_name
+                  in
+                  if List.length main_image <> 1 then
+                    Test.fail
+                      "Unexpected setting. All the docker images found: %s. \
+                       There should only be one image which is not 'netdata' \
+                       in this list"
+                      (String.concat ";" images_name) ;
+                  let main_image = List.hd main_image in
+                  let*! _ =
+                    Gcloud.compute_ssh
+                      ~zone
+                      ~vm_name
+                      "docker"
+                      ["stop"; main_image]
+                  in
+                  let*! _ =
+                    Gcloud.compute_ssh
+                      ~zone
+                      ~vm_name
+                      "docker"
+                      ["start"; main_image]
+                  in
+                  let* () =
+                    other_images
+                    |> Lwt_list.iter_p (fun image ->
+                           let*! _ =
+                             Gcloud.compute_ssh
+                               ~zone
+                               ~vm_name
+                               "docker"
+                               ["kill"; image]
+                           in
+                           let*! _ =
+                             Gcloud.compute_ssh
+                               ~zone
+                               ~vm_name
+                               "docker"
+                               ["rm"; image]
+                           in
+                           Lwt.return_unit)
+                  in
+                  Lwt.return_unit)
+         in
+         unit)
 
 let simple ~tags =
   Cloud.register
