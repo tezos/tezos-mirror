@@ -51,11 +51,34 @@ let precheck_pass = true
 
 let precheck_fail = false
 
-(** Requester-specific Alcotest testable instantiations *)
+(** Requester-specific testable instantiations *)
+
+let value_typ : Parameters.value Check.typ = Check.int
 
 let testable_test_value : Parameters.value Alcotest.testable = Alcotest.int
+let key_typ : Parameters.key Check.typ = Check.string
 
 let testable_test_key : Parameters.key Alcotest.testable = Alcotest.string
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7152
+   replace this typ by one using ['a tzresult typ]
+*)
+let value_tzresult_typ : Parameters.value Error_monad.tzresult Check.typ =
+  let open Check in
+  let pp fmt = function
+    | Ok x -> Format.fprintf fmt "@[<hov 2>Ok@ (%d)@]" x
+    | Error x ->
+        Format.fprintf fmt "@[<hov 2>Error@ (%a)@]" Error_monad.pp_print_trace x
+  in
+  let cmp =
+    Result.compare
+      ~ok:Stdlib.Int.compare
+      ~error:
+        (List.compare (fun x y ->
+             Stdlib.String.compare
+               (Error_monad.find_info_of_error x).id
+               (Error_monad.find_info_of_error y).id))
+  in
+  comparable pp cmp
 
 (** Test helpers *)
 
