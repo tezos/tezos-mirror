@@ -84,6 +84,9 @@ val wait_first : t -> (Block_hash.t * Block_header.t) Lwt.t
     independently of how they were processed by the current process. *)
 val get_latest_head : t -> (Block_hash.t * Block_header.t) option
 
+(** [get_status t] returns the connection status to the L1 node. *)
+val get_status : t -> [`Connected | `Disconnected | `Reconnecting]
+
 (** {2 Helper functions for the Layer 1 chain} *)
 
 (** [get_predecessor_opt ?max_read state head] returns the predecessor of block

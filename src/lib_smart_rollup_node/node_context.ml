@@ -98,6 +98,7 @@ type sync_info = {
 type 'a t = {
   config : Configuration.t;
   cctxt : Client_context.full;
+  degraded : ('a, bool) Reference.t;
   dal_cctxt : Dal_node_client.cctxt option;
   dac_client : Dac_observer_client.t option;
   data_dir : string;
@@ -214,6 +215,7 @@ let dal_supported node_ctxt =
 let readonly (node_ctxt : _ t) =
   {
     node_ctxt with
+    degraded = Reference.readonly node_ctxt.degraded;
     store = Store.readonly node_ctxt.store;
     context = Context.readonly node_ctxt.context;
     lcc = Reference.readonly node_ctxt.lcc;

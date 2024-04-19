@@ -353,6 +353,12 @@ let wait_first l1_ctxt =
 
 let get_latest_head l1_ctxt = l1_ctxt.last_seen
 
+let get_status l1_ctxt =
+  match l1_ctxt.status with
+  | Connected _ -> `Connected
+  | Connecting _ -> `Reconnecting
+  | Disconnected -> `Disconnected
+
 (** [predecessors_of_blocks hashes] given a list of successive block hashes,
     from newest to oldest, returns an associative list that associates a hash to
     its predecessor in this list. *)

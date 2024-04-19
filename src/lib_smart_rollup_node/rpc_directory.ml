@@ -100,8 +100,86 @@ module Admin_directory = Make_directory (struct
 end)
 
 let () =
-  Root_directory.register0 Rollup_node_services.Root.health
+  Root_directory.register0 Rollup_node_services.Root.ping
   @@ fun _node_ctxt () () -> Lwt_result_syntax.return_unit
+
+let () =
+  Root_directory.register0 Rollup_node_services.Root.health
+  @@ fun node_ctxt () () ->
+  let open Lwt_result_syntax in
+  let degraded = Reference.get node_ctxt.degraded in
+  let l1_connection = Layer1.get_status node_ctxt.Node_context.l1_ctxt in
+  let* l2_head = Node_context.last_processed_head_opt node_ctxt in
+  let l1_head = Layer1.get_latest_head node_ctxt.l1_ctxt in
+  let l1_blocks_late =
+    match (l1_head, l2_head) with
+    | None, _ | _, None -> 0l
+    | Some l1, Some l2 -> Int32.sub l1.header.level l2.header.level
+  in
+  let publisher_worker =
+    match Publisher.worker_status () with
+    | (`Running | `Crashed _) as st -> [("publisher", st)]
+    | `Not_running -> []
+  in
+  let batcher_worker =
+    match Batcher.worker_status () with
+    | (`Running | `Crashed _) as st -> [("batcher", st)]
+    | `Not_running -> []
+  in
+  let refutation_coordinator_worker =
+    match Refutation_coordinator.worker_status () with
+    | (`Running | `Crashed _) as st -> [("refutation_coordinator", st)]
+    | `Not_running -> []
+  in
+  let refutation_player_workers =
+    Refutation_player.current_games ()
+    |> List.map (fun (opponent, _w) ->
+           ( Format.asprintf
+               "refutation_player (against %a)"
+               Signature.Public_key_hash.pp
+               opponent,
+             `Running ))
+  in
+  let injector_workers =
+    Injector.running_worker_tags ()
+    |> List.map (fun tags ->
+           ( Format.sprintf
+               "injector (%s)"
+               (String.concat ", " (List.map Operation_kind.to_string tags)),
+             `Running ))
+  in
+  let active_workers =
+    publisher_worker @ batcher_worker @ refutation_coordinator_worker
+    @ refutation_player_workers @ injector_workers
+  in
+  let l1_likely_late =
+    match l1_head with
+    | None -> true
+    | Some {header = {timestamp; _}; _} ->
+        Time.Protocol.diff Time.System.(to_protocol @@ now ()) timestamp > 60L
+  in
+  let healthy =
+    (not degraded) && l1_connection = `Connected && l1_blocks_late <= 1l
+    && (not l1_likely_late)
+    && List.for_all (fun (_name, st) -> st = `Running) active_workers
+  in
+  return
+    Rollup_node_services.
+      {
+        healthy;
+        degraded;
+        l1 =
+          {
+            connection = l1_connection;
+            blocks_late = l1_blocks_late;
+            last_seen_head =
+              Option.map
+                (fun Layer1.{hash; level; header = {timestamp; _}} ->
+                  (hash, level, timestamp))
+                l1_head;
+          };
+        active_workers;
+      }
 
 let () =
   Root_directory.register0 Rollup_node_services.Root.version

@@ -27,7 +27,6 @@
 
 type state = {
   mutable plugin : (module Protocol_plugin_sig.S);
-  mutable degraded : bool;
   rpc_server : Rpc_server.t;
   configuration : Configuration.t;
   node_ctxt : Node_context.rw;
@@ -349,7 +348,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let*! () = Daemon_event.new_heads_processed reorg.new_chain in
   let* () = Batcher.produce_batches () in
   let*! () = Injector.inject ~header:head.header () in
-  state.degraded <- false ;
+  Reference.set node_ctxt.degraded false ;
   return_unit
 
 let daemonize state =
@@ -375,7 +374,8 @@ let degraded_refutation_loop state (head : Layer1.header) =
   return_unit
 
 let refutation_loop state (head : Layer1.header) =
-  if state.degraded then degraded_refutation_loop state head
+  if Reference.get state.node_ctxt.degraded then
+    degraded_refutation_loop state head
   else simple_refutation_loop head
 
 let rec refutation_daemon ?(restart = false) state =
@@ -520,7 +520,7 @@ let rec process_daemon ({node_ctxt; _} as state) =
   in
   let error_to_degraded_mode e =
     let*! () = Daemon_event.error e in
-    state.degraded <- true ;
+    Reference.set node_ctxt.degraded true ;
     if node_ctxt.config.no_degraded then fatal_error_exit e
     else
       let*! () =
@@ -809,8 +809,6 @@ let run ~data_dir ~irmin_cache_size ~index_buffer_size ?log_kernel_debug_file
       ~cors:configuration.cors
       dir
   in
-  let state =
-    {node_ctxt; rpc_server; configuration; plugin; degraded = false}
-  in
+  let state = {node_ctxt; rpc_server; configuration; plugin} in
   let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
   run state

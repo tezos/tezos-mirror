@@ -65,3 +65,6 @@ val register_messages : string list -> L2_message.id list tzresult Lwt.t
     known by the batcher (the batcher only keeps the batched status of the last
     500000 messages). *)
 val message_status : L2_message.id -> (status * string) option tzresult
+
+(** Returns the status of the publisher worker  *)
+val worker_status : unit -> [`Running | `Not_running | `Crashed of error]
