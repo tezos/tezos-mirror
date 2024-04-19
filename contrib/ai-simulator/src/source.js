@@ -698,6 +698,7 @@ export class Delegate {
   #storage_own_staked_balance_mask = [];
   #storage_third_party_staked_balance_mask = [];
   #storage_own_spendable_balance_mask = [];
+  #storage_third_party_delegated_balance_mask = [];
 
   constructor(simulator, config) {
     this.simulator = simulator;
@@ -734,7 +735,10 @@ export class Delegate {
   }
 
   #third_party_delegated_balance(cycle) {
-    return this.#storage_third_party_delegated_balance[cycle];
+    return (
+      this.#storage_third_party_delegated_balance_mask[cycle] ??
+      this.#storage_third_party_delegated_balance[cycle]
+    );
   }
 
   // The storage_cache_index is used to register what are the values
@@ -748,7 +752,7 @@ export class Delegate {
   }
 
   set_third_party_delegated_balance(cycle, value) {
-    this.#storage_third_party_delegated_balance[cycle] = value;
+    this.#storage_third_party_delegated_balance_mask[cycle] = value;
     this.#storage_cache_index = Math.min(this.#storage_cache_index, cycle);
   }
 
@@ -1024,7 +1028,7 @@ export class Delegate {
         this.#storage_own_spendable_balance_mask[0] ?? 0;
 
       this.#storage_third_party_delegated_balance[0] =
-        this.#storage_third_party_delegated_balance[0] ?? 0;
+        this.#storage_third_party_delegated_balance_mask[0] ?? 0;
 
       return;
     }
@@ -1048,7 +1052,7 @@ export class Delegate {
         rewards.estimated_rewards_from_delegating;
 
     this.#storage_third_party_delegated_balance[cycle] =
-      this.#storage_third_party_delegated_balance[cycle] ??
+      this.#storage_third_party_delegated_balance_mask[cycle] ??
       this.#storage_third_party_delegated_balance[cycle - 1];
   }
 
