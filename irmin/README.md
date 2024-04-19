@@ -40,6 +40,7 @@ purposes that are using the `irmin` libraries.
 | `irmin-mem`    | `./test/irmin-mem` | [`test/irmin-mem`](https://github.com/mirage/irmin/tree/main/test/irmin-mem) |
 | `irmin`    | `./test/irmin` | [`test/irmin`](https://github.com/mirage/irmin/tree/main/test/irmin) |
 | `irmin-tezos`    | `./test/irmin-tezos` | [`test/irmin-tezos`](https://github.com/mirage/irmin/tree/main/test/irmin-tezos) |
+| `irmin-pack`    | `./test/irmin-pack  | [`test/irmin-pack`](https://github.com/mirage/irmin/tree/main/test/irmin-pack) |
 
 
 ## To-do before modifying the code

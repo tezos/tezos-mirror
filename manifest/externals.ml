@@ -116,6 +116,8 @@ let fmt_cli = external_sublib fmt "fmt.cli"
 
 let fmt_tty = external_sublib fmt "fmt.tty"
 
+let fpath = external_lib "fpath" V.True
+
 let hacl_star =
   external_lib
     ~js_compatible:true
