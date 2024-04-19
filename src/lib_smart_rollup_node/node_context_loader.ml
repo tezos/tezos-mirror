@@ -171,6 +171,9 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
         })
       last_whitelist_update
   in
+  let*? unsafe_patches =
+    Pvm_patches.make kind rollup_address configuration.unsafe_pvm_patches
+  in
   let sync = create_sync_info () in
   let node_ctxt =
     {
@@ -185,6 +188,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       lpc = Reference.new_ lpc;
       private_info = Reference.new_ private_info;
       kind;
+      unsafe_patches;
       injector_retention_period = 0;
       block_finality_time = 2;
       lockfile;
@@ -254,6 +258,7 @@ module For_snapshots = struct
           fee_parameters = Configuration.default_fee_parameters;
           mode;
           loser_mode;
+          unsafe_pvm_patches = [];
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
           dac_timeout = None;
@@ -297,6 +302,10 @@ module For_snapshots = struct
     in
     let global_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
+    let*? unsafe_patches =
+      (* Only consider hardcoded patches for snapshot validation. *)
+      Pvm_patches.make metadata.kind metadata.rollup_address []
+    in
     return
       {
         config;
@@ -310,6 +319,7 @@ module For_snapshots = struct
         lpc = Reference.new_ lpc;
         private_info = Reference.new_ None;
         kind = metadata.kind;
+        unsafe_patches;
         injector_retention_period = 0;
         block_finality_time = 2;
         lockfile;
@@ -354,6 +364,7 @@ module Internal_for_tests = struct
           fee_parameters = Configuration.default_fee_parameters;
           mode;
           loser_mode;
+          unsafe_pvm_patches = [];
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
           dac_timeout = None;
@@ -411,6 +422,7 @@ module Internal_for_tests = struct
     in
     let global_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
+    let*? unsafe_patches = Pvm_patches.make kind rollup_address [] in
     return
       {
         config;
@@ -424,6 +436,7 @@ module Internal_for_tests = struct
         lpc;
         private_info = Reference.new_ None;
         kind;
+        unsafe_patches;
         injector_retention_period = 0;
         block_finality_time = 2;
         current_protocol;

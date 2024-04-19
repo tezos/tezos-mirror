@@ -56,6 +56,9 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Support for unsafely increasing the WASM PVM's tick limit of a rollup.
+  (MR :gl:`!12907`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

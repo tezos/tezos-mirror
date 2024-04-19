@@ -172,3 +172,17 @@ module Wasm_2_0_0 = struct
       ~init
       ~f:(fun a b c -> f a (to_node_pvmstate b) c)
 end
+
+module Unsafe = struct
+  let apply_patch (kind : Octez_smart_rollup.Kind.t) state
+      (patch : Pvm_patches.unsafe_patch) =
+    let open Lwt_result_syntax in
+    let open (val Pvm.of_kind kind) in
+    let*? patch = Unsafe_patches.of_patch patch in
+    let* state =
+      protect @@ fun () ->
+      Unsafe_patches.apply (Ctxt_wrapper.of_node_pvmstate state) patch
+      |> Lwt_result.ok
+    in
+    return (Ctxt_wrapper.to_node_pvmstate state)
+end
