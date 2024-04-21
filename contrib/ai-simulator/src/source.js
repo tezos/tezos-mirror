@@ -1106,4 +1106,20 @@ export class Delegate {
     this.set_own_staked_balance(cycle, new_staked);
     this.set_own_spendable_balance(cycle, new_spendable);
   }
+
+  set_ratio_third_party_staked_delegated_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
+    if (this.config.delegate_policy.limit_of_staking_over_baking == 0) {
+      return;
+    }
+    const staked = this.#third_party_staked_balance(cycle);
+    const delegated = this.#third_party_delegated_balance(cycle);
+    const den = staked + delegated;
+    const new_staked = Math.round((value / 100) * den);
+    const new_delegated = den - new_staked;
+    this.set_third_party_staked_balance(cycle, new_staked);
+    this.set_third_party_delegated_balance(cycle, new_delegated);
+  }
 }
