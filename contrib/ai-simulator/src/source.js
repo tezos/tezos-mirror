@@ -1083,4 +1083,14 @@ export class Delegate {
         (this.#own_staked_balance(cycle) + this.#own_spendable_balance(cycle)))
     );
   }
+
+  ratio_third_party_staked_delegated_balance(cycle) {
+    this.#prepare_for(cycle);
+    return (
+      100 *
+      (this.#third_party_staked_balance(cycle) /
+        (this.#third_party_delegated_balance(cycle) +
+          this.#third_party_staked_balance(cycle)))
+    );
+  }
 }
