@@ -890,13 +890,16 @@ export class Delegate {
 
     const ratio_denum = considered_staked.times(2).add(considered_delegated);
 
-    const ratio_for_staking = ratio_denum.isZero()
-      ? bigRat.zero
-      : bigRat(considered_staked.times(2)).divide(ratio_denum);
+    const ratio_for_staking =
+      ratio_denum.isZero() || !this.simulator.is_ai_activated(adjusted_cycle)
+        ? bigRat.zero
+        : bigRat(considered_staked.times(2)).divide(ratio_denum);
 
     const ratio_for_delegating = ratio_denum.isZero()
       ? bigRat.zero
-      : bigRat(considered_delegated).divide(ratio_denum);
+      : !this.simulator.is_ai_activated(adjusted_cycle)
+        ? bigRat.one
+        : bigRat(considered_delegated).divide(ratio_denum);
 
     return { baking_power, ratio_for_staking, ratio_for_delegating };
   }
