@@ -295,12 +295,28 @@ export class Simulator {
   }
 
   set_staked_ratio_at(cycle, value) {
-    const ratio = bigRat.clip(bigRat(value), bigRat.zero, bigRat.one);
-    const total_supply = this.total_supply(cycle);
-    const res = ratio.multiply(total_supply).ceil();
-    const i = cycle + this.config.proto.consensus_rights_delay + 1;
-    this.#storage_total_staked_mask[i] = res;
+    this.#prepare_for(cycle);
+    this.#storage_issuance_bonus = [];
     this.#storage_cache_index = Math.min(cycle, this.#storage_cache_index);
+
+    const ratio = bigRat.clip(bigRat(value), bigRat.zero, bigRat.one);
+    const i = cycle + this.config.proto.consensus_rights_delay + 1;
+
+    const total_supply = this.#storage_total_supply[i];
+    const total_staked = this.#storage_total_staked[i];
+    const total_delegated = this.#storage_total_delegated[i];
+
+    const new_value = ratio.multiply(total_supply).ceil();
+
+    const diff_staked = new_value - total_staked;
+    const diff_delegated = this.#storage_total_delegated[i] - diff_staked;
+
+    const new_delegated = Math.max(diff_delegated, 0);
+    const new_staked =
+      diff_delegated < 0 ? new_value + diff_delegated : new_value;
+
+    this.#storage_total_staked_mask[i] = new_staked;
+    this.#storage_total_delegated_mask[i] = new_delegated;
   }
 
   staked_ratio_for_next_cycle(cycle) {
