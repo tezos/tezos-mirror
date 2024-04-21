@@ -820,7 +820,10 @@ export class Delegate {
       ? bigInt.zero
       : stake_diff.negate();
 
-    const available_staked = stake_diff.isPositive() ? stake_diff : bigInt.zero;
+    const available_staked =
+      this.simulator.is_ai_activated(cycle) && stake_diff.isPositive()
+        ? stake_diff
+        : bigInt.zero;
 
     const own_delegated = bigInt(this.#own_spendable_balance(cycle));
     const third_party_delegated = bigInt(
