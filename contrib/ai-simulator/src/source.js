@@ -1093,4 +1093,17 @@ export class Delegate {
           this.#third_party_staked_balance(cycle)))
     );
   }
+
+  set_ratio_own_staked_spendable_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
+    const staked = this.#own_staked_balance(cycle);
+    const spendable = this.#own_spendable_balance(cycle);
+    const den = staked + spendable;
+    const new_staked = Math.round((value / 100) * den);
+    const new_spendable = den - new_staked;
+    this.set_own_staked_balance(cycle, new_staked);
+    this.set_own_spendable_balance(cycle, new_spendable);
+  }
 }
