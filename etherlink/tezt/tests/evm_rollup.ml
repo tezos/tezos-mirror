@@ -329,6 +329,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     let output_config = Temp.file "config.yaml" in
     let*! () =
       Evm_node.make_kernel_installer_config
+        ~remove_whitelist:Option.(is_some whitelist)
         ?kernel_root_hash
         ~bootstrap_accounts
         ?da_fee_per_byte
@@ -5473,16 +5474,12 @@ let test_tx_pool_transaction_size_exceeded =
 let test_whitelist_is_executed =
   let rollup_operator_key = Constant.bootstrap1.public_key_hash in
   let whitelist = [rollup_operator_key] in
-  let additional_config =
-    [Installer_kernel_config.Set {value = ""; to_ = "/evm/remove_whitelist"}]
-  in
   let commitment_period = 5 and challenge_window = 5 in
   register_both
     ~challenge_window
     ~commitment_period
     ~whitelist
     ~rollup_operator_key
-    ~additional_config
     ~tags:["evm"; "whitelist"; "update"]
     ~title:
       "Check that the kernel submit a whitelist update message when flag is \

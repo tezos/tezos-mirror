@@ -27,6 +27,7 @@ val make :
   ?sequencer_pool_address:string * string ->
   ?maximum_allowed_ticks:string * string ->
   ?maximum_gas_per_transaction:string * string ->
+  ?remove_whitelist:string * string ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

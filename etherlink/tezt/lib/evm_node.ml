@@ -820,14 +820,16 @@ let wait_termination (evm_node : t) =
       let* _status = Process.wait process in
       unit
 
-let make_kernel_installer_config ?kernel_root_hash ?chain_id ?bootstrap_balance
-    ?bootstrap_accounts ?sequencer ?delayed_bridge ?ticketer ?administrator
-    ?sequencer_governance ?kernel_governance ?kernel_security_governance
-    ?minimum_base_fee_per_gas ?(da_fee_per_byte = Wei.zero)
-    ?delayed_inbox_timeout ?delayed_inbox_min_levels ?sequencer_pool_address
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction ~output () =
+let make_kernel_installer_config ?(remove_whitelist = false) ?kernel_root_hash
+    ?chain_id ?bootstrap_balance ?bootstrap_accounts ?sequencer ?delayed_bridge
+    ?ticketer ?administrator ?sequencer_governance ?kernel_governance
+    ?kernel_security_governance ?minimum_base_fee_per_gas
+    ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ~output () =
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
+    @ Cli_arg.optional_switch "remove-whitelist" remove_whitelist
     @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
     @ Cli_arg.optional_arg "chain-id" string_of_int chain_id
     @ Cli_arg.optional_arg "sequencer" Fun.id sequencer
