@@ -98,7 +98,7 @@ let fetched_slot =
     ~section
     ~name:"reconstructed_slot"
     ~msg:"reconstructed slot: size {size}, shards {shards}"
-    ~level:Notice
+    ~level:Info
     ("size", Data_encoding.int31)
     ("shards", Data_encoding.int31)
 
@@ -187,7 +187,7 @@ let stored_slot_content =
     ~section
     ~name:"stored_slot_content"
     ~msg:"slot stored: commitment {commitment}"
-    ~level:Notice
+    ~level:Info
     ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
 
