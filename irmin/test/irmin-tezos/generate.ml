@@ -76,7 +76,8 @@ module Generator = struct
 end
 
 let register_test title f =
-  Tezt.Test.register ~__FILE__ ~tags:[ "irmin"; "store" ] ~title @@ f
+  Tezt.Test.register ~__FILE__ ~tags:[ Tag.layer1; "irmin"; "store" ] ~title
+  @@ f
 
 let register () =
   register_test "create store (minimal indexing strategy)" (fun () ->
