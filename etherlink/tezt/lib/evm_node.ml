@@ -567,6 +567,8 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
 
 let spawn_command evm_node args =
   Process.spawn
+    ~name:evm_node.name
+    ~color:evm_node.color
     ?runner:evm_node.persistent_state.runner
     (Uses.path Constant.octez_evm_node)
   @@ args
