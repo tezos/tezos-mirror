@@ -34,6 +34,12 @@ type mode =
       preimages_dir : string;
       rollup_node_endpoint : string;
     }
+  | Threshold_encryption_observer of {
+      initial_kernel : string;
+      preimages_dir : string;
+      rollup_node_endpoint : string;
+      bundler_node_endpoint : string;
+    }
   | Sequencer of {
       initial_kernel : string;
       preimage_dir : string option;
@@ -87,11 +93,13 @@ let mode t = t.persistent_state.mode
 let is_sequencer t =
   match t.persistent_state.mode with
   | Sequencer _ -> true
-  | Observer _ | Proxy _ -> false
+  | Observer _ | Threshold_encryption_observer _ | Proxy _ -> false
 
 let initial_kernel t =
   match t.persistent_state.mode with
-  | Sequencer {initial_kernel; _} | Observer {initial_kernel; _} ->
+  | Sequencer {initial_kernel; _}
+  | Observer {initial_kernel; _}
+  | Threshold_encryption_observer {initial_kernel; _} ->
       initial_kernel
   | Proxy _ ->
       Test.fail
@@ -99,7 +107,7 @@ let initial_kernel t =
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
-  | Sequencer _ | Observer _ -> true
+  | Sequencer _ | Observer _ | Threshold_encryption_observer _ -> true
   | Proxy _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port () =
@@ -394,6 +402,8 @@ let create ?name ?runner ?(mode = Proxy {devmode = false}) ?data_dir ?rpc_addr
     | Proxy _ -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
     | Observer _ -> "observer_" ^ fresh_name ()
+    | Threshold_encryption_observer _ ->
+        "threshold_encryption_observer_" ^ fresh_name ()
   in
   let name = Option.value ~default:(new_name ()) name in
   let data_dir =
@@ -444,6 +454,16 @@ let run_args evm_node =
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Observer {initial_kernel; _} ->
         ["run"; "observer"; "--initial-kernel"; initial_kernel]
+    | Threshold_encryption_observer {initial_kernel; bundler_node_endpoint; _}
+      ->
+        [
+          "run";
+          "observer";
+          "--initial-kernel";
+          initial_kernel;
+          "--bundler-node-endpoint";
+          bundler_node_endpoint;
+        ]
   in
   mode_args @ shared_args
 
@@ -574,6 +594,23 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
+    | Threshold_encryption_observer
+        {
+          preimages_dir;
+          initial_kernel = _;
+          rollup_node_endpoint;
+          bundler_node_endpoint;
+        } ->
+        [
+          "--evm-node-endpoint";
+          evm_node.persistent_state.endpoint;
+          "--rollup-node-endpoint";
+          rollup_node_endpoint;
+          "--bundler-node-endpoint";
+          bundler_node_endpoint;
+          "--preimages-dir";
+          preimages_dir;
+        ]
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
@@ -588,6 +625,9 @@ let endpoint ?(private_ = false) (evm_node : t) =
           Test.fail "Sequencer doesn't have a private RPC server"
       | Proxy _ -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
+      | Threshold_encryption_observer _ ->
+          Test.fail
+            "Threshold encryption observer doesn't have a private RPC server"
     else
       ( evm_node.persistent_state.rpc_addr,
         evm_node.persistent_state.rpc_port,

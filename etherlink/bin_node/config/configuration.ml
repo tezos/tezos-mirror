@@ -33,6 +33,7 @@ type sequencer = {
 
 type observer = {
   evm_node_endpoint : Uri.t;
+  threshold_encryption_bundler_endpoint : Uri.t option;
   preimages : string;
   preimages_endpoint : Uri.t option;
 }
@@ -140,9 +141,11 @@ let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
     blueprints_publisher_config;
   }
 
-let observer_config_dft ?preimages ?preimages_endpoint ~evm_node_endpoint () =
+let observer_config_dft ?preimages ?preimages_endpoint ~evm_node_endpoint
+    ?threshold_encryption_bundler_endpoint () =
   {
     evm_node_endpoint;
+    threshold_encryption_bundler_endpoint;
     preimages = Option.value ~default:default_preimages preimages;
     preimages_endpoint;
   }
@@ -250,18 +253,33 @@ let sequencer_encoding =
 let observer_encoding =
   let open Data_encoding in
   conv
-    (fun {preimages; preimages_endpoint; evm_node_endpoint} ->
-      (preimages, preimages_endpoint, Uri.to_string evm_node_endpoint))
-    (fun (preimages, preimages_endpoint, evm_node_endpoint) ->
+    (fun {
+           preimages;
+           preimages_endpoint;
+           evm_node_endpoint;
+           threshold_encryption_bundler_endpoint;
+         } ->
+      ( preimages,
+        preimages_endpoint,
+        Uri.to_string evm_node_endpoint,
+        threshold_encryption_bundler_endpoint ))
+    (fun ( preimages,
+           preimages_endpoint,
+           evm_node_endpoint,
+           threshold_encryption_bundler_endpoint ) ->
       {
         preimages;
         preimages_endpoint;
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
+        threshold_encryption_bundler_endpoint;
       })
-    (obj3
+    (obj4
        (dft "preimages" string default_preimages)
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
-       (req "evm_node_endpoint" string))
+       (req "evm_node_endpoint" string)
+       (opt
+          "threshold_encryption_bundler_endpoint"
+          Tezos_rpc.Encoding.uri_encoding))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -404,9 +422,10 @@ module Cli = struct
       ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
       ~keep_alive ~rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown () =
+      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -431,6 +450,7 @@ module Cli = struct
             ?preimages
             ?preimages_endpoint
             ~evm_node_endpoint
+            ?threshold_encryption_bundler_endpoint
             ())
         evm_node_endpoint
     in
@@ -471,9 +491,10 @@ module Cli = struct
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
       ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown configuration =
+      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -555,6 +576,10 @@ module Cli = struct
                 Option.value
                   ~default:observer_config.evm_node_endpoint
                   evm_node_endpoint;
+              threshold_encryption_bundler_endpoint =
+                (match threshold_encryption_bundler_endpoint with
+                | None -> observer_config.threshold_encryption_bundler_endpoint
+                | endpoint -> endpoint);
             }
       | None ->
           Option.map
@@ -563,6 +588,7 @@ module Cli = struct
                 ?preimages
                 ?preimages_endpoint
                 ~evm_node_endpoint
+                ?threshold_encryption_bundler_endpoint
                 ())
             evm_node_endpoint
     in
@@ -618,7 +644,8 @@ module Cli = struct
       ?cors_headers ?tx_pool_timeout_limit ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit ~keep_alive ?rollup_node_endpoint ~verbose
       ?preimages ?preimages_endpoint ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint ?max_blueprints_lag
+      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       () =
@@ -652,6 +679,7 @@ module Cli = struct
           ~keep_alive
           ?sequencer_key
           ?evm_node_endpoint
+          ?threshold_encryption_bundler_endpoint
           ?preimages
           ?preimages_endpoint
           ?time_between_blocks
@@ -688,6 +716,7 @@ module Cli = struct
           ~keep_alive
           ?sequencer_key
           ?evm_node_endpoint
+          ?threshold_encryption_bundler_endpoint
           ?preimages
           ?preimages_endpoint
           ?time_between_blocks

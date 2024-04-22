@@ -12,6 +12,7 @@
    Component:    Smart Optimistic Rollups: Etherlink Sequencer
    Requirement:  make -f etherlink.mk build
                  npm install eth-cli
+                 make dsn-sequencer
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_sequencer.ml
 *)
 
@@ -43,6 +44,9 @@ let uses _protocol =
     Constant.octez_evm_node;
     Constant.smart_rollup_installer;
     Constant.WASM.evm_kernel;
+    (* TODO Once we successfully integrate the octez-dsn-node executable into
+       the build toolchain, we uncomment the constant below. *)
+    (* Constant.octez_dsn_node; *)
   ]
 
 open Helpers
@@ -150,8 +154,8 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(sequencer = Constant.bootstrap1) ?sequencer_pool_address
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction protocol
-    =
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?(threshold_encryption = false) protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -224,17 +228,29 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
   let* sequencer =
     Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
-  let* observer =
-    Evm_node.init
-      ~mode:
-        (Observer
+  let* mode =
+    if threshold_encryption then
+      let* bundler =
+        Dsn_node.bundler ~endpoint:(Evm_node.endpoint sequencer) ()
+      in
+      return
+        (Evm_node.Threshold_encryption_observer
+           {
+             initial_kernel = output;
+             preimages_dir;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             bundler_node_endpoint = Dsn_node.endpoint bundler;
+           })
+    else
+      return
+        (Evm_node.Observer
            {
              initial_kernel = output;
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
            })
-      (Evm_node.endpoint sequencer)
   in
+  let* observer = Evm_node.init ~mode (Evm_node.endpoint sequencer) in
   let* proxy =
     Evm_node.init
       ~mode:(Proxy {devmode})
@@ -1303,17 +1319,24 @@ let test_observer_applies_blueprint_when_restarted =
 
   unit
 
-let test_observer_forwards_transaction =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "observer"; "transaction"]
-    ~title:"Observer forwards transaction"
-    ~uses
-  @@ fun protocol ->
+let test_observer_forwards_transaction ?(threshold_encryption = false) =
+  let tags =
+    List.append
+      (if threshold_encryption then ["threshold_encryption"] else [])
+      ["evm"; "observer"; "transaction"]
+  in
+  let title =
+    "Observer forwards transaction"
+    ^ if threshold_encryption then "to bundler" else ""
+  in
+  Protocol.register_test ~__FILE__ ~tags ~title ~uses @@ fun protocol ->
   (* Start the evm node *)
   let tbb = 1. in
   let* {sequencer = sequencer_node; observer = observer_node; _} =
-    setup_sequencer ~time_between_blocks:(Time_between_blocks tbb) protocol
+    setup_sequencer
+      ~time_between_blocks:(Time_between_blocks tbb)
+      ~threshold_encryption
+      protocol
   in
   (* Ensure the sequencer has produced the block. *)
   let* () =
@@ -2942,6 +2965,9 @@ let () =
   test_observer_applies_blueprint protocols ;
   test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_forwards_transaction protocols ;
+  (* TODO Once we successfully integrate the octez-dsn-node executable into
+     the build toolchain, we can revisit and reactivate the test below. *)
+  (* test_observer_forwards_transaction ~threshold_encryption:true protocols ; *)
   test_sequencer_is_reimbursed protocols ;
   test_upgrade_kernel_auto_sync protocols ;
   test_self_upgrade_kernel protocols ;

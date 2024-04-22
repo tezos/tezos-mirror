@@ -53,6 +53,7 @@ type sequencer = {
 
 type observer = {
   evm_node_endpoint : Uri.t;
+  threshold_encryption_bundler_endpoint : Uri.t option;
   preimages : string;
   preimages_endpoint : Uri.t option;
 }
@@ -121,6 +122,7 @@ val observer_config_dft :
   ?preimages:string ->
   ?preimages_endpoint:Uri.t ->
   evm_node_endpoint:Uri.t ->
+  ?threshold_encryption_bundler_endpoint:Uri.t ->
   unit ->
   observer
 
@@ -144,6 +146,7 @@ module Cli : sig
     ?private_rpc_port:int ->
     ?sequencer_key:Client_keys.sk_uri ->
     ?evm_node_endpoint:Uri.t ->
+    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
@@ -174,6 +177,7 @@ module Cli : sig
     ?private_rpc_port:int ->
     ?sequencer_key:Client_keys.sk_uri ->
     ?evm_node_endpoint:Uri.t ->
+    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?max_blueprints_lag:int ->
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->

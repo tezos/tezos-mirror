@@ -55,6 +55,8 @@ let octez_smart_rollup_node =
 
 let octez_evm_node = Uses.make ~tag:"evm_node" ~path:"./octez-evm-node"
 
+let octez_dsn_node = Uses.make ~tag:"dsn_node" ~path:"./octez-dsn-node"
+
 let octez_signer = Uses.make ~tag:"signer" ~path:"./octez-signer"
 
 let octez_injector_server =
