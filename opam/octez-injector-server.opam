@@ -13,7 +13,7 @@ depends: [
   "octez-libs" { = version }
   "octez-injector" { = version }
   "octez-shell-libs" { = version }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
+  "data-encoding" { = "1.0.1" }
 ]
 depopts: [
   "tezos-injector-018-Proxford"

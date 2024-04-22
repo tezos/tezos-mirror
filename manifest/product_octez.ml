@@ -10,6 +10,7 @@
 open Manifest
 open Externals
 open Internals
+open Product_data_encoding
 
 include Product (struct
   let name = "octez"

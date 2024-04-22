@@ -93,13 +93,6 @@ let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
 let ctypes_stubs_js = external_lib ~js_compatible:true "ctypes_stubs_js" V.True
 
-let data_encoding =
-  external_lib
-    ~js_compatible:true
-    ~main_module:"Data_encoding"
-    "data-encoding"
-    V.(at_least "1.0.1" && less_than "1.1")
-
 let digestif = external_lib "digestif" V.True
 
 let dune_configurator = external_lib "dune-configurator" V.True
@@ -148,12 +141,6 @@ let ipaddr =
     V.(at_least "5.3.0" && less_than "6.0.0")
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
-
-let json_data_encoding =
-  external_lib
-    ~js_compatible:true
-    "json-data-encoding"
-    V.(at_least "1.0.1" && less_than "1.1")
 
 let jsonm = external_lib "jsonm" V.True
 

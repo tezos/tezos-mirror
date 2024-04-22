@@ -14,7 +14,7 @@ depends: [
   "caqti"
   "caqti-dynload"
   "caqti-lwt" { >= "2.0.1" }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
+  "data-encoding" { = "1.0.1" }
   "lwt" { >= "5.7.0" }
   "octez-protocol-alpha-libs" { = version }
   "octez-shell-libs" { = version }

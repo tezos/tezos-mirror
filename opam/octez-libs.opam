@@ -16,7 +16,7 @@ depends: [
   "qcheck-alcotest" { >= "0.20" }
   "lwt" { >= "5.7.0" }
   "pure-splitmix" { = "0.3" }
-  "data-encoding" { >= "1.0.1" & < "1.1" }
+  "data-encoding" { = "1.0.1" }
   "ppx_expect"
   "hex" { >= "1.3.0" }
   "zarith" { >= "1.13" & < "1.14" }
