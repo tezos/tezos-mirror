@@ -1054,6 +1054,7 @@ let test_delayed_deposit_from_init_rollup_node =
     let mode = Evm_node.mode sequencer in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~devmode:true
@@ -1112,6 +1113,7 @@ let test_init_from_rollup_node_data_dir =
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config evm_node' in
   let* () =
     (* bake 2 blocks so rollup context is for the finalized l1 level
        and can't be reorged. *)
@@ -1191,6 +1193,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config evm_node' in
   let* () =
     (* bake 2 blocks so rollup context is for the finalized l1 level
        and can't be reorged. *)
@@ -2246,6 +2249,7 @@ let test_sequencer_upgrade =
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
 
   let* _ = Evm_node.wait_for_shutdown_event sequencer
   and* () =
@@ -2322,11 +2326,13 @@ let test_sequencer_diverge =
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
   let observer_bis =
     Evm_node.create
       ~mode:(Evm_node.mode observer)
       (Evm_node.endpoint sequencer_bis)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config observer_bis in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~devmode:true
@@ -2861,6 +2867,7 @@ let test_preimages_endpoint =
       ~mode:sequencer_mode_without_preimages_dir
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
   let* () =
     repeat 2 (fun () ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
