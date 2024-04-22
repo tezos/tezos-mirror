@@ -429,20 +429,25 @@ Missing edge cases:
 
 ### `LSR: nat : nat`
 
-- [lsr_00.tzt](lsr_00.tzt)
-- [lsr_01.tzt](lsr_01.tzt)
-- [lsr_02.tzt](lsr_02.tzt)
-- [lsr_03.tzt](lsr_03.tzt)
-- [lsr_04.tzt](lsr_04.tzt)
-- [lsr_05.tzt](lsr_05.tzt)
-
-Missing edge cases:
-
-- No zero shift test for non-zero argument
+- [lsr_nat_00.tzt](lsr_nat_00.tzt)
+- [lsr_nat_01.tzt](lsr_nat_01.tzt)
+- [lsr_nat_02.tzt](lsr_nat_02.tzt)
+- [lsr_nat_03.tzt](lsr_nat_03.tzt)
+- [lsr_nat_04.tzt](lsr_nat_04.tzt)
+- [lsr_nat_05.tzt](lsr_nat_05.tzt)
+- [lsr_nat_06.tzt](lsr_nat_06.tzt)
+- [lsr_nat_07.tzt](lsr_nat_07.tzt)
 
 ### `LSR: bytes : nat`
 
-***None***
+- [lsr_bytes_00.tzt](lsr_bytes_00.tzt)
+- [lsr_bytes_01.tzt](lsr_bytes_01.tzt)
+- [lsr_bytes_02.tzt](lsr_bytes_02.tzt)
+- [lsr_bytes_03.tzt](lsr_bytes_03.tzt)
+- [lsr_bytes_04.tzt](lsr_bytes_04.tzt)
+- [lsr_bytes_05.tzt](lsr_bytes_05.tzt)
+- [lsr_bytes_06.tzt](lsr_bytes_06.tzt)
+- [lsr_bytes_07.tzt](lsr_bytes_07.tzt)
 
 ### `LT`
 
@@ -1339,7 +1344,6 @@ Instructions with no tests:
 - `LAMBDA_REC`
 - `LAMBDA`
 - `LEVEL`
-- `LSR: bytes : nat`
 - `MAP: option ty`
 - `MIN_BLOCK_TIME`
 - `MUL: bls12_381_fr : bls12_381_fr`
@@ -1400,7 +1404,6 @@ Instructions with missing edge cases:
 - `IF_NONE` -- check that stack tail is preserved
 - `IF` -- check that stack tail is preserved
 - `ISNAT` for positive argument
-- `LSR: nat : nat` zero shift for non-zero argument
 - `MUL: int : int` 0 * x
 - `MUL: int : int` negative * negative
 - `MUL: int : int` negative * positive
