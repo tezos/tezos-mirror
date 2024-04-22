@@ -1,0 +1,123 @@
+
+./octez-client rpc list
+
+Available services:
+  
+  - POST /commitments
+      Add a slot in the node's context if not already present. The
+      corresponding commitment is returned. 
+  + commitments/<DAL_commitment>/
+    - GET /commitments/<DAL_commitment>/headers
+        Return the known headers for the slot whose commitment is given. 
+    - GET /commitments/<DAL_commitment>/proof
+        Compute the proof associated with a commitment. 
+    - PUT /commitments/<DAL_commitment>/shards
+        Compute and save the shards of the slot associated to the given
+        commitment. If the input's flag is true, the shard proofs are also
+        computed. 
+    - GET /commitments/<DAL_commitment>/slot
+        Retrieve the content of the slot associated with the given
+        commitment. 
+  - GET /levels/<int32>/headers
+      Return the known headers for the given published level. 
+  - GET /levels/<int32>/slot_indices/<int>/commitment
+      Return the accepted commitment associated to the given slot index and
+      published at the given level. 
+  + p2p/
+    - POST /p2p/connect
+        Connect to a new peer. 
+    + gossipsub/
+      - GET /p2p/gossipsub/backoffs
+          Get the backoffs of the peers with a backoff, per topic. 
+      - GET /p2p/gossipsub/connections
+          Get this node's currently active connections. 
+      - GET /p2p/gossipsub/message_cache
+          Get the number of message ids in the message cache, grouped by
+          heartbeat tick and topic. 
+      - GET /p2p/gossipsub/scores
+          Get the scores of the peers with a known score. 
+      - GET /p2p/gossipsub/topics
+          Get the topics this node is currently subscribed to. 
+      - GET /p2p/gossipsub/topics/peers
+          Get an association list between each topic subscribed to by the
+          connected peers and the remote peers subscribed to that topic. If
+          the 'subscribed' flag is given, then restrict the output to the
+          topics this node is subscribed to. 
+    + peers/
+      - GET /p2p/peers/by-id/<peer_id>
+          Get info of the requested peer 
+      - PATCH /p2p/peers/by-id/<peer_id>
+          Change the permissions of a given peer. With `{acl: ban}`:
+          blacklist the given peer and remove it from the whitelist if
+          present. With `{acl: open}`: removes the peer from the blacklist
+          and whitelist. With `{acl: trust}`: trust the given peer
+          permanently and remove it from the blacklist if present. The peer
+          cannot be blocked (but its host IP still can). In all cases, the
+          updated information for the peer is returned. If input is omitted,
+          this is equivalent to using the `GET` version of this RPC. 
+      - DELETE /p2p/peers/disconnect/<peer_id>
+          Disconnect from a peer. 
+      - GET /p2p/peers/info
+          Get list of known peers and their corresponding info. 
+      - GET /p2p/peers/list
+          By default, get the list of known peers. When the 'connected' flag
+          is given, then only get the connected peers. 
+    + points/
+      - GET /p2p/points/by-id/<point>
+          Get info of the requested point 
+      - DELETE /p2p/points/disconnect/<point>
+          Disconnect from a point. 
+      - GET /p2p/points/info
+          By default, get the list of known points and their corresponding
+          info. When the 'connected' flag is given, then only get the
+          connected points. 
+  - POST /pages/<int>/proof
+      Compute the proof associated with a page of a given slot. 
+  - /plugin <dynamic>
+  - GET /profiles
+      Return the list of current profiles tracked by the DAL node. 
+  - PATCH /profiles
+      Update the list of profiles tracked by the DAL node. Note that it does
+      not take the bootstrap profile as it is incompatible with other
+      profiles. 
+  - GET /profiles/<pkh>/attested_levels/<int32>/assigned_shard_indices
+      Return the shard indexes assigned to the given public key hash at the
+      given level. 
+  - GET /profiles/<pkh>/attested_levels/<int32>/attestable_slots
+      Return the currently attestable slots at the given attested level by
+      the given public key hash. A slot is attestable at level [l] if it is
+      published at level [l - attestation_lag] and *all* the shards assigned
+      at level [l] to the given public key hash are available in the DAL
+      node's store. 
+  - GET /shard/<DAL_commitment>/<int>
+      Fetch shard as bytes 
+  - POST /slot
+      Post a slot to the DAL node, computes its commitment and commitment
+      proof, then computes the correspoding shards with their proof. The
+      result of this RPC can be directly used to publish a slot header. 
+  - GET /slot/pages/<DAL_commitment>
+      Fetch slot as list of pages 
+  - GET /version
+      version 
+
+
+Dynamic parameter description:
+  
+  int
+  int32
+  <pkh>
+      A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded) 
+  int
+  <point>
+      A network point (ipv4:port or [ipv6]:port). 
+  <peer_id>
+      A cryptographic node identity (Base58Check-encoded) 
+  int
+  int32
+  <DAL_commitment>
+      DAL_commitment (Base58Check-encoded) 
+
+Warning:
+  Failed to acquire the protocol version from the node
+  Did not find service: GET http://[HOST]:[PORT]/chains/main/blocks/head/protocols
+

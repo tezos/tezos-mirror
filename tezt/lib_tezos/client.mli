@@ -262,10 +262,11 @@ module Spawn : sig
 end
 
 (** Run [octez-client rpc list]. *)
-val rpc_list : ?endpoint:endpoint -> t -> string Lwt.t
+val rpc_list : ?endpoint:endpoint -> ?hooks:Process.hooks -> t -> string Lwt.t
 
 (** Same as [rpc_list], but do not wait for the process to exit. *)
-val spawn_rpc_list : ?endpoint:endpoint -> t -> Process.t
+val spawn_rpc_list :
+  ?endpoint:endpoint -> ?hooks:Process.hooks -> t -> Process.t
 
 (** Run [octez-client rpc schema]. *)
 val rpc_schema :
@@ -657,7 +658,7 @@ val bake_until_level :
   be different from the target cycle if the "blocks_per_cycle" value changes
   during the execution, for instance because of a protocol migration.
 
-  Fail if the node is already at [target_cycle] or higher. 
+  Fail if the node is already at [target_cycle] or higher.
 
   @param keys See {!bake_for}.
 
