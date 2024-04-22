@@ -25,10 +25,10 @@ capability.
 
 This means that, unlike other blockchains like Bitcoin or Ethereum, Tezos comes to consensus not only about the state of its ledger, but also about how the protocol and the nodes should adapt and upgrade.
 
-This is a fundamental design choice, allowing Tezos to be seamlessly upgradable and continuosly evolving.
+This is a fundamental design choice, allowing Tezos to be seamlessly upgradable and continuously evolving.
 Due to this feature, Tezos is built to last, and always stay at the leading edge of blockchain technology.
 
-To learn more about Tezos, the `Tezos documentation <https://tezos.com>`__.
+To learn more about Tezos, see <https://tezos.com>.
 
 To learn more about how Octez & the protocol fit into Tezos and its ecosystem, see :doc:`introduction/tezos`.
 
@@ -40,9 +40,9 @@ To learn more about how Octez & the protocol fit into Tezos and its ecosystem, s
     <summary><img alt="Getting started" class="normal" src="getting_started_2.png" style="width:min(95%,1000px); cursor: pointer;" />
     </summary><div style="max-width:min(90%,1000px); margin-top:1em; margin-left:2em">
 
-**Newcomer to Octez?** Start participating to Tezos using Octez!
+**Newcomer to Octez?** Start participating in Tezos using Octez!
 
-Start participating to Tezos by following the ``Introduction`` section in the documentation menu.
+Start participating in Tezos by following the ``Introduction`` section in the documentation menu.
 
 These tutorials explain:
 
