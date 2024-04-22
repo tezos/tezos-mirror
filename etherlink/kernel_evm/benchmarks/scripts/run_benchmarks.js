@@ -282,9 +282,9 @@ async function analyze_profiler_output(path) {
     results.sputnik_runtime_ticks = await get_ticks(path, "EvmHandler.*Host.*execute");
     results.store_transaction_object_ticks = await get_ticks(path, "storage.*store_transaction_object");
     results.store_receipt_ticks = await get_ticks(path, "store_transaction_receipt");
-    results.interpreter_init_ticks = await get_ticks(path, "interpreter(init)");
-    results.interpreter_decode_ticks = await get_ticks(path, "interpreter(decode)");
-    results.stage_one_ticks = await get_ticks(path, "stage_one.*fetch");
+    results.interpreter_init_ticks = await get_ticks(path, /interpreter\(init\)/);
+    results.interpreter_decode_ticks = await get_ticks(path, /interpreter\(decode\)/);
+    results.stage_one_ticks = await get_ticks(path, "stage_one.*fetch_blueprints");
     results.block_finalize = await get_ticks(path, "store_current_block");
     results.logs_to_bloom = await get_ticks(path, "logs_to_bloom");
     results.block_in_progress_store_ticks = await get_ticks(path, "store_block_in_progress");
