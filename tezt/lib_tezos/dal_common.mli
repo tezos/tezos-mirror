@@ -87,6 +87,20 @@ module Helpers : sig
   val store_slot_uri :
     Endpoint.t -> ?with_proof:bool -> slot -> (string * string) Lwt.t
 
+  (* Publish and store the slot on the corresponding DAL node. *)
+  val publish_and_store_slot :
+    ?dont_wait:bool ->
+    ?with_proof:bool ->
+    ?counter:int ->
+    ?force:bool ->
+    ?fee:int ->
+    Client.t ->
+    Dal_node.t ->
+    Account.key ->
+    index:int ->
+    slot ->
+    string Lwt.t
+
   val pp_cryptobox_error :
     Format.formatter ->
     [ `Fail of string
