@@ -28,7 +28,7 @@
 - Add a `verbose` line for logs in the configuration. It sets the
   verbose level of the logs ( `debug`, `info`, `notice`, `warning`,
   `error`, `fatal`). Command line option `--verbose` set it `debug`,
-  by default it's `info`. (!12917)
+  by default it's `notice`. (!12917, !12345)
 - The transaction pool is now removing any transaction that was included more
   than a defined threshold ago (one hour by default). (!12741)
 - The transaction pool imposes a limit of users permitted simultaneously

@@ -463,7 +463,7 @@ module Cli = struct
           tx_pool_tx_per_addr_limit;
       keep_alive;
       rollup_node_endpoint;
-      verbose = (if verbose then Debug else Internal_event.Level.default);
+      verbose = (if verbose then Debug else Internal_event.Notice);
     }
 
   let patch_configuration_from_args ~devmode ?rpc_addr ?rpc_port ?cors_origins
