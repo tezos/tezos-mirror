@@ -1214,3 +1214,7 @@ let serve_files ?(on_request = fun _ -> ()) ~name ~port ~root f =
     serve
   in
   Lwt.finalize f stopper
+
+let ticks_per_snapshot = function
+  | Protocol.Alpha -> 55_000_000_000_000
+  | Oxford | Paris -> 11_000_000_000
