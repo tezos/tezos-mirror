@@ -51,7 +51,7 @@ async function processFile(filename, { analysis_acc, graph_acc, sanity_acc }) {
         }))
     for await (const record of parser) {
         // Work with each record
-        analysis.process_record(record, analysis_acc)
+        analysis.process_record(record, analysis_acc, sanity_acc)
         graphs.process_record(record, graph_acc)
         sanity.check_record(record, sanity_acc)
     }

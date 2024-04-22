@@ -17,6 +17,7 @@ const hashing = require('./hashing')
 const tmp = require("tmp");
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const PDFDocument = require('pdfkit');
+const { warn } = require('console')
 
 const number_formatter_compact = Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'long' });
 const number_formatter = Intl.NumberFormat('en', {});
@@ -135,19 +136,23 @@ async function print_analysis({ filename, report, analysis_acc }, dir) {
     return error_hashing + error_bip_loading + error_stage_one + error_block_finalization + error_register + error_reboot
 }
 
-function process_record(record, acc) {
-    if (is_transaction(record)) process_transaction_record(record, acc)
-    else if (is_scenario(record)) process_bench_record(record, acc)
-    else if (is_blueprint_reading(record)) process_blueprint_reading_record(record, acc)
-    else if (is_run(record)) process_run_record(record, acc)
-    else console.log("[WARNING] couldn't sort record " + JSON.stringify(record))
+function process_record(record, acc, sanity_acc) {
+    if (is_transaction(record)) process_transaction_record(record, acc, sanity_acc)
+    else if (is_scenario(record)) process_bench_record(record, acc, sanity_acc)
+    else if (is_blueprint_reading(record)) process_blueprint_reading_record(record, acc, sanity_acc)
+    else if (is_run(record)) process_run_record(record, acc, sanity_acc)
+    else {
+        let error = `[WARNING] couldn't sort record ${JSON.stringify(record)}`;
+        sanity_acc.push(error);
+        console.log(error);
+    }
 }
 
-function process_blueprint_reading_record(record, acc){
+function process_blueprint_reading_record(record, acc, _) {
     acc.bip_loading.push(record)
 }
 
-function process_run_record(record, acc) {
+function process_run_record(record, acc, _) {
     acc.runs_infos.push(record)
     if (!isNaN(record.kernel_run_ticks)) acc.kernel_runs.push(record.kernel_run_ticks)
     if (!isNaN(record.interpreter_decode_ticks)) {
@@ -162,7 +167,7 @@ function process_run_record(record, acc) {
     }
 }
 
-function process_bench_record(record, acc) {
+function process_bench_record(record, acc, sanity_acc) {
 
     // Adds infos needed for block finalization analysis
     if (!isNaN(record.inbox_size)) {
@@ -175,7 +180,9 @@ function process_bench_record(record, acc) {
             last_record.block_finalize = record.block_finalize
             acc.block_finalization.push(last_record)
         } else {
-            console.error("[Error] couldn't find correct finalize information")
+        let error = "[Error] couldn't find correct finalize information";
+        sanity_acc.push(error);
+        console.error(error);
         }
     }
 
@@ -192,11 +199,13 @@ function process_bench_record(record, acc) {
         acc.stage_one_data.push(data);
         acc.tmp_stage_one_data = [];
     } else {
-        console.error(`[Error] Missing stage one data for ${record.benchmark_name}`)
+        let error = `[Error] Missing stage one data for ${record.benchmark_name}`;
+        sanity_acc.push(error);
+        console.error(error);
     }
 }
 
-function process_transaction_record(record, acc) {
+function process_transaction_record(record, acc, sanity_acc) {
     acc.transaction.push(record)
     acc.signatures.push(record.signature_verification_ticks)
     if (is_transfer(record)) process_transfer(record, acc)
@@ -211,9 +220,11 @@ function process_transaction_record(record, acc) {
     if (!isNaN(record.tx_size) && !isNaN(record.sputnik_runtime_ticks) && !isNaN(record.run_transaction_ticks))
         acc.tx_overhead.push(record)
 
-    if(acc.tmp_stage_one_data.length !== 0) {
+    if (acc.tmp_stage_one_data.length !== 0) {
         // Shouldn't happen: tmp data is flushed when encountering scenario record
-        console.error(`[Error] Entered ${record.benchmark_name} transaction record with leftover stage_one data  -> ${acc.tmp_stage_one_data}`)
+        let error = `[Error] Entered ${record.benchmark_name} transaction record with leftover stage_one data  -> ${acc.tmp_stage_one_data}`;
+        console.error(error);
+        sanity_acc.push(error);
         acc.tmp_stage_one_data = [];
     }
 }
