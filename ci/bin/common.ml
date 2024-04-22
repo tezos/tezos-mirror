@@ -314,6 +314,8 @@ let changeset_octez =
           "tezt/**/*";
           "michelson_test_scripts/**/*";
           "tzt_reference_test_suite/**/*";
+          "irmin/**/*";
+          "brassaia/**/*";
         ])
 
 (** Only if octez source code has changed, if the images has changed or
