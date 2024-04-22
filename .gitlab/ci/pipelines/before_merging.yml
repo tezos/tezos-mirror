@@ -84,9 +84,11 @@ oc.docker:rust-toolchain:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink.mk
     - etherlink/**/*
     - images/**/*
+    - irmin/**/*
     - kernels.mk
     - michelson_test_scripts/**/*
     - scripts/ci/**/*
@@ -211,7 +213,9 @@ oc.build:static-x86_64-linux-binaries:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -241,7 +245,9 @@ oc.build_x86_64-released:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -280,7 +286,9 @@ oc.build_x86_64-exp-dev-extra:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -346,9 +354,11 @@ oc.build_kernels:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink.mk
     - etherlink/**/*
     - images/**/*
+    - irmin/**/*
     - kernels.mk
     - michelson_test_scripts/**/*
     - scripts/ci/**/*
@@ -402,7 +412,9 @@ oc.tezt:fetch-records:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -6710,7 +6722,9 @@ misc_opam_checks:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -6757,7 +6771,9 @@ oc.integration:compiler-rejections:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -6782,7 +6798,9 @@ oc.script:test-gen-genesis:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -6834,7 +6852,9 @@ oc.script:test_octez_release_versions:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7029,7 +7049,9 @@ oc.unit:non-proto-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7070,7 +7092,9 @@ oc.unit:other-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7111,7 +7135,9 @@ oc.unit:proto-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7152,7 +7178,9 @@ oc.unit:non-proto-arm64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7191,7 +7219,9 @@ oc.unit:webassembly-x86_64:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7217,7 +7247,9 @@ oc.unit:js_components:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7247,7 +7279,9 @@ oc.unit:protocol_compiles:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7457,7 +7491,9 @@ tezt:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7522,7 +7558,9 @@ tezt-memory-3k:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7586,7 +7624,9 @@ tezt-memory-4k:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7651,7 +7691,9 @@ tezt-time-sensitive:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7715,7 +7757,9 @@ tezt-slow:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7778,7 +7822,9 @@ tezt-flaky:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7843,7 +7889,9 @@ tezt:static-binaries:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
@@ -7915,7 +7963,9 @@ oc.unified_coverage:
   - changes:
     - .gitlab-ci.yml
     - .gitlab/**/*
+    - brassaia/**/*
     - etherlink/**/*
+    - irmin/**/*
     - michelson_test_scripts/**/*
     - src/**/*
     - tezt/**/*
