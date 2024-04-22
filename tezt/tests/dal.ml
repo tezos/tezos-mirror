@@ -1252,23 +1252,6 @@ let () =
            e)
   | _ -> None
 
-let publish_and_store_slot ?dont_wait ?with_proof ?counter ?force ?(fee = 1_200)
-    client dal_node source ~index content =
-  let* commitment, proof = Helpers.store_slot dal_node ?with_proof content in
-  let* _ =
-    publish_commitment
-      ?dont_wait
-      ?counter
-      ?force
-      ~source
-      ~fee
-      ~index
-      ~commitment
-      ~proof
-      client
-  in
-  return commitment
-
 (* Similar to [publish_and_store_slot] but additionally bakes [1 +
    number_of_extra_blocks] blocks to trigger the publication of the
    shards of the published slot commitment. Moreover, the [wait_slot]
@@ -1321,7 +1304,7 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
 let publish_store_and_attest_slot ?with_proof ?counter ?force ?fee client node
     dal_node source ~index ~content ~attestation_lag ~number_of_slots =
   let* _commitment =
-    publish_and_store_slot
+    Helpers.publish_and_store_slot
       ?with_proof
       ?counter
       ?force
@@ -1461,7 +1444,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let publish ?fee source ~index content =
     let content = Helpers.make_slot ~slot_size content in
     let* commitment =
-      publish_and_store_slot ?fee client dal_node source ~index content
+      Helpers.publish_and_store_slot ?fee client dal_node source ~index content
     in
     return (index, commitment)
   in
@@ -1661,7 +1644,7 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
   let crypto_params = parameters.Dal.Parameters.cryptobox in
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
-  let publish = publish_and_store_slot client dal_node in
+  let publish = Helpers.publish_and_store_slot client dal_node in
   let* slot_header =
     publish Constant.bootstrap1 ~index:0
     @@ Helpers.make_slot ~slot_size slot_content
@@ -2858,7 +2841,7 @@ let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
       payload
       level ;
     let promise =
-      publish_and_store_slot
+      Helpers.publish_and_store_slot
         ~with_proof:true
         ~force:true
         ~counter:!counter
@@ -3703,7 +3686,7 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
   let* slot_commitment =
     let slot_size = crypto_params.slot_size in
     let slot_content = generate_dummy_slot slot_size in
-    publish_and_store_slot
+    Helpers.publish_and_store_slot
       ~with_proof:true
       client
       dal_node1
@@ -3860,7 +3843,7 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
         let slot_index = i - 1 in
         let account = Account.Bootstrap.keys.(slot_index) in
         let* _slot_commitment =
-          publish_and_store_slot
+          Helpers.publish_and_store_slot
             ~with_proof:true
             client
             dal_node1
@@ -3916,7 +3899,7 @@ let test_gs_prune_and_ihave protocol parameters _cryptobox node client dal_node1
      messages. *)
   let slot_index = 0 in
   let* commitment =
-    publish_and_store_slot
+    Helpers.publish_and_store_slot
       ~with_proof:true
       client
       dal_node1
@@ -4432,7 +4415,7 @@ let test_commitments_history_rpcs _protocol dal_parameters _cryptobox node
     if level >= max_level then return @@ List.rev commitments
     else
       let* commitment =
-        publish_and_store_slot
+        Helpers.publish_and_store_slot
           client
           dal_node
           Constant.bootstrap1
@@ -6217,7 +6200,7 @@ module Refutations = struct
       Helpers.make_slot
         ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
         (Format.sprintf "Hello slot %d" index)
-      |> publish_and_store_slot client honest_dal_node source ~index
+      |> Helpers.publish_and_store_slot client honest_dal_node source ~index
     in
     let* commitment0 = publish Constant.bootstrap1 0 in
     let* commitment1 = publish Constant.bootstrap2 1 in
