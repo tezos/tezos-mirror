@@ -454,8 +454,6 @@ impl<'a> DebuggerApp<'a> {
 
         let ext_field = |ext_val: ExtensionValue| match ext_val {
             ExtensionValue::Off => "O".fg(GRAY),
-            ExtensionValue::Initial => "I".fg(GREEN),
-            ExtensionValue::Clean => "C".fg(BLUE),
             ExtensionValue::Dirty => "D".fg(RED),
         };
 

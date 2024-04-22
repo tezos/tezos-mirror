@@ -967,9 +967,9 @@ impl CSRegister {
                 let mstatus = xstatus::set_MBE(mstatus, false);
 
                 // Set register dirtiness
-                let mstatus = xstatus::set_VS(mstatus, xstatus::ExtensionValue::Initial);
+                let mstatus = xstatus::set_VS(mstatus, xstatus::ExtensionValue::Dirty);
                 let mstatus = xstatus::set_FS(mstatus, xstatus::ExtensionValue::Dirty);
-                let mstatus = xstatus::set_XS(mstatus, xstatus::ExtensionValue::Initial);
+                let mstatus = xstatus::set_XS(mstatus, xstatus::ExtensionValue::Dirty);
                 let mstatus = xstatus::set_SD(mstatus, false);
 
                 // Registers are also 64-bit wide in user and supervisor mode
