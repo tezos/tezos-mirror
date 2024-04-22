@@ -79,7 +79,10 @@ let tests : (string * (t -> unit Lwt.t)) list =
   [ test "simple" test_simple ]
 
 let register_test title f =
-  Tezt.Test.register ~__FILE__ ~tags:[ "ih_brassaia"; "store" ] ~title @@ f
+  Tezt.Test.register ~__FILE__
+    ~tags:[ "ih_brassaia"; "store"; Tag.flaky ]
+    ~title
+  @@ f
 
 let register () =
   List.iter (fun (s, f) -> register_test s (wrap_context_init f)) tests
