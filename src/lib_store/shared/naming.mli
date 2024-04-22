@@ -75,7 +75,7 @@ val chain_dir :
   Chain_id.t ->
   [`Chain_dir] directory
 
-val lock_file : [`Chain_dir] directory -> [`Lockfile] file
+val lockfile : [`Chain_dir] directory -> [`Lockfile] file
 
 val gc_lockfile : [`Chain_dir] directory -> [`Gc_lockfile] file
 
