@@ -4,7 +4,6 @@
 
 pub mod posix;
 
-use self::posix::PosixState;
 use crate::{
     machine_state::{bus::main_memory::MainMemoryLayout, MachineState},
     state_backend::{self, AllocatedOf, Manager},
