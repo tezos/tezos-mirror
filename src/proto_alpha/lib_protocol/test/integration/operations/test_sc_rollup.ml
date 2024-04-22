@@ -983,7 +983,6 @@ let test_originating_with_invalid_types () =
     [
       "mutez";
       "big_map string nat";
-      "contract string";
       "sapling_state 2";
       "sapling_transaction 2";
       "lambda string nat";

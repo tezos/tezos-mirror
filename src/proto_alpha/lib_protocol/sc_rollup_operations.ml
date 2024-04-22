@@ -206,6 +206,7 @@ let rec validate_ty :
         | Bool_t -> (k [@ocaml.tailcall]) ()
         | Never_t -> (k [@ocaml.tailcall]) ()
         | Chain_id_t -> (k [@ocaml.tailcall]) ()
+        | Contract_t _ -> (k [@ocaml.tailcall]) ()
         (* Valid collection types. *)
         | Ticket_t (ty, _) ->
             (validate_ty [@ocaml.tailcall]) ty no_entrypoints k
@@ -247,7 +248,6 @@ let rec validate_ty :
         | Mutez_t -> tzfail Sc_rollup_invalid_parameters_type
         | Big_map_t (_key_ty, _val_ty, _) ->
             tzfail Sc_rollup_invalid_parameters_type
-        | Contract_t _ -> tzfail Sc_rollup_invalid_parameters_type
         | Sapling_transaction_t _ -> tzfail Sc_rollup_invalid_parameters_type
         | Sapling_transaction_deprecated_t _ ->
             tzfail Sc_rollup_invalid_parameters_type
