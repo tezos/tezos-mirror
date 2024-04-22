@@ -11,18 +11,6 @@ use crate::{
     traps::EnvironException,
 };
 
-pub trait PosixHandler {
-    fn handle_call<ML, M, PH>(
-        posix_state: &mut PosixState<M>,
-        machine: &mut MachineState<ML, M>,
-        env_exception: EnvironException,
-    ) -> EcallOutcome
-    where
-        ML: MainMemoryLayout,
-        M: state_backend::Manager,
-        PH: PosixHandler;
-}
-
 /// An execution environment
 pub trait ExecutionEnvironment {
     /// Layout of the EE state
