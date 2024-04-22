@@ -60,8 +60,9 @@ let test_protocol_migration_message ~from_version ~to_version
   Lwt_result_syntax.return_unit
 
 let proto_name : Tezos_scoru_wasm.Pvm_input_kind.protocol -> string = function
-  | Paris -> "Paris"
+  | Nairobi -> "Nairobi"
   | Oxford -> "Oxford"
+  | Paris -> "Paris"
   | Proto_alpha -> "Proto_alpha"
 
 let tests =
@@ -82,7 +83,9 @@ let tests =
            ~from_version
            ~to_version
            ~after_protocol_activation:protocol))
-    [(V3, V4, Paris); (V1, V2, Oxford); (V3, V4, Proto_alpha)]
+    [
+      (V2, V4, Proto_alpha); (V2, V4, Paris); (V1, V2, Oxford); (V0, V1, Nairobi);
+    ]
 
 let () =
   Alcotest_lwt.run
