@@ -103,7 +103,7 @@ Oxford RPCs
 The OpenAPI specifications for the RPCs of the smart rollup node for the Oxford
 (``Proxford``) protocol can be found at:
 
-- `oxford-smart-rollup-node-openapi.json (version 19.1)
+- `oxford-smart-rollup-node-openapi.json (version 19.2)
   <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/oxford-smart-rollup-node-openapi.json>`_
 
 - `oxford-smart-rollup-node-openapi.json (version 20.0~rc1)
