@@ -4,24 +4,11 @@
 
 pub mod posix;
 
-use self::posix::PosixState;
 use crate::{
     machine_state::{bus::main_memory::MainMemoryLayout, MachineState},
     state_backend::{self, AllocatedOf, Manager},
     traps::EnvironException,
 };
-
-pub trait PosixHandler {
-    fn handle_call<ML, M, PH>(
-        posix_state: &mut PosixState<M>,
-        machine: &mut MachineState<ML, M>,
-        env_exception: EnvironException,
-    ) -> EcallOutcome
-    where
-        ML: MainMemoryLayout,
-        M: state_backend::Manager,
-        PH: PosixHandler;
-}
 
 /// An execution environment
 pub trait ExecutionEnvironment {
