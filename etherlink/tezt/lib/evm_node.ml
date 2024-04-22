@@ -427,108 +427,23 @@ let name evm_node = evm_node.name
 
 let data_dir evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
 
+(* assume a valid config for the given command and uses new latest run
+   command format. *)
 let run_args evm_node =
   let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
   let mode_args =
     match evm_node.persistent_state.mode with
-    | Proxy {devmode} ->
-        ["run"; "proxy"; "with"; "endpoint"; evm_node.persistent_state.endpoint]
-        @ Cli_arg.optional_switch "devmode" devmode
-    | Sequencer
-        {
-          initial_kernel;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
-          sequencer;
-          genesis_timestamp;
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-          max_number_of_chunks;
-          devmode;
-          wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
-        } ->
-        [
-          "run";
-          "sequencer";
-          "with";
-          "endpoint";
-          evm_node.persistent_state.endpoint;
-          "signing";
-          "with";
-          sequencer;
-          "--initial-kernel";
-          initial_kernel;
-        ]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-lag"
-            string_of_int
-            max_blueprints_lag
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-ahead"
-            string_of_int
-            max_blueprints_ahead
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-catch-up"
-            string_of_int
-            max_blueprints_catchup
-        @ Cli_arg.optional_arg
-            "catch-up-cooldown"
-            string_of_int
-            catchup_cooldown
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            (function
-              | Nothing -> "none"
-              | Time_between_blocks f -> Format.sprintf "%.3f" f)
-            time_between_blocks
+    | Proxy _ -> ["run"; "proxy"]
+    | Sequencer {initial_kernel; genesis_timestamp; wallet_dir; _} ->
+        ["run"; "sequencer"; "--initial-kernel"; initial_kernel]
         @ Cli_arg.optional_arg
             "genesis-timestamp"
             (fun timestamp ->
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_switch "devmode" devmode
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_pool_timeout_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-addr-limit"
-            string_of_int
-            tx_pool_addr_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_pool_tx_per_addr_limit
-    | Observer {preimages_dir; initial_kernel; rollup_node_endpoint} ->
-        [
-          "run";
-          "observer";
-          "with";
-          "endpoint";
-          evm_node.persistent_state.endpoint;
-          "and";
-          "rollup";
-          "node";
-          "endpoint";
-          rollup_node_endpoint;
-          "--preimages-dir";
-          preimages_dir;
-          "--initial-kernel";
-          initial_kernel;
-        ]
+    | Observer {initial_kernel; _} ->
+        ["run"; "observer"; "--initial-kernel"; initial_kernel]
   in
   mode_args @ shared_args
 
@@ -576,6 +491,93 @@ let spawn_command evm_node args =
 let spawn_run ?(extra_arguments = []) evm_node =
   spawn_command evm_node (run_args evm_node @ extra_arguments)
 
+let spawn_init_config ?(extra_arguments = []) evm_node =
+  let shared_args = data_dir evm_node @ evm_node.persistent_state.arguments in
+  let mode_args =
+    match evm_node.persistent_state.mode with
+    | Proxy {devmode} ->
+        ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
+        @ Cli_arg.optional_switch "devmode" devmode
+    | Sequencer
+        {
+          initial_kernel = _;
+          preimage_dir;
+          private_rpc_port;
+          time_between_blocks;
+          sequencer;
+          genesis_timestamp = _;
+          max_blueprints_lag;
+          max_blueprints_ahead;
+          max_blueprints_catchup;
+          catchup_cooldown;
+          max_number_of_chunks;
+          devmode;
+          wallet_dir;
+          tx_pool_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
+        } ->
+        [
+          "--rollup-node-endpoint";
+          evm_node.persistent_state.endpoint;
+          "--sequencer-key";
+          sequencer;
+        ]
+        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
+        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
+        @ Cli_arg.optional_arg
+            "maximum-blueprints-lag"
+            string_of_int
+            max_blueprints_lag
+        @ Cli_arg.optional_arg
+            "maximum-blueprints-ahead"
+            string_of_int
+            max_blueprints_ahead
+        @ Cli_arg.optional_arg
+            "maximum-blueprints-catch-up"
+            string_of_int
+            max_blueprints_catchup
+        @ Cli_arg.optional_arg
+            "catch-up-cooldown"
+            string_of_int
+            catchup_cooldown
+        @ Cli_arg.optional_arg
+            "time-between-blocks"
+            (function
+              | Nothing -> "none"
+              | Time_between_blocks f -> Format.sprintf "%.3f" f)
+            time_between_blocks
+        @ Cli_arg.optional_arg
+            "max-number-of-chunks"
+            string_of_int
+            max_number_of_chunks
+        @ Cli_arg.optional_switch "devmode" devmode
+        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ Cli_arg.optional_arg
+            "tx-pool-timeout-limit"
+            string_of_int
+            tx_pool_timeout_limit
+        @ Cli_arg.optional_arg
+            "tx-pool-addr-limit"
+            string_of_int
+            tx_pool_addr_limit
+        @ Cli_arg.optional_arg
+            "tx-pool-tx-per-addr-limit"
+            string_of_int
+            tx_pool_tx_per_addr_limit
+    | Observer {preimages_dir; initial_kernel = _; rollup_node_endpoint} ->
+        [
+          "--evm-node-endpoint";
+          evm_node.persistent_state.endpoint;
+          "--rollup-node-endpoint";
+          rollup_node_endpoint;
+          "--preimages-dir";
+          preimages_dir;
+        ]
+  in
+  spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
+  @ extra_arguments
+
 let endpoint ?(private_ = false) (evm_node : t) =
   let addr, port, path =
     if private_ then
@@ -597,6 +599,7 @@ let init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node =
   let evm_node =
     create ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port rollup_node
   in
+  let* () = Process.check @@ spawn_init_config evm_node in
   let* () = run evm_node in
   return evm_node
 

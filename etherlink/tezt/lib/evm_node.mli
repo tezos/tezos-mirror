@@ -134,9 +134,13 @@ val wait_for_retrying_connect : ?timeout:float -> t -> unit Lwt.t
 val wait_for_rollup_node_follower_connection_acquired :
   ?timeout:float -> t -> unit Lwt.t
 
+(** [spawn_init_config ?extra_arguments evm_node] runs "init config"
+    with arguments found in the state. *)
+val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
+
 (** [init ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    rollup_node_endpoint] creates an EVM node server with {!create}
-    and runs it with {!run}. *)
+    rollup_node_endpoint] creates an EVM node server with {!create},
+    init the config with {!spawn_init_config} runs it with {!run}. *)
 val init :
   ?name:string ->
   ?runner:Runner.t ->

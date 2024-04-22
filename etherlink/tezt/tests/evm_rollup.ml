@@ -630,9 +630,9 @@ let test_evm_node_connection =
       ~default_operator:Constant.bootstrap1.alias
   in
   let evm_node = Evm_node.create (Sc_rollup_node.endpoint sc_rollup_node) in
+  let* () = Process.check @@ Evm_node.spawn_init_config evm_node in
   (* Tries to start the EVM node server without a listening rollup node. *)
-  let process = Evm_node.spawn_run evm_node in
-  let* () = Process.check ~expect_failure:true process in
+  let* () = Process.check ~expect_failure:true @@ Evm_node.spawn_run evm_node in
   (* Starts the rollup node. *)
   let* _ = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   (* Starts the EVM node server and asks its version. *)
@@ -4526,6 +4526,7 @@ let test_migrate_proxy_to_sequencer_future =
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config sequencer_node in
   let* () =
     repeat 10 (fun () ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
@@ -4692,6 +4693,7 @@ let test_migrate_proxy_to_sequencer_past =
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
+  let* () = Process.check @@ Evm_node.spawn_init_config sequencer_node in
   (* Run the sequencer from the rollup node state. *)
   let* () =
     Evm_node.init_from_rollup_node_data_dir
