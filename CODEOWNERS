@@ -15,57 +15,6 @@
 # Insert code owner declarations here!
 # ************************************
 
-/docs/                       @NicVolanschi
-/docs/protocols/alpha.rst
-
-/etherlink/kernel_evm/evm_evaluation     @rodibozman
-/etherlink/kernel_evm/evm_execution      @rodibozman
-
-/src/bin_codec               @raphael-proust
-/src/bin_node                @romain.nl
-/src/bin_openapi             @romain.nl
-/src/bin_snoop               @naih
-/src/lib_base                @raphael-proust
-/src/lib_benchmark           @naih
-/src/lib_error_monad         @raphael-proust
-/src/lib_event_logging       @romain.nl
-/src/lib_lwt_result_stdlib   @raphael-proust
-/src/lib_node_config         @Killian-Delarue
-/src/lib_openapi             @romain.nl @Killian-Delarue
-/src/lib_p2p*                @julien.t @vivienpe
-/src/lib_protocol_environment   @raphael-proust
-/src/lib_shell_benchmarks    @naih
-/src/lib_stdlib              @raphael-proust
-/src/lib_stdlib_unix         @raphael-proust
-/src/lib_version             @romain.nl
-/src/proto_*/lib_benchmark   @naih
-/src/proto_*/lib_benchmarks_proto @naih
-/src/proto_*/lib_protocol/sc_rollup_proof*         @sribaroud
-/src/proto_*/lib_protocol/sc_rollup_game*          @sribaroud
-/src/proto_*/lib_protocol/sc_rollup_inbox*         @sribaroud
-/src/proto_*/lib_protocol/sc_rollup_refutation*    @sribaroud
-
-/src/lib_aplonk               @MarcBeunardeau
-/src/lib_bls12_381*           @victor-dumitrescu
-/src/lib_crypto               @victor-dumitrescu
-/src/lib_hacl                 @victor-dumitrescu
-/src/lib_mec                  @MarcBeunardeau
-/src/lib_plonk                @MarcBeunardeau
-/src/lib_polynomial           @MarcBeunardeau
-
-/src/lib_webassembly         @lthms @ole.kruger @picdc
-/src/lib_scoru_wasm          @lthms @ole.kruger @picdc
-
-/scripts                     @romain.nl
-
-/tezt/lib*                   @romain.nl
-/tezt/records                @romain.nl
-
-/manifest                    @romain.nl
-
-/.gitlab                     @romain.nl @arvidnl
-/ci                          @arvidnl
-
 # Octez Merge Team
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
