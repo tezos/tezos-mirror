@@ -236,7 +236,7 @@ impl Evaluation {
         let block_fees = retrieve_block_fees(host)?;
 
         let current_constants = match storage::read_current_block(host) {
-            Ok(block) => block.constants(chain_id, block_fees),
+            Ok(block) => block.constants(chain_id, block_fees, crate::block::GAS_LIMIT),
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
@@ -355,7 +355,7 @@ impl TxValidation {
         let block_fees = retrieve_block_fees(host)?;
 
         let current_constants = match storage::read_current_block(host) {
-            Ok(block) => block.constants(chain_id, block_fees),
+            Ok(block) => block.constants(chain_id, block_fees, crate::block::GAS_LIMIT),
             Err(_) => {
                 let timestamp = current_timestamp(host);
                 let timestamp = U256::from(timestamp.as_u64());
