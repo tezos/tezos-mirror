@@ -4745,6 +4745,10 @@ let octez_rpc_process =
         octez_node_config |> open_;
         octez_rpc_http |> open_;
         octez_rpc_http_server |> open_;
+        octez_rpc_http_client_unix |> open_;
+        octez_rpc_http_client |> open_;
+        octez_shell_services;
+        octez_store |> open_;
         lwt_unix;
         lwt_exit;
         prometheus_app;
