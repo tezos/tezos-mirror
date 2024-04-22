@@ -31,7 +31,7 @@ let version_for_protocol : Pvm_input_kind.protocol -> Wasm_pvm_state.version =
   | Nairobi -> V1
   | Oxford -> V2
   | Paris -> V4
-  | Proto_alpha -> V4
+  | Proto_alpha -> V5
 
 let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports
@@ -78,7 +78,7 @@ let get_wasm_version {durable; _} =
 
 let stack_size_limit = function
   | Wasm_pvm_state.V0 -> 300
-  | V1 | V2 | V3 | V4 -> 60_000
+  | V1 | V2 | V3 | V4 | V5 -> 60_000
 (* The limit 60_000 has been chosen such that the simplest WASM program
    consisting in trying to recursively call 60,000 times the same function
    results in Wasmer raising a runtime error.
@@ -670,7 +670,9 @@ let update_output_buffer pvm_state level =
 
 let apply_migration version pvm_state =
   match version with
-  | Wasm_pvm_state.V4 ->
+  | Wasm_pvm_state.V5 ->
+      {pvm_state with max_nb_ticks = Z.of_int64 50_000_000_000_000L}
+  | V4 ->
       {
         pvm_state with
         buffers =

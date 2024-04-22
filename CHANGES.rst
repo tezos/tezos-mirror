@@ -68,6 +68,9 @@ Smart Rollup node
 - Use a local cache per game for intermediate states of dissections. (MR
   :gl:`!12899`)
 
+- Introduce the 5th version of the WASM PVM, which defaults to a higher tick
+  limits to delegate refutability to the kernels. (MR :gl:`!12999`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
