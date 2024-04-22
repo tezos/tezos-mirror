@@ -42,6 +42,12 @@ type mode =
       preimages_dir : string;
       rollup_node_endpoint : string;
     }
+  | Threshold_encryption_observer of {
+      initial_kernel : string;
+      preimages_dir : string;
+      rollup_node_endpoint : string;
+      bundler_node_endpoint : string;
+    }
   | Sequencer of {
       initial_kernel : string;
           (** Path to the initial kernel used by the sequencer. *)

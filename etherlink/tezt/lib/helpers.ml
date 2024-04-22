@@ -61,6 +61,9 @@ let next_evm_level ~evm_node ~sc_rollup_node ~client =
       let*@ _l2_level = Rpc.produce_block evm_node in
       unit
   | Observer _ -> Test.fail "Cannot create a new level with an Observer node"
+  | Threshold_encryption_observer _ ->
+      Test.fail
+        "Cannot create a new level with a Threshold encryption observer node"
 
 let kernel_inputs_path = "etherlink/tezt/tests/evm_kernel_inputs"
 

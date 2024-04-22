@@ -230,7 +230,12 @@ and[@tailrec] stream_loop ~evm_node_endpoint (Qty next_blueprint_number) stream
 let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   let rollup_node_endpoint = config.rollup_node_endpoint in
-  let*? {evm_node_endpoint; preimages; preimages_endpoint} =
+  let*? {
+          evm_node_endpoint;
+          threshold_encryption_bundler_endpoint;
+          preimages;
+          preimages_endpoint;
+        } =
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =
@@ -255,7 +260,10 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
 
       let keep_alive = config.keep_alive
 
-      let evm_node_endpoint = evm_node_endpoint
+      let evm_node_endpoint =
+        match threshold_encryption_bundler_endpoint with
+        | Some endpoint -> endpoint
+        | None -> evm_node_endpoint
     end) : Services_backend_sig.S)
   in
 

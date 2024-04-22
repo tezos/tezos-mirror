@@ -296,6 +296,23 @@ let rollup_node_endpoint_param =
     ~desc:"The address of a rollup node."
     Params.rollup_node_endpoint
 
+let bundler_node_endpoint_arg =
+  Tezos_clic.arg
+    ~long:"bundler-node-endpoint"
+    ~placeholder:"url"
+    ~doc:
+      "The address of a service which encrypts incoming transactions for the \
+       rollup."
+    Params.endpoint
+
+let bundler_node_endpoint_param =
+  Tezos_clic.param
+    ~name:"bundler-node-endpoint"
+    ~desc:
+      "The address of a service which encrypts incoming transactions for the \
+       rollup."
+    Params.endpoint
+
 let time_between_blocks_arg =
   Tezos_clic.arg
     ~long:"time-between-blocks"
@@ -760,7 +777,8 @@ let sequencer_command =
 
 let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
     ?cors_origins ?cors_headers ~verbose ?preimages ?rollup_node_endpoint
-    ?preimages_endpoint ?evm_node_endpoint ?tx_pool_timeout_limit
+    ?preimages_endpoint ?evm_node_endpoint
+    ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?kernel () =
   let open Lwt_result_syntax in
@@ -779,6 +797,7 @@ let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
       ?preimages
       ?preimages_endpoint
       ?evm_node_endpoint
+      ?threshold_encryption_bundler_endpoint
       ?tx_pool_timeout_limit
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
@@ -811,6 +830,7 @@ let observer_command =
            "The EVM node endpoint address (as ADDR:PORT) the node will \
             communicate with."
          Params.evm_node_endpoint
+    @@ bundler_node_endpoint_param
     @@ prefixes ["and"; "rollup"; "node"; "endpoint"]
     @@ rollup_node_endpoint_param @@ stop)
   @@ fun ( ( data_dir,
@@ -830,6 +850,7 @@ let observer_command =
              verbose ),
            (kernel, preimages, preimages_endpoint) )
              evm_node_endpoint
+             threshold_encryption_bundler_endpoint
              rollup_node_endpoint
              () ->
   let*? () =
@@ -853,6 +874,7 @@ let observer_command =
     ~rollup_node_endpoint
     ?preimages_endpoint
     ~evm_node_endpoint
+    ~threshold_encryption_bundler_endpoint
     ?tx_pool_timeout_limit
     ?tx_pool_addr_limit
     ?tx_pool_tx_per_addr_limit
@@ -1283,7 +1305,7 @@ If the <evm-node-endpoint> is set then adds the configuration for the observer
 mode.|}
     (merge_options
        common_config_args
-       (args13
+       (args14
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1296,6 +1318,7 @@ mode.|}
           maximum_blueprints_catchup_arg
           catchup_cooldown_arg
           evm_node_endpoint_arg
+          bundler_node_endpoint_arg
           (* others option *)
           wallet_dir_arg
           (Tezos_clic.switch
@@ -1330,6 +1353,7 @@ mode.|}
              max_blueprints_catchup,
              catchup_cooldown,
              evm_node_endpoint,
+             threshold_encryption_bundler_endpoint,
              wallet_dir,
              force ) )
          () ->
@@ -1363,6 +1387,7 @@ mode.|}
           ?private_rpc_port
           ?sequencer_key
           ?evm_node_endpoint
+          ?threshold_encryption_bundler_endpoint
           ?max_blueprints_lag
           ?max_blueprints_ahead
           ?max_blueprints_catchup
@@ -1591,8 +1616,9 @@ let sequencer_simple_command =
         ())
 
 let observer_run_args =
-  Tezos_clic.args4
+  Tezos_clic.args5
     evm_node_endpoint_arg
+    bundler_node_endpoint_arg
     preimages_arg
     preimages_endpoint_arg
     kernel_arg
@@ -1618,7 +1644,11 @@ let observer_simple_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose ),
-           (evm_node_endpoint, preimages, preimages_endpoint, kernel) )
+           ( evm_node_endpoint,
+             threshold_encryption_bundler_endpoint,
+             preimages,
+             preimages_endpoint,
+             kernel ) )
          () ->
       start_observer
         ~data_dir
@@ -1633,6 +1663,7 @@ let observer_simple_command =
         ?rollup_node_endpoint
         ?preimages_endpoint
         ?evm_node_endpoint
+        ?threshold_encryption_bundler_endpoint
         ?tx_pool_timeout_limit
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit

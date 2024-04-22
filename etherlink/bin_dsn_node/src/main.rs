@@ -16,10 +16,18 @@
 //! sequencer sidecar, attesting the order of transactions in the proposal and
 //! providing decryption shares for encrypted transactions.
 
-use std::error::Error;
-
 use clap::{command, Parser, Subcommand};
+use futures::future::try_join_all;
+use std::net::SocketAddr;
 use tracing::info;
+use url::Url;
+
+mod bundler;
+mod errors;
+mod json_http_rpc;
+mod rpc_encoding;
+mod server;
+mod shutdown;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -32,7 +40,11 @@ struct Cli {
 #[derive(Subcommand, Clone, Debug)]
 enum Commands {
     /// Run the dsn node in bundler mode
-    Bundler,
+    Bundler {
+        #[arg(short, long, default_value_t = ([127,0,0,1], 3000).into())]
+        listening_addr: SocketAddr,
+        sequencer_endpoint: Url,
+    },
     /// Run the dsn node in sequencer sidecar mode
     Sequencer,
     /// Run the dsn node in keyholder mode
@@ -40,23 +52,40 @@ enum Commands {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() {
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     // use that subscriber to process traces emitted after this point
-    tracing::subscriber::set_global_default(subscriber)?;
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
-    let cli = Cli::parse();
-    match cli.command {
-        Commands::Bundler => {
-            info!("Starting DSN node in Bundler mode");
+    info!("DSN node is launching...");
+
+    let mut shutdown = shutdown::Shutdown::default();
+    let rx = shutdown.subscribe();
+    let tx = shutdown.subscribe_to_shutdown();
+
+    let node_handle = tokio::spawn(async move {
+        let cli = Cli::parse();
+        match cli.command {
+            Commands::Bundler {
+                listening_addr,
+                sequencer_endpoint,
+            } => {
+                info!("Starting DSN node in Bundler mode");
+                bundler::run(listening_addr, sequencer_endpoint, rx, tx).await
+            }
+            Commands::Sequencer => {
+                info!("Starting DSN node in Sequencer sidecar mode");
+                Ok::<(), ()>(())
+            }
+            Commands::Keyholder => {
+                info!("Starting DSN node in Keyholder mode");
+                Ok::<(), ()>(())
+            }
         }
-        Commands::Sequencer => {
-            info!("Starting DSN node in Sequencer sidecar mode");
-        }
-        Commands::Keyholder => {
-            info!("Starting DSN node in Keyholder mode");
-        }
-    }
-    Ok(())
+    });
+
+    let shutdown_handle = tokio::spawn(async move { shutdown.run().await });
+
+    try_join_all([node_handle, shutdown_handle]).await.unwrap();
 }
