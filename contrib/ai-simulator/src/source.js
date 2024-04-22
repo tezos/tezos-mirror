@@ -944,7 +944,8 @@ export class Delegate {
       .valueOf();
 
     const estimated_rewards_for_nonce_revelation =
-      previous_estimated_number_of_blocks_baked *
+      (estimated_number_of_blocks_baked /
+        this.simulator.config.proto.blocks_per_commitment) *
       this.simulator.seed_nonce_revelation_tip(cycle);
 
     const estimated_rewards_for_vdf_revelation = baking_power.isZero()
