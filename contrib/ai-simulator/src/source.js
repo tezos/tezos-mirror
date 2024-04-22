@@ -948,11 +948,10 @@ export class Delegate {
         this.simulator.config.proto.blocks_per_commitment) *
       this.simulator.seed_nonce_revelation_tip(cycle);
 
-    const estimated_rewards_for_vdf_revelation = baking_power.isZero()
-      ? 0
-      : (this.simulator.config.proto.blocks_per_cycle /
-          this.simulator.config.proto.blocks_per_commitment) *
-        this.simulator.vdf_revelation_tip(cycle);
+    const estimated_rewards_for_vdf_revelation =
+      (estimated_number_of_blocks_baked /
+        this.simulator.config.proto.blocks_per_commitment) *
+      this.simulator.vdf_revelation_tip(cycle);
 
     const estimated_total_rewards =
       estimated_rewards_for_fixed_portion_baking +
