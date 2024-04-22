@@ -296,15 +296,29 @@ Types `COMPARE` isn't tested for:
 
 ### `EDIV: nat : nat`
 
-***None***
+- [ediv_nat-nat_00.tzt](ediv_nat-nat_00.tzt)
+- [ediv_nat-nat_01.tzt](ediv_nat-nat_01.tzt)
+- [ediv_nat-nat_02.tzt](ediv_nat-nat_02.tzt)
+- [ediv_nat-nat_03.tzt](ediv_nat-nat_03.tzt)
+- [ediv_nat-nat_04.tzt](ediv_nat-nat_04.tzt)
 
 ### `EDIV: nat : int`
 
-***None***
+- [ediv_nat-int_00.tzt](ediv_nat-int_00.tzt)
+- [ediv_nat-int_01.tzt](ediv_nat-int_01.tzt)
+- [ediv_nat-int_02.tzt](ediv_nat-int_02.tzt)
+- [ediv_nat-int_03.tzt](ediv_nat-int_03.tzt)
+- [ediv_nat-int_04.tzt](ediv_nat-int_04.tzt)
+- [ediv_nat-int_05.tzt](ediv_nat-int_05.tzt)
 
 ### `EDIV: int : nat`
 
-***None***
+- [ediv_int-nat_00.tzt](ediv_int-nat_00.tzt)
+- [ediv_int-nat_01.tzt](ediv_int-nat_01.tzt)
+- [ediv_int-nat_02.tzt](ediv_int-nat_02.tzt)
+- [ediv_int-nat_03.tzt](ediv_int-nat_03.tzt)
+- [ediv_int-nat_04.tzt](ediv_int-nat_04.tzt)
+- [ediv_int-nat_05.tzt](ediv_int-nat_05.tzt)
 
 ### `EDIV: int : int`
 
@@ -312,14 +326,11 @@ Types `COMPARE` isn't tested for:
 - [ediv_int-int_01.tzt](ediv_int-int_01.tzt)
 - [ediv_int-int_02.tzt](ediv_int-int_02.tzt)
 - [ediv_int-int_03.tzt](ediv_int-int_03.tzt)
-
-Missing edge cases:
-
-- No division of positive over positive
-- No division of negative over negative
-- No division of zero over non-zero
-- No division of zero over zero
-- No division with the result of 1
+- [ediv_int-int_04.tzt](ediv_int-int_04.tzt)
+- [ediv_int-int_05.tzt](ediv_int-int_05.tzt)
+- [ediv_int-int_06.tzt](ediv_int-int_06.tzt)
+- [ediv_int-int_07.tzt](ediv_int-int_07.tzt)
+- [ediv_int-int_08.tzt](ediv_int-int_08.tzt)
 
 ### `EDIV: mutez : nat`
 
@@ -337,11 +348,8 @@ Missing edge cases:
 - [ediv_mutez-mutez_01.tzt](ediv_mutez-mutez_01.tzt)
 - [ediv_mutez-mutez_02.tzt](ediv_mutez-mutez_02.tzt)
 - [ediv_mutez-mutez_03.tzt](ediv_mutez-mutez_03.tzt)
-
-Missing edge cases:
-
-- No division of zero over non-zero
-- No division of zero over zero
+- [ediv_mutez-mutez_04.tzt](ediv_mutez-mutez_04.tzt)
+- [ediv_mutez-mutez_05.tzt](ediv_mutez-mutez_05.tzt)
 
 ### `EQ`
 
@@ -1316,9 +1324,6 @@ Instructions with no tests:
 - `COMPARE: unit : unit`
 - `DUP n`
 - `DUP`
-- `EDIV: int : nat`
-- `EDIV: nat : int`
-- `EDIV: nat : nat`
 - `EMIT`
 - `GET n`
 - `GET_AND_UPDATE: kty : option vty : big_map kty vty`
@@ -1387,13 +1392,6 @@ Instructions with missing edge cases:
 - `DROP n` for n = 1
 - `DUG n` for n = 0
 - `DUG n` for n = 1
-- `EDIV: int : int` negative / negative
-- `EDIV: int : int` positive / positive
-- `EDIV: int : int` with result 1
-- `EDIV: int : int` zero / non-zero
-- `EDIV: int : int` zero / zero
-- `EDIV: mutez : mutez` zero / non-zero
-- `EDIV: mutez : mutez` zero / zero
 - `IF_CONS` -- check that stack tail is preserved
 - `IF_LEFT` -- check that stack tail is preserved
 - `IF_NONE` -- check that stack tail is preserved
