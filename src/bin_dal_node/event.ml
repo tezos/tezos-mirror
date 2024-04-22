@@ -96,8 +96,8 @@ let failed_to_persist_profiles =
 let fetched_slot =
   declare_2
     ~section
-    ~name:"fetched_slot"
-    ~msg:"slot fetched: size {size}, shards {shards}"
+    ~name:"reconstructed_slot"
+    ~msg:"reconstructed slot: size {size}, shards {shards}"
     ~level:Notice
     ("size", Data_encoding.int31)
     ("shards", Data_encoding.int31)
