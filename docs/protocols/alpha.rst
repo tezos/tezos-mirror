@@ -17,6 +17,11 @@ Environment Version
 Smart Rollups
 -------------
 
+- Michelson values of type ``contract _`` are now allowed in messages
+  exchanged between smart contracts and smart rollups. In particular,
+  it is now possible for smart rollups to use typed callbacks in
+  outbox messages. (MR :gl:`!11130`)
+
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
