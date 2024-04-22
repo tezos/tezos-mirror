@@ -38,7 +38,7 @@ risc-v-dummy.elf::
 
 .PHONY: build-deps
 build-deps:
-	@exec ./install-rust-std-hermit.sh
+	@exec ./scripts/install-rust-std-hermit.sh
 	@rustup component add rustfmt clippy
 ifneq ($(NATIVE_TARGET),)
 	@rustup target add $(NATIVE_TARGET)
