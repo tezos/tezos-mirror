@@ -1404,6 +1404,14 @@ let config_key_arg ~name ~placeholder =
   Tezos_clic.arg ~long ~doc ~placeholder
   @@ Tezos_clic.parameter (fun _ s -> return (name, s))
 
+let config_key_flag ~name =
+  let open Lwt_result_syntax in
+  let long = String.mapi (fun _ c -> if c = '_' then '-' else c) name in
+  let doc = Format.sprintf "enable flag %s in the installer config" name in
+  Tezos_clic.map_arg ~f:(fun _ enable ->
+      if enable then return_some (name, "") else return_none)
+  @@ Tezos_clic.switch ~long ~doc ()
+
 let bootstrap_account_arg =
   let long = "bootstrap-account" in
   let doc = Format.sprintf "add a bootstrap account in the installer config." in
@@ -1416,7 +1424,7 @@ let make_kernel_config_command =
   let open Lwt_result_syntax in
   command
     ~desc:"Transforms the JSON list of instructions to a RLP list"
-    (args18
+    (args19
        (config_key_arg ~name:"kernel_root_hash" ~placeholder:"root hash")
        (config_key_arg ~name:"chain_id" ~placeholder:"chain id")
        (config_key_arg ~name:"sequencer" ~placeholder:"edpk...")
@@ -1435,6 +1443,7 @@ let make_kernel_config_command =
        (config_key_arg
           ~name:"maximum_gas_per_transaction"
           ~placeholder:"30000...")
+       (config_key_flag ~name:"remove_whitelist")
        (Tezos_clic.default_arg
           ~long:"boostrap-balance"
           ~doc:"boolance of boostrap account"
@@ -1464,6 +1473,7 @@ let make_kernel_config_command =
            sequencer_pool_address,
            maximum_allowed_ticks,
            maximum_gas_per_transaction,
+           remove_whitelist,
            boostrap_balance,
            bootstrap_accounts )
          output
@@ -1485,6 +1495,7 @@ let make_kernel_config_command =
         ?sequencer_pool_address
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
+        ?remove_whitelist
         ~boostrap_balance
         ?bootstrap_accounts
         ~output

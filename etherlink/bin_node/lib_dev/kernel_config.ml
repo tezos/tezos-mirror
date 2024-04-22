@@ -23,7 +23,7 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
     ?kernel_governance ?kernel_security_governance ?minimum_base_fee_per_gas
     ?da_fee_per_byte ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?sequencer_pool_address ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ~output () =
+    ?remove_whitelist ~output () =
   let bootstrap_accounts =
     match bootstrap_accounts with
     | None -> []
@@ -71,5 +71,6 @@ let make ~boostrap_balance ?bootstrap_accounts ?kernel_root_hash ?chain_id
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ bootstrap_accounts
+    @ make_instr remove_whitelist
   in
   Installer_config.to_file instrs ~output
