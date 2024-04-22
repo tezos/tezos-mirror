@@ -780,7 +780,7 @@ let produce_slot t level i =
     in
     let* _ = Node.wait_for_level producer.node level in
     let* _ =
-      Dal.Helpers.publish_and_store_slot
+      Dal_common.Helpers.publish_and_store_slot
         ~dont_wait:true
         ~with_proof:true
         producer.client

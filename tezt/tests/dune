@@ -10,7 +10,6 @@
   str
   bls12-381
   tezt-tezos
-  tezt_cloud
   tezt_risc_v_sandbox
   tezt_tx_kernel
   data-encoding
@@ -144,5 +143,4 @@
   -open Tezt_wrapper
   -open Tezt_wrapper.Base
   -open Tezt_tezos
-  -open Tezt_tezos.Runnable.Syntax
-  -open Tezt_cloud))
+  -open Tezt_tezos.Runnable.Syntax))

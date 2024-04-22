@@ -90,7 +90,6 @@ let () =
       str;
       bls12_381;
       tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-      tezt_cloud |> open_;
       Octez.tezt_risc_v_sandbox;
       tezt_tx_kernel;
       Data_encoding.data_encoding;
