@@ -2,18 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{state_backend as backend, traps::Exception};
-
 use super::{
     bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
     csregisters::{
-        fields::FieldValue,
         satp::{self, SvLength, TranslationAlgorithm},
         xstatus, CSRRepr, CSRegister,
     },
     mode::Mode,
     MachineState,
 };
+use crate::{bits::Bits64, state_backend as backend, traps::Exception};
 
 mod physical_address;
 mod pte;
@@ -86,7 +84,7 @@ where
 
     // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
     let mut i = levels.saturating_sub(1);
-    let mut a: Address = satp::get_PPN(satp).value() * PAGE_SIZE;
+    let mut a: Address = satp::get_PPN(satp) * PAGE_SIZE;
     // For all translation algorithms the page table entry size is 8 bytes.
     let mut pte: u64;
     loop {
@@ -123,7 +121,7 @@ where
             return Err(access_type.exception(v_addr));
         }
         i -= 1;
-        a = pte::get_PPN(pte).raw_bits() * PAGE_SIZE;
+        a = pte::get_PPN(pte).to_bits() * PAGE_SIZE;
     }
 
     // TODO: implement step 5 (MXR & SUM aware translation)

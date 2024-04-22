@@ -14,10 +14,7 @@
 use super::PAGE_OFFSET_WIDTH;
 use crate::{
     create_field,
-    machine_state::{
-        bus::Address,
-        csregisters::{fields::UnsignedValue, satp::SvLength},
-    },
+    machine_state::{bus::Address, csregisters::satp::SvLength},
 };
 use std::ops::RangeInclusive;
 use twiddle::Twiddle;
@@ -49,7 +46,7 @@ pub(super) fn get_raw_ppn_i_range(
 
 // The PPN_i fields are not created with the macro `create_field!` because it is useful
 // to be able to call the i-th physical page number by an argument `i`.
-create_field!(PAGE_OFFSET, UnsignedValue, 0, PAGE_OFFSET_WIDTH as u64);
+create_field!(PAGE_OFFSET, u64, 0, PAGE_OFFSET_WIDTH as u64);
 
 /// Get `p_addr.PPN[index]` from a physical address specified by `sv_length` Standard.
 pub fn get_PPN_IDX(p_addr: Address, sv_length: &SvLength, index: usize) -> Option<Address> {
@@ -80,11 +77,7 @@ pub fn set_PPN_IDX(
 
 #[cfg(test)]
 mod tests {
-    use crate::machine_state::csregisters::{
-        fields::{FieldValue, UnsignedValue},
-        satp::SvLength,
-        CSRRepr,
-    };
+    use crate::machine_state::csregisters::{satp::SvLength, CSRRepr};
     use proptest::proptest;
 
     #[test]
@@ -101,14 +94,14 @@ mod tests {
             use crate::machine_state::address_translation::physical_address as pa;
 
             let run_tests = |sv_length, ppn_vals: Vec<CSRRepr>, args| {
-                let mut addr = pa::set_PAGE_OFFSET(0u64, UnsignedValue::new(offset));
+                let mut addr = pa::set_PAGE_OFFSET(0u64, offset);
                 for (idx, &ppn_idx) in ppn_vals.iter().enumerate() {
                     addr = pa::set_PPN_IDX(addr, sv_length, idx, ppn_idx).unwrap();
                 }
                 for (idx, res) in args {
                     assert_eq!(pa::get_PPN_IDX(addr, sv_length, idx), res);
                 }
-                assert_eq!(pa::get_PAGE_OFFSET(addr).raw_bits(), offset);
+                assert_eq!(pa::get_PAGE_OFFSET(addr), offset);
             };
 
             run_tests(&SvLength::Sv39,
