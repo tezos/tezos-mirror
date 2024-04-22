@@ -119,7 +119,7 @@ module Pipeline = struct
   let filename : name:string -> string =
    fun ~name -> sf ".gitlab/ci/pipelines/%s.yml" name
 
-  let register ?variables ?(jobs = []) name if_ =
+  let register ?variables ~jobs name if_ =
     let pipeline : t = {variables; if_; name; jobs} in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7015
        check that stages have not been crossed. *)

@@ -23,9 +23,7 @@ let default = default ~interruptible:true ()
 (* Top-level [variables:] *)
 let variables : variables =
   [
-    (* /!\ CI_REGISTRY is overriden to use a private Docker registry mirror in AWS ECR
-       in GitLab namespaces `nomadic-labs` and `tezos`
-       /!\ This value MUST be the same as `opam_repository_tag` in `scripts/version.sh` *)
+    (* /!\ This value MUST be the same as `opam_repository_tag` in `scripts/version.sh` *)
     ("build_deps_image_version", Common.build_deps_image_version);
     ("build_deps_image_name", "${GCP_REGISTRY}/tezos/opam-repository");
     ( "rust_toolchain_image_name",
@@ -72,8 +70,7 @@ let job_dummy : job =
 
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
-   pipeline is defined. At the moment, all these pipelines are defined
-   manually in .yml, but will eventually be generated. *)
+   pipeline is defined. *)
 let () =
   (* Matches Octez release tags, e.g. [octez-v1.2.3] or [octez-v1.2.3-rc4]. *)
   let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
@@ -143,7 +140,6 @@ let () =
     schedule_extended_tests
     ~jobs:(Code_verification.jobs Schedule_extended_test)
 
-(* Split pipelines and writes image templates *)
 let config () =
   (* Split pipelines types into workflow and includes *)
   let workflow, includes = Pipeline.workflow_includes () in

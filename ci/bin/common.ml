@@ -73,10 +73,6 @@ let alpine_version =
 
 (* Register images.
 
-   The set of registered images are written to
-   [.gitlab/ci/jobs/shared/images.yml] for interoperability with
-   hand-written .yml files.
-
    For documentation on the [runtime_X_dependencies] and the
    [rust_toolchain] images, refer to
    {{:https://gitlab.com/tezos/opam-repository/}
@@ -712,10 +708,6 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     ~variables
     script
 
-(* Note: here we rely on [$IMAGE_ARCH_PREFIX] to be empty.
-   Otherwise, [$DOCKER_IMAGE_TAG] would contain [$IMAGE_ARCH_PREFIX] too.
-   [$IMAGE_ARCH_PREFIX] is only used when building Docker images,
-   here we handle all architectures so there is no such variable. *)
 let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~job_docker_arm64 : tezos_job =
   job_docker_authenticated

@@ -53,13 +53,6 @@ let jobs =
     job_docker_merge_manifests
       ~__POS__
       ~ci_docker_hub:true
-        (* TODO: In theory, actually uses either release or
-           experimental variant of docker jobs depending on
-           pipeline. In practice, this does not matter as these jobs
-           have the same name in the generated files
-           ([oc.build:ARCH]). However, when the merge_manifest jobs
-           are created directly in the appropriate pipeline, the
-           correcty variant must be used. *)
       ~job_docker_amd64:job_docker_amd64_experimental
       ~job_docker_arm64:job_docker_arm64_experimental
   in
