@@ -89,6 +89,9 @@ module Slots : sig
     commitment ->
     (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
     Lwt.t
+
+  val remove_slot_by_commitment :
+    t -> slot_size:int -> commitment -> unit tzresult Lwt.t
 end
 
 module Shard_proofs_cache : sig

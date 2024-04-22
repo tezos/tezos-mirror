@@ -210,6 +210,15 @@ let removed_slot_shards =
     ~pp1:Cryptobox.Commitment.pp_short
     ("commitment", Cryptobox.Commitment.encoding)
 
+let removed_slot =
+  declare_1
+    ~section
+    ~name:"removed_slot"
+    ~msg:"removed slot for commitment {commitment}"
+    ~level:Info
+    ~pp1:Cryptobox.Commitment.pp_short
+    ("commitment", Cryptobox.Commitment.encoding)
+
 let decoding_data_failed =
   declare_1
     ~section

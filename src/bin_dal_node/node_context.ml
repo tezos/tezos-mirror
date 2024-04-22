@@ -106,7 +106,7 @@ let update_plugin_in_ready ctxt plugin proto =
   | Ready ready_ctxt ->
       ctxt.status <- Ready {ready_ctxt with plugin; plugin_proto = proto}
 
-let next_shards_level_to_gc ctxt ~current_level =
+let next_level_to_gc ctxt ~current_level =
   match ctxt.config.history_mode with
   | Full -> Int32.zero
   | Rolling {blocks = `Some n} ->

@@ -357,15 +357,15 @@ module Handler = struct
           return_unit
     else return_unit
 
-  (* This function removes the shards corresponding to the commitments at level
-     exactly [Node_context.next_shards_level_to_gc ~head_level]. In the future
-     we may want to remove the shards from all preceeding levels, not only this
-     one. Also, removing could be done more efficiently than iterating on all
-     the slots. *)
-  let remove_old_level_shards proto_parameters ctxt head_level =
+  (* This function removes from the store all the slots (and their
+     shards) published at level exactly [Node_context.next_level_to_gc
+     ~head_level]. In the future we may want to remove the shards from
+     all preceeding levels, not only this one. Also, removing could be
+     done more efficiently than iterating on all the slots. *)
+  let remove_old_level_slots_and_shards proto_parameters ctxt head_level =
     let open Lwt_result_syntax in
     let oldest_level =
-      Node_context.next_shards_level_to_gc ctxt ~current_level:head_level
+      Node_context.next_level_to_gc ctxt ~current_level:head_level
     in
     let number_of_slots = Dal_plugin.(proto_parameters.number_of_slots) in
     let store = Node_context.get_store ctxt in
@@ -395,7 +395,15 @@ module Handler = struct
     List.iter_es
       (fun commitment ->
         let*! () = Event.(emit removed_slot_shards commitment) in
-        Store.Shards.remove store.shards commitment)
+        let* () = Store.Shards.remove store.shards commitment in
+        let*! () = Event.(emit removed_slot commitment) in
+        let* () =
+          Store.Slots.remove_slot_by_commitment
+            store.slots
+            ~slot_size:proto_parameters.cryptobox_parameters.slot_size
+            commitment
+        in
+        return_unit)
       commitments
 
   let process_block ctxt cctxt (module Plugin : Dal_plugin.T) plugin_proto
@@ -546,7 +554,9 @@ module Handler = struct
                cryptobox
                head_level
                proto_parameters.attestation_lag) ;
-          let* () = remove_old_level_shards proto_parameters ctxt head_level in
+          let* () =
+            remove_old_level_slots_and_shards proto_parameters ctxt head_level
+          in
           let process_block =
             process_block
               ctxt
