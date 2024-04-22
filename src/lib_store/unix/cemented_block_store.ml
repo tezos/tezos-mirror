@@ -333,6 +333,12 @@ let load ~readonly ~log_size cemented_blocks_dir =
   in
   return cemented_store
 
+let reload_cemented_blocks_files t =
+  let open Lwt_result_syntax in
+  let* cemented_blocks_files = load_table t.cemented_blocks_dir in
+  t.cemented_blocks_files <- cemented_blocks_files ;
+  return_unit
+
 let init ?(log_size = default_index_log_size) chain_dir ~readonly =
   let open Lwt_result_syntax in
   let cemented_blocks_dir = Naming.cemented_blocks_dir chain_dir in

@@ -141,6 +141,11 @@ val close : t -> unit
    lowest known cycle of the store. *)
 val cemented_blocks_files : t -> cemented_blocks_file array option
 
+(** [reload_cemented_blocks_files cemented_store] updates the cemented
+    store so the latest cemented files are available. This is
+    particularly useful for RO instances. *)
+val reload_cemented_blocks_files : t -> (unit, tztrace) result Lwt.t
+
 (** [cemented_metadata_files cemented_store] returns the {b current}
    array of cemented metadata files. The returned array is sorted in
    ascending order such that the first element of the array is the
