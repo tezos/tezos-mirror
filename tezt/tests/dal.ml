@@ -46,26 +46,8 @@ let hooks = Tezos_regression.hooks
 let rpc_hooks = Tezos_regression.rpc_hooks
 
 module Dal = Dal_common
+module Helpers = Dal.Helpers
 module Cryptobox = Dal.Cryptobox
-
-module Helpers = struct
-  include Dal.Helpers
-
-  (* We override store slot so that it uses a DAL node in this file. *)
-  let store_slot dal_node ?with_proof slot =
-    match Dal_node.runner dal_node with
-    | None -> store_slot (Either.Left dal_node) ?with_proof slot
-    | Some runner ->
-        let endpoint =
-          Endpoint.
-            {
-              host = runner.Runner.address;
-              scheme = "http";
-              port = Dal_node.rpc_port dal_node;
-            }
-        in
-        store_slot (Either.Right endpoint) ?with_proof slot
-end
 
 module Dal_RPC = struct
   include Dal.RPC

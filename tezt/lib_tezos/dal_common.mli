@@ -80,11 +80,12 @@ module Helpers : sig
   (** This function builds a slot with the given content, and makes the given
       DAL node to compute and store the corresponding commitment and shards by
       calling relevant RPCs. It returns the commitment and its proof. *)
+
   val store_slot :
-    (Dal_node.t, Endpoint.t) Either.t ->
-    ?with_proof:bool ->
-    slot ->
-    (string * string) Lwt.t
+    Dal_node.t -> ?with_proof:bool -> slot -> (string * string) Lwt.t
+
+  val store_slot_uri :
+    Endpoint.t -> ?with_proof:bool -> slot -> (string * string) Lwt.t
 
   val pp_cryptobox_error :
     Format.formatter ->

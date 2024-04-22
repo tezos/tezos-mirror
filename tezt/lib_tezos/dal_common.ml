@@ -580,6 +580,24 @@ module Helpers = struct
           Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
         in
         return (commitment, proof)
+
+  let store_slot_uri dal_node_endpoint ?with_proof slot =
+    store_slot (Either.Right dal_node_endpoint) ?with_proof slot
+
+  (* We override store slot so that it uses a DAL node in this file. *)
+  let store_slot dal_node ?with_proof slot =
+    match Dal_node.runner dal_node with
+    | None -> store_slot (Either.Left dal_node) ?with_proof slot
+    | Some runner ->
+        let endpoint =
+          Endpoint.
+            {
+              host = runner.Runner.address;
+              scheme = "http";
+              port = Dal_node.rpc_port dal_node;
+            }
+        in
+        store_slot (Either.Right endpoint) ?with_proof slot
 end
 
 module Commitment = struct
