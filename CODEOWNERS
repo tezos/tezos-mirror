@@ -15,6 +15,10 @@
 # Insert code owner declarations here!
 # ************************************
 
+
+/etherlink/bin_dsn_node               @jtcoolen @hantang.sun @m-kus
+/etherlink/tezt                       @jtcoolen @hantang.sun @m-kus
+
 # Octez Merge Team
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
