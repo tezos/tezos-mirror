@@ -54,7 +54,7 @@ type t = {
   endpoint : Uri.t;  (** The endpoint of a Tezos L1 node. *)
   metrics_addr : P2p_point.Id.t;
       (** The TCP address of the node's server used to export metrics. *)
-  profiles : Types.profiles;
+  profile : Profile_manager.t;
       (** The profiles determining the topics of interest. *)
   history_mode : history_mode;
 }

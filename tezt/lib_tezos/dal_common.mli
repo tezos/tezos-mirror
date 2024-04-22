@@ -129,7 +129,7 @@ module RPC : sig
   type operator_profiles = operator_profile list
 
   (* Profiles tracked by the DAL node. *)
-  type profiles = Bootstrap | Operator of operator_profiles
+  type profile = Bootstrap | Operator of operator_profiles
 
   (** Information contained in a slot header fetched from the DAL node. *)
   type slot_header = {
@@ -184,7 +184,7 @@ module RPC : sig
 
   (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)
-  val get_profiles : unit -> profiles RPC_core.t
+  val get_profiles : unit -> profile RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
         statuses known about the given commitment. The resulting list can be filtered by a
@@ -294,7 +294,7 @@ module Committee : sig
 end
 
 module Check : sig
-  val profiles_typ : RPC.profiles Check.typ
+  val profiles_typ : RPC.profile Check.typ
 
   val topics_peers_typ : (RPC.topic * string list) list Check.typ
 

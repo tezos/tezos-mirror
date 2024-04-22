@@ -72,16 +72,7 @@ let init_cryptobox config dal_config
      We should load the verifier SRS by default.
   *)
   let prover_srs =
-    match config.Configuration_file.profiles with
-    | Types.Bootstrap -> false
-    | Types.Random_observer -> true
-    | Types.Operator l ->
-        List.exists
-          (function
-            | Types.Attester _ -> false
-            | Producer _ -> true
-            | Observer _ -> true)
-          l
+    Profile_manager.is_prover_profile config.Configuration_file.profile
   in
   let* () =
     if prover_srs then
@@ -261,21 +252,20 @@ module Handler = struct
             Profile_manager.empty
             proto_parameters
             (Node_context.get_gs_worker ctxt)
-            config.Configuration_file.profiles
-      | Some pctxt ->
-          let profiles = Profile_manager.get_profiles pctxt in
+            config.Configuration_file.profile
+      | Some loaded_profile ->
           (* The profiles from the loaded context are prioritized over the
              profiles provided in the config file. *)
-          let merged_profiles =
-            Types.merge_profiles
-              ~lower_prio:config.Configuration_file.profiles
-              ~higher_prio:profiles
+          let merged_profile =
+            Profile_manager.merge_profiles
+              ~lower_prio:config.Configuration_file.profile
+              ~higher_prio:loaded_profile
           in
           Profile_manager.add_profiles
             Profile_manager.empty
             proto_parameters
             (Node_context.get_gs_worker ctxt)
-            merged_profiles
+            merged_profile
     in
     match pctxt_opt with
     | None -> fail Errors.[Profile_incompatibility]
@@ -627,12 +617,8 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
       match
         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
       with
-      | Operator profile_list
-        when List.exists
-               (function
-                 | Types.Observer {slot_index = index} -> index = slot_index
-                 | _ -> false)
-               profile_list ->
+      | Operator profile
+        when Operator_profile.is_observed_slot slot_index profile ->
           Amplificator.try_amplification
             node_store
             commitment
@@ -694,7 +680,7 @@ let run ~data_dir configuration_override =
              startup. *)
           peers = points;
           endpoint;
-          profiles;
+          profile;
           listen_addr;
           public_addr;
           _;
@@ -727,34 +713,33 @@ let run ~data_dir configuration_override =
     in
     let open Worker_parameters in
     let limits =
-      match profiles with
-      | Types.Bootstrap ->
-          (* Bootstrap nodes should always have a mesh size of zero.
-             so all grafts are responded with prunes with PX. See:
-             https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
+      if Profile_manager.is_bootstrap_profile profile then
+        (* Bootstrap nodes should always have a mesh size of zero.
+           so all grafts are responded with prunes with PX. See:
+           https://github.com/libp2p/specs/blob/f5c5829ef9753ef8b8a15d36725c59f0e9af897e/pubsub/gossipsub/gossipsub-v1.1.md#recommendations-for-network-operators
 
-             Additionally, we set [max_sent_iwant_per_heartbeat = 0]
-             so bootstrap nodes do not download any shards via IHave/IWant
-             transfers.
+           Additionally, we set [max_sent_iwant_per_heartbeat = 0]
+           so bootstrap nodes do not download any shards via IHave/IWant
+           transfers.
 
-             Also, we set [prune_backoff = 10] so that bootstrap nodes send PX
-             peers quicker. In particular, we want to avoid the following
-             scenario: a peer receives a Prune from the bootstrap node, then
-             disconnects for some reason and reconnects within the backoff
-             period; with a large backoff, its first Graft will be answered with
-             a no PX Prune, and therefore the peer will have to wait for the new
-             backoff timeout to be able to obtain PX peers. *)
-          {
-            limits with
-            max_sent_iwant_per_heartbeat = 0;
-            degree_low = 0;
-            degree_high = 0;
-            degree_out = 0;
-            degree_optimal = 0;
-            degree_score = 0;
-            prune_backoff = Ptime.Span.of_int_s 10;
-          }
-      | Random_observer | Operator _ -> limits
+           Also, we set [prune_backoff = 10] so that bootstrap nodes send PX
+           peers quicker. In particular, we want to avoid the following
+           scenario: a peer receives a Prune from the bootstrap node, then
+           disconnects for some reason and reconnects within the backoff
+           period; with a large backoff, its first Graft will be answered with
+           a no PX Prune, and therefore the peer will have to wait for the new
+           backoff timeout to be able to obtain PX peers. *)
+        {
+          limits with
+          max_sent_iwant_per_heartbeat = 0;
+          degree_low = 0;
+          degree_high = 0;
+          degree_out = 0;
+          degree_optimal = 0;
+          degree_score = 0;
+          prune_backoff = Ptime.Span.of_int_s 10;
+        }
+      else limits
     in
     let gs_worker =
       Gossipsub.Worker.(
@@ -774,7 +759,7 @@ let run ~data_dir configuration_override =
     let* p2p_config = p2p_config config in
     Gossipsub.Transport_layer.create
       ~public_addr
-      ~is_bootstrap_peer:(profiles = Types.Bootstrap)
+      ~is_bootstrap_peer:(profile = Profile_manager.bootstrap)
       p2p_config
       p2p_limits
       ~network_name

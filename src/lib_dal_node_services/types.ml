@@ -313,24 +313,7 @@ type slot_header = {
   status : header_status;
 }
 
-type operator_profile =
-  | Attester of Tezos_crypto.Signature.public_key_hash
-  | Producer of {slot_index : int}
-  | Observer of {slot_index : int}
-
-type operator_profiles = operator_profile list
-
-type profiles = Bootstrap | Operator of operator_profiles | Random_observer
-
-let merge_profiles ~lower_prio ~higher_prio =
-  match (lower_prio, higher_prio) with
-  | Bootstrap, Bootstrap -> Bootstrap
-  | Operator _, Bootstrap -> Bootstrap
-  | Bootstrap, Operator op -> Operator op
-  | Operator op1, Operator op2 -> Operator (op1 @ op2)
-  | Random_observer, Random_observer -> Random_observer
-  | Random_observer, ((Operator _ | Bootstrap) as profile) -> profile
-  | (Operator _ | Bootstrap), Random_observer -> Random_observer
+type profile = Bootstrap | Operator of Operator_profile.t | Random_observer
 
 type with_proof = {with_proof : bool}
 
@@ -423,35 +406,7 @@ let slot_header_encoding =
           (obj1 (req "commitment" Cryptobox.Commitment.encoding))
           header_status_encoding))
 
-let operator_profile_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"Attester with pkh"
-        (Tag 0)
-        (obj2
-           (req "kind" (constant "attester"))
-           (req
-              "public_key_hash"
-              Tezos_crypto.Signature.Public_key_hash.encoding))
-        (function Attester attest -> Some ((), attest) | _ -> None)
-        (function (), attest -> Attester attest);
-      case
-        ~title:"Slot producer"
-        (Tag 1)
-        (obj2 (req "kind" (constant "producer")) (req "slot_index" int31))
-        (function Producer {slot_index} -> Some ((), slot_index) | _ -> None)
-        (function (), slot_index -> Producer {slot_index});
-      case
-        ~title:"observer"
-        (Tag 2)
-        (obj2 (req "kind" (constant "observer")) (req "slot_index" int31))
-        (function Observer {slot_index} -> Some ((), slot_index) | _ -> None)
-        (function (), slot_index -> Observer {slot_index});
-    ]
-
-let profiles_encoding =
+let profile_encoding =
   let open Data_encoding in
   union
     [
@@ -466,7 +421,7 @@ let profiles_encoding =
         (Tag 2)
         (obj2
            (req "kind" (constant "operator"))
-           (req "operator_profiles" (list operator_profile_encoding)))
+           (req "operator_profiles" Operator_profile.encoding))
         (function
           | Operator operator_profiles -> Some ((), operator_profiles)
           | _ -> None)

@@ -229,41 +229,16 @@ type header_status =
         block. *)
   ]
 
-(** Profiles that operate on shards/slots. *)
-type operator_profile =
-  | Attester of Tezos_crypto.Signature.public_key_hash
-      (** [Attester pkh] downloads all shards assigned to [pkh].
-            Used by bakers to attest availability of their assigned shards. *)
-  | Producer of {slot_index : int}
-      (** [Producer {slot_index}] produces/publishes slot for slot index [slot_index]. *)
-  | Observer of {slot_index : int}
-      (** [Observer {slot_index}] observes slot for slot index
-          [slot_index]: collects the shards corresponding to some slot
-          index, reconstructs slots when enough shards are seen, and
-          republishes missing shards. *)
-
-(** List of operator profiles. It may contain dupicates as it represents profiles
-      provided by the user in unprocessed form. *)
-type operator_profiles = operator_profile list
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6958
-   Unify the {profiles} type with the one from `src/bin_dal_node/profile_manager.ml` *)
-
 (** DAL node can track one or many profiles that correspond to various modes
       that the DAL node would operate in. *)
-type profiles =
+type profile =
   | Bootstrap
       (** The bootstrap profile facilitates peer discovery in the DAL
-      network.  Note that bootstrap nodes are incompatible with
-      attester/producer/observer profiles as bootstrap nodes are
-      expected to connect to all the meshes with degree 0. *)
-  | Operator of operator_profiles
+          network.  Note that bootstrap nodes are incompatible with
+          attester/producer/observer profiles as bootstrap nodes are
+          expected to connect to all the meshes with degree 0. *)
+  | Operator of Operator_profile.t
   | Random_observer
-
-(* Merge the two sets of profiles. In case of incompatibility (that is, case
-   [Bootstrap] vs the other kinds), the profiles from [higher_prio] take
-   priority. *)
-val merge_profiles : lower_prio:profiles -> higher_prio:profiles -> profiles
 
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)
@@ -297,11 +272,9 @@ val slot_id_encoding : slot_id Data_encoding.t
 
 val header_status_encoding : header_status Data_encoding.t
 
-val profiles_encoding : profiles Data_encoding.t
+val profile_encoding : profile Data_encoding.t
 
 val with_proof_encoding : with_proof Data_encoding.t
-
-val operator_profile_encoding : operator_profile Data_encoding.t
 
 val attestable_slots_encoding : attestable_slots Data_encoding.t
 

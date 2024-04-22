@@ -258,6 +258,46 @@ module Profile_handlers = struct
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
   let get_attestable_slots ctxt pkh attested_level () () =
+    let get_attestable_slots ~shard_indices store proto_parameters
+        ~attested_level =
+      let open Lwt_result_syntax in
+      let expected_number_of_shards = List.length shard_indices in
+      if expected_number_of_shards = 0 then return Types.Not_in_committee
+      else
+        let published_level =
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
+             Correctly compute [published_level] in case of protocol changes, in
+             particular a change of the value of [attestation_lag]. *)
+          Int32.(
+            sub
+              attested_level
+              (of_int proto_parameters.Dal_plugin.attestation_lag))
+        in
+        let are_shards_stored slot_index =
+          let*! r =
+            Slot_manager.get_commitment_by_published_level_and_index
+              ~level:published_level
+              ~slot_index
+              store
+          in
+          let open Errors in
+          match r with
+          | Error `Not_found -> return_false
+          | Error (#decoding as e) ->
+              fail (e :> [Errors.decoding | Errors.other])
+          | Ok commitment ->
+              Store.Shards.are_shards_available
+                store.shards
+                commitment
+                shard_indices
+              |> lwt_map_error (fun e -> `Other e)
+        in
+        let all_slot_indexes =
+          Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
+        in
+        let* flags = List.map_es are_shards_stored all_slot_indexes in
+        return (Types.Attestable_slots {slots = flags; published_level})
+    in
     call_handler2 ctxt (fun store {proto_parameters; _} ->
         (* For retrieving the assigned shard indexes, we consider the committee
            at [attested_level - 1], because the (DAL) attestations in the blocks
@@ -271,7 +311,7 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
-        Profile_manager.get_attestable_slots
+        get_attestable_slots
           ~shard_indices
           store
           proto_parameters
