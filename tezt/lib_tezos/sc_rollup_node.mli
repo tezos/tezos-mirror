@@ -73,6 +73,7 @@ type argument =
   | Mode of mode
   | Rollup of string
   | Pre_images_endpoint of string
+  | Apply_unsafe_patches
 
 type event = {name : string; value : JSON.t; timestamp : float}
 

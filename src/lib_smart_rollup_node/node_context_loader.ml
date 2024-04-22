@@ -259,6 +259,7 @@ module For_snapshots = struct
           fee_parameters = Configuration.default_fee_parameters;
           mode;
           loser_mode;
+          apply_unsafe_patches = true;
           unsafe_pvm_patches = [];
           dal_node_endpoint = None;
           dac_observer_endpoint = None;
@@ -366,6 +367,7 @@ module Internal_for_tests = struct
           fee_parameters = Configuration.default_fee_parameters;
           mode;
           loser_mode;
+          apply_unsafe_patches = false;
           unsafe_pvm_patches = [];
           dal_node_endpoint = None;
           dac_observer_endpoint = None;

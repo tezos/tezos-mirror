@@ -105,6 +105,7 @@ type argument =
   | Mode of mode
   | Rollup of string
   | Pre_images_endpoint of string
+  | Apply_unsafe_patches
 
 let make_argument = function
   | Data_dir dir -> ["--data-dir"; dir]
@@ -124,6 +125,7 @@ let make_argument = function
   | Mode mode -> ["--mode"; string_of_mode mode]
   | Rollup addr -> ["--rollup"; addr]
   | Pre_images_endpoint addr -> ["--pre-images-endpoint"; addr]
+  | Apply_unsafe_patches -> ["--apply-unsafe-patches"]
 
 let is_redundant = function
   | Data_dir _, Data_dir _
@@ -141,7 +143,8 @@ let is_redundant = function
   | Dal_node _, Dal_node _
   | Mode _, Mode _
   | Rollup _, Rollup _
-  | Pre_images_endpoint _, Pre_images_endpoint _ ->
+  | Pre_images_endpoint _, Pre_images_endpoint _
+  | Apply_unsafe_patches, Apply_unsafe_patches ->
       true
   | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
   | Metrics_addr _, _
@@ -160,7 +163,8 @@ let is_redundant = function
   | Dal_node _, _
   | Mode _, _
   | Rollup _, _
-  | Pre_images_endpoint _, _ ->
+  | Pre_images_endpoint _, _
+  | Apply_unsafe_patches, _ ->
       false
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)

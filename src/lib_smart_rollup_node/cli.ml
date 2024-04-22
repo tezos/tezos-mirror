@@ -512,3 +512,10 @@ let protocol_hash_arg =
        the last registered protocol in the rollup node which may be different \
        between different versions of the node."
     protocol_hash_parameter
+
+let apply_unsafe_patches_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"apply-unsafe-patches"
+    ~doc:
+      "Apply unsafe PVM patches in the configuration or hardcoded by the node."
+    ()

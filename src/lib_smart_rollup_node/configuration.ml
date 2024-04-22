@@ -64,6 +64,7 @@ type t = {
   fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
+  apply_unsafe_patches : bool;
   unsafe_pvm_patches : Pvm_patches.unsafe_patch list;
   dal_node_endpoint : Uri.t option;
   dac_observer_endpoint : Uri.t option;
@@ -437,6 +438,7 @@ let encoding default_display : t Data_encoding.t =
            fee_parameters;
            mode;
            loser_mode;
+           apply_unsafe_patches = _;
            unsafe_pvm_patches;
            dal_node_endpoint;
            dac_observer_endpoint;
@@ -529,6 +531,10 @@ let encoding default_display : t Data_encoding.t =
         fee_parameters;
         mode;
         loser_mode;
+        apply_unsafe_patches =
+          (* Flag --apply-unsafe-patches must always be given on command
+             line. *)
+          false;
         unsafe_pvm_patches;
         dal_node_endpoint;
         dac_observer_endpoint;
@@ -739,7 +745,7 @@ module Cli = struct
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers =
+      ~allowed_origins ~allowed_headers ~apply_unsafe_patches =
     let open Result_syntax in
     let* purposed_operator, default_operator =
       get_purposed_and_default_operators operators
@@ -771,6 +777,7 @@ module Cli = struct
       fee_parameters = Operation_kind.Map.empty;
       mode;
       loser_mode = Option.value ~default:Loser_mode.no_failures loser_mode;
+      apply_unsafe_patches;
       unsafe_pvm_patches = [];
       batcher = default_batcher;
       injector =
@@ -818,7 +825,8 @@ module Cli = struct
       ~pre_images_endpoint ~injector_retention_period ~injector_attempts
       ~injection_ttl ~mode ~sc_rollup_address ~boot_sector_file ~operators
       ~index_buffer_size ~irmin_cache_size ~log_kernel_debug ~no_degraded
-      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers =
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches =
     let open Result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let* () = check_custom_mode mode in
@@ -874,6 +882,7 @@ module Cli = struct
               Option.value ~default:default_injector.injection_ttl injection_ttl;
           };
         loser_mode = Option.value ~default:configuration.loser_mode loser_mode;
+        apply_unsafe_patches;
         metrics_addr = Option.either metrics_addr configuration.metrics_addr;
         index_buffer_size =
           Option.either index_buffer_size configuration.index_buffer_size;
@@ -911,7 +920,7 @@ module Cli = struct
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
       ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers =
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the smart rollup node is not the one of Octez node *)
@@ -959,6 +968,7 @@ module Cli = struct
           ~history_mode
           ~allowed_origins
           ~allowed_headers
+          ~apply_unsafe_patches
       in
       return configuration
     else
@@ -1008,6 +1018,7 @@ module Cli = struct
           ~history_mode
           ~allowed_headers
           ~allowed_origins
+          ~apply_unsafe_patches
       in
       return config
 end

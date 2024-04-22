@@ -93,6 +93,7 @@ type t = {
   fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
+  apply_unsafe_patches : bool;
   unsafe_pvm_patches : Pvm_patches.unsafe_patch list;
   (*DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3718
     Decide whether we want to handle connections to multiple
@@ -288,6 +289,7 @@ module Cli : sig
     history_mode:history_mode option ->
     allowed_origins:string list option ->
     allowed_headers:string list option ->
+    apply_unsafe_patches:bool ->
     t tzresult
 
   val create_or_read_config :
@@ -320,5 +322,6 @@ module Cli : sig
     history_mode:history_mode option ->
     allowed_origins:string list option ->
     allowed_headers:string list option ->
+    apply_unsafe_patches:bool ->
     t tzresult Lwt.t
 end
