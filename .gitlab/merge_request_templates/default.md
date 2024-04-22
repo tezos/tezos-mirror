@@ -3,19 +3,22 @@ Thanks you for taking the time to contributing to the Tezos project!
 
 Make sure to read our Contributing guide (https://tezos.gitlab.io/developer/contributing.html) and the Merge process description (https://tezos.gitlab.io/developer/merge_team.html). -->
 
-# Context
+# What
 
-<!--
-Describe the feature this MR introduces or the bug that it fixes.
+<!-- Explain what your MR does without going into details. -->
 
-Refer to corresponding issues if applicable (writing "Related: `<issue number>` or "Fixes: `<issue number>`" accordingly).
+# Why
 
-Specify related merge requests, specifically dependencies. -->
+<!-- Explain the motivation for your work. -->
+
+# How
+
+<!-- Explain how your MR achieves what it says it does and why it is a good way. -->
+<!-- Discuss possible side-effects and other solutions you have considered. -->
 
 # Manually testing the MR
 
-<!--
-Describe how reviewers and approvers can test this MR. -->
+<!-- Describe how reviewers and approvers can test this MR. -->
 
 # Checklist
 
@@ -25,8 +28,3 @@ Describe how reviewers and approvers can test this MR. -->
 - [ ] For new features and bug fixes, add an item in the appropriate changelog (`docs/protocols/alpha.rst` for the protocol and the environment, `CHANGES.rst` at the root of the repository for everything else).
 - [ ] Select suitable reviewers using the `Reviewers` field below.
 - [ ] Select as `Assignee` the next person who should [take action on that MR](https://tezos.gitlab.io/developer/contributing.html#merge-request-assignees-field)
-
-<!--
-Note: If you modify this merge request description template, also update its copy at 
-https://gitlab.com/tezos/tezos/-/settings/merge_requests#project_merge_requests_template
--->
