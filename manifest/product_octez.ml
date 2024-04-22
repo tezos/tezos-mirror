@@ -3138,6 +3138,49 @@ let _irmin_pack_tests =
       ]
     ~preprocess:[pps ppx_irmin_internal]
 
+let _brassaia_pack_tests =
+  tezt
+    [
+      "common";
+      "test";
+      "test_async";
+      "test_corrupted";
+      "test_dispatcher";
+      "test_existing_stores";
+      "test_flush_reload";
+      "test_gc";
+      "test_hashes";
+      "test_indexing_strategy";
+      "test_inode";
+      "test_lower";
+      "test_mapping";
+      "test_nearest_geq";
+      "test_pack";
+      "test_pack_version_bump";
+      "test_readonly";
+      "test_ranges";
+      "test_snapshot";
+      "test_tree";
+      "test_upgrade";
+    ]
+    ~path:"brassaia/test/brassaia-pack"
+    ~opam:"tezos_internal_brassaia_tests"
+    ~synopsis:"Tezos internal brassaia tests"
+    ~deps:
+      [
+        octez_context_memory;
+        brassaia;
+        brassaia_test_helpers |> open_;
+        brassaia_pack;
+        brassaia_pack_unix;
+        brassaia_tezos;
+        octez_test_helpers |> open_;
+        alcotezt;
+        fpath;
+        tezt_lib |> open_ |> open_ ~m:"Base";
+      ]
+    ~preprocess:[pps ppx_brassaia_internal]
+
 (* This binding assumes that librustzcash.a is installed in the system default
    directories or in: $OPAM_SWITCH_PREFIX/lib
 
