@@ -1,0 +1,3 @@
+code { SUB } ;
+input { Stack_elt int 3 ; Stack_elt int 0 } ;
+output { Stack_elt int 3 }
