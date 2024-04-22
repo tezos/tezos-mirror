@@ -246,26 +246,25 @@ The table below summarises the modes and their associated purposes:
 +-------------+------------+----------+------------+------------+------------------+
 |             | Operating  | Batching | Cementing  | Recovering | Executing_outbox |
 +=============+============+==========+============+============+==================+
-| Operator    | Yes        | Yes      | Yes        | No         | Yes[^1]_         |
+| Operator    | Yes        | Yes      | Yes        | No         | Yes [#f1]_       |
 +-------------+------------+----------+------------+------------+------------------+
-| Maintenance | Yes        | No       | Yes        | No         | Yes[^1]_         |
+| Maintenance | Yes        | No       | Yes        | No         | Yes [#f1]_       |
 +-------------+------------+----------+------------+------------+------------------+
-| Bailout     | Yes[^2]_   | No       | Yes        | Yes        | No               |
+| Bailout     | Yes [#f2]_ | No       | Yes        | Yes        | No               |
 +-------------+------------+----------+------------+------------+------------------+
-| Accuser     | Yes [^3]_  | No       | No         | No         | No               |
+| Accuser     | Yes [#f3]_ | No       | No         | No         | No               |
 +-------------+------------+----------+------------+------------+------------------+
 | Batcher     | No         | Yes      | No         | No         | No               |
 +-------------+------------+----------+------------+------------+------------------+
 | Observer    | No         | No       | No         | No         | No               |
 +-------------+------------+----------+------------+------------+------------------+
 
-.. [^1] If and only it's a private rollup. In that case, only the
+.. [#f1] If and only it's a private rollup. In that case, only the
        whitelist update outbox message are injected.
-.. [^2] A rollup node in bailout mode won't publish any new commitments but only
+.. [#f2] A rollup node in bailout mode won't publish any new commitments but only
        defends the one published by the operator if they are refuted.
-.. [^3] An accuser node will publish commitments only when it detects
+.. [#f3] An accuser node will publish commitments only when it detects
        conflicts; for such cases it must make a deposit of 10,000 tez.
-
 
 Then to run the rollup node, use the following command:
 
@@ -309,9 +308,8 @@ To bypass that limitation and inject multiple
 it is possible to provide multiple keys for the batcher purpose of a
 rollup node. At each block, the rollup node will use as many keys as
 possible to inject a corresponding number of queued L2 messages into
-the L1 rollup inbox[^1].
-
-[^1]: The order of the batches of L2 messages is not guaranteed to be
+the L1 rollup inbox.
+The order of the batches of L2 messages is not guaranteed to be
 preserved by the rollup node nor by the octez node mempool.
 
 The way to provide multiple batcher keys on the command line is:
