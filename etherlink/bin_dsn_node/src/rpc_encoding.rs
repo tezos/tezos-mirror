@@ -56,11 +56,9 @@ impl<'de> Deserialize<'de> for JsonRpcVersion {
         let value: Value = Deserialize::deserialize(deserializer)?;
         match value {
             Value::String(s) if s == "2.0" => Ok(JsonRpcVersion::V2_0),
-            _ => {
-                Err(serde::de::Error::custom(
-                    "Only JSON-RPC version 2.0 supported",
-                ))
-            }
+            _ => Err(serde::de::Error::custom(
+                "Only JSON-RPC version 2.0 supported",
+            )),
         }
     }
 }
