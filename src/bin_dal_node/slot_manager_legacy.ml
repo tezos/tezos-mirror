@@ -205,10 +205,7 @@ let get_slot cryptobox store commitment =
   | Ok None | Error (`Decoding_failed _) ->
       (* The slot could not be obtained from the slot store, attempt a
          reconstruction. *)
-      let minimal_number_of_shards =
-        assert (number_of_shards mod redundancy_factor = 0) ;
-        number_of_shards / redundancy_factor
-      in
+      let minimal_number_of_shards = number_of_shards / redundancy_factor in
       let rec loop acc shard_id remaining =
         if remaining <= 0 then return acc
         else if shard_id >= number_of_shards then
