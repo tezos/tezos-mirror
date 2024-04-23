@@ -819,8 +819,6 @@ let test_rpc_produceBlock =
     ~tags:["evm"; "sequencer"; "produce_block"]
     ~title:"RPC method produceBlock"
   @@ fun {sequencer; _} _protocol ->
-  (* Set a large [time_between_blocks] to make sure the block production is
-     triggered by the RPC call. *)
   let*@ start_block_number = Rpc.block_number sequencer in
   let*@ _ = Rpc.produce_block sequencer in
   let*@ new_block_number = Rpc.block_number sequencer in
