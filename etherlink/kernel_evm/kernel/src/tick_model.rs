@@ -52,13 +52,13 @@ pub mod constants {
 
     /// The number of ticks used for storing receipt is overapproximated by
     /// an affine function of the size of the receipt
-    pub const RECEIPT_TICKS_COEF: u64 = 960;
+    pub const RECEIPT_TICKS_COEF: u64 = 1028;
     pub const RECEIPT_TICKS_INTERCEPT: u64 = 200_000;
 
     /// The number of ticks used for storing transactions is overapproximated by
     /// an affine function of the size of the transaction
     pub const TX_OBJ_TICKS_COEF: u64 = 880;
-    pub const TX_OBJ_TICKS_INTERCEPT: u64 = 200_000;
+    pub const TX_OBJ_TICKS_INTERCEPT: u64 = 900_000;
 
     /// The number of ticks used to compute the bloom filter is overapproximated
     /// by an affine function of the size of the bloom
