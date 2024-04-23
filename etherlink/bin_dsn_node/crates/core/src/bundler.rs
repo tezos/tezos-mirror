@@ -24,6 +24,8 @@ use crate::rpc_encoding::{SendRawTransaction, SendRawTransactionResult};
 use crate::server;
 use crate::server::RpcServer;
 
+// TODO: Move to separate bundler crate
+
 // TODO: Handle errors and make the return type of the BoxBody Infallible
 type Response = hyper::Response<BoxBody<Bytes, Box<dyn StdError + Send + Sync>>>;
 

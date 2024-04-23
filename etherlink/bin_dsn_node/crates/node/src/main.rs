@@ -17,26 +17,13 @@
 //! providing decryption shares for encrypted transactions.
 
 use clap::{command, Parser, Subcommand};
+use dsn_core::{bundler, sequencer, shutdown};
 use futures::future::try_join_all;
 use std::net::SocketAddr;
 use tracing::info;
 use url::Url;
 
-mod bundler;
-mod errors;
-mod json_http_rpc;
-mod rpc_encoding;
-mod server;
-mod shutdown;
-
 use tracing::error;
-
-mod error;
-mod sequencer;
-mod types;
-
-//TODO: move this to a separate crate
-mod rpc_helpers;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

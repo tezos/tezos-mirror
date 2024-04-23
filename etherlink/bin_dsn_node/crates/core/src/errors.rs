@@ -4,6 +4,9 @@
 
 use thiserror::Error;
 
+// TODO: Merge error and errors modules together
+// TODO: Move to separate crate
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Host component missing in URI")]

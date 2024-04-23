@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+//TODO: Move to separate sequencer crate
+
 use std::sync::Arc;
 
 pub mod protocol;

@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+//TODO: Move to separate types crate
+
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

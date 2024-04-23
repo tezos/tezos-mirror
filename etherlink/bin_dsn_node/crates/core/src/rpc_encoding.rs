@@ -5,6 +5,8 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
+//TODO: Move to separate rpc crate
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 enum Param {
