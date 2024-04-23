@@ -213,7 +213,7 @@ module type REFUTATION_GAME_HELPERS = sig
   val generate_proof :
     Node_context.rw -> Game.t -> Context.pvmstate -> string tzresult Lwt.t
 
-  (** [make_dissection plugin node_ctxt ~start_state ~start_chunk
+  (** [make_dissection plugin node_ctxt cache ~start_state ~start_chunk
       ~our_stop_chunk ~default_number_of_sections ~commitment_period_tick_offset
       ~last_level] computes a dissection from between [start_chunk] and
       [our_stop_chunk] at level [last_level]. [commitment_period_tick_offset] is
@@ -222,6 +222,7 @@ module type REFUTATION_GAME_HELPERS = sig
   val make_dissection :
     (module PARTIAL) ->
     Node_context.rw ->
+    Pvm_plugin_sig.state_cache ->
     start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state option ->
     start_chunk:Game.dissection_chunk ->
     our_stop_chunk:Game.dissection_chunk ->

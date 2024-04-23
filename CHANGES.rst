@@ -61,7 +61,10 @@ Smart Rollup node
   (MR :gl:`!12940`)
 
 - Support for unsafely increasing the WASM PVM's tick limit of a rollup.
-  (MR :gl:`!12907`)
+  (MRs :gl:`!12907`, :gl:`!12957`, :gl:`!12983`)
+
+- Use a local cache per game for intermediate states of dissections. (MR
+  :gl:`!12899`)
 
 Smart Rollup WASM Debugger
 --------------------------

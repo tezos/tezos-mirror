@@ -53,7 +53,7 @@ val genesis_state :
   _ Node_context.t ->
   (Context.pvmstate * original_genesis_state) tzresult Lwt.t
 
-(** [state_of_tick plugin node_ctxt ?start_state ~tick level] returns [Some
+(** [state_of_tick plugin node_ctxt cache ?start_state ~tick level] returns [Some
     state] for a given [tick] if this [tick] happened before [level] and where
     [state] is the PVM evaluation state before [tick] happened. Otherwise,
     returns [None]. If provided, the evaluation is resumed from
@@ -61,6 +61,7 @@ val genesis_state :
 val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
   Node_context.rw ->
+  Pvm_plugin_sig.state_cache ->
   ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
   int32 ->
