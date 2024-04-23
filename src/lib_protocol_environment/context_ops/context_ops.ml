@@ -36,6 +36,28 @@ type index =
   | Disk_index of Context.index
   | Memory_index of Tezos_context_memory.Context.index
 
+open Environment_context
+
+let init ~kind ?patch_context ?readonly ?index_log_size s =
+  let open Lwt_syntax in
+  match kind with
+  | `Disk ->
+      let patch_context =
+        Option.map
+          (fun f context ->
+            let open Lwt_result_syntax in
+            let* context = f (Shell_context.wrap_disk_context context) in
+            return @@ Shell_context.unwrap_disk_context context)
+          patch_context
+      in
+      let+ index = Context.init ?patch_context ?readonly ?index_log_size s in
+      Disk_index index
+  | `Memory ->
+      let+ index =
+        Tezos_context_memory.Context.init ?readonly ?index_log_size s
+      in
+      Memory_index index
+
 let index (context : Environment_context.t) =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
@@ -299,3 +321,14 @@ let close context_index =
   match context_index with
   | Disk_index index -> Context.close index
   | Memory_index index -> Tezos_context_memory.Context.close index
+
+let compute_testchain_chain_id (context : Environment_context.t) block_hash =
+  match context with
+  | Context {kind = Shell_context.Context; _} ->
+      Context.compute_testchain_chain_id block_hash
+  | Context {kind = Memory_context.Context; _} ->
+      Tezos_context_memory.Context.compute_testchain_chain_id block_hash
+  | Context t ->
+      err_implementation_mismatch
+        ~expected:"shell, brassaia or memory"
+        ~got:t.impl_name

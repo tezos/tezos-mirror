@@ -816,7 +816,9 @@ module Block = struct
             let*! forked_chains =
               Stored_data.get chain_state.forked_chains_data
             in
-            let testchain_id = Context.compute_testchain_chain_id genesis in
+            let testchain_id =
+              Context_ops.compute_testchain_chain_id context genesis
+            in
             let forked_hash_opt =
               Chain_id.Map.find testchain_id forked_chains
             in
@@ -2317,7 +2319,10 @@ module Chain = struct
       ~genesis_header ~test_protocol ~expiration =
     let open Lwt_result_syntax in
     let forked_block_hash = Block.hash forked_block in
-    let genesis_hash' = Context.compute_testchain_genesis forked_block_hash in
+    let* context = Block.context chain_store forked_block in
+    let genesis_hash' =
+      Context_ops.compute_testchain_genesis context forked_block_hash
+    in
     assert (Block_hash.equal genesis_hash genesis_hash') ;
     let* () =
       fail_unless
@@ -2704,7 +2709,7 @@ let load_store ?history_mode ?block_cache_limit store_dir ~context_index
   let global_store =
     {
       store_dir;
-      context_index = Context_ops.Disk_index context_index;
+      context_index;
       main_chain_store = None;
       protocol_store;
       allow_testchains;
@@ -2760,15 +2765,6 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ~store_dir ~context_dir ~allow_testchains genesis =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit init_store) readonly in
-  let patch_context =
-    Option.map
-      (fun f ctxt ->
-        let open Tezos_shell_context in
-        let ctxt = Shell_context.wrap_disk_context ctxt in
-        let+ ctxt = f ctxt in
-        Shell_context.unwrap_disk_context ctxt)
-      patch_context
-  in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
@@ -2777,15 +2773,15 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     match commit_genesis with
     | Some commit_genesis ->
         let*! context_index =
-          Context.init ~readonly:true ?patch_context context_dir
+          Context_ops.init ~kind:`Disk ~readonly:true ?patch_context context_dir
         in
         Lwt.return (context_index, commit_genesis)
     | None ->
         let*! context_index =
-          Context.init ~readonly ?patch_context context_dir
+          Context_ops.init ~kind:`Disk ~readonly ?patch_context context_dir
         in
         let commit_genesis ~chain_id =
-          Context.commit_genesis
+          Context_ops.commit_genesis
             context_index
             ~chain_id
             ~time:genesis.time
@@ -2815,7 +2811,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
       create_store
         ?block_cache_limit
         store_dir
-        ~context_index:(Context_ops.Disk_index context_index)
+        ~context_index
         ~chain_id
         ~genesis
         ~genesis_context
@@ -2827,7 +2823,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   let*! () =
     if
       (not (Chain.history_mode main_chain_store = Archive))
-      && not (Context.is_gc_allowed context_index)
+      && not (Context_ops.is_gc_allowed context_index)
     then Store_events.(emit context_gc_is_not_allowed) ()
     else Lwt.return_unit
   in
@@ -2863,7 +2859,9 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
     (* Nothing to do, the store is not set *)
     return_unit
   else
-    let*! context_index = Context.init ~readonly:false context_dir in
+    let*! context_index =
+      Context_ops.init ~kind:`Disk ~readonly:false context_dir
+    in
     let* store =
       load_store
         store_dir
@@ -3330,7 +3328,9 @@ module Unsafe = struct
     in
     protect
       (fun () ->
-        let*! context_index = Context.init ~readonly:true context_dir in
+        let*! context_index =
+          Context_ops.init ~kind:`Disk ~readonly:true context_dir
+        in
         let* store =
           load_store
             store_dir

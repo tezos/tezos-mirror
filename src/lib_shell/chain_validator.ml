@@ -194,16 +194,17 @@ let with_activated_peer_validator w peer_id f =
       | Worker_types.Launching _ ->
           return_ok_unit)
 
-let may_switch_test_chain w active_chains spawn_child block =
+let may_switch_test_chain w active_chains spawn_child chain_store block =
   let open Lwt_result_syntax in
   let nv = Worker.state w in
   let may_create_child block test_protocol expiration forking_block_hash =
     let block_header = Store.Block.header block in
+    let* context = Store.Block.context chain_store block in
     let genesis_hash =
-      Tezos_context_disk.Context.compute_testchain_genesis forking_block_hash
+      Context_ops.compute_testchain_genesis context forking_block_hash
     in
     let testchain_id =
-      Tezos_context_disk.Context.compute_testchain_chain_id genesis_hash
+      Context_ops.compute_testchain_chain_id context genesis_hash
     in
     let*! activated =
       match nv.child with
@@ -489,7 +490,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
     in
     let*! () =
       if start_testchain then
-        may_switch_test_chain w active_chains spawn_child block
+        may_switch_test_chain w active_chains spawn_child chain_store block
       else Lwt.return_unit
     in
     Lwt_watcher.notify nv.new_head_input (Store.Block.hash block, block_header) ;
