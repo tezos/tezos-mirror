@@ -3,7 +3,7 @@ module R = Rustzcash
 
 let test_get_memo_size () =
   let open Core.Raw in
-  let sk = List.nth Keys.xsks_raw 0 in
+  let sk = List.nth (Lazy.force Keys.xsks_raw) 0 in
   let vk = Viewing_key.of_sk sk in
   let address = Viewing_key.(dummy_address ()) in
   let rcm = Rcm.random () in
@@ -19,7 +19,7 @@ let test_proof_raw () =
   let open Core.Raw in
   let module S = Storage.Make_Storage (Core.Raw) in
   let module T = S.Tree in
-  let xsk = List.nth Keys.xsks_raw 0 in
+  let xsk = List.nth (Lazy.force Keys.xsks_raw) 0 in
   let vlue = 100L in
   let pos = 0L in
   let rcm = Rcm.random () in
@@ -88,9 +88,10 @@ let test_full_transaction () =
   let module T = S.Tree in
   let open Core.Raw in
   let key = "SaplingForTezosV1" in
-  let xsk1 = List.nth Keys.xsks_raw 0 in
-  let xsk2 = List.nth Keys.xsks_raw 1 in
-  let xsk3 = List.nth Keys.xsks_raw 2 in
+  let xsks_raw = Lazy.force Keys.xsks_raw in
+  let xsk1 = List.nth xsks_raw 0 in
+  let xsk2 = List.nth xsks_raw 1 in
+  let xsk3 = List.nth xsks_raw 2 in
   let xfvk1 = Viewing_key.of_sk xsk1 in
   let xfvk2 = Viewing_key.of_sk xsk2 in
   let xfvk3 = Viewing_key.of_sk xsk3 in
@@ -306,8 +307,8 @@ let test_forge () =
   let open Lwt_result_syntax in
   let module Core = Core.Client in
   let key = "SaplingForTezosV1" in
-  let sk1 = List.nth Keys.xsks 0 in
-  let sk2 = List.nth Keys.xsks 1 in
+  let sk1 = List.nth (Lazy.force Keys.xsks) 0 in
+  let sk2 = List.nth (Lazy.force Keys.xsks) 1 in
   let vk1 = Core.Viewing_key.of_sk sk1 in
   let vk2 = Core.Viewing_key.of_sk sk2 in
   let _, addr1 = Core.Viewing_key.(new_address vk1 default_index) in
@@ -363,8 +364,8 @@ let test_simple_client () =
   let open Example.Client in
   (*String that has to be equal to the one of the smart contract/verify_update*)
   let key = "SaplingForTezosV1" in
-  let wa = new_wallet (List.nth Keys.xsks 0) in
-  let wb = new_wallet (List.nth Keys.xsks 1) in
+  let wa = new_wallet (List.nth (Lazy.force Keys.xsks) 0) in
+  let wb = new_wallet (List.nth (Lazy.force Keys.xsks) 1) in
   (* create state with nothing *)
   let state = Storage.empty ~memo_size:2 in
   let addr_b = new_address wb in
@@ -428,7 +429,7 @@ let test_replay () =
   let open Example.Client in
   let right_string = "SaplingForTezosV1" in
   let wrong_string = "SaplingForTezosVaezf1" in
-  let wa = new_wallet (List.nth Keys.xsks 0) in
+  let wa = new_wallet (List.nth (Lazy.force Keys.xsks) 0) in
   let state = Storage.empty ~memo_size:2 in
   let addr = new_address wa in
   let t1, _ = pay wa addr 2L ~memo:"t1" 3L state right_string in
@@ -443,7 +444,7 @@ let test_wrong_bound_data () =
   let open Lwt_result_syntax in
   let open Example.Client in
   let key = "SaplingForTezosV1" in
-  let wa = new_wallet (List.nth Keys.xsks 0) in
+  let wa = new_wallet (List.nth (Lazy.force Keys.xsks) 0) in
   let state = Storage.empty ~memo_size:2 in
   let addr = new_address wa in
   let t1, _ = pay wa addr 2L ~memo:"t1" ~bound_data:"right" 3L state key in
