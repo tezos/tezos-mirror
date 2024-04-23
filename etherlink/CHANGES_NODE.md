@@ -51,6 +51,8 @@
   range or log numbers). (!12905)
 - Observers do not stop when the rollup node they are connected to advertise a
   blueprint application for a level in the future. (!12753)
+- The observer does not hang anymore when trying to reconnect to a sequencer that
+  is still down. (!13024)
 
 ### Breaking changes
 

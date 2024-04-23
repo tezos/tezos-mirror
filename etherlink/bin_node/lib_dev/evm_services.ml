@@ -104,7 +104,7 @@ let get_blueprint ~evm_node_endpoint Ethereum_types.(Qty level) =
     ()
 
 let monitor_blueprints ~evm_node_endpoint Ethereum_types.(Qty level) =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
   let* _spill_all =

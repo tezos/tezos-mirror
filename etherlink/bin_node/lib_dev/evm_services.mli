@@ -24,4 +24,4 @@ val register :
 val monitor_blueprints :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
-  Blueprint_types.with_events Lwt_stream.t Lwt.t
+  Blueprint_types.with_events Lwt_stream.t tzresult Lwt.t
