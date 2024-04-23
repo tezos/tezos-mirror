@@ -154,10 +154,10 @@ let current_block_height evm_state =
          whose number will be [zero]. Since the semantics of [apply_blueprint]
          is to verify the block height has been incremented once, we default to
          [-1]. *)
-      return (Block_height Z.(pred zero))
+      return (Qty Z.(pred zero))
   | Some current_block_number ->
       let (Qty current_block_number) = decode_number current_block_number in
-      return (Block_height current_block_number)
+      return (Qty current_block_number)
 
 let current_block_hash evm_state =
   let open Lwt_result_syntax in
@@ -197,9 +197,7 @@ let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
 
-type apply_result =
-  | Apply_success of t * block_height * block_hash
-  | Apply_failure
+type apply_result = Apply_success of t * quantity * block_hash | Apply_failure
 
 let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
     (blueprint : Blueprint_types.payload) =
@@ -209,7 +207,7 @@ let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
       (function `External payload -> `Input ("\001" ^ payload))
       blueprint
   in
-  let*! (Block_height before_height) = current_block_height evm_state in
+  let*! (Qty before_height) = current_block_height evm_state in
   let* evm_state =
     execute
       ?profile
@@ -220,10 +218,10 @@ let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
       evm_state
       exec_inputs
   in
-  let*! (Block_height after_height) = current_block_height evm_state in
+  let*! (Qty after_height) = current_block_height evm_state in
   let* block_hash = current_block_hash evm_state in
   if Z.(equal (succ before_height) after_height) then
-    return (Apply_success (evm_state, Block_height after_height, block_hash))
+    return (Apply_success (evm_state, Qty after_height, block_hash))
   else return Apply_failure
 
 let clear_delayed_inbox evm_state =

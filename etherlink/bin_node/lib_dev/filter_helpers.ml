@@ -42,8 +42,8 @@ open Ethereum_types
     A [bloom] filter is computed using the topics and address.
 *)
 type valid_filter = {
-  from_block : block_height;
-  to_block : block_height;
+  from_block : quantity;
+  to_block : quantity;
   bloom : Ethbloom.t;
   topics : filter_topic option list;
   address : address list;
@@ -71,7 +71,7 @@ let height_from_param (module Rollup_node_rpc : Services_backend_sig.S) from to_
       let+ h = Rollup_node_rpc.current_block_number () in
       (h, h)
 
-let valid_range log_filter_config (Block_height from) (Block_height to_) =
+let valid_range log_filter_config (Qty from) (Qty to_) =
   Z.(
     to_ >= from
     && to_ - from < of_int log_filter_config.Configuration.max_nb_blocks)
@@ -265,8 +265,8 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
   let* filter =
     validate_filter log_filter_config (module Rollup_node_rpc) filter
   in
-  let (Block_height from) = filter.from_block in
-  let (Block_height to_) = filter.to_block in
+  let (Qty from) = filter.from_block in
+  let (Qty to_) = filter.to_block in
   let length = Z.(to_int (to_ - from)) + 1 in
   let block_numbers =
     split_in_chunks ~chunk_size:log_filter_config.chunk_size ~length ~base:from

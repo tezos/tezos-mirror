@@ -90,19 +90,8 @@ let quantity_encoding =
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
-(** Ethereum block level. *)
-type block_height = Block_height of Z.t [@@ocaml.unboxed]
-
-let block_height_of_z z = Block_height z
-
-let block_height_encoding =
-  Data_encoding.conv
-    (fun (Block_height h) -> z_to_hexa h)
-    (fun h -> Block_height (Z.of_string h))
-    Data_encoding.string
-
 (** Ethereum block params in RPCs. *)
-type block_param = Hash_param of block_height | Earliest | Latest | Pending
+type block_param = Hash_param of quantity | Earliest | Latest | Pending
 
 let block_param_encoding =
   let open Data_encoding in
@@ -112,7 +101,7 @@ let block_param_encoding =
        case
          ~title:tag
          (Tag 0)
-         block_height_encoding
+         quantity_encoding
          (function Hash_param h -> Some h | _ -> None)
          (fun h -> Hash_param h));
       (let tag = "earliest" in
@@ -620,7 +609,7 @@ let block_transactions_encoding =
 
 (** Ethereum block hash representation from RPCs. *)
 type block = {
-  number : block_height;
+  number : quantity;
   hash : block_hash;
   parent : block_hash;
   nonce : hex;
@@ -712,7 +701,7 @@ let block_from_rlp bytes =
       let gasUsed = decode_number gasUsed in
       let timestamp = decode_number timestamp in
       {
-        number = Block_height number;
+        number = Qty number;
         hash;
         parent;
         (* Post merge: always 0. *)
@@ -829,7 +818,7 @@ let block_encoding =
       })
     (merge_objs
        (obj10
-          (req "number" block_height_encoding)
+          (req "number" quantity_encoding)
           (req "hash" block_hash_encoding)
           (req "parentHash" block_hash_encoding)
           (req "nonce" hex_encoding)
