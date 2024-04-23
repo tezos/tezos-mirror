@@ -203,15 +203,21 @@ let[@tailrec] rec main_loop ~first_connection ~evm_node_endpoint =
   in
 
   let*! head = Evm_context.head_info () in
-  let*! blueprints_stream =
+
+  let*! call_result =
     Evm_services.monitor_blueprints
       ~evm_node_endpoint
       head.next_blueprint_number
   in
-  (stream_loop [@tailcall])
-    ~evm_node_endpoint
-    head.next_blueprint_number
-    blueprints_stream
+
+  match call_result with
+  | Ok blueprints_stream ->
+      (stream_loop [@tailcall])
+        ~evm_node_endpoint
+        head.next_blueprint_number
+        blueprints_stream
+  | Error _ ->
+      (main_loop [@tailcall]) ~first_connection:false ~evm_node_endpoint
 
 and[@tailrec] stream_loop ~evm_node_endpoint (Qty next_blueprint_number) stream
     =

@@ -1319,6 +1319,40 @@ let test_observer_applies_blueprint_when_restarted =
 
   unit
 
+let test_observer_applies_blueprint_when_sequencer_restarted =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "observer"]
+    ~title:"Can restart the sequencer node"
+    ~uses
+  @@ fun protocol ->
+  (* Start the evm node *)
+  let* {sequencer; observer; _} =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+
+  (* We produce a block and check the observer applies it. *)
+  let* _ = Evm_node.wait_for_blueprint_applied observer 1
+  and* _ = Rpc.produce_block sequencer in
+
+  (* We stop the sequencer and wait for the observer to detect it and emit an
+     event accordingly. *)
+  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.wait_for_retrying_connect observer in
+
+  (* We wait for a second event from the observer to witness that its first
+     reconnection attempt failed. *)
+  let* () = Evm_node.wait_for_retrying_connect observer in
+
+  (* We restart the sequencer. *)
+  let* () = Evm_node.run sequencer in
+
+  (* We produce a block and check the observer applies it. *)
+  let* _ = Evm_node.wait_for_blueprint_applied observer 2
+  and* _ = Rpc.produce_block sequencer in
+
+  unit
+
 let test_observer_forwards_transaction ?(threshold_encryption = false) =
   let tags =
     List.append
@@ -2961,6 +2995,7 @@ let () =
   test_init_from_rollup_node_with_delayed_inbox protocols ;
   test_observer_applies_blueprint protocols ;
   test_observer_applies_blueprint_when_restarted protocols ;
+  test_observer_applies_blueprint_when_sequencer_restarted protocols ;
   test_observer_forwards_transaction protocols ;
   (* TODO Once we successfully integrate the octez-dsn-node executable into
      the build toolchain, we can revisit and reactivate the test below. *)
