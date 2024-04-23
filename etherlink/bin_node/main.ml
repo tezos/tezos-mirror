@@ -1316,11 +1316,10 @@ let replay_command =
   let open Tezos_clic in
   command
     ~desc:"Replay a specific block level."
-    (args7
+    (args6
        data_dir_arg
        preimages_arg
        preimages_endpoint_arg
-       rollup_address_arg
        verbose_arg
        kernel_arg
        profile_arg)
@@ -1332,13 +1331,7 @@ let replay_command =
               Lwt.return_ok
               @@ Evm_node_lib_dev_encoding.Ethereum_types.Qty (Z.of_string s)))
     @@ stop)
-    (fun ( data_dir,
-           preimages,
-           preimages_endpoint,
-           smart_rollup_address,
-           verbose,
-           kernel_path,
-           profile )
+    (fun (data_dir, preimages, preimages_endpoint, verbose, kernel_path, profile)
          l2_level
          () ->
       let open Lwt_result_syntax in
@@ -1349,9 +1342,6 @@ let replay_command =
           else None
         in
         init ?config ()
-      in
-      let smart_rollup_address =
-        Tezos_crypto.Hashed.Smart_rollup_address.to_string smart_rollup_address
       in
       let preimages =
         match preimages with
@@ -1364,7 +1354,6 @@ let replay_command =
         ~data_dir
         ~preimages
         ~preimages_endpoint
-        ~smart_rollup_address
         l2_level)
 
 let init_config_command =

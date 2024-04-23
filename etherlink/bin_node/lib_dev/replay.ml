@@ -36,7 +36,7 @@ let patch_kernel ~kernel_path evm_state =
   return evm_state
 
 let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ~smart_rollup_address number =
+    ?smart_rollup_address number =
   let open Lwt_result_syntax in
   let* _init =
     Evm_context.start
@@ -44,7 +44,7 @@ let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       ~preimages
       ~preimages_endpoint
       ~fail_on_missing_blueprint:false
-      ~smart_rollup_address
+      ?smart_rollup_address
       ()
   in
   let alter_evm_state =
