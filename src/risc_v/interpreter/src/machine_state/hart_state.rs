@@ -1,3 +1,4 @@
+use super::csregisters::values::CSRValue;
 use crate::{
     machine_state::{
         bus::Address,
@@ -94,16 +95,14 @@ impl<M: backend::Manager> HartState<M> {
         };
 
         // Setting xepc allows the trap handler to resume the previous computation
-        self.csregisters.write(xepc_reg, return_pc.into());
+        self.csregisters.write(xepc_reg, return_pc);
 
         // The trap handler wants to know what caused the trap
-        self.csregisters
-            .write(xcause_reg, trap_source.xcause().into());
-        self.csregisters
-            .write(xtval_reg, trap_source.xtval().into());
+        self.csregisters.write(xcause_reg, trap_source.xcause());
+        self.csregisters.write(xtval_reg, trap_source.xtval());
 
         // Configure machine status for the trap handler
-        let mstatus = self.csregisters.read(CSRegister::mstatus);
+        let mstatus: CSRValue = self.csregisters.read(CSRegister::mstatus);
         let mstatus = match trap_mode {
             TrapMode::Supervisor => {
                 // Remember whether interupts were enabled before taking the trap
@@ -143,12 +142,12 @@ impl<M: backend::Manager> HartState<M> {
                 )
             }
         };
-        self.csregisters.write(CSRegister::mstatus, mstatus.into());
+        self.csregisters.write(CSRegister::mstatus, mstatus);
 
         // Escalate the privilege to the corresponding mode
         self.mode.write(trap_mode.as_mode());
 
-        trap_source.trap_handler_address(self.csregisters.read(xtvec_reg).repr())
+        trap_source.trap_handler_address(self.csregisters.read(xtvec_reg))
     }
 }
 

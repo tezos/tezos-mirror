@@ -451,9 +451,10 @@ where
     pub(super) fn f_rounding_mode(&self, rm: InstrRoundingMode) -> Result<Round, Exception> {
         let rm = match rm {
             InstrRoundingMode::Static(rm) => rm,
-            InstrRoundingMode::Dynamic => {
-                self.csregisters.read(CSRegister::frm).repr().try_into()?
-            }
+            InstrRoundingMode::Dynamic => self
+                .csregisters
+                .read::<CSRRepr>(CSRegister::frm)
+                .try_into()?,
         };
 
         Ok(rm.into())

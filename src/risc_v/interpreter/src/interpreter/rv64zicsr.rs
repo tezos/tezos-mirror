@@ -48,10 +48,10 @@ where
 
         // When `rd = x0`, we don't want to trigger any CSR read effects.
         if rd.is_zero() {
-            self.csregisters.write(csr, value.into());
+            self.csregisters.write(csr, value);
         } else {
-            let old = self.csregisters.replace(csr, value.into());
-            self.xregisters.write(rd, old.repr());
+            let old: registers::XValue = self.csregisters.replace(csr, value);
+            self.xregisters.write(rd, old);
         }
         Ok(())
     }

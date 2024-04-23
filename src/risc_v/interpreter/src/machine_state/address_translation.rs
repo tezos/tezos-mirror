@@ -6,6 +6,7 @@ use super::{
     bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
     csregisters::{
         satp::{self, SvLength, TranslationAlgorithm},
+        values::CSRValue,
         xstatus, CSRRepr, CSRegister,
     },
     mode::Mode,
@@ -191,7 +192,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// as though the current privilege mode were set to MPP.
     /// Instruction address-translation and protection are unaffected by the setting of MPRV
     pub fn effective_translation_hart_mode(&self, access_type: &AccessType) -> Mode {
-        let mstatus = self.hart.csregisters.read(CSRegister::mstatus);
+        let mstatus: CSRValue = self.hart.csregisters.read(CSRegister::mstatus);
         if xstatus::get_MPRV(mstatus)
             && (access_type == &AccessType::Store || access_type == &AccessType::Load)
         {
@@ -217,7 +218,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Mode::User | Mode::Supervisor => (),
             Mode::Machine => return None,
         };
-        let satp = self.hart.csregisters.read(CSRegister::satp);
+        let satp: CSRValue = self.hart.csregisters.read(CSRegister::satp);
         satp::get_MODE(satp)
     }
 
@@ -234,7 +235,7 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             None => Ok(v_addr),
             Some(TranslationAlgorithm::Bare) => Ok(v_addr),
             Some(TranslationAlgorithm::Sv(length)) => {
-                let satp = self.hart.csregisters.read(CSRegister::satp).repr();
+                let satp = self.hart.csregisters.read(CSRegister::satp);
                 sv_translate_impl(&self.bus, v_addr, satp, length, &access_type)
                     .map_err(|_e| access_type.exception(v_addr))
             }

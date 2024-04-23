@@ -16,6 +16,7 @@ use self::{
 };
 use super::{bus::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
+    bits::Bits64,
     machine_state::mode::Mode,
     state_backend::{self as backend, Manager, Region},
     traps::{Exception, Interrupt, TrapContext, TrapKind},
@@ -1122,7 +1123,7 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> Result<()> {
     let mode = hart_state.mode.read();
     check_privilege(csr, mode)?;
-    let mstatus = hart_state.csregisters.read(CSRegister::mstatus);
+    let mstatus: CSRValue = hart_state.csregisters.read(CSRegister::mstatus);
     let tvm = xstatus::get_TVM(mstatus);
     check_satp_access(csr, tvm)?;
     let fs = xstatus::get_FS(mstatus);
@@ -1220,11 +1221,11 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Write to a CSR.
     #[inline(always)]
-    pub fn write(&mut self, reg: CSRegister, value: CSRValue) {
+    pub fn write<V: Bits64>(&mut self, reg: CSRegister, value: V) {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
         // extra function to read mstatus if needed
-        if let Some(value) = reg.make_value_writable(CSRRepr::from(value)) {
+        if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let (reg, value) = self.transform_write(reg, value);
             self.registers.write(reg as usize, value);
         }
@@ -1232,27 +1233,28 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Read from a CSR.
     #[inline(always)]
-    pub fn read(&self, reg: CSRegister) -> CSRValue {
+    pub fn read<V: Bits64>(&self, reg: CSRegister) -> V {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
 
         // sstatus is just a restricted view of mstatus.
         // to maintain consistency, when reading sstatus
         // just return mstatus with only the sstatus fields, making the other fields 0
-        self.transform_read(reg, None).into()
+        V::from_bits(self.transform_read(reg, None))
     }
 
     /// Replace the CSR value, returning the previous value.
     #[inline(always)]
-    pub fn replace(&mut self, reg: CSRegister, value: CSRValue) -> CSRValue {
+    pub fn replace<V: Bits64>(&mut self, reg: CSRegister, value: V) -> V {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
 
-        if let Some(value) = reg.make_value_writable(CSRRepr::from(value)) {
+        if let Some(value) = reg.make_value_writable(value.to_bits()) {
             let (upd_reg, value) = self.transform_write(reg, value);
             let old_value = self.registers.replace(upd_reg as usize, value);
 
-            self.transform_read(reg, Some(old_value)).into()
+            let old_value = self.transform_read(reg, Some(old_value));
+            V::from_bits(old_value)
         } else {
             self.read(reg)
         }
@@ -1263,9 +1265,9 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn set_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        let old_value = self.read(reg);
-        let new_value = CSRRepr::from(old_value) | bits;
-        self.write(reg, new_value.into());
+        let old_value: CSRValue = self.read(reg);
+        let new_value = old_value.repr() | bits;
+        self.write(reg, new_value);
         old_value
     }
 
@@ -1274,9 +1276,9 @@ impl<M: backend::Manager> CSRegisters<M> {
     pub fn clear_bits(&mut self, reg: CSRegister, bits: CSRRepr) -> CSRValue {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6594
         // Respect field specifications (e.g. WPRI, WLRL, WARL)
-        let old_value = self.read(reg);
+        let old_value: CSRValue = self.read(reg);
         let new_value = old_value.repr() & !bits;
-        self.write(reg, new_value.into());
+        self.write(reg, new_value);
         old_value
     }
 
@@ -1292,14 +1294,14 @@ impl<M: backend::Manager> CSRegisters<M> {
         // regardless of the setting of the global yIE
         // bit for the higher-privilege mode."
 
-        let mstatus = self.read(CSRegister::mstatus);
+        let mstatus: CSRValue = self.read(CSRegister::mstatus);
         let ie_machine = match xstatus::get_MIE(mstatus) {
-            true => self.read(CSRegister::mie).repr(),
-            false => 0,
+            true => self.read(CSRegister::mie),
+            false => 0u64,
         };
         let ie_supervisor = match xstatus::get_SIE(mstatus) {
-            true => self.read(CSRegister::sie).repr(),
-            false => 0,
+            true => self.read(CSRegister::sie),
+            false => 0u64,
         };
 
         match current_mode {
@@ -1352,7 +1354,7 @@ impl<M: backend::Manager> CSRegisters<M> {
                 TrapKind::Interrupt => CSRegister::mideleg,
                 TrapKind::Exception => CSRegister::medeleg,
             };
-            let deleg_val = self.read(deleg).repr();
+            let deleg_val: CSRRepr = self.read(deleg);
 
             match deleg_val.bit(trap_source.exception_code() as usize) {
                 true => TrapMode::Supervisor,
@@ -1369,12 +1371,10 @@ impl<M: backend::Manager> CSRegisters<M> {
         trap_source: &TC,
         trap_mode: TrapMode,
     ) -> Address {
-        let xtvec = self
-            .read(match trap_mode {
-                TrapMode::Supervisor => CSRegister::stvec,
-                TrapMode::Machine => CSRegister::mtvec,
-            })
-            .repr();
+        let xtvec = self.read(match trap_mode {
+            TrapMode::Supervisor => CSRegister::stvec,
+            TrapMode::Machine => CSRegister::mtvec,
+        });
         trap_source.trap_handler_address(xtvec)
     }
 }
@@ -1397,13 +1397,13 @@ impl<M: backend::Manager> CSRegisters<M> {
 
         // Then we try to reset known CSRs to known default values.
         for reg in CSRegister::iter() {
-            self.write(reg, reg.default_value().into());
+            self.write(reg, reg.default_value());
         }
     }
 
     /// Check whether floating point extension is disabled.
     pub fn floating_disabled(&self) -> bool {
-        let mstatus = self.read(CSRegister::mstatus);
+        let mstatus: CSRValue = self.read(CSRegister::mstatus);
 
         xstatus::get_FS(mstatus) == ExtensionValue::Off
     }
@@ -1419,7 +1419,9 @@ mod tests {
                 tests::{test_determinism, ManagerFor},
                 Backend, BackendManagement, Layout, Region,
             },
-            csregisters::{CSRegister, CSRegisters, CSRegistersLayout, Exception},
+            csregisters::{
+                values::CSRValue, CSRRepr, CSRegister, CSRegisters, CSRegistersLayout, Exception,
+            },
             mode::Mode,
         },
         traps::{Interrupt, TrapContext},
@@ -1628,60 +1630,75 @@ mod tests {
         // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP (through mstatus)
         csrs.write(
             CSRegister::mstatus,
-            (1 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 1 << 8 | 1 << 7).into(),
+            1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 1 << 8 | 1 << 7,
         );
         // SXL, UXL should be set to MXL (WARL), SD bit should be 1
-        let read_mstatus = csrs.read(CSRegister::mstatus);
+        let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
         assert_eq!(
             read_mstatus.repr(),
-            1 << 63 | 1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0b11 << 9 | 1 << 8 | 1 << 7
+            1u64 << 63
+                | 1 << 37
+                | 0b10 << 34
+                | 0b10 << 32
+                | 0b11 << 11
+                | 0b11 << 9
+                | 1 << 8
+                | 1 << 7
         );
         // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
-        let read_sstatus = csrs.read(CSRegister::sstatus);
+        let read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
         assert_eq!(
             read_sstatus.repr(),
-            1 << 63 | 0b10 << 32 | 0b11 << 9 | 1 << 8
+            1u64 << 63 | 0b10 << 32 | 0b11 << 9 | 1 << 8
         );
 
         // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP, (through sstatus, M-fields should be ignored, being WPRI)
         csrs.write(
             CSRegister::sstatus,
-            (0 << 37 | 0b11 << 34 | 0b01 << 32 | 0b11 << 11 | 0 << 9 | 0 << 7 | 1 << 8).into(),
+            0u64 << 37 | 0b11 << 34 | 0b01 << 32 | 0b11 << 11 | 0 << 9 | 0 << 7 | 1 << 8,
         );
         // setting VS to 0, SD bit becomes 0. Otherwise, only UXL and SPP fields are non-zero.
-        let second_read_sstatus = csrs.read(CSRegister::sstatus);
-        assert_eq!(second_read_sstatus.repr(), 0b10 << 32 | 1 << 8);
+        let second_read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
+        assert_eq!(second_read_sstatus.repr(), 0b10u64 << 32 | 1 << 8);
         // MBE remained 1, SXL, UXL are constant, MPP remained 0b11, VS is 0 due to the sstatus change, SPP and MPIE remained 1,
-        let read_mstatus = csrs.read(CSRegister::mstatus);
+        let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
         assert_eq!(
             read_mstatus.repr(),
-            1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
+            1u64 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
         );
 
         assert_eq!(csrs.registers.read(CSRegister::sstatus as usize), 0);
         assert_eq!(
             csrs.registers.read(CSRegister::mstatus as usize),
-            1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
+            1u64 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0 << 9 | 1 << 8 | 1 << 7
         );
 
         // write to MBE, SXL, UXL, MPP, VS, SPP, MPIE (through sstatus)
-        let old_sstatus = csrs.replace(
+        let old_sstatus: CSRValue = csrs.replace(
             CSRegister::sstatus,
-            (1 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 0 << 8 | 0 << 7).into(),
+            (1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 0 << 8 | 0 << 7)
+                .into(),
         );
         assert_eq!(old_sstatus, second_read_sstatus);
         assert_eq!(csrs.registers.read(CSRegister::sstatus as usize), 0x0);
         // SXL, UXL should be set to MXL (WARL), SD bit should be 1
-        let read_mstatus = csrs.read(CSRegister::mstatus);
+        let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
         assert_eq!(
             read_mstatus.repr(),
-            1 << 63 | 1 << 37 | 0b10 << 34 | 0b10 << 32 | 0b11 << 11 | 0b11 << 9 | 0 << 8 | 1 << 7
+            1u64 << 63
+                | 1 << 37
+                | 0b10 << 34
+                | 0b10 << 32
+                | 0b11 << 11
+                | 0b11 << 9
+                | 0 << 8
+                | 1 << 7
         );
         // SXL should be 0 (WPRI), MBE, MPP, MPIE should be 0 (WPRI for sstatus), SD bit also 1
-        let read_sstatus = csrs.read(CSRegister::sstatus);
+        let read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
         assert_eq!(
             read_sstatus.repr(),
-            1 << 63 | 0b10 << 32 | 0b11 << 9 | 0 << 8
+            1u64 << 63 | 0b10 << 32 | 0b11 << 9 | 0 << 8
         );
     });
 
@@ -1695,14 +1712,14 @@ mod tests {
         let stip: u64 = 1 << Interrupt::SupervisorTimer.exception_code();
 
         // check shadowing of MTIP
-        csrs.write(CSRegister::mip, (mtip | seip).into());
-        assert_eq!(csrs.read(CSRegister::mip).repr(), mtip | seip);
-        assert_eq!(csrs.read(CSRegister::sip).repr(), seip);
+        csrs.write(CSRegister::mip, mtip | seip);
+        assert_eq!(csrs.read::<CSRRepr>(CSRegister::mip), mtip | seip);
+        assert_eq!(csrs.read::<CSRRepr>(CSRegister::sip), seip);
 
         // MSIP bit should not be written
-        csrs.write(CSRegister::sie, (stip | seip | msip).into());
-        assert_eq!(csrs.read(CSRegister::mie).repr(), stip | seip);
-        assert_eq!(csrs.read(CSRegister::sie).repr(), stip | seip);
+        csrs.write(CSRegister::sie, stip | seip | msip);
+        assert_eq!(csrs.read::<CSRRepr>(CSRegister::mie), stip | seip);
+        assert_eq!(csrs.read::<CSRRepr>(CSRegister::sie), stip | seip);
     });
 
     backend_test!(test_reset, F, {
@@ -1718,29 +1735,29 @@ mod tests {
         let mut csrs = create_state!(CSRegisters, CSRegistersLayout, F, backend);
 
         // check starting values
-        assert_eq!(0, csrs.read(CSRegister::fcsr).repr());
-        assert_eq!(0, csrs.read(CSRegister::frm).repr());
-        assert_eq!(0, csrs.read(CSRegister::fflags).repr());
+        assert_eq!(0, csrs.read::<CSRRepr>(CSRegister::fcsr));
+        assert_eq!(0, csrs.read::<CSRRepr>(CSRegister::frm));
+        assert_eq!(0, csrs.read::<CSRRepr>(CSRegister::fflags));
 
         // writing to fcsr is reflected in frm/fflags
-        csrs.write(CSRegister::fcsr, u64::MAX.into());
+        csrs.write(CSRegister::fcsr, u64::MAX);
 
-        assert_eq!(0xff, csrs.read(CSRegister::fcsr).repr());
-        assert_eq!(0b111, csrs.read(CSRegister::frm).repr());
-        assert_eq!(0b11111, csrs.read(CSRegister::fflags).repr());
+        assert_eq!(0xff, csrs.read::<CSRRepr>(CSRegister::fcsr));
+        assert_eq!(0b111, csrs.read::<CSRRepr>(CSRegister::frm));
+        assert_eq!(0b11111, csrs.read::<CSRRepr>(CSRegister::fflags));
 
         // writing to frm is reflected in fcsr
-        csrs.write(CSRegister::frm, 0b010.into());
+        csrs.write(CSRegister::frm, 0b010);
 
-        assert_eq!(0b01011111, csrs.read(CSRegister::fcsr).repr());
-        assert_eq!(0b010, csrs.read(CSRegister::frm).repr());
-        assert_eq!(0b11111, csrs.read(CSRegister::fflags).repr());
+        assert_eq!(0b01011111, csrs.read::<CSRRepr>(CSRegister::fcsr));
+        assert_eq!(0b010, csrs.read::<CSRRepr>(CSRegister::frm));
+        assert_eq!(0b11111, csrs.read::<CSRRepr>(CSRegister::fflags));
 
         // writing to fflags is reflected in fcsr
-        csrs.write(CSRegister::fflags, 0b01010.into());
+        csrs.write(CSRegister::fflags, 0b01010);
 
-        assert_eq!(0b01001010, csrs.read(CSRegister::fcsr).repr());
-        assert_eq!(0b010, csrs.read(CSRegister::frm).repr());
-        assert_eq!(0b01010, csrs.read(CSRegister::fflags).repr());
+        assert_eq!(0b01001010, csrs.read::<CSRRepr>(CSRegister::fcsr));
+        assert_eq!(0b010, csrs.read::<CSRRepr>(CSRegister::frm));
+        assert_eq!(0b01010, csrs.read::<CSRRepr>(CSRegister::fflags));
     });
 }

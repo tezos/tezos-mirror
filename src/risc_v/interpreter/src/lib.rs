@@ -25,6 +25,7 @@ use crate::{
     },
     traps::EnvironException,
 };
+use bits::Bits64;
 use derive_more::{Error, From};
 use exec_env::{
     posix::{Posix, PosixState},
@@ -32,7 +33,7 @@ use exec_env::{
 };
 use machine_state::{
     bus::Address,
-    csregisters::{satp::TranslationAlgorithm, CSRRepr, CSRegister},
+    csregisters::{satp::TranslationAlgorithm, CSRegister},
     registers::{FRegister, FValue},
     AccessType,
 };
@@ -181,8 +182,8 @@ impl<'a> Interpreter<'a> {
         self.machine_state.hart.fregisters.read(reg)
     }
 
-    pub fn read_csregister(&self, reg: CSRegister) -> CSRRepr {
-        self.machine_state.hart.csregisters.read(reg).repr()
+    pub fn read_csregister<V: Bits64>(&self, reg: CSRegister) -> V {
+        self.machine_state.hart.csregisters.read::<V>(reg)
     }
 
     pub fn read_pc(&self) -> u64 {
