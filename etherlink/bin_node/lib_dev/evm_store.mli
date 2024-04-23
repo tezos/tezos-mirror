@@ -98,6 +98,16 @@ module L1_latest_known_level : sig
   val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
+module Metadata : sig
+  val store :
+    t -> Tezos_crypto.Hashed.Smart_rollup_address.t -> unit tzresult Lwt.t
+
+  val get : t -> Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
+
+  val find :
+    t -> Tezos_crypto.Hashed.Smart_rollup_address.t option tzresult Lwt.t
+end
+
 (** [reset store ~l2_level] clear the table that has information
     related to l2 level that after [l2_level] *)
 val reset : t -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
