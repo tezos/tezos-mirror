@@ -315,8 +315,6 @@ module Legacy = struct
          The status associated to a slot header is either
          [`Waiting_attesattion], [`Attested], or [`Unattested]. *)
 
-      val slots_indices : Types.level -> Irmin.Path.t
-
       val commitment : Types.slot_id -> Irmin.Path.t
 
       val status : Types.slot_id -> Irmin.Path.t
@@ -474,35 +472,6 @@ module Legacy = struct
       ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
       commitment_str_opt
 
-  let get_headers ~skip_commitment slot_ids store accu =
-    let open Lwt_result_syntax in
-    List.fold_left_es
-      (fun acc slot_id ->
-        let commitment_path = Path.Level.commitment slot_id in
-        let*! commitment_opt = Irmin.find store commitment_path in
-        match commitment_opt with
-        | None -> return acc
-        | Some read_commitment -> (
-            let*? decision = skip_commitment read_commitment in
-            match decision with
-            | `Skip -> return acc
-            | `Keep commitment -> (
-                let status_path = Path.Level.status slot_id in
-                let*! status_opt = Irmin.find store status_path in
-                match status_opt with
-                | None -> return acc
-                | Some status_str ->
-                    let*? status = decode_header_status status_str in
-                    return
-                    @@ {
-                         Types.slot_id;
-                         commitment;
-                         status = (status :> Types.header_status);
-                       }
-                       :: acc)))
-      accu
-      slot_ids
-
   let get_slot_status ~slot_id node_store =
     let open Lwt_result_syntax in
     let store = node_store.store in
@@ -513,42 +482,4 @@ module Legacy = struct
     | Some status_str ->
         let*? status = decode_header_status status_str in
         return_some status
-
-  let get_published_level_headers ~published_level ?header_status node_store =
-    let open Lwt_result_syntax in
-    let store = node_store.store in
-    (* Get the list of slots indices from the given level. *)
-    let*! slots_indices =
-      Irmin.list store @@ Path.Level.slots_indices published_level
-    in
-    (* Build the list of slot IDs. *)
-    let slot_ids =
-      List.rev_map
-        (fun (index, _tree) ->
-          {
-            Types.Slot_id.slot_level = published_level;
-            slot_index = int_of_string index;
-          })
-        slots_indices
-    in
-    let* accu =
-      let skip_commitment c =
-        let open Result_syntax in
-        let* commit = decode_commitment c in
-        return @@ `Keep commit
-      in
-      get_headers ~skip_commitment slot_ids store []
-    in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4541
-       Enable the same filtering for GET /commitments/<commitment>/headers
-       (function get_commitment_headers above). Push this filtering into the result
-       construction? *)
-    return
-    @@
-    match header_status with
-    | None -> accu
-    | Some hs ->
-        List.filter_map
-          (fun header -> if header.Types.status = hs then Some header else None)
-          accu
 end

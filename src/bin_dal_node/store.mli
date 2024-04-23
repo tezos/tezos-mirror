@@ -196,18 +196,4 @@ module Legacy : sig
       [> `Decoding_failed of Types.Store.kind * tztrace] )
     result
     Lwt.t
-
-  (** [get_published_level_headers ~published_level ?header_status
-      store] returns all the slot headers (commitments, slot
-      identifiers, and statuses) of the slots published at the given
-      level. The optional argument ?header_status can be used to
-      restrict the output to only the headers with the given status. *)
-  val get_published_level_headers :
-    published_level:int32 ->
-    ?header_status:Types.header_status ->
-    t ->
-    ( Types.slot_header list,
-      [> `Decoding_failed of Types.Store.kind * tztrace] )
-    result
-    Lwt.t
 end
