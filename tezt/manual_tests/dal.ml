@@ -32,14 +32,6 @@
 
 module Dal = Dal_common
 
-module Helpers = struct
-  include Dal.Helpers
-
-  (* We override store slot so that it uses a DAL node in this file. *)
-  let store_slot dal_node ?with_proof slot =
-    store_slot (Either.Left dal_node) ?with_proof slot
-end
-
 module Dal_RPC = struct
   include Dal.RPC
 
@@ -351,10 +343,11 @@ let slots_injector_scenario ?publisher_sk ~airdropper_alias client dal_node
   (* Endless loop that injects slots *)
   let rec loop level =
     let slot =
-      sf "slot=%d/payload=%d" slot_index level |> Helpers.make_slot ~slot_size
+      sf "slot=%d/payload=%d" slot_index level
+      |> Dal_common.Helpers.make_slot ~slot_size
     in
     let* commitment, proof =
-      Helpers.store_slot dal_node ~with_proof:true slot
+      Dal_common.Helpers.store_slot dal_node ~with_proof:true slot
     in
     let* level = Node.wait_for_level l1_node (level + 1) in
     let*! () =

@@ -477,16 +477,57 @@ module Dal_RPC = struct
   end
 end
 
+let pad n message =
+  let padding = String.make n '\000' in
+  message ^ padding
+
+module Commitment = struct
+  let dummy_commitment
+      ?(on_error =
+        function
+        | `Slot_wrong_size str ->
+            Test.fail "Dal_common.dummy_commitment failed: %s" str
+        | ( `Invalid_degree_strictly_less_than_expected _
+          | `Prover_SRS_not_loaded ) as commit_error ->
+            Test.fail "%s" (Cryptobox.string_of_commit_error commit_error))
+      cryptobox message =
+    let parameters = Cryptobox.Verifier.parameters cryptobox in
+    let padding_length = parameters.slot_size - String.length message in
+    let padded_message =
+      if padding_length > 0 then pad padding_length message else message
+    in
+    let slot = String.to_bytes padded_message in
+    let open Tezos_error_monad.Error_monad.Result_syntax in
+    (let* p = Cryptobox.polynomial_from_slot cryptobox slot in
+     let* cm = Cryptobox.commit cryptobox p in
+     let* proof = Cryptobox.prove_commitment cryptobox p in
+     Ok (cm, proof))
+    |> function
+    | Ok res -> res
+    | Error e -> on_error e
+
+  let to_string commitment = Cryptobox.Commitment.to_b58check commitment
+
+  let of_string commitment =
+    Cryptobox.Commitment.of_b58check_opt commitment
+    |> mandatory "The b58check-encoded slot commitment is not valid"
+
+  let proof_to_string proof =
+    Data_encoding.Json.construct Cryptobox.Commitment_proof.encoding proof
+    |> Data_encoding.Json.to_string
+
+  let proof_of_string proof =
+    Data_encoding.Json.destruct
+      Cryptobox.Commitment_proof.encoding
+      (`String proof)
+end
+
 module Helpers = struct
   let endpoint dal_node =
     Printf.sprintf
       "http://%s:%d"
       (Dal_node.rpc_host dal_node)
       (Dal_node.rpc_port dal_node)
-
-  let pad n message =
-    let padding = String.make n '\000' in
-    message ^ padding
 
   type slot = string
 
@@ -580,47 +621,44 @@ module Helpers = struct
           Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
         in
         return (commitment, proof)
-end
 
-module Commitment = struct
-  let dummy_commitment
-      ?(on_error =
-        function
-        | `Slot_wrong_size str ->
-            Test.fail "Dal_common.dummy_commitment failed: %s" str
-        | ( `Invalid_degree_strictly_less_than_expected _
-          | `Prover_SRS_not_loaded ) as commit_error ->
-            Test.fail "%s" (Cryptobox.string_of_commit_error commit_error))
-      cryptobox message =
-    let parameters = Cryptobox.Verifier.parameters cryptobox in
-    let padding_length = parameters.slot_size - String.length message in
-    let padded_message =
-      if padding_length > 0 then Helpers.pad padding_length message else message
+  let store_slot_uri dal_node_endpoint ?with_proof slot =
+    store_slot (Either.Right dal_node_endpoint) ?with_proof slot
+
+  (* We override store slot so that it uses a DAL node in this file. *)
+  let store_slot dal_node ?with_proof slot =
+    match Dal_node.runner dal_node with
+    | None -> store_slot (Either.Left dal_node) ?with_proof slot
+    | Some runner ->
+        let endpoint =
+          Endpoint.
+            {
+              host = runner.Runner.address;
+              scheme = "http";
+              port = Dal_node.rpc_port dal_node;
+            }
+        in
+        store_slot (Either.Right endpoint) ?with_proof slot
+
+  let publish_and_store_slot ?dont_wait ?with_proof ?counter ?force
+      ?(fee = 1_200) client dal_node source ~index content =
+    (* We override store slot so that it uses a DAL node in this file. *)
+    let* commitment_string, proof = store_slot dal_node ?with_proof content in
+    let commitment = Commitment.of_string commitment_string in
+    let proof = Commitment.proof_of_string proof in
+    let* _ =
+      publish_commitment
+        ?dont_wait
+        ?counter
+        ?force
+        ~source
+        ~fee
+        ~index
+        ~commitment
+        ~proof
+        client
     in
-    let slot = String.to_bytes padded_message in
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    (let* p = Cryptobox.polynomial_from_slot cryptobox slot in
-     let* cm = Cryptobox.commit cryptobox p in
-     let* proof = Cryptobox.prove_commitment cryptobox p in
-     Ok (cm, proof))
-    |> function
-    | Ok res -> res
-    | Error e -> on_error e
-
-  let to_string commitment = Cryptobox.Commitment.to_b58check commitment
-
-  let of_string commitment =
-    Cryptobox.Commitment.of_b58check_opt commitment
-    |> mandatory "The b58check-encoded slot commitment is not valid"
-
-  let proof_to_string proof =
-    Data_encoding.Json.construct Cryptobox.Commitment_proof.encoding proof
-    |> Data_encoding.Json.to_string
-
-  let proof_of_string proof =
-    Data_encoding.Json.destruct
-      Cryptobox.Commitment_proof.encoding
-      (`String proof)
+    return commitment_string
 end
 
 module Check = struct
