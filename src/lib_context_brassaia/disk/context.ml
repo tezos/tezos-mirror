@@ -42,7 +42,7 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"context_dump.write.cannot_open"
+    ~id:"brassaia.context_dump.write.cannot_open"
     ~title:"Cannot open file for context dump"
     ~description:""
     ~pp:(fun ppf uerr ->
@@ -55,7 +55,7 @@ let () =
     (fun e -> Cannot_create_file e) ;
   register_error_kind
     `Permanent
-    ~id:"context_dump.read.cannot_open"
+    ~id:"brassaia.context_dump.read.cannot_open"
     ~title:"Cannot open file for context restoring"
     ~description:""
     ~pp:(fun ppf uerr ->
@@ -68,7 +68,7 @@ let () =
     (fun e -> Cannot_open_file e) ;
   register_error_kind
     `Permanent
-    ~id:"context_dump.cannot_find_protocol"
+    ~id:"brassaia.context_dump.cannot_find_protocol"
     ~title:"Cannot find protocol"
     ~description:""
     ~pp:(fun ppf () -> Format.fprintf ppf "@[Cannot find protocol in context@]")
@@ -77,7 +77,7 @@ let () =
     (fun () -> Cannot_find_protocol) ;
   register_error_kind
     `Permanent
-    ~id:"context_dump.read.suspicious"
+    ~id:"brassaia.context_dump.read.suspicious"
     ~title:"Suspicious file: data after end"
     ~description:""
     ~pp:(fun ppf uerr ->
@@ -161,7 +161,7 @@ let () =
 module Events = struct
   include Internal_event.Simple
 
-  let section = ["node"; "context"; "disk"]
+  let section = ["node"; "context_brassaia"; "disk"]
 
   let init_context =
     declare_3

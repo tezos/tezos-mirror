@@ -393,7 +393,7 @@ type error += Unsupported_context_hash_version of Context_hash.Version.t
 let () =
   register_error_kind
     `Permanent
-    ~id:"context_hash.unsupported_version"
+    ~id:"brassaia.context_hash.unsupported_version"
     ~title:"Unsupported context hash version"
     ~description:"Unsupported context hash version."
     ~pp:(fun ppf version ->

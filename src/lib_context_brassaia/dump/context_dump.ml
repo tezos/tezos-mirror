@@ -41,7 +41,7 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"context_dump.writing_error"
+    ~id:"brassaia.context_dump.writing_error"
     ~title:"Writing error"
     ~description:"Cannot write in file for context dump"
     ~pp:(fun ppf s ->
@@ -51,7 +51,7 @@ let () =
     (fun s -> System_write_error s) ;
   register_error_kind
     `Permanent
-    ~id:"context_dump.context_not_found"
+    ~id:"brassaia.context_dump.context_not_found"
     ~title:"Context not found"
     ~description:"Cannot find context corresponding to hash"
     ~pp:(fun ppf mb ->
@@ -61,7 +61,7 @@ let () =
     (fun mb -> Context_not_found mb) ;
   register_error_kind
     `Permanent
-    ~id:"context_dump.system_read_error"
+    ~id:"brassaia.context_dump.system_read_error"
     ~title:"System read error"
     ~description:"Failed to read file"
     ~pp:(fun ppf uerr ->
@@ -71,7 +71,7 @@ let () =
     (fun e -> System_read_error e) ;
   register_error_kind
     `Permanent
-    ~id:"context_dump.inconsistent_context_dump"
+    ~id:"brassaia.context_dump.inconsistent_context_dump"
     ~title:"Inconsistent context dump"
     ~description:"Error while reading context dump"
     ~pp:(fun ppf () ->
@@ -83,7 +83,7 @@ let () =
     (fun () -> Inconsistent_context_dump) ;
   register_error_kind
     `Permanent
-    ~id:"context_dump.restore_context_failure"
+    ~id:"brassaia.context_dump.restore_context_failure"
     ~title:"Failed to restore context"
     ~description:"Internal error while restoring the context"
     ~pp:(fun ppf () ->
