@@ -4,6 +4,7 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
+use dsn_rpc::responses::{internal_server_error, not_found};
 use futures::FutureExt;
 
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Method, Request};
@@ -13,8 +14,8 @@ use tokio::net::TcpListener;
 use tracing::info;
 
 use dsn_rpc::errors::RpcError;
-use dsn_rpc::rpc_helpers::{
-    internal_server_error, monitor_broadcast_channel_handler, not_found_handler, post_handler, Resp,
+use dsn_rpc::handlers::{
+    handle_monitor_request_with_broadcast_receiver, handle_post_request, Resp,
 };
 
 use super::protocol::ProtocolClient;
@@ -24,7 +25,7 @@ pub async fn monitor_proposal(
     _req: Request<Incoming>,
 ) -> Result<Resp, RpcError> {
     let receiver = protocol_client.preblock_streams().await;
-    monitor_broadcast_channel_handler(receiver).await
+    handle_monitor_request_with_broadcast_receiver(receiver).await
 }
 
 pub async fn start_server(
@@ -69,7 +70,7 @@ pub async fn post_proposal_handler(
         .boxed()
     };
 
-    post_handler(req, f).await
+    handle_post_request(req, f).await
 }
 
 async fn router_service(
@@ -86,6 +87,6 @@ async fn router_service(
             let res = monitor_proposal(protocol_client, req).await.unwrap();
             Ok(res)
         }
-        _ => not_found_handler().await,
+        _ => not_found(),
     }
 }

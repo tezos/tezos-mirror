@@ -2,11 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::convert::Infallible;
 use std::error::Error as StdError;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
+use dsn_rpc::router::Router;
+use futures::FutureExt;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::body::{Bytes, Incoming};
@@ -21,13 +24,12 @@ use url::Url;
 use crate::errors::Error;
 use crate::json_http_rpc;
 use dsn_rpc::rpc_encoding::{SendRawTransaction, SendRawTransactionResult};
-use dsn_rpc::server;
 use dsn_rpc::server::RpcServer;
 
 // TODO: Move to separate bundler crate
 
 // TODO: Handle errors and make the return type of the BoxBody Infallible
-type Response = hyper::Response<BoxBody<Bytes, Box<dyn StdError + Send + Sync>>>;
+type Response = hyper::Response<BoxBody<Bytes, Infallible>>;
 
 pub async fn run(
     listening_addr: SocketAddr,
@@ -112,13 +114,15 @@ async fn proxy_server(
 ) -> Result<()> {
     let upstream_server = Arc::new(upstream_server);
     let app = {
-        server::Router::new().route("/", Method::POST, {
-            let upstream_server = upstream_server.clone();
-            move |req| proxy_service(req, upstream_server.clone())
-        })
+        Router::builder()
+            .with_route("/", Method::POST, {
+                let upstream_server = upstream_server.clone();
+                move |(), req| proxy_service(req, upstream_server.clone()).boxed()
+            })
+            .build()
     };
 
-    let mut server = RpcServer::new(listening_addr, rx_shutdown, tx_shutdown);
+    let mut server = RpcServer::new(listening_addr, rx_shutdown, tx_shutdown, ());
 
     server.serve(app).await
 }

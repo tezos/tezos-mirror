@@ -13,13 +13,16 @@ use futures::{future, Future, Stream, StreamExt, TryStreamExt};
 use http_body_util::{combinators::BoxBody, BodyExt, Full, StreamBody};
 use hyper::{
     body::{Bytes, Frame, Incoming},
-    Request, Response, StatusCode,
+    Request, Response,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
-use crate::errors::RpcError;
+use crate::{
+    errors::RpcError,
+    responses::{bad_request, internal_server_error},
+};
 
 /// The [Body] of [Response]s returned by the Rpc server.
 /// All application logic errors obtained when processing requests
@@ -30,6 +33,7 @@ pub type ResponseBody = BoxBody<Bytes, Infallible>;
 
 pub type Resp = hyper::Response<ResponseBody>;
 
+//TODO: Do we need to handle errors a la Resto?
 fn stream_until_first_error<T: Send + Sync + 'static, E: Send + Sync + Debug + 'static>(
     stream: impl Stream<Item = Result<T, E>> + Send + Sync + 'static,
     on_error: &'static str,
@@ -43,7 +47,7 @@ fn stream_until_first_error<T: Send + Sync + 'static, E: Send + Sync + Debug + '
 /// Construct a streamed response body from a stream. The items are serialized
 /// in json format before being sent as part of a response.
 /// This handler returns a [RpcError] in case of connection errors.
-pub fn monitor_stream_handler<T: Serialize>(
+pub fn handle_monitor_request_with_stream<T: Serialize>(
     stream: impl Stream<Item = T> + Send + Sync + 'static,
 ) -> Result<Resp, RpcError> {
     let json_stream = stream_until_first_error(
@@ -59,13 +63,15 @@ pub fn monitor_stream_handler<T: Serialize>(
 /// Constructs a streamed response body from a [tokio::sync::broadcast::receiver<T>].
 /// Items are serialized in json format before being streamed in the response body.
 /// This handler returns a [RpcError] in case of connection errors.
-pub async fn monitor_broadcast_channel_handler<T: Serialize + Clone + Send + Sync + 'static>(
+pub async fn handle_monitor_request_with_broadcast_receiver<
+    T: Serialize + Clone + Send + Sync + 'static,
+>(
     receiver: tokio::sync::broadcast::Receiver<T>,
 ) -> Result<Resp, RpcError> {
     let stream = tokio_stream::wrappers::BroadcastStream::new(receiver);
     let stream_after_broadcast =
-        stream_until_first_error(stream, "Failed to receive falue from broadcast channel");
-    monitor_stream_handler(stream_after_broadcast)
+        stream_until_first_error(stream, "Failed to receive value from broadcast channel");
+    handle_monitor_request_with_stream(stream_after_broadcast)
 }
 
 /// Helper function for handling post requests.
@@ -73,7 +79,7 @@ pub async fn monitor_broadcast_channel_handler<T: Serialize + Clone + Send + Syn
 /// This function gets an asynchronous combinator in input to process the request. The output of the
 /// combinator function is serialized in json format and sent as the response body in a single frame.
 /// This handler returns a [RpcError] in case of connection errors.
-pub async fn post_handler<
+pub async fn handle_post_request<
     T: for<'a> Deserialize<'a>,
     S: Serialize,
     F: FnOnce(
@@ -120,9 +126,7 @@ pub async fn post_handler<
 /// combinator function is serialized in json format and sent as the response body in a single frame.
 /// This handler returns a [RpcError] in case of connection errors.
 //TODO: Handle query parameters
-//TODO: Remove warning suppression once this handler is used
-#[allow(unused)]
-pub async fn get_handler<
+pub async fn get<
     T: for<'a> Deserialize<'a>,
     S: Serialize,
     F: FnOnce(
@@ -161,39 +165,4 @@ pub async fn get_handler<
     let response_body = Full::new(json_response.into()).boxed();
 
     Ok(Response::new(response_body))
-}
-
-/// Simple handler for non-existing routes. It returns a response with status code `404 (Not found)`.
-/// This handler returns a [RpcError] in case of connection errors.
-pub async fn not_found_handler() -> Result<Resp, RpcError> {
-    let response_body = Full::new("not found".into())
-        .map_err(|never| match never {})
-        .boxed();
-    let response = Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(response_body)?;
-
-    Ok(response)
-}
-
-/// Simple handler for bad requests. It returns a response with status code `400 (Bad request)`.
-/// This handler returns a [RpcError] in case of connection errors.
-pub fn bad_request() -> Result<Resp, RpcError> {
-    let response_body: ResponseBody = Full::new("Bad request".into()).boxed();
-    let response = Response::builder()
-        .status(StatusCode::BAD_REQUEST)
-        .body(response_body)?;
-
-    Ok(response)
-}
-
-/// Simple handler for bad requests. It returns a response with status code `500 (Internal server error)`.
-/// This handler returns a [RpcError] in case of connection errors.
-pub fn internal_server_error() -> Result<Resp, RpcError> {
-    let response_body: ResponseBody = Full::new("Internal server error".into()).boxed();
-    let response = Response::builder()
-        .status(StatusCode::INTERNAL_SERVER_ERROR)
-        .body(response_body)?;
-
-    Ok(response)
 }
