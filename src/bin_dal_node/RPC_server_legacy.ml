@@ -29,10 +29,7 @@ open Tezos_dal_node_services
 let handle_slot_pages ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
   let*? {cryptobox; _} = Node_context.get_ready ctxt in
-  Slot_manager.get_slot_pages
-    cryptobox
-    (Node_context.get_store ctxt).shards
-    commitment
+  Slot_manager.get_slot_pages cryptobox (Node_context.get_store ctxt) commitment
 
 let register_show_slot_pages ctxt dir =
   Tezos_rpc.Directory.register dir Services.slot_pages (handle_slot_pages ctxt)

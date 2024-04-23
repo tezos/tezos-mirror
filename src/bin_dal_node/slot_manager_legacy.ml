@@ -196,26 +196,46 @@ let get_slot cryptobox store commitment =
   let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
   in
-  let minimal_number_of_shards =
-    assert (number_of_shards mod redundancy_factor = 0) ;
-    number_of_shards / redundancy_factor
+  (* First attempt to get the slot from the slot store. *)
+  let*! res =
+    Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
   in
-  let rec loop acc shard_id remaining =
-    if remaining <= 0 then return acc
-    else if shard_id >= number_of_shards then
-      let provided = minimal_number_of_shards - remaining in
-      tzfail @@ Missing_shards {provided; required = minimal_number_of_shards}
-    else
-      let*! res = Store.Shards.read store commitment shard_id in
-      match res with
-      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
-      | Error _ -> loop acc (shard_id + 1) remaining
-  in
-  let* shards = loop Seq.empty 0 minimal_number_of_shards in
-  let*? polynomial = polynomial_from_shards cryptobox shards in
-  let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-  let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
-  return slot
+  match res with
+  | Ok (Some slot) -> return slot
+  | Ok None | Error (`Decoding_failed _) ->
+      (* The slot could not be obtained from the slot store, attempt a
+         reconstruction. *)
+      let minimal_number_of_shards = number_of_shards / redundancy_factor in
+      let rec loop acc shard_id remaining =
+        if remaining <= 0 then return acc
+        else if shard_id >= number_of_shards then
+          let provided = minimal_number_of_shards - remaining in
+          tzfail
+          @@ Missing_shards {provided; required = minimal_number_of_shards}
+        else
+          let*! res =
+            Store.Shards.read store.Store.shards commitment shard_id
+          in
+          match res with
+          | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
+          | Error _ -> loop acc (shard_id + 1) remaining
+      in
+      let* shards = loop Seq.empty 0 minimal_number_of_shards in
+      let*? polynomial = polynomial_from_shards cryptobox shards in
+      let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
+      (* Store the slot so that next calls don't require a reconstruction. *)
+      let* () =
+        Store.Slots.add_slot_by_commitment
+          store.Store.slots
+          cryptobox
+          slot
+          commitment
+        |> Errors.to_tzresult
+      in
+      let*! () =
+        Event.(emit fetched_slot (Bytes.length slot, Seq.length shards))
+      in
+      return slot
 
 let get_slot_pages cryptobox store commitment =
   let open Lwt_result_syntax in
