@@ -38,6 +38,8 @@ use tick_model::estimate_remaining_ticks_for_transaction_execution;
 
 use tezos_ethereum::block::BlockConstants;
 
+pub const GAS_LIMIT: u64 = 1 << 50;
+
 /// Struct used to allow the compiler to check that the tick counter value is
 /// correctly moved and updated. Copy and Clone should NOT be derived.
 struct TickCounter {
@@ -299,8 +301,11 @@ fn compute_bip<Host: KernelRuntime>(
                 .context("Failed to finalize the block in progress")?;
             *current_block_number = new_block.number + 1;
             *current_block_parent_hash = new_block.hash;
-            *current_constants = new_block
-                .constants(current_constants.chain_id, current_constants.block_fees);
+            *current_constants = new_block.constants(
+                current_constants.chain_id,
+                current_constants.block_fees,
+                GAS_LIMIT,
+            );
 
             *first_block_of_reboot = false;
         }
@@ -369,7 +374,7 @@ pub fn produce<Host: Runtime>(
     let (mut current_constants, mut current_block_number, mut current_block_parent_hash) =
         match storage::read_current_block(host) {
             Ok(block) => (
-                block.constants(chain_id, block_fees),
+                block.constants(chain_id, block_fees, GAS_LIMIT),
                 block.number + 1,
                 block.hash,
             ),

@@ -186,13 +186,18 @@ impl L2Block {
         }
     }
 
-    pub fn constants(&self, chain_id: U256, block_fees: BlockFees) -> BlockConstants {
+    pub fn constants(
+        &self,
+        chain_id: U256,
+        block_fees: BlockFees,
+        gas_limit: u64,
+    ) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         BlockConstants {
             number: self.number,
             coinbase: H160::zero(),
             timestamp,
-            gas_limit: self.gas_limit.unwrap_or(1u64),
+            gas_limit,
             block_fees,
             chain_id,
             prevrandao: None,
@@ -243,7 +248,7 @@ impl Default for L2Block {
             receipts_root: L2Block::dummy_hash(),
             miner: None,
             extra_data: None,
-            gas_limit: None,
+            gas_limit: Some(1 << 50),
             gas_used: U256::zero(),
             timestamp: Timestamp::from(0),
             transactions: Vec::new(),
@@ -291,7 +296,7 @@ impl Decodable for L2Block {
                     decode_option_explicit(&next(&mut it)?, "miner", decode_field)?;
                 let extra_data: Option<OwnedHash> =
                     decode_option_explicit(&next(&mut it)?, "extra_data", decode_field)?;
-                let gas_limit: Option<u64> = decode_option_explicit(
+                let gas_limit = decode_option_explicit(
                     &next(&mut it)?,
                     "gas_limit",
                     decode_field_u64_le,

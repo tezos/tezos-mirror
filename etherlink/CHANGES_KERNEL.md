@@ -4,6 +4,8 @@
 
 ### Features
 
+- Set block gas limit to 2^50. (!13010)
+
 ### Bug fixes
 
 ### Breaking changes
