@@ -103,7 +103,7 @@ mod test {
 
             // Turn fs on
             let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
-            state.hart.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
 
             let mut perform_test = |offset: i64| -> Result<(), Exception> {
                 state.hart.fregisters.write(fa2, val.into());
@@ -139,7 +139,7 @@ mod test {
 
             // Turn fs on
             let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
-            state.hart.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
 
             let mut perform_test = |offset: i64| -> Result<(), Exception> {
                 state.hart.fregisters.write(fa2, val.into());

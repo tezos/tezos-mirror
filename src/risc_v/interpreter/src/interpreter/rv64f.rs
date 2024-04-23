@@ -583,7 +583,7 @@ mod tests {
 
             // Turn fs on
             let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
-            state.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.csregisters.write(CSRegister::mstatus, mstatus);
 
             state.xregisters.write(rs1, f as u64);
 
@@ -619,7 +619,7 @@ mod tests {
 
             // Turn fs on
             let mstatus = xstatus::set_FS(0u64, ExtensionValue::Dirty);
-            state.hart.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.hart.csregisters.write(CSRegister::mstatus, mstatus);
 
             let mut perform_test = |offset: u64| -> Result<(), Exception> {
                 // Save test values v_i in registers ai

@@ -375,9 +375,9 @@ mod tests {
         machine_state::{
             bus::{main_memory::tests::T1K, Address},
             csregisters::{
-                xstatus,
-                xstatus::{MPPValue, SPPValue},
-                CSRegister,
+                values::CSRValue,
+                xstatus::{self, MPPValue, SPPValue},
+                CSRRepr, CSRegister,
             },
             hart_state::{HartState, HartStateLayout},
             mode::Mode,
@@ -849,20 +849,20 @@ mod tests {
 
             // TEST: TSR trapping
             state.reset(curr_pc);
-            state.csregisters.write(CSRegister::mepc, mepc.into());
-            state.csregisters.write(CSRegister::sepc, sepc.into());
+            state.csregisters.write(CSRegister::mepc, mepc);
+            state.csregisters.write(CSRegister::sepc, sepc);
 
-            assert_eq!(state.csregisters.read(CSRegister::sepc).repr(), sepc);
-            assert_eq!(state.csregisters.read(CSRegister::mepc).repr(), mepc);
+            assert_eq!(state.csregisters.read::<CSRRepr>(CSRegister::sepc), sepc);
+            assert_eq!(state.csregisters.read::<CSRRepr>(CSRegister::mepc), mepc);
 
-            let mstatus = state.csregisters.read(CSRegister::mstatus);
+            let mstatus: CSRValue = state.csregisters.read(CSRegister::mstatus);
             let mstatus = xstatus::set_TSR(mstatus, true);
-            state.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.csregisters.write(CSRegister::mstatus, mstatus);
             assert_eq!(state.run_sret(), Err(Exception::IllegalInstruction));
 
             // set TSR back to 0
             let mstatus = xstatus::set_TSR(mstatus, false);
-            state.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.csregisters.write(CSRegister::mstatus, mstatus);
 
             // TEST: insuficient privilege mode
             state.mode.write(Mode::User);
@@ -870,14 +870,14 @@ mod tests {
 
             // TEST: Use SRET from M-mode, check SPP, SIE, SPIE, MPRV
             state.mode.write(Mode::Machine);
-            let mstatus = xstatus::set_SIE(state.csregisters.read(CSRegister::mstatus), true);
+            let mstatus = xstatus::set_SIE(state.csregisters.read::<CSRValue>(CSRegister::mstatus), true);
             let mstatus = xstatus::set_SPP(mstatus, SPPValue::User);
-            state.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.csregisters.write(CSRegister::mstatus, mstatus);
 
             // check pc address
             assert_eq!(state.run_sret(), Ok(sepc));
             // check fields
-            let mstatus = state.csregisters.read(CSRegister::mstatus);
+            let mstatus: CSRValue = state.csregisters.read(CSRegister::mstatus);
             assert!(xstatus::get_SPIE(mstatus));
             assert!(!xstatus::get_SIE(mstatus));
             assert!(!xstatus::get_MPRV(mstatus));
@@ -888,12 +888,12 @@ mod tests {
             let mstatus = xstatus::set_MPIE(mstatus, true);
             let mstatus = xstatus::set_MPP(mstatus, MPPValue::Machine);
             let mstatus = xstatus::set_MPRV(mstatus, true);
-            state.csregisters.write(CSRegister::mstatus, mstatus.into());
+            state.csregisters.write(CSRegister::mstatus, mstatus);
             state.mode.write(Mode::Machine);
             // check pc address
             assert_eq!(state.run_mret(), Ok(mepc));
             // check fields
-            let mstatus = state.csregisters.read(CSRegister::mstatus);
+            let mstatus: CSRValue = state.csregisters.read(CSRegister::mstatus);
             assert!(xstatus::get_MPIE(mstatus));
             assert!(xstatus::get_MIE(mstatus));
             assert!(xstatus::get_MPRV(mstatus));

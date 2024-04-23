@@ -17,6 +17,7 @@ use risc_v_interpreter::{
         csregisters::{
             self,
             satp::{self, SvLength, TranslationAlgorithm},
+            values::CSRValue,
             xstatus::{ExtensionValue, MPPValue, SPPValue},
             CSRRepr, CSRegister,
         },
@@ -414,7 +415,7 @@ impl<'a> DebuggerApp<'a> {
         use csregisters::*;
         use CSRegister as CSR;
 
-        let mstatus = self.interpreter.read_csregister(CSR::mstatus);
+        let mstatus: CSRValue = self.interpreter.read_csregister(CSR::mstatus);
         let mbe = xstatus::get_MBE(mstatus);
         let sbe = xstatus::get_SBE(mstatus);
         let tvm = xstatus::get_TVM(mstatus);
@@ -557,8 +558,8 @@ impl<'a> DebuggerApp<'a> {
 
         use csregisters::*;
 
-        let frm = self.interpreter.read_csregister(CSRegister::frm);
-        let fflags = self.interpreter.read_csregister(CSRegister::fflags);
+        let frm: CSRRepr = self.interpreter.read_csregister(CSRegister::frm);
+        let fflags: CSRRepr = self.interpreter.read_csregister(CSRegister::fflags);
 
         fn rounding_mode(rm: u64) -> &'static str {
             match rm {
@@ -585,7 +586,8 @@ impl<'a> DebuggerApp<'a> {
                 format!(" {0:>6}: ", CSRegister::fcsr).into(),
                 format!(
                     "0x{:02x}",
-                    self.interpreter.read_csregister(CSRegister::fcsr)
+                    self.interpreter
+                        .read_csregister::<CSRRepr>(CSRegister::fcsr)
                 )
                 .fg(ORANGE),
             ]),

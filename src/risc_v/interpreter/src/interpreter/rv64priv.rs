@@ -2,6 +2,7 @@ use crate::{
     machine_state::{
         bus::{main_memory, Address},
         csregisters::{
+            values::CSRValue,
             xstatus::{self, MPPValue, SPPValue},
             CSRegister,
         },
@@ -28,7 +29,7 @@ where
             Mode::Machine => (),
         }
 
-        let mstatus = self.csregisters.read(CSRegister::mstatus);
+        let mstatus: CSRValue = self.csregisters.read(CSRegister::mstatus);
         // get MPP
         let prev_privilege = xstatus::get_MPP(mstatus);
         // Set MIE to MPIE
@@ -46,7 +47,7 @@ where
         };
 
         // Commit the mstatus
-        self.csregisters.write(CSRegister::mstatus, mstatus.into());
+        self.csregisters.write(CSRegister::mstatus, mstatus);
 
         // Set the mode after handling mret, according to MPP read initially
         self.mode.write(match prev_privilege {
@@ -56,7 +57,7 @@ where
         });
 
         // set pc to MEPC (we just have to return it)
-        Ok(self.csregisters.read(CSRegister::mepc).repr())
+        Ok(self.csregisters.read(CSRegister::mepc))
     }
 
     /// `SRET` instruction
@@ -70,7 +71,7 @@ where
         }
         // Section 3.1.6.5
         // SRET raises IllegalInstruction exception when TSR (Trap SRET) bit is on.
-        let mstatus = self.csregisters.read(CSRegister::mstatus);
+        let mstatus: CSRValue = self.csregisters.read(CSRegister::mstatus);
         if xstatus::get_TSR(mstatus) {
             return Err(Exception::IllegalInstruction);
         }
@@ -88,7 +89,7 @@ where
         let mstatus = xstatus::set_MPRV(mstatus, false);
 
         // Commit the mstatus
-        self.csregisters.write(CSRegister::mstatus, mstatus.into());
+        self.csregisters.write(CSRegister::mstatus, mstatus);
 
         // Set the mode after handling sret, according to SPP read initially
         self.mode.write(match prev_privilege {
@@ -97,7 +98,7 @@ where
         });
 
         // set pc to SEPC (we just have to return it)
-        Ok(self.csregisters.read(CSRegister::sepc).repr())
+        Ok(self.csregisters.read(CSRegister::sepc))
     }
 }
 
@@ -124,7 +125,7 @@ where
     #[inline(always)]
     pub fn sfence_vma(&self, _asid: XRegister, _vaddr: XRegister) -> Result<(), Exception> {
         let mode = self.hart.mode.read();
-        let mstatus = self.hart.csregisters.read(CSRegister::mstatus);
+        let mstatus: CSRValue = self.hart.csregisters.read(CSRegister::mstatus);
         let tvm = xstatus::get_TVM(mstatus);
 
         if tvm && mode == Mode::Supervisor {
