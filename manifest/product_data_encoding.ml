@@ -16,8 +16,6 @@ end)
 
 let opam_version = "1.0.1"
 
-let profile = Some "data-encoding"
-
 let json_data_encoding_stdlib =
   public_lib
     "json-data-encoding.stdlib"
@@ -30,7 +28,6 @@ let json_data_encoding_stdlib =
     ~opam:"json-data-encoding"
     ~modules:["json_data_encoding_stdlib"; "list_override"]
     ~deps:[uri]
-    ?profile
 
 let json_data_encoding =
   public_lib
@@ -44,7 +41,6 @@ let json_data_encoding =
     ~bisect_ppx:No
     ~modules:["json_encoding"; "json_query"; "json_repr"; "json_schema"]
     ~deps:[uri; hex; json_data_encoding_stdlib |> open_]
-    ?profile
 
 let _json_data_encoding_tests =
   tests
@@ -62,7 +58,6 @@ let _json_data_encoding_tests =
     ~modes:[Native; JS]
     ~deps:
       [json_data_encoding; crowbar; alcotest; js_of_ocaml_compiler; conf_npm]
-    ?profile
 
 let json_data_encoding_bson =
   public_lib
@@ -77,7 +72,6 @@ let json_data_encoding_bson =
     ~modules:["json_repr_bson"]
     ~deps:
       [json_data_encoding; ocplib_endian; json_data_encoding_stdlib |> open_]
-    ?profile
 
 let _json_data_encoding_bson_tests =
   test
@@ -85,7 +79,6 @@ let _json_data_encoding_bson_tests =
     ~opam:"json-data-encoding-bson"
     ~path:"data-encoding/json-data-encoding/test-bson"
     ~deps:[crowbar; alcotest; json_data_encoding; json_data_encoding_bson]
-    ?profile
 
 let _json_data_encoding_browser =
   public_lib
@@ -104,7 +97,6 @@ let _json_data_encoding_browser =
         js_of_ocaml |> open_;
         json_data_encoding_stdlib |> open_;
       ]
-    ?profile
 
 let data_encoding =
   public_lib
@@ -128,7 +120,6 @@ let data_encoding =
         ppx_hash;
       ]
     ~dune:Dune.[[S "include"; S "dune.inc"]]
-    ?profile
 
 let _data_encoding_tests =
   test
@@ -146,7 +137,6 @@ let _data_encoding_tests =
         js_of_ocaml_compiler;
         conf_npm;
       ]
-    ?profile
 
 let _data_encoding_expect_tests =
   private_lib
@@ -156,7 +146,6 @@ let _data_encoding_expect_tests =
     ~bisect_ppx:No
     ~deps:[data_encoding; zarith; zarith_stubs_js; ezjsonm; bigstringaf]
     ~opam:"data-encoding"
-    ?profile
 
 (* Some tests require [--stack-size] to be runnable with node.js.
    The version of node in our runners does not support [--stack-size]. *)
@@ -176,7 +165,6 @@ let _data_encoding_pbt_tests =
     ~modes:[Native]
     ~bisect_ppx:No
     ~deps:[data_encoding; zarith; zarith_stubs_js; crowbar; bigstringaf]
-    ?profile
 
 (* the other projects can depend on data-encoding, but as an "external"
    dependency *)
