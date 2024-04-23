@@ -13,10 +13,11 @@ type head = {
   evm_state : Evm_state.t;
 }
 
-(** [start ~data_dir ~preimages ~preimages_endpoint ~smart_rollup_address ()]
-    creates a new worker to manage a local EVM context where it initializes the
-    {!type-index}, and use a checkpoint mechanism to load the latest
-    {!type-store} if any.
+(** [start ~data_dir ~preimages ~preimages_endpoint
+    ~smart_rollup_address ()] creates a new worker to
+    manage a local EVM context where it initializes the {!type-index},
+    and use a checkpoint mechanism to load the latest {!type-store} if
+    any.
 
     Returns a value telling if the context was loaded from disk
     ([Loaded]) or was initialized from scratch ([Created]). *)

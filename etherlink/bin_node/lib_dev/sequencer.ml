@@ -210,8 +210,8 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
       ~data_dir
       ~preimages:sequencer_config.preimages
       ~preimages_endpoint:sequencer_config.preimages_endpoint
-      ~smart_rollup_address
       ~fail_on_missing_blueprint:true
+      ~smart_rollup_address
       ()
   in
   let*! head = Evm_context.head_info () in
