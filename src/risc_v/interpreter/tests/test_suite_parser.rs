@@ -145,10 +145,7 @@ fn parse_encoded(encoded: &str) -> Instr {
 fn check_instructions(fname: &str, instructions: Vec<(String, Instr, String)>) {
     for (address, parsed_instr, objdump_instr) in instructions {
         let printed_instr = parsed_instr.to_string();
-        if printed_instr.starts_with("unknown")
-            || objdump_instr.starts_with('.')
-            || objdump_instr == "unimp"
-            || objdump_instr == "c.unimp"
+        if objdump_instr.starts_with('.') || objdump_instr == "unimp" || objdump_instr == "c.unimp"
         {
             continue;
         }
@@ -166,7 +163,8 @@ fn parser_riscv_test_suite() {
 
     for f in std::fs::read_dir(tests_dir).unwrap() {
         let file = f.unwrap();
-        if file.path().is_dir() {
+        if file.path().is_dir() || file.file_name().to_string_lossy().starts_with("rv64uzfh") {
+            // Don't run tests for the unimplemented Zfh extension
             continue;
         }
         let path = file.path();
