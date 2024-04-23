@@ -206,6 +206,25 @@ module Slots_handlers = struct
   let get_shard ctxt ((_, commitment), shard_index) () () =
     call_handler1 ctxt (fun {shards; _} ->
         Store.Shards.read shards commitment shard_index)
+
+  let handle_slot_pages ctxt (((), level), slot_index) () () =
+    let open Lwt_result_syntax in
+    let*? {cryptobox; _} = Node_context.get_ready ctxt in
+    let node_store = Node_context.get_store ctxt in
+    let*! res =
+      Slot_manager.get_commitment_by_published_level_and_index
+        ~level
+        ~slot_index
+        node_store
+    in
+    match res with
+    | Ok commitment ->
+        let* pages =
+          Slot_manager.get_slot_pages cryptobox node_store commitment
+        in
+        return_some pages
+    | Error `Not_found -> return_none
+    | Error (`Decoding_failed _) as res -> Errors.to_tzresult (Lwt.return res)
 end
 
 module Profile_handlers = struct
@@ -364,7 +383,7 @@ end
 let add_service registerer service handler directory =
   registerer directory service handler
 
-let register_new :
+let register :
     Node_context.t -> unit Tezos_rpc.Directory.t -> unit Tezos_rpc.Directory.t =
  fun ctxt directory ->
   directory
@@ -412,6 +431,10 @@ let register_new :
        Tezos_rpc.Directory.register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.opt_register
+       Services.slot_pages
+       (Slots_handlers.handle_slot_pages ctxt)
   |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
@@ -482,12 +505,6 @@ let register_new :
        Services.get_shard
        (Slots_handlers.get_shard ctxt)
 
-let register_legacy ctxt =
-  let open RPC_server_legacy in
-  Tezos_rpc.Directory.empty |> register_show_slot_pages ctxt
-
-let register ctxt = register_new ctxt (register_legacy ctxt)
-
 let register_plugin node_ctxt =
   Tezos_rpc.Directory.register_dynamic_directory
     Tezos_rpc.Directory.empty
@@ -511,7 +528,7 @@ let register_plugin node_ctxt =
 let start configuration ctxt =
   let open Lwt_syntax in
   let Configuration_file.{rpc_addr; _} = configuration in
-  let dir = Tezos_rpc.Directory.merge (register ctxt) (register_plugin ctxt) in
+  let dir = register ctxt (register_plugin ctxt) in
   let dir =
     Tezos_rpc.Directory.register_describe_directory_service
       dir
