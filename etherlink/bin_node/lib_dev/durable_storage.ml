@@ -27,9 +27,11 @@ module Make (Reader : READER) = struct
     let* res_opt = inspect_durable_and_decode_opt path decode in
     match res_opt with Some res -> return res | None -> failwith "null"
 
-  let balance address =
+  let balance address block =
     let open Lwt_result_syntax in
-    let+ answer = Reader.read (Durable_storage_path.Accounts.balance address) in
+    let+ answer =
+      Reader.read ~block (Durable_storage_path.Accounts.balance address)
+    in
     match answer with
     | Some bytes ->
         Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
