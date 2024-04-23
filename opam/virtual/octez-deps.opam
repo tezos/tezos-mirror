@@ -30,6 +30,7 @@ depends: [
   "cohttp-lwt-unix" { >= "5.2.0" }
   "conf-libev"
   "conf-rust"
+  "crowbar" { >= "0.2" }
   "crunch" { >= "3.3.0" }
   "ctypes" { >= "0.18.0" }
   "ctypes-foreign" { >= "0.18.0" }
@@ -51,6 +52,8 @@ depends: [
   "integers_stubs_js"
   "ipaddr" { >= "5.3.0" & < "6.0.0" }
   "jingoo"
+  "js_of_ocaml" { >= "3.3.0" }
+  "js_of_ocaml-compiler"
   "json-data-encoding" { = "1.0.1" }
   "jsonm"
   "lambda-term" { >= "3.3.1" }
@@ -72,6 +75,7 @@ depends: [
   "optint"
   "ppx_deriving"
   "ppx_expect"
+  "ppx_hash"
   "ppx_import"
   "ppx_repr" { >= "0.6.0" }
   "ppx_sexp_conv"
