@@ -2734,8 +2734,6 @@ let octez_context_helpers =
         octez_merkle_proof_encoding;
         irmin;
         irmin_pack;
-        brassaia;
-        brassaia_pack;
       ]
     ~conflicts:[Conflicts.checkseum]
 
@@ -3623,7 +3621,6 @@ let octez_validation =
         octez_base |> open_ ~m:"TzPervasives";
         octez_crypto |> open_;
         octez_rpc;
-        octez_context |> open_;
         octez_context_ops |> open_;
         octez_shell_context |> open_;
         octez_shell_services |> open_;
@@ -3670,7 +3667,6 @@ let octez_store_unix =
         index;
         octez_store_shared |> open_;
         octez_protocol_environment |> open_;
-        octez_context |> open_;
         octez_context_ops |> open_;
         octez_shell_context;
         octez_validation |> open_;
@@ -3832,7 +3828,6 @@ let octez_shell =
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_base_unix |> open_;
         octez_rpc;
-        octez_context |> open_;
         octez_store |> open_;
         octez_store_shared |> open_;
         octez_protocol_environment |> open_;
@@ -4465,7 +4460,6 @@ let octez_shell_benchmarks =
         octez_error_monad |> open_;
         octez_benchmark |> open_;
         octez_crypto;
-        octez_context;
         octez_shell_context;
         octez_store;
         octez_micheline;
@@ -4855,7 +4849,6 @@ let octez_scoru_wasm_helpers =
         octez_base |> open_ ~m:"TzPervasives";
         tree_encoding;
         octez_base_unix;
-        octez_context_disk;
         octez_scoru_wasm;
         octez_scoru_wasm_fast;
         octez_webassembly_interpreter_extra |> open_;
@@ -4887,7 +4880,6 @@ let octez_scoru_wasm_tests_helpers =
         octez_base |> open_ ~m:"TzPervasives";
         tree_encoding;
         octez_base_unix;
-        octez_context_disk;
         octez_base_test_helpers |> open_;
         octez_test_helpers;
         octez_scoru_wasm;
@@ -4958,7 +4950,6 @@ let _octez_scoru_wasm_tests =
         octez_base |> open_ ~m:"TzPervasives";
         tree_encoding;
         octez_base_unix;
-        octez_context_disk;
         octez_base_test_helpers |> open_;
         octez_test_helpers |> open_;
         octez_scoru_wasm;
@@ -4987,7 +4978,6 @@ let _octez_scoru_wasm_fast_tests =
         octez_base |> open_ ~m:"TzPervasives";
         tree_encoding;
         octez_base_unix;
-        octez_context_disk;
         octez_base_test_helpers |> open_;
         octez_scoru_wasm_helpers |> open_;
         octez_scoru_wasm_tests_helpers |> open_;
@@ -5540,7 +5530,6 @@ end = struct
           ~deps:
             [
               (if N.(number >= 015) then Some tezt_lib else None) |> if_some;
-              octez_context;
               alcotezt |> if_ N.(number <= 019);
               octez_base |> open_ ~m:"TzPervasives"
               |> error_monad_module N.(number <= 018);
@@ -7458,7 +7447,6 @@ let yes_wallet_lib =
          octez_node_config;
          octez_store;
          octez_shell_context;
-         octez_context;
        ]
       @ protocols)
     ~all_modules_except:["yes_wallet"]
@@ -7774,7 +7762,6 @@ let _octez_node =
          octez_store |> open_;
          octez_store_unix_reconstruction |> open_;
          octez_store_unix_snapshots |> open_;
-         octez_context;
          octez_validation |> open_;
          octez_shell_context |> open_;
          octez_workers |> open_;

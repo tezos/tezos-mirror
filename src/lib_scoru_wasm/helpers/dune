@@ -9,7 +9,6 @@
   octez-libs.base
   octez-libs.tree-encoding
   octez-libs.base.unix
-  octez-libs.tezos-context.disk
   octez-l2-libs.scoru-wasm
   octez-l2-libs.scoru-wasm-fast
   octez-l2-libs.webassembly-interpreter-extra)

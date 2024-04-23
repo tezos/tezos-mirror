@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   tezt
-  octez-libs.tezos-context
   octez-alcotezt
   octez-libs.base
   octez-protocol-018-Proxford-libs.client

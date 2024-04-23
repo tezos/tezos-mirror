@@ -22,7 +22,6 @@
   octez-shell-libs.store
   octez-shell-libs.store.unix-reconstruction
   octez-shell-libs.store.unix-snapshots
-  octez-libs.tezos-context
   octez-shell-libs.validation
   octez-shell-libs.shell-context
   octez-libs.tezos-workers
