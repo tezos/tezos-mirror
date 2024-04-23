@@ -46,15 +46,6 @@ type slot = bytes
 val get_slot_pages :
   Cryptobox.t -> Store.t -> Cryptobox.commitment -> bytes list tzresult Lwt.t
 
-(** [save_shards store commitment shards] stores [shards] onto the [store]
-    associated to the given [commitment] *)
-val save_shards :
-  Store.t ->
-  Cryptobox.t ->
-  Cryptobox.commitment ->
-  Cryptobox.shard Seq.t ->
-  unit tzresult Lwt.t
-
 (* Same as [Cryptobox.polynomial_from_shards] but using Lwt +
    tzresult. The argument [number_of_needed_shards] is used to cap the
    number of Lwt promises resolved from the shard sequence. *)
