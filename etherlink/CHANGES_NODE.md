@@ -61,6 +61,8 @@
 - The new command `init config` allows to initialize a new configuration file
   for an EVM node. (!12798)
 - Observers now try to reconnect to their EVM endpoint if necessary. (!12772)
+- The sequencer can read its smart rollup address from its store and check
+  whether it's consistent with the rollup node endpoint. (!12345)
 
 ### Bug fixes
 
