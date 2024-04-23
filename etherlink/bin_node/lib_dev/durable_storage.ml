@@ -8,7 +8,10 @@
 open Ethereum_types
 
 module type READER = sig
-  val read : Durable_storage_path.path -> bytes option tzresult Lwt.t
+  val read :
+    ?block:Ethereum_types.block_param ->
+    Durable_storage_path.path ->
+    bytes option tzresult Lwt.t
 end
 
 module Make (Reader : READER) = struct

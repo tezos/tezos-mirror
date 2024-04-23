@@ -37,14 +37,20 @@ module MakeBackend (Base : sig
   val smart_rollup_address : string
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
-    let read path =
-      call_service
-        ~keep_alive:Base.keep_alive
-        ~base:Base.base
-        durable_state_value
-        ((), Block_id.Head)
-        {key = path}
-        ()
+    let read ?block path =
+      match block with
+      | Some param when param <> Ethereum_types.Latest ->
+          failwith
+            "The EVM node in proxy mode support state requests only on latest \
+             block."
+      | _ ->
+          call_service
+            ~keep_alive:Base.keep_alive
+            ~base:Base.base
+            durable_state_value
+            ((), Block_id.Head)
+            {key = path}
+            ()
   end
 
   module TxEncoder = struct

@@ -1047,6 +1047,16 @@ let head_info () =
   let+ head_info in
   !head_info
 
+let find_evm_state block =
+  let open Lwt_result_syntax in
+  match block with
+  | Ethereum_types.Latest ->
+      let*! {evm_state; _} = head_info () in
+      return_some evm_state
+  | Earliest -> failwith "Block parameter earliest is not yet supported"
+  | Pending -> failwith "Block parameter pending is not supported"
+  | Hash_param number -> worker_wait_for_request (Evm_state_after {number})
+
 let execute_and_inspect ?wasm_entrypoint input =
   let open Lwt_result_syntax in
   let*! {evm_state; _} = head_info () in
@@ -1058,11 +1068,18 @@ let execute_and_inspect ?wasm_entrypoint input =
     ~input
     evm_state
 
-let inspect path =
+let inspect ?(block = Ethereum_types.Latest) path =
   let open Lwt_result_syntax in
-  let*! {evm_state; _} = head_info () in
-  let*! res = Evm_state.inspect evm_state path in
-  return res
+  let* evm_state = find_evm_state block in
+  match evm_state with
+  | None ->
+      failwith
+        "EVM state was not found on block %a"
+        Ethereum_types.pp_block_param
+        block
+  | Some evm_state ->
+      let*! res = Evm_state.inspect evm_state path in
+      return res
 
 let blueprints_watcher () = Lwt_watcher.create_stream blueprint_watcher
 
