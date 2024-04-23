@@ -138,8 +138,8 @@ let get_commitment_by_published_level_and_index :
     ~query:Tezos_rpc.Query.empty
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(
-      open_root / "levels" /: Tezos_rpc.Arg.int32 / "slot_indices"
-      /: Tezos_rpc.Arg.int / "commitment")
+      open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
+      / "commitment")
 
 let get_slot_status :
     < meth : [`GET]
