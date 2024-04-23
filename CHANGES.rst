@@ -47,6 +47,8 @@ Proxy Server
 Protocol Compiler And Environment
 ---------------------------------
 
+- Added a new version of the protocol environment (V13). (MR :gl:`!12966`)
+
 Codec
 -----
 
