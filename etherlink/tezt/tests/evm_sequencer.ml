@@ -44,9 +44,6 @@ let uses _protocol =
     Constant.octez_evm_node;
     Constant.smart_rollup_installer;
     Constant.WASM.evm_kernel;
-    (* TODO Once we successfully integrate the octez-dsn-node executable into
-       the build toolchain, we uncomment the constant below. *)
-    (* Constant.octez_dsn_node; *)
   ]
 
 open Helpers
@@ -313,8 +310,12 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?threshold_encryption
-    ?(uses = uses) body =
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?(threshold_encryption = false) ?(uses = uses) body =
+  let uses =
+    if threshold_encryption then fun p -> Constant.octez_dsn_node :: uses p
+    else uses
+  in
   let body protocol =
     let* sequencer_setup =
       setup_sequencer
@@ -337,15 +338,57 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
         ?preimages_dir
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
-        ?threshold_encryption
+        ~threshold_encryption
         protocol
     in
     body sequencer_setup protocol
   in
   Protocol.register_test ~__FILE__ ~uses body
 
+let register_both ?devmode ?genesis_timestamp ?time_between_blocks
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
+    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
+    ?kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?uses ~title ~tags body
+    protocols =
+  let register ~threshold_encryption =
+    register_test
+      ?devmode
+      ?genesis_timestamp
+      ?time_between_blocks
+      ?max_blueprints_lag
+      ?max_blueprints_ahead
+      ?max_blueprints_catchup
+      ?catchup_cooldown
+      ?delayed_inbox_timeout
+      ?delayed_inbox_min_levels
+      ?max_number_of_chunks
+      ?bootstrap_accounts
+      ?sequencer
+      ?sequencer_pool_address
+      ?kernel
+      ?da_fee
+      ?minimum_base_fee_per_gas
+      ?preimages_dir
+      ?maximum_allowed_ticks
+      ?maximum_gas_per_transaction
+      ?uses
+      ~threshold_encryption
+      body
+      protocols
+  in
+  register
+    ~threshold_encryption:false
+    ~title:(sf "%s (sn_sequencer)" title)
+    ~tags:("single" :: tags) ;
+  register
+    ~threshold_encryption:true
+    ~title:(sf "%s (te_sequencer)" title)
+    ~tags:(Tag.ci_disabled :: "threshold_encryption" :: tags)
+
 let test_remove_sequencer =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "admin"]
     ~title:"Remove sequencer via sequencer admin contract"
@@ -402,7 +445,7 @@ let test_remove_sequencer =
   unit
 
 let test_persistent_state =
-  register_test
+  register_both
     ~tags:["evm"; "sequencer"]
     ~title:"Sequencer state is persistent across runs"
   @@ fun {sequencer; _} _protocol ->
@@ -430,7 +473,7 @@ let test_persistent_state =
   unit
 
 let test_publish_blueprints =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
@@ -456,7 +499,7 @@ let test_publish_blueprints =
 
 let test_sequencer_too_ahead =
   let max_blueprints_ahead = 5 in
-  register_test
+  register_both
     ~max_blueprints_ahead
     ~time_between_blocks:Nothing
     ~tags:["evm"; "max_blueprint_ahead"]
@@ -506,7 +549,7 @@ let test_resilient_to_rollup_node_disconnect =
   let catchup_cooldown = 10 in
   let first_batch_blueprints_count = 5 in
   let ensure_rollup_node_publish = 5 in
-  register_test
+  register_both
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -634,7 +677,7 @@ let test_resilient_to_rollup_node_disconnect =
     ()
 
 let test_can_fetch_blueprint =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer can provide blueprints on demand"
@@ -669,7 +712,7 @@ let test_can_fetch_blueprint =
       "At least two blueprints from a different level are equal."
 
 let test_can_fetch_smart_rollup_address =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "rpc"]
     ~title:"Sequencer can return the smart rollup address on demand"
@@ -682,7 +725,7 @@ let test_can_fetch_smart_rollup_address =
   unit
 
 let test_send_transaction_to_delayed_inbox =
-  register_test
+  register_both
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"]
     ~title:"Send a transaction to the delayed inbox"
@@ -726,7 +769,7 @@ let test_send_transaction_to_delayed_inbox =
   unit
 
 let test_send_deposit_to_delayed_inbox =
-  register_test
+  register_both
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "deposit"]
     ~title:"Send a deposit to the delayed inbox"
@@ -771,7 +814,7 @@ let test_send_deposit_to_delayed_inbox =
   unit
 
 let test_rpc_produceBlock =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "produce_block"]
     ~title:"RPC method produceBlock"
@@ -840,7 +883,7 @@ let check_delayed_inbox_is_empty ~sc_rollup_node =
   unit
 
 let test_delayed_transfer_is_included =
-  register_test
+  register_both
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Delayed transaction is included"
@@ -893,7 +936,7 @@ let test_delayed_transfer_is_included =
   unit
 
 let test_largest_delayed_transfer_is_included =
-  register_test
+  register_both
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Largest possible delayed transaction is included"
@@ -951,7 +994,7 @@ let test_largest_delayed_transfer_is_included =
   unit
 
 let test_delayed_deposit_is_included =
-  register_test
+  register_both
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
     ~title:"Delayed deposit is included"
@@ -1008,7 +1051,7 @@ let test_delayed_deposit_is_included =
   unit
 
 let test_delayed_deposit_from_init_rollup_node =
-  register_test
+  register_both
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "init"]
@@ -1085,7 +1128,7 @@ let test_delayed_deposit_from_init_rollup_node =
 (** test to initialise a sequencer data dir based on a rollup node
         data dir *)
 let test_init_from_rollup_node_data_dir =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
@@ -1132,7 +1175,7 @@ let test_init_from_rollup_node_data_dir =
   unit
 
 let test_init_from_rollup_node_with_delayed_inbox =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "delayed_inbox"]
     ~title:
@@ -1204,7 +1247,7 @@ let test_init_from_rollup_node_with_delayed_inbox =
 
 let test_observer_applies_blueprint =
   let tbb = 3. in
-  register_test
+  register_both
     ~time_between_blocks:(Time_between_blocks tbb)
     ~tags:["evm"; "observer"]
     ~title:"Can start an Observer node"
@@ -1253,7 +1296,7 @@ let test_observer_applies_blueprint =
   unit
 
 let test_observer_applies_blueprint_when_restarted =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can restart an Observer node"
@@ -1273,7 +1316,7 @@ let test_observer_applies_blueprint_when_restarted =
   unit
 
 let test_observer_applies_blueprint_when_sequencer_restarted =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can restart the sequencer node"
@@ -1300,22 +1343,11 @@ let test_observer_applies_blueprint_when_sequencer_restarted =
 
   unit
 
-let test_observer_forwards_transaction ?(threshold_encryption = false) =
-  let tags =
-    List.append
-      (if threshold_encryption then ["threshold_encryption"] else [])
-      ["evm"; "observer"; "transaction"]
-  in
-  let title =
-    "Observer forwards transaction"
-    ^ if threshold_encryption then "to bundler" else ""
-  in
+let test_observer_forwards_transaction =
+  let tags = ["evm"; "observer"; "transaction"] in
+  let title = "Observer forwards transaction" in
   let tbb = 1. in
-  register_test
-    ~time_between_blocks:(Time_between_blocks tbb)
-    ~threshold_encryption
-    ~tags
-    ~title
+  register_both ~time_between_blocks:(Time_between_blocks tbb) ~tags ~title
   @@ fun {sequencer = sequencer_node; observer = observer_node; _} _protocol ->
   (* Ensure the sequencer has produced the block. *)
   let* () =
@@ -1353,7 +1385,7 @@ let test_sequencer_is_reimbursed =
   (* We use an arbitrary address for the pool address, the goal is just to
      verify its balance increases. *)
   let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
-  register_test
+  register_both
     ~da_fee:Wei.one
     ~time_between_blocks:(Time_between_blocks tbb)
     ~sequencer_pool_address
@@ -1415,7 +1447,7 @@ let test_self_upgrade_kernel =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
-  register_test
+  register_both
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "self"]
@@ -1495,7 +1527,7 @@ let test_upgrade_kernel_auto_sync =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
-  register_test
+  register_both
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
@@ -1564,7 +1596,7 @@ let test_upgrade_kernel_auto_sync =
   unit
 
 let test_delayed_transfer_timeout =
-  register_test
+  register_both
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:1
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -1623,7 +1655,7 @@ let test_delayed_transfer_timeout =
   unit
 
 let test_delayed_transfer_timeout_fails_l1_levels =
-  register_test
+  register_both
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -1698,7 +1730,7 @@ let test_force_kernel_upgrade_too_early =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  register_test
+  register_both
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
@@ -1760,7 +1792,7 @@ let test_force_kernel_upgrade =
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
-  register_test
+  register_both
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
@@ -1840,7 +1872,7 @@ let test_external_transaction_to_delayed_inbox_fails =
 
      Since we want to test what happens when the tx is actually submitted, we
      bypass the da fee check here. *)
-  register_test
+  register_both
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
     ~bootstrap_accounts:Eth_account.lots_of_address
@@ -1876,7 +1908,7 @@ let test_delayed_inbox_flushing =
      to give us time to send the second one while the first one is not
      timed out yet.
   *)
-  register_test
+  register_both
     ~delayed_inbox_timeout:1
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -1955,7 +1987,7 @@ let test_delayed_inbox_flushing =
   unit
 
 let test_no_automatic_block_production =
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "block"]
     ~title:"No automatic block production"
@@ -1992,7 +2024,7 @@ let test_no_automatic_block_production =
 
 let test_migration_from_ghostnet =
   (* Creates a sequencer using prod version and ghostnet kernel. *)
-  register_test
+  register_both
     ~time_between_blocks:Nothing
     ~kernel:Constant.WASM.ghostnet_evm_kernel
     ~devmode:false
@@ -2101,7 +2133,7 @@ let test_migration_from_ghostnet =
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_sequencer_upgrade =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"; Tag.flaky]
@@ -2245,7 +2277,7 @@ let test_sequencer_upgrade =
     source. To obtain that we create two sequencers, one is going to
     diverged from the other. *)
 let test_sequencer_diverge =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "diverge"]
@@ -2313,7 +2345,7 @@ let test_sequencer_diverge =
 (** This test that the sequencer evm node can catchup event from the
     rollup node. *)
 let test_sequencer_can_catch_up_on_event =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"]
@@ -2365,7 +2397,7 @@ let test_sequencer_can_catch_up_on_event =
   unit
 
 let test_sequencer_dont_read_level_twice =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"; Tag.slow]
@@ -2426,7 +2458,7 @@ let test_sequencer_dont_read_level_twice =
   unit
 
 let test_stage_one_reboot =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~maximum_allowed_ticks:9_000_000_000L
@@ -2502,7 +2534,7 @@ let test_stage_one_reboot =
   unit
 
 let test_blueprint_is_limited_in_size =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~max_number_of_chunks:2
@@ -2583,7 +2615,7 @@ let test_blueprint_is_limited_in_size =
   unit
 
 let test_blueprint_limit_with_delayed_inbox =
-  register_test
+  register_both
     ~bootstrap_accounts:Eth_account.lots_of_address
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
@@ -2663,7 +2695,7 @@ let test_blueprint_limit_with_delayed_inbox =
   @@ List.combine delayed_hashes block_numbers
 
 let test_reset =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "reset"]
@@ -2740,7 +2772,7 @@ let test_reset =
   unit
 
 let test_preimages_endpoint =
-  register_test
+  register_both
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
@@ -2847,9 +2879,6 @@ let () =
   test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_applies_blueprint_when_sequencer_restarted protocols ;
   test_observer_forwards_transaction protocols ;
-  (* TODO Once we successfully integrate the octez-dsn-node executable into
-     the build toolchain, we can revisit and reactivate the test below. *)
-  (* test_observer_forwards_transaction ~threshold_encryption:true protocols ; *)
   test_sequencer_is_reimbursed protocols ;
   test_upgrade_kernel_auto_sync protocols ;
   test_self_upgrade_kernel protocols ;
