@@ -24,27 +24,27 @@ use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
 // TODO: Handle errors and make the return type of the BoxBody Infallible
-type Response = hyper::Response<BoxBody<Bytes, Box<dyn Error + Send + Sync>>>;
+pub type Response = hyper::Response<BoxBody<Bytes, Box<dyn Error + Send + Sync>>>;
 
-type Service = dyn Fn(Request<Incoming>) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + Sync + 'static>>
+pub type Service = dyn Fn(Request<Incoming>) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + Sync + 'static>>
     + Send
     + Sync
     + 'static;
 
-type Path = String;
+pub type Path = String;
 
-pub(crate) struct Router {
+pub struct Router {
     routes: HashMap<(Method, Path), Box<Service>>,
 }
 
 impl Router {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Router {
             routes: HashMap::new(),
         }
     }
 
-    pub(crate) fn route<F, Fut>(mut self, path: &str, method: Method, handler: F) -> Self
+    pub fn route<F, Fut>(mut self, path: &str, method: Method, handler: F) -> Self
     where
         F: Fn(Request<Incoming>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Response>> + Send + Sync + 'static,
@@ -90,7 +90,7 @@ pub struct RpcConfig {
 }
 
 impl RpcServer {
-    pub(crate) fn new(
+    pub fn new(
         listening_addr: SocketAddr,
         rx_shutdown: broadcast::Receiver<Arc<dyn Error + Send + Sync>>,
         tx_shutdown: broadcast::Sender<Arc<dyn Error + Send + Sync>>,
@@ -106,7 +106,7 @@ impl RpcServer {
         }
     }
 
-    pub(crate) async fn serve(&mut self, app: Router) -> Result<()> {
+    pub async fn serve(&mut self, app: Router) -> Result<()> {
         let listener = TcpListener::bind(self.config.socket_addr).await;
         match listener {
             Err(e) => {

@@ -20,9 +20,9 @@ use url::Url;
 
 use crate::errors::Error;
 use crate::json_http_rpc;
-use crate::rpc_encoding::{SendRawTransaction, SendRawTransactionResult};
-use crate::server;
-use crate::server::RpcServer;
+use dsn_rpc::rpc_encoding::{SendRawTransaction, SendRawTransactionResult};
+use dsn_rpc::server;
+use dsn_rpc::server::RpcServer;
 
 // TODO: Move to separate bundler crate
 

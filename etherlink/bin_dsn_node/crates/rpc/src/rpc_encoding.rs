@@ -16,7 +16,7 @@ enum Param {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SendRawTransaction {
+pub struct SendRawTransaction {
     jsonrpc: JsonRpcVersion,
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<u64>,
@@ -25,7 +25,7 @@ pub(crate) struct SendRawTransaction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SendRawTransactionResult {
+pub struct SendRawTransactionResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<u64>,
     jsonrpc: JsonRpcVersion,

@@ -8,7 +8,8 @@ members = [
     #TODO: split node and rpc server in different crates
     "crates/node",
     "crates/core",
-    "crates/threshold_encryption"
+    "crates/threshold_encryption",
+    "crates/rpc",
 ]
 
 [workspace.package]

@@ -5,6 +5,8 @@
 //! Helpers for handling http requests.
 //! Functions in this module are designed to be compatible with `Tezos_rpc_services`.
 
+// TODO: Move to separate rpc crate
+
 use std::{convert::Infallible, pin::Pin};
 
 use futures::{future, Future, Stream, StreamExt, TryStreamExt};
@@ -17,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
 
-use crate::error::RpcError;
+use crate::errors::RpcError;
 
 /// The [Body] of [Response]s returned by the Rpc server.
 /// All application logic errors obtained when processing requests

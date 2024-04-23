@@ -12,12 +12,9 @@ use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 use tracing::info;
 
-use crate::{
-    error::RpcError,
-    rpc_helpers::{
-        internal_server_error, monitor_broadcast_channel_handler, not_found_handler, post_handler,
-        Resp,
-    },
+use dsn_rpc::errors::RpcError;
+use dsn_rpc::rpc_helpers::{
+    internal_server_error, monitor_broadcast_channel_handler, not_found_handler, post_handler, Resp,
 };
 
 use super::protocol::ProtocolClient;
