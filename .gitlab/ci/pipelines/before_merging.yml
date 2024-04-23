@@ -6978,6 +6978,34 @@ test_etherlink_kernel:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
     NATIVE_TARGET: x86_64-unknown-linux-musl
 
+test_etherlink_firehose:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - .gitlab-ci.yml
+    - .gitlab/**/*
+    - etherlink/firehose/**/*
+    - etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*
+    - images/**/*
+    when: on_success
+  needs:
+  - oc.docker:rust-toolchain
+  dependencies:
+  - oc.docker:rust-toolchain
+  cache:
+    key: kernels
+    paths:
+    - cargo/
+  script:
+  - make -C etherlink/firehose check
+  variables:
+    CC: clang
+    CARGO_HOME: $CI_PROJECT_DIR/cargo
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+
 test_risc_v_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
