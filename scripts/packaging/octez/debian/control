@@ -79,3 +79,18 @@ Description: Octez signer
  .
  This package installs the Octez remote signer. It's recommended to run the signer
  and the baker on different hosts and use a hardware ledger for key management.
+
+Package: octez-experimental
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: Octez experimental binaries
+ This package is a collection of debug and experimental binaries from the
+ octez software suite.
+ .
+ This package installs:
+ - octez-snoop: is a tool for benchmarking and fitting statistical models
+   which predict the performance of any piece of code of interest.
+ - octez-smart-rollup-wasm-debugger: runs Smart Rollups in debug mode to
+   make it easier to test and observe them.
+ - octez-protocol-compiler: used by the node to compile new protocols on
+   the fly, and that can be used for developing new protocols.
