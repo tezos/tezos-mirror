@@ -29,6 +29,15 @@ mod rpc_encoding;
 mod server;
 mod shutdown;
 
+use tracing::error;
+
+mod error;
+mod sequencer;
+mod types;
+
+//TODO: move this to a separate crate
+mod rpc_helpers;
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
@@ -46,7 +55,7 @@ enum Commands {
         sequencer_endpoint: Url,
     },
     /// Run the dsn node in sequencer sidecar mode
-    Sequencer,
+    Sequencer(sequencer::cli::Args),
     /// Run the dsn node in keyholder mode
     Keyholder,
 }
@@ -74,12 +83,16 @@ async fn main() {
                 info!("Starting DSN node in Bundler mode");
                 bundler::run(listening_addr, sequencer_endpoint, rx, tx).await
             }
-            Commands::Sequencer => {
+            Commands::Sequencer(args) => {
                 info!("Starting DSN node in Sequencer sidecar mode");
+                if let Err(e) = sequencer::start(args).await {
+                    error!("Sequencer terminated unexpectedly with error {:?}", e)
+                }
                 Ok::<(), ()>(())
             }
             Commands::Keyholder => {
                 info!("Starting DSN node in Keyholder mode");
+
                 Ok::<(), ()>(())
             }
         }
