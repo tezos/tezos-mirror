@@ -32,6 +32,11 @@ Node
   /chains/<chain>/mempool/pending_operations`` which allows operations
   to be filtered by source. (MR :gl:`!11278`)
 
+- Add an RPC
+  ``/chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<sr1...>/consumed_outputs/<outbox_level>``
+  that returns the consumed output's indexes for the given outbox
+  level. (MR :gl:`!12776`)
+
 Client
 ------
 
