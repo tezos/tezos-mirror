@@ -8,11 +8,8 @@
   tezt.core
   octez-libs.base
   octez-libs.base.unix
-  octez-libs.context.sigs
-  octez-libs.tezos-context.disk
-  octez-libs.tezos-context.memory
-  octez-libs.tezos-context.encoding
   octez-internal-libs.irmin_test_helpers
+  octez-internal-libs.irmin.mem
   octez-alcotezt
   octez-libs.stdlib-unix
   octez-libs.test-helpers

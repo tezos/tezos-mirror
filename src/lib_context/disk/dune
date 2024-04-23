@@ -12,9 +12,6 @@
   octez-internal-libs.irmin
   octez-internal-libs.irmin_pack
   octez-internal-libs.irmin_pack.unix
-  octez-internal-libs.brassaia
-  octez-internal-libs.brassaia_pack
-  octez-internal-libs.brassaia_pack.unix
   logs.fmt
   octez-libs.stdlib-unix
   octez-libs.stdlib

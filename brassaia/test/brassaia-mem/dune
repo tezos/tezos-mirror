@@ -6,7 +6,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
-  octez-libs.tezos-context.memory
+  octez-libs.tezos-context-brassaia.memory
   octez-internal-libs.brassaia_test_helpers
   octez-libs.test-helpers
   tezt)

@@ -20,6 +20,7 @@ It contains the following libraries:
 - {{!module-Tezos_base_test_helpers}Tezos_base_test_helpers}: Octez base test helpers
 - {{!module-Tezos_clic}Tezos_clic}
 - {{!module-Tezos_context}Tezos_context}: On-disk context abstraction for [octez-node]
+- {{!module-Tezos_context_brassaia}Tezos_context_brassaia}: On-disk context abstraction for [octez-node] (brassaia)
 - {{!module-Tezos_crypto}Tezos_crypto}: Library with all the cryptographic primitives used by Tezos
 - {{!module-Tezos_crypto_dal}Tezos_crypto_dal}: DAL cryptographic primitives
 - {{!module-Tezos_error_monad}Tezos_error_monad}: Error monad

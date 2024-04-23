@@ -1,3 +1,5 @@
+module Tezos_context_encoding = Tezos_context_brassaia_encoding
+module Tezos_context_disk = Tezos_context_brassaia_disk.Tezos_context_disk
 module Conf = Tezos_context_encoding.Context_binary.Conf
 module Schema = Tezos_context_encoding.Context.Schema
 module Context = Tezos_context_disk.Context
