@@ -1094,6 +1094,15 @@ let spam_withdrawal =
     bin = kernel_inputs_path ^ "/spam_withdrawal.bin";
   }
 
+(** The info for the "gas_limit.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/gas_limit.sol] *)
+let gas_limit_contract =
+  {
+    label = "gas_limit_contract";
+    abi = kernel_inputs_path ^ "/gas_limit.abi";
+    bin = kernel_inputs_path ^ "/gas_limit.bin";
+  }
+
 (** Test that the contract creation works.  *)
 let test_l2_deploy_simple_storage =
   register_proxy
@@ -5062,6 +5071,38 @@ let test_revert_is_correctly_propagated =
          eth-cli cannot decode an encoded string using Ethereum format. *)
       unit
 
+let test_block_gas_limit =
+  register_both
+    ~tags:["evm"; "gas_limit"; "block"]
+    ~title:"Block gas limit returns 2^50."
+  @@ fun ~protocol:_ ~evm_setup:({evm_node; endpoint; _} as evm_setup) ->
+  let* contract, _tx =
+    deploy
+      ~contract:gas_limit_contract
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      evm_setup
+  in
+  let* opcode_gas_limit =
+    let* gas_limit =
+      Eth_cli.contract_call
+        ~endpoint
+        ~abi_label:gas_limit_contract.label
+        ~address:contract
+        ~method_call:"retrieve()"
+        ()
+    in
+    return (Int64.of_string (String.trim gas_limit))
+  in
+  let*@ block = Rpc.get_block_by_number ~block:"latest" evm_node in
+  let block_gas_limit = block.gasLimit in
+  let check_gas_limit gas_limit =
+    Check.((gas_limit = 1125899906842624L) int64)
+      ~error_msg:"The gas limit should be 2**50, got %L"
+  in
+  check_gas_limit opcode_gas_limit ;
+  check_gas_limit block_gas_limit ;
+  unit
+
 (** Test that the kernel can handle more than 100 withdrawals withdrawals
     per level, which is currently the limit of outbox messages in the L1. *)
 let test_outbox_size_limit_resilience ~slow =
@@ -5603,6 +5644,7 @@ let register_evm_node ~protocols =
   test_call_recursive_contract_estimate_gas protocols ;
   test_blockhash_opcode protocols ;
   test_revert_is_correctly_propagated protocols ;
+  test_block_gas_limit protocols ;
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_tx_pool_timeout protocols ;
