@@ -3060,6 +3060,38 @@ let test_preimages_endpoint =
     ~error_msg:"The sequencer should have used the file server" ;
   unit
 
+let test_store_smart_rollup_address =
+  register_both
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "store"]
+    ~title:"Sequencer checks the smart rollup address"
+    ~uses
+  @@ fun {sequencer; client; node; _} _protocol ->
+  (* Starting the sequencer stores the smart rollup address in the store. *)
+  (* Kill the sequencer. *)
+  let* () = Evm_node.terminate sequencer in
+  (* Originate another rollup. *)
+  let* other_rollup_address =
+    originate_sc_rollup ~keys:[] ~kind:"wasm_2_0_0" ~alias:"vbot" client
+  in
+  let other_rollup_node =
+    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+  in
+  let* () = Sc_rollup_node.run other_rollup_node other_rollup_address [] in
+  (* Try to run the sequencer with an invalid smart rollup address. *)
+  let process =
+    Evm_node.spawn_run
+      ~extra_arguments:
+        ["--rollup-node-endpoint"; Sc_rollup_node.endpoint other_rollup_node]
+      sequencer
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "The EVM node follows the smart rollup address*")
+      process
+  in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -3104,4 +3136,5 @@ let () =
   test_blueprint_is_limited_in_size protocols ;
   test_blueprint_limit_with_delayed_inbox protocols ;
   test_reset protocols ;
-  test_preimages_endpoint protocols
+  test_preimages_endpoint protocols ;
+  test_store_smart_rollup_address protocols
