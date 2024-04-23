@@ -27,7 +27,7 @@ be predicted too much in advance.
 Delegation and Staking
 ----------------------
 
-A *delegate* is any :ref:`user account <def_implicit_account_alpha>` registered as
+A *delegate* is any :ref:`user account <def_user_account_alpha>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
 operation emitter (its signer). Note that ``tz4`` accounts cannot be registered

@@ -325,7 +325,7 @@ _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
 
-.. _def_implicit_account_alpha:
+.. _def_user_account_alpha:
 
 _`User account`
     An account_ that is linked to a public key. Contrary to a `smart
