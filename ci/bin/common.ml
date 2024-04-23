@@ -482,7 +482,7 @@ let changeset_test_etherlink_kernel =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["etherlink.mk"; "etherlink/kernel_evm/**/*"; "src/kernel_sdk/**/*"])
+    @ make ["etherlink.mk"; "etherlink/**/*.rs"; "src/kernel_sdk/**/*"])
 
 let changeset_test_risc_v_kernels =
   Changeset.(

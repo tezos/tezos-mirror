@@ -6958,7 +6958,7 @@ test_etherlink_kernel:
     - .gitlab-ci.yml
     - .gitlab/**/*
     - etherlink.mk
-    - etherlink/kernel_evm/**/*
+    - etherlink/**/*.rs
     - images/**/*
     - src/kernel_sdk/**/*
     when: on_success
