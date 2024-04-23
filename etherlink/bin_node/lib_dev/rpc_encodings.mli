@@ -144,7 +144,7 @@ module Get_storage_at :
      and type output = Ethereum_types.hex
 
 module Block_number :
-  METHOD with type input = unit and type output = Ethereum_types.block_height
+  METHOD with type input = unit and type output = Ethereum_types.quantity
 
 module Get_block_by_number :
   METHOD

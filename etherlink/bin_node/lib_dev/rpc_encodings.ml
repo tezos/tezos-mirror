@@ -244,11 +244,11 @@ module Block_number = struct
 
   type input = unit
 
-  type output = block_height
+  type output = quantity
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = block_height_encoding
+  let output_encoding = quantity_encoding
 
   let method_ = "eth_blockNumber"
 

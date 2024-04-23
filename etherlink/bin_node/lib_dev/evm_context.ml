@@ -466,8 +466,7 @@ module State = struct
     in
 
     match try_apply with
-    | Apply_success
-        (evm_state, Block_height blueprint_number, current_block_hash)
+    | Apply_success (evm_state, Qty blueprint_number, current_block_hash)
       when Z.equal blueprint_number next ->
         let* () =
           Evm_store.Blueprints.store
