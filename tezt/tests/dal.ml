@@ -1361,12 +1361,11 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
       if not query_string then (None, None)
       else (Some slot_level, Some slot_index)
     in
-    let* response =
+    let* headers =
       Dal_RPC.(
-        call_raw dal_node
-        @@ get_commitment_headers ?slot_index ?slot_level commit)
+        call dal_node @@ get_commitment_headers ?slot_index ?slot_level commit)
     in
-    return @@ check_result response
+    return @@ check_result headers
   in
   let* () = Lwt_list.iter_s (test check_result ~query_string:true) slots_info in
   Lwt_list.iter_s (test check_result ~query_string:false) slots_info
@@ -1382,15 +1381,10 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
   unit
 
-(* Checks that [response] contains zero or one slot header. If [expected_status]
+(* Checks that [headers] contains zero or one slot header. If [expected_status]
    is not given, the expected response is the empty list; if it is given, the
    response should contain exactly one header, with the given status. *)
-let get_headers_succeeds ~__LOC__ ?expected_status response =
-  let headers =
-    JSON.(
-      parse ~origin:"get_headers_succeeds" response.RPC_core.body
-      |> Dal_RPC.slot_headers_of_json)
-  in
+let get_headers_succeeds ~__LOC__ ?expected_status headers =
   match (headers, expected_status) with
   | [], None -> ()
   | _ :: _, None ->
