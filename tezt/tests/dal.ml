@@ -1392,8 +1392,9 @@ let get_headers_succeeds ~__LOC__ ?expected_status headers =
          commitment, got %d."
         (List.length headers)
 
-let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
-  let test check_result ~query_string (slot_index, commit) =
+let check_get_commitment_headers ~__LOC__ ?expected_status dal_node ~slot_level
+    slots_info =
+  let test ~query_string (slot_index, commit) =
     let slot_level, slot_index =
       if not query_string then (None, None)
       else (Some slot_level, Some slot_index)
@@ -1402,10 +1403,10 @@ let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
       Dal_RPC.(
         call dal_node @@ get_commitment_headers ?slot_index ?slot_level commit)
     in
-    return @@ check_result headers
+    return @@ get_headers_succeeds ~__LOC__ ?expected_status headers
   in
-  let* () = Lwt_list.iter_s (test check_result ~query_string:true) slots_info in
-  Lwt_list.iter_s (test check_result ~query_string:false) slots_info
+  let* () = Lwt_list.iter_s (test ~query_string:true) slots_info in
+  Lwt_list.iter_s (test ~query_string:false) slots_info
 
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
@@ -1449,7 +1450,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     check_get_commitment_headers
       dal_node
       ~slot_level:level
-      (get_headers_succeeds ~__LOC__)
+      ~__LOC__
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
   let* () =
@@ -1468,7 +1469,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     check_get_commitment_headers
       dal_node
       ~slot_level:level
-      (get_headers_succeeds ~__LOC__)
+      ~__LOC__
       [slot0; slot1; slot2_a; slot2_b; slot3; slot4]
   in
 
@@ -1499,8 +1500,12 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     ~error_msg:
       "Published header is different from stored header (current = %L, \
        expected = %R)" ;
-  let check_get_commitment_headers =
-    check_get_commitment_headers dal_node ~slot_level:pub_level
+  let check_get_commitment_headers ?expected_status l =
+    check_get_commitment_headers
+      ?expected_status
+      dal_node
+      ~slot_level:pub_level
+      l
   in
   let check_get_commitment =
     check_get_commitment dal_node ~slot_level:pub_level
@@ -1510,13 +1515,12 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = check_get_commitment get_commitment_succeeds ok in
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ ~expected_status:"waiting_attestation")
+      ~__LOC__
+      ~expected_status:"waiting_attestation"
       ok
   in
   (* slot_2_a is not selected. *)
-  let* () =
-    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot2_a]
-  in
+  let* () = check_get_commitment_headers ~__LOC__ [slot2_a] in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
 
@@ -1550,31 +1554,24 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = check_get_commitment get_commitment_succeeds ok in
   (* Slot that were waiting for attestation and now attested. *)
   let* () =
-    check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ ~expected_status:"attested")
-      attested
+    check_get_commitment_headers ~__LOC__ ~expected_status:"attested" attested
   in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
   (* Slot that were waiting for attestation and now unattested. *)
   let* () =
     check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ ~expected_status:"unattested")
+      ~__LOC__
+      ~expected_status:"unattested"
       unattested
   in
   (* slot2_a is still not selected. *)
-  let* () =
-    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot2_a]
-  in
+  let* () = check_get_commitment_headers ~__LOC__ [slot2_a] in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
-  let* () =
-    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot3]
-  in
+  let* () = check_get_commitment_headers ~__LOC__ [slot3] in
   (* slot4 is never injected in any of the nodes. So, it's not
      known by the Dal node. *)
-  let* () =
-    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot4]
-  in
+  let* () = check_get_commitment_headers ~__LOC__ [slot4] in
   (* The number of published slots has not changed *)
   let* () =
     check_published_level_headers
