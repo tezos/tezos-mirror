@@ -14,6 +14,9 @@ branch of Octez.
 Environment Version
 -------------------
 
+This protocol requires a different protocol environment version than Paris.
+It requires protocol environment V13, compared to V12 for Paris.
+
 Smart Rollups
 -------------
 
