@@ -25,9 +25,37 @@
 
 (** This module provides different handlers related to DAL slots. *)
 
-(* We cannot include a raw mli file. But this will be removed once full
-   migration is done. *)
-include module type of Slot_manager_legacy
+(**
+   Functions to manage slots storage.
+
+   - writing a slot means splitting it in shards and store them on disk
+   - reading a slot means rebuild it from the shards
+   *)
+
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4099
+    DAL/Node: make slot_header/commitment definition consistent with
+    alpha_context.mli *)
+
+type slot = bytes
+
+(** [get_slot_pages] behaves as [get_slot], except that it also
+    splits the slot into pages before returning them.
+
+    Returns an [Error _] if the length of the slot associated to the
+    [Cryptobox.commitment] is ill-formed. Specifically, when its
+    length is not a multiple of the page-size specified in the
+    [Cryptobox.parameters] argument. *)
+val get_slot_pages :
+  Cryptobox.t -> Store.t -> Cryptobox.commitment -> bytes list tzresult Lwt.t
+
+(* Same as [Cryptobox.polynomial_from_shards] but using Lwt +
+   tzresult. The argument [number_of_needed_shards] is used to cap the
+   number of Lwt promises resolved from the shard sequence. *)
+val polynomial_from_shards_lwt :
+  Cryptobox.t ->
+  Cryptobox.shard Seq_s.t ->
+  number_of_needed_shards:int ->
+  Cryptobox.polynomial tzresult Lwt.t
 
 type error +=
   | Invalid_slot_size of {provided : int; expected : int}

@@ -98,7 +98,7 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
       let*! () = Lwt_io.close ic_parent in
       let*! () = Lwt_io.close oc_parent in
       let* polynomial =
-        Slot_manager_legacy.polynomial_from_shards_lwt
+        Slot_manager.polynomial_from_shards_lwt
           cryptobox
           shards
           ~number_of_needed_shards
