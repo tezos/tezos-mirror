@@ -53,9 +53,6 @@ let info message =
 let set ~msg store path v =
   Irmin.set_exn store path v ~info:(fun () -> info msg)
 
-let remove ~msg store path =
-  Irmin.remove_exn store path ~info:(fun () -> info msg)
-
 module Value_size_hooks = struct
   (* The [value_size] required by [Tezos_key_value_store.directory] is known when
      the daemon loads a protocol, after the store is activated. We use the closure
@@ -324,21 +321,13 @@ module Legacy = struct
          indices.
 
          "Accepted" path(s) are used to store information about slots headers
-         that are either [`Waiting_attesattion], [`Attested], or [`Unattested].
-
-         "Others" path(s) are used to store information of slots headers when
-         their statuses are [`Not_selected] or [`Unseen_or_not_finalized]. *)
+         that are either [`Waiting_attesattion], [`Attested], or [`Unattested]. *)
 
       val slots_indices : Types.level -> Irmin.Path.t
 
       val accepted_header_commitment : Types.slot_id -> Irmin.Path.t
 
       val accepted_header_status : Types.slot_id -> Irmin.Path.t
-
-      val others : Types.slot_id -> Irmin.Path.t
-
-      val other_header_status :
-        Types.slot_id -> Cryptobox.commitment -> Irmin.Path.t
     end
   end = struct
     type t = string list
@@ -384,14 +373,6 @@ module Legacy = struct
       let accepted_header_status index =
         let prefix = accepted_header index in
         prefix / "status"
-
-      let others index =
-        let prefix = headers index in
-        prefix / "others"
-
-      let other_header_status index commitment =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        others index / commitment_repr / "status"
     end
   end
 
@@ -416,7 +397,6 @@ module Legacy = struct
             Types.Slot_id.{slot_level = published_level; slot_index}
           in
           let header_path = Path.Commitment.header commitment index in
-          let others_path = Path.Level.other_header_status index commitment in
           match status with
           | Dal_plugin.Succeeded ->
               let*! () =
@@ -431,15 +411,6 @@ module Legacy = struct
               in
               let status_path = Path.Level.accepted_header_status index in
               let data = encode_commitment commitment in
-              (* Before adding the item in accepted path, we should remove it from
-                 others path, as it may appear there with an
-                 Unseen_or_not_finalized status. *)
-              let*! () =
-                remove
-                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" others_path)
-                  slots_store
-                  others_path
-              in
               let*! () =
                 set
                   ~msg:
@@ -575,28 +546,6 @@ module Legacy = struct
     in
     get_accepted_headers ~skip_commitment slot_ids store accu
 
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
-     header. *)
-  let get_other_headers_of_identified_commitment commitment slot_id store acc =
-    let open Lwt_result_syntax in
-    let*! status_opt =
-      Irmin.find store @@ Path.Level.other_header_status slot_id commitment
-    in
-    match status_opt with
-    | None -> return acc
-    | Some status_str ->
-        let*? status = decode_header_status status_str in
-        return @@ ({Types.slot_id; commitment; status} :: acc)
-
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
-     header. *)
-  let get_other_headers_of_commitment commitment slot_ids store accu =
-    List.fold_left_es
-      (fun acc slot_id ->
-        get_other_headers_of_identified_commitment commitment slot_id store acc)
-      accu
-      slot_ids
-
   let get_commitment_headers commitment ?slot_level ?slot_index node_store =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
        Improve the implementation of this handler.
@@ -607,30 +556,7 @@ module Legacy = struct
     let*! indexes = Irmin.list store @@ Path.Commitment.headers commitment in
     (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
     let*? slot_ids = filter_indexes ?slot_level ?slot_index indexes in
-    let* accu = get_other_headers_of_commitment commitment slot_ids store [] in
-    get_accepted_headers_of_commitment commitment slot_ids store accu
-
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "other(s)"
-     header. *)
-  let get_other_headers slot_ids store accu =
-    let open Lwt_result_syntax in
-    List.fold_left_es
-      (fun acc slot_id ->
-        let*! commitments_with_statuses =
-          Irmin.list store @@ Path.Level.others slot_id
-        in
-        List.fold_left_es
-          (fun acc (encoded_commitment, _status_tree) ->
-            let*? commitment = decode_commitment encoded_commitment in
-            get_other_headers_of_identified_commitment
-              commitment
-              slot_id
-              store
-              acc)
-          acc
-          commitments_with_statuses)
-      accu
-      slot_ids
+    get_accepted_headers_of_commitment commitment slot_ids store []
 
   let get_published_level_headers ~published_level ?header_status node_store =
     let open Lwt_result_syntax in
@@ -649,14 +575,13 @@ module Legacy = struct
           })
         slots_indices
     in
-    let* accu = get_other_headers slot_ids store [] in
     let* accu =
       let skip_commitment c =
         let open Result_syntax in
         let* commit = decode_commitment c in
         return @@ `Keep commit
       in
-      get_accepted_headers ~skip_commitment slot_ids store accu
+      get_accepted_headers ~skip_commitment slot_ids store []
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4541
        Enable the same filtering for GET /commitments/<commitment>/headers
