@@ -12,12 +12,12 @@ use crate::{
     state_backend::{AllocatedOf, Atom, Cell, Manager},
     traps::EnvironException,
 };
+use std::marker::PhantomData;
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
     SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
     SBI_TEZOS_META_ORIGINATION_LEVEL,
 };
-use std::marker::PhantomData;
 
 /// PVM execution environment
 pub enum PvmSbi {}
@@ -50,7 +50,6 @@ where
         machine: &mut MachineState<ML, M>,
         env_exception: EnvironException,
     ) -> EcallOutcome {
-
         // All calls from machine mode are fatal (according to rvemu sbi)
         if let EnvironException::EnvCallFromMMode = env_exception {
             return EcallOutcome::Handled {
