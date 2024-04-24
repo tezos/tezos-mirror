@@ -44,9 +44,11 @@ module Make (Reader : READER) = struct
     |> Option.map (fun bytes ->
            bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)
 
-  let code address =
+  let code address block =
     let open Lwt_result_syntax in
-    let+ answer = Reader.read (Durable_storage_path.Accounts.code address) in
+    let+ answer =
+      Reader.read ~block (Durable_storage_path.Accounts.code address)
+    in
     match answer with
     | Some bytes ->
         bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string

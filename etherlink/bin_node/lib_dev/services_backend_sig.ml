@@ -19,8 +19,12 @@ module type S = sig
   val nonce :
     Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t
 
-  (** [code address] returns the [address]'s code. *)
-  val code : Ethereum_types.address -> Ethereum_types.hex tzresult Lwt.t
+  (** [code address block_param] returns the [address]'s code at block
+      [block_param]. *)
+  val code :
+    Ethereum_types.address ->
+    Ethereum_types.block_param ->
+    Ethereum_types.hex tzresult Lwt.t
 
   (** [inject_raw_transactions ~timestamp ~smart_rollup_address
       ~transactions] crafts the hashes and chunks of each transaction
