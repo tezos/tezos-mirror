@@ -1499,6 +1499,7 @@ dependencies = [
  "rand 0.8.5",
  "rustc_apfloat",
  "strum 0.26.1",
+ "tezos-smart-rollup-constants",
  "thiserror",
  "twiddle",
  "vm-fdt",

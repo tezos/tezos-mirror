@@ -599,7 +599,7 @@ let octez_risc_v_pvm =
         (* We have to include all the locally mentioned Cargo.toml files
          * within the workspace (including transitively). *)
         [S "file"; S "../sandbox/Cargo.toml"];
-        [S "file"; S "../../kernel_sdk/constants/Cargo.toml"];
+        [S "source_tree"; S "../../kernel_sdk/constants"];
         [S "file"; S "../../kernel_sdk/core/Cargo.toml"];
         [S "file"; S "../../kernel_sdk/host/Cargo.toml"];
         [S "file"; S "../../kernel_sdk/encoding/Cargo.toml"];

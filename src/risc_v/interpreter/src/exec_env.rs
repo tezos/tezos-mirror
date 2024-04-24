@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 pub mod posix;
+pub mod pvm;
 
 use crate::{
     machine_state::{bus::main_memory::MainMemoryLayout, MachineState},
