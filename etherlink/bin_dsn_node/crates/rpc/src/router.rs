@@ -8,18 +8,23 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
-use anyhow::Result;
 use http_body_util::combinators::BoxBody;
 use hyper::body::{Bytes, Incoming};
 use hyper::{Method, Request, StatusCode};
+
+use crate::errors::RpcError;
 
 pub type ResponseBody = BoxBody<Bytes, Infallible>;
 
 // TODO: Handle errors and make the return type of the BoxBody Infallible
 pub type Response = hyper::Response<ResponseBody>;
 
-pub type Service<S> = dyn Fn(&S, Request<Incoming>) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + 'static>>
+pub type Service<S> = dyn Fn(
+        Arc<S>,
+        Request<Incoming>,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, RpcError>> + Send + 'static>>
     + Send
     + Sync
     + 'static;
@@ -39,7 +44,10 @@ impl<S> RouterBuilder<S> {
 
     pub fn with_route<F>(mut self, path: &str, method: Method, handler: F) -> Self
     where
-        F: Fn(&S, Request<Incoming>) -> Pin<Box<dyn Send + Future<Output = Result<Response>>>>
+        F: Fn(
+                Arc<S>,
+                Request<Incoming>,
+            ) -> Pin<Box<dyn Send + Future<Output = Result<Response, RpcError>>>>
             + Send
             + Sync
             + 'static,
@@ -61,12 +69,16 @@ pub struct Router<S> {
 }
 
 impl<S> Router<S> {
-    pub(crate) async fn handle_request(&self, s: &S, req: Request<Incoming>) -> Result<Response> {
+    pub(crate) async fn handle_request(
+        &self,
+        s: Arc<S>,
+        req: Request<Incoming>,
+    ) -> Result<Response, RpcError> {
         if let Some(handler) = self
             .routes
             .get(&(req.method().clone(), req.uri().path().to_string()))
         {
-            return handler(&s, req).await;
+            return handler(s, req).await;
         }
         Ok(hyper::Response::builder()
             .status(StatusCode::NOT_FOUND)

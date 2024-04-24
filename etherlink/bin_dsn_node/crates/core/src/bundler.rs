@@ -7,7 +7,8 @@ use std::error::Error as StdError;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use anyhow::Result;
+use dsn_rpc::errors::RpcError;
+use dsn_rpc::responses::internal_server_error;
 use dsn_rpc::router::Router;
 use futures::FutureExt;
 use http_body_util::combinators::BoxBody;
@@ -18,7 +19,7 @@ use hyper::{Method, Request};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpStream;
 use tokio::sync::broadcast;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use url::Url;
 
 use crate::errors::Error;
@@ -49,13 +50,13 @@ pub async fn run(
     }
 }
 
-fn parse_url(url: Url) -> Result<(String, u16)> {
+fn parse_url(url: Url) -> Result<(String, u16), Error> {
     let host = url.host_str().ok_or(Error::UriHostMissing)?;
     let port = url.port().ok_or(Error::UriPortMissing)?;
     Ok((host.to_string(), port))
 }
 
-async fn connect<B>(upstream_server: Url) -> Result<SendRequest<B>>
+async fn connect<B>(upstream_server: Url) -> Result<SendRequest<B>, anyhow::Error>
 where
     B: hyper::body::Body + 'static + Send,
     B::Data: Send,
@@ -73,7 +74,9 @@ where
     Ok(sender)
 }
 
-async fn connect_exponential_backoff<B>(upstream_server: &Url) -> Result<SendRequest<B>>
+async fn connect_exponential_backoff<B>(
+    upstream_server: &Url,
+) -> Result<SendRequest<B>, anyhow::Error>
 where
     B: hyper::body::Body + 'static + Send,
     B::Data: Send,
@@ -86,8 +89,17 @@ where
     tokio_retry::Retry::spawn(retry_strategy, || connect(upstream_server.clone())).await
 }
 
-async fn proxy_service(req: Request<Incoming>, upstream_server: Arc<Url>) -> Result<Response> {
-    let sender = connect_exponential_backoff(&upstream_server).await?;
+async fn proxy_service(
+    req: Request<Incoming>,
+    upstream_server: Arc<Url>,
+) -> Result<Response, RpcError> {
+    let sender = match connect_exponential_backoff(&upstream_server).await {
+        Err(e) => {
+            warn!("Could not connect to upstream server: {:?}", e);
+            return internal_server_error();
+        }
+        Ok(sender) => sender,
+    };
 
     // TODO: Parse the JSON RPC request first
     let value = json_http_rpc::transform_and_proxy_request::<
@@ -97,11 +109,25 @@ async fn proxy_service(req: Request<Incoming>, upstream_server: Arc<Url>) -> Res
         Full<Bytes>,
         _,
     >(sender, req, |e| e)
-    .await?;
+    .await;
 
-    let body = Full::new(serde_json::to_string(&value)?.into())
-        .map_err(|e| match e {})
-        .boxed();
+    let value = match value {
+        Err(e) => {
+            warn!("Error while proxying requests: {:?}", e);
+            return internal_server_error();
+        }
+        Ok(v) => v,
+    };
+
+    let json_response: Bytes = match serde_json::to_string(&value) {
+        Err(e) => {
+            warn!("Error when serializing proxied responses: {:?}", e);
+            return internal_server_error();
+        }
+        Ok(v) => v.into(),
+    };
+
+    let body = Full::new(json_response).map_err(|e| match e {}).boxed();
 
     Ok(Response::new(BoxBody::new(body)))
 }
@@ -111,13 +137,13 @@ async fn proxy_server(
     upstream_server: Url,
     rx_shutdown: broadcast::Receiver<Arc<dyn StdError + Send + Sync>>,
     tx_shutdown: broadcast::Sender<Arc<dyn StdError + Send + Sync>>,
-) -> Result<()> {
+) -> Result<(), RpcError> {
     let upstream_server = Arc::new(upstream_server);
     let app = {
         Router::builder()
             .with_route("/", Method::POST, {
                 let upstream_server = upstream_server.clone();
-                move |(), req| proxy_service(req, upstream_server.clone()).boxed()
+                move |_state, req| proxy_service(req, upstream_server.clone()).boxed()
             })
             .build()
     };

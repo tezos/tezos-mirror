@@ -72,7 +72,7 @@ async fn main() {
             }
             Commands::Sequencer(args) => {
                 info!("Starting DSN node in Sequencer sidecar mode");
-                if let Err(e) = sequencer::start(args).await {
+                if let Err(e) = sequencer::start(args, rx, tx).await {
                     error!("Sequencer terminated unexpectedly with error {:?}", e)
                 }
                 Ok::<(), ()>(())

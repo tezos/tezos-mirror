@@ -85,7 +85,11 @@ pub async fn handle_post_request<
     F: FnOnce(
         T,
     ) -> Pin<
-        Box<dyn Send + Future<Output = Result<S, Box<dyn std::error::Error + Send + Sync>>>>,
+        Box<
+            dyn 'static
+                + Send
+                + Future<Output = Result<S, Box<dyn std::error::Error + Send + Sync>>>,
+        >,
     >,
 >(
     req: Request<Incoming>,

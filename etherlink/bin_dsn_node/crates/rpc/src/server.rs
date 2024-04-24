@@ -10,7 +10,6 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use anyhow::Result;
 use http_body_util::combinators::BoxBody;
 use hyper::body::{Bytes, Incoming};
 use hyper::server::conn::http1;
@@ -22,12 +21,15 @@ use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
+use crate::errors::RpcError;
 use crate::router::Router;
 
 // TODO: Handle errors and make the return type of the BoxBody Infallible
 pub type Response = hyper::Response<BoxBody<Bytes, Box<dyn Error + Send + Sync>>>;
 
-pub type Service = dyn Fn(Request<Incoming>) -> Pin<Box<dyn Future<Output = Result<Response>> + Send + Sync + 'static>>
+pub type Service = dyn Fn(
+        Request<Incoming>,
+    ) -> Pin<Box<dyn Future<Output = Result<Response, RpcError>> + Send + Sync + 'static>>
     + Send
     + Sync
     + 'static;
@@ -73,7 +75,7 @@ impl<S: Send + Sync + Clone + 'static> RpcServer<S> {
         }
     }
 
-    pub async fn serve(&mut self, app: Router<S>) -> Result<()> {
+    pub async fn serve(&mut self, app: Router<S>) -> Result<(), RpcError> {
         let listener = TcpListener::bind(self.config.socket_addr).await;
         match listener {
             Err(e) => {
@@ -93,10 +95,13 @@ impl<S: Send + Sync + Clone + 'static> RpcServer<S> {
                         Ok((tcp, _)) = listener.accept() => {
                             let io = TokioIo::new(tcp);
                             let app = app.clone();
-                            let state = self.state.clone();
+                            // TODO: This is needed in the sequencer because resubscription to broadcast
+                            // channels must happen by cloning the ProtocolClient.
+                            // Should we allow cloning the state in general?
+                            let state = Arc::new((*self.state).clone());
                             tokio::task::spawn(async move {
                                 if let Err(err) = http1::Builder::new()
-                                    .serve_connection(io, service_fn(|req| app.handle_request(&state, req)))
+                                    .serve_connection(io, service_fn(|req| app.handle_request(state.clone(), req)))
                                     .await
                                 {
                                     warn!("Error serving connection: {:?}", err);
