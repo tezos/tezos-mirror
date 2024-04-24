@@ -33,7 +33,6 @@
 # @linoscope = Lin Oshitani
 # @lrand = Lucas Randazzo
 # @lthms = Thomas Letan
-# @MarcBeunardeau = Marc Beunardeau
 # @MBourgoin = Mathias Bourgoin
 # @mebsout = Alain Mebsout
 # @murbard = Arthur B.
@@ -50,13 +49,12 @@
 # @Saroupille = François Thiré
 # @sribaroud = Sylvain R.
 # @tomjack = Tom Jack
-# @vbotbol = vbot
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
 # @victor-dumitrescu = Victor Dumitrescu
 # @yrg = Yann Regis-Gianas
 #
-* @ACoquereau @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MarcBeunardeau @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vbotbol @vch9 @vect0r @victor-dumitrescu @yrg
+* @ACoquereau @andrea.cerone @arvidnl @bsall @dianegalloiswong @emturner @eugenz @iguerNL @jobjo @julien.t @Killian-Delarue @linoscope @lrand @lthms @MBourgoin @mebsout @murbard @naih @NicVolanschi @ole.kruger @pe.cornilleau @picdc @rafoo_ @raphael-proust @rodibozman @romain.nl @ryan.tan3 @Saroupille @sribaroud @tomjack @vch9 @vect0r @victor-dumitrescu @yrg
 
 # CODEOWNERS Owners
 #
@@ -64,6 +62,6 @@
 #
 # Note that this stanza MUST appear LAST so that it takes precedence over prior rules.
 #
-/CODEOWNERS         @murbard @vbotbol @romain.nl
-/docs/CODEOWNERS    @murbard @vbotbol @romain.nl
-/.gitlab/CODEOWNERS @murbard @vbotbol @romain.nl
+/CODEOWNERS         @murbard @romain.nl
+/docs/CODEOWNERS    @murbard @romain.nl
+/.gitlab/CODEOWNERS @murbard @romain.nl
