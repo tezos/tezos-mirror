@@ -73,7 +73,7 @@ let tests =
          If you end up here because of this, please add a protocol migration
          test for you new version. *)
       (match from_version with
-      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 -> ()) ;
+      | Tezos_scoru_wasm.Wasm_pvm_state.V0 | V1 | V2 | V3 | V4 | V5 -> ()) ;
       tztest
         (sf
            "protocol migration message handling by the WASM PVM (%s)"
@@ -84,7 +84,7 @@ let tests =
            ~to_version
            ~after_protocol_activation:protocol))
     [
-      (V2, V4, Proto_alpha); (V2, V4, Paris); (V1, V2, Oxford); (V0, V1, Nairobi);
+      (V4, V5, Proto_alpha); (V2, V4, Paris); (V1, V2, Oxford); (V0, V1, Nairobi);
     ]
 
 let () =

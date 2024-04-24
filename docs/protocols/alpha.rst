@@ -17,6 +17,9 @@ Environment Version
 This protocol requires a different protocol environment version than Paris.
 It requires protocol environment V13, compared to V12 for Paris.
 
+- Removed the 4th version of the WASM PVM, added the 5th version of the WASM
+  PVM. (MR :gl:`!12999`)
+
 Smart Rollups
 -------------
 
@@ -24,6 +27,8 @@ Smart Rollups
   exchanged between smart contracts and smart rollups. In particular,
   it is now possible for smart rollups to use typed callbacks in
   outbox messages. (MR :gl:`!11130`)
+
+- Bumped WASM PVM to V5. (MR :gl:`!12999`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------

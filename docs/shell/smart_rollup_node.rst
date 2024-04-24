@@ -1014,7 +1014,11 @@ upgrades. The WASM PVM will upgrade itself when it reads the
 +--------------+----------------+
 | Nairobi      | 2.0.0-r1       |
 +--------------+----------------+
-| Alpha        | 2.0.0-r1       |
+| Oxford2      | 2.0.0-r2       |
++--------------+----------------+
+| Paris        | 2.0.0-r4       |
++--------------+----------------+
+| Alpha        | 2.0.0-r5       |
 +--------------+----------------+
 
 The changes in each WASM PVM version can be found by searching for string "PVM" in the corresponding protocol's changelog, section ``Smart Rollups`` (e.g. `this section <../protocols/alpha.html#smart-rollups>`__ for protocol Alpha).

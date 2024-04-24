@@ -43,7 +43,8 @@ open Sc_rollup_helpers
 *)
 
 let default_wasm_pvm_revision = function
-  | Protocol.Alpha | Paris -> "2.0.0-r4"
+  | Protocol.Alpha -> "2.0.0-r5"
+  | Paris -> "2.0.0-r4"
   | Protocol.Oxford -> "2.0.0-r3"
 
 let max_nb_ticks = function
