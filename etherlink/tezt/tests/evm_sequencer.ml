@@ -1320,23 +1320,28 @@ let test_get_balance_block_param =
     ~title:"RPC method getBalance uses block parameter"
     ~uses
   @@ fun protocol ->
-  let* {sequencer; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
+  let* {sequencer; sc_rollup_node; proxy; client; _} =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+  let transfer address =
+    let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+    let transfer =
+      Eth_cli.transaction_send
+        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+        ~to_public_key:address
+        ~value:(Wei.of_eth_int 10)
+        ~endpoint:(Evm_node.endpoint sequencer)
+        ()
+    in
+    let* _tx_hash = wait_for in
+    (* Once the transaction is in the transaction pool the next block will include it. *)
+    let*@ _ = Rpc.produce_block sequencer in
+    (* Resolve the transaction send to make sure it was included. *)
+    transfer
+  in
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
-  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
-  let transfer =
-    Eth_cli.transaction_send
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~to_public_key:address
-      ~value:(Wei.of_eth_int 10)
-      ~endpoint:(Evm_node.endpoint sequencer)
-      ()
-  in
-  let* _tx_hash = wait_for in
-  (* Once the transaction is in the transaction pool the next block will include it. *)
-  let*@ _ = Rpc.produce_block sequencer in
-  (* Resolve the transaction send to make sure it was included. *)
-  let* _tx_hash = transfer in
+  let* _tx_hash = transfer address in
   (* Check the balance on genesis block and latest block. *)
   let*@ balance_genesis = Rpc.get_balance ~address ~block:"0" sequencer in
   let*@ balance_now = Rpc.get_balance ~address ~block:"latest" sequencer in
@@ -1344,6 +1349,61 @@ let test_get_balance_block_param =
     ~error_msg:(sf "%s should have no funds at genesis, but got %%L" address) ;
   Check.((balance_now = Wei.of_eth_int 10) Wei.typ)
     ~error_msg:(sf "Balance of %s expected to be %%R but got %%L" address) ;
+  (* Now we will create another observer initialized from the rollup node, in
+     order to test the block parameter "earliest". "Earliest" on the current
+     sequencer will be block [0] which is not really robust to test. *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* _ =
+    repeat 2 (fun _ ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let observer_partial_history =
+    let name = "observer_partial_history" in
+    Evm_node.create
+      ~name
+      ~mode:
+        (Observer
+           {
+             initial_kernel = "evm_kernel.wasm";
+             preimages_dir = "/tmp";
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           })
+      ~data_dir:(Temp.dir name)
+      (Evm_node.endpoint sequencer)
+  in
+  let* () =
+    Process.check @@ Evm_node.spawn_init_config observer_partial_history
+  in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      observer_partial_history
+      sc_rollup_node
+  in
+  let* () = Evm_node.run observer_partial_history in
+  (* Transfer funds again to the address. *)
+  let*@ level = Rpc.block_number sequencer in
+  let* _tx_hash = transfer address in
+  let* () =
+    Evm_node.wait_for_blueprint_applied
+      observer_partial_history
+      (Int32.to_int level + 1)
+  in
+  (* Observer does not know block 0. *)
+  let*@? (_error : Rpc.error) =
+    Rpc.get_balance ~address ~block:"0" observer_partial_history
+  in
+  let*@ balance_earliest =
+    Rpc.get_balance ~address ~block:"earliest" observer_partial_history
+  in
+  let*@ balance_now =
+    Rpc.get_balance ~address ~block:"latest" observer_partial_history
+  in
+  Check.((balance_earliest = Wei.of_eth_int 10) Wei.typ)
+    ~error_msg:(sf "%s expected to have a balance of %%R but got %%L" address) ;
+  Check.((balance_now = Wei.of_eth_int 20) Wei.typ)
+    ~error_msg:(sf "%s expected to have a balance of %%R but got %%L" address) ;
   unit
 
 let test_observer_applies_blueprint_when_sequencer_restarted =
