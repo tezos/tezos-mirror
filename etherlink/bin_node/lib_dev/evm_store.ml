@@ -190,6 +190,10 @@ module Q = struct
       (unit ->? t2 level context_hash)
       @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id DESC LIMIT 1|eos}
 
+    let get_earliest =
+      (unit ->? t2 level context_hash)
+      @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id ASC LIMIT 1|eos}
+
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
   end
@@ -391,6 +395,10 @@ module Context_hashes = struct
   let find_latest store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Context_hashes.get_latest ()
+
+  let find_earliest store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Context_hashes.get_earliest ()
 
   let clear_after store l2_level =
     with_connection store @@ fun conn ->

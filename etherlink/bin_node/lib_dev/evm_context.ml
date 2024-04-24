@@ -99,6 +99,7 @@ module Request = struct
         number : Ethereum_types.quantity;
       }
         -> (Evm_state.t option, tztrace) t
+    | Earliest_state : (Evm_state.t option, tztrace) t
 
   type view = View : _ t -> view
 
@@ -191,6 +192,12 @@ module Request = struct
           (function
             | View (Evm_state_after {number}) -> Some ((), number) | _ -> None)
           (fun ((), number) -> View (Evm_state_after {number}));
+        case
+          (Tag 10)
+          ~title:"Earliest_state"
+          (obj1 (req "request" (constant "earliest_state")))
+          (function View Earliest_state -> Some () | _ -> None)
+          (fun () -> View Earliest_state);
       ]
 
   let pp ppf view =
@@ -773,6 +780,15 @@ module Handlers = struct
             let*! evm_state = Irmin_context.PVMState.get context in
             return_some evm_state
         | None -> return_none)
+    | Earliest_state -> (
+        let ctxt = Worker.state self in
+        let* checkpoint = Evm_store.Context_hashes.find_earliest ctxt.store in
+        match checkpoint with
+        | Some (_level, checkpoint) ->
+            let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
+            let*! evm_state = Irmin_context.PVMState.get context in
+            return_some evm_state
+        | None -> return_none)
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -1053,7 +1069,7 @@ let find_evm_state block =
   | Ethereum_types.Latest ->
       let*! {evm_state; _} = head_info () in
       return_some evm_state
-  | Earliest -> failwith "Block parameter earliest is not yet supported"
+  | Earliest -> worker_wait_for_request Earliest_state
   | Pending -> failwith "Block parameter pending is not supported"
   | Hash_param number -> worker_wait_for_request (Evm_state_after {number})
 

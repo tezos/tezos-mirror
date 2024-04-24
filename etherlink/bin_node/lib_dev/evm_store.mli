@@ -50,6 +50,9 @@ module Context_hashes : sig
   val find_latest :
     t -> (Ethereum_types.quantity * Context_hash.t) option tzresult Lwt.t
 
+  val find_earliest :
+    t -> (Ethereum_types.quantity * Context_hash.t) option tzresult Lwt.t
+
   val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
