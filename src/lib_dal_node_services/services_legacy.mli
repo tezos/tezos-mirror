@@ -23,11 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type 'rpc service =
+  ('meth, 'prefix, 'params, 'query, 'input, 'output) Tezos_rpc.Service.service
+  constraint
+    'rpc =
+    < meth : 'meth
+    ; prefix : 'prefix
+    ; params : 'params
+    ; query : 'query
+    ; input : 'input
+    ; output : 'output >
+
+(** Fetch a slot and return the list of its pages. *)
 val slot_pages :
-  ( [`GET],
-    unit,
-    unit * Tezos_crypto_dal.Cryptobox.commitment,
-    unit,
-    unit,
-    Tezos_crypto_dal.Cryptobox.page list )
-  Tezos_rpc.Service.service
+  < input : unit
+  ; meth : [`GET]
+  ; output : Tezos_crypto_dal.Cryptobox.page list
+  ; params : (unit * int32) * int
+  ; prefix : unit
+  ; query : unit >
+  service

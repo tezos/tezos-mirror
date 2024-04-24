@@ -1220,13 +1220,23 @@ let test_slots_attestation_operation_dal_committee_membership_check protocol
   in
   iter ()
 
-let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
+let test_dal_node_slot_management _protocol parameters _cryptobox _node client
     dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let slot_index = 0 in
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
-  let* slot_commitment, _proof =
-    Helpers.(store_slot dal_node @@ make_slot ~slot_size slot_content)
+  let* slot_commitment =
+    Helpers.publish_and_store_slot
+      client
+      dal_node
+      Constant.bootstrap1
+      ~index:slot_index
+      Helpers.(make_slot ~slot_size slot_content)
   in
+  let* () = bake_for client in
+  let* published_level = Client.level client in
+  (* Finalize the publication. *)
+  let* () = bake_for ~count:2 client in
   let* received_slot =
     Dal_RPC.(call dal_node @@ get_commitment_slot slot_commitment)
   in
@@ -1235,11 +1245,17 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node _client
     (slot_content = received_slot_content)
       string
       ~error_msg:"Wrong slot content: Expected: %L. Got: %R") ;
-  (* Only check that the function to retrieve pages succeeds, actual
-     contents are checked in the test `rollup_node_stores_dal_slots`. *)
-  let* _slots_as_pages =
-    Dal_RPC.(call dal_node @@ slot_pages slot_commitment)
+  let* _ =
+    Dal_RPC.(call dal_node @@ get_published_level_headers published_level)
   in
+  let* pages =
+    Dal_RPC.(call dal_node @@ level_slot_pages ~published_level ~slot_index)
+  in
+  Check.(
+    slot_content = Helpers.(content_of_slot @@ slot_of_pages ~slot_size pages))
+    Check.string
+    ~__LOC__
+    ~error_msg:"Unexecpeted slot fetched: Expected: %L. Got: %R" ;
   return ()
 
 let () =
@@ -2136,9 +2152,12 @@ let rollup_node_stores_dal_slots ?expand_test protocol parameters dal_node
           (index + 1 = slot_index)
             int
             ~error_msg:"unexpected slot index (current = %L, expected = %R)") ;
-        let slot_commitment = List.nth commitments slot_index in
         let* slot_pages =
-          Dal_RPC.(call dal_node @@ slot_pages slot_commitment)
+          Dal_RPC.(
+            call dal_node
+            @@ level_slot_pages
+                 ~published_level:slots_published_level
+                 ~slot_index)
         in
         let relevant_page = List.nth slot_pages 0 in
         let confirmed_slot_content =

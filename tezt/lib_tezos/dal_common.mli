@@ -61,6 +61,11 @@ module Helpers : sig
      by removing the padding. *)
   val content_of_slot : slot -> string
 
+  (** [slot_of_pages ~slot_size pages] produces a slot from a list of
+      pages. The length of the result is checked against the given
+      [slot_size]. *)
+  val slot_of_pages : slot_size:int -> string list -> slot
+
   val make_cryptobox :
     ?on_error:(string -> Cryptobox.t) -> Cryptobox.parameters -> Cryptobox.t
 
@@ -125,8 +130,11 @@ module RPC_legacy : sig
 
   type remote_uri_provider = Endpoint.t
 
-  (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
-  val slot_pages : string -> string list RPC_core.t
+  (** [level_slot_pages ~published_level ~slot_index] gets the pages
+      of the slot published at level [published_level] on slot index
+      [slot_index]. *)
+  val level_slot_pages :
+    published_level:int -> slot_index:int -> string list RPC_core.t
 end
 
 module RPC : sig

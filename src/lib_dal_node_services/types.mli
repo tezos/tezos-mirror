@@ -38,6 +38,8 @@ type page_index = int
 module Slot_id : sig
   type t = {slot_level : level; slot_index : slot_index}
 
+  module Comparable : Stdlib.Set.OrderedType with type t = t
+
   module Set : Set.S with type elt = t
 end
 

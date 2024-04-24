@@ -128,8 +128,17 @@ module RPC_legacy = struct
   let get_bytes_from_json_string_node json =
     JSON.as_string json |> decode_hex_string_to_bytes
 
-  let slot_pages slot_header =
-    make GET ["slot"; "pages"; slot_header] (fun pages ->
+  let level_slot_pages ~published_level ~slot_index =
+    make
+      GET
+      [
+        "levels";
+        string_of_int published_level;
+        "slots";
+        string_of_int slot_index;
+        "pages";
+      ]
+      (fun pages ->
         pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
 end
 
@@ -544,6 +553,11 @@ module Helpers = struct
     String.split_on_char '\000' slot
     |> List.filter (fun str -> not (str = String.empty))
     |> String.concat "\000"
+
+  let slot_of_pages ~slot_size pages =
+    let slot = String.concat "" pages in
+    assert (String.length slot = slot_size) ;
+    slot
 
   let pp_cryptobox_error fmt = function
     | `Fail message -> Format.fprintf fmt "Fail: %s" message
