@@ -188,7 +188,7 @@ val caboose : block_store -> block_descriptor Lwt.t
 
 val write_caboose : block_store -> block_descriptor -> unit tzresult Lwt.t
 
-val status : block_store -> Block_store_status.Legacy.t Lwt.t
+val status : block_store -> Block_store_status.t Lwt.t
 
 val genesis_block : block_store -> Block_repr.t
 
@@ -384,3 +384,6 @@ val v_3_0_upgrade :
   cleanups:(unit -> unit Lwt.t) list ref ->
   finalizers:(unit -> unit Lwt.t) list ref ->
   unit tzresult Lwt.t
+
+(** Upgrade the block_store_status *)
+val v_3_1_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t
