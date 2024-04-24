@@ -147,6 +147,7 @@
 (package (name tezt-cloud)(allow_empty))
 (package (name tezt-etherlink)(allow_empty))
 (package (name tezt-risc-v-sandbox)(allow_empty))
+(package (name tezt-tests-cloud)(allow_empty))
 (package (name tezt-tezos))
 (package (name tezt-tx-kernel)(allow_empty))
 ; This file was automatically generated, do not edit.
