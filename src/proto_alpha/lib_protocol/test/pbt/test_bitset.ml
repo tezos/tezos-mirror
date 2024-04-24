@@ -88,9 +88,17 @@ let test_diff (c1, c2) =
 let test_fill =
   let two = Z.of_int 2 in
   fun length ->
+    let all_pos = 0 -- (length - 1) in
     let f1 = fill ~length |> value_of |> to_z in
-    let f2 = from_list (0 -- (length - 1)) |> value_of |> to_z in
+    let f2_t = from_list all_pos |> value_of in
+    let all_pos_found = to_list f2_t in
+    let f2 = to_z f2_t in
     let f3 = Z.(pow two length |> pred) in
+    Check.(
+      (List.sort Int.compare all_pos = List.sort Int.compare all_pos_found)
+        (list int)
+        ~__LOC__
+        ~error_msg:"Expected %L, Found %R") ;
     Z.equal f1 f2 && Z.equal f2 f3
 
 let () =

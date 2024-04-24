@@ -3483,6 +3483,9 @@ module Sc_rollup : sig
       Raw_level.t ->
       message_index:int ->
       (Z.t * context) tzresult Lwt.t
+
+    val consumed_outputs :
+      level:Raw_level.t -> context -> t -> (context * int list) tzresult Lwt.t
   end
 
   type output = {

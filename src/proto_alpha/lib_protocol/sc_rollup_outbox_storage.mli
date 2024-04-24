@@ -43,3 +43,11 @@ val record_applied_message :
   Raw_level_repr.t ->
   message_index:int ->
   (Z.t * Raw_context.t) tzresult Lwt.t
+
+(** [consumed_outputs ~level ctxt rollup] returns the indexes of
+    consumed output stored in the context for [level]. *)
+val consumed_outputs :
+  level:Raw_level_repr.t ->
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Raw_context.t * int list) tzresult Lwt.t

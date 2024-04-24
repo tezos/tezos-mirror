@@ -3873,7 +3873,7 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       description = "output exec";
     }
     ~uses:(fun _protocol -> [Constant.octez_codec])
-  @@ fun protocol rollup_node sc_rollup _node client ->
+  @@ fun protocol rollup_node sc_rollup node client ->
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let src = Constant.bootstrap1.public_key_hash in
   let src2 = Constant.bootstrap2.public_key_hash in
@@ -3952,10 +3952,10 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
     in
     repeat blocks_to_wait @@ fun () -> Client.bake_for_and_wait client
   in
+  let outbox_level = 5 in
+  let message_index = 0 in
   let trigger_outbox_message_execution ?expected_l1_error address =
-    let outbox_level = 5 in
     let parameters = "37" in
-    let message_index = 0 in
     let check_expected_outbox () =
       let* outbox =
         Sc_rollup_node.RPC.call rollup_node
@@ -3997,17 +3997,8 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
           in
           Log.info "Expected is %s" (JSON.encode expected) ;
           assert (JSON.encode expected = JSON.encode outbox) ;
-          let* proof =
-            Sc_rollup_node.RPC.call rollup_node
-            @@ Sc_rollup_rpc.outbox_proof_simple ~message_index ~outbox_level ()
-          in
-          let* proof' =
-            Sc_rollup_node.RPC.call rollup_node
-            @@ Sc_rollup_rpc.outbox_proof_simple ~message_index ~outbox_level ()
-          in
-          (* Test outbox_proof command with/without input transactions. *)
-          assert (proof' = proof) ;
-          return proof
+          Sc_rollup_node.RPC.call rollup_node
+          @@ Sc_rollup_rpc.outbox_proof_simple ~message_index ~outbox_level ()
       | Some _ ->
           assert (JSON.encode outbox = "[]") ;
           return None
@@ -4054,11 +4045,29 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
       target_contract_address
   in
   let* () = Client.bake_for_and_wait client in
+  let consumed_outputs () =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs
+         ~sc_rollup
+         ~outbox_level
+         ()
+  in
+  let* prior_consumed_outputs = consumed_outputs () in
+  Check.((prior_consumed_outputs = []) (list int))
+    ~error_msg:"Expected empty list found %L for consumed outputs" ;
   let* () =
     trigger_outbox_message_execution ?expected_l1_error target_contract_address
   in
   match expected_error with
   | None ->
+      let* () =
+        if Option.is_none expected_l1_error then (
+          let* after_consumed_outputs = consumed_outputs () in
+          Check.((after_consumed_outputs = [message_index]) (list int))
+            ~error_msg:"Expected %R found %L for consumed outputs" ;
+          unit)
+        else unit
+      in
       let* () =
         check_contract_execution target_contract_address expected_storage
       in

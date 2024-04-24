@@ -1032,6 +1032,24 @@ let get_chain_block_context_smart_rollups_smart_rollup_staker_games
     ]
     Fun.id
 
+let get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs
+    ?(chain = "main") ?(block = "head") ~sc_rollup ~outbox_level () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "smart_rollups";
+      "smart_rollup";
+      sc_rollup;
+      "consumed_outputs";
+      string_of_int outbox_level;
+    ]
+  @@ fun json -> JSON.(as_list json |> List.map as_int)
+
 type smart_rollup_inbox = {
   old_levels_messages : string;
   level : int;

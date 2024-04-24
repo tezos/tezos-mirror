@@ -2785,6 +2785,13 @@ module Sc_rollup = struct
           Data_encoding.(
             option Sc_rollup.Whitelist.last_whitelist_update_encoding)
         RPC_path.(path_sc_rollup / "last_whitelist_update")
+
+    let consumed_outputs =
+      RPC_service.get_service
+        ~description:"Return the known consumed outputs of a smart rollup."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(list int31)
+        RPC_path.(path_sc_rollup / "consumed_outputs" /: Raw_level.rpc_arg)
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2813,6 +2820,15 @@ module Sc_rollup = struct
           in
           return_some last_whitelist_update
         else return_none)
+
+  let register_consumed_outputs () =
+    let open Lwt_result_syntax in
+    Registration.register2 ~chunked:true S.consumed_outputs
+    @@ fun ctxt address outbox_level () () ->
+    let* _ctxt, consumed_outputs =
+      Sc_rollup.Outbox.consumed_outputs ~level:outbox_level ctxt address
+    in
+    return consumed_outputs
 
   let register_kind () =
     let open Lwt_result_syntax in
@@ -2997,6 +3013,7 @@ module Sc_rollup = struct
     register_inbox () ;
     register_whitelist () ;
     register_last_whitelist_update () ;
+    register_consumed_outputs () ;
     register_genesis_info () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;

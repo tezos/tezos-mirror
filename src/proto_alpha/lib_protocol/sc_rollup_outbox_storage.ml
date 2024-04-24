@@ -80,3 +80,17 @@ let record_applied_message ctxt rollup level ~message_index =
       (level, bitset)
   in
   (Z.of_int size_diff, ctxt)
+
+let consumed_outputs ~level ctxt rollup =
+  let open Lwt_result_syntax in
+  let level_index = level_index ctxt level in
+  let* ctxt, lvl_bitset_opt =
+    Storage.Sc_rollup.Applied_outbox_messages.find (ctxt, rollup) level_index
+  in
+  match lvl_bitset_opt with
+  | None -> return (ctxt, [])
+  | Some (found_level, bitset) ->
+      if Raw_level_repr.(found_level = level) then
+        let indices = Bitset.to_list bitset in
+        return (ctxt, indices)
+      else return (ctxt, [])

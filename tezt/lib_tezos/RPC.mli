@@ -942,6 +942,16 @@ val get_chain_block_context_smart_rollups_all :
 val get_chain_block_context_smart_rollups_smart_rollup_staker_games :
   ?chain:string -> ?block:string -> staker:string -> string -> unit -> JSON.t t
 
+(** RPC: [GET
+    chains/<chain>/blocks/<block>/context/smart_rollups/smart_rollup/<smart_rollup_address>/consumed_outputs/<outbox_level>] *)
+val get_chain_block_context_smart_rollups_smart_rollup_consumed_outputs :
+  ?chain:string ->
+  ?block:string ->
+  sc_rollup:string ->
+  outbox_level:int ->
+  unit ->
+  int list t
+
 (** this type is smaller than the actual encoding and can be enhance
     on need. *)
 type smart_rollup_inbox = {

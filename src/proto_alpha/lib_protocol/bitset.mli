@@ -49,6 +49,9 @@ val add : t -> int -> t tzresult
     [positions]. *)
 val from_list : int list -> t tzresult
 
+(** [to_list t] returns the list of int in the bitset. *)
+val to_list : t -> int list
+
 (** [fill ~length] is equivalent to setting all bits for positions in
     [0, length - 1] to [one]. i.e., to [from_list (0 -- size -1)] or to
     [(2 ^ length) - 1]. But it's more efficient than folding on individual
