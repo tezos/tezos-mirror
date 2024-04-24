@@ -7610,6 +7610,38 @@ oc.unit:protocol_compiles:
   variables:
     CARGO_NET_OFFLINE: "false"
 
+de.unit:x86_64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: always
+  needs:
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
+de.unit:arm64:
+  image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  needs:
+  - oc.build_arm64-released
+  - oc.build_arm64-exp-dev-extra
+  dependencies: []
+  before_script:
+  - eval $(opam env)
+  script:
+  - dune runtest data-encoding
+
 oc.install_bin_ubuntu_focal:
   image: public.ecr.aws/lts/ubuntu:20.04_stable
   stage: test
