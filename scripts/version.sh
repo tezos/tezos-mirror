@@ -15,14 +15,14 @@
 
 export ocaml_version=4.14.1
 export opam_version=2
-export recommended_rust_version=1.71.1
+export recommended_rust_version=1.73.0
 export recommended_node_version=18.18.2
 
 # The Alpine minor version used to build the opam-repository images
 # and used to run the `trigger` job in the CI. This value SHOULD
 # correspond to the Alpine minor version given by the `trigger` job's
 # `image:`.
-export alpine_version='3.18'
+export alpine_version='3.19'
 
 ## full_opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
@@ -35,7 +35,7 @@ export full_opam_repository_tag=518f55a1ee5da870035b9593f98db03f43ce7f5f
 ## distribution.
 ## The value of `opam_repository_tag` MUST be reflected in the `build_deps_image_version` variable
 ## of `.gitlab-ci.yml`, which is ensured by running `make -C ci` from the root.
-export opam_repository_tag="${OPAM_REPOSITORY_TAG:-07a7c6694aeb8355724a9fad11c3729143523cd9}"
+export opam_repository_tag="${OPAM_REPOSITORY_TAG:-a921e49555556ab83b6dad58ef18ec83a8a2b7c1}"
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.

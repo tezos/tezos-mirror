@@ -59,7 +59,6 @@ depends: [
   "conf-pkg-config" {= "3"}
   "conf-protoc" {= "4.4.0"}
   "conf-rust" {= "0.1"}
-  "conf-rust-2021" {= "1"}
   "conf-sqlite3" {= "1"}
   "conf-which" {= "1"}
   "conf-zlib" {= "1"}
@@ -223,7 +222,6 @@ depends: [
   "tar" {= "2.6.0"}
   "tar-unix" {= "2.6.0"}
   "terminal" {= "0.2.2"}
-  "tezos-rust-libs" {= "1.6"}
   "tezos-sapling-parameters" {= "1.1.0"}
   "tezt" {= "4.0.0"}
   "time_now" {= "v0.16.0"}

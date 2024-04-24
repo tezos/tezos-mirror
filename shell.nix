@@ -29,7 +29,8 @@
       # Formatter/LSP for Cargo manifests (and TOML in general)
       pkgs.taplo
     ]
-    ++ (pkgs.lib.optional pkgs.stdenv.isDarwin sources.riscv64Pkgs.libiconvReal);
+    # On Mac, Rust's standard library needs libiconv
+    ++ pkgs.lib.optional pkgs.stdenv.isDarwin pkgs.libiconv;
 
   mainPackage = (import ./default.nix {inherit sources;}).overrideAttrs (old: {
     # This makes the shell load faster.
@@ -127,6 +128,7 @@ in
         devPackageSet.ocp-indent
         devPackageSet.merlin
         devPackageSet.utop
+        devPackageSet.odoc
       ]
       ++ (
         if pkgs.stdenv.isDarwin

@@ -161,11 +161,11 @@
     "tezos-opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1712845588,
-        "narHash": "sha256-LOlySwYOGBkn6d9ac+Tvmo5t5xcrkd5QGFhMLpJjUCE=",
+        "lastModified": 1712923240,
+        "narHash": "sha256-ZeCv9scXOOZrYvh8fT0+jP30al9za2kBInc2P6AGjcE=",
         "owner": "tezos",
         "repo": "opam-repository",
-        "rev": "07a7c6694aeb8355724a9fad11c3729143523cd9",
+        "rev": "a921e49555556ab83b6dad58ef18ec83a8a2b7c1",
         "type": "gitlab"
       },
       "original": {

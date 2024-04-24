@@ -12,7 +12,7 @@ stages:
 - manual
 
 trigger:
-  image: alpine:3.18
+  image: alpine:3.19
   stage: start
   tags:
   - gcp
