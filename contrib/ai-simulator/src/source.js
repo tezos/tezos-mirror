@@ -801,7 +801,7 @@ export class Delegate {
 
     const considered_staked = bigInt.min(
       own_staked.add(third_party_staked),
-      max_third_party_staked,
+      own_staked.add(max_third_party_staked),
     );
 
     const stake_diff = max_third_party_staked.minus(third_party_staked);
