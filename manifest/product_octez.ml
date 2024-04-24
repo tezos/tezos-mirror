@@ -2776,6 +2776,7 @@ let octez_context_brassaia_helpers =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 let octez_context_memory =
   octez_lib
     "tezos-context.memory"
@@ -2794,6 +2795,7 @@ let octez_context_memory =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 let octez_context_brassaia_memory =
   octez_lib
     "tezos-context-brassaia.memory"
@@ -2856,6 +2858,7 @@ let octez_context_brassaia_dump =
     ~path:"src/lib_context_brassaia/dump"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 
 let octez_context_disk =
   octez_lib
@@ -2880,6 +2883,7 @@ let octez_context_disk =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 let octez_context_brassaia_disk =
   octez_lib
     "tezos-context-brassaia.disk"
@@ -3857,7 +3861,6 @@ let _octez_store_mocked =
         octez_base |> open_ ~m:"TzPervasives";
         octez_crypto |> open_;
         octez_shell_services |> open_;
-        octez_context_memory |> open_;
         octez_context_ops |> open_;
         octez_validation |> open_;
         octez_protocol_environment;
@@ -4988,7 +4991,6 @@ let octez_scoru_wasm_benchmark =
         octez_base |> open_ ~m:"TzPervasives";
         tezt_lib;
         octez_webassembly_interpreter;
-        octez_context_memory;
         octez_scoru_wasm;
         octez_scoru_wasm_helpers;
         lwt_unix;
@@ -6570,7 +6572,7 @@ let hash = Protocol.hash
             octez_stdlib_unix |> open_;
             octez_shell_context |> if_ N.(number <= 019) |> open_;
             octez_context |> open_;
-            octez_context_memory |> if_ N.(number >= 012);
+            octez_context_memory |> if_ (N.(number >= 012) && N.(number <= 019));
             octez_rpc_http_client_unix |> if_ N.(number >= 011);
             octez_context_ops |> if_ N.(number >= 011) |> open_;
             octez_rpc;
