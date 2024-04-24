@@ -1074,4 +1074,52 @@ export class Delegate {
     this.#prepare_for(cycle);
     return this.#third_party_delegated_balance(cycle);
   }
+
+  ratio_own_staked_spendable_balance(cycle) {
+    this.#prepare_for(cycle);
+    return (
+      100 *
+      (this.#own_staked_balance(cycle) /
+        (this.#own_staked_balance(cycle) + this.#own_spendable_balance(cycle)))
+    );
+  }
+
+  ratio_third_party_staked_delegated_balance(cycle) {
+    this.#prepare_for(cycle);
+    return (
+      100 *
+      (this.#third_party_staked_balance(cycle) /
+        (this.#third_party_delegated_balance(cycle) +
+          this.#third_party_staked_balance(cycle)))
+    );
+  }
+
+  set_ratio_own_staked_spendable_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
+    const staked = this.#own_staked_balance(cycle);
+    const spendable = this.#own_spendable_balance(cycle);
+    const den = staked + spendable;
+    const new_staked = Math.round((value / 100) * den);
+    const new_spendable = den - new_staked;
+    this.set_own_staked_balance(cycle, new_staked);
+    this.set_own_spendable_balance(cycle, new_spendable);
+  }
+
+  set_ratio_third_party_staked_delegated_balance(cycle, value) {
+    if (!this.simulator.is_ai_activated(cycle)) {
+      return;
+    }
+    if (this.config.delegate_policy.limit_of_staking_over_baking == 0) {
+      return;
+    }
+    const staked = this.#third_party_staked_balance(cycle);
+    const delegated = this.#third_party_delegated_balance(cycle);
+    const den = staked + delegated;
+    const new_staked = Math.round((value / 100) * den);
+    const new_delegated = den - new_staked;
+    this.set_third_party_staked_balance(cycle, new_staked);
+    this.set_third_party_delegated_balance(cycle, new_delegated);
+  }
 }
