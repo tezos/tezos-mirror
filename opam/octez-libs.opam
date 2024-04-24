@@ -69,7 +69,6 @@ depends: [
   "conf-rust"
   "integers"
   "integers_stubs_js"
-  "tezos-rust-libs" { = "1.6" }
   "tezos-sapling-parameters" { >= "1.1.0" }
   "lwt-watcher" { = "0.2" }
   "resto-cohttp" { >= "1.2" }
@@ -81,7 +80,6 @@ depends: [
   "bigstring" {with-test}
 ]
 x-opam-monorepo-opam-provided: [
-  "tezos-rust-libs"
   "tezos-sapling-parameters"
 ]
 conflicts: [

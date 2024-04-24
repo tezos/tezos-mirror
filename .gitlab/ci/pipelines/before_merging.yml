@@ -2,7 +2,7 @@
 # Edit file ci/bin/main.ml instead.
 
 trigger:
-  image: alpine:3.18
+  image: alpine:3.19
   stage: trigger
   tags:
   - gcp
@@ -6682,7 +6682,7 @@ oc.docker-build-ubuntu-dependencies:
       - gcp_arm64
 
 oc.build-debian-based-packages:
-  image: alpine:3.18
+  image: alpine:3.19
   stage: manual
   tags:
   - gcp

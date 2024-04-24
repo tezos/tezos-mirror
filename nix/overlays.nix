@@ -47,13 +47,5 @@
     inotify = null;
   };
 
-  fix-rust-packages = final: prev: {
-    conf-rust-2021 = prev.conf-rust-2021.overrideAttrs (old: {
-      propagatedNativeBuildInputs =
-        (old.propagatedNativeBuildInputs or [])
-        ++
-        # Upstream conf-rust* packages don't request libiconv
-        [libiconv];
-    });
-  };
+  fix-rust-packages = final: prev: {};
 }
