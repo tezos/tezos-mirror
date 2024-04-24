@@ -110,7 +110,7 @@ module Committee = struct
          (JSON.as_list json)
 end
 
-module RPC_legacy = struct
+module Dal_RPC = struct
   type default_uri_provider = (Dal_node.t, Endpoint.t) Either.t
 
   type local_uri_provider = Dal_node.t
@@ -136,10 +136,6 @@ module RPC_legacy = struct
       ]
       (fun pages ->
         pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
-end
-
-module Dal_RPC = struct
-  include RPC_legacy
 
   type commitment = string
 

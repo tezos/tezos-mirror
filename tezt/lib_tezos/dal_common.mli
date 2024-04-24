@@ -120,7 +120,7 @@ module Helpers : sig
     unit
 end
 
-module RPC_legacy : sig
+module RPC : sig
   type default_uri_provider = (Dal_node.t, Endpoint.t) Either.t
 
   type local_uri_provider = Dal_node.t
@@ -132,10 +132,6 @@ module RPC_legacy : sig
       [slot_index]. *)
   val level_slot_pages :
     published_level:int -> slot_index:int -> string list RPC_core.t
-end
-
-module RPC : sig
-  include module type of RPC_legacy
 
   type commitment = string
 
