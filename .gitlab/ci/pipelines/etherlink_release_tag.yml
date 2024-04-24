@@ -2,7 +2,7 @@
 # Edit file ci/bin/main.ml instead.
 
 docker:prepare-etherlink-release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: prepare_release
   tags:
   - gcp
@@ -21,7 +21,7 @@ docker:prepare-etherlink-release:
     - kernels.tar.gz
 
 gitlab:etherlink-release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.4.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0
   stage: publish_package_gitlab
   tags:
   - gcp

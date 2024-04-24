@@ -40,7 +40,7 @@ oc.build:static-arm64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 oc.docker:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - gcp
@@ -60,7 +60,7 @@ oc.docker:amd64:
     rust_toolchain_image_tag: is-never-pulled
 
 oc.docker:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - gcp_arm64
@@ -169,7 +169,7 @@ oc.build:rpm:amd64:
       - rockylinux:9.3
 
 docker:merge_manifests:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: prepare_release
   tags:
   - gcp
@@ -188,7 +188,7 @@ docker:merge_manifests:
     CI_DOCKER_HUB: "true"
 
 gitlab:publish:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.4.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0
   stage: publish_package_gitlab
   tags:
   - gcp

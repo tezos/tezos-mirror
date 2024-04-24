@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
@@ -29,6 +29,7 @@ echo "CI_PROJECT_NAMESPACE=${CI_PROJECT_NAMESPACE}"
 echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
 echo "DOCKER_BUILD_TARGET=${DOCKER_BUILD_TARGET:-}"
 echo "RUST_TOOLCHAIN_IMAGE=${RUST_TOOLCHAIN_IMAGE:-}"
+echo "CI_COMMIT_REF_PROTECTED=${CI_COMMIT_REF_PROTECTED:-}"
 
 # CI_DOCKER_HUB is used to switch to Docker Hub if credentials are available with CI_DOCKER_AUTH
 # /!\ CI_DOCKER_HUB can be unset, CI_DOCKER_AUTH is only available on protected branches
@@ -64,9 +65,22 @@ fi
 
 # Allow to push to private GCP Artifact Registry if the CI/CD variable is defined
 if [ -n "${GCP_REGISTRY:-}" ]; then
-  echo "### Logging into GCP Artifact Registry for pushing images"
-  GCP_ARTIFACT_REGISTRY_TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | cut -d'"' -f4)
-  echo "${GCP_ARTIFACT_REGISTRY_TOKEN}" | docker login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
+  # There are two registries for storing Docker images. The first allows pushes from
+  # Tezos CI jobs on unprotected branches. The second is accessible for push
+  # operation only from protected branches for security reasons. Finally, both
+  # registries are publicly accessible for pulls.
+  if [ "${CI_COMMIT_REF_PROTECTED:-false}" = true ]; then
+    echo "### Logging into protected GCP Artifact Registry for pushing images"
+    echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
+    gcloud auth activate-service-account --key-file=protected_sa.json
+    gcloud auth configure-docker us.gcr.io
+    gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-central1-docker.pkg.dev
+    rm protected_sa.json
+  else
+    echo "### Logging into standard GCP Artifact Registry for pushing images"
+    GCP_ARTIFACT_REGISTRY_TOKEN=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | cut -d'"' -f4)
+    echo "${GCP_ARTIFACT_REGISTRY_TOKEN}" | docker login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
+  fi
 fi
 
 # shellcheck source=scripts/ci/docker_registry.inc.sh

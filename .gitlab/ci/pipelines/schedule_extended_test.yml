@@ -29,7 +29,7 @@ docker:hadolint-schedule_extended_test:
   - hadolint Dockerfile
 
 oc.docker:rust-toolchain:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - gcp
@@ -49,7 +49,7 @@ oc.docker:rust-toolchain:
       dotenv: rust_toolchain_image_tag.env
 
 oc.docker:client-libs-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - gcp
