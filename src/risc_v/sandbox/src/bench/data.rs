@@ -10,11 +10,13 @@ use std::{
     time::Duration,
 };
 
+pub(super) type InstructionData = HashMap<InstrType, Vec<Duration>>;
+
 /// Underlying data for a benchmark run.
 pub(super) struct BenchData {
     pub(super) duration: Duration,
     pub(super) steps: usize,
-    pub(super) instr_count: Option<HashMap<InstrType, Vec<Duration>>>,
+    pub(super) instr_count: Option<InstructionData>,
     pub(super) run_result: InterpreterResult,
 }
 
