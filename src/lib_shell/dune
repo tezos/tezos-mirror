@@ -16,7 +16,6 @@
   octez-shell-libs.store.shared
   octez-proto-libs.protocol-environment
   octez-shell-libs.context-ops
-  octez-shell-libs.shell-context
   octez-shell-libs.p2p
   octez-libs.stdlib-unix
   octez-shell-libs.shell-services
@@ -39,7 +38,6 @@
   -open Tezos_store_shared
   -open Tezos_protocol_environment
   -open Tezos_context_ops
-  -open Tezos_shell_context
   -open Tezos_p2p
   -open Tezos_stdlib_unix
   -open Tezos_shell_services

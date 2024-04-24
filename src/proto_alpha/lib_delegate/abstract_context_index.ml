@@ -32,7 +32,7 @@ type t = {
 
 let abstract index =
   {
-    sync_fun = (fun () -> Context.sync index);
-    checkout_fun = Shell_context.checkout index;
-    finalize_fun = (fun () -> Context.close index);
+    sync_fun = (fun () -> Context_ops.sync index);
+    checkout_fun = Context_ops.checkout index;
+    finalize_fun = (fun () -> Context_ops.close index);
   }

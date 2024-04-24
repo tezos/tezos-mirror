@@ -30,4 +30,4 @@ type t = {
   finalize_fun : unit -> unit Lwt.t;
 }
 
-val abstract : Context.index -> t
+val abstract : Context_ops.index -> t

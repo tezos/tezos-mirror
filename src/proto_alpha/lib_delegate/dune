@@ -19,7 +19,6 @@
   octez-shell-libs.client-commands
   octez-libs.stdlib
   octez-libs.stdlib-unix
-  octez-shell-libs.shell-context
   octez-libs.tezos-context
   octez-libs.tezos-context.memory
   octez-libs.rpc-http-client-unix
@@ -44,7 +43,6 @@
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
-  -open Tezos_shell_context
   -open Tezos_context
   -open Tezos_context_ops
   -open Tezos_rpc_http

@@ -11,11 +11,13 @@
   octez-proto-libs.protocol-environment
   octez-libs.tezos-context
   octez-libs.tezos-context-brassaia
-  octez-shell-libs.shell-context)
+  octez-shell-libs.shell-context
+  octez-shell-libs.brassaia-context)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_error_monad
   -open Tezos_context
   -open Tezos_context_brassaia
-  -open Tezos_shell_context))
+  -open Tezos_shell_context
+  -open Tezos_brassaia_context))
