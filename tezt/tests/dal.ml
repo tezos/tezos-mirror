@@ -1366,32 +1366,6 @@ let check_published_level_headers ~__LOC__ dal_node ~pub_level
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
   unit
 
-(* Checks that [headers] contains zero or one slot header. If [expected_status]
-   is not given, the expected response is the empty list; if it is given, the
-   response should contain exactly one header, with the given status. *)
-let get_headers_succeeds ~__LOC__ ?expected_status headers =
-  match (headers, expected_status) with
-  | [], None -> ()
-  | _ :: _, None ->
-      Test.fail
-        ~__LOC__
-        "It was expected that there is no slot id for the given commitment, \
-         got %d."
-        (List.length headers)
-  | [header], Some expected_status ->
-      Check.(header.Dal_RPC.status = expected_status)
-        ~__LOC__
-        Check.string
-        ~error_msg:
-          "The value of the fetched status should match the expected one \
-           (current = %L, expected = %R)"
-  | _, Some _ ->
-      Test.fail
-        ~__LOC__
-        "It was expected that there is exactly one slot id for the given \
-         commitment, got %d."
-        (List.length headers)
-
 let check_get_commitment_headers ~__LOC__ ?expected_status dal_node ~slot_level
     slots_info =
   let test (slot_index, commitment) =
@@ -1415,7 +1389,30 @@ let check_get_commitment_headers ~__LOC__ ?expected_status dal_node ~slot_level
         return [Dal_RPC.{status; slot_level; slot_index; commitment}]
       else return []
     in
-    return @@ get_headers_succeeds ~__LOC__ ?expected_status headers
+    let () =
+      match (headers, expected_status) with
+      | [], None -> ()
+      | _ :: _, None ->
+          Test.fail
+            ~__LOC__
+            "It was expected that there is no slot id for the given \
+             commitment, got %d."
+            (List.length headers)
+      | [header], Some expected_status ->
+          Check.(header.Dal_RPC.status = expected_status)
+            ~__LOC__
+            Check.string
+            ~error_msg:
+              "The value of the fetched status should match the expected one \
+               (current = %L, expected = %R)"
+      | _, Some _ ->
+          Test.fail
+            ~__LOC__
+            "It was expected that there is exactly one slot id for the given \
+             commitment, got %d."
+            (List.length headers)
+    in
+    unit
   in
   Lwt_list.iter_s test slots_info
 
