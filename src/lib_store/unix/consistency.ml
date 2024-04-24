@@ -738,10 +738,10 @@ let check_block_protocol_hash block_store context_index ~expected block =
       in
       match resulting_context_hash_opt with
       | Some ctxt_hash -> (
-          let*! ctxt = Context.checkout context_index ctxt_hash in
+          let*! ctxt = Context_ops.checkout context_index ctxt_hash in
           match ctxt with
           | Some ctxt ->
-              let*! got = Context.get_protocol ctxt in
+              let*! got = Context_ops.get_protocol ctxt in
               return Protocol_hash.(got = expected)
           | None -> return_false)
       | None -> return_false)
@@ -1042,17 +1042,17 @@ let fix_protocol_levels chain_dir block_store context_index genesis
         let*! protocol =
           let*! ctxt =
             if is_genesis then
-              Context.checkout_exn context_index (Block_repr.context lowest)
+              Context_ops.checkout_exn context_index (Block_repr.context lowest)
             else
               (* The successor of the lowest has the same protocol
                  committed as the lowest and it will be correct
                  whether the context hash semantics is the current's
                  or the predecessor's resulting context. *)
-              Context.checkout_exn
+              Context_ops.checkout_exn
                 context_index
                 (Block_repr.context succ_lowest)
           in
-          Context.get_protocol ctxt
+          Context_ops.get_protocol ctxt
         in
         (* Protocol above savepoints should be registered *)
         let* (module Proto) = Registered_protocol.get_result protocol in

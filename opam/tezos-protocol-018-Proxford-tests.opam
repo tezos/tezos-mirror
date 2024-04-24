@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
-  "octez-libs" {with-test}
   "octez-alcotezt" {with-test}
+  "octez-libs" {with-test}
   "octez-protocol-018-Proxford-libs" {with-test}
   "tezos-protocol-018-Proxford" {with-test}
   "tezos-benchmark" {with-test}

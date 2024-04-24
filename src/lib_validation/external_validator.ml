@@ -45,7 +45,7 @@ module Processing = struct
   open Filename.Infix
 
   type state = {
-    context_index : Context.index;
+    context_index : Context_ops.index;
     cache : Context_ops.Environment_context.block_cache option;
     cached_result :
       (Block_validation.apply_result * Context_ops.Environment_context.t) option;
@@ -99,14 +99,10 @@ module Processing = struct
       Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
     in
     let*! context_index =
-      Context.init
+      Context_ops.init
+        ~kind:`Disk
         ~patch_context:(fun ctxt ->
-          let open Lwt_result_syntax in
-          let ctxt = Shell_context.wrap_disk_context ctxt in
-          let+ ctxt =
-            Patch_context.patch_context genesis sandbox_parameters ctxt
-          in
-          Shell_context.unwrap_disk_context ctxt)
+          Patch_context.patch_context genesis sandbox_parameters ctxt)
         ~readonly
         context_root
     in
@@ -135,7 +131,7 @@ module Processing = struct
     | Commit_genesis {chain_id} ->
         let*! commit =
           Error_monad.catch_es (fun () ->
-              Context.commit_genesis
+              Context_ops.commit_genesis
                 context_index
                 ~chain_id
                 ~time:genesis.time
@@ -159,12 +155,12 @@ module Processing = struct
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
                 let*! o =
-                  Context.checkout
+                  Context_ops.checkout
                     context_index
                     predecessor_resulting_context_hash
                 in
                 match o with
-                | Some c -> return (Shell_context.wrap_disk_context c)
+                | Some c -> return c
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
@@ -233,13 +229,12 @@ module Processing = struct
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
                 let*! context =
-                  Context.checkout
+                  Context_ops.checkout
                     context_index
                     predecessor_resulting_context_hash
                 in
                 match context with
-                | Some context ->
-                    return (Shell_context.wrap_disk_context context)
+                | Some context -> return context
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
@@ -294,13 +289,12 @@ module Processing = struct
           let* predecessor_context =
             Error_monad.catch_es (fun () ->
                 let*! o =
-                  Context.checkout
+                  Context_ops.checkout
                     context_index
                     predecessor_resulting_context_hash
                 in
                 match o with
-                | Some context ->
-                    return (Shell_context.wrap_disk_context context)
+                | Some context -> return context
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
@@ -328,11 +322,10 @@ module Processing = struct
         continue block_validate_result cache cached_result
     | External_validation.Fork_test_chain
         {chain_id; context_hash; forked_header} ->
-        let*! context_opt = Context.checkout context_index context_hash in
+        let*! context_opt = Context_ops.checkout context_index context_hash in
         let*! res =
           match context_opt with
           | Some ctxt ->
-              let ctxt = Shell_context.wrap_disk_context ctxt in
               with_retry_to_load_protocol protocol_root (fun () ->
                   Block_validation.init_test_chain chain_id ctxt forked_header)
           | None ->
@@ -342,7 +335,7 @@ module Processing = struct
         continue res cache cached_result
     | External_validation.Context_garbage_collection
         {context_hash; gc_lockfile_path} ->
-        let*! () = Context.gc context_index context_hash in
+        let*! () = Context_ops.gc context_index context_hash in
         let*! lockfile =
           Lwt_unix.openfile
             gc_lockfile_path
@@ -359,7 +352,7 @@ module Processing = struct
         let gc_waiter () =
           Lwt.finalize
             (fun () ->
-              let*! () = Context.wait_gc_completion context_index in
+              let*! () = Context_ops.wait_gc_completion context_index in
               let*! () = Lwt_unix.lockf lockfile Unix.F_ULOCK 0 in
               Lwt.return_unit)
             (fun () -> Lwt_unix.close lockfile)
@@ -367,7 +360,7 @@ module Processing = struct
         let () = Lwt.dont_wait gc_waiter (fun _exn -> ()) in
         continue (Ok ()) cache cached_result
     | External_validation.Context_split ->
-        let*! () = Context.split context_index in
+        let*! () = Context_ops.split context_index in
         continue (Ok ()) cache cached_result
     | External_validation.Terminate ->
         let*! () = Lwt_io.flush_all () in

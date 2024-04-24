@@ -210,10 +210,11 @@ type chain_store
     throughout the store {b and} context.
       Default: false
 *)
+
 val init :
   ?patch_context:
-    (Tezos_protocol_environment.Context.t ->
-    Tezos_protocol_environment.Context.t tzresult Lwt.t) ->
+    (Context_ops.Environment_context.t ->
+    Context_ops.Environment_context.t tzresult Lwt.t) ->
   ?commit_genesis:(chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t) ->
   ?history_mode:History_mode.t ->
   ?readonly:bool ->
