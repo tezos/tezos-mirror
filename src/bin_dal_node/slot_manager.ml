@@ -93,14 +93,6 @@ let commit cryptobox polynomial =
            [Invalid_degree (Cryptobox.string_of_commit_error commit_error)])
   | Error `Prover_SRS_not_loaded -> Error (Errors.other [No_prover_SRS])
 
-let commitment_should_exist node_store cryptobox commitment =
-  let open Lwt_result_syntax in
-  let* exists =
-    Store.(
-      Slots.exists_slot_by_commitment node_store.slots cryptobox commitment)
-  in
-  if not exists then fail `Not_found else return_unit
-
 (* Main functions *)
 
 let add_commitment node_store slot cryptobox =
@@ -121,14 +113,6 @@ let add_commitment node_store slot cryptobox =
         commitment
   in
   return commitment
-
-let associate_slot_id_with_commitment node_store cryptobox commitment slot_id =
-  let open Lwt_result_syntax in
-  let* () = commitment_should_exist node_store cryptobox commitment in
-  let*! () =
-    Store.Legacy.associate_slot_id_with_commitment node_store commitment slot_id
-  in
-  return_unit
 
 let get_commitment_slot node_store cryptobox commitment =
   let open Lwt_result_syntax in

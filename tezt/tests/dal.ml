@@ -1526,8 +1526,8 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let ok = [slot0; slot1; slot2_b] in
   let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
   let* () =
-    (* There are 4 published slots: slot0, slot1, slot2_a, and slot2_b *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
+    (* There are 3 published slots: slot0, slot1, and slot2_b *)
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   let* slot_headers =
     Dal_RPC.(
@@ -1559,9 +1559,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
   (* slot_2_a is not selected. *)
   let* () =
-    check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ ~expected_status:"not_selected")
-      [slot2_a]
+    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot2_a]
   in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
@@ -1588,7 +1586,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   let* () = wait_block_processing3 in
   let* () =
     (* The number of published slots has not changed *)
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
 
   Log.info "Check that the store is as expected" ;
@@ -1610,9 +1608,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
   in
   (* slot2_a is still not selected. *)
   let* () =
-    check_get_commitment_headers
-      (get_headers_succeeds ~__LOC__ ~expected_status:"not_selected")
-      [slot2_a]
+    check_get_commitment_headers (get_headers_succeeds ~__LOC__) [slot2_a]
   in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
   let* () =
@@ -1631,7 +1627,7 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
       ~number_of_headers:0
   in
   let* () =
-    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:4
+    check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   check_published_level_headers
     ~__LOC__
@@ -1757,50 +1753,6 @@ let test_dal_node_test_post_commitments _protocol parameters cryptobox _node
     ~error_msg:
       "The commitment of a stored commitment should match the one computed \
        locally (current = %L, expected = %R)" ;
-  unit
-
-let test_dal_node_test_patch_commitments _protocol parameters cryptobox _node
-    _client dal_node =
-  let failing_patch_slot_rpc commit ~slot_level ~slot_index =
-    let* response =
-      Dal_RPC.(
-        call_raw dal_node @@ patch_commitment commit ~slot_level ~slot_index)
-    in
-    return @@ RPC_core.check_string_response ~code:404 response
-  in
-  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
-  let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
-  let commitment =
-    Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
-  in
-  let* () = failing_patch_slot_rpc commitment ~slot_level:0 ~slot_index:0 in
-  let* commitment' = Dal_RPC.(call dal_node @@ post_commitment slot) in
-  Check.(commitment' = commitment)
-    Check.string
-    ~error_msg:
-      "The commitment of a stored commitment should match the one computed \
-       locally (current = %L, expected = %R)" ;
-  let patch_slot_rpc ~slot_level ~slot_index =
-    Dal_RPC.(
-      call dal_node @@ patch_commitment commitment ~slot_level ~slot_index)
-  in
-  let check ~__LOC__ expected_headers =
-    let* response =
-      Dal_RPC.(call_raw dal_node @@ get_commitment_headers commitment)
-    in
-    check_headers ~__LOC__ expected_headers response ;
-    unit
-  in
-  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
-  let* () = check ~__LOC__ [(0, 0, "unseen")] in
-  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:0 in
-  let* () = check ~__LOC__ [(0, 0, "unseen")] in
-  let* () = patch_slot_rpc ~slot_level:0 ~slot_index:1 in
-  let* () = check ~__LOC__ [(0, 0, "unseen"); (0, 1, "unseen")] in
-  let* () = patch_slot_rpc ~slot_level:(-4) ~slot_index:3 in
-  let* () =
-    check ~__LOC__ [(0, 0, "unseen"); (0, 1, "unseen"); (-4, 3, "unseen")]
-  in
   unit
 
 let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
@@ -6369,11 +6321,6 @@ let register ~protocols =
     ~producer_profiles:[0]
     "dal node POST /commitments"
     test_dal_node_test_post_commitments
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
-    "dal node PATCH /commitments"
-    test_dal_node_test_patch_commitments
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]

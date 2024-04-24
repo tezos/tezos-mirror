@@ -146,16 +146,6 @@ module Legacy : sig
 
   *)
 
-  (** [associate_slot_id_with_commitment store commitment slot_id]
-      adds an entry to the bidirectional mapping between commitments
-      and slot identifiers. The status is initialized to
-      [`Unseen_or_not_finalized].
-
-      This function is only used by RPCs.
-  *)
-  val associate_slot_id_with_commitment :
-    t -> commitment -> Types.slot_id -> unit Lwt.t
-
   (** [add_slot_headers ~number_of_slots ~block_level slot_headers
       store] adds all the given slot headers at the given block level,
       updating the bidirectional mapping between commitments and slot
