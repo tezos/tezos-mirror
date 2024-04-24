@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use core::fmt;
 use enum_tag::EnumTag;
 use risc_v_interpreter::{parser::instruction::Instr, InterpreterResult};
 use std::{
@@ -81,6 +82,15 @@ type InstrTag = <Instr as EnumTag>::Tag;
 pub(super) enum InstrType {
     Instr(InstrTag),
     FetchErr(InstrGetError),
+}
+
+impl fmt::Display for InstrType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InstrType::FetchErr(err) => write!(f, "FetchErr: {err:?}"),
+            InstrType::Instr(tag) => write!(f, "Instruction: {tag:?}"),
+        }
+    }
 }
 
 /// Holds the instruction-level data of a benchmark run.
