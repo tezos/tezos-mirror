@@ -218,11 +218,18 @@ let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
       evm_state
       exec_inputs
   in
-  let*! (Qty after_height) = current_block_height evm_state in
   let* block_hash = current_block_hash evm_state in
-  if Z.(equal (succ before_height) after_height) then
-    return (Apply_success (evm_state, Qty after_height, block_hash))
-  else return Apply_failure
+  let* block =
+    let*! bytes =
+      inspect evm_state (Durable_storage_path.Block.by_hash block_hash)
+    in
+    return (Option.map Ethereum_types.block_from_rlp bytes)
+  in
+  match block with
+  | Some {number = Qty after_height; _}
+    when Z.(equal (succ before_height) after_height) ->
+      return (Apply_success (evm_state, Qty after_height, block_hash))
+  | _ -> return Apply_failure
 
 let clear_delayed_inbox evm_state =
   let open Lwt_syntax in
