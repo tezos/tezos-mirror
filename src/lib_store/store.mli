@@ -1022,8 +1022,6 @@ module Chain_traversal : sig
     (Block.t * Block.t list) Lwt.t
 end
 
-val v_3_0_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
-
 val v_3_1_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
 (**/**)
