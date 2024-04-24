@@ -1380,39 +1380,30 @@ let check_get_commitment_headers ~__LOC__ ?expected_status dal_node ~slot_level
           return (commitment = published_commitment)
       | _ -> return false
     in
-    let* headers =
-      if commitment_is_published then
+    match (commitment_is_published, expected_status) with
+    | false, None -> unit
+    | true, None ->
+        Test.fail
+          ~__LOC__
+          "It was expected that the given commitment was not published but it \
+           was."
+    | true, Some expected_status ->
         let* status =
           Dal_RPC.(
             call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
         in
-        return [Dal_RPC.{status; slot_level; slot_index; commitment}]
-      else return []
-    in
-    let () =
-      match (headers, expected_status) with
-      | [], None -> ()
-      | _ :: _, None ->
-          Test.fail
-            ~__LOC__
-            "It was expected that there is no slot id for the given \
-             commitment, got %d."
-            (List.length headers)
-      | [header], Some expected_status ->
-          Check.(header.Dal_RPC.status = expected_status)
-            ~__LOC__
-            Check.string
-            ~error_msg:
-              "The value of the fetched status should match the expected one \
-               (current = %L, expected = %R)"
-      | _, Some _ ->
-          Test.fail
-            ~__LOC__
-            "It was expected that there is exactly one slot id for the given \
-             commitment, got %d."
-            (List.length headers)
-    in
-    unit
+        Check.(status = expected_status)
+          ~__LOC__
+          Check.string
+          ~error_msg:
+            "The value of the fetched status should match the expected one \
+             (current = %L, expected = %R)" ;
+        unit
+    | false, Some _ ->
+        Test.fail
+          ~__LOC__
+          "The commitment published for the given slot id is not the expected \
+           one."
   in
   Lwt_list.iter_s test slots_info
 
