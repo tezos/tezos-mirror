@@ -191,14 +191,10 @@ module RPC : sig
          the DAL node. *)
   val get_profiles : unit -> profile RPC_core.t
 
-  (** Call RPC "GET /commitments/<commitment>/headers" to get the headers and
-        statuses known about the given commitment. The resulting list can be filtered by a
-        given header publication level and slot index. *)
-  val get_commitment_headers :
-    ?slot_level:int ->
-    ?slot_index:int ->
-    commitment ->
-    slot_header list RPC_core.t
+  (** Call RPC "GET /levels/<slot_level>/slots/<slot_index>/status" to
+      get the status known about the given slot. *)
+  val get_level_slot_status :
+    slot_level:int -> slot_index:int -> string RPC_core.t
 
   (** Call RPC "GET
         /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
