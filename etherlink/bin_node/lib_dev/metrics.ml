@@ -87,14 +87,60 @@ module Info = struct
          [commit_hash; commit_date; string_of_bool devmode; mode])
 end
 
-type t = {chain : Chain.t}
+module Block = struct
+  type t = {time_processed : Counter.t; transactions : Counter.t}
+
+  module Process_time_histogram = Histogram (struct
+    let spec = Histogram_spec.of_list [0.1; 0.1; 0.5; 1.; 2.; 5.; 10.]
+  end)
+
+  let process_time_histogram =
+    Process_time_histogram.v
+      ~registry
+      ~namespace
+      ~subsystem
+      ~help:"The time the EVM node spent processing a block"
+      "block_process_time_histogram"
+
+  let init name =
+    let time_processed =
+      Counter.v_label
+        ~registry
+        ~label_name:"time_processed"
+        ~help:"Time to process the blocks"
+        ~namespace
+        ~subsystem
+        "time_processed"
+        name
+    in
+    let transactions =
+      Counter.v_label
+        ~registry
+        ~label_name:"transactions"
+        ~help:"Number of transactions in the blocks"
+        ~namespace
+        ~subsystem
+        "transactions"
+        name
+    in
+    {time_processed; transactions}
+end
+
+type t = {chain : Chain.t; block : Block.t}
 
 let metrics =
   let name = "Etherlink" in
   let chain = Chain.init name in
-  {chain}
+  let block = Block.init name in
+  {chain; block}
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
 
 let set_confirmed_level ~level =
   Gauge.set metrics.chain.confirmed_head (Z.to_float level)
+
+let set_block ~time_processed ~transactions =
+  let pt = Ptime.Span.to_float_s time_processed in
+  Block.(Process_time_histogram.(observe process_time_histogram pt)) ;
+  Counter.inc metrics.block.time_processed pt ;
+  Counter.inc metrics.block.transactions (Int.to_float transactions)

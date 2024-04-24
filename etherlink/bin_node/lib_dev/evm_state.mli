@@ -69,6 +69,7 @@ type apply_result =
       evm_state : t;
       level : Ethereum_types.quantity;
       block_hash : Ethereum_types.block_hash;
+      number_of_transactions : int;
     }
   | Apply_failure
 
