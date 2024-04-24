@@ -320,14 +320,14 @@ module Legacy = struct
          Part of the storage for slots' headers where paths are indexed by slots
          indices.
 
-         "Accepted" path(s) are used to store information about slots headers
-         that are either [`Waiting_attesattion], [`Attested], or [`Unattested]. *)
+         The status associated to a slot header is either
+         [`Waiting_attesattion], [`Attested], or [`Unattested]. *)
 
       val slots_indices : Types.level -> Irmin.Path.t
 
-      val accepted_header_commitment : Types.slot_id -> Irmin.Path.t
+      val commitment : Types.slot_id -> Irmin.Path.t
 
-      val accepted_header_status : Types.slot_id -> Irmin.Path.t
+      val status : Types.slot_id -> Irmin.Path.t
     end
   end = struct
     type t = string list
@@ -362,16 +362,16 @@ module Legacy = struct
         let open Types.Slot_id in
         slots_indices index.slot_level / Int.to_string index.slot_index
 
-      let accepted_header index =
+      let header index =
         let prefix = headers index in
         prefix / "accepted"
 
-      let accepted_header_commitment index =
-        let prefix = accepted_header index in
+      let commitment index =
+        let prefix = header index in
         prefix / "commitment"
 
-      let accepted_header_status index =
-        let prefix = accepted_header index in
+      let status index =
+        let prefix = header index in
         prefix / "status"
     end
   end
@@ -406,10 +406,8 @@ module Legacy = struct
                   header_path
                   ""
               in
-              let commitment_path =
-                Path.Level.accepted_header_commitment index
-              in
-              let status_path = Path.Level.accepted_header_status index in
+              let commitment_path = Path.Level.commitment index in
+              let status_path = Path.Level.status index in
               let data = encode_commitment commitment in
               let*! () =
                 set
@@ -447,7 +445,7 @@ module Legacy = struct
     List.iter_s
       (fun slot_index ->
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
-        let status_path = Path.Level.accepted_header_status index in
+        let status_path = Path.Level.status index in
         let msg =
           Path.to_string ~prefix:"update_slot_headers_attestation:" status_path
         in
@@ -481,7 +479,7 @@ module Legacy = struct
     let open Lwt_result_syntax in
     let index = Types.Slot_id.{slot_level = level; slot_index} in
     let*! commitment_str_opt =
-      Irmin.find node_store.store @@ Path.Level.accepted_header_commitment index
+      Irmin.find node_store.store @@ Path.Level.commitment index
     in
     Option.fold
       ~none:(fail `Not_found)
@@ -503,13 +501,11 @@ module Legacy = struct
         indexes
       |> return
 
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
-     header. *)
-  let get_accepted_headers ~skip_commitment slot_ids store accu =
+  let get_headers ~skip_commitment slot_ids store accu =
     let open Lwt_result_syntax in
     List.fold_left_es
       (fun acc slot_id ->
-        let commitment_path = Path.Level.accepted_header_commitment slot_id in
+        let commitment_path = Path.Level.commitment slot_id in
         let*! commitment_opt = Irmin.find store commitment_path in
         match commitment_opt with
         | None -> return acc
@@ -518,7 +514,7 @@ module Legacy = struct
             match decision with
             | `Skip -> return acc
             | `Keep commitment -> (
-                let status_path = Path.Level.accepted_header_status slot_id in
+                let status_path = Path.Level.status slot_id in
                 let*! status_opt = Irmin.find store status_path in
                 match status_opt with
                 | None -> return acc
@@ -534,9 +530,7 @@ module Legacy = struct
       accu
       slot_ids
 
-  (* See doc-string in {!Legacy.Path.Level} for the notion of "accepted"
-     header. *)
-  let get_accepted_headers_of_commitment commitment slot_ids store accu =
+  let get_headers_of_commitment commitment slot_ids store accu =
     let encoded_commitment = encode_commitment commitment in
     let skip_commitment read_commitment =
       Result_syntax.return
@@ -544,7 +538,7 @@ module Legacy = struct
          `Keep commitment
         else `Skip)
     in
-    get_accepted_headers ~skip_commitment slot_ids store accu
+    get_headers ~skip_commitment slot_ids store accu
 
   let get_commitment_headers commitment ?slot_level ?slot_index node_store =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
@@ -556,7 +550,7 @@ module Legacy = struct
     let*! indexes = Irmin.list store @@ Path.Commitment.headers commitment in
     (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
     let*? slot_ids = filter_indexes ?slot_level ?slot_index indexes in
-    get_accepted_headers_of_commitment commitment slot_ids store []
+    get_headers_of_commitment commitment slot_ids store []
 
   let get_published_level_headers ~published_level ?header_status node_store =
     let open Lwt_result_syntax in
@@ -581,7 +575,7 @@ module Legacy = struct
         let* commit = decode_commitment c in
         return @@ `Keep commit
       in
-      get_accepted_headers ~skip_commitment slot_ids store []
+      get_headers ~skip_commitment slot_ids store []
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4541
        Enable the same filtering for GET /commitments/<commitment>/headers
