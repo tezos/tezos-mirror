@@ -76,7 +76,7 @@ nix:
     when: on_failure
 
 oc.docker:rust-toolchain:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - gcp
@@ -114,7 +114,7 @@ oc.docker:rust-toolchain:
       dotenv: rust_toolchain_image_tag.env
 
 oc.docker:client-libs-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - gcp
@@ -6423,7 +6423,7 @@ opam:tezt-tezos:
   retry: 2
 
 oc.docker-build-debian-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - $TAGS
@@ -6458,7 +6458,7 @@ oc.docker-build-debian-dependencies:
       - gcp_arm64
 
 oc.docker-build-ubuntu-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: build
   tags:
   - $TAGS
@@ -8275,7 +8275,7 @@ documentation:linkcheck:
   - make -C docs linkcheck
 
 oc.docker:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: manual
   tags:
   - gcp
@@ -8300,7 +8300,7 @@ oc.docker:amd64:
   when: manual
 
 oc.docker:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.10.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
   stage: manual
   tags:
   - gcp_arm64

@@ -25,6 +25,12 @@ let variables : variables =
   [
     (* /!\ This value MUST be the same as `opam_repository_tag` in `scripts/version.sh` *)
     ("build_deps_image_version", Common.build_deps_image_version);
+    (* /!\ GCP_REGISTRY is the variable containing the name of the registry to and from
+       which docker images are produced and consumed. This variable is defined at tezos
+       level with the value unprotected registry and at tezos/tezos level in its protected
+       version. This mechanism allows pipelines from a protected tezos/tezos branch to
+       read the protected variable from tezos/tezos and for others to not have access to
+       the variable tezos/tezos but tezos. *)
     ("build_deps_image_name", "${GCP_REGISTRY}/tezos/opam-repository");
     ( "rust_toolchain_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
