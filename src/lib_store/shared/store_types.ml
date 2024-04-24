@@ -26,6 +26,64 @@
 (* block_store_status *)
 
 module Block_store_status = struct
+  type t = Idle of int | Merging of int
+
+  let get_value status_data =
+    let open Lwt_syntax in
+    let* status = Stored_data.get status_data in
+    match status with
+    | Idle value -> return value
+    | Merging value -> return value
+
+  let set_idle_status status_data =
+    let open Lwt_syntax in
+    let* status_value = get_value status_data in
+    Stored_data.write status_data (Idle (status_value + 1))
+
+  let set_merge_status status_data =
+    let open Lwt_syntax in
+    let* status_value = get_value status_data in
+    Stored_data.write status_data (Merging (status_value + 1))
+
+  let is_idle = function Idle _ -> true | Merging _ -> false
+
+  let is_merging = function Idle _ -> false | Merging _ -> true
+
+  let create_idle_status = Idle 0
+
+  let equal s1 s2 =
+    match (s1, s2) with
+    | Idle c1, Idle c2 when c1 = c2 -> true
+    | Merging c1, Merging c2 when c1 = c2 -> true
+    | Idle _, Idle _
+    | Merging _, Merging _
+    | Idle _, Merging _
+    | Merging _, Idle _ ->
+        false
+
+  let encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          (Tag 0)
+          ~title:"idle"
+          int31
+          (function Idle c -> Some c | _ -> None)
+          (fun c -> Idle c);
+        case
+          (Tag 1)
+          ~title:"merging"
+          int31
+          (function Merging c -> Some c | _ -> None)
+          (fun c -> Merging c);
+      ]
+
+  let pp ppf = function
+    | Idle i -> Format.fprintf ppf "Idle %d" i
+    | Merging i -> Format.fprintf ppf "Merging %d" i
+
   module Legacy = struct
     type t = Idle | Merging
 
@@ -56,6 +114,13 @@ module Block_store_status = struct
       | Idle -> Format.fprintf ppf "Idle"
       | Merging -> Format.fprintf ppf "Merging"
   end
+
+  let of_legacy legacy_status_data =
+    let open Lwt_result_syntax in
+    let*! legacy_status = Stored_data.get legacy_status_data in
+    match legacy_status with
+    | Legacy.Idle -> return (Idle 0)
+    | Merging -> return (Merging 0)
 end
 
 (* block_descriptor *)

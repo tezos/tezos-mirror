@@ -1024,6 +1024,9 @@ end
 
 val v_3_0_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
+val v_3_1_upgrade :
+  store_dir:string -> Genesis.t -> upgrade_to_v3:bool -> unit tzresult Lwt.t
+
 (**/**)
 
 (** Unsafe set of functions intended for internal store manipulation

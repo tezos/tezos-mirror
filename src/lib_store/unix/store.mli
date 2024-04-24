@@ -1023,6 +1023,10 @@ end
     {b Warning} Not backward-compatible. *)
 val v_3_0_upgrade : store_dir:string -> Genesis.t -> unit tzresult Lwt.t
 
+(** Potentially upgrade to v_3 and then upgrade the block_store_status in v_3_1. *)
+val v_3_1_upgrade :
+  store_dir:string -> Genesis.t -> upgrade_to_v3:bool -> unit tzresult Lwt.t
+
 (**/**)
 
 (** Unsafe set of functions intended for internal store manipulation

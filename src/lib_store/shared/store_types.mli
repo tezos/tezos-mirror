@@ -26,36 +26,59 @@
 (** {1 Global types used in the store library} *)
 
 module Block_store_status : sig
-  module Legacy : sig
-    (** The type used to describe the status of the store. *)
-    type t
+  (** The type used to describe the status of the store. *)
+  type t
 
-    (* Setters *)
+  (* Getters *)
+  val get_value : t Stored_data.t -> int Lwt.t
+
+  (* Setters *)
+
+  val set_idle_status : t Stored_data.t -> unit tzresult Lwt.t
+
+  val set_merge_status : t Stored_data.t -> unit tzresult Lwt.t
+
+  (* Status querying *)
+
+  val is_idle : t -> bool
+
+  val is_merging : t -> bool
+
+  (* Initialisers *)
+
+  val create_idle_status : t
+
+  (* Equality function *)
+  val equal : t -> t -> bool
+
+  (* Encoding *)
+  val encoding : t Data_encoding.t
+
+  (* Printing *)
+
+  val pp : Format.formatter -> t -> unit
+
+  module Legacy : sig
+    type t
 
     val set_idle_status : t Stored_data.t -> unit tzresult Lwt.t
 
     val set_merge_status : t Stored_data.t -> unit tzresult Lwt.t
 
-    (* Status querying *)
-
     val is_idle : t -> bool
 
     val is_merging : t -> bool
 
-    (* Initialisers *)
-
     val create_idle_status : t
 
-    (* Equality function *)
     val equal : t -> t -> bool
 
-    (* Encoding  *)
     val encoding : t Data_encoding.t
-
-    (* Printing *)
 
     val pp : Format.formatter -> t -> unit
   end
+
+  val of_legacy : Legacy.t Stored_data.t -> t tzresult Lwt.t
 end
 
 (** The type used to describe a block pointer i.e. its hash and level. *)

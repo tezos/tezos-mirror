@@ -101,7 +101,8 @@ end
  *  - 1.0     : context upgrade (upgrade to irmin.3.3) -- v14.0
  *  - 2.0     : introduce context GC (upgrade to irmin.3.4) -- v15.0
  *  - 3.0     : change blocks' context hash semantics and introduce
-                context split (upgrade to irmin.3.5) -- v16.0 *)
+                context split (upgrade to irmin.3.5) -- v16.0
+ *  - 3.1     : change encoding for block store status -- v20.3 *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
@@ -118,7 +119,9 @@ let v_2_0 = Version.make ~major:2 ~minor:0
 
 let v_3_0 = Version.make ~major:3 ~minor:0
 
-let current_version = v_3_0
+let v_3_1 = Version.make ~major:3 ~minor:1
+
+let current_version = v_3_1
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -141,29 +144,32 @@ let upgradable_data_version =
     let*! () = Context.close ctxt in
     return_unit
   in
-  let v_3_0_upgrade ~data_dir genesis =
+  let v_3_1_upgrade ~data_dir genesis ~upgrade_to_v3 =
     let store_dir = store_dir data_dir in
-    Store.v_3_0_upgrade ~store_dir genesis
+    Store.v_3_1_upgrade ~store_dir genesis ~upgrade_to_v3
   in
   [
     ( v_0_6,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
         let* () = v_1_0_upgrade ~data_dir in
-        v_3_0_upgrade ~data_dir genesis );
+        v_3_1_upgrade ~data_dir genesis ~upgrade_to_v3:true );
     ( v_0_7,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
         let* () = v_1_0_upgrade ~data_dir in
-        v_3_0_upgrade ~data_dir genesis );
+        v_3_1_upgrade ~data_dir genesis ~upgrade_to_v3:true );
     ( v_0_8,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
         let* () = v_1_0_upgrade ~data_dir in
-        v_3_0_upgrade ~data_dir genesis );
+        v_3_1_upgrade ~data_dir genesis ~upgrade_to_v3:true );
     ( v_1_0,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
-        v_3_0_upgrade ~data_dir genesis );
+        v_3_1_upgrade ~data_dir genesis ~upgrade_to_v3:true );
     ( v_2_0,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
-        v_3_0_upgrade ~data_dir genesis );
+        v_3_1_upgrade ~data_dir genesis ~upgrade_to_v3:true );
+    ( v_3_0,
+      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        v_3_1_upgrade ~data_dir genesis ~upgrade_to_v3:false );
   ]
 
 type error += Invalid_data_dir_version of Version.t * Version.t
@@ -456,8 +462,9 @@ let ensure_data_dir ?(mode = Is_compatible) genesis data_dir =
       (* Enable automatic upgrade to avoid users to manually upgrade. *)
   | Some (version, _)
     when Version.(
-           equal version v_2_0 || equal version v_1_0 || equal version v_0_6
-           || equal version v_0_7 || equal version v_0_8) ->
+           equal version v_3_0 || equal version v_2_0 || equal version v_1_0
+           || equal version v_0_6 || equal version v_0_7 || equal version v_0_8)
+    ->
       let* () =
         upgrade_data_dir ~data_dir genesis ~chain_name:() ~sandbox_parameters:()
       in
