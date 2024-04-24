@@ -3222,12 +3222,8 @@ let v_3_0_upgrade ~store_dir genesis =
       let*! () = List.iter_s (fun f -> f ()) !finalizers in
       return_unit)
 
-let v_3_1_upgrade ~store_dir genesis ~upgrade_to_v3 =
-  let open Lwt_result_syntax in
-  let* () =
-    if upgrade_to_v3 then v_3_0_upgrade ~store_dir genesis else return_unit
-  in
-  (* Hypothesis: v_3_0_upgrade has been run before or is run here *)
+let v_3_1_upgrade ~store_dir genesis =
+  (* Hypothesis: The node storage version is 3.0 *)
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir =
     Naming.chain_dir (Naming.store_dir ~dir_path:store_dir) chain_id
