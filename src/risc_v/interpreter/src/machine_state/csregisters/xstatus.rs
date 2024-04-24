@@ -45,9 +45,8 @@ impl Bits64 for MPPValue {
             0b00 => MPPValue::User,
             0b01 => MPPValue::Supervisor,
             0b11 => MPPValue::Machine,
-            // WARL field, invalid value `10`is considered User
-            0b10 => MPPValue::User,
-            _ => unreachable!(),
+            // WARL field, invalid value is considered User
+            _ => MPPValue::User,
         }
     }
 
@@ -80,38 +79,27 @@ impl Bits64 for SPPValue {
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-#[repr(u8)]
+#[repr(u64)]
 pub enum XLenValue {
-    MXL32 = 0b01,
     MXL64 = 0b10,
-    MXL128 = 0b11,
 }
 
 impl Bits64 for XLenValue {
     const WIDTH: usize = 2;
 
-    fn to_bits(&self) -> u64 {
-        *self as u8 as u64
+    fn from_bits(_value: u64) -> Self {
+        Self::MXL64
     }
 
-    fn from_bits(value: u64) -> Self {
-        match value & 0b11 {
-            0b01 => XLenValue::MXL32,
-            0b10 => XLenValue::MXL64,
-            0b11 => XLenValue::MXL128,
-            // WARL field, invalid value considered 64 bits
-            0b00 => XLenValue::MXL64,
-            _ => unreachable!(),
-        }
+    fn to_bits(&self) -> u64 {
+        *self as u64
     }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-#[repr(u8)]
+#[repr(u64)]
 pub enum ExtensionValue {
     Off = 0b00,
-    Initial = 0b01,
-    Clean = 0b10,
     Dirty = 0b11,
 }
 
@@ -121,15 +109,12 @@ impl Bits64 for ExtensionValue {
     fn from_bits(value: u64) -> Self {
         match value & 0b11 {
             0b00 => ExtensionValue::Off,
-            0b01 => ExtensionValue::Initial,
-            0b10 => ExtensionValue::Clean,
-            0b11 => ExtensionValue::Dirty,
-            _ => unreachable!(),
+            _ => ExtensionValue::Dirty,
         }
     }
 
     fn to_bits(&self) -> u64 {
-        *self as u8 as u64
+        *self as u64
     }
 }
 
@@ -257,12 +242,12 @@ mod tests {
         assert!(!field);
 
         let field = ExtensionValue::from_bits(0b1111_0010);
-        assert_eq!(field, ExtensionValue::Clean);
-        assert_eq!(field.to_bits(), 0b10);
+        assert_eq!(field, ExtensionValue::Dirty);
+        assert_eq!(field.to_bits(), 0b11);
 
         let field = XLenValue::from_bits(0b01);
-        assert_eq!(field, XLenValue::MXL32);
-        assert_eq!(field.to_bits(), 0b01);
+        assert_eq!(field, XLenValue::MXL64);
+        assert_eq!(field.to_bits(), 0b10);
 
         let field = MPPValue::from_bits(0b1010);
         assert_eq!(field, MPPValue::User);
