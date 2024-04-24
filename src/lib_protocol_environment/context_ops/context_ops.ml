@@ -47,6 +47,8 @@ type index =
 
 open Environment_context
 
+type t = Environment_context.t
+
 let err_impl_mismatch ~got =
   err_implementation_mismatch
     ~expected:"shell, memory, brassaia or brassaia_memory"
