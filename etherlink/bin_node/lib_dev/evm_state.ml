@@ -197,7 +197,9 @@ let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
 
-type apply_result = Apply_success of t * quantity * block_hash | Apply_failure
+type apply_result =
+  | Apply_success of {evm_state : t; level : quantity; block_hash : block_hash}
+  | Apply_failure
 
 let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
     (blueprint : Blueprint_types.payload) =
@@ -228,7 +230,7 @@ let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
   match block with
   | Some {number = Qty after_height; _}
     when Z.(equal (succ before_height) after_height) ->
-      return (Apply_success (evm_state, Qty after_height, block_hash))
+      return (Apply_success {evm_state; level = Qty after_height; block_hash})
   | _ -> return Apply_failure
 
 let clear_delayed_inbox evm_state =

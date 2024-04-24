@@ -65,7 +65,11 @@ val current_block_height : t -> Ethereum_types.quantity Lwt.t
 val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
 
 type apply_result =
-  | Apply_success of t * Ethereum_types.quantity * Ethereum_types.block_hash
+  | Apply_success of {
+      evm_state : t;
+      level : Ethereum_types.quantity;
+      block_hash : Ethereum_types.block_hash;
+    }
   | Apply_failure
 
 (** [apply_blueprint ~data-dir ~config state payload] applies the
