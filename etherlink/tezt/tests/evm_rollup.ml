@@ -1832,6 +1832,22 @@ let test_eth_call_large =
   let tags = ["evm"; "eth_call"; "simulate"; "large"] in
   register_both ~title ~tags test_f
 
+let test_eth_call_input =
+  let test_f ~protocol:_ ~evm_setup =
+    let sender = Eth_account.bootstrap_accounts.(0) in
+    let eth_call =
+      [
+        ("to", Ezjsonm.encode_string sender.address);
+        ("input", Ezjsonm.encode_string "0xcafe");
+      ]
+    in
+
+    check_eth_call evm_setup eth_call "0x"
+  in
+  let title = "eth_call with input instead of data" in
+  let tags = ["evm"; "eth_call"; "simulate"; "input"] in
+  register_both ~title ~tags test_f
+
 let test_estimate_gas =
   let test_f ~protocol:_ ~evm_setup =
     (* large request *)
@@ -5586,6 +5602,7 @@ let register_evm_node ~protocols =
   test_eth_call_storage_contract protocols ;
   test_eth_call_storage_contract_eth_cli protocols ;
   test_eth_call_large protocols ;
+  test_eth_call_input protocols ;
   test_preinitialized_evm_kernel protocols ;
   test_deposit_and_withdraw protocols ;
   test_estimate_gas protocols ;
