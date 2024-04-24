@@ -203,11 +203,6 @@ module RPC : sig
   val get_assigned_shard_indices :
     level:int -> pkh:string -> int list RPC_core.t
 
-  (** Call RPC "GET /levels/<published_level>/headers?status" to get the known
-        headers with the given published level. *)
-  val get_published_level_headers :
-    ?status:string -> int -> slot_header list RPC_core.t
-
   type slot_set = bool list
 
   type attestable_slots = Not_in_committee | Attestable_slots of slot_set
