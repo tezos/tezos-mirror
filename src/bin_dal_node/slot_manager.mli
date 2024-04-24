@@ -177,18 +177,14 @@ val get_commitment_by_published_level_and_index :
   Store.t ->
   (Cryptobox.commitment, [Errors.decoding | Errors.not_found]) result Lwt.t
 
-(** [get_commitment_headers commitment ?slot_level ?slot_index store] returns
-    the list of slot headers {!Types.slot_header} known by the DAL.
-    The result is filtered by [slot_level] and [slot_index] if provided.
-
-    The function may return an decoding error in case of failure.
+(** [get_slot_status ~slot_id store] returns the status associated to the
+    accepted slot of id [slot_id] or [None] if no status is currently
+    stored for that slot id.
 *)
-val get_commitment_headers :
-  Cryptobox.commitment ->
-  ?slot_level:Types.level ->
-  ?slot_index:Types.slot_index ->
+val get_slot_status :
+  slot_id:Types.slot_id ->
   Store.t ->
-  (Types.slot_header list, Errors.decoding) result Lwt.t
+  (Types.header_status option, Errors.decoding) result Lwt.t
 
 (** [get_published_level_headers ~published_level ?header_status store] returns
     the list of slot headers {!Types.slot_header} that are published

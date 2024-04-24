@@ -186,14 +186,10 @@ module Slots_handlers = struct
           store
         |> to_option_tzresult)
 
-  let get_commitment_headers ctxt commitment (slot_level, slot_index) () =
+  let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
-        Slot_manager.get_commitment_headers
-          commitment
-          ?slot_level
-          ?slot_index
-          store
-        |> Errors.to_tzresult)
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        Slot_manager.get_slot_status ~slot_id store |> Errors.to_tzresult)
 
   let get_published_level_headers ctxt published_level header_status () =
     call_handler1 ctxt (fun store ->
@@ -416,9 +412,9 @@ let register :
        Services.get_profiles
        (Profile_handlers.get_profiles ctxt)
   |> add_service
-       Tezos_rpc.Directory.register1
-       Services.get_commitment_headers
-       (Slots_handlers.get_commitment_headers ctxt)
+       Tezos_rpc.Directory.opt_register2
+       Services.get_slot_status
+       (Slots_handlers.get_slot_status ctxt)
   |> add_service
        Tezos_rpc.Directory.register2
        Services.get_assigned_shard_indices
