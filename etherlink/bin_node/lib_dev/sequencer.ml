@@ -70,15 +70,20 @@ let install_finalizer_seq server private_server =
 let callback_log server conn req body =
   let open Cohttp in
   let open Lwt_syntax in
-  let uri = req |> Request.uri |> Uri.to_string in
-  let meth = req |> Request.meth |> Code.string_of_method in
-  let* body_str = body |> Cohttp_lwt.Body.to_string in
-  let* () = Events.callback_log ~uri ~meth ~body:body_str in
-  Tezos_rpc_http_server.RPC_server.resto_callback
-    server
-    conn
-    req
-    (Cohttp_lwt.Body.of_string body_str)
+  let path = Request.uri req |> Uri.path in
+  if path = "/metrics" then
+    let* response = Metrics.Metrics_server.callback conn req body in
+    Lwt.return (`Response response)
+  else
+    let uri = req |> Request.uri |> Uri.to_string in
+    let meth = req |> Request.meth |> Code.string_of_method in
+    let* body_str = body |> Cohttp_lwt.Body.to_string in
+    let* () = Events.callback_log ~uri ~meth ~body:body_str in
+    Tezos_rpc_http_server.RPC_server.resto_callback
+      server
+      conn
+      req
+      (Cohttp_lwt.Body.of_string body_str)
 
 let start_server
     Configuration.
@@ -202,6 +207,7 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
   in
   let*! head = Evm_context.head_info () in
   let (Qty next_blueprint_number) = head.next_blueprint_number in
+  Metrics.set_level ~level:(Z.pred next_blueprint_number) ;
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint

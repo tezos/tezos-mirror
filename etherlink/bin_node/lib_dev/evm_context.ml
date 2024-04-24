@@ -294,6 +294,7 @@ module State = struct
         in
         return (evm_state, on_success)
     | Blueprint_applied {number = Qty number; hash = expected_block_hash} -> (
+        Metrics.set_confirmed_level ~level:number ;
         let* block_hash_opt =
           let*! bytes =
             Evm_state.inspect
@@ -518,6 +519,7 @@ module State = struct
     if applied_upgrade then ctxt.session.pending_upgrade <- None ;
     let* head_info in
     head_info := session_to_head_info ctxt.session ;
+    Metrics.set_level ~level ;
     Blueprint_events.blueprint_applied (level, block_hash)
 
   let apply_blueprint ctxt timestamp payload delayed_transactions =
