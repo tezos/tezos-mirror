@@ -362,16 +362,12 @@ module Legacy = struct
         let open Types.Slot_id in
         slots_indices index.slot_level / Int.to_string index.slot_index
 
-      let header index =
-        let prefix = headers index in
-        prefix / "accepted"
-
       let commitment index =
-        let prefix = header index in
+        let prefix = headers index in
         prefix / "commitment"
 
       let status index =
-        let prefix = header index in
+        let prefix = headers index in
         prefix / "status"
     end
   end
