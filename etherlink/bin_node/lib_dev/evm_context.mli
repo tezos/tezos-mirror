@@ -57,9 +57,10 @@ val apply_evm_events :
   Ethereum_types.Evm_events.t list ->
   unit tzresult Lwt.t
 
-(** [inspect ctxt path] returns the value stored in [path] of the freshest EVM
-    state, if it exists. *)
-val inspect : string -> bytes option tzresult Lwt.t
+(** [inspect ?block path] returns the value (if it exists) stored in [path] on the EVM
+    state of [block] (if [block] is omitted then the freshest state is used). *)
+val inspect :
+  ?block:Ethereum_types.block_param -> string -> bytes option tzresult Lwt.t
 
 (** [execute_and_inspect ~input ctxt] executes [input] using the freshest EVM
     state, and returns [input.insights_requests].

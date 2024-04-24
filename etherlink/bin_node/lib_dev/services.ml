@@ -171,8 +171,8 @@ let dispatch_request (config : Configuration.t)
         in
         build ~f module_ parameters
     | Method (Get_balance.Method, module_) ->
-        let f (address, _block_param) =
-          let* balance = Backend_rpc.balance address in
+        let f (address, block_param) =
+          let* balance = Backend_rpc.balance address block_param in
           rpc_ok balance
         in
         build_with_input ~f module_ parameters

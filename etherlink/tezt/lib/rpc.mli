@@ -112,3 +112,8 @@ val tez_kernelRootHash : Evm_node.t -> (string option, error) result Lwt.t
     latest) *)
 val call :
   to_:string -> data:string -> Evm_node.t -> (string, error) result Lwt.t
+
+(** [get_balance ~address ?block evm_node] calls [eth_getBalance]. [block]
+    defaults to ["latest"].*)
+val get_balance :
+  address:string -> ?block:string -> Evm_node.t -> (Wei.t, error) result Lwt.t

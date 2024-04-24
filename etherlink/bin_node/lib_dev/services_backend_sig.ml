@@ -8,8 +8,12 @@
 module type S = sig
   module Reader : Durable_storage.READER
 
-  (** [balance address] returns the [address]'s balance. *)
-  val balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t
+  (** [balance address block_param] returns the [address]'s balance at block
+      [block_param]. *)
+  val balance :
+    Ethereum_types.address ->
+    Ethereum_types.block_param ->
+    Ethereum_types.quantity tzresult Lwt.t
 
   (** [nonce address] returns the [address]'s nonce. *)
   val nonce :

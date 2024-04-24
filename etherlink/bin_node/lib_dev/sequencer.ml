@@ -10,7 +10,7 @@ module MakeBackend (Ctxt : sig
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
   module Reader = struct
-    let read path = Evm_context.inspect path
+    let read ?block path = Evm_context.inspect ?block path
   end
 
   module TxEncoder = struct

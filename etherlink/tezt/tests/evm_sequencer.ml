@@ -819,8 +819,6 @@ let test_rpc_produceBlock =
     ~tags:["evm"; "sequencer"; "produce_block"]
     ~title:"RPC method produceBlock"
   @@ fun {sequencer; _} _protocol ->
-  (* Set a large [time_between_blocks] to make sure the block production is
-     triggered by the RPC call. *)
   let*@ start_block_number = Rpc.block_number sequencer in
   let*@ _ = Rpc.produce_block sequencer in
   let*@ new_block_number = Rpc.block_number sequencer in
@@ -1313,6 +1311,39 @@ let test_observer_applies_blueprint_when_restarted =
   let* _ = Evm_node.wait_for_blueprint_applied observer 2
   and* _ = Rpc.produce_block sequencer in
 
+  unit
+
+let test_get_balance_block_param =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
+    ~title:"RPC method getBalance uses block parameter"
+    ~uses
+  @@ fun protocol ->
+  let* {sequencer; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
+  (* Transfer funds to a random address. *)
+  let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
+  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+  let transfer =
+    Eth_cli.transaction_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~to_public_key:address
+      ~value:(Wei.of_eth_int 10)
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ()
+  in
+  let* _tx_hash = wait_for in
+  (* Once the transaction is in the transaction pool the next block will include it. *)
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Resolve the transaction send to make sure it was included. *)
+  let* _tx_hash = transfer in
+  (* Check the balance on genesis block and latest block. *)
+  let*@ balance_genesis = Rpc.get_balance ~address ~block:"0" sequencer in
+  let*@ balance_now = Rpc.get_balance ~address ~block:"latest" sequencer in
+  Check.((balance_genesis = Wei.of_eth_int 0) Wei.typ)
+    ~error_msg:(sf "%s should have no funds at genesis, but got %%L" address) ;
+  Check.((balance_now = Wei.of_eth_int 10) Wei.typ)
+    ~error_msg:(sf "Balance of %s expected to be %%R but got %%L" address) ;
   unit
 
 let test_observer_applies_blueprint_when_sequencer_restarted =
@@ -2869,6 +2900,7 @@ let () =
   test_send_transaction_to_delayed_inbox protocols ;
   test_send_deposit_to_delayed_inbox protocols ;
   test_rpc_produceBlock protocols ;
+  test_get_balance_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;

@@ -199,9 +199,14 @@ val wait_for_diverged : t -> (int * string * string) Lwt.t
 val wait_for_missing_blueprint : t -> (int * string) Lwt.t
 
 (** [wait_for_rollup_node_ahead evm_node] waits for the event
-    [evm_events_follower_rollup_node_ahead.v0] using {!wait_for} and return the
+    [evm_events_follower_rollup_node_ahead.v0] using {!wait_for} and returns the
     missing blueprint level. *)
 val wait_for_rollup_node_ahead : t -> int Lwt.t
+
+(** [wait_for_tx_pool_add_transaction ?timeout evm_node] waits for the event
+    [tx_pool_add_transaction.v0] using {!wait_for} and returns the transaction
+    hash. *)
+val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
 
 (** Waits until a node terminates and return its status. If the node is
     not running, make the test fail. *)

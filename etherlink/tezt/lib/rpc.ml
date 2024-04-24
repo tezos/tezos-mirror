@@ -85,6 +85,12 @@ module Request = struct
       method_ = "eth_call";
       parameters = `A [eth_call_obj ~to_ ~data; `String "latest"];
     }
+
+  let get_balance ~address ~block =
+    {
+      method_ = "eth_getBalance";
+      parameters = `A [`String address; `String block];
+    }
 end
 
 let net_version evm_node =
@@ -243,4 +249,14 @@ let call ~to_ ~data evm_node =
   return
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
+       response
+
+let get_balance ~address ?(block = "latest") evm_node =
+  let* response =
+    Evm_node.call_evm_rpc evm_node (Request.get_balance ~address ~block)
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         Evm_node.extract_result response |> JSON.as_string |> Wei.of_string)
        response
