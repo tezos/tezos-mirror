@@ -70,20 +70,15 @@ let install_finalizer_seq server private_server =
 let callback_log server conn req body =
   let open Cohttp in
   let open Lwt_syntax in
-  let path = Request.uri req |> Uri.path in
-  if path = "/metrics" then
-    let* response = Metrics.Metrics_server.callback conn req body in
-    Lwt.return (`Response response)
-  else
-    let uri = req |> Request.uri |> Uri.to_string in
-    let meth = req |> Request.meth |> Code.string_of_method in
-    let* body_str = body |> Cohttp_lwt.Body.to_string in
-    let* () = Events.callback_log ~uri ~meth ~body:body_str in
-    Tezos_rpc_http_server.RPC_server.resto_callback
-      server
-      conn
-      req
-      (Cohttp_lwt.Body.of_string body_str)
+  let uri = req |> Request.uri |> Uri.to_string in
+  let meth = req |> Request.meth |> Code.string_of_method in
+  let* body_str = body |> Cohttp_lwt.Body.to_string in
+  let* () = Events.callback_log ~uri ~meth ~body:body_str in
+  Tezos_rpc_http_server.RPC_server.resto_callback
+    server
+    conn
+    req
+    (Cohttp_lwt.Body.of_string body_str)
 
 let start_server
     Configuration.
@@ -176,7 +171,9 @@ let loop_sequencer (sequencer_config : Configuration.sequencer) =
           diff >= Int64.of_float time_between_blocks
         in
         let* nb_transactions =
-          Block_producer.produce_block ~force ~timestamp:now
+          Threshold_encryption_block_producer.produce_block
+            ~force
+            ~timestamp:now
         and* () = Lwt.map Result.ok @@ Lwt_unix.sleep 0.5 in
         if nb_transactions > 0 || force then loop now
         else loop last_produced_block
@@ -188,31 +185,32 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
-  Metrics.Info.init ~devmode:configuration.devmode ~mode:"sequencer" ;
   let {rollup_node_endpoint; keep_alive; _} = configuration in
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address
       ~keep_alive:configuration.keep_alive
       rollup_node_endpoint
   in
-  let*? sequencer_config = Configuration.sequencer_config_exn configuration in
+  let*? threshold_encryption_sequencer_config =
+    Configuration.threshold_encryption_sequencer_config_exn configuration
+  in
   let* status =
     Evm_context.start
       ?kernel_path:kernel
       ~data_dir
-      ~preimages:sequencer_config.preimages
-      ~preimages_endpoint:sequencer_config.preimages_endpoint
+      ~preimages:threshold_encryption_sequencer_config.preimages
+      ~preimages_endpoint:
+        threshold_encryption_sequencer_config.preimages_endpoint
       ~smart_rollup_address
       ~fail_on_missing_blueprint:true
       ()
   in
   let*! head = Evm_context.head_info () in
   let (Qty next_blueprint_number) = head.next_blueprint_number in
-  Metrics.set_level ~level:(Z.pred next_blueprint_number) ;
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
-      ~config:sequencer_config.blueprints_publisher_config
+      ~config:threshold_encryption_sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ()
   in
@@ -222,7 +220,7 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
       let* genesis =
         Sequencer_blueprint.create
           ~cctxt
-          ~sequencer_key:sequencer_config.sequencer
+          ~sequencer_key:threshold_encryption_sequencer_config.sequencer
           ~timestamp:genesis_timestamp
           ~smart_rollup_address
           ~transactions:[]
@@ -253,18 +251,22 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
         tx_pool_tx_per_addr_limit =
           Int64.to_int configuration.tx_pool_tx_per_addr_limit;
         max_number_of_chunks =
-          (match configuration.sequencer with
-          | Some {max_number_of_chunks; _} -> Some max_number_of_chunks
-          | None -> None);
+          Some threshold_encryption_sequencer_config.max_number_of_chunks;
       }
   in
   let* () =
-    Block_producer.start
+    Threshold_encryption_blueprint_producer.start
       {
         cctxt;
         smart_rollup_address;
-        sequencer_key = sequencer_config.sequencer;
-        maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
+        sequencer_key = threshold_encryption_sequencer_config.sequencer;
+      }
+  in
+  let* () =
+    Threshold_encryption_block_producer.start
+      {
+        maximum_number_of_chunks =
+          threshold_encryption_sequencer_config.max_number_of_chunks;
       }
   in
   let* () =
@@ -272,13 +274,8 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
       {rollup_node_endpoint; keep_alive; filter_event = (fun _ -> true)}
   in
   let () =
-    Rollup_node_follower.start
-      ~keep_alive:configuration.keep_alive
-      ~proxy:false
-      ~rollup_node_endpoint
-      ()
+    Rollup_node_follower.start ~keep_alive ~proxy:false ~rollup_node_endpoint ()
   in
-
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)
   in
@@ -292,10 +289,10 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
           Services.private_directory
             configuration
             ((module Sequencer), smart_rollup_address)
-            ~produce_block:Block_producer.produce_block
+            ~produce_block:Threshold_encryption_block_producer.produce_block
         in
         (private_directory, private_rpc_port))
-      sequencer_config.private_rpc_port
+      threshold_encryption_sequencer_config.private_rpc_port
   in
   let* server, private_server =
     start_server configuration ~directory ~private_info
@@ -303,5 +300,5 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_seq server private_server
   in
-  let* () = loop_sequencer sequencer_config in
+  let* () = loop_sequencer threshold_encryption_sequencer_config in
   return_unit

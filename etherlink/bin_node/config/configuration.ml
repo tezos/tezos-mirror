@@ -31,6 +31,8 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
+type threshold_encryption_sequencer = sequencer
+
 type observer = {
   evm_node_endpoint : Uri.t;
   threshold_encryption_bundler_endpoint : Uri.t option;
@@ -46,6 +48,7 @@ type t = {
   cors_headers : string list;
   log_filter : log_filter_config;
   sequencer : sequencer option;
+  threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
@@ -115,6 +118,36 @@ let default_catchup_cooldown = 1
 let sequencer_config_dft ?preimages ?preimages_endpoint ?time_between_blocks
     ?max_number_of_chunks ?private_rpc_port ~sequencer ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown () =
+  let blueprints_publisher_config =
+    {
+      max_blueprints_lag =
+        Option.value ~default:default_max_blueprints_lag max_blueprints_lag;
+      max_blueprints_ahead =
+        Option.value ~default:default_max_blueprints_ahead max_blueprints_ahead;
+      max_blueprints_catchup =
+        Option.value
+          ~default:default_max_blueprints_catchup
+          max_blueprints_catchup;
+      catchup_cooldown =
+        Option.value ~default:default_catchup_cooldown catchup_cooldown;
+    }
+  in
+  {
+    preimages = Option.value ~default:default_preimages preimages;
+    preimages_endpoint;
+    time_between_blocks =
+      Option.value ~default:default_time_between_blocks time_between_blocks;
+    max_number_of_chunks =
+      Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
+    private_rpc_port;
+    sequencer;
+    blueprints_publisher_config;
+  }
+
+let threshold_encryption_sequencer_config_dft ?preimages ?preimages_endpoint
+    ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ~sequencer
+    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+    ?catchup_cooldown () =
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
@@ -250,6 +283,8 @@ let sequencer_encoding =
        (req "sequencer" string)
        (req "blueprints_publisher_config" blueprints_publisher_config_encoding))
 
+let threshold_encryption_sequencer_encoding = sequencer_encoding
+
 let observer_encoding =
   let open Data_encoding in
   conv
@@ -292,6 +327,7 @@ let encoding : t Data_encoding.t =
            cors_headers;
            log_filter;
            sequencer;
+           threshold_encryption_sequencer;
            observer;
            max_active_connections;
            tx_pool_timeout_limit;
@@ -308,10 +344,11 @@ let encoding : t Data_encoding.t =
           cors_headers,
           log_filter,
           sequencer,
+          threshold_encryption_sequencer,
           observer,
-          max_active_connections,
-          tx_pool_timeout_limit ),
-        ( tx_pool_addr_limit,
+          max_active_connections ),
+        ( tx_pool_timeout_limit,
+          tx_pool_addr_limit,
           tx_pool_tx_per_addr_limit,
           keep_alive,
           Uri.to_string rollup_node_endpoint,
@@ -323,10 +360,11 @@ let encoding : t Data_encoding.t =
              cors_headers,
              log_filter,
              sequencer,
+             threshold_encryption_sequencer,
              observer,
-             max_active_connections,
-             tx_pool_timeout_limit ),
-           ( tx_pool_addr_limit,
+             max_active_connections ),
+           ( tx_pool_timeout_limit,
+             tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              keep_alive,
              rollup_node_endpoint,
@@ -339,6 +377,7 @@ let encoding : t Data_encoding.t =
         cors_headers;
         log_filter;
         sequencer;
+        threshold_encryption_sequencer;
         observer;
         max_active_connections;
         tx_pool_timeout_limit;
@@ -360,19 +399,20 @@ let encoding : t Data_encoding.t =
              log_filter_config_encoding
              (default_filter_config ()))
           (opt "sequencer" sequencer_encoding)
+          (opt "sequencer" threshold_encryption_sequencer_encoding)
           (opt "observer" observer_encoding)
           (dft
              "max_active_connections"
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
-             default_max_active_connections)
+             default_max_active_connections))
+       (obj6
           (dft
              "tx-pool-timeout-limit"
              ~description:
                "Transaction timeout limit inside the transaction pool"
              int64
-             default_tx_pool_timeout_limit))
-       (obj5
+             default_tx_pool_timeout_limit)
           (dft
              "tx-pool-addr-limit"
              ~description:
@@ -414,6 +454,12 @@ let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 let sequencer_config_exn {sequencer; _} =
   Option.to_result ~none:(error_missing_config ~name:"sequencer") sequencer
 
+let threshold_encryption_sequencer_config_exn
+    {threshold_encryption_sequencer; _} =
+  Option.to_result
+    ~none:(error_missing_config ~name:"threshold_encryption_sequencer")
+    threshold_encryption_sequencer
+
 let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
 
@@ -430,6 +476,23 @@ module Cli = struct
       Option.map
         (fun sequencer ->
           sequencer_config_dft
+            ?preimages
+            ?preimages_endpoint
+            ?time_between_blocks
+            ?max_number_of_chunks
+            ?private_rpc_port
+            ?max_blueprints_lag
+            ?max_blueprints_ahead
+            ?max_blueprints_catchup
+            ?catchup_cooldown
+            ~sequencer
+            ())
+        sequencer_key
+    in
+    let threshold_encryption_sequencer =
+      Option.map
+        (fun sequencer ->
+          threshold_encryption_sequencer_config_dft
             ?preimages
             ?preimages_endpoint
             ?time_between_blocks
@@ -469,6 +532,7 @@ module Cli = struct
       cors_headers = Option.value ~default:default_cors_headers cors_headers;
       log_filter;
       sequencer;
+      threshold_encryption_sequencer;
       observer;
       max_active_connections = default_max_active_connections;
       tx_pool_timeout_limit =
@@ -561,6 +625,82 @@ module Cli = struct
                 ())
             sequencer_key
     in
+    let threshold_encryption_sequencer =
+      let threshold_encryption_sequencer_config =
+        configuration.threshold_encryption_sequencer
+      in
+      match threshold_encryption_sequencer_config with
+      | Some threshold_encryption_sequencer_config ->
+          let blueprints_publisher_config =
+            let blueprints_publisher_config =
+              threshold_encryption_sequencer_config.blueprints_publisher_config
+            in
+            {
+              max_blueprints_lag =
+                Option.value
+                  ~default:blueprints_publisher_config.max_blueprints_lag
+                  max_blueprints_lag;
+              max_blueprints_ahead =
+                Option.value
+                  ~default:blueprints_publisher_config.max_blueprints_ahead
+                  max_blueprints_ahead;
+              max_blueprints_catchup =
+                Option.value
+                  ~default:blueprints_publisher_config.max_blueprints_catchup
+                  max_blueprints_catchup;
+              catchup_cooldown =
+                Option.value
+                  ~default:blueprints_publisher_config.catchup_cooldown
+                  catchup_cooldown;
+            }
+          in
+          Some
+            {
+              preimages =
+                Option.value
+                  ~default:threshold_encryption_sequencer_config.preimages
+                  preimages;
+              preimages_endpoint =
+                Option.either
+                  preimages_endpoint
+                  threshold_encryption_sequencer_config.preimages_endpoint;
+              time_between_blocks =
+                Option.value
+                  ~default:
+                    threshold_encryption_sequencer_config.time_between_blocks
+                  time_between_blocks;
+              max_number_of_chunks =
+                Option.value
+                  ~default:
+                    threshold_encryption_sequencer_config.max_number_of_chunks
+                  max_number_of_chunks;
+              private_rpc_port =
+                Option.either
+                  private_rpc_port
+                  threshold_encryption_sequencer_config.private_rpc_port;
+              sequencer =
+                Option.value
+                  ~default:threshold_encryption_sequencer_config.sequencer
+                  sequencer_key;
+              blueprints_publisher_config;
+            }
+      | None ->
+          Option.map
+            (fun sequencer ->
+              threshold_encryption_sequencer_config_dft
+                ?preimages
+                ?preimages_endpoint
+                ?time_between_blocks
+                ?max_number_of_chunks
+                ?private_rpc_port
+                ?max_blueprints_lag
+                ?max_blueprints_ahead
+                ?max_blueprints_catchup
+                ?catchup_cooldown
+                ~sequencer
+                ())
+            sequencer_key
+    in
     let observer =
       match configuration.observer with
       | Some observer_config ->
@@ -618,6 +758,7 @@ module Cli = struct
         Option.value ~default:configuration.cors_headers cors_headers;
       log_filter;
       sequencer;
+      threshold_encryption_sequencer;
       observer;
       max_active_connections = configuration.max_active_connections;
       tx_pool_timeout_limit =

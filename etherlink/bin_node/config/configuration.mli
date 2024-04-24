@@ -51,6 +51,8 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
+type threshold_encryption_sequencer = sequencer
+
 type observer = {
   evm_node_endpoint : Uri.t;
   threshold_encryption_bundler_endpoint : Uri.t option;
@@ -66,6 +68,7 @@ type t = {
   cors_headers : string list;
   log_filter : log_filter_config;
   sequencer : sequencer option;
+  threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
@@ -96,6 +99,11 @@ val load : data_dir:string -> t tzresult Lwt.t
     [config] or fails *)
 val sequencer_config_exn : t -> sequencer tzresult
 
+(** [threshold_encryption_sequencer_config_exn config] returns the threshold
+    encryption sequencer config of [config] or fails. *)
+val threshold_encryption_sequencer_config_exn :
+  t -> threshold_encryption_sequencer tzresult
+
 (** [observer_config_exn config] returns the observer config of
     [config] or fails *)
 val observer_config_exn : t -> observer tzresult
@@ -115,6 +123,22 @@ val sequencer_config_dft :
   ?catchup_cooldown:int ->
   unit ->
   sequencer
+
+(** [threshold_encryption_sequencer_config_dft ()] returns the default
+    threshold encryption sequencer config populated with given value. *)
+val threshold_encryption_sequencer_config_dft :
+  ?preimages:string ->
+  ?preimages_endpoint:Uri.t ->
+  ?time_between_blocks:time_between_blocks ->
+  ?max_number_of_chunks:int ->
+  ?private_rpc_port:int ->
+  sequencer:Client_keys.sk_uri ->
+  ?max_blueprints_lag:int ->
+  ?max_blueprints_ahead:int ->
+  ?max_blueprints_catchup:int ->
+  ?catchup_cooldown:int ->
+  unit ->
+  threshold_encryption_sequencer
 
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)
