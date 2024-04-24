@@ -177,8 +177,8 @@ let dispatch_request (config : Configuration.t)
         in
         build_with_input ~f module_ parameters
     | Method (Get_storage_at.Method, module_) ->
-        let f (address, position, _block_param) =
-          let* value = Backend_rpc.storage_at address position in
+        let f (address, position, block_param) =
+          let* value = Backend_rpc.storage_at address position block_param in
           rpc_ok value
         in
         build_with_input ~f module_ parameters
