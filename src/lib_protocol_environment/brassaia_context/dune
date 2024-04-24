@@ -2,13 +2,13 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_shell_context)
- (public_name octez-shell-libs.shell-context)
+ (name tezos_brassaia_context)
+ (public_name octez-shell-libs.brassaia-context)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-proto-libs.protocol-environment
-  octez-libs.tezos-context)
+  octez-libs.tezos-context-brassaia)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives))

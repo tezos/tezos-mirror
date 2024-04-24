@@ -5,6 +5,7 @@ This is a package containing some libraries used by the shell of Octez.
 It contains the following libraries:
 
 - {{!module-Mocked}Mocked}
+- {{!module-Tezos_brassaia_context}Tezos_brassaia_context}
 - {{!module-Tezos_client_base}Tezos_client_base}: Tezos: common helpers for `octez-client`
 - {{!module-Tezos_client_base_unix}Tezos_client_base_unix}: Tezos: common helpers for `octez-client` (unix-specific fragment)
 - {{!module-Tezos_client_commands}Tezos_client_commands}: Tezos: protocol agnostic commands for `octez-client`

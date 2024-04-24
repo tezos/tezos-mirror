@@ -2776,6 +2776,7 @@ let octez_context_brassaia_helpers =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 let octez_context_memory =
   octez_lib
     "tezos-context.memory"
@@ -2794,6 +2795,7 @@ let octez_context_memory =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 let octez_context_brassaia_memory =
   octez_lib
     "tezos-context-brassaia.memory"
@@ -2856,6 +2858,7 @@ let octez_context_brassaia_dump =
     ~path:"src/lib_context_brassaia/dump"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 
 let octez_context_disk =
   octez_lib
@@ -2880,6 +2883,7 @@ let octez_context_disk =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+(* Should not be used directly in most cases, use context_ops abstraction instead *)
 let octez_context_brassaia_disk =
   octez_lib
     "tezos-context-brassaia.disk"
@@ -3447,10 +3451,13 @@ let octez_protocol_environment =
         octez_protocol_environment_structs;
         octez_micheline |> open_;
         octez_context_memory;
+        octez_context_brassaia_memory;
         octez_scoru_wasm;
         octez_event_logging;
       ]
 
+(* in general this library should not be used directly, context_ops should be
+   used instead *)
 let octez_shell_context =
   octez_shell_lib
     "shell-context"
@@ -3461,6 +3468,17 @@ let octez_shell_context =
         octez_base |> open_ ~m:"TzPervasives";
         octez_protocol_environment;
         octez_context;
+      ]
+
+let octez_brassaia_context =
+  octez_shell_lib
+    "brassaia-context"
+    ~internal_name:"tezos_brassaia_context"
+    ~path:"src/lib_protocol_environment/brassaia_context"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_protocol_environment;
         octez_context_brassaia;
       ]
 
@@ -3500,6 +3518,7 @@ let octez_context_ops =
         octez_context |> open_;
         octez_context_brassaia |> open_;
         octez_shell_context |> open_;
+        octez_brassaia_context |> open_;
       ]
 
 let _octez_protocol_shell_context_tests =
@@ -3676,7 +3695,6 @@ let octez_protocol_updater =
         octez_micheline |> open_;
         octez_shell_services |> open_;
         octez_protocol_environment;
-        octez_shell_context;
         octez_protocol_compiler_registerer;
         octez_protocol_compiler_native;
         octez_context |> open_;
@@ -3697,7 +3715,6 @@ let octez_validation =
         octez_crypto |> open_;
         octez_rpc;
         octez_context_ops |> open_;
-        octez_shell_context |> open_;
         octez_shell_services |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
@@ -3743,7 +3760,6 @@ let octez_store_unix =
         octez_store_shared |> open_;
         octez_protocol_environment |> open_;
         octez_context_ops |> open_;
-        octez_shell_context;
         octez_validation |> open_;
         octez_protocol_updater |> open_;
         octez_stdlib_unix |> open_;
@@ -3845,7 +3861,6 @@ let _octez_store_mocked =
         octez_base |> open_ ~m:"TzPervasives";
         octez_crypto |> open_;
         octez_shell_services |> open_;
-        octez_context_memory |> open_;
         octez_context_ops |> open_;
         octez_validation |> open_;
         octez_protocol_environment;
@@ -3907,7 +3922,6 @@ let octez_shell =
         octez_store_shared |> open_;
         octez_protocol_environment |> open_;
         octez_context_ops |> open_;
-        octez_shell_context |> open_;
         octez_p2p |> open_;
         octez_stdlib_unix |> open_;
         octez_shell_services |> open_;
@@ -4535,7 +4549,6 @@ let octez_shell_benchmarks =
         octez_error_monad |> open_;
         octez_benchmark |> open_;
         octez_crypto;
-        octez_shell_context;
         octez_store;
         octez_micheline;
       ]
@@ -4978,7 +4991,6 @@ let octez_scoru_wasm_benchmark =
         octez_base |> open_ ~m:"TzPervasives";
         tezt_lib;
         octez_webassembly_interpreter;
-        octez_context_memory;
         octez_scoru_wasm;
         octez_scoru_wasm_helpers;
         lwt_unix;
@@ -6558,9 +6570,9 @@ let hash = Protocol.hash
             octez_client_commands |> open_;
             octez_stdlib |> open_;
             octez_stdlib_unix |> open_;
-            octez_shell_context |> open_;
+            octez_shell_context |> if_ N.(number <= 019) |> open_;
             octez_context |> open_;
-            octez_context_memory |> if_ N.(number >= 012);
+            octez_context_memory |> if_ (N.(number >= 012) && N.(number <= 019));
             octez_rpc_http_client_unix |> if_ N.(number >= 011);
             octez_context_ops |> if_ N.(number >= 011) |> open_;
             octez_rpc;
@@ -7521,7 +7533,6 @@ let yes_wallet_lib =
          ezjsonm;
          octez_node_config;
          octez_store;
-         octez_shell_context;
        ]
       @ protocols)
     ~all_modules_except:["yes_wallet"]
@@ -7838,7 +7849,6 @@ let _octez_node =
          octez_store_unix_reconstruction |> open_;
          octez_store_unix_snapshots |> open_;
          octez_validation |> open_;
-         octez_shell_context |> open_;
          octez_workers |> open_;
          octez_protocol_updater |> open_;
          cmdliner;
@@ -7992,6 +8002,7 @@ let _octez_proxy_server =
          octez_rpc_http_client_unix;
          octez_rpc_http_server;
          octez_shell_services;
+         (* TODO: use context_ops ~kind:`Disk instead of shell_context *)
          octez_shell_context;
          octez_version_value;
          uri;

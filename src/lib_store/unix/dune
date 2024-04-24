@@ -13,7 +13,6 @@
   octez-shell-libs.store.shared
   octez-proto-libs.protocol-environment
   octez-shell-libs.context-ops
-  octez-shell-libs.shell-context
   octez-shell-libs.validation
   octez-shell-libs.protocol-updater
   octez-libs.stdlib-unix

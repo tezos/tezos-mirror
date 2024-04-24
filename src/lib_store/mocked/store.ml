@@ -1832,32 +1832,26 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
       "init: already initialized context in %s"
       context_dir ;
   context_dirs := context_dir :: !context_dirs ;
-  let patch_context =
-    Option.map
-      (fun f ctxt ->
-        let ctxt =
-          Tezos_protocol_environment.Memory_context.wrap_memory_context ctxt
-        in
-        let+ ctxt = f ctxt in
-        Tezos_protocol_environment.Memory_context.unwrap_memory_context ctxt)
-      patch_context
-  in
+
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let*! context_index, commit_genesis =
-    let open Tezos_context_memory in
     match commit_genesis with
     | Some commit_genesis ->
         let*! context_index =
-          Context.init ~readonly:true ?patch_context context_dir
+          Context_ops.init
+            ~kind:`Memory
+            ~readonly:true
+            ?patch_context
+            context_dir
         in
         Lwt.return (context_index, commit_genesis)
     | None ->
         let*! context_index =
-          Context.init ~readonly ?patch_context context_dir
+          Context_ops.init ~kind:`Memory ~readonly ?patch_context context_dir
         in
         let commit_genesis ~chain_id =
-          Context.commit_genesis
+          Context_ops.commit_genesis
             context_index
             ~chain_id
             ~time:genesis.time
@@ -1879,7 +1873,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     create_store
       ?block_cache_limit
       store_dir
-      ~context_index:(Context_ops.Memory_index context_index)
+      ~context_index
       ~chain_id
       ~genesis
       ~genesis_context

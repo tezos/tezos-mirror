@@ -10,7 +10,6 @@
   ezjsonm
   octez-node-config
   octez-shell-libs.store
-  octez-shell-libs.shell-context
   tezos-protocol-018-Proxford.protocol
   tezos-protocol-019-PtParisB.protocol
   tezos-protocol-alpha.protocol)

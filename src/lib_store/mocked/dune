@@ -10,7 +10,6 @@
   octez-libs.base
   octez-libs.crypto
   octez-shell-libs.shell-services
-  octez-libs.tezos-context.memory
   octez-shell-libs.context-ops
   octez-shell-libs.validation
   octez-proto-libs.protocol-environment
@@ -20,7 +19,6 @@
   -open Tezos_base.TzPervasives
   -open Tezos_crypto
   -open Tezos_shell_services
-  -open Tezos_context_memory
   -open Tezos_context_ops
   -open Tezos_validation
   -open Tezos_store_shared)
