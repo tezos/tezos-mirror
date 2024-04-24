@@ -203,9 +203,10 @@ export class Simulator {
   total_staked_balance(cycle) {
     if (cycle <= this.config.proto.consensus_rights_delay + 1) {
       return bigInt(
-        this.#storage_total_staked[
-          this.config.proto.consensus_rights_delay + 1
-        ],
+        this.#storage_total_staked_mask[cycle] ??
+          this.#storage_total_staked[
+            this.config.proto.consensus_rights_delay + 1
+          ],
       );
     }
     // staked balances are set with adjusted cycles
