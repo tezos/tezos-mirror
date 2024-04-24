@@ -77,10 +77,6 @@ module Slots_handlers = struct
       ~none:(function `Not_found -> true | _ -> false)
       r
 
-  let post_commitment ctxt () slot =
-    call_handler2 ctxt (fun store {cryptobox; _} ->
-        Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult)
-
   let get_commitment_slot ctxt commitment () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         Slot_manager.get_commitment_slot store cryptobox commitment
@@ -148,18 +144,6 @@ module Slots_handlers = struct
                   Cryptobox.string_of_commit_error commit_error
             in
             tzfail (Cryptobox_error ("get_page_proof", msg)))
-
-  let put_commitment_shards ctxt commitment () Types.{with_proof} =
-    call_handler2
-      ctxt
-      (fun store {cryptobox; shards_proofs_precomputation; _} ->
-        Slot_manager.add_commitment_shards
-          ~shards_proofs_precomputation
-          store
-          cryptobox
-          commitment
-          ~with_proof
-        |> Errors.to_option_tzresult)
 
   let post_slot ctxt query slot =
     call_handler2
@@ -389,10 +373,6 @@ let register_new :
        Services.post_slot
        (Slots_handlers.post_slot ctxt)
   |> add_service
-       Tezos_rpc.Directory.register0
-       Services.post_commitment
-       (Slots_handlers.post_commitment ctxt)
-  |> add_service
        Tezos_rpc.Directory.opt_register1
        Services.get_commitment_slot
        (Slots_handlers.get_commitment_slot ctxt)
@@ -404,10 +384,6 @@ let register_new :
        Tezos_rpc.Directory.register1
        Services.get_page_proof
        (Slots_handlers.get_page_proof ctxt)
-  |> add_service
-       Tezos_rpc.Directory.opt_register1
-       Services.put_commitment_shards
-       (Slots_handlers.put_commitment_shards ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
        Services.get_commitment_by_published_level_and_index

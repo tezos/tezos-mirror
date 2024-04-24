@@ -86,16 +86,13 @@ module Helpers : sig
       DAL node to compute and store the corresponding commitment and shards by
       calling relevant RPCs. It returns the commitment and its proof. *)
 
-  val store_slot :
-    Dal_node.t -> ?with_proof:bool -> slot -> (string * string) Lwt.t
+  val store_slot : Dal_node.t -> slot -> (string * string) Lwt.t
 
-  val store_slot_uri :
-    Endpoint.t -> ?with_proof:bool -> slot -> (string * string) Lwt.t
+  val store_slot_uri : Endpoint.t -> slot -> (string * string) Lwt.t
 
   (* Publish and store the slot on the corresponding DAL node. *)
   val publish_and_store_slot :
     ?dont_wait:bool ->
-    ?with_proof:bool ->
     ?counter:int ->
     ?force:bool ->
     ?fee:int ->
@@ -170,21 +167,15 @@ module RPC : sig
         the input (and output) is expected to be a list. *)
   val slot_headers_of_json : JSON.t -> slot_header list
 
-  (** Call RPC "POST /commitments" to store a slot and retrun the commitment
-        in case of success. *)
-  val post_commitment : Helpers.slot -> commitment RPC_core.t
+  type commitment_proof = string
+
+  (** Call RPC "POST /slots" to store a slot and return the commitment
+        and its proof in case of success. *)
+  val post_slot : Helpers.slot -> (commitment * commitment_proof) RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
         content associated with the given commitment. *)
   val get_commitment_slot : commitment -> Helpers.slot RPC_core.t
-
-  (** Call RPC "PUT /commitments/<commitment>/shards" to compute and store the
-        shards of the slot whose commitment is given, using the current DAL
-        parameters. Note that [with_proof], whose default value is [false], is
-        provided as input to the RPC. *)
-  val put_commitment_shards : ?with_proof:bool -> commitment -> unit RPC_core.t
-
-  type commitment_proof = string
 
   (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
        associated to a commitment. *)

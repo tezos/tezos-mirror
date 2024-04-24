@@ -37,23 +37,6 @@ type 'rpc service =
     ; input : 'input
     ; output : 'output >
 
-let post_commitment :
-    < meth : [`POST]
-    ; input : Cryptobox.slot
-    ; output : Cryptobox.commitment
-    ; prefix : unit
-    ; params : unit
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.post_service
-    ~description:
-      "Add a slot in the node's context if not already present. The \
-       corresponding commitment is returned."
-    ~query:Tezos_rpc.Query.empty
-    ~input:slot_encoding
-    ~output:Cryptobox.Commitment.encoding
-    Tezos_rpc.Path.(open_root / "commitments")
-
 let post_slot :
     < meth : [`POST]
     ; input : string
@@ -77,7 +60,7 @@ let post_slot :
         obj2
           (req "commitment" Cryptobox.Commitment.encoding)
           (req "commitment_proof" Cryptobox.Commitment_proof.encoding))
-    Tezos_rpc.Path.(open_root / "slot")
+    Tezos_rpc.Path.(open_root / "slots")
 
 let patch_commitment :
     < meth : [`PATCH]
@@ -139,25 +122,6 @@ let get_page_proof :
     ~input:slot_encoding
     ~output:Cryptobox.page_proof_encoding
     Tezos_rpc.Path.(open_root / "pages" /: Tezos_rpc.Arg.int / "proof")
-
-let put_commitment_shards :
-    < meth : [`PUT]
-    ; input : with_proof
-    ; output : unit
-    ; prefix : unit
-    ; params : unit * Cryptobox.commitment
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.put_service
-    ~description:
-      "Compute and save the shards of the slot associated to the given \
-       commitment. If the input's flag is true, the shard proofs are also \
-       computed."
-    ~query:Tezos_rpc.Query.empty
-    ~input:with_proof_encoding
-    ~output:Data_encoding.unit
-    Tezos_rpc.Path.(
-      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "shards")
 
 let get_commitment_by_published_level_and_index :
     < meth : [`GET]

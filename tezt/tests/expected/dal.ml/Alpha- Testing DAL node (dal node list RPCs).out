@@ -3,18 +3,11 @@
 
 Available services:
   
-  - POST /commitments
-      Add a slot in the node's context if not already present. The
-      corresponding commitment is returned. 
   + commitments/<DAL_commitment>/
     - GET /commitments/<DAL_commitment>/headers
         Return the known headers for the slot whose commitment is given. 
     - GET /commitments/<DAL_commitment>/proof
         Compute the proof associated with a commitment. 
-    - PUT /commitments/<DAL_commitment>/shards
-        Compute and save the shards of the slot associated to the given
-        commitment. If the input's flag is true, the shard proofs are also
-        computed. 
     - GET /commitments/<DAL_commitment>/slot
         Retrieve the content of the slot associated with the given
         commitment. 
@@ -94,7 +87,7 @@ Available services:
       node's store. 
   - GET /shard/<DAL_commitment>/<int>
       Fetch shard as bytes 
-  - POST /slot
+  - POST /slots
       Post a slot to the DAL node, computes its commitment and commitment
       proof, then computes the correspoding shards with their proof. The
       result of this RPC can be directly used to publish a slot header. 

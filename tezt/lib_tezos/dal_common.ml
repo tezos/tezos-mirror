@@ -119,10 +119,6 @@ module RPC_legacy = struct
 
   let make ?data ?query_string = RPC_core.make ?data ?query_string
 
-  (** [encode_bytes_for_json raw] encodes arbitrary byte sequence as hex string for JSON *)
-  let encode_bytes_to_hex_string raw =
-    "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
-
   let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
 
   let get_bytes_from_json_string_node json =
@@ -189,15 +185,6 @@ module Dal_RPC = struct
     | [] -> ()
     | _ -> JSON.error t "Not an empty object"
 
-  let post_commitment slot =
-    let slot =
-      JSON.parse
-        ~origin:"Dal_common.RPC.post_commitments"
-        (encode_bytes_to_hex_string slot)
-    in
-    let data : RPC_core.data = Data (JSON.unannotate slot) in
-    make ~data POST ["commitments"] JSON.as_string
-
   (* Converts a possibly invalid UTF-8 string into a JSON object using
      Data-encoding's unistring representation. *)
   let unistring_to_json s =
@@ -213,7 +200,7 @@ module Dal_RPC = struct
     make
       ~data
       POST
-      ["slot"]
+      ["slots"]
       JSON.(
         fun json ->
           ( json |-> "commitment" |> as_string,
@@ -221,10 +208,6 @@ module Dal_RPC = struct
 
   let get_commitment_slot commitment =
     make GET ["commitments"; commitment; "slot"] get_bytes_from_json_string_node
-
-  let put_commitment_shards ?(with_proof = true) commitment =
-    let data : RPC_core.data = Data (`O [("with_proof", `Bool with_proof)]) in
-    make ~data PUT ["commitments"; commitment; "shards"] as_empty_object_or_fail
 
   type commitment_proof = string
 
@@ -602,36 +585,20 @@ module Helpers = struct
         ]
         client)
 
-  let store_slot dal_node_or_endpoint ?with_proof slot =
+  let store_slot dal_node_or_endpoint slot =
     let call = function
       | Either.Left node -> Dal_RPC.Local.call node
       | Either.Right endpoint -> Dal_RPC.Remote.call endpoint
     in
-    (* Use the POST /slot RPC except if shard proof computation is
-       explicitly deactivated with with_proof:false *)
-    match with_proof with
-    | None | Some true -> call dal_node_or_endpoint @@ Dal_RPC.post_slot slot
-    | Some false ->
-        let* commitment =
-          call dal_node_or_endpoint @@ Dal_RPC.post_commitment slot
-        in
-        let* () =
-          Dal_RPC.(
-            call dal_node_or_endpoint
-            @@ put_commitment_shards ~with_proof:false commitment)
-        in
-        let* proof =
-          Dal_RPC.(call dal_node_or_endpoint @@ get_commitment_proof commitment)
-        in
-        return (commitment, proof)
+    call dal_node_or_endpoint @@ Dal_RPC.post_slot slot
 
-  let store_slot_uri dal_node_endpoint ?with_proof slot =
-    store_slot (Either.Right dal_node_endpoint) ?with_proof slot
+  let store_slot_uri dal_node_endpoint slot =
+    store_slot (Either.Right dal_node_endpoint) slot
 
   (* We override store slot so that it uses a DAL node in this file. *)
-  let store_slot dal_node ?with_proof slot =
+  let store_slot dal_node slot =
     match Dal_node.runner dal_node with
-    | None -> store_slot (Either.Left dal_node) ?with_proof slot
+    | None -> store_slot (Either.Left dal_node) slot
     | Some runner ->
         let endpoint =
           Endpoint.
@@ -641,12 +608,12 @@ module Helpers = struct
               port = Dal_node.rpc_port dal_node;
             }
         in
-        store_slot (Either.Right endpoint) ?with_proof slot
+        store_slot (Either.Right endpoint) slot
 
-  let publish_and_store_slot ?dont_wait ?with_proof ?counter ?force
-      ?(fee = 1_200) client dal_node source ~index content =
+  let publish_and_store_slot ?dont_wait ?counter ?force ?(fee = 1_200) client
+      dal_node source ~index content =
     (* We override store slot so that it uses a DAL node in this file. *)
-    let* commitment_string, proof = store_slot dal_node ?with_proof content in
+    let* commitment_string, proof = store_slot dal_node content in
     let commitment = Commitment.of_string commitment_string in
     let proof = Commitment.proof_of_string proof in
     let* _ =
