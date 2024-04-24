@@ -2450,6 +2450,18 @@ let octez_merkle_proof_encoding =
       ]
     ~js_compatible:true
 
+let octez_brassaia_merkle_proof_encoding =
+  octez_lib
+    "tezos-context-brassaia.merkle_proof_encoding"
+    ~path:"src/lib_context_brassaia/merkle_proof_encoding"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib |> open_;
+        octez_context_sigs;
+      ]
+    ~js_compatible:true
+
 let octez_shell_services =
   octez_shell_lib
     "shell-services"
@@ -2716,6 +2728,17 @@ let octez_context_encoding =
         octez_stdlib |> open_;
         irmin;
         irmin_pack;
+      ]
+    ~conflicts:[Conflicts.checkseum]
+
+let octez_context_brassaia_encoding =
+  octez_lib
+    "tezos-context-brassaia.encoding"
+    ~path:"src/lib_context_brassaia/encoding"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib |> open_;
         brassaia;
         brassaia_pack;
       ]
@@ -2737,6 +2760,22 @@ let octez_context_helpers =
       ]
     ~conflicts:[Conflicts.checkseum]
 
+let octez_context_brassaia_helpers =
+  octez_lib
+    "tezos-context-brassaia.helpers"
+    ~path:"src/lib_context_brassaia/helpers"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib |> open_;
+        octez_context_brassaia_encoding;
+        octez_context_sigs;
+        octez_brassaia_merkle_proof_encoding;
+        brassaia;
+        brassaia_pack;
+      ]
+    ~conflicts:[Conflicts.checkseum]
+
 let octez_context_memory =
   octez_lib
     "tezos-context.memory"
@@ -2752,6 +2791,22 @@ let octez_context_memory =
         octez_context_sigs;
         octez_context_encoding;
         octez_context_helpers;
+      ]
+    ~conflicts:[Conflicts.checkseum]
+
+let octez_context_brassaia_memory =
+  octez_lib
+    "tezos-context-brassaia.memory"
+    ~path:"src/lib_context_brassaia/memory"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib |> open_;
+        brassaia_pack;
+        brassaia_pack_mem;
+        octez_context_sigs;
+        octez_context_brassaia_encoding;
+        octez_context_brassaia_helpers;
       ]
     ~conflicts:[Conflicts.checkseum]
 
@@ -2795,6 +2850,13 @@ let octez_context_dump =
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
 
+let octez_context_brassaia_dump =
+  octez_lib
+    "tezos-context-brassaia.dump"
+    ~path:"src/lib_context_brassaia/dump"
+    ~deps:
+      [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
+
 let octez_context_disk =
   octez_lib
     "tezos-context.disk"
@@ -2807,9 +2869,6 @@ let octez_context_disk =
         irmin;
         irmin_pack;
         irmin_pack_unix;
-        brassaia;
-        brassaia_pack;
-        brassaia_pack_unix;
         logs_fmt;
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
@@ -2818,6 +2877,29 @@ let octez_context_disk =
         octez_context_encoding;
         octez_context_memory;
         octez_context_dump;
+      ]
+    ~conflicts:[Conflicts.checkseum]
+
+let octez_context_brassaia_disk =
+  octez_lib
+    "tezos-context-brassaia.disk"
+    ~path:"src/lib_context_brassaia/disk"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        bigstringaf;
+        fmt;
+        brassaia;
+        brassaia_pack;
+        brassaia_pack_unix;
+        logs_fmt;
+        octez_stdlib_unix |> open_;
+        octez_stdlib |> open_;
+        octez_context_sigs;
+        octez_context_brassaia_helpers;
+        octez_context_brassaia_encoding;
+        octez_context_brassaia_memory |> open_;
+        octez_context_brassaia_dump;
       ]
     ~conflicts:[Conflicts.checkseum]
 
@@ -2846,6 +2928,13 @@ let octez_context =
     ~path:"src/lib_context"
     ~synopsis:"On-disk context abstraction for [octez-node]"
     ~deps:[octez_context_disk; octez_context_memory]
+
+let octez_context_brassaia =
+  octez_lib
+    "tezos-context-brassaia"
+    ~path:"src/lib_context_brassaia"
+    ~synopsis:"On-disk context abstraction for [octez-node] (brassaia)"
+    ~deps:[octez_context_brassaia_disk; octez_context_brassaia_memory]
 
 let _octez_context_tests =
   tezt
@@ -2892,11 +2981,8 @@ let _irmin_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
-        octez_context_disk;
-        octez_context_memory;
-        octez_context_encoding;
         irmin_test_helpers;
+        octez_context_disk;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
@@ -2912,11 +2998,8 @@ let _brassaia_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
-        octez_context_disk;
-        octez_context_memory;
-        octez_context_encoding;
         brassaia_test_helpers;
+        octez_context_brassaia_disk;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
@@ -2932,7 +3015,6 @@ let _irmin_data_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
         alcotezt;
         irmin_test_helpers;
         octez_stdlib_unix |> open_;
@@ -2950,7 +3032,6 @@ let _brassaia_data_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
         alcotezt;
         brassaia_test_helpers;
         octez_stdlib_unix |> open_;
@@ -2968,7 +3049,6 @@ let _irmin_generic_key_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
         irmin_test_helpers;
         irmin_mem;
         vector;
@@ -2988,7 +3068,6 @@ let _brassaia_generic_key_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
         brassaia_test_helpers;
         brassaia_mem;
         vector;
@@ -3008,11 +3087,8 @@ let _irmin_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
-        octez_context_disk;
-        octez_context_memory;
-        octez_context_encoding;
         irmin_test_helpers |> open_;
+        irmin_mem;
         alcotezt;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
@@ -3030,11 +3106,8 @@ let _brassaia_tests =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
-        octez_context_sigs;
-        octez_context_disk;
-        octez_context_memory;
-        octez_context_encoding;
         brassaia_test_helpers |> open_;
+        brassaia_mem;
         alcotezt;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
@@ -3064,7 +3137,7 @@ let _brassaia_mem_tests =
     ~synopsis:"Tezos internal brassaia tests"
     ~deps:
       [
-        octez_context_memory;
+        octez_context_brassaia_memory;
         brassaia_test_helpers;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
@@ -3388,6 +3461,7 @@ let octez_shell_context =
         octez_base |> open_ ~m:"TzPervasives";
         octez_protocol_environment;
         octez_context;
+        octez_context_brassaia;
       ]
 
 let _octez_protocol_environment_tests =
@@ -3424,6 +3498,7 @@ let octez_context_ops =
         octez_error_monad |> open_;
         octez_protocol_environment;
         octez_context |> open_;
+        octez_context_brassaia |> open_;
         octez_shell_context |> open_;
       ]
 

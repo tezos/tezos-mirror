@@ -2,14 +2,14 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_context_encoding)
- (public_name octez-libs.tezos-context.encoding)
+ (name tezos_context_brassaia_encoding)
+ (public_name octez-libs.tezos-context-brassaia.encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.stdlib
-  octez-internal-libs.irmin
-  octez-internal-libs.irmin_pack)
+  octez-internal-libs.brassaia
+  octez-internal-libs.brassaia_pack)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
