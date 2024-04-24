@@ -1355,21 +1355,6 @@ let get_commitment_succeeds expected_commitment response =
 let get_commitment_not_found _commit r =
   RPC_core.check_string_response ~code:404 r
 
-let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
-  let test check_result ~query_string (slot_index, commit) =
-    let slot_level, slot_index =
-      if not query_string then (None, None)
-      else (Some slot_level, Some slot_index)
-    in
-    let* headers =
-      Dal_RPC.(
-        call dal_node @@ get_commitment_headers ?slot_index ?slot_level commit)
-    in
-    return @@ check_result headers
-  in
-  let* () = Lwt_list.iter_s (test check_result ~query_string:true) slots_info in
-  Lwt_list.iter_s (test check_result ~query_string:false) slots_info
-
 let check_published_level_headers ~__LOC__ dal_node ~pub_level
     ~number_of_headers =
   let* slot_headers =
@@ -1406,6 +1391,21 @@ let get_headers_succeeds ~__LOC__ ?expected_status headers =
         "It was expected that there is exactly one slot id for the given \
          commitment, got %d."
         (List.length headers)
+
+let check_get_commitment_headers dal_node ~slot_level check_result slots_info =
+  let test check_result ~query_string (slot_index, commit) =
+    let slot_level, slot_index =
+      if not query_string then (None, None)
+      else (Some slot_level, Some slot_index)
+    in
+    let* headers =
+      Dal_RPC.(
+        call dal_node @@ get_commitment_headers ?slot_index ?slot_level commit)
+    in
+    return @@ check_result headers
+  in
+  let* () = Lwt_list.iter_s (test check_result ~query_string:true) slots_info in
+  Lwt_list.iter_s (test check_result ~query_string:false) slots_info
 
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
