@@ -879,12 +879,16 @@ let call_extendable_encoding =
   (* `merge_objs <obj> unit` allows the encoding to accept any number of
       unspecified fields from JSON. *)
   merge_objs
-    (conv
+    (conv_with_guard
        (fun {from; to_; gas; gasPrice; value; data} ->
-         (from, Some to_, gas, gasPrice, value, data))
-       (fun (from, to_, gas, gasPrice, value, data) ->
-         {from; to_ = Option.join to_; gas; gasPrice; value; data})
-       (obj6
+         (from, Some to_, gas, gasPrice, value, data, None))
+       (function
+         | from, to_, gas, gasPrice, value, data, None
+         | from, to_, gas, gasPrice, value, None, data ->
+             Ok {from; to_ = Option.join to_; gas; gasPrice; value; data}
+         | _, _, _, _, _, Some _, Some _ ->
+             Error "Cannot specify both data and input")
+       (obj7
           (opt "from" address_encoding)
           (opt "to" (option address_encoding))
           (* `call` is also used for estimateGas, which allows all fields to be
@@ -892,6 +896,7 @@ let call_extendable_encoding =
           (opt "gas" quantity_encoding)
           (opt "gasPrice" quantity_encoding)
           (opt "value" quantity_encoding)
+          (opt "input" hash_encoding)
           (opt "data" hash_encoding)))
     unit
 
