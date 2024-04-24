@@ -305,14 +305,6 @@ let bundler_node_endpoint_arg =
        rollup."
     Params.endpoint
 
-let bundler_node_endpoint_param =
-  Tezos_clic.param
-    ~name:"bundler-node-endpoint"
-    ~desc:
-      "The address of a service which encrypts incoming transactions for the \
-       rollup."
-    Params.endpoint
-
 let time_between_blocks_arg =
   Tezos_clic.arg
     ~long:"time-between-blocks"
@@ -822,7 +814,11 @@ let observer_command =
        observer` command."
     (merge_options
        common_config_args
-       (args3 kernel_arg preimages_arg preimages_endpoint_arg))
+       (args4
+          kernel_arg
+          preimages_arg
+          preimages_endpoint_arg
+          bundler_node_endpoint_arg))
     (prefixes ["run"; "observer"; "with"; "endpoint"]
     @@ param
          ~name:"evm-node-endpoint"
@@ -830,7 +826,6 @@ let observer_command =
            "The EVM node endpoint address (as ADDR:PORT) the node will \
             communicate with."
          Params.evm_node_endpoint
-    @@ bundler_node_endpoint_param
     @@ prefixes ["and"; "rollup"; "node"; "endpoint"]
     @@ rollup_node_endpoint_param @@ stop)
   @@ fun ( ( data_dir,
@@ -848,9 +843,11 @@ let observer_command =
              tx_pool_addr_limit,
              tx_pool_tx_per_addr_limit,
              verbose ),
-           (kernel, preimages, preimages_endpoint) )
+           ( kernel,
+             preimages,
+             preimages_endpoint,
+             threshold_encryption_bundler_endpoint ) )
              evm_node_endpoint
-             threshold_encryption_bundler_endpoint
              rollup_node_endpoint
              () ->
   let*? () =
@@ -874,7 +871,7 @@ let observer_command =
     ~rollup_node_endpoint
     ?preimages_endpoint
     ~evm_node_endpoint
-    ~threshold_encryption_bundler_endpoint
+    ?threshold_encryption_bundler_endpoint
     ?tx_pool_timeout_limit
     ?tx_pool_addr_limit
     ?tx_pool_tx_per_addr_limit
