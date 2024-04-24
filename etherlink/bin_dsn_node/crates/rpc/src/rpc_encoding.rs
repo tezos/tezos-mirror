@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+//! Encodings for deserialising Requests and Responses received.
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-//TODO: Move to separate rpc crate
+// TODO: Move to a separate types crate
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]

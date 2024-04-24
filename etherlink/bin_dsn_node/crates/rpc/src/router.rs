@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//TODO: Move to separate bundler folder
+//! Module for building route tables for http requests.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -18,9 +18,13 @@ use crate::errors::RpcError;
 
 pub type ResponseBody = BoxBody<Bytes, Infallible>;
 
-// TODO: Handle errors and make the return type of the BoxBody Infallible
 pub type Response = hyper::Response<ResponseBody>;
 
+/// The type of a service handler that will be executed
+/// once a request has been routed to that service.
+/// It is an asynchronous function that takes in input an atomic
+/// reference to the server state, as well as the whole request to
+/// be processed.
 pub type Service<S> = dyn Fn(
         Arc<S>,
         Request<Incoming>,
@@ -31,6 +35,7 @@ pub type Service<S> = dyn Fn(
 
 pub type Path = String;
 
+/// Auxiliary builder factory for building routers.
 pub struct RouterBuilder<S> {
     routes: HashMap<(Method, Path), Box<Service<S>>>,
 }
@@ -42,6 +47,8 @@ impl<S> RouterBuilder<S> {
         }
     }
 
+    /// Binds a route to a service handler. The result is a [RouterBuilder] that
+    /// can be used to append more routes
     pub fn with_route<F>(mut self, path: &str, method: Method, handler: F) -> Self
     where
         F: Fn(
@@ -57,6 +64,7 @@ impl<S> RouterBuilder<S> {
         self
     }
 
+    /// Returns a new [Router] built using the routes specified by [self].]
     pub fn build(self) -> Router<S> {
         Router {
             routes: self.routes,
@@ -69,6 +77,12 @@ pub struct Router<S> {
 }
 
 impl<S> Router<S> {
+    /// Handles a http request received by an external client. The service
+    /// handler for handling the request is retrieved from the [Router]'s internal
+    /// [HashMap], using the request [Method]  and [Path].
+    /// The body of the request must be of type [Incoming], which means that
+    /// the request can be chunked into frames. When successful, the result is
+    /// the [Response] that is returned to the client, or an error of type [RpcError].
     pub(crate) async fn handle_request(
         &self,
         s: Arc<S>,
@@ -85,6 +99,7 @@ impl<S> Router<S> {
             .body(BoxBody::default())?)
     }
 
+    /// Returns a new [RouterBuilder].
     pub fn builder() -> RouterBuilder<S> {
         RouterBuilder::<S>::new()
     }

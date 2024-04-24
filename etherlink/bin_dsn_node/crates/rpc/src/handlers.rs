@@ -5,8 +5,6 @@
 //! Helpers for handling http requests.
 //! Functions in this module are designed to be compatible with `Tezos_rpc_services`.
 
-// TODO: Move to separate rpc crate
-
 use std::{convert::Infallible, pin::Pin};
 
 use futures::{future, Future, Stream, StreamExt, TryStreamExt};
@@ -24,7 +22,7 @@ use crate::{
     responses::{bad_request, internal_server_error},
 };
 
-/// The [Body] of [Response]s returned by the Rpc server.
+/// The body of [Response]s returned by the Rpc server.
 /// All application logic errors obtained when processing requests
 /// are handed by the rpc handlers implemented in this module: in case of
 /// errors a response with custom body and  status code is returned.

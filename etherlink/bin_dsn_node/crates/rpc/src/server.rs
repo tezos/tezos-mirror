@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-//TODO: Move to separate bundler folder
-
+use std::convert::Infallible;
 use std::error::Error;
 use std::future::Future;
 use std::net::SocketAddr;
@@ -24,8 +23,7 @@ use tracing::{error, info, warn};
 use crate::errors::RpcError;
 use crate::router::Router;
 
-// TODO: Handle errors and make the return type of the BoxBody Infallible
-pub type Response = hyper::Response<BoxBody<Bytes, Box<dyn Error + Send + Sync>>>;
+pub type Response = hyper::Response<BoxBody<Bytes, Infallible>>;
 
 pub type Service = dyn Fn(
         Request<Incoming>,
