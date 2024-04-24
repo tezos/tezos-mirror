@@ -3447,6 +3447,7 @@ let octez_protocol_environment =
         octez_protocol_environment_structs;
         octez_micheline |> open_;
         octez_context_memory;
+        octez_context_brassaia_memory;
         octez_scoru_wasm;
         octez_event_logging;
       ]

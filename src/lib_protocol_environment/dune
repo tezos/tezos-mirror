@@ -20,6 +20,7 @@
   octez-proto-libs.protocol-environment.structs
   octez-libs.micheline
   octez-libs.tezos-context.memory
+  octez-libs.tezos-context-brassaia.memory
   octez-l2-libs.scoru-wasm
   octez-libs.event-logging)
  (flags
