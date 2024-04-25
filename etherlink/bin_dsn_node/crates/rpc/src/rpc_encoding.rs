@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+//! Encodings for deserialising Requests and Responses received.
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-//TODO: Move to separate rpc crate
+// TODO: Move to a separate types crate
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -16,7 +18,7 @@ enum Param {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SendRawTransaction {
+pub struct SendRawTransaction {
     jsonrpc: JsonRpcVersion,
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<u64>,
@@ -25,7 +27,7 @@ pub(crate) struct SendRawTransaction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SendRawTransactionResult {
+pub struct SendRawTransactionResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<u64>,
     jsonrpc: JsonRpcVersion,

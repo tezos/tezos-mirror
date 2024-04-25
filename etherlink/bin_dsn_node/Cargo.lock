@@ -373,6 +373,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "dsn-rpc",
  "futures",
  "hex",
  "http-body",
@@ -397,6 +398,28 @@ dependencies = [
  "chrono",
  "clap",
  "dsn-core",
+ "futures",
+ "hex",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "dsn-rpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
  "futures",
  "hex",
  "http-body-util",
