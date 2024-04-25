@@ -4,6 +4,19 @@
 
 ### Features
 
+- The RPC `eth_getBalance` supports the default block parameter
+  (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block). (!13039, !12345)
+
+### Bug fixes
+
+### Breaking changes
+
+### Internal
+
+## Version for b9f6c9138719220db83086f0548e49c5c4c8421f
+
+### Features
+
 - Add `run <mode>` command and deprecate other commands (!12789). Now
   the preferred way to run any mode are:
   - `run proxy`
@@ -42,8 +55,6 @@
 - The new command `init config` allows to initialize a new configuration file
   for an EVM node. (!12798)
 - Observers now try to reconnect to their EVM endpoint if necessary. (!12772)
-- The RPC `eth_getBalance` supports the default block parameter
-  (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block). (!13039, !12345)
 
 ### Bug fixes
 
