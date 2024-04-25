@@ -834,7 +834,7 @@ export class Delegate {
       .add(third_party_delegated)
       .add(over_staked);
 
-    const max_delegated = considered_staked.times(9);
+    const max_delegated = own_staked.times(9);
 
     const delegated_diff = max_delegated.minus(extended_delegated);
 
