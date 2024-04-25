@@ -150,7 +150,7 @@ module Slots_handlers = struct
             Ok (Bytes.of_string (slot ^ padding))
         in
         let* commitment =
-          Slot_manager.add_commitment store slot cryptobox |> Errors.to_tzresult
+          Slot_manager.add_slot store slot cryptobox |> Errors.to_tzresult
         in
         let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
         (* Cannot return None *)
