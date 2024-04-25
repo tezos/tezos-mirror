@@ -7,10 +7,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main config ~rollup_node_endpoint ~keep_alive] starts
-    the main event-loop of the proxy using [rollup_node_endpoint]. *)
-val main :
-  Configuration.t ->
-  keep_alive:bool ->
-  rollup_node_endpoint:Uri.t ->
-  unit tzresult Lwt.t
+(** [main config] starts the main event-loop of the proxy using
+    [config.rollup_node_endpoint]. *)
+val main : Configuration.t -> unit tzresult Lwt.t

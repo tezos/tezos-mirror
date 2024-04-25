@@ -88,19 +88,10 @@ let quantity_encoding =
     (fun q -> Qty (Z.of_string q))
     Data_encoding.string
 
-(** Ethereum block level. *)
-type block_height = Block_height of Z.t [@@ocaml.unboxed]
-
-let block_height_of_z z = Block_height z
-
-let block_height_encoding =
-  Data_encoding.conv
-    (fun (Block_height h) -> z_to_hexa h)
-    (fun h -> Block_height (Z.of_string h))
-    Data_encoding.string
+let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
 (** Ethereum block params in RPCs. *)
-type block_param = Hash_param of block_height | Earliest | Latest | Pending
+type block_param = Hash_param of quantity | Earliest | Latest | Pending
 
 let block_param_encoding =
   let open Data_encoding in
@@ -110,7 +101,7 @@ let block_param_encoding =
        case
          ~title:tag
          (Tag 0)
-         block_height_encoding
+         quantity_encoding
          (function Hash_param h -> Some h | _ -> None)
          (fun h -> Hash_param h));
       (let tag = "earliest" in
@@ -618,7 +609,7 @@ let block_transactions_encoding =
 
 (** Ethereum block hash representation from RPCs. *)
 type block = {
-  number : block_height;
+  number : quantity;
   hash : block_hash;
   parent : block_hash;
   nonce : hex;
@@ -710,7 +701,7 @@ let block_from_rlp bytes =
       let gasUsed = decode_number gasUsed in
       let timestamp = decode_number timestamp in
       {
-        number = Block_height number;
+        number = Qty number;
         hash;
         parent;
         (* Post merge: always 0. *)
@@ -827,7 +818,7 @@ let block_encoding =
       })
     (merge_objs
        (obj10
-          (req "number" block_height_encoding)
+          (req "number" quantity_encoding)
           (req "hash" block_hash_encoding)
           (req "parentHash" block_hash_encoding)
           (req "nonce" hex_encoding)
@@ -888,12 +879,16 @@ let call_extendable_encoding =
   (* `merge_objs <obj> unit` allows the encoding to accept any number of
       unspecified fields from JSON. *)
   merge_objs
-    (conv
+    (conv_with_guard
        (fun {from; to_; gas; gasPrice; value; data} ->
-         (from, Some to_, gas, gasPrice, value, data))
-       (fun (from, to_, gas, gasPrice, value, data) ->
-         {from; to_ = Option.join to_; gas; gasPrice; value; data})
-       (obj6
+         (from, Some to_, gas, gasPrice, value, data, None))
+       (function
+         | from, to_, gas, gasPrice, value, data, None
+         | from, to_, gas, gasPrice, value, None, data ->
+             Ok {from; to_ = Option.join to_; gas; gasPrice; value; data}
+         | _, _, _, _, _, Some _, Some _ ->
+             Error "Cannot specify both data and input")
+       (obj7
           (opt "from" address_encoding)
           (opt "to" (option address_encoding))
           (* `call` is also used for estimateGas, which allows all fields to be
@@ -901,6 +896,7 @@ let call_extendable_encoding =
           (opt "gas" quantity_encoding)
           (opt "gasPrice" quantity_encoding)
           (opt "value" quantity_encoding)
+          (opt "input" hash_encoding)
           (opt "data" hash_encoding)))
     unit
 
@@ -1022,21 +1018,21 @@ let hash_raw_tx str =
 let transaction_nonce bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
-    match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _])
-    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _; _]) ->
-        let+ nonce = Rlp.decode_z nonce in
-        nonce
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
-  else if String.starts_with ~prefix:"02" bytes then
-    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _])
     | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _]) ->
         let+ nonce = Rlp.decode_z nonce in
         nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _])
+    | Ok (Rlp.List [_; Value nonce; _; _; _; _; _; _; _; _; _; _]) ->
+        let+ nonce = Rlp.decode_z nonce in
+        nonce
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else
     (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
@@ -1045,25 +1041,48 @@ let transaction_nonce bytes =
         nonce
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
 
+(** [transaction_data bytes] returns the data of a given raw transaction. *)
+let transaction_data bytes =
+  let open Result_syntax in
+  if String.starts_with ~prefix:"01" bytes then
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; _; _; Value data; _])
+    | Ok (Rlp.List [_; _; _; _; _; _; Value data; _; _; _; _]) ->
+        return data
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; _; _; _; Value data; _])
+    | Ok (Rlp.List [_; _; _; _; _; _; _; Value data; _; _; _; _]) ->
+        return data
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
+  else
+    (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; _; Value data; _; _; _]) -> return data
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 elements")
+
 (** [transaction_gas_limit bytes] returns the gas limit of a given raw transaction. *)
 let transaction_gas_limit bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _])
-    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _; _; _; _]) ->
-        let+ gas_limit = Rlp.decode_z gas_limit in
-        gas_limit
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
-  else if String.starts_with ~prefix:"02" bytes then
-    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
-    match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _])
-    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _; _; _; _]) ->
+    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; Value gas_limit; _; _; _; _; _; _; _]) ->
         let+ gas_limit = Rlp.decode_z gas_limit in
         gas_limit
     | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+  else if String.starts_with ~prefix:"02" bytes then
+    (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
+    match bytes |> String.to_bytes |> Rlp.decode with
+    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; _; Value gas_limit; _; _; _; _; _; _; _]) ->
+        let+ gas_limit = Rlp.decode_z gas_limit in
+        gas_limit
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else
     (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
@@ -1077,18 +1096,18 @@ let transaction_gas_limit bytes =
 let transaction_gas_price bytes =
   let open Result_syntax in
   if String.starts_with ~prefix:"01" bytes then
-    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md*)
+    (* EIP-2930: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2930.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _])
-    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _; _; _; _]) ->
+    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _])
+    | Ok (Rlp.List [_; _; Value gas_price; _; _; _; _; _; _; _; _]) ->
         let* gas_price = Rlp.decode_z gas_price in
         return gas_price
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
   else if String.starts_with ~prefix:"02" bytes then
     (* EIP-1559: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md *)
     match bytes |> String.to_bytes |> Rlp.decode with
-    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _])
-    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _; _; _]) ->
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _])
+    | Ok (Rlp.List [_; _; _; Value max_fee_per_gas; _; _; _; _; _; _; _; _]) ->
         (* Normally, max_priority_fee_per_gas would also be a fee paid per gas in
            addition to base fee per gas.
            This would incentivise miners to include the transaction.
@@ -1099,7 +1118,7 @@ let transaction_gas_price bytes =
            the data availability fee. *)
         let* max_fee_per_gas = Rlp.decode_z max_fee_per_gas in
         return max_fee_per_gas
-    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 8 or 11 elements")
+    | _ -> tzfail (Rlp.Rlp_decoding_error "Expected a list of 9 or 12 elements")
   else
     (* Legacy: https://eips.ethereum.org/EIPS/eip-2972 *)
     match bytes |> String.to_bytes |> Rlp.decode with
@@ -1238,15 +1257,20 @@ module Delayed_transaction = struct
       (fun (kind, hash, raw) -> {kind; hash; raw})
       (tup3 encoding_kind hash_encoding (string' Hex))
 
-  let of_rlp_content hash rlp_content =
+  let of_rlp_content ?(transaction_tag = "\x03") hash rlp_content =
     match rlp_content with
     | Rlp.(List [Value tag; content]) -> (
         match (Bytes.to_string tag, content) with
-        (* This is a bit counter intuitive but what we decode is actually
-           the TransactionContent, which is Ethereum|Deposit|DelayedTransaction.
+        (* The new delayed transaction event actually contains the
+           TransactionContent, which is Ethereum|Deposit|DelayedTransaction.
            Transaction cannot be in the delayed inbox by construction, therefore
-           we care only about Deposit and DelayedTransaction. *)
-        | "\x03", Rlp.Value raw_tx ->
+           we care only about Deposit and DelayedTransaction.
+
+           However, we use this function to decode actual delayed inbox item
+           when we initialize from a rollup-node. They contain the same
+           payload but have a different tag for transaction.
+        *)
+        | tag, Rlp.Value raw_tx when tag = transaction_tag ->
             let hash =
               raw_tx |> Bytes.to_string |> hash_raw_tx |> Hex.of_string
               |> Hex.show |> hash_of_string

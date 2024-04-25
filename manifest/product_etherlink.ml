@@ -144,6 +144,7 @@ let evm_node_lib_prod =
         octez_layer2_store |> open_;
         octez_smart_rollup_lib |> open_;
         evm_node_migrations;
+        prometheus_app;
       ]
 
 let evm_node_lib_dev_encoding =

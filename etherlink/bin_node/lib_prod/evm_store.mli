@@ -36,6 +36,8 @@ module Blueprints : sig
     from:Ethereum_types.quantity ->
     to_:Ethereum_types.quantity ->
     (Ethereum_types.quantity * Blueprint_types.payload) list tzresult Lwt.t
+
+  val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 module Context_hashes : sig
@@ -47,6 +49,8 @@ module Context_hashes : sig
 
   val find_latest :
     t -> (Ethereum_types.quantity * Context_hash.t) option tzresult Lwt.t
+
+  val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 module Kernel_upgrades : sig
@@ -59,6 +63,8 @@ module Kernel_upgrades : sig
   val find_latest_pending : t -> Ethereum_types.Upgrade.t option tzresult Lwt.t
 
   val record_apply : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 module Delayed_transactions : sig
@@ -77,10 +83,18 @@ module Delayed_transactions : sig
     t ->
     Ethereum_types.hash ->
     Ethereum_types.Delayed_transaction.t option tzresult Lwt.t
+
+  val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 module L1_latest_known_level : sig
-  val store : t -> int32 -> unit tzresult Lwt.t
+  val store : t -> Ethereum_types.quantity -> int32 -> unit tzresult Lwt.t
 
-  val find : t -> int32 option tzresult Lwt.t
+  val find : t -> (Ethereum_types.quantity * int32) option tzresult Lwt.t
+
+  val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
+
+(** [reset store ~l2_level] clear the table that has information
+    related to l2 level that after [l2_level] *)
+val reset : t -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t

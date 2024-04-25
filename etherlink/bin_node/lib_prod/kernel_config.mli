@@ -1,0 +1,33 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** [make ~boostrap_balance ?bootstrap_accounts ... ~output ()]
+    generates a configuration file located at [output], where
+    [bootstrap_accounts] are provisioned with [bootstrap_balance]. *)
+val make :
+  boostrap_balance:Ethereum_types.NonceMap.key ->
+  ?bootstrap_accounts:string list ->
+  ?kernel_root_hash:string * string ->
+  ?chain_id:string * string ->
+  ?sequencer:string * string ->
+  ?delayed_bridge:string * string ->
+  ?ticketer:string * string ->
+  ?admin:string * string ->
+  ?sequencer_governance:string * string ->
+  ?kernel_governance:string * string ->
+  ?kernel_security_governance:string * string ->
+  ?minimum_base_fee_per_gas:string * string ->
+  ?da_fee_per_byte:string * string ->
+  ?delayed_inbox_timeout:string * string ->
+  ?delayed_inbox_min_levels:string * string ->
+  ?sequencer_pool_address:string * string ->
+  ?maximum_allowed_ticks:string * string ->
+  ?maximum_gas_per_transaction:string * string ->
+  ?remove_whitelist:string * string ->
+  output:string ->
+  unit ->
+  unit tzresult Lwt.t

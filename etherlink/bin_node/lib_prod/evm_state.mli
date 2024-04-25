@@ -20,6 +20,7 @@ val kernel_logs_directory : data_dir:string -> string
     [simulation] adds a prefix to the event to differenciate the logs.
 *)
 val execute :
+  ?profile:bool ->
   ?kind:Events.kernel_log_kind ->
   data_dir:string ->
   ?log_file:string ->
@@ -58,13 +59,13 @@ val execute_and_inspect :
 
 (** [current_block_height evm_state] returns the height of the latest block
     produced by the kernel. *)
-val current_block_height : t -> Ethereum_types.block_height Lwt.t
+val current_block_height : t -> Ethereum_types.quantity Lwt.t
 
 (** Same as {!current_block_height} for the block hash. *)
 val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
 
 type apply_result =
-  | Apply_success of t * Ethereum_types.block_height * Ethereum_types.block_hash
+  | Apply_success of t * Ethereum_types.quantity * Ethereum_types.block_hash
   | Apply_failure
 
 (** [apply_blueprint ~data-dir ~config state payload] applies the
@@ -76,6 +77,8 @@ type apply_result =
     {!kernel_logs_directory}.
 *)
 val apply_blueprint :
+  ?log_file:string ->
+  ?profile:bool ->
   data_dir:string ->
   config:Config.config ->
   t ->

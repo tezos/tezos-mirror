@@ -26,16 +26,25 @@ val start :
   preimages:string ->
   preimages_endpoint:Uri.t option ->
   smart_rollup_address:string ->
+  fail_on_missing_blueprint:bool ->
   unit ->
   init_status tzresult Lwt.t
 
-(** [init_from_rollup_node ~data_dir
-    ~rollup_node_data_dir ~inspect_current_blueprint_number]
-    initialises the irmin context and metadata of the evm using the
-    latest known evm state of the given rollup
-    node. *)
+(** [init_from_rollup_node ~omit_delayed_tx_events ~data_dir
+    ~rollup_node_data_dir] initialises the irmin context and metadata
+    of the evm using the latest known evm state of the given rollup
+    node. if [omit_delayed_tx_events] dont populate the delayed tx
+    event from the state into the db. *)
 val init_from_rollup_node :
-  data_dir:string -> rollup_node_data_dir:string -> unit tzresult Lwt.t
+  omit_delayed_tx_events:bool ->
+  data_dir:string ->
+  rollup_node_data_dir:string ->
+  unit tzresult Lwt.t
+
+(** [reset ~data_dir ~l2_level] reset the sequencer storage to
+    [l2_level]. {b Warning: b} Data will be lost ! *)
+val reset :
+  data_dir:string -> l2_level:Ethereum_types.quantity -> unit tzresult Lwt.t
 
 (** [apply_evm_events ~finalized_level events] applies all the
     events [events] on the local context. The events are performed in a
@@ -97,3 +106,19 @@ val shutdown : unit -> unit tzresult Lwt.t
 
 (** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
 val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
+
+(** [replay ?alter_evm_state level] replays the [level]th blueprint on top of
+    the expected context.
+
+    The optional argument [alter_evm_state] allows to modify the EVM state
+    before replaying the blueprint. This can be useful to test how the
+    blueprint would have paned out under different circumstances like with a
+    different kernel for instance.
+
+    Note: this function only goes through the worker to fetch the correct
+    context. *)
+val replay :
+  ?profile:bool ->
+  ?alter_evm_state:(Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
+  Ethereum_types.quantity ->
+  Evm_state.apply_result tzresult Lwt.t

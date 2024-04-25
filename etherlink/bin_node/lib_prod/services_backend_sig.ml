@@ -39,7 +39,7 @@ module type S = sig
 
   (** [current_block_number ()] returns the most recent processed and
       stored block number. *)
-  val current_block_number : unit -> Ethereum_types.block_height tzresult Lwt.t
+  val current_block_number : unit -> Ethereum_types.quantity tzresult Lwt.t
 
   (** [nth_block_hash n] returns the hash of the [n]th processed and
       stored block. *)

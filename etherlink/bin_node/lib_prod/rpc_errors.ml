@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2023 Functori <contact@functori.com>                        *)
-(* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,14 +23,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Instantiate a module of type {!Services_backend_sig.S} that communicates with a rollup
-      node endpoint given by [Base.base]. *)
-module Make : functor
-  (Base : sig
-     val base : Uri.t
+(** Errors from EIP-1474 *)
 
-     val keep_alive : bool
+open Rpc_encodings
 
-     val smart_rollup_address : string
-   end)
-  -> Services_backend_sig.S
+type t = Data_encoding.json JSONRPC.error
+
+let parse_error = JSONRPC.{code = -32700; message = "Parse error"; data = None}
+
+let invalid_request reason =
+  JSONRPC.{code = -32600; message = reason; data = None}
+
+let method_not_found method_ =
+  JSONRPC.
+    {code = -32601; message = "Method not found"; data = Some (`String method_)}
+
+let invalid_params reason =
+  JSONRPC.{code = -32602; message = reason; data = None}
+
+let internal_error reason =
+  JSONRPC.{code = -32603; message = reason; data = None}
+
+let invalid_input =
+  JSONRPC.{code = -32000; message = "Invalid input"; data = None}
+
+let resource_not_found reason =
+  JSONRPC.{code = -32001; message = reason; data = None}
+
+let resource_unavailable reason =
+  JSONRPC.{code = -32002; message = reason; data = None}
+
+let transaction_rejected reason hash =
+  JSONRPC.
+    {
+      code = -32003;
+      message = reason;
+      data =
+        hash
+        |> Option.map
+             (Data_encoding.Json.construct Ethereum_types.hash_encoding);
+    }
+
+let method_not_supported method_ =
+  JSONRPC.
+    {
+      code = -32004;
+      message = "Method not supported";
+      data = Some (`String method_);
+    }
+
+let limit_exceeded reason hash =
+  JSONRPC.
+    {
+      code = -32005;
+      message = reason;
+      data =
+        hash
+        |> Option.map
+             (Data_encoding.Json.construct Ethereum_types.hash_encoding);
+    }
+
+let json_rpc_version_not_supported reason =
+  JSONRPC.{code = -32006; message = reason; data = None}

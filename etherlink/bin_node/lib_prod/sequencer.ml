@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -69,15 +70,20 @@ let install_finalizer_seq server private_server =
 let callback_log server conn req body =
   let open Cohttp in
   let open Lwt_syntax in
-  let uri = req |> Request.uri |> Uri.to_string in
-  let meth = req |> Request.meth |> Code.string_of_method in
-  let* body_str = body |> Cohttp_lwt.Body.to_string in
-  let* () = Events.callback_log ~uri ~meth ~body:body_str in
-  Tezos_rpc_http_server.RPC_server.resto_callback
-    server
-    conn
-    req
-    (Cohttp_lwt.Body.of_string body_str)
+  let path = Request.uri req |> Uri.path in
+  if path = "/metrics" then
+    let* response = Metrics.Metrics_server.callback conn req body in
+    Lwt.return (`Response response)
+  else
+    let uri = req |> Request.uri |> Uri.to_string in
+    let meth = req |> Request.meth |> Code.string_of_method in
+    let* body_str = body |> Cohttp_lwt.Body.to_string in
+    let* () = Events.callback_log ~uri ~meth ~body:body_str in
+    Tezos_rpc_http_server.RPC_server.resto_callback
+      server
+      conn
+      req
+      (Cohttp_lwt.Body.of_string body_str)
 
 let start_server
     Configuration.
@@ -151,9 +157,9 @@ let start_server
       return (server, private_server))
     (fun _ -> return (server, private_server))
 
-let loop_sequencer (config : Configuration.sequencer) =
+let loop_sequencer (sequencer_config : Configuration.sequencer) =
   let open Lwt_result_syntax in
-  let time_between_blocks = config.time_between_blocks in
+  let time_between_blocks = sequencer_config.time_between_blocks in
   let rec loop last_produced_block =
     match time_between_blocks with
     | Nothing ->
@@ -178,14 +184,15 @@ let loop_sequencer (config : Configuration.sequencer) =
   let now = Helpers.now () in
   loop now
 
-let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
-    ~max_blueprints_ahead ~max_blueprints_catchup ~catchup_cooldown
-    ?(genesis_timestamp = Helpers.now ()) ~cctxt ~sequencer
+let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel () =
   let open Lwt_result_syntax in
   let open Configuration in
+  let {rollup_node_endpoint; keep_alive; _} = configuration in
   let* smart_rollup_address =
-    Rollup_services.smart_rollup_address rollup_node_endpoint
+    Rollup_services.smart_rollup_address
+      ~keep_alive:configuration.keep_alive
+      rollup_node_endpoint
   in
   let*? sequencer_config = Configuration.sequencer_config_exn configuration in
   let* status =
@@ -195,17 +202,16 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       ~preimages:sequencer_config.preimages
       ~preimages_endpoint:sequencer_config.preimages_endpoint
       ~smart_rollup_address
+      ~fail_on_missing_blueprint:true
       ()
   in
   let*! head = Evm_context.head_info () in
   let (Qty next_blueprint_number) = head.next_blueprint_number in
+  Metrics.set_level ~level:(Z.pred next_blueprint_number) ;
   let* () =
     Blueprints_publisher.start
       ~rollup_node_endpoint
-      ~max_blueprints_lag
-      ~max_blueprints_ahead
-      ~max_blueprints_catchup
-      ~catchup_cooldown
+      ~config:sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ()
   in
@@ -215,7 +221,7 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
       let* genesis =
         Sequencer_blueprint.create
           ~cctxt
-          ~sequencer_key:sequencer
+          ~sequencer_key:sequencer_config.sequencer
           ~timestamp:genesis_timestamp
           ~smart_rollup_address
           ~transactions:[]
@@ -237,22 +243,40 @@ let main ~data_dir ~rollup_node_endpoint ~max_blueprints_lag
   end) in
   let* () =
     Tx_pool.start
-      {rollup_node = (module Sequencer); smart_rollup_address; mode = Sequencer}
+      {
+        rollup_node = (module Sequencer);
+        smart_rollup_address;
+        mode = Sequencer;
+        tx_timeout_limit = configuration.tx_pool_timeout_limit;
+        tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit =
+          Int64.to_int configuration.tx_pool_tx_per_addr_limit;
+        max_number_of_chunks =
+          (match configuration.sequencer with
+          | Some {max_number_of_chunks; _} -> Some max_number_of_chunks
+          | None -> None);
+      }
   in
   let* () =
     Block_producer.start
       {
         cctxt;
         smart_rollup_address;
-        sequencer_key = sequencer;
+        sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
       }
   in
   let* () =
     Evm_events_follower.start
-      {rollup_node_endpoint; filter_event = (fun _ -> true)}
+      {rollup_node_endpoint; keep_alive; filter_event = (fun _ -> true)}
   in
-  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
+  let () =
+    Rollup_node_follower.start
+      ~keep_alive:configuration.keep_alive
+      ~proxy:false
+      ~rollup_node_endpoint
+      ()
+  in
 
   let directory =
     Services.directory configuration ((module Sequencer), smart_rollup_address)

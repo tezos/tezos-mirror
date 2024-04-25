@@ -10,6 +10,7 @@ type parameters = {
       (** Rollup node endpoint used to monitor kernel events. *)
   filter_event : Ethereum_types.Evm_events.t -> bool;
       (** Filter event the follower applies. *)
+  keep_alive : bool;
 }
 
 (** [start parameters] starts the events follower. *)

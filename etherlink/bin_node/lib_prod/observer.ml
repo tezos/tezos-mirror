@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -9,6 +10,8 @@ open Ethereum_types
 
 module MakeBackend (Ctxt : sig
   val evm_node_endpoint : Uri.t
+
+  val keep_alive : bool
 
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.Backend = struct
@@ -74,6 +77,7 @@ end) : Services_backend_sig.Backend = struct
 
       let* response =
         call_service
+          ~keep_alive:Ctxt.keep_alive
           ~base:Ctxt.evm_node_endpoint
           (Services.dispatch_service ~path:Resto.Path.root)
           ()
@@ -126,6 +130,8 @@ let on_new_blueprint next_blueprint_number
 module Make (Ctxt : sig
   val evm_node_endpoint : Uri.t
 
+  val keep_alive : bool
+
   val smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t
 end) : Services_backend_sig.S =
   Services_backend_sig.Make (MakeBackend (Ctxt))
@@ -133,15 +139,20 @@ end) : Services_backend_sig.S =
 let callback_log server conn req body =
   let open Cohttp in
   let open Lwt_syntax in
-  let uri = req |> Request.uri |> Uri.to_string in
-  let meth = req |> Request.meth |> Code.string_of_method in
-  let* body_str = body |> Cohttp_lwt.Body.to_string in
-  let* () = Events.callback_log ~uri ~meth ~body:body_str in
-  Tezos_rpc_http_server.RPC_server.resto_callback
-    server
-    conn
-    req
-    (Cohttp_lwt.Body.of_string body_str)
+  let path = Request.uri req |> Uri.path in
+  if path = "/metrics" then
+    let* response = Metrics.Metrics_server.callback conn req body in
+    Lwt.return (`Response response)
+  else
+    let uri = req |> Request.uri |> Uri.to_string in
+    let meth = req |> Request.meth |> Code.string_of_method in
+    let* body_str = body |> Cohttp_lwt.Body.to_string in
+    let* () = Events.callback_log ~uri ~meth ~body:body_str in
+    Tezos_rpc_http_server.RPC_server.resto_callback
+      server
+      conn
+      req
+      (Cohttp_lwt.Body.of_string body_str)
 
 let observer_start
     ({rpc_addr; rpc_port; cors_origins; cors_headers; max_active_connections; _} :
@@ -186,46 +197,71 @@ let install_finalizer_observer server =
   let* () = Evm_events_follower.shutdown () in
   Evm_context.shutdown ()
 
-let main_loop ~evm_node_endpoint =
+let[@tailrec] rec main_loop ~first_connection ~evm_node_endpoint =
   let open Lwt_result_syntax in
-  let rec loop (Qty next_blueprint_number) stream =
-    let*! candidate = Lwt_stream.get stream in
-    match candidate with
-    | Some blueprint ->
-        let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
-        let* _ = Tx_pool.pop_and_inject_transactions () in
-        loop (Qty (Z.succ next_blueprint_number)) stream
-    | None -> return_unit
+  let* () =
+    when_ (not first_connection) @@ fun () ->
+    let delay = Random.float 2. in
+    let*! () = Events.retrying_connect ~endpoint:evm_node_endpoint ~delay in
+    let*! () = Lwt_unix.sleep delay in
+    return_unit
   in
 
   let*! head = Evm_context.head_info () in
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/6876
-     Should be resilient to errors from the EVM node endpoint *)
-  let*! blueprints_stream =
+  let*! call_result =
     Evm_services.monitor_blueprints
       ~evm_node_endpoint
       head.next_blueprint_number
   in
 
-  loop head.next_blueprint_number blueprints_stream
+  match call_result with
+  | Ok blueprints_stream ->
+      (stream_loop [@tailcall])
+        ~evm_node_endpoint
+        head.next_blueprint_number
+        blueprints_stream
+  | Error _ ->
+      (main_loop [@tailcall]) ~first_connection:false ~evm_node_endpoint
 
-let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
-    ~(config : Configuration.t) () =
+and[@tailrec] stream_loop ~evm_node_endpoint (Qty next_blueprint_number) stream
+    =
   let open Lwt_result_syntax in
+  let*! candidate = Lwt_stream.get stream in
+  match candidate with
+  | Some blueprint ->
+      let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
+      let* _ = Tx_pool.pop_and_inject_transactions () in
+      (stream_loop [@tailcall])
+        ~evm_node_endpoint
+        (Qty (Z.succ next_blueprint_number))
+        stream
+  | None -> (main_loop [@tailcall]) ~first_connection:false ~evm_node_endpoint
+
+let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
+  let open Lwt_result_syntax in
+  let rollup_node_endpoint = config.rollup_node_endpoint in
+  let*? {
+          evm_node_endpoint;
+          threshold_encryption_bundler_endpoint;
+          preimages;
+          preimages_endpoint;
+        } =
+    Configuration.observer_config_exn config
+  in
   let* smart_rollup_address =
     Evm_services.get_smart_rollup_address ~evm_node_endpoint
   in
-  let*? observer_config = Configuration.observer_config_exn config in
   let* _loaded =
     Evm_context.start
       ~data_dir
       ?kernel_path
-      ~preimages:observer_config.preimages
-      ~preimages_endpoint:observer_config.preimages_endpoint
+      ~preimages
+      ~preimages_endpoint
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
+      ~fail_on_missing_blueprint:false
       ()
   in
 
@@ -233,7 +269,12 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
     (module Make (struct
       let smart_rollup_address = smart_rollup_address
 
-      let evm_node_endpoint = evm_node_endpoint
+      let keep_alive = config.keep_alive
+
+      let evm_node_endpoint =
+        match threshold_encryption_bundler_endpoint with
+        | Some endpoint -> endpoint
+        | None -> evm_node_endpoint
     end) : Services_backend_sig.S)
   in
 
@@ -245,6 +286,11 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
           Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
             smart_rollup_address;
         mode = Observer;
+        tx_timeout_limit = config.tx_pool_timeout_limit;
+        tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+        tx_pool_tx_per_addr_limit =
+          Int64.to_int config.tx_pool_tx_per_addr_limit;
+        max_number_of_chunks = None;
       }
   in
 
@@ -260,10 +306,17 @@ let main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint ~data_dir
     Evm_events_follower.start
       {
         rollup_node_endpoint;
+        keep_alive = config.keep_alive;
         filter_event =
           (function New_delayed_transaction _ -> false | _ -> true);
       }
   in
-  let () = Rollup_node_follower.start ~proxy:false ~rollup_node_endpoint in
+  let () =
+    Rollup_node_follower.start
+      ~keep_alive:config.keep_alive
+      ~proxy:false
+      ~rollup_node_endpoint
+      ()
+  in
 
-  main_loop ~evm_node_endpoint
+  main_loop ~first_connection:true ~evm_node_endpoint

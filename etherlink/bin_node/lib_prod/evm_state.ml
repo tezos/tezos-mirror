@@ -55,7 +55,8 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
+let execute ?(profile = false) ?(kind = Events.Application) ~data_dir
+    ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     evm_state inbox =
   let open Lwt_result_syntax in
@@ -69,16 +70,34 @@ let execute ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
         messages := msg :: !messages ;
         event_kernel_log ~kind ~msg)
   in
-  let* evm_state, _, _, _ =
-    Wasm.Commands.eval
-      ~write_debug
-      ~wasm_entrypoint
-      0l
-      inbox
-      config
-      Inbox
-      evm_state
+  let eval evm_state =
+    if profile then
+      let* evm_state, _, _ =
+        Wasm.Commands.profile
+          ~collapse:false
+          ~with_time:true
+          ~no_reboot:false
+          0l
+          inbox
+          {config with flamecharts_directory = data_dir}
+          Custom_section.FuncMap.empty
+          evm_state
+      in
+      return evm_state
+    else
+      let* evm_state, _, _, _ =
+        Wasm.Commands.eval
+          ~write_debug
+          ~wasm_entrypoint
+          0l
+          inbox
+          config
+          Inbox
+          evm_state
+      in
+      return evm_state
   in
+  let* evm_state = eval evm_state in
   (* The messages are accumulated during the execution and stored
      atomatically at the end to preserve their order. *)
   let*! () =
@@ -135,10 +154,10 @@ let current_block_height evm_state =
          whose number will be [zero]. Since the semantics of [apply_blueprint]
          is to verify the block height has been incremented once, we default to
          [-1]. *)
-      return (Block_height Z.(pred zero))
+      return (Qty Z.(pred zero))
   | Some current_block_number ->
       let (Qty current_block_number) = decode_number current_block_number in
-      return (Block_height current_block_number)
+      return (Qty current_block_number)
 
 let current_block_hash evm_state =
   let open Lwt_result_syntax in
@@ -178,11 +197,9 @@ let execute_and_inspect ~data_dir ?wasm_entrypoint ~config
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
 
-type apply_result =
-  | Apply_success of t * block_height * block_hash
-  | Apply_failure
+type apply_result = Apply_success of t * quantity * block_hash | Apply_failure
 
-let apply_blueprint ~data_dir ~config evm_state
+let apply_blueprint ?log_file ?profile ~data_dir ~config evm_state
     (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
   let exec_inputs =
@@ -190,19 +207,21 @@ let apply_blueprint ~data_dir ~config evm_state
       (function `External payload -> `Input ("\001" ^ payload))
       blueprint
   in
-  let*! (Block_height before_height) = current_block_height evm_state in
+  let*! (Qty before_height) = current_block_height evm_state in
   let* evm_state =
     execute
+      ?profile
       ~data_dir
       ~wasm_entrypoint:Tezos_scoru_wasm.Constants.wasm_entrypoint
       ~config
+      ?log_file
       evm_state
       exec_inputs
   in
-  let*! (Block_height after_height) = current_block_height evm_state in
+  let*! (Qty after_height) = current_block_height evm_state in
   let* block_hash = current_block_hash evm_state in
   if Z.(equal (succ before_height) after_height) then
-    return (Apply_success (evm_state, Block_height after_height, block_hash))
+    return (Apply_success (evm_state, Qty after_height, block_hash))
   else return Apply_failure
 
 let clear_delayed_inbox evm_state =
