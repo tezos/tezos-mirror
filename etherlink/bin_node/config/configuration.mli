@@ -111,6 +111,7 @@ val observer_config_exn : t -> observer tzresult
 (** [sequencer_config_dft ()] returns the default sequencer config
     populated with given value. *)
 val sequencer_config_dft :
+  data_dir:string ->
   ?preimages:string ->
   ?preimages_endpoint:Uri.t ->
   ?time_between_blocks:time_between_blocks ->
@@ -127,6 +128,7 @@ val sequencer_config_dft :
 (** [threshold_encryption_sequencer_config_dft ()] returns the default
     threshold encryption sequencer config populated with given value. *)
 val threshold_encryption_sequencer_config_dft :
+  data_dir:string ->
   ?preimages:string ->
   ?preimages_endpoint:Uri.t ->
   ?time_between_blocks:time_between_blocks ->
@@ -143,6 +145,7 @@ val threshold_encryption_sequencer_config_dft :
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)
 val observer_config_dft :
+  data_dir:string ->
   ?preimages:string ->
   ?preimages_endpoint:Uri.t ->
   evm_node_endpoint:Uri.t ->
@@ -152,6 +155,7 @@ val observer_config_dft :
 
 module Cli : sig
   val create :
+    data_dir:string ->
     devmode:bool ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
