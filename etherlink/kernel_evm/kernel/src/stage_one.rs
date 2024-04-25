@@ -99,7 +99,11 @@ fn fetch_sequencer_blueprints<Host: Runtime>(
     }
 }
 
-pub fn fetch<Host: Runtime>(
+// DO NOT RENAME: function name is used during benchmark
+// Never inlined when the kernel is compiled for benchmarks, to ensure the
+// function is visible in the profiling results.
+#[cfg_attr(feature = "benchmark", inline(never))]
+pub fn fetch_blueprints<Host: Runtime>(
     host: &mut Host,
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     config: &mut Configuration,
@@ -249,7 +253,7 @@ mod tests {
         let mut host = MockHost::default();
         host.add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -267,7 +271,7 @@ mod tests {
         host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
         host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_proxy_configuration();
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -283,7 +287,7 @@ mod tests {
         let mut host = MockHost::default();
         host.add_external(Bytes::from(hex::decode(DUMMY_TRANSACTION).unwrap()));
         let mut conf = dummy_sequencer_config();
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -301,7 +305,7 @@ mod tests {
         host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK1).unwrap()));
         host.add_external(Bytes::from(hex::decode(DUMMY_CHUNK2).unwrap()));
         let mut conf = dummy_sequencer_config();
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -319,7 +323,7 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_NUMBER_10).unwrap(),
         ));
         let mut conf = dummy_sequencer_config();
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         // The dummy chunk in the inbox is registered at block 10
         store_current_block_number(&mut host, U256::from(9)).unwrap();
@@ -339,7 +343,7 @@ mod tests {
             hex::decode(DUMMY_BLUEPRINT_CHUNK_UNPARSABLE).unwrap(),
         ));
         let mut conf = dummy_sequencer_config();
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -389,7 +393,7 @@ mod tests {
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
         host.add_transfer(dummy_delayed_transaction(), &metadata);
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -413,7 +417,7 @@ mod tests {
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
         host.add_transfer(dummy_delayed_transaction(), &metadata);
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -437,7 +441,7 @@ mod tests {
             PublicKeyHash::from_b58check("tz1NiaviJwtMbpEcNqSP6neeoBYj8Brb3QPv").unwrap(),
         );
         host.add_transfer(dummy_delayed_transaction(), &metadata);
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail").0
@@ -461,7 +465,7 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -490,7 +494,7 @@ mod tests {
             ),
             &metadata,
         );
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         match read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")
@@ -517,7 +521,7 @@ mod tests {
             dummy_deposit(conf.tezos_contracts.ticketer.clone().unwrap()),
             &metadata,
         );
-        fetch(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
+        fetch_blueprints(&mut host, DEFAULT_SR_ADDRESS, &mut conf).expect("fetch failed");
 
         if read_next_blueprint(&mut host, &mut conf)
             .expect("Blueprint reading shouldn't fail")

@@ -2,26 +2,50 @@
 //
 // SPDX-License-Identifier: MIT
 
-const BASE_GAS = 21000
-const CREATE_STORAGE_CUTOFF = 600_000
-
 const MLR = require("ml-regression-multivariate-linear")
 
 const path = require('node:path')
 const fs = require('fs');
 const csv = require('csv-stringify/sync');
 
-module.exports = { is_transfer, is_create, is_transaction, BASE_GAS, make_lr, print_lr, print_summary_errors, print_model, predict_linear_model, print_csv }
+module.exports = {
+    is_scenario,
+    is_run,
+    is_blueprint_reading,
+    is_transfer,
+    is_create,
+    is_transaction,
+    make_lr,
+    print_lr,
+    print_summary_errors,
+    print_model,
+    predict_linear_model,
+    print_csv
+}
 
 function is_transfer(record) {
-    return record.gas_cost == BASE_GAS
+    return record.tx_type === "TRANSFER"
 }
 function is_create(record) {
-    return record.store_transaction_object_ticks > CREATE_STORAGE_CUTOFF
+    return record.tx_type === "CREATE"
 }
 
 function is_transaction(record) {
     return !record.benchmark_name.includes("(all)")
+        && !record.benchmark_name.includes("(bip)")
+        && !record.benchmark_name.includes("(run)")
+}
+
+function is_scenario(record) {
+    return record.benchmark_name.includes("(all)")
+}
+
+function is_run(record) {
+    return record.benchmark_name.includes("(run)")
+}
+
+function is_blueprint_reading(record) {
+    return record.benchmark_name.includes("(bip)")
 }
 
 function make_lr(data, select_x, select_y) {

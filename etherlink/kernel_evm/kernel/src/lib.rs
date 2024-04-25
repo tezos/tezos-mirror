@@ -9,7 +9,7 @@ use crate::configuration::{fetch_configuration, Configuration};
 use crate::error::Error;
 use crate::error::UpgradeProcessError::Fallback;
 use crate::migration::storage_migration;
-use crate::stage_one::fetch;
+use crate::stage_one::fetch_blueprints;
 use crate::storage::{read_sequencer_pool_address, PRIVATE_FLAG_PATH};
 use anyhow::Context;
 use delayed_inbox::DelayedInbox;
@@ -130,7 +130,7 @@ pub fn stage_one<Host: Runtime>(
     log!(host, Debug, "Entering stage one.");
     log!(host, Debug, "Configuration: {}", configuration);
 
-    fetch(host, smart_rollup_address, configuration)
+    fetch_blueprints(host, smart_rollup_address, configuration)
 }
 
 fn set_kernel_version<Host: Runtime>(host: &mut Host) -> Result<(), Error> {

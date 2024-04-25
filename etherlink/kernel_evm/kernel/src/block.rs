@@ -89,6 +89,7 @@ fn compute<Host: Runtime>(
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
         let data_size: u64 = transaction.data_size();
 
+        log!(host, Benchmarking, "Transaction data size: {}", data_size);
         // The current number of ticks remaining for the current `kernel_run` is allocated for the transaction.
         let allocated_ticks = estimate_remaining_ticks_for_transaction_execution(
             limits.maximum_allowed_ticks,
@@ -196,6 +197,7 @@ enum BlueprintParsing {
     RebootNeeded,
 }
 
+#[cfg_attr(feature = "benchmark", inline(never))]
 fn next_bip_from_blueprints<Host: Runtime>(
     host: &mut Host,
     current_block_number: U256,
@@ -212,6 +214,7 @@ fn next_bip_from_blueprints<Host: Runtime>(
     }
 
     let (blueprint, size) = read_next_blueprint(host, config)?;
+    log!(host, Benchmarking, "Size of blueprint: {}", size);
     let ticks = tick_counter
         .c
         .saturating_add(ticks_for_next_blueprint(size as u64));
@@ -514,6 +517,12 @@ pub fn produce<Host: Runtime>(
             Ok(ComputationResult::RebootNeeded) => {
                 // The computation will resume at next reboot, we leave the
                 // storage untouched.
+                log!(
+                    safe_host,
+                    Benchmarking,
+                    "Estimated ticks: {}",
+                    tick_counter.c
+                );
                 return Ok(ComputationResult::RebootNeeded);
             }
             Err(err) => {
@@ -522,6 +531,12 @@ pub fn produce<Host: Runtime>(
                 // which point did it fail nor why. We cannot make assumption
                 // on how many ticks it consumed before failing. Therefore
                 // the safest solution is to simply reboot after a failure.
+                log!(
+                    safe_host,
+                    Benchmarking,
+                    "Estimated ticks: {}",
+                    tick_counter.c
+                );
                 return Ok(ComputationResult::RebootNeeded);
             }
         }

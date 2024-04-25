@@ -139,6 +139,7 @@ impl Transaction {
         match &self.content {
             TransactionContent::Deposit(_) => 0,
             TransactionContent::Ethereum(e) | TransactionContent::EthereumDelayed(e) => {
+                // FIXME: probably need to take into account the access list
                 e.data.len() as u64
             }
         }
@@ -296,9 +297,11 @@ impl InputHandler for SequencerInput {
             Self::DelayedInput(tx) => {
                 let previous_timestamp = read_last_info_per_level_timestamp(host)?;
                 let level = read_l1_level(host)?;
+                log!(host, Benchmarking, "Handling a delayed input");
                 delayed_inbox.save_transaction(host, *tx, previous_timestamp, level)?
             }
             Self::SequencerBlueprint(seq_blueprint) => {
+                log!(host, Benchmarking, "Handling a blueprint input");
                 log!(
                     host,
                     Debug,
@@ -579,6 +582,14 @@ pub fn read_sequencer_inbox<Host: Runtime>(
         // Checks there will be enough ticks to handle at least another chunk of
         // full size. If it is not the case, asks for reboot.
         if parsing_context.allocated_ticks < maximum_ticks_for_sequencer_chunk() {
+            log!(
+                host,
+                Benchmarking,
+                "Estimated ticks: {}",
+                limits
+                    .maximum_allowed_ticks
+                    .saturating_sub(parsing_context.allocated_ticks)
+            );
             return Ok(StageOneStatus::Reboot);
         };
         match read_and_dispatch_input::<Host, SequencerInput>(
@@ -603,7 +614,17 @@ pub fn read_sequencer_inbox<Host: Runtime>(
                 )
             }
             Ok(ReadStatus::Ongoing) => (),
-            Ok(ReadStatus::FinishedRead) => return Ok(StageOneStatus::Done),
+            Ok(ReadStatus::FinishedRead) => {
+                log!(
+                    host,
+                    Benchmarking,
+                    "Estimated ticks: {}",
+                    limits
+                        .maximum_allowed_ticks
+                        .saturating_sub(parsing_context.allocated_ticks)
+                );
+                return Ok(StageOneStatus::Done);
+            }
             Ok(ReadStatus::FinishedIgnore) => return Ok(StageOneStatus::Skipped),
         }
     }
