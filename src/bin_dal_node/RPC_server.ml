@@ -184,9 +184,10 @@ module Slots_handlers = struct
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_status ~slot_id store |> Errors.to_tzresult)
 
-  let get_shard ctxt ((_, commitment), shard_index) () () =
-    call_handler1 ctxt (fun {shards; _} ->
-        Store.Shards.read shards commitment shard_index
+  let get_slot_shard ctxt slot_level slot_index shard_index () () =
+    call_handler1 ctxt (fun node_store ->
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        Slot_manager.get_slot_shard node_store slot_id shard_index
         |> Errors.to_option_tzresult)
 
   let handle_slot_pages ctxt (((), level), slot_index) () () =
@@ -475,9 +476,9 @@ let register :
        Services.P2P.Peers.patch_peer
        (P2P.patch_peer ctxt)
   |> add_service
-       Tezos_rpc.Directory.opt_register
-       Services.get_shard
-       (Slots_handlers.get_shard ctxt)
+       Tezos_rpc.Directory.opt_register3
+       Services.get_slot_shard
+       (Slots_handlers.get_slot_shard ctxt)
 
 let register_plugin node_ctxt =
   Tezos_rpc.Directory.register_dynamic_directory
