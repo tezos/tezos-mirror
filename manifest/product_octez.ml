@@ -2189,6 +2189,7 @@ let octez_base_test_helpers =
         octez_test_helpers |> open_;
         alcotezt;
         qcheck_alcotest;
+        tezt_core_lib;
       ]
     ~linkall:true
     ~bisect_ppx:No

@@ -11,7 +11,8 @@
   octez-libs.event-logging-test-helpers
   octez-libs.test-helpers
   octez-alcotezt
-  qcheck-alcotest)
+  qcheck-alcotest
+  tezt.core)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
