@@ -44,9 +44,11 @@ module Make (Reader : READER) = struct
     |> Option.map (fun bytes ->
            bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)
 
-  let code address =
+  let code address block =
     let open Lwt_result_syntax in
-    let+ answer = Reader.read (Durable_storage_path.Accounts.code address) in
+    let+ answer =
+      Reader.read ~block (Durable_storage_path.Accounts.code address)
+    in
     match answer with
     | Some bytes ->
         bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
@@ -214,7 +216,7 @@ module Make (Reader : READER) = struct
       Durable_storage_path.kernel_root_hash
       Bytes.to_string
 
-  let storage_at address (Qty pos) =
+  let storage_at address (Qty pos) block =
     let open Lwt_result_syntax in
     let pad32left0 s =
       let open Ethereum_types in
@@ -226,7 +228,7 @@ module Make (Reader : READER) = struct
     in
     let index = Z.format "#x" pos |> pad32left0 in
     let+ answer =
-      Reader.read (Durable_storage_path.Accounts.storage address index)
+      Reader.read ~block (Durable_storage_path.Accounts.storage address index)
     in
     match answer with
     | Some bytes ->
