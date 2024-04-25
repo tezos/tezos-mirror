@@ -74,6 +74,7 @@ let test_simple_event_logging_time ~executors title simple_event =
     ~uses_node:true
     ~uses_admin_client:true
     ~uses_client:true
+    ~team:Team.infrastructure
     ~executors
   @@ fun () ->
   Long_test.time_lwt title @@ fun () ->
@@ -85,6 +86,7 @@ let test_legacy_event_logging_time ~executors title f =
     ~title
     ~tags:["legacy"; "event"; "logging"; "time"; title]
     ~timeout:(Seconds 10)
+    ~team:Team.infrastructure
     ~executors
   @@ fun () ->
   Long_test.time_lwt title @@ fun () -> repeat nb_repeat f
