@@ -16,6 +16,8 @@ module Pool = struct
     raw_tx : string; (* Current transaction. *)
     gas_price : Z.t; (* The maximum price the user can pay for fees. *)
     gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
+    inclusion_timestamp : Time.Protocol.t;
+        (* Time of inclusion in the transaction pool. *)
   }
 
   type t = {
@@ -26,15 +28,23 @@ module Pool = struct
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
   (** Add a transaction to the pool. *)
-  let add t pkey raw_tx =
+  let add {transactions; global_index} pkey raw_tx =
     let open Result_syntax in
-    let {transactions; global_index} = t in
     let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
     let* gas_limit = Ethereum_types.transaction_gas_limit raw_tx in
+    let inclusion_timestamp = Helpers.now () in
     (* Add the transaction to the user's transaction map *)
     let transactions =
-      let transaction = {index = global_index; raw_tx; gas_price; gas_limit} in
+      let transaction =
+        {
+          index = global_index;
+          raw_tx;
+          gas_price;
+          gas_limit;
+          inclusion_timestamp;
+        }
+      in
       Pkey_map.update
         pkey
         (function
@@ -107,12 +117,16 @@ module Pool = struct
     aux current_nonce user_transactions |> Ethereum_types.quantity_of_z
 end
 
-type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer | Observer
+type mode = Proxy | Sequencer | Observer
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);
   smart_rollup_address : string;
   mode : mode;
+  tx_timeout_limit : int64;
+  tx_pool_addr_limit : int;
+  tx_pool_tx_per_addr_limit : int;
+  max_number_of_chunks : int option;
 }
 
 module Types = struct
@@ -121,6 +135,10 @@ module Types = struct
     smart_rollup_address : string;
     mutable pool : Pool.t;
     mode : mode;
+    tx_timeout_limit : int64;
+    tx_pool_addr_limit : int;
+    tx_pool_tx_per_addr_limit : int;
+    max_number_of_chunks : int option;
     mutable locked : bool;
   }
 
@@ -230,10 +248,58 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
+let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
+  let maximum_chunks_per_l1_level =
+    Option.value
+      ~default:Sequencer_blueprint.maximum_chunks_per_l1_level
+      max_number_of_chunks
+  in
+  Bytes.length tx_data
+  > Sequencer_blueprint.maximum_usable_space_in_blueprint
+      (* Minus one so that the "rest" of the raw transaction can
+         be contained within one of the chunks. *)
+      (maximum_chunks_per_l1_level - 1)
+
+let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
+    ~tx_pool_tx_per_addr_limit =
+  let open Lwt_result_syntax in
+  let boundaries_are_not_reached = return (false, "") in
+  match Pool.Pkey_map.find address pool.Pool.transactions with
+  | None ->
+      if Pool.Pkey_map.cardinal pool.Pool.transactions < tx_pool_addr_limit then
+        boundaries_are_not_reached
+      else
+        let*! () = Tx_pool_events.users_threshold_reached () in
+        return
+          ( true,
+            "The transaction pool has reached its maximum threshold for user \
+             transactions. Transaction is rejected." )
+  | Some txs ->
+      if Pool.Nonce_map.cardinal txs < tx_pool_tx_per_addr_limit then
+        boundaries_are_not_reached
+      else
+        let*! () =
+          Tx_pool_events.txs_per_user_threshold_reached
+            ~address:(Ethereum_types.Address.to_string address)
+        in
+        return
+          ( true,
+            "Limit of transaction for a user was reached. Transaction is \
+             rejected." )
+
 let on_normal_transaction state tx_raw =
   let open Lwt_result_syntax in
   let open Types in
-  let {rollup_node = (module Rollup_node); pool; _} = state in
+  let {
+    rollup_node = (module Rollup_node);
+    pool;
+    tx_pool_addr_limit;
+    tx_pool_tx_per_addr_limit;
+    max_number_of_chunks;
+    _;
+  } =
+    state
+  in
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
   match is_valid with
   | Error err ->
@@ -243,19 +309,33 @@ let on_normal_transaction state tx_raw =
       in
       return (Error err)
   | Ok {address} ->
-      (* Add the tx to the pool*)
-      let*? pool = Pool.add pool address tx_raw in
-      (* compute the hash *)
-      let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
-      let hash =
-        Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
-      in
-      let*! () =
-        Tx_pool_events.add_transaction
-          ~transaction:(Ethereum_types.hash_to_string hash)
-      in
-      state.pool <- pool ;
-      return (Ok hash)
+      let*? tx_data = Ethereum_types.transaction_data tx_raw in
+      if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
+        let*! () = Tx_pool_events.tx_data_size_limit_reached () in
+        return @@ Error "Transaction data exceeded the allowed size."
+      else
+        let* address_boundaries_are_reached, error_msg =
+          check_address_boundaries
+            ~pool
+            ~address
+            ~tx_pool_addr_limit
+            ~tx_pool_tx_per_addr_limit
+        in
+        if address_boundaries_are_reached then return @@ Error error_msg
+        else
+          (* Add the transaction to the pool *)
+          let*? pool = Pool.add pool address tx_raw in
+          (* Compute the hash *)
+          let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
+          let hash =
+            Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
+          in
+          let*! () =
+            Tx_pool_events.add_transaction
+              ~transaction:(Ethereum_types.hash_to_string hash)
+          in
+          state.pool <- pool ;
+          return (Ok hash)
 
 (** Checks that [balance] is enough to pay up to the maximum [gas_limit]
     the sender defined parametrized by the [gas_price]. *)
@@ -267,6 +347,12 @@ let can_prepay ~balance ~gas_price ~gas_limit =
 let can_pay_with_current_base_fee ~gas_price ~base_fee_per_gas =
   gas_price >= base_fee_per_gas
 
+(** Check if a transaction timed out since the moment it was included in the 
+    transaction pool. *)
+let transaction_timed_out ~tx_timeout_limit ~current_timestamp
+    ~inclusion_timestamp =
+  Time.Protocol.diff current_timestamp inclusion_timestamp >= tx_timeout_limit
+
 let pop_transactions state ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   let Types.
@@ -274,6 +360,7 @@ let pop_transactions state ~maximum_cumulative_size =
           rollup_node = (module Rollup_node : Services_backend_sig.S);
           pool;
           locked;
+          tx_timeout_limit;
           _;
         } =
     state
@@ -293,18 +380,23 @@ let pop_transactions state ~maximum_cumulative_size =
         addresses
     in
     let addr_with_nonces = List.filter_ok addr_with_nonces in
-    (* Remove transactions with too low nonce and the ones that
+    (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
     let* (Qty base_fee_per_gas) = Rollup_node.base_fee_per_gas () in
+    let current_timestamp = Helpers.now () in
     let pool =
       addr_with_nonces
       |> List.fold_left
            (fun pool (pkey, balance, current_nonce) ->
              Pool.remove
                pkey
-               (fun nonce {gas_limit; gas_price; _} ->
+               (fun nonce {gas_limit; gas_price; inclusion_timestamp; _} ->
                  nonce < current_nonce
-                 || not (can_prepay ~balance ~gas_price ~gas_limit))
+                 || (not (can_prepay ~balance ~gas_price ~gas_limit))
+                 || transaction_timed_out
+                      ~current_timestamp
+                      ~inclusion_timestamp
+                      ~tx_timeout_limit)
                pool)
            pool
     in
@@ -362,7 +454,7 @@ let pop_and_inject_transactions state =
   | Sequencer ->
       failwith
         "Internal error: the sequencer is not supposed to use this function"
-  | Observer | Proxy _ ->
+  | Observer | Proxy ->
       (* We over approximate the number of transactions to pop in proxy and
          observer mode to the maximum size an L1 block can hold. If the proxy
          sends more, they won't be applied at the next level. For the observer,
@@ -413,7 +505,7 @@ module Handlers = struct
           Worker.Queue.push_request w Request.Pop_and_inject_transactions
         in
         return_unit
-    | Sequencer | Proxy _ -> return_unit
+    | Sequencer | Proxy -> return_unit
 
   let on_request :
       type r request_error.
@@ -440,7 +532,16 @@ module Handlers = struct
   type launch_error = error trace
 
   let on_launch _w ()
-      ({rollup_node; smart_rollup_address; mode} : Types.parameters) =
+      ({
+         rollup_node;
+         smart_rollup_address;
+         mode;
+         tx_timeout_limit;
+         tx_pool_addr_limit;
+         tx_pool_tx_per_addr_limit;
+         max_number_of_chunks;
+       } :
+        Types.parameters) =
     let state =
       Types.
         {
@@ -448,6 +549,10 @@ module Handlers = struct
           smart_rollup_address;
           pool = Pool.empty;
           mode;
+          tx_timeout_limit;
+          tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit;
+          max_number_of_chunks;
           locked = false;
         }
     in

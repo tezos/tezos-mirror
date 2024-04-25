@@ -489,11 +489,7 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
   let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
   let* () =
     if config.devmode then Evm_node_lib_dev.Proxy.main config
-    else
-      Evm_node_lib_prod.Proxy.main
-        config
-        ~keep_alive
-        ~rollup_node_endpoint:config.rollup_node_endpoint
+    else Evm_node_lib_prod.Proxy.main config
   in
   let wait, _resolve = Lwt.wait () in
   let* () = wait in
@@ -645,21 +641,10 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ~devmode ?rpc_addr
       ?kernel
       ()
   else
-    let*? sequencer_config = Configuration.sequencer_config_exn configuration in
     Evm_node_lib_prod.Sequencer.main
       ~data_dir
-      ~rollup_node_endpoint:configuration.rollup_node_endpoint
-      ~max_blueprints_lag:
-        sequencer_config.blueprints_publisher_config.max_blueprints_lag
-      ~max_blueprints_ahead:
-        sequencer_config.blueprints_publisher_config.max_blueprints_ahead
-      ~max_blueprints_catchup:
-        sequencer_config.blueprints_publisher_config.max_blueprints_catchup
-      ~catchup_cooldown:
-        sequencer_config.blueprints_publisher_config.catchup_cooldown
       ?genesis_timestamp
       ~cctxt:(wallet_ctxt :> Client_context.wallet)
-      ~sequencer:sequencer_config.sequencer
       ~configuration
       ?kernel
       ()
@@ -1214,6 +1199,7 @@ let init_from_rollup_node_command =
           ~rollup_node_data_dir
       else
         Evm_node_lib_prod.Evm_context.init_from_rollup_node
+          ~omit_delayed_tx_events
           ~data_dir
           ~rollup_node_data_dir)
 

@@ -56,13 +56,11 @@ module Make (Reader : READER) = struct
     match n with
     (* This avoids an unecessary service call in case we ask a block's number
        with an already expected/known block number [n]. *)
-    | Durable_storage_path.Block.Nth i ->
-        return @@ Ethereum_types.Block_height i
+    | Durable_storage_path.Block.Nth i -> return @@ Ethereum_types.Qty i
     | Durable_storage_path.Block.Current -> (
         let+ answer = Reader.read Durable_storage_path.Block.current_number in
         match answer with
-        | Some bytes ->
-            Ethereum_types.Block_height (Bytes.to_string bytes |> Z.of_bits)
+        | Some bytes -> Ethereum_types.Qty (Bytes.to_string bytes |> Z.of_bits)
         | None ->
             raise
             @@ Invalid_block_structure
@@ -148,7 +146,7 @@ module Make (Reader : READER) = struct
 
   let blocks_by_number ~full_transaction_object ~number =
     let open Lwt_result_syntax in
-    let* (Ethereum_types.Block_height level) = block_number number in
+    let* (Ethereum_types.Qty level) = block_number number in
     let* block_hash_opt =
       inspect_durable_and_decode_opt
         (Durable_storage_path.Indexes.block_by_number (Nth level))

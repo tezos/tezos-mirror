@@ -125,16 +125,6 @@ module Q = struct
         AND name=?
     )|}
 
-  module type MIGRATION = sig
-    val name : string
-
-    val up : (unit, unit, [`Zero]) Caqti_request.t list
-  end
-
-  type migration = (module MIGRATION)
-
-  let migration_step = ( @@ ) (unit ->. unit)
-
   module Migrations = struct
     let create_table =
       (unit ->. unit)
@@ -153,156 +143,19 @@ module Q = struct
       INSERT INTO migrations (id, name) VALUES (?, ?)
       |}
 
-    module V0 = struct
-      let name = "initial_set_of_tables"
+    (*
+      To introduce a new migration
 
-      let up =
-        [
-          migration_step
-            {|
-        CREATE TABLE executable_blueprints (
-          id SERIAL PRIMARY KEY,
-          payload BLOB NOT NULL
-        )|};
-          migration_step
-            {|
-        CREATE TABLE publishable_blueprints (
-          id SERIAL PRIMARY KEY,
-          payload BLOB NOT NULL
-        )|};
-          migration_step
-            {|
-        CREATE TABLE context_hashes (
-          id SERIAL PRIMARY KEY,
-          context_hash VARCHAR(52) NOT NULL
-        );|};
-        ]
-    end
+        - Create a .sql file led by the next migration number [N = version + 1]
+          (with leading 0s) followed by the name of the migration (e.g.
+          [005_create_blueprints_table.sql])
+        - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
+        - Increment [version]
+    *)
+    let version = 6
 
-    module V1 = struct
-      let name = "create_upgrade_events_table"
-
-      let up =
-        [
-          migration_step
-            {|
-        CREATE TABLE kernel_upgrades (
-          applied_before INT NOT NULL,
-          root_hash TEXT NOT NULL,
-          activation_timestamp INT NOT NULL,
-          applied INT
-        )
-        |};
-        ]
-    end
-
-    module V2 = struct
-      let name = "add_lastest_tezos_level"
-
-      let up =
-        [
-          migration_step
-            {|
-        CREATE TABLE l1_latest_level (
-          lock CHAR(1) PRIMARY KEY NOT NULL DEFAULT 'l',
-          level INT,
-          CONSTRAINT CK_T1_Locked CHECK (lock='l')
-        );|};
-          (* The CONSTRAINT allows no more than 1 row in this
-             table, making sure we only have 1 tezos level at
-             most *)
-        ]
-    end
-
-    module V3 = struct
-      let name = "add_timestamp_to_blueprints"
-
-      let up =
-        [
-          (* We need to drop the content of [Executable_blueprint] in order to
-             add a column that should not be left empty. *)
-          migration_step
-            {|
-            DELETE FROM executable_blueprints
-        |};
-          migration_step
-            {|
-            ALTER TABLE executable_blueprints
-            ADD COLUMN timestamp DATETIME NOT NULL
-        |};
-        ]
-    end
-
-    module V4 = struct
-      let name = "upgrade_events_table_improvement"
-
-      let up =
-        [
-          (* We need to drop the previous contents because the contents has not
-             been kept up to date *)
-          migration_step {|
-        DELETE FROM kernel_upgrades
-        |};
-          (* We use this opportunity to do some renaming. *)
-          migration_step
-            {|
-        ALTER TABLE kernel_upgrades
-        RENAME COLUMN applied_before TO injected_before
-        |};
-          migration_step
-            {|
-        ALTER TABLE kernel_upgrades
-        RENAME COLUMN applied TO applied_before
-        |};
-          (* We add a constraint that we can only have one kernel upgrade not
-             applied at a given time *)
-          migration_step
-            {|
-        CREATE UNIQUE INDEX unapplied_upgrade
-        ON kernel_upgrades (applied_before)
-        WHERE applied_before IS NULL
-    |};
-        ]
-    end
-
-    module V5 = struct
-      let name = "create_blueprints_table"
-
-      let up =
-        [
-          migration_step
-            {|
-        CREATE TABLE blueprints (
-          id SERIAL PRIMARY KEY,
-          payload BLOB NOT NULL,
-          timestamp DATETIME NOT NULL
-        )|};
-          migration_step {|
-          DROP TABLE executable_blueprints
-|};
-          migration_step {|
-          DROP TABLE publishable_blueprints
-|};
-          migration_step
-            {|
-        CREATE TABLE delayed_transactions (
-          injected_before INT NOT NULL,
-          hash TEXT NOT NULL,
-          payload TEXT NOT NULL
-        )
-        |};
-        ]
-    end
-
-    let all : migration list =
-      [
-        (module V0);
-        (module V1);
-        (module V2);
-        (module V3);
-        (module V4);
-        (module V5);
-      ]
+    let all : Evm_node_migrations.migration list =
+      Evm_node_migrations.migrations version
   end
 
   module Blueprints = struct
@@ -319,6 +172,9 @@ module Q = struct
       @@ {|SELECT id, payload FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
+
+    let clear_after =
+      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id > ?|}
   end
 
   module Context_hashes = struct
@@ -333,6 +189,9 @@ module Q = struct
     let get_latest =
       (unit ->? t2 level context_hash)
       @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id DESC LIMIT 1|eos}
+
+    let clear_after =
+      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
   end
 
   module Kernel_upgrades = struct
@@ -353,6 +212,10 @@ module Q = struct
       @@ {|
       UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before = NULL
     |}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM kernel_upgrades WHERE injected_before > ?|}
   end
 
   module Delayed_transactions = struct
@@ -367,15 +230,24 @@ module Q = struct
     let select_at_hash =
       (root_hash ->? delayed_transaction)
       @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
   end
 
   module L1_latest_level = struct
     let insert =
-      (l1_level ->. unit)
-      @@ {eos|REPLACE INTO l1_latest_level (level) VALUES (?)|eos}
+      (t2 level l1_level ->. unit)
+      @@ {|INSERT INTO l1_latest_level_with_l2_level (l2_level, l1_level) VALUES (?, ?)|}
 
     let get =
-      (unit ->! l1_level) @@ {eos|SELECT (level) FROM l1_latest_level|eos}
+      (unit ->! t2 level l1_level)
+      @@ {|SELECT l2_level, l1_level  FROM l1_latest_level_with_l2_level ORDER BY l2_level DESC LIMIT 1|}
+
+    let clear_after =
+      (level ->. unit)
+      @@ {|DELETE FROM l1_latest_level_with_l2_level WHERE l2_level > ?|}
   end
 end
 
@@ -440,7 +312,7 @@ module Migrations = struct
              EVM node"
     | None -> return all_migrations
 
-  let apply_migration store id (module M : Q.MIGRATION) =
+  let apply_migration store id (module M : Evm_node_migrations.S) =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
     let* () = List.iter_es (fun up -> Db.exec conn up ()) M.up in
@@ -471,7 +343,7 @@ let init ~data_dir =
     let* migrations = Migrations.missing_migrations store in
     let* () =
       List.iter_es
-        (fun (i, ((module M : Q.MIGRATION) as mig)) ->
+        (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
           let* () = Migrations.apply_migration store i mig in
           let*! () = Evm_store_events.applied_migration M.name in
           return_unit)
@@ -501,6 +373,10 @@ module Blueprints = struct
   let find_range store ~from ~to_ =
     with_connection store @@ fun conn ->
     Db.collect_list conn Q.Blueprints.select_range (from, to_)
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Blueprints.clear_after l2_level
 end
 
 module Context_hashes = struct
@@ -515,6 +391,10 @@ module Context_hashes = struct
   let find_latest store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Context_hashes.get_latest ()
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Context_hashes.clear_after l2_level
 end
 
 module Kernel_upgrades = struct
@@ -532,6 +412,10 @@ module Kernel_upgrades = struct
   let record_apply store level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.Kernel_upgrades.record_apply level
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Kernel_upgrades.clear_after l2_level
 end
 
 module Delayed_transactions = struct
@@ -550,17 +434,34 @@ module Delayed_transactions = struct
   let at_hash store hash =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.Delayed_transactions.select_at_hash hash
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Delayed_transactions.clear_after l2_level
 end
 
 module L1_latest_known_level = struct
-  let store store level =
+  let store store l1_level l2_level =
     with_connection store @@ fun conn ->
-    Db.exec conn Q.L1_latest_level.insert level
+    Db.exec conn Q.L1_latest_level.insert (l1_level, l2_level)
 
   let find store =
     with_connection store @@ fun conn ->
     Db.find_opt conn Q.L1_latest_level.get ()
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_latest_level.clear_after l2_level
 end
+
+let reset store ~l2_level =
+  let open Lwt_result_syntax in
+  let* () = Blueprints.clear_after store l2_level in
+  let* () = Context_hashes.clear_after store l2_level in
+  let* () = L1_latest_known_level.clear_after store l2_level in
+  let* () = Kernel_upgrades.clear_after store l2_level in
+  let* () = Delayed_transactions.clear_after store l2_level in
+  return_unit
 
 (* Error registration *)
 let () =

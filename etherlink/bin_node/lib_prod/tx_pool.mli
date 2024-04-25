@@ -2,15 +2,23 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
-type mode = Proxy of {rollup_node_endpoint : Uri.t} | Sequencer | Observer
+type mode = Proxy | Sequencer | Observer
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);  (** The backend RPC module. *)
   smart_rollup_address : string;  (** The address of the smart rollup. *)
   mode : mode;
+  tx_timeout_limit : int64;  (** TTL of a transaction inside the pool. *)
+  tx_pool_addr_limit : int;  (** Maximum allowed addresses inside the pool. *)
+  tx_pool_tx_per_addr_limit : int;
+      (** Maximum allowed transactions per address inside the pool. *)
+  max_number_of_chunks : int option;
+      (** Maximum allowed number of chunks to be sent (relevant for the
+          sequencer). *)
 }
 
 (** [start parameters] starts the tx-pool *)

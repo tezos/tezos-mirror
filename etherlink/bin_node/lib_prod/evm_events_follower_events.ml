@@ -69,16 +69,35 @@ module Event = struct
       ("level", Data_encoding.n)
       ("hash", Ethereum_types.block_hash_encoding)
 
-  let missing_block =
+  let missing_blueprint =
     declare_2
       ~section
-      ~name:"evm_events_follower_missing_block"
+      ~name:"evm_events_follower_missing_blueprint"
       ~msg:
         "The rollup diverged, blueprint {level} not found in local state \
          (block hash: {expected_hash})."
       ~level:Error
       ("level", Data_encoding.n)
       ("expected_hash", Ethereum_types.block_hash_encoding)
+
+  let rollup_node_ahead =
+    declare_1
+      ~section
+      ~name:"evm_events_follower_rollup_node_ahead"
+      ~msg:"Blueprint {level} was confirmed before we received it."
+      ~level:Warning
+      ("level", Data_encoding.n)
+
+  let out_of_sync =
+    declare_2
+      ~section
+      ~name:"evm_events_follower_out_of_sync"
+      ~msg:
+        "Evm node sequencer received finalized level {received} but was \
+         expected {expected}"
+      ~level:Error
+      ("received", Data_encoding.int32)
+      ("expected", Data_encoding.int32)
 end
 
 let started = Internal_event.Simple.emit Event.started
@@ -95,5 +114,11 @@ let diverged divergence = Internal_event.Simple.emit Event.diverged divergence
 let upstream_blueprint_applied level_hash =
   Internal_event.Simple.emit Event.upstream_blueprint_applied level_hash
 
-let missing_block divergence =
-  Internal_event.Simple.emit Event.missing_block divergence
+let missing_blueprint divergence =
+  Internal_event.Simple.emit Event.missing_blueprint divergence
+
+let rollup_node_ahead Ethereum_types.(Qty level) =
+  Internal_event.Simple.emit Event.rollup_node_ahead level
+
+let out_of_sync ~received ~expected =
+  Internal_event.Simple.emit Event.out_of_sync (received, expected)

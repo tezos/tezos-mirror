@@ -5,12 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [main ?kernel_path ~rollup_node_endpoint ~evm_node_endpoint
-    ~data_dir ~config] starts the main event-loop of the Observer,
-    consuming the blueprints received from [evm_node_endpoint]. *)
+(** [main ~data_dir ~preimages ~preimages_endpoint ~smart_rollup_address level]
+    replays the [level]th blueprint on top of the expected context. *)
 val main :
+  ?profile:bool ->
   ?kernel_path:string ->
   data_dir:string ->
-  config:Configuration.t ->
-  unit ->
+  preimages:string ->
+  preimages_endpoint:Uri.t option ->
+  smart_rollup_address:string ->
+  Ethereum_types.quantity ->
   unit tzresult Lwt.t

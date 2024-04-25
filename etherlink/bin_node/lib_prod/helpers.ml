@@ -29,3 +29,9 @@ let unwrap_error_monad f =
   | Ok v -> return v
   | Error errs ->
       Lwt.fail_with (Format.asprintf "%a" Error_monad.pp_print_trace errs)
+
+let normalize_addr str =
+  let str = String.lowercase_ascii str in
+  match String.remove_prefix ~prefix:"0x" str with
+  | Some str -> str
+  | None -> str
