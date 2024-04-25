@@ -1034,25 +1034,65 @@ export class Delegate {
 
     const rewards = this.estimated_rewards(cycle - 1);
 
-    this.#storage_own_staked_balance[cycle] =
-      this.#storage_own_staked_balance_mask[cycle] ??
-      this.#storage_own_staked_balance[cycle - 1] +
-        rewards.estimated_rewards_from_own_staking +
-        rewards.estimated_rewards_from_edge_of_baking_over_staking;
+    if (!this.simulator.is_ai_activated(cycle)) {
+      const previous_own_staked_balance =
+        this.#storage_own_staked_balance[cycle - 1];
 
-    this.#storage_third_party_staked_balance[cycle] =
-      this.#storage_third_party_staked_balance_mask[cycle] ??
-      this.#storage_third_party_staked_balance[cycle - 1] +
-        rewards.estimated_rewards_from_third_party_staking;
+      const previous_third_party_delegated =
+        this.#storage_third_party_delegated_balance[cycle - 1];
 
-    this.#storage_own_spendable_balance[cycle] =
-      this.#storage_own_spendable_balance_mask[cycle] ??
-      this.#storage_own_spendable_balance[cycle - 1] +
-        rewards.estimated_rewards_from_delegating;
+      const previous_own_spendable_balance =
+        this.#storage_own_spendable_balance[cycle - 1];
 
-    this.#storage_third_party_delegated_balance[cycle] =
-      this.#storage_third_party_delegated_balance_mask[cycle] ??
-      this.#storage_third_party_delegated_balance[cycle - 1];
+      const previous_total_delegated =
+        previous_own_spendable_balance + previous_third_party_delegated;
+
+      const new_own_staked_balance = Math.round(
+        (1 / 10) *
+          (previous_own_staked_balance +
+            previous_total_delegated +
+            rewards.estimated_total_rewards),
+      );
+
+      const new_own_spendable_balance =
+        previous_own_spendable_balance -
+        (previous_own_staked_balance - new_own_staked_balance);
+
+      this.#storage_own_staked_balance[cycle] =
+        this.#storage_own_staked_balance_mask[cycle] ?? new_own_staked_balance;
+
+      this.#storage_own_spendable_balance[cycle] =
+        this.#storage_own_spendable_balance_mask[cycle] ??
+        new_own_spendable_balance;
+
+      this.#storage_third_party_delegated_balance[cycle] =
+        this.#storage_third_party_delegated_balance_mask[cycle] ??
+        this.#storage_third_party_delegated_balance[cycle - 1];
+
+      this.#storage_third_party_staked_balance[cycle] =
+        this.#storage_third_party_staked_balance_mask[cycle] ??
+        this.#storage_third_party_staked_balance[cycle - 1];
+    } else {
+      this.#storage_own_staked_balance[cycle] =
+        this.#storage_own_staked_balance_mask[cycle] ??
+        this.#storage_own_staked_balance[cycle - 1] +
+          rewards.estimated_rewards_from_own_staking +
+          rewards.estimated_rewards_from_edge_of_baking_over_staking;
+
+      this.#storage_third_party_staked_balance[cycle] =
+        this.#storage_third_party_staked_balance_mask[cycle] ??
+        this.#storage_third_party_staked_balance[cycle - 1] +
+          rewards.estimated_rewards_from_third_party_staking;
+
+      this.#storage_own_spendable_balance[cycle] =
+        this.#storage_own_spendable_balance_mask[cycle] ??
+        this.#storage_own_spendable_balance[cycle - 1] +
+          rewards.estimated_rewards_from_delegating;
+
+      this.#storage_third_party_delegated_balance[cycle] =
+        this.#storage_third_party_delegated_balance_mask[cycle] ??
+        this.#storage_third_party_delegated_balance[cycle - 1];
+    }
   }
 
   #prepare_for(cycle) {
