@@ -934,24 +934,15 @@ export class Delegate {
       estimated_number_of_attestations *
       this.simulator.attestation_reward_per_slot(cycle);
 
-    const { baking_power: previous_baking_power } = this.baking_power(
-      cycle - 1,
-    );
-
-    const previous_estimated_number_of_blocks_baked = previous_baking_power
-      .times(this.simulator.config.proto.blocks_per_cycle)
-      .ceil()
-      .valueOf();
-
     const estimated_rewards_for_nonce_revelation =
-      previous_estimated_number_of_blocks_baked *
+      (estimated_number_of_blocks_baked /
+        this.simulator.config.proto.blocks_per_commitment) *
       this.simulator.seed_nonce_revelation_tip(cycle);
 
-    const estimated_rewards_for_vdf_revelation = baking_power.isZero()
-      ? 0
-      : (this.simulator.config.proto.blocks_per_cycle /
-          this.simulator.config.proto.blocks_per_commitment) *
-        this.simulator.vdf_revelation_tip(cycle);
+    const estimated_rewards_for_vdf_revelation =
+      (estimated_number_of_blocks_baked /
+        this.simulator.config.proto.blocks_per_commitment) *
+      this.simulator.vdf_revelation_tip(cycle);
 
     const estimated_total_rewards =
       estimated_rewards_for_fixed_portion_baking +
