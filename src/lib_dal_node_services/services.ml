@@ -77,12 +77,12 @@ let patch_commitment :
     ~output:Data_encoding.unit
     Tezos_rpc.Path.(open_root / "commitments" /: Cryptobox.Commitment.rpc_arg)
 
-let get_commitment_slot :
+let get_slot_content :
     < meth : [`GET]
     ; input : unit
     ; output : Cryptobox.slot
     ; prefix : unit
-    ; params : unit * Cryptobox.commitment
+    ; params : (unit * Types.level) * Types.slot_index
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
@@ -91,7 +91,8 @@ let get_commitment_slot :
     ~query:Tezos_rpc.Query.empty
     ~output:slot_encoding
     Tezos_rpc.Path.(
-      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "slot")
+      open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
+      / "content")
 
 let get_commitment_proof :
     < meth : [`GET]

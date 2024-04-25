@@ -87,6 +87,18 @@ val get_commitment_slot :
   Cryptobox.commitment ->
   (slot, [> Errors.decoding | Errors.not_found]) result Lwt.t
 
+(** [get_slot_content node_store cryptobox slot_id] returns the slot
+    content associated with the given [slot_id] in [node_store].
+
+    In addition to decoding errors, the function returns [`Not_found]
+    if there is no slot content for [slot_id] in [node_store].
+*)
+val get_slot_content :
+  Store.t ->
+  Cryptobox.t ->
+  Types.slot_id ->
+  (slot, [> Errors.decoding | Errors.not_found]) result Lwt.t
+
 (** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof] registers the shards of the slot whose commitment is
     given.

@@ -77,9 +77,10 @@ module Slots_handlers = struct
       ~none:(function `Not_found -> true | _ -> false)
       r
 
-  let get_commitment_slot ctxt commitment () () =
+  let get_slot_content ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
-        Slot_manager.get_commitment_slot store cryptobox commitment
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        Slot_manager.get_slot_content store cryptobox slot_id
         |> to_option_tzresult)
 
   (* This function assumes the slot is valid since we already have
@@ -380,9 +381,9 @@ let register :
        Services.post_slot
        (Slots_handlers.post_slot ctxt)
   |> add_service
-       Tezos_rpc.Directory.opt_register1
-       Services.get_commitment_slot
-       (Slots_handlers.get_commitment_slot ctxt)
+       Tezos_rpc.Directory.opt_register2
+       Services.get_slot_content
+       (Slots_handlers.get_slot_content ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register1
        Services.get_commitment_proof
