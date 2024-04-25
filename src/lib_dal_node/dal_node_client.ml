@@ -55,5 +55,10 @@ let get_slot_pages cctxt (slot_id : Types.slot_id) =
     ()
     ()
 
-let get_page_proof cctxt page_index slot_data =
-  call cctxt Services.get_page_proof ((), page_index) () slot_data
+let get_slot_page_proof cctxt (slot_id : Types.slot_id) page_index =
+  call
+    cctxt
+    Services.get_slot_page_proof
+    ((((), slot_id.slot_level), slot_id.slot_index), page_index)
+    ()
+    ()

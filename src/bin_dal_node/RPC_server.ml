@@ -107,19 +107,26 @@ module Slots_handlers = struct
                     node." ))
         | Ok proof -> return proof)
 
-  let get_page_proof ctxt page_index () slot_data =
-    call_handler2 ctxt (fun _store {cryptobox; _} ->
+  let get_slot_page_proof ctxt slot_level slot_index page_index () () =
+    call_handler2 ctxt (fun store {cryptobox; _} ->
         let open Lwt_result_syntax in
-        let proof =
-          let open Result_syntax in
-          let* polynomial =
-            Cryptobox.polynomial_from_slot cryptobox slot_data
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        let*! proof =
+          let* content =
+            Slot_manager.get_slot_content store cryptobox slot_id
           in
-          Cryptobox.prove_page cryptobox polynomial page_index
+          let*? polynomial = Cryptobox.polynomial_from_slot cryptobox content in
+          let*? proof = Cryptobox.prove_page cryptobox polynomial page_index in
+          return proof
         in
         match proof with
-        | Ok proof -> return proof
-        | Error e ->
+        | (Ok _ | Error (`Not_found | `Decoding_failed _ | `Other _)) as proof
+          ->
+            Lwt.return proof |> to_option_tzresult
+        | Error
+            (( `Fail _ | `Page_index_out_of_range | `Slot_wrong_size _
+             | `Invalid_degree_strictly_less_than_expected _
+             | `Prover_SRS_not_loaded ) as e) ->
             let msg =
               match e with
               | `Fail s -> "Fail " ^ s
@@ -129,7 +136,7 @@ module Slots_handlers = struct
                 | `Prover_SRS_not_loaded ) as commit_error ->
                   Cryptobox.string_of_commit_error commit_error
             in
-            tzfail (Cryptobox_error ("get_page_proof", msg)))
+            tzfail (Cryptobox_error ("get_slot_page_proof", msg)))
 
   let post_slot ctxt query slot =
     call_handler2
@@ -370,9 +377,9 @@ let register :
        Services.get_slot_content
        (Slots_handlers.get_slot_content ctxt)
   |> add_service
-       Tezos_rpc.Directory.register1
-       Services.get_page_proof
-       (Slots_handlers.get_page_proof ctxt)
+       Tezos_rpc.Directory.opt_register3
+       Services.get_slot_page_proof
+       (Slots_handlers.get_slot_page_proof ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
        Services.get_commitment_by_published_level_and_index

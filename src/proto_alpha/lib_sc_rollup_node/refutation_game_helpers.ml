@@ -97,8 +97,14 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
                 let dal_cctxt =
                   WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt
                 in
-                Dal_node_client.get_page_proof dal_cctxt page_index
-                @@ Bytes.concat Bytes.empty pages
+                let Dal.Slot.Header.{published_level; index} = slot_id in
+                Dal_node_client.get_slot_page_proof
+                  dal_cctxt
+                  {
+                    slot_level = published_level |> Raw_level.to_int32;
+                    slot_index = index |> Alpha_context.Dal.Slot_index.to_int;
+                  }
+                  page_index
               in
               return_some (content, page_proof)
           | None ->

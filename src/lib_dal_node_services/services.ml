@@ -94,20 +94,21 @@ let get_slot_content :
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
       / "content")
 
-let get_page_proof :
-    < meth : [`POST]
-    ; input : Cryptobox.slot
+let get_slot_page_proof :
+    < meth : [`GET]
+    ; input : unit
     ; output : Cryptobox.page_proof
     ; prefix : unit
-    ; params : unit * Types.page_index
+    ; params : ((unit * Types.level) * Types.slot_index) * Types.page_index
     ; query : unit >
     service =
-  Tezos_rpc.Service.post_service
+  Tezos_rpc.Service.get_service
     ~description:"Compute the proof associated with a page of a given slot."
     ~query:Tezos_rpc.Query.empty
-    ~input:slot_encoding
     ~output:Cryptobox.page_proof_encoding
-    Tezos_rpc.Path.(open_root / "pages" /: Tezos_rpc.Arg.int / "proof")
+    Tezos_rpc.Path.(
+      open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
+      / "pages" /: Tezos_rpc.Arg.int / "proof")
 
 let get_commitment_by_published_level_and_index :
     < meth : [`GET]
