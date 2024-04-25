@@ -119,12 +119,9 @@ source_tarball="${gitlab_octez_source_package_name}.tar.bz2"
 git --version
 # Verify the placeholder %(describe:tags) is available
 git describe --tags
-# Pass '--worktree-attributes' to ensure that ignores written by restrict_export_to_octez_source.sh
-# are respected.
-git archive "${CI_COMMIT_TAG}" --format=tar --worktree-attributes --prefix "${gitlab_octez_source_package_name}/" | bzip2 > "${source_tarball}"
 
-# Check tarball is valid
-tar -tjf "${source_tarball}" > /dev/null
+# shellcheck source=./scripts/ci/create_octez_tarball.sh
+. ./scripts/ci/create_octez_tarball.sh
 
 # Verify git expanded placeholders in archive
 tar -Oxf "${source_tarball}" "${gitlab_octez_source_package_name}/src/lib_version/exe/get_git_info.ml" | grep "let raw_current_version = \"${CI_COMMIT_TAG}\""

@@ -399,6 +399,26 @@ oc.build:rpm:amd64:
       - fedora:39
       - rockylinux:9.3
 
+build_octez_source:
+  image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+  stage: build
+  tags:
+  - gcp
+  dependencies: []
+  before_script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  script:
+  - ./scripts/ci/restrict_export_to_octez_source.sh
+  - ./scripts/ci/create_octez_tarball.sh octez
+  - mv octez.tar.bz2 ../
+  - cd ../
+  - tar xf octez.tar.bz2
+  - cd octez/
+  - eval $(opam env)
+  - make octez
+
 opam:prepare:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
   stage: packaging
