@@ -75,12 +75,12 @@ let test_simple { index; block2; _ } =
       Lwt.return_unit
 
 let tests : (string * (t -> unit Lwt.t)) list =
-  let test name f = (Printf.sprintf "ih_brassaia_disk:%s" name, f) in
+  let test name f = (Printf.sprintf "brassaia_disk:%s" name, f) in
   [ test "simple" test_simple ]
 
 let register_test title f =
   Tezt.Test.register ~__FILE__
-    ~tags:[ "ih_brassaia"; "store"; Tag.flaky ]
+    ~tags:[ Tag.layer1; "brassaia"; "store"; Tag.flaky ]
     ~title
   @@ f
 

@@ -80,7 +80,8 @@ module Generator = struct
 end
 
 let register_test title f =
-  Tezt.Test.register ~__FILE__ ~tags:[ "brassaia"; "store" ]
+  Tezt.Test.register ~__FILE__
+    ~tags:[ Tag.layer1; "brassaia"; "store" ]
     ~title:(Format.sprintf "Brassaia: %s" title)
   @@ f
 
