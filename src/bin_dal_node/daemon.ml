@@ -369,7 +369,7 @@ module Handler = struct
         (fun slot_index ->
           let open Lwt_syntax in
           let* result =
-            Slot_manager.get_commitment_by_published_level_and_index
+            Slot_manager.get_slot_commitment
               ~level:oldest_level
               ~slot_index
               store

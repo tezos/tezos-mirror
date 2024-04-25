@@ -89,7 +89,7 @@ val get_slot_page_proof :
 
 (** Return the accepted commitment associated to the given slot index and
     published at the given level, if any. *)
-val get_commitment_by_published_level_and_index :
+val get_slot_commitment :
   < meth : [`GET]
   ; input : unit
   ; output : Cryptobox.commitment

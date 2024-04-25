@@ -166,7 +166,7 @@ val update_selected_slot_headers_statuses :
   Store.t ->
   unit Lwt.t
 
-(** [get_commitment_by_published_level_and_index ~level ~slot_index node_store]
+(** [get_slot_commitment ~level ~slot_index node_store]
     returns the commitment associated with the accepted slot header of index
     [slot_index] published at level [level]. Returns [Error `Not_found] if no
     such commitment is found in [node_store].
@@ -175,7 +175,7 @@ val update_selected_slot_headers_statuses :
     if there is no commitment for the given [level] and [slot_index] in
     [node_store].
 *)
-val get_commitment_by_published_level_and_index :
+val get_slot_commitment :
   level:Types.level ->
   slot_index:Types.slot_index ->
   Store.t ->

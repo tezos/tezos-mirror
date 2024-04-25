@@ -110,7 +110,7 @@ let get_slot_page_proof :
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
       / "pages" /: Tezos_rpc.Arg.int / "proof")
 
-let get_commitment_by_published_level_and_index :
+let get_slot_commitment :
     < meth : [`GET]
     ; input : unit
     ; output : Cryptobox.commitment

@@ -464,8 +464,7 @@ module Legacy = struct
       store
       attested
 
-  let get_commitment_by_published_level_and_index ~level ~slot_index node_store
-      =
+  let get_slot_commitment ~level ~slot_index node_store =
     let open Lwt_result_syntax in
     let index = Types.Slot_id.{slot_level = level; slot_index} in
     let*! commitment_str_opt =

@@ -165,12 +165,9 @@ module Slots_handlers = struct
         in
         return (commitment, commitment_proof))
 
-  let get_commitment_by_published_level_and_index ctxt level slot_index () () =
+  let get_slot_commitment ctxt level slot_index () () =
     call_handler1 ctxt (fun store ->
-        Slot_manager.get_commitment_by_published_level_and_index
-          ~level
-          ~slot_index
-          store
+        Slot_manager.get_slot_commitment ~level ~slot_index store
         |> Errors.to_option_tzresult)
 
   let get_slot_status ctxt slot_level slot_index () () =
@@ -188,10 +185,7 @@ module Slots_handlers = struct
     call_handler2 ctxt (fun node_store {cryptobox; _} ->
         (let open Lwt_result_syntax in
         let* commitment =
-          Slot_manager.get_commitment_by_published_level_and_index
-            ~level
-            ~slot_index
-            node_store
+          Slot_manager.get_slot_commitment ~level ~slot_index node_store
         in
         Slot_manager.get_slot_pages cryptobox node_store commitment)
         |> Errors.to_option_tzresult)
@@ -239,7 +233,7 @@ module Profile_handlers = struct
         in
         let are_shards_stored slot_index =
           let*! r =
-            Slot_manager.get_commitment_by_published_level_and_index
+            Slot_manager.get_slot_commitment
               ~level:published_level
               ~slot_index
               store
@@ -370,8 +364,8 @@ let register :
        (Slots_handlers.get_slot_page_proof ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register2
-       Services.get_commitment_by_published_level_and_index
-       (Slots_handlers.get_commitment_by_published_level_and_index ctxt)
+       Services.get_slot_commitment
+       (Slots_handlers.get_slot_commitment ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
        Services.patch_profiles
