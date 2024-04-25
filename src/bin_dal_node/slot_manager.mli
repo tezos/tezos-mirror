@@ -176,8 +176,7 @@ val update_selected_slot_headers_statuses :
     [node_store].
 *)
 val get_slot_commitment :
-  level:Types.level ->
-  slot_index:Types.slot_index ->
+  Types.slot_id ->
   Store.t ->
   (Cryptobox.commitment, [Errors.other | Errors.not_found]) result Lwt.t
 

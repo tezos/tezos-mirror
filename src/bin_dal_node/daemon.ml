@@ -368,12 +368,10 @@ module Handler = struct
       List.filter_map_s
         (fun slot_index ->
           let open Lwt_syntax in
-          let* result =
-            Slot_manager.get_slot_commitment
-              ~level:oldest_level
-              ~slot_index
-              store
+          let slot_id : Types.slot_id =
+            {slot_level = oldest_level; slot_index}
           in
+          let* result = Slot_manager.get_slot_commitment slot_id store in
           match result with
           | Error `Not_found -> return_none
           | Error (`Other _) ->

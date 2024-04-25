@@ -165,9 +165,10 @@ module Slots_handlers = struct
         in
         return (commitment, commitment_proof))
 
-  let get_slot_commitment ctxt level slot_index () () =
+  let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
-        Slot_manager.get_slot_commitment ~level ~slot_index store
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        Slot_manager.get_slot_commitment slot_id store
         |> Errors.to_option_tzresult)
 
   let get_slot_status ctxt slot_level slot_index () () =
@@ -181,12 +182,11 @@ module Slots_handlers = struct
         Slot_manager.get_slot_shard node_store slot_id shard_index
         |> Errors.to_option_tzresult)
 
-  let get_slot_pages ctxt level slot_index () () =
+  let get_slot_pages ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun node_store {cryptobox; _} ->
         (let open Lwt_result_syntax in
-        let* commitment =
-          Slot_manager.get_slot_commitment ~level ~slot_index node_store
-        in
+        let slot_id : Types.slot_id = {slot_level; slot_index} in
+        let* commitment = Slot_manager.get_slot_commitment slot_id node_store in
         Slot_manager.get_slot_pages cryptobox node_store commitment)
         |> Errors.to_option_tzresult)
 end
@@ -232,12 +232,10 @@ module Profile_handlers = struct
               (of_int proto_parameters.Dal_plugin.attestation_lag))
         in
         let are_shards_stored slot_index =
-          let*! r =
-            Slot_manager.get_slot_commitment
-              ~level:published_level
-              ~slot_index
-              store
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
           in
+          let*! r = Slot_manager.get_slot_commitment slot_id store in
           let open Errors in
           match r with
           | Error `Not_found -> return_false

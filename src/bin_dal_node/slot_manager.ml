@@ -415,17 +415,15 @@ let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     attested_slots
     node_store
 
-let get_slot_commitment ~level ~slot_index node_store =
-  Store.Legacy.get_slot_commitment ~level ~slot_index node_store
+let get_slot_commitment (slot_id : Types.slot_id) node_store =
+  Store.Legacy.get_slot_commitment
+    ~level:slot_id.slot_level
+    ~slot_index:slot_id.slot_index
+    node_store
 
 let get_slot_content node_store cryptobox (slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
-  let* commitment =
-    get_slot_commitment
-      ~level:slot_id.slot_level
-      ~slot_index:slot_id.slot_index
-      node_store
-  in
+  let* commitment = get_slot_commitment slot_id node_store in
   get_commitment_slot node_store cryptobox commitment
 
 let get_slot_status ~slot_id node_store =
@@ -433,10 +431,5 @@ let get_slot_status ~slot_id node_store =
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   let open Lwt_result_syntax in
-  let* commitment =
-    get_slot_commitment
-      ~level:slot_id.slot_level
-      ~slot_index:slot_id.slot_index
-      store
-  in
+  let* commitment = get_slot_commitment slot_id store in
   Store.Shards.read store.shards commitment shard_index
