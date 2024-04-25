@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_crypto_dal
-
 (** Instance of [Tezos_client_base.Client_context] that only handles IOs and
     RPCs. Can be used for keys and RPCs related commands. *)
 type cctxt
@@ -40,8 +38,6 @@ val call :
 (** [make_unix_context endpoint] generates a cctxt with the provided
     [endpoint]. *)
 val make_unix_cctxt : Uri.t -> cctxt
-
-val get_slot : cctxt -> Cryptobox.Commitment.t -> Cryptobox.slot tzresult Lwt.t
 
 (** [get_slot_pages cctxt slot_id] fetches from the dal node the pages
     of the slot with id [slot_id]. *)
