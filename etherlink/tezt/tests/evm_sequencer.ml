@@ -378,10 +378,7 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
       body
       protocols
   in
-  register
-    ~threshold_encryption:false
-    ~title:(sf "%s (sn_sequencer)" title)
-    ~tags:("single" :: tags) ;
+  register ~threshold_encryption:false ~title:(sf "%s (sequencer)" title) ~tags ;
   register
     ~threshold_encryption:true
     ~title:(sf "%s (te_sequencer)" title)
@@ -2867,7 +2864,7 @@ let test_preimages_endpoint =
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
-    ~title:"Sequencer an use remote server to get preimages"
+    ~title:"Sequencer use remote server to get preimages"
     ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
   @@ fun {
            sc_rollup_node;
