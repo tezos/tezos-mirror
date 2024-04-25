@@ -379,9 +379,19 @@ module Dal_RPC = struct
   let get_plugin_commitments_history_hash ~hash () =
     make GET ["plugin"; "commitments_history"; "hash"; hash] Fun.id
 
-  let get_shard ~slot_header ~shard_id =
-    make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
-    json |> JSON.encode
+  let get_level_slot_shard_content ~slot_level ~slot_index ~shard_index =
+    make
+      GET
+      [
+        "levels";
+        string_of_int slot_level;
+        "slots";
+        string_of_int slot_index;
+        "shards";
+        string_of_int shard_index;
+        "content";
+      ]
+    @@ fun json -> json |> JSON.encode
 
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider =
   struct

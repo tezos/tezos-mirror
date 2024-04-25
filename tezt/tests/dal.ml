@@ -1316,8 +1316,8 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
   (* Bake some more blocks to finalize the block containing the publication. *)
   let* () = bake_for ~count:number_of_extra_blocks_to_bake client in
   (* Wait for the shards to be received *)
-  let* () = p in
-  return (level, commitment)
+  let* res = p in
+  return (level, commitment, res)
 
 let publish_store_and_attest_slot ?counter ?force ?fee client node dal_node
     source ~index ~content ~attestation_lag ~number_of_slots =
@@ -1612,10 +1612,12 @@ let generate_dummy_slot slot_size =
   String.init slot_size (fun i ->
       match i mod 3 with 0 -> 'a' | 1 -> 'b' | _ -> 'c')
 
-let get_shards dal_node ~slot_header downloaded_shard_ids =
+let get_shards dal_node ~slot_level ~slot_index downloaded_shard_ids =
   Lwt_list.map_s
-    (fun shard_id ->
-      Dal_RPC.(call dal_node @@ get_shard ~slot_header ~shard_id))
+    (fun shard_index ->
+      Dal_RPC.(
+        call dal_node
+        @@ get_level_slot_shard_content ~slot_level ~slot_index ~shard_index))
     downloaded_shard_ids
 
 let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
@@ -1631,12 +1633,14 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
   let slot_size = crypto_params.slot_size in
   let slot_content = generate_dummy_slot slot_size in
   let publish = Helpers.publish_and_store_slot client dal_node in
-  let* slot_header =
-    publish Constant.bootstrap1 ~index:0
+  let slot_index = 0 in
+  let* _commitment =
+    publish Constant.bootstrap1 ~index:slot_index
     @@ Helpers.make_slot ~slot_size slot_content
   in
   let* () = bake_for client in
-  let* _level = Node.wait_for_level node 1 in
+  let* slot_level = Node.wait_for_level node 1 in
+  let* () = bake_until_processed ~level:slot_level client [dal_node] in
   let number_of_shards =
     (crypto_params.number_of_shards / crypto_params.redundancy_factor) - 1
   in
@@ -1644,7 +1648,9 @@ let test_dal_node_rebuild_from_shards _protocol parameters _cryptobox node
     range 0 number_of_shards
     |> List.map (fun i -> i * crypto_params.redundancy_factor)
   in
-  let* shards = get_shards dal_node ~slot_header downloaded_shard_ids in
+  let* shards =
+    get_shards dal_node ~slot_level ~slot_index downloaded_shard_ids
+  in
   let shard_of_json shard =
     let shard =
       match Data_encoding.Json.from_string shard with
@@ -4300,7 +4306,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
          all_shard_indices
   in
   let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
-  let* publication_level, _commitment =
+  let* publication_level, _commitment, () =
     publish_store_and_wait_slot
       node
       client
@@ -4891,7 +4897,7 @@ module Amplification = struct
 
       wait_banned_promise
     in
-    let* publication_level_bis, _commitment =
+    let* publication_level_bis, _commitment, () =
       publish_store_and_wait_slot
         node
         client
@@ -5045,7 +5051,7 @@ module Amplification = struct
       Lwt.pick
         [promise_reconstruction_cancelled; promise_reconstruction_finished]
     in
-    let* publication_level_bis, _commitment =
+    let* publication_level_bis, _commitment, () =
       publish_store_and_wait_slot
         node
         client
@@ -5084,12 +5090,16 @@ module Garbage_collection = struct
             commitment ;
           None))
 
-  let get_shard_rpc commitment shard_id node =
-    Dal_RPC.(call node @@ get_shard ~slot_header:commitment ~shard_id)
+  let get_shard_rpc ~slot_level ~slot_index ~shard_index node =
+    Dal_RPC.(
+      call node
+      @@ get_level_slot_shard_content ~slot_level ~slot_index ~shard_index)
 
-  let get_shard_rpc_failure_expected commitment node =
+  let get_shard_rpc_failure_expected ~slot_level ~slot_index node =
     let* shard_observer_response =
-      Dal_RPC.(call_raw node @@ get_shard ~slot_header:commitment ~shard_id:0)
+      Dal_RPC.(
+        call_raw node
+        @@ get_level_slot_shard_content ~slot_level ~slot_index ~shard_index:0)
     in
     Check.(shard_observer_response.code = 500)
       ~__LOC__
@@ -5108,26 +5118,27 @@ module Garbage_collection = struct
     in
     Log.info "Producer DAL node is running" ;
 
-    let wait_slot commitment =
-      (* Check the producer stored the first shard *)
-      Log.info "RPC to producer for first shard" ;
-      let* _first_shard =
-        Dal_RPC.(
-          call slot_producer @@ get_shard ~slot_header:commitment ~shard_id:0)
-      in
-      unit
-    in
-
-    let* _publication_level, commitment =
+    let* publication_level, commitment, () =
       publish_store_and_wait_slot
         node
         client
         slot_producer
         Constant.bootstrap1
         ~index:slot_index
-        ~wait_slot
+        ~wait_slot:(fun _commitment -> unit)
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
+    in
+
+    Log.info "RPC to producer for first shard" ;
+    (* Check the producer stored the first shard *)
+    let* _first_shard =
+      Dal_RPC.(
+        call slot_producer
+        @@ get_level_slot_shard_content
+             ~slot_level:publication_level
+             ~slot_index
+             ~shard_index:0)
     in
 
     let wait_remove_shards_promise =
@@ -5143,7 +5154,12 @@ module Garbage_collection = struct
     let* () = wait_remove_shards_promise in
 
     Log.info "RPC deleted shard producer" ;
-    let* () = get_shard_rpc_failure_expected commitment slot_producer in
+    let* () =
+      get_shard_rpc_failure_expected
+        ~slot_level:publication_level
+        ~slot_index
+        slot_producer
+    in
 
     Log.info "End of test" ;
     unit
@@ -5293,21 +5309,12 @@ module Garbage_collection = struct
       in
       let* shard_index_observer = wait_for_first_shard_observer_promise in
       let* shard_index_attester = wait_for_first_shard_attester_promise in
-
-      Log.info "RPC first shard observer" ;
-      let* _shard_observer =
-        get_shard_rpc commitment shard_index_observer observer
-      in
-      Log.info "RPC first shard producer" ;
-      let* _shard_producer = get_shard_rpc commitment 0 slot_producer in
-      Log.info "RPC first shard attester" ;
-      let* _shard_attester =
-        get_shard_rpc commitment shard_index_attester attester
-      in
-      unit
+      return (shard_index_observer, shard_index_attester)
     in
 
-    let* _publication_level, commitment =
+    let* ( publication_level,
+           commitment,
+           (shard_index_observer, shard_index_attester) ) =
       publish_store_and_wait_slot
         node
         client
@@ -5317,6 +5324,31 @@ module Garbage_collection = struct
         ~wait_slot
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
+    in
+
+    Log.info "RPC first shard observer" ;
+    let* _shard_observer =
+      get_shard_rpc
+        ~slot_level:publication_level
+        ~slot_index
+        ~shard_index:shard_index_observer
+        observer
+    in
+    Log.info "RPC first shard producer" ;
+    let* _shard_producer =
+      get_shard_rpc
+        ~slot_level:publication_level
+        ~slot_index
+        ~shard_index:0
+        slot_producer
+    in
+    Log.info "RPC first shard attester" ;
+    let* _shard_attester =
+      get_shard_rpc
+        ~slot_level:publication_level
+        ~slot_index
+        ~shard_index:shard_index_attester
+        attester
     in
 
     let wait_remove_shards_attester_promise =
@@ -5332,12 +5364,29 @@ module Garbage_collection = struct
     let* () = wait_remove_shards_attester_promise in
 
     Log.info "RPC deleted shard attester" ;
-    let* () = get_shard_rpc_failure_expected commitment attester in
+    let* () =
+      get_shard_rpc_failure_expected
+        ~slot_level:publication_level
+        ~slot_index
+        attester
+    in
 
     Log.info "RPC shard still stored observer" ;
-    let* _shard_observer = get_shard_rpc commitment 0 observer in
+    let* _shard_observer =
+      get_shard_rpc
+        ~slot_level:publication_level
+        ~slot_index
+        ~shard_index:0
+        observer
+    in
     Log.info "RPC shard still stored producer" ;
-    let* _shard_producer = get_shard_rpc commitment 0 slot_producer in
+    let* _shard_producer =
+      get_shard_rpc
+        ~slot_level:publication_level
+        ~slot_index
+        ~shard_index:0
+        slot_producer
+    in
 
     Log.info "End of test" ;
     unit
