@@ -7,7 +7,7 @@
 // everytime I change code elsewhere.
 #![allow(dead_code)]
 
-use crate::devicetree;
+use super::devicetree;
 use kernel_loader::{LoadResult, Memory};
 use rvemu::{cpu::Mode, emulator::Emulator};
 use std::{error::Error, fs};
