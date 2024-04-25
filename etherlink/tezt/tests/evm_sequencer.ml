@@ -378,10 +378,7 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
       body
       protocols
   in
-  register
-    ~threshold_encryption:false
-    ~title:(sf "%s (sn_sequencer)" title)
-    ~tags:("single" :: tags) ;
+  register ~threshold_encryption:false ~title:(sf "%s (sequencer)" title) ~tags ;
   register
     ~threshold_encryption:true
     ~title:(sf "%s (te_sequencer)" title)
