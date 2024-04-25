@@ -61,22 +61,6 @@ const ratio_target = bigRat(50, 100);
  */
 const ratio_radius = bigRat(2, 100);
 
-/* Helpers */
-
-const safe_get = (array, cycle) => {
-  if (cycle < 0) {
-    throw new Error(
-      `Querying data for a negative cycle (${cycle}) is not allowed.`,
-    );
-  }
-  if (cycle >= array.length) {
-    throw new Error(
-      `Querying data for a cycle (${cycle}) that is beyond the maximum cycle, defined as ${array.length}.`,
-    );
-  }
-  return array[cycle];
-};
-
 /**
  * The Adaptive Issuance simulator.
  * @typedef {Object} Simulator
@@ -342,7 +326,7 @@ export class Simulator {
     if (cycle < this.config.chain.ai_activation_cycle) {
       return bigRat.zero;
     }
-    if (this.#storage_issuance_bonus[cycle] != null) {
+    if (this.#storage_issuance_bonus[cycle]) {
       return bigRat(this.#storage_issuance_bonus[cycle]);
     }
     const previous_bonus = this.dynamic_rate_for_next_cycle(cycle - 1);
@@ -546,7 +530,9 @@ export class Simulator {
 
     const delegated = this.total_delegated_balance(cycle - 1);
 
-    const staked = this.total_staked_balance(cycle);
+    const staked = this.total_staked_balance(
+      cycle + this.config.proto.consensus_rights_delay,
+    );
 
     if (this.is_ai_activated(cycle)) {
       const ratio_for_delegated = bigRat(delegated).divide(
