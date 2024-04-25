@@ -399,7 +399,9 @@ let encoding data_dir : t Data_encoding.t =
              log_filter_config_encoding
              (default_filter_config ()))
           (opt "sequencer" (sequencer_encoding data_dir))
-          (opt "sequencer" (threshold_encryption_sequencer_encoding data_dir))
+          (opt
+             "threshold_encryption_sequencer"
+             (threshold_encryption_sequencer_encoding data_dir))
           (opt "observer" (observer_encoding data_dir))
           (dft
              "max_active_connections"
