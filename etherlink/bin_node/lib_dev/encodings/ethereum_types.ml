@@ -887,23 +887,23 @@ let call_extendable_encoding =
   merge_objs
     (conv_with_guard
        (fun {from; to_; gas; gasPrice; value; data} ->
-         (from, Some to_, gas, gasPrice, value, data, None))
+         (from, to_, gas, gasPrice, value, data, None))
        (function
          | from, to_, gas, gasPrice, value, data, None
          | from, to_, gas, gasPrice, value, None, data ->
-             Ok {from; to_ = Option.join to_; gas; gasPrice; value; data}
+             Ok {from; to_; gas; gasPrice; value; data}
          | _, _, _, _, _, Some _, Some _ ->
              Error "Cannot specify both data and input")
        (obj7
-          (opt "from" address_encoding)
-          (opt "to" (option address_encoding))
+          (dft "from" (option address_encoding) None)
+          (dft "to" (option address_encoding) None)
           (* `call` is also used for estimateGas, which allows all fields to be
              empty, hence `to` can be `null` or absent. *)
-          (opt "gas" quantity_encoding)
-          (opt "gasPrice" quantity_encoding)
-          (opt "value" quantity_encoding)
-          (opt "input" hash_encoding)
-          (opt "data" hash_encoding)))
+          (dft "gas" (option quantity_encoding) None)
+          (dft "gasPrice" (option quantity_encoding) None)
+          (dft "value" (option quantity_encoding) None)
+          (dft "input" (option hash_encoding) None)
+          (dft "data" (option hash_encoding) None)))
     unit
 
 let call_encoding =
