@@ -2867,7 +2867,7 @@ let test_preimages_endpoint =
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
-    ~title:"Sequencer an use remote server to get preimages"
+    ~title:"Sequencer use remote server to get preimages"
     ~uses:(fun protocol -> Constant.WASM.ghostnet_evm_kernel :: uses protocol)
   @@ fun {
            sc_rollup_node;
