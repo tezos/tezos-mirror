@@ -39,8 +39,8 @@
 type slot = bytes
 
 (** [get_slot_pages ~reconstruct_if_missing cryptobox store
-    commitment] fetches from the store the slot corresponding to the
-    given commitment and split it into pages. If the slot is not found
+    slot_id] fetches from the store the slot corresponding to the
+    given slot id and split it into pages. If the slot is not found
     in the store and [reconstruct_if_missing] is true, the slot is
     reconstructed from the stored shards.
 
@@ -55,7 +55,7 @@ val get_slot_pages :
   reconstruct_if_missing:bool ->
   Cryptobox.t ->
   Store.t ->
-  Cryptobox.commitment ->
+  Types.slot_id ->
   (bytes list, [> Errors.not_found | Errors.other]) result Lwt.t
 
 (* Same as [Cryptobox.polynomial_from_shards] but using Lwt +

@@ -190,14 +190,12 @@ module Slots_handlers = struct
 
   let get_slot_pages ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun node_store {cryptobox; _} ->
-        (let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        let* commitment = Slot_manager.get_slot_commitment slot_id node_store in
         Slot_manager.get_slot_pages
           ~reconstruct_if_missing:true
           cryptobox
           node_store
-          commitment)
+          slot_id
         |> Errors.to_option_tzresult)
 end
 

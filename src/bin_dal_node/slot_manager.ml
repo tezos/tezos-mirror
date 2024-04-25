@@ -423,10 +423,12 @@ let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   let* commitment = get_slot_commitment slot_id store in
   Store.Shards.read store.shards commitment shard_index
 
-let get_slot_pages ~reconstruct_if_missing cryptobox store commitment =
+let get_slot_pages ~reconstruct_if_missing cryptobox store slot_id =
   let open Lwt_result_syntax in
   let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot = get_slot ~reconstruct_if_missing cryptobox store commitment in
+  let* slot =
+    get_slot_content ~reconstruct_if_missing store cryptobox slot_id
+  in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
