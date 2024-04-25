@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
 use crate::{cli::RunOptions, format_status, posix_exit_mode};
 use risc_v_interpreter::{Interpreter, InterpreterResult};
 use std::error::Error;
