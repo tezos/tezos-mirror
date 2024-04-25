@@ -106,7 +106,7 @@ type commitment = string
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment) Hashtbl.t;
-  attestations : (public_key_hash, Z.t) Hashtbl.t;
+  attestations : (public_key_hash, Z.t option) Hashtbl.t;
   attested_commitments : Z.t;
 }
 
@@ -345,8 +345,11 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                        per_level_info.attestations
                        account.Account.public_key_hash
                    with
-                   | None -> Z.zero
-                   | Some z -> z
+                   | None -> (* No attestation in block *) 0
+                   | Some (Some z) ->
+                       (* Attestation with DAL payload *) Z.popcount z * 100 / n
+                   | Some None ->
+                       (* Attestation without DAL payload: no DAL rights. *) 100
                  in
                  let old_ratio =
                    match
@@ -360,8 +363,7 @@ let update_ratio_attested_commitments_per_baker t per_level_info metrics =
                  if n = 0 then (account.Account.public_key_hash, old_ratio)
                  else
                    ( account.Account.public_key_hash,
-                     ((old_ratio * weight) + (Z.popcount bitset * 100 / n))
-                     / (weight + 1) ))
+                     ((old_ratio * weight) + bitset) / (weight + 1) ))
           |> Hashtbl.of_seq)
 
 let get_metrics t infos_per_level metrics =
@@ -470,14 +472,17 @@ let get_infos_per_level client ~level =
   let get_dal_attestation operation =
     JSON.(
       operation |-> "contents" |=> 0 |-> "dal_attestation" |> as_string
-      |> Z.of_string)
+      |> Z.of_string |> Option.some)
   in
   let attestations =
     consensus_operations |> List.to_seq
     |> Seq.filter is_dal_attestation
     |> Seq.map (fun operation ->
            let public_key_hash = get_public_key_hash operation in
-           let dal_attestation = get_dal_attestation operation in
+           let dal_attestation =
+             if is_dal_attestation operation then get_dal_attestation operation
+             else None
+           in
            (public_key_hash, dal_attestation))
     |> Hashtbl.of_seq
   in
