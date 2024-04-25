@@ -136,6 +136,25 @@ module type METHOD = sig
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+let encoding_with_optional_block_param encoding =
+  let open Data_encoding in
+  let encoding = if is_tup encoding then encoding else tup1 encoding in
+  union
+    [
+      case
+        ~title:"with_block_param"
+        (Tag 0)
+        (merge_tups encoding (tup1 Ethereum_types.block_param_encoding))
+        (fun (t, block_param) -> Some (t, block_param))
+        (fun (t, block_param) -> (t, block_param));
+      case
+        ~title:"without_block_param"
+        (Tag 1)
+        encoding
+        (fun (t, _) -> Some t)
+        (fun t -> (t, Ethereum_types.Latest));
+    ]
+
 module Kernel_version = struct
   type input = unit
 
@@ -213,7 +232,7 @@ module Get_balance = struct
 
   type output = quantity
 
-  let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
+  let input_encoding = encoding_with_optional_block_param address_encoding
 
   let output_encoding = quantity_encoding
 
@@ -229,8 +248,15 @@ module Get_storage_at = struct
 
   type output = hex
 
-  let input_encoding =
-    Data_encoding.tup3 address_encoding quantity_encoding block_param_encoding
+  let input_encoding : input Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun (address, quantity, block_param) ->
+        ((address, quantity), block_param))
+      (fun ((address, quantity), block_param) ->
+        (address, quantity, block_param))
+      (encoding_with_optional_block_param
+         (tup2 address_encoding quantity_encoding))
 
   let output_encoding = hex_encoding
 
@@ -295,7 +321,7 @@ module Get_code = struct
 
   type output = hex
 
-  let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
+  let input_encoding = encoding_with_optional_block_param address_encoding
 
   let output_encoding = hex_encoding
 
@@ -327,7 +353,7 @@ module Get_transaction_count = struct
 
   type output = quantity
 
-  let input_encoding = Data_encoding.tup2 address_encoding block_param_encoding
+  let input_encoding = encoding_with_optional_block_param address_encoding
 
   let output_encoding = quantity_encoding
 
@@ -535,24 +561,7 @@ module Eth_call = struct
 
   type output = hash
 
-  let input_encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          ~title:"full_parameters"
-          (Tag 0)
-          (tup2 call_encoding block_param_encoding)
-          (fun (call, block_param) -> Some (call, block_param))
-          (fun (call, block_param) -> (call, block_param));
-        (* eth-cli doesn't put the block parameter. *)
-        case
-          ~title:"only_call_parameter"
-          (Tag 1)
-          (tup1 call_encoding)
-          (fun (call, _) -> Some call)
-          (fun call -> (call, Latest));
-      ]
+  let input_encoding = encoding_with_optional_block_param call_encoding
 
   let output_encoding = hash_encoding
 
@@ -568,24 +577,7 @@ module Get_estimate_gas = struct
 
   type output = quantity
 
-  let input_encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          ~title:"full_parameters"
-          (Tag 0)
-          (tup2 call_encoding block_param_encoding)
-          (fun (call, block_param) -> Some (call, block_param))
-          (fun (call, block_param) -> (call, block_param));
-        (* eth-cli doesn't put the block parameter. *)
-        case
-          ~title:"only_call_parameter"
-          (Tag 1)
-          (tup1 call_encoding)
-          (fun (call, _) -> Some call)
-          (fun call -> (call, Latest));
-      ]
+  let input_encoding = Eth_call.input_encoding
 
   let output_encoding = quantity_encoding
 
