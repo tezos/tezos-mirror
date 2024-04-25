@@ -191,23 +191,6 @@ let get_slot cryptobox store commitment =
       in
       return slot
 
-let get_slot_pages cryptobox store commitment =
-  let open Lwt_result_syntax in
-  let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot = get_slot cryptobox store commitment in
-  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
-     If this is not the case, we throw an `Illformed_pages` error.
-  *)
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
-     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
-  let*? pages =
-    String.chunk_bytes
-      dal_parameters.page_size
-      slot
-      ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
-  in
-  return @@ List.map (fun page -> String.to_bytes page) pages
-
 (* Used wrapper functions on top of Cryptobox. *)
 
 let polynomial_from_slot cryptobox slot =
@@ -433,3 +416,20 @@ let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   let open Lwt_result_syntax in
   let* commitment = get_slot_commitment slot_id store in
   Store.Shards.read store.shards commitment shard_index
+
+let get_slot_pages cryptobox store commitment =
+  let open Lwt_result_syntax in
+  let dal_parameters = Cryptobox.parameters cryptobox in
+  let* slot = get_slot cryptobox store commitment in
+  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
+     If this is not the case, we throw an `Illformed_pages` error.
+  *)
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
+     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
+  let*? pages =
+    String.chunk_bytes
+      dal_parameters.page_size
+      slot
+      ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
+  in
+  return @@ List.map (fun page -> String.to_bytes page) pages
