@@ -75,7 +75,11 @@ module Slots_handlers = struct
   let get_slot_content ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_content store cryptobox slot_id
+        Slot_manager.get_slot_content
+          ~reconstruct_if_missing:true
+          store
+          cryptobox
+          slot_id
         |> Errors.to_option_tzresult)
 
   (* This function assumes the slot is valid since we already have
@@ -109,7 +113,13 @@ module Slots_handlers = struct
     call_handler2 ctxt (fun store {cryptobox; _} ->
         (let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        let* content = Slot_manager.get_slot_content store cryptobox slot_id in
+        let* content =
+          Slot_manager.get_slot_content
+            ~reconstruct_if_missing:true
+            store
+            cryptobox
+            slot_id
+        in
         let*! proof =
           let*? polynomial = Cryptobox.polynomial_from_slot cryptobox content in
           let*? proof = Cryptobox.prove_page cryptobox polynomial page_index in

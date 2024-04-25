@@ -240,16 +240,15 @@ let add_slot node_store slot cryptobox =
   in
   return commitment
 
-let get_commitment_slot node_store cryptobox commitment =
-  Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
-
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof =
   let open Lwt_result_syntax in
-  let* slot = get_commitment_slot node_store cryptobox commitment in
+  let* slot =
+    get_slot ~reconstruct_if_missing:false cryptobox node_store commitment
+  in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
-  let* () = Store.(Shards.write_all node_store.shards commitment shards) in
+  let* () = Store.Shards.write_all node_store.shards commitment shards in
   if with_proof then
     let*? precomputation =
       match shards_proofs_precomputation with
@@ -410,10 +409,11 @@ let get_slot_commitment (slot_id : Types.slot_id) node_store =
     ~slot_index:slot_id.slot_index
     node_store
 
-let get_slot_content node_store cryptobox (slot_id : Types.slot_id) =
+let get_slot_content ~reconstruct_if_missing node_store cryptobox
+    (slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
   let* commitment = get_slot_commitment slot_id node_store in
-  get_commitment_slot node_store cryptobox commitment
+  get_slot ~reconstruct_if_missing cryptobox node_store commitment
 
 let get_slot_status ~slot_id node_store =
   Store.Legacy.get_slot_status ~slot_id node_store

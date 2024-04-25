@@ -86,21 +86,28 @@ val add_slot :
   Cryptobox.t ->
   (Cryptobox.commitment, [> Errors.other]) result Lwt.t
 
-(** [get_slot_content node_store cryptobox slot_id] returns the slot
-    content associated with the given [slot_id] in [node_store].
+(** [get_slot_content ~reconstruct_if_missing node_store cryptobox
+    slot_id] returns the slot content associated with the given
+    [slot_id] in [node_store].
+
+    If the slot is not found in the store and [reconstruct_if_missing]
+    is true, the slot is reconstructed from the stored shards.
 
     In addition to decoding errors, the function returns [`Not_found]
-    if there is no slot content for [slot_id] in [node_store].
+    if there is no slot content for [slot_id] in [node_store] or if
+    [reconstruct_if_missing] is true and not enough shards are stored
+    to reconstruct the slot.
 *)
 val get_slot_content :
+  reconstruct_if_missing:bool ->
   Store.t ->
   Cryptobox.t ->
   Types.slot_id ->
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
-(** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
-    commitment ~with_proof] registers the shards of the slot whose commitment is
-    given.
+(** [add_commitment_shards ~shards_proofs_precomputation node_store
+    cryptobox commitment ~with_proof] registers the shards of the slot
+    whose commitment is given.
 
     If [with_proof] is true, proofs are generated for the computed
     shards using [shards_proofs_precomputation] and stored in a bounded
