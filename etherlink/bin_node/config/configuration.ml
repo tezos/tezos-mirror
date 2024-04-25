@@ -430,7 +430,7 @@ let encoding data_dir : t Data_encoding.t =
              default_tx_pool_tx_per_addr_limit)
           (dft "keep_alive" bool default_keep_alive)
           (req "rollup_node_endpoint" string)
-          (req "verbose" Internal_event.Level.encoding)))
+          (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
