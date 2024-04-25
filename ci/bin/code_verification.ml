@@ -1793,9 +1793,10 @@ let jobs pipeline_type =
           ~before_script:(before_script ~eval_opam:true [])
           ~artifacts:
             (artifacts
+               ~when_:Always
                ~expire_in:(Duration (Hours 1))
                (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
-               ["docs/_build/api/odoc/"])
+               ["docs/_build/api/odoc/"; "docs/odoc.log"])
           ["make -C docs odoc-lite"]
       in
       let job_manuals =

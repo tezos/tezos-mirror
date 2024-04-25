@@ -8308,6 +8308,8 @@ documentation:odoc:
     expire_in: 1 hour
     paths:
     - docs/_build/api/odoc/
+    - docs/odoc.log
+    when: always
 
 documentation:manuals:
   image: ${build_deps_image_name}:runtime-build-test-dependencies--${build_deps_image_version}
