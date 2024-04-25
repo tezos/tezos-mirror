@@ -32,8 +32,6 @@ pub type Service = dyn Fn(
     + Sync
     + 'static;
 
-pub type Path = String;
-
 /// A singleton for spawning main RPC server thread.
 #[derive(Debug)]
 pub struct RpcServer<S> {
@@ -93,10 +91,7 @@ impl<S: Send + Sync + Clone + 'static> RpcServer<S> {
                         Ok((tcp, _)) = listener.accept() => {
                             let io = TokioIo::new(tcp);
                             let app = app.clone();
-                            // TODO: This is needed in the sequencer because resubscription to broadcast
-                            // channels must happen by cloning the ProtocolClient.
-                            // Should we allow cloning the state in general?
-                            let state = Arc::new((*self.state).clone());
+                            let state = self.state.clone();
                             tokio::task::spawn(async move {
                                 if let Err(err) = http1::Builder::new()
                                     .serve_connection(io, service_fn(|req| app.handle_request(state.clone(), req)))

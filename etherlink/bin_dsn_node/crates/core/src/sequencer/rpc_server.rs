@@ -20,7 +20,7 @@ use dsn_rpc::server::RpcServer;
 use super::protocol::ProtocolClient;
 
 pub async fn monitor_proposal(
-    protocol_client: Arc<ProtocolClient>,
+    protocol_client: ProtocolClient,
     _req: Request<Incoming>,
 ) -> Result<Resp, RpcError> {
     let receiver = protocol_client.preblock_streams().await;
@@ -28,7 +28,7 @@ pub async fn monitor_proposal(
 }
 
 pub async fn post_proposal_handler(
-    protocol_client: Arc<ProtocolClient>,
+    protocol_client: ProtocolClient,
     req: Request<Incoming>,
 ) -> Result<Resp, RpcError> {
     let protocol_client = protocol_client.clone();
@@ -44,11 +44,11 @@ pub async fn post_proposal_handler(
 }
 
 pub fn router() -> Router<ProtocolClient> {
-    let post_proposal = |protocol_client: Arc<ProtocolClient>, req| {
+    let post_proposal = |protocol_client: ProtocolClient, req| {
         async { post_proposal_handler(protocol_client, req).await }.boxed()
     };
 
-    let monitor_proposal = |protocol_client: Arc<ProtocolClient>, req| {
+    let monitor_proposal = |protocol_client: ProtocolClient, req| {
         async { monitor_proposal(protocol_client, req).await }.boxed()
     };
 

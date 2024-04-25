@@ -26,18 +26,16 @@ pub type Response = hyper::Response<ResponseBody>;
 /// reference to the server state, as well as the whole request to
 /// be processed.
 pub type Service<S> = dyn Fn(
-        Arc<S>,
+        S,
         Request<Incoming>,
     ) -> Pin<Box<dyn Future<Output = Result<Response, RpcError>> + Send + 'static>>
     + Send
     + Sync
     + 'static;
 
-pub type Path = String;
-
 /// Auxiliary builder factory for building routers.
 pub struct RouterBuilder<S> {
-    routes: HashMap<(Method, Path), Box<Service<S>>>,
+    routes: HashMap<(Method, String), Box<Service<S>>>,
 }
 
 impl<S> RouterBuilder<S> {
@@ -52,7 +50,7 @@ impl<S> RouterBuilder<S> {
     pub fn with_route<F>(mut self, path: &str, method: Method, handler: F) -> Self
     where
         F: Fn(
-                Arc<S>,
+                S,
                 Request<Incoming>,
             ) -> Pin<Box<dyn Send + Future<Output = Result<Response, RpcError>>>>
             + Send
@@ -73,13 +71,13 @@ impl<S> RouterBuilder<S> {
 }
 
 pub struct Router<S> {
-    routes: HashMap<(Method, Path), Box<Service<S>>>,
+    routes: HashMap<(Method, String), Box<Service<S>>>,
 }
 
-impl<S> Router<S> {
+impl<S: Clone> Router<S> {
     /// Handles a http request received by an external client. The service
     /// handler for handling the request is retrieved from the [Router]'s internal
-    /// [HashMap], using the request [Method]  and [Path].
+    /// [HashMap], using the request [Method]  and request path.
     /// The body of the request must be of type [Incoming], which means that
     /// the request can be chunked into frames. When successful, the result is
     /// the [Response] that is returned to the client, or an error of type [RpcError].
@@ -92,7 +90,8 @@ impl<S> Router<S> {
             .routes
             .get(&(req.method().clone(), req.uri().path().to_string()))
         {
-            return handler(s, req).await;
+            let state = (*s).clone();
+            return handler(state, req).await;
         }
         Ok(hyper::Response::builder()
             .status(StatusCode::NOT_FOUND)

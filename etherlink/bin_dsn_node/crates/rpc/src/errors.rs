@@ -9,20 +9,8 @@ use thiserror::Error;
 pub enum RpcError {
     /// Errors when handling stream connections
     #[error("Stream error {0}")]
-    StreamError(hyper::Error),
+    StreamError(#[from] hyper::Error),
     /// Errors when handling HTTP connections
     #[error("Connection error {0}")]
-    ConnectionError(hyper::http::Error),
-}
-
-impl From<hyper::Error> for RpcError {
-    fn from(error: hyper::Error) -> Self {
-        RpcError::StreamError(error)
-    }
-}
-
-impl From<hyper::http::Error> for RpcError {
-    fn from(error: hyper::http::Error) -> Self {
-        RpcError::ConnectionError(error)
-    }
+    ConnectionError(#[from] hyper::http::Error),
 }
