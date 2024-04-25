@@ -184,7 +184,7 @@ module Slots_handlers = struct
         Slot_manager.get_slot_shard node_store slot_id shard_index
         |> Errors.to_option_tzresult)
 
-  let handle_slot_pages ctxt (((), level), slot_index) () () =
+  let get_slot_pages ctxt (((), level), slot_index) () () =
     call_handler2 ctxt (fun node_store {cryptobox; _} ->
         (let open Lwt_result_syntax in
         let* commitment =
@@ -395,7 +395,7 @@ let register :
   |> add_service
        Tezos_rpc.Directory.opt_register
        Services.slot_pages
-       (Slots_handlers.handle_slot_pages ctxt)
+       (Slots_handlers.get_slot_pages ctxt)
   |> add_service Tezos_rpc.Directory.register0 Services.version (version ctxt)
   |> add_service
        Tezos_rpc.Directory.register0
