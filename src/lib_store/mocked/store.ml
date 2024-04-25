@@ -73,7 +73,6 @@ and chain_store = {
   chain_state : chain_state Shared.t;
   (* Genesis is only on-disk: read-only except at creation *)
   genesis_block_data : block Stored_data.t;
-  block_watcher : block Lwt_watcher.input;
   validated_block_watcher : block Lwt_watcher.input;
   block_rpc_directories :
     (chain_store * block) Tezos_rpc.Directory.t Protocol_hash.Map.t
@@ -546,7 +545,6 @@ module Block = struct
               in
               return (Some new_chain_state, ()))
         in
-        Lwt_watcher.notify chain_store.block_watcher block ;
         Lwt_watcher.notify
           chain_store.global_store.global_block_watcher
           (chain_store, block) ;
@@ -1497,7 +1495,6 @@ module Chain = struct
         ~initial_data:genesis_block
     in
     let chain_state = Shared.create chain_state in
-    let block_watcher = Lwt_watcher.create_input () in
     let validated_block_watcher = Lwt_watcher.create_input () in
     let block_rpc_directories = Protocol_hash.Table.create 7 in
     let chain_store : chain_store =
@@ -1509,7 +1506,6 @@ module Chain = struct
         chain_state;
         genesis_block_data;
         block_store;
-        block_watcher;
         validated_block_watcher;
         block_rpc_directories;
       }
@@ -1694,8 +1690,6 @@ module Chain = struct
 
   let validated_watcher chain_store =
     Lwt_watcher.create_stream chain_store.validated_block_watcher
-
-  let watcher chain_store = Lwt_watcher.create_stream chain_store.block_watcher
 
   let get_rpc_directory chain_store block =
     let open Lwt_syntax in

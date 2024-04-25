@@ -907,10 +907,6 @@ module Chain : sig
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 
-  (** [watcher chain_store] instantiates a new block watcher for
-      [chain_store]. *)
-  val watcher : chain_store -> Block.t Lwt_stream.t * Lwt_watcher.stopper
-
   (** [validated_watcher chain_store] instantiates a new validated block
        watcher for [chain_store]. *)
   val validated_watcher :
