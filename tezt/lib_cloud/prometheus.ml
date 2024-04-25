@@ -160,7 +160,6 @@ let run_with_snapshot ~snapshot ~port =
       "docker"
       [
         "run";
-        "-d";
         "-uroot";
         "-v";
         Format.asprintf "%s:/prometheus" snapshot;
