@@ -66,6 +66,8 @@
   blueprint application for a level in the future. (!12753)
 - The observer does not hang anymore when trying to reconnect to a sequencer that
   is still down. (!13024)
+- Preimages default directory is now `<data_dir>/wasm_2_0_0` instead of
+  `$HOME/.octez-evm-node/_evm_installer_preimages`. (!13070)
 
 ### Breaking changes
 
