@@ -202,8 +202,17 @@ module Dal_RPC = struct
           ( json |-> "commitment" |> as_string,
             json |-> "commitment_proof" |> as_string ))
 
-  let get_commitment_slot commitment =
-    make GET ["commitments"; commitment; "slot"] get_bytes_from_json_string_node
+  let get_level_slot_content ~slot_level ~slot_index =
+    make
+      GET
+      [
+        "levels";
+        string_of_int slot_level;
+        "slots";
+        string_of_int slot_index;
+        "content";
+      ]
+      get_bytes_from_json_string_node
 
   type commitment_proof = string
 

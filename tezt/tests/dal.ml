@@ -1225,7 +1225,7 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node client
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let slot_index = 0 in
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
-  let* slot_commitment =
+  let* _slot_commitment =
     Helpers.publish_and_store_slot
       client
       dal_node
@@ -1238,7 +1238,9 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node client
   (* Finalize the publication. *)
   let* () = bake_for ~count:2 client in
   let* received_slot =
-    Dal_RPC.(call dal_node @@ get_commitment_slot slot_commitment)
+    Dal_RPC.(
+      call dal_node
+      @@ get_level_slot_content ~slot_level:published_level ~slot_index)
   in
   let received_slot_content = Helpers.content_of_slot received_slot in
   Check.(
@@ -1686,7 +1688,7 @@ let commitment_of_slot cryptobox slot =
       as commit_error) ->
       Test.fail "%s" (Cryptobox.string_of_commit_error commit_error)
 
-let test_dal_node_test_post_slot _protocol parameters cryptobox _node _client
+let test_dal_node_test_post_slot _protocol parameters cryptobox _node client
     dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let mk_slot size =
@@ -1716,11 +1718,28 @@ let test_dal_node_test_post_slot _protocol parameters cryptobox _node _client
     ~error_msg:
       "Storing a slot twice should return the same commitment (current = %L, \
        expected = %R)" ;
-  let* commitment3, _proof = Dal_RPC.(call dal_node @@ post_slot slot_small) in
+  let* commitment3, proof3 = Dal_RPC.(call dal_node @@ post_slot slot_small) in
+  (* To retrieve the content of the slot corresponding to commitment3,
+     we need to publish the commitment on the L1 and bake some blocks
+     to finalize the publication. *)
+  let slot_index = 0 in
+  let* _ =
+    Dal.Helpers.publish_commitment
+      ~source:Constant.bootstrap1
+      ~index:slot_index
+      ~commitment:(Dal.Commitment.of_string commitment3)
+      ~proof:(Dal.Commitment.proof_of_string proof3)
+      client
+  in
+  let* () = bake_for client in
+  let* slot_level = Client.level client in
+  (* Finalize the publication. *)
+  let* () = bake_until_processed ~level:slot_level client [dal_node] in
+
   (* The POST /slots RPC accepts slots shorter than the size and pads
      them.  The content_of_slot helper removes the padding. *)
   let* padded_slot =
-    Dal_RPC.(call dal_node @@ get_commitment_slot commitment3)
+    Dal_RPC.(call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
   in
   Check.(generate_dummy_slot (size - 1) = Helpers.content_of_slot padded_slot)
     Check.string
@@ -1737,22 +1756,36 @@ let test_dal_node_test_post_slot _protocol parameters cryptobox _node _client
        locally (current = %L, expected = %R)" ;
   unit
 
-let test_dal_node_test_get_commitment_slot _protocol parameters cryptobox _node
-    _client dal_node =
+let test_dal_node_test_get_level_slot_content _protocol parameters _cryptobox
+    _node client dal_node =
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
   let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
-  let commitment =
-    Cryptobox.Commitment.to_b58check @@ commitment_of_slot cryptobox slot
+  let slot_index = 0 in
+  let* commitment, proof = Dal_RPC.(call dal_node @@ post_slot slot) in
+  let* _ =
+    Dal.Helpers.publish_commitment
+      ~source:Constant.bootstrap1
+      ~index:slot_index
+      ~commitment:(Dal.Commitment.of_string commitment)
+      ~proof:(Dal.Commitment.proof_of_string proof)
+      client
   in
+  let* () = bake_for client in
+  let* slot_level = Client.level client in
+  (* Publication is not yet finalized, the RPC should fail with 404
+     error code. *)
   let* () =
     let* response =
-      Dal_RPC.(call_raw dal_node @@ get_commitment_slot commitment)
+      Dal_RPC.(
+        call_raw dal_node @@ get_level_slot_content ~slot_level ~slot_index)
     in
     return @@ RPC_core.check_string_response ~code:404 response
   in
-  let* _commitment, _proof = Dal_RPC.(call dal_node @@ post_slot slot) in
-  (* commit = _commitment already tested in /POST test. *)
-  let* got_slot = Dal_RPC.(call dal_node @@ get_commitment_slot commitment) in
+  (* Finalize the publication. *)
+  let* () = bake_until_processed ~level:slot_level client [dal_node] in
+  let* got_slot =
+    Dal_RPC.(call dal_node @@ get_level_slot_content ~slot_level ~slot_index)
+  in
   Check.(Helpers.content_of_slot slot = Helpers.content_of_slot got_slot)
     Check.string
     ~error_msg:
@@ -6277,8 +6310,8 @@ let register ~protocols =
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]
-    "dal node GET /commitments/<commitment>/slot"
-    test_dal_node_test_get_commitment_slot
+    "dal node GET /levels/<level>/slots/<index>/content"
+    test_dal_node_test_get_level_slot_content
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~producer_profiles:[0]
