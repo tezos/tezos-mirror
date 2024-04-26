@@ -1819,66 +1819,109 @@ module Manager = struct
     total_gas_used : Gas.Arith.fp;
   }
 
-  let check_source_and_counter ~expected_source ~source ~previous_counter
-      ~counter =
+  type batch_elt = Elt : 'kind Kind.manager contents -> batch_elt
+
+  let rec batch_fold_left_e :
+      type kind.
+      f:('a -> batch_elt -> 'a tzresult) ->
+      init:'a ->
+      batch:kind Kind.manager contents_list ->
+      'a tzresult =
+   fun ~f ~init ~batch ->
     let open Result_syntax in
-    let* () =
-      error_unless
-        (Signature.Public_key_hash.equal expected_source source)
-        Inconsistent_sources
+    match batch with
+    | Single contents -> f init (Elt contents)
+    | Cons (contents, tail) ->
+        let* acc = f init (Elt contents) in
+        batch_fold_left_e ~f ~init:acc ~batch:tail
+
+  let check_source ~expected ~source =
+    Option.iter_e
+      (fun expected ->
+        error_unless
+          (Signature.Public_key_hash.equal source expected)
+          Inconsistent_sources)
+      expected
+
+  let check_counter ~previous_counter ~counter =
+    Option.iter_e
+      (fun previous_counter ->
+        error_unless
+          Manager_counter.(succ previous_counter = counter)
+          Inconsistent_counters)
+      previous_counter
+
+  (** Used in [check_consistency] below. *)
+  type consistency_state = {
+    first_source : public_key_hash option;
+        (** [None] while checking the first operation in the batch,
+            then the [source] of the first operation in the batch. *)
+    previous_counter : Manager_counter.t option;
+        (** [None] while checking the first operation in the batch,
+            then the [counter] of the previous operation in the
+            batch. *)
+  }
+
+  (** Checks that a batch of manager operations is well-formed.
+
+      The consistency checks from this function are universal
+      requirements for all batches, regardless of the context. E.g. we
+      check here that counters are internally consistent, but not that
+      the first counter is the next expected counter for its source in
+      the context.
+
+      Accordingly, all potential errors here should be [`Permanent].
+
+      {b Source consistency}
+
+      All operations in the batch must have the same source.
+
+      {b Counter consistency}
+
+      All counters in the batch must be increasing and consecutive.
+
+      {b Reveal position}
+
+      Only the very first operation in the batch may be a [Reveal].
+
+      ---
+
+      This function can return the following errors:
+
+      - [Inconsistent_sources] when the batch contains multiple
+      sources.
+
+      - [Inconsistent_counters] when the counters are not consecutive.
+
+      - [Incorrect_reveal_position] when a [Reveal] operation is
+      encountered after the first operation of the batch.
+  *)
+  let check_consistency batch =
+    let open Result_syntax in
+    let initial_state = {first_source = None; previous_counter = None} in
+    let check_elt {first_source; previous_counter}
+        (Elt (Manager_operation {source; counter; operation; _})) =
+      (* Checks an individual operation of the batch. Relies on the
+         given {!consistency_state} (see the type definition for
+         invariants), and returns the appropriate {!consistency_state}
+         for the next operation in the batch. *)
+      let* () = check_source ~expected:first_source ~source in
+      let* () = check_counter ~previous_counter ~counter in
+      let* () =
+        match operation with
+        | Reveal _ -> (
+            (* Only the first operation in a batch is allowed to be a
+               [Reveal]. Invariants of {!consistency_state} guarantee
+               that [first_source] is [None] when checking the first
+               operation, then [Some _] for other operations. *)
+            match first_source with
+            | None -> return_unit
+            | Some _ -> tzfail Incorrect_reveal_position)
+        | _ -> return_unit
+      in
+      return {first_source = Some source; previous_counter = Some counter}
     in
-    error_unless
-      Manager_counter.(succ previous_counter = counter)
-      Inconsistent_counters
-
-  let rec check_batch_tail_sanity :
-      type kind.
-      public_key_hash ->
-      Manager_counter.t ->
-      kind Kind.manager contents_list ->
-      unit tzresult =
-    let open Result_syntax in
-    fun expected_source previous_counter -> function
-      | Single (Manager_operation {operation = Reveal _key; _}) ->
-          tzfail Incorrect_reveal_position
-      | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
-          tzfail Incorrect_reveal_position
-      | Single (Manager_operation {source; counter; _}) ->
-          check_source_and_counter
-            ~expected_source
-            ~source
-            ~previous_counter
-            ~counter
-      | Cons (Manager_operation {source; counter; _}, rest) ->
-          let* () =
-            check_source_and_counter
-              ~expected_source
-              ~source
-              ~previous_counter
-              ~counter
-          in
-          check_batch_tail_sanity source counter rest
-
-  let check_batch :
-      type kind.
-      kind Kind.manager contents_list ->
-      (public_key_hash * public_key option * Manager_counter.t) tzresult =
-    let open Result_syntax in
-    fun contents_list ->
-      match contents_list with
-      | Single (Manager_operation {source; operation = Reveal key; counter; _})
-        ->
-          return (source, Some key, counter)
-      | Single (Manager_operation {source; counter; _}) ->
-          return (source, None, counter)
-      | Cons
-          (Manager_operation {source; operation = Reveal key; counter; _}, rest)
-        ->
-          let* () = check_batch_tail_sanity source counter rest in
-          return (source, Some key, counter)
-      | Cons (Manager_operation {source; counter; _}, rest) ->
-          let* () = check_batch_tail_sanity source counter rest in
-          return (source, None, counter)
+    batch_fold_left_e ~f:check_elt ~init:initial_state ~batch
 
   let assert_sponsored_operations_feature_enabled vi =
     error_unless
@@ -1902,17 +1945,15 @@ module Manager = struct
 
       Invariants checked:
 
-      - The feature flag for sponsored operations.
+      - The feature flag for sponsored operations (ie fail if the
+      batch contains a [Host] operation but the feature flag is
+      disabled).
 
-      - All operations in a batch have the same source.
+      - The batch is well formed: see {!check_consistency}.
 
       - The source's contract is allocated.
 
-      - The counters in a batch are successive, and the first of them
-        is the source's next expected counter.
-
-      - A batch contains at most one Reveal operation that must occur
-        in first position.
+      - The first counter is the source's next expected counter.
 
       - The source's public key has been revealed (either before the
         considered batch, or during its first operation).
@@ -1921,13 +1962,26 @@ module Manager = struct
       so all operations in the batch are required to originate from the
       same manager. This may change in the future, in order to allow
       several managers to group-sign a sequence of operations. *)
-  let check_sanity_and_find_public_key vi
-      (contents_list : _ Kind.manager contents_list) =
+  let check_sanity_and_find_public_key vi (type kind)
+      (contents_list : kind Kind.manager contents_list) =
     let open Lwt_result_syntax in
     let*? () = check_for_hosted_ops vi contents_list in
-    let*? source, revealed_key, first_counter = check_batch contents_list in
+    let*? (_ : consistency_state) = check_consistency contents_list in
+    let source, first_counter =
+      match contents_list with
+      | Single (Manager_operation {source; counter; _})
+      | Cons (Manager_operation {source; counter; _}, _) ->
+          (source, counter)
+    in
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
+    let revealed_key =
+      match contents_list with
+      | Single (Manager_operation {operation = Reveal pk; _})
+      | Cons (Manager_operation {operation = Reveal pk; _}, _) ->
+          Some pk
+      | _ -> None
+    in
     let* pk =
       (* Note that it is important to always retrieve the public
          key. This includes the case where the key ends up not being
