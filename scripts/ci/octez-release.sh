@@ -12,13 +12,6 @@ script_inputs_dir="$src_dir/script-inputs"
 
 binaries="$(cat "$script_inputs_dir/released-executables")"
 
-# these variables are used in the script scripts/ci/create_gitlab_package.sh
-debian_bookworm_packages="$(find packages/debian/bookworm/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-ubuntu_focal_packages="$(find packages/ubuntu/focal/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-ubuntu_jammy_packages="$(find packages/ubuntu/jammy/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
-fedora_packages="$(find packages/fedora/39/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
-rockylinux_packages="$(find packages/rockylinux/9.3/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
-
 octez_source_content="$script_inputs_dir/octez-source-content"
 
 ### Compute GitLab release names from git tags
