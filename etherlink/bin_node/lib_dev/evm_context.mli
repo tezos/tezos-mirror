@@ -60,7 +60,7 @@ val apply_evm_events :
 (** [inspect ?block path] returns the value (if it exists) stored in [path] on the EVM
     state of [block] (if [block] is omitted then the freshest state is used). *)
 val inspect :
-  ?block:Ethereum_types.Block_parameter.t ->
+  ?block:Ethereum_types.Block_parameter.extended ->
   string ->
   bytes option tzresult Lwt.t
 

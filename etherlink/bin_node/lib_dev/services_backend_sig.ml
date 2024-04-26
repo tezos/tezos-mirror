@@ -12,7 +12,7 @@ module type S = sig
       [block_param]. *)
   val balance :
     Ethereum_types.address ->
-    Ethereum_types.Block_parameter.t ->
+    Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
   (** [nonce address] returns the [address]'s nonce. *)
@@ -23,7 +23,7 @@ module type S = sig
       [block_param]. *)
   val code :
     Ethereum_types.address ->
-    Ethereum_types.Block_parameter.t ->
+    Ethereum_types.Block_parameter.extended ->
     Ethereum_types.hex tzresult Lwt.t
 
   (** [inject_raw_transactions ~timestamp ~smart_rollup_address
@@ -122,7 +122,7 @@ module type S = sig
   val storage_at :
     Ethereum_types.address ->
     Ethereum_types.quantity ->
-    Ethereum_types.Block_parameter.t ->
+    Ethereum_types.Block_parameter.extended ->
     Ethereum_types.hex tzresult Lwt.t
 
   val smart_rollup_address : string

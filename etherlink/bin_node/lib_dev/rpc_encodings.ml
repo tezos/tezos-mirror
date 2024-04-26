@@ -136,7 +136,8 @@ module type METHOD = sig
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
-let encoding_with_optional_block_param encoding =
+let encoding_with_optional_block_param block_param_encoding default_block_param
+    encoding =
   let open Data_encoding in
   let encoding = if is_tup encoding then encoding else tup1 encoding in
   union
@@ -144,7 +145,7 @@ let encoding_with_optional_block_param encoding =
       case
         ~title:"with_block_param"
         (Tag 0)
-        (merge_tups encoding (tup1 Ethereum_types.Block_parameter.encoding))
+        (merge_tups encoding (tup1 block_param_encoding))
         (fun (t, block_param) -> Some (t, block_param))
         (fun (t, block_param) -> (t, block_param));
       case
@@ -152,8 +153,20 @@ let encoding_with_optional_block_param encoding =
         (Tag 1)
         encoding
         (fun (t, _) -> Some t)
-        (fun t -> (t, Ethereum_types.Block_parameter.Latest));
+        (fun t -> (t, default_block_param));
     ]
+
+let encoding_with_optional_extended_block_param encoding =
+  encoding_with_optional_block_param
+    Ethereum_types.Block_parameter.extended_encoding
+    Ethereum_types.Block_parameter.(Block_parameter Latest)
+    encoding
+
+let encoding_with_optional_block_param encoding =
+  encoding_with_optional_block_param
+    Ethereum_types.Block_parameter.encoding
+    Ethereum_types.Block_parameter.Latest
+    encoding
 
 module Kernel_version = struct
   type input = unit
@@ -228,11 +241,12 @@ end
 module Get_balance = struct
   open Ethereum_types
 
-  type input = address * Block_parameter.t
+  type input = address * Block_parameter.extended
 
   type output = quantity
 
-  let input_encoding = encoding_with_optional_block_param address_encoding
+  let input_encoding =
+    encoding_with_optional_extended_block_param address_encoding
 
   let output_encoding = quantity_encoding
 
@@ -244,7 +258,7 @@ end
 module Get_storage_at = struct
   open Ethereum_types
 
-  type input = address * quantity * Block_parameter.t
+  type input = address * quantity * Block_parameter.extended
 
   type output = hex
 
@@ -255,7 +269,7 @@ module Get_storage_at = struct
         ((address, quantity), block_param))
       (fun ((address, quantity), block_param) ->
         (address, quantity, block_param))
-      (encoding_with_optional_block_param
+      (encoding_with_optional_extended_block_param
          (tup2 address_encoding quantity_encoding))
 
   let output_encoding = hex_encoding
@@ -317,11 +331,12 @@ end
 module Get_code = struct
   open Ethereum_types
 
-  type input = address * Block_parameter.t
+  type input = address * Block_parameter.extended
 
   type output = hex
 
-  let input_encoding = encoding_with_optional_block_param address_encoding
+  let input_encoding =
+    encoding_with_optional_extended_block_param address_encoding
 
   let output_encoding = hex_encoding
 

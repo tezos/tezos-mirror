@@ -132,7 +132,8 @@ module Accounts :
 
 module Get_balance :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.Block_parameter.t
+    with type input =
+      Ethereum_types.address * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.quantity
 
 module Get_storage_at :
@@ -140,7 +141,7 @@ module Get_storage_at :
     with type input =
       Ethereum_types.address
       * Ethereum_types.quantity
-      * Ethereum_types.Block_parameter.t
+      * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.hex
 
 module Block_number :
@@ -158,7 +159,8 @@ module Get_block_by_hash :
 
 module Get_code :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.Block_parameter.t
+    with type input =
+      Ethereum_types.address * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.hex
 
 module Gas_price :

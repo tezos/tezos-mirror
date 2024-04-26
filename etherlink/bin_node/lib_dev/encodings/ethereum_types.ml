@@ -90,6 +90,21 @@ let quantity_encoding =
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
+(** Ethereum block hash (32 bytes) *)
+type block_hash = Block_hash of hex [@@ocaml.unboxed]
+
+let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
+
+let block_hash_of_string s = Block_hash (hex_of_string s)
+
+let block_hash_encoding =
+  Data_encoding.(
+    conv (fun (Block_hash h) -> hex_to_string h) block_hash_of_string string)
+
+let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
+
+let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
+
 module Block_parameter = struct
   (** Ethereum block params in RPCs. *)
   type t = Number of quantity | Earliest | Latest | Pending
@@ -133,20 +148,51 @@ module Block_parameter = struct
            (function Pending -> Some () | _ -> None)
            (fun () -> Pending));
       ]
+
+  (** Extended block parameter defined in https://eips.ethereum.org/EIPS/eip-1898. *)
+  type extended =
+    | Block_parameter of t
+    | Block_hash of {hash : block_hash; require_canonical : bool}
+
+  let pp_extended fmt = function
+    | Block_parameter param -> pp fmt param
+    | Block_hash {hash; _} -> Format.printf "blockHash : %a" pp_block_hash hash
+
+  let extended_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"block_parameter"
+          (Tag 0)
+          encoding
+          (function
+            | Block_parameter block_param -> Some block_param | _ -> None)
+          (fun block_param -> Block_parameter block_param);
+        case
+          ~title:"block_parameter_hash"
+          (Tag 1)
+          (obj2
+             (req "blockHash" block_hash_encoding)
+             (dft "requireCanonical" bool false))
+          (function
+            | Block_hash {hash; require_canonical} ->
+                Some (hash, require_canonical)
+            | _ -> None)
+          (fun (hash, require_canonical) ->
+            Block_hash {hash; require_canonical});
+        case
+          ~title:"block_parameter_number"
+          (Tag 2)
+          (obj2
+             (req "blockNumber" quantity_encoding)
+             (dft "requireCanonical" bool false))
+          (function
+            | Block_parameter (Number number) -> Some (number, false)
+            | _ -> None)
+          (fun (number, _require_canonical) -> Block_parameter (Number number));
+      ]
 end
-
-(** Ethereum block hash (32 bytes) *)
-type block_hash = Block_hash of hex [@@ocaml.unboxed]
-
-let block_hash_of_string s = Block_hash (hex_of_string s)
-
-let block_hash_encoding =
-  Data_encoding.(
-    conv (fun (Block_hash h) -> hex_to_string h) block_hash_of_string string)
-
-let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
-
-let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
 
 (** Ethereum hash, that would encoded with a 0x prefix. *)
 type hash = Hash of hex [@@ocaml.unboxed]

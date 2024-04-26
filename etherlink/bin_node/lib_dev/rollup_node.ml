@@ -39,7 +39,8 @@ end) : Services_backend_sig.Backend = struct
   module Reader = struct
     let read ?block path =
       match block with
-      | Some param when param <> Ethereum_types.Block_parameter.Latest ->
+      | Some param
+        when param <> Ethereum_types.Block_parameter.(Block_parameter Latest) ->
           failwith
             "The EVM node in proxy mode support state requests only on latest \
              block."
