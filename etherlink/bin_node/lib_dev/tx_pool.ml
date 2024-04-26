@@ -376,7 +376,7 @@ let pop_transactions state ~maximum_cumulative_size =
           let* nonce = Rollup_node.nonce address in
           let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
           let* (Qty balance) =
-            Rollup_node.balance address Ethereum_types.Latest
+            Rollup_node.balance address Ethereum_types.Block_parameter.Latest
           in
           Lwt.return_ok (address, balance, nonce))
         addresses

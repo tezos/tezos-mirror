@@ -132,7 +132,7 @@ module Accounts :
 
 module Get_balance :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.block_param
+    with type input = Ethereum_types.address * Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Get_storage_at :
@@ -140,7 +140,7 @@ module Get_storage_at :
     with type input =
       Ethereum_types.address
       * Ethereum_types.quantity
-      * Ethereum_types.block_param
+      * Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.hex
 
 module Block_number :
@@ -148,7 +148,7 @@ module Block_number :
 
 module Get_block_by_number :
   METHOD
-    with type input = Ethereum_types.block_param * bool
+    with type input = Ethereum_types.Block_parameter.t * bool
      and type output = Ethereum_types.block
 
 module Get_block_by_hash :
@@ -158,7 +158,7 @@ module Get_block_by_hash :
 
 module Get_code :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.block_param
+    with type input = Ethereum_types.address * Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.hex
 
 module Gas_price :
@@ -166,7 +166,7 @@ module Gas_price :
 
 module Get_transaction_count :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.block_param
+    with type input = Ethereum_types.address * Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Get_block_transaction_count_by_hash :
@@ -176,7 +176,7 @@ module Get_block_transaction_count_by_hash :
 
 module Get_block_transaction_count_by_number :
   METHOD
-    with type input = Ethereum_types.block_param
+    with type input = Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Get_uncle_count_by_block_hash :
@@ -186,7 +186,7 @@ module Get_uncle_count_by_block_hash :
 
 module Get_uncle_count_by_block_number :
   METHOD
-    with type input = Ethereum_types.block_param
+    with type input = Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Get_transaction_receipt :
@@ -206,7 +206,7 @@ module Get_transaction_by_block_hash_and_index :
 
 module Get_transaction_by_block_number_and_index :
   METHOD
-    with type input = Ethereum_types.block_param * Ethereum_types.quantity
+    with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
      and type output = Ethereum_types.transaction_object option
 
 module Get_uncle_by_block_hash_and_index :
@@ -216,7 +216,7 @@ module Get_uncle_by_block_hash_and_index :
 
 module Get_uncle_by_block_number_and_index :
   METHOD
-    with type input = Ethereum_types.block_param * Ethereum_types.quantity
+    with type input = Ethereum_types.Block_parameter.t * Ethereum_types.quantity
      and type output = Ethereum_types.block option
 
 module Send_raw_transaction :
@@ -231,12 +231,12 @@ module Send_transaction :
 
 module Eth_call :
   METHOD
-    with type input = Ethereum_types.call * Ethereum_types.block_param
+    with type input = Ethereum_types.call * Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.hash
 
 module Get_estimate_gas :
   METHOD
-    with type input = Ethereum_types.call * Ethereum_types.block_param
+    with type input = Ethereum_types.call * Ethereum_types.Block_parameter.t
      and type output = Ethereum_types.quantity
 
 module Txpool_content :

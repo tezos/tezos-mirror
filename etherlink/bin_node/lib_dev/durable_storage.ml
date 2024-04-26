@@ -9,7 +9,7 @@ open Ethereum_types
 
 module type READER = sig
   val read :
-    ?block:Ethereum_types.block_param ->
+    ?block:Ethereum_types.Block_parameter.t ->
     Durable_storage_path.path ->
     bytes option tzresult Lwt.t
 end

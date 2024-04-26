@@ -90,48 +90,50 @@ let quantity_encoding =
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
-(** Ethereum block params in RPCs. *)
-type block_param = Number of quantity | Earliest | Latest | Pending
+module Block_parameter = struct
+  (** Ethereum block params in RPCs. *)
+  type t = Number of quantity | Earliest | Latest | Pending
 
-let pp_block_param fmt = function
-  | Number quantity -> pp_quantity fmt quantity
-  | Earliest -> Format.pp_print_string fmt "earliest"
-  | Latest -> Format.pp_print_string fmt "latest"
-  | Pending -> Format.pp_print_string fmt "pending"
+  let pp fmt = function
+    | Number quantity -> pp_quantity fmt quantity
+    | Earliest -> Format.pp_print_string fmt "earliest"
+    | Latest -> Format.pp_print_string fmt "latest"
+    | Pending -> Format.pp_print_string fmt "pending"
 
-let block_param_encoding =
-  let open Data_encoding in
-  union
-    [
-      (let tag = "hex" in
-       case
-         ~title:tag
-         (Tag 0)
-         quantity_encoding
-         (function Number n -> Some n | _ -> None)
-         (fun n -> Number n));
-      (let tag = "earliest" in
-       case
-         ~title:tag
-         (Tag 1)
-         (constant tag)
-         (function Earliest -> Some () | _ -> None)
-         (fun () -> Earliest));
-      (let tag = "latest" in
-       case
-         ~title:tag
-         (Tag 2)
-         (constant tag)
-         (function Latest -> Some () | _ -> None)
-         (fun () -> Latest));
-      (let tag = "pending" in
-       case
-         ~title:tag
-         (Tag 3)
-         (constant tag)
-         (function Pending -> Some () | _ -> None)
-         (fun () -> Pending));
-    ]
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        (let tag = "hex" in
+         case
+           ~title:tag
+           (Tag 0)
+           quantity_encoding
+           (function Number n -> Some n | _ -> None)
+           (fun n -> Number n));
+        (let tag = "earliest" in
+         case
+           ~title:tag
+           (Tag 1)
+           (constant tag)
+           (function Earliest -> Some () | _ -> None)
+           (fun () -> Earliest));
+        (let tag = "latest" in
+         case
+           ~title:tag
+           (Tag 2)
+           (constant tag)
+           (function Latest -> Some () | _ -> None)
+           (fun () -> Latest));
+        (let tag = "pending" in
+         case
+           ~title:tag
+           (Tag 3)
+           (constant tag)
+           (function Pending -> Some () | _ -> None)
+           (fun () -> Pending));
+      ]
+end
 
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
@@ -1176,8 +1178,8 @@ let filter_address_encoding =
     ]
 
 type filter = {
-  from_block : block_param option;
-  to_block : block_param option;
+  from_block : Block_parameter.t option;
+  to_block : Block_parameter.t option;
   address : filter_address option;
   topics : filter_topic option list option;
   block_hash : block_hash option;
@@ -1191,8 +1193,8 @@ let filter_encoding =
     (fun (from_block, to_block, address, topics, block_hash) ->
       {from_block; to_block; address; topics; block_hash})
     (obj5
-       (opt "fromBlock" block_param_encoding)
-       (opt "toBlock" block_param_encoding)
+       (opt "fromBlock" Block_parameter.encoding)
+       (opt "toBlock" Block_parameter.encoding)
        (opt "address" filter_address_encoding)
        (opt "topics" (list @@ option filter_topic_encoding))
        (opt "blockHash" block_hash_encoding))

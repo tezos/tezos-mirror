@@ -1066,7 +1066,7 @@ let head_info () =
 let find_evm_state block =
   let open Lwt_result_syntax in
   match block with
-  | Ethereum_types.Latest ->
+  | Ethereum_types.Block_parameter.Latest ->
       let*! {evm_state; _} = head_info () in
       return_some evm_state
   | Earliest -> worker_wait_for_request Earliest_state
@@ -1084,14 +1084,14 @@ let execute_and_inspect ?wasm_entrypoint input =
     ~input
     evm_state
 
-let inspect ?(block = Ethereum_types.Latest) path =
+let inspect ?(block = Ethereum_types.Block_parameter.Latest) path =
   let open Lwt_result_syntax in
   let* evm_state = find_evm_state block in
   match evm_state with
   | None ->
       failwith
         "EVM state was not found on block %a"
-        Ethereum_types.pp_block_param
+        Ethereum_types.Block_parameter.pp
         block
   | Some evm_state ->
       let*! res = Evm_state.inspect evm_state path in

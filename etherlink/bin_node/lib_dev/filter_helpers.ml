@@ -62,6 +62,7 @@ type error +=
 let height_from_param (module Rollup_node_rpc : Services_backend_sig.S) from to_
     =
   let open Lwt_result_syntax in
+  let open Block_parameter in
   match (from, to_) with
   | Number h1, Number h2 -> return (h1, h2)
   | Number h1, _ ->
