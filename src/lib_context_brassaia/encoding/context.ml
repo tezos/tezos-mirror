@@ -94,6 +94,9 @@ end = struct
       H.of_raw_string
       H.to_raw_string
 
+  let encoding : t Data_encoding.t =
+    Data_encoding.conv H.to_raw_string H.of_raw_string Data_encoding.string
+
   let short_hash =
     let f = short_hash_string ?seed:None in
     fun t -> f (H.to_raw_string t)

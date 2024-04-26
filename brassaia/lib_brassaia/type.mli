@@ -22,3 +22,5 @@ module type Defaultable = sig
 
   val default : t
 end
+
+val of_string_exn : path:string -> 'a t -> string -> 'a

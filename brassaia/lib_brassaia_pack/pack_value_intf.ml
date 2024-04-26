@@ -59,6 +59,8 @@ module type S = sig
 
       It is expected that an implementation only works for [k] that is returned
       from [to_kinded t] and will raise an exception otherwise. *)
+
+  val encoding : t Data_encoding.t
 end
 
 module type T = sig

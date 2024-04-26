@@ -1790,6 +1790,13 @@ struct
     let of_kinded = function Node n -> n | _ -> assert false
     let depth = Bin.depth
 
+    let encoding =
+      Data_encoding.conv (Repr.to_string t)
+        (Brassaia.Type.of_string_exn
+           ~path:
+             "brassaia/lib_brassaia_pack/inode.ml/Make_internal/Raw/of_string" t)
+        Data_encoding.string
+
     exception Invalid_depth of { expected : int; got : int; v : t }
 
     let kind (t : t) =

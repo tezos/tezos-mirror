@@ -38,6 +38,18 @@ struct
     type nonrec hash = hash
 
     let to_hash x = x
+    let pp ppf t = Type.(pp Key.t) ppf t
+
+    (* This function uses the encoding and decoding provided by Type to implement
+       the data_encoding of a Key by going through its string representation.
+       Data_encoding.conv doesn't accept function that return a result hence
+       the use of a custom of_string_exn function that raises an error if the result
+       was `Error 'msg` *)
+    let encoding =
+      Data_encoding.conv (Type.to_string Key.t)
+        (Type.of_string_exn
+           ~path:"lib_brassaia/indexable.ml/Of_content_addressable/of string" t)
+        Data_encoding.string
   end
 
   let index _ h = Lwt.return_some h

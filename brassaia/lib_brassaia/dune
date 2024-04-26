@@ -6,6 +6,7 @@
  (public_name octez-libs.brassaia)
  (instrumentation (backend bisect_ppx))
  (libraries
+  data-encoding
   octez-libs.brassaia.data
   astring
   bheap

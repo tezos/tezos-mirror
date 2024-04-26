@@ -22,4 +22,11 @@ module Of_hash (Hash : Type.S) = struct
 
   let to_hash x = x [@@inline]
   let of_hash x = x [@@inline]
+
+  let encoding =
+    Data_encoding.conv (Type.to_string Hash.t)
+      Type.(of_string_exn ~path:"lib_brassaia/key.ml/Of_hash/of_string" Hash.t)
+      Data_encoding.string
+
+  let pp ppf t = Type.(pp Hash.t) ppf t
 end

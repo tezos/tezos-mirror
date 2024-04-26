@@ -24,6 +24,17 @@ module Keyed_by_value = struct
         (fun _ ->
           Alcotest.fail ~pos:__POS__ "Key implementation is non-serialisable")
         (fun t -> t.value)
+
+    let pp ppf kt = Type.(pp t) ppf kt
+
+    let encoding =
+      Data_encoding.conv (Type.to_string t)
+        Brassaia.Type.(
+          of_string_exn
+            ~path:
+              "test/brassaia/generic_key/test_inlined_contents.ml/Keyed_by_value/of_string"
+            t)
+        Data_encoding.string
   end
 
   module Make (Hash : Hash.S) (Value : Type.S) = struct

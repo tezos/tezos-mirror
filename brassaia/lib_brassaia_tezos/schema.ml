@@ -45,6 +45,9 @@ module Hash : Brassaia.Hash.S = struct
       Repr.(string_of (`Fixed H.digest_size))
       ~short_hash H.of_raw_string H.to_raw_string
 
+  let encoding =
+    Data_encoding.conv H.to_raw_string H.of_raw_string Data_encoding.string
+
   let short_hash_string = short_hash_string ?seed:None
   let short_hash t = short_hash_string (H.to_raw_string t)
   let hash_size = H.digest_size

@@ -21,3 +21,8 @@ module type Defaultable = sig
 
   val default : t
 end
+
+let of_string_exn ~path t s =
+  match Repr.of_string t s with
+  | Ok hash -> hash
+  | Error (`Msg msg) -> Fmt.failwith "%s failed with msg: '%s'" path msg

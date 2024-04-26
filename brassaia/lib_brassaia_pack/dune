@@ -6,6 +6,7 @@
  (public_name octez-libs.brassaia_pack)
  (instrumentation (backend bisect_ppx))
  (libraries
+  data-encoding
   fmt
   octez-libs.brassaia
   octez-libs.brassaia.data
