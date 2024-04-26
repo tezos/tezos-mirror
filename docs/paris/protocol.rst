@@ -120,4 +120,9 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   adaptive_slashing
+
+.. toctree::
+   :maxdepth: 2
+
    dal_support
