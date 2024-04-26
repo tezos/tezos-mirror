@@ -4,6 +4,7 @@
 
 ### Features
 
+- Support daily log files for the observer mode (!13101).
 - The RPC `eth_getBalance` supports the default block parameter
   (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block). (!13039, !12345)
 

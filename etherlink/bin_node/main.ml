@@ -861,7 +861,24 @@ let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
   in
   let*! () =
     let open Tezos_base_unix.Internal_event_unix in
-    init ~config:(make_with_defaults ~verbosity:config.verbose ()) ()
+    let config =
+      make_with_defaults
+        ~verbosity:config.verbose
+        ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
+          (* Show only above Info rpc_server events, they are not
+             relevant as we do not have a REST-API server. If not
+             set, the daily logs are polluted with these
+             uninformative logs. *)
+        ~daily_logs_section_prefixes:
+          [
+            ("rpc_server", Notice);
+            ("rpc_server", Warning);
+            ("rpc_server", Error);
+            ("rpc_server", Fatal);
+          ]
+        ()
+    in
+    init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   Observer.main ?kernel_path:kernel ~data_dir ~config ()
