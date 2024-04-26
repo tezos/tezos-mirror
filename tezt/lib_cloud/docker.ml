@@ -15,23 +15,25 @@ let build ?(tag = "latest") ?dockerfile ~args () =
            ["--build-arg"; Format.asprintf "%s=%s" key value])
     |> List.concat
   in
-  let workspace = Lazy.force Env.workspace in
+  let tezt_cloud = Lazy.force Env.tezt_cloud in
   let dockerfile =
-    Option.value ~default:(Path.docker // workspace // ".Dockerfile") dockerfile
+    Option.value
+      ~default:(Path.docker // tezt_cloud // ".Dockerfile")
+      dockerfile
   in
-  let tag = ["-t"; Format.asprintf "%s:%s" workspace tag] in
+  let tag = ["-t"; Format.asprintf "%s:%s" tezt_cloud tag] in
   let args = ["build"; "-f"; dockerfile] @ build_args @ tag @ ["."] in
   let value = Process.spawn ~name ~color "docker" args in
   let run = Process.check in
   {value; run}
 
 let tag ?(tag = "latest") docker_registry =
-  let workspace = Lazy.force Env.workspace in
+  let tezt_cloud = Lazy.force Env.tezt_cloud in
   let args =
     [
       "tag";
-      Format.asprintf "%s:%s" workspace tag;
-      Format.asprintf "%s/%s:%s" docker_registry workspace tag;
+      Format.asprintf "%s:%s" tezt_cloud tag;
+      Format.asprintf "%s/%s:%s" docker_registry tezt_cloud tag;
     ]
   in
   let value = Process.spawn ~name ~color "docker" args in
@@ -39,18 +41,18 @@ let tag ?(tag = "latest") docker_registry =
   {value; run}
 
 let push ?(tag = "latest") docker_registry =
-  let workspace = Lazy.force Env.workspace in
+  let tezt_cloud = Lazy.force Env.tezt_cloud in
   let args =
-    ["push"; Format.asprintf "%s/%s:%s" docker_registry workspace tag]
+    ["push"; Format.asprintf "%s/%s:%s" docker_registry tezt_cloud tag]
   in
   let value = Process.spawn ~name ~color "docker" args in
   let run = Process.check in
   {value; run}
 
 let pull ?(tag = "latest") docker_registry =
-  let workspace = Lazy.force Env.workspace in
+  let tezt_cloud = Lazy.force Env.tezt_cloud in
   let args =
-    ["pull"; Format.asprintf "%s/%s:%s" docker_registry workspace tag]
+    ["pull"; Format.asprintf "%s/%s:%s" docker_registry tezt_cloud tag]
   in
   let value = Process.spawn ~name ~color "docker" args in
   let run = Process.check in

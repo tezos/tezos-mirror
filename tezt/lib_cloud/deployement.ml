@@ -5,18 +5,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type configuration = {machine_type : string}
+
 module Remote = struct
+  type workspace_info = {configuration : configuration; number_of_vms : int}
+
+  type point_info = {workspace_name : string; gcp_name : string}
+
+  type address = string
+
   type t = {
     base_port : int;
     ports_per_vm : int;
-    next_port : (string * int, int) Hashtbl.t;
-    names : (string, string) Hashtbl.t;
+    agents_info : (address, point_info) Hashtbl.t;
+    agents : Agent.t list;
+    workspaces_info : (string, workspace_info) Hashtbl.t;
     zone : string;
   }
-
-  let get_points base_port =
-    let* addresses = Terraform.VM.points () in
-    List.map (fun address -> (address, base_port)) addresses |> Lwt.return
 
   let rec wait_docker_running ~zone ~vm_name =
     let*? process =
@@ -66,12 +71,9 @@ module Remote = struct
         let* () = Lwt_unix.sleep 2. in
         wait_docker_running ~zone ~vm_name
 
-  let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~number_of_vms () =
-    let workspace = Lazy.force Env.workspace in
-    let docker_registry = Format.asprintf "%s-docker-registry" workspace in
-    let machine_type = Cli.machine_type in
-    let* () = Terraform.Docker_registry.init () in
-    let* () = Terraform.VM.init () in
+  let workspace_deploy ?(base_port = 30_000) ?(ports_per_vm = 50)
+      ~workspace_name ~machine_type ~number_of_vms ~docker_registry () =
+    let* () = Terraform.VM.Workspace.select workspace_name in
     let* () =
       Terraform.VM.deploy
         ~machine_type
@@ -81,16 +83,14 @@ module Remote = struct
         ~docker_registry
     in
     let names =
-      Seq.ints 1 |> Seq.take number_of_vms
-      |> Seq.map (fun i -> Format.asprintf "%s-%03d" workspace i)
-      |> List.of_seq
+      List.init number_of_vms (fun i ->
+          Format.asprintf "%s-%03d" workspace_name (i + 1))
     in
     let* zone = Terraform.VM.zone () in
     let* () =
       List.map (fun vm_name -> wait_docker_running ~zone ~vm_name) names
       |> Lwt.join
     in
-    let next_port = Hashtbl.create number_of_vms in
     let* () =
       let run_command ~vm_name cmd args =
         Gcloud.compute_ssh ~zone ~vm_name cmd args
@@ -102,29 +102,118 @@ module Remote = struct
         |> Lwt.join
       else Lwt.return_unit
     in
-    let* points = get_points base_port in
-    List.iter
-      (fun point -> Hashtbl.replace next_port point (base_port + 1))
-      points ;
-    let* ips =
-      names
-      |> Lwt_list.map_p (fun name -> Gcloud.get_ip_address_from_name ~zone name)
+    let ssh_id = Lazy.force Env.ssh_private_key in
+    let agent_of_name name =
+      let* ip = Gcloud.get_ip_address_from_name ~zone name in
+      let point = (ip, base_port) in
+      let next_available_port =
+        let port = ref base_port in
+        fun () ->
+          incr port ;
+          !port
+      in
+      Agent.make ~ssh_id ~point ~next_available_port ~name () |> Lwt.return
     in
-    let names = List.combine names ips |> List.to_seq |> Hashtbl.of_seq in
-    Lwt.return {base_port; ports_per_vm; next_port; names; zone}
+    let* agents = names |> Lwt_list.map_p agent_of_name in
+    Lwt.return agents
 
-  let run_command {names; zone; _} ~address cmd args =
-    let vm_name = Hashtbl.find names address in
+  let get_configuration agents_info workspaces_info agent =
+    let address = agent |> Agent.runner |> Option.some |> Runner.address in
+    let {workspace_name; _} = Hashtbl.find agents_info address in
+    let {configuration; _} = Hashtbl.find workspaces_info workspace_name in
+    configuration
+
+  let order_agents agents_info workspaces_info agents configurations =
+    let bindings =
+      agents
+      |> List.map (fun agent ->
+             let configuration =
+               get_configuration agents_info workspaces_info agent
+             in
+             (configuration, agent))
+    in
+    let rec order configurations bindings =
+      match configurations with
+      | [] -> []
+      | configuration :: configurations ->
+          let agent = List.assoc configuration bindings in
+          let bindings = List.remove_assoc configuration bindings in
+          agent :: order configurations bindings
+    in
+    order configurations bindings
+
+  let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~configurations () =
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
+    let docker_registry = Format.asprintf "%s-docker-registry" tezt_cloud in
+    let workspaces_info = Hashtbl.create 11 in
+    let agents_info = Hashtbl.create 11 in
+    let () =
+      List.to_seq configurations |> Seq.group ( = )
+      |> Seq.iteri (fun i seq ->
+             let configuration = Seq.uncons seq |> Option.get |> fst in
+             let name = Format.asprintf "%s-%d" tezt_cloud i in
+             Hashtbl.add
+               workspaces_info
+               name
+               {configuration; number_of_vms = Seq.length seq})
+    in
+    let* () = Terraform.Docker_registry.init () in
+    let* () = Terraform.VM.init () in
+    let workspaces_names =
+      workspaces_info |> Hashtbl.to_seq_keys |> List.of_seq
+    in
+    let* () = Terraform.VM.Workspace.init workspaces_names in
+    let* agents =
+      workspaces_info |> Hashtbl.to_seq |> List.of_seq
+      |> Lwt_list.map_s
+           (fun (workspace_name, {configuration = {machine_type}; number_of_vms})
+           ->
+             let* () = Terraform.VM.Workspace.select workspace_name in
+             let* () = Terraform.VM.init () in
+             let* agents =
+               workspace_deploy
+                 ~base_port
+                 ~ports_per_vm
+                 ~workspace_name
+                 ~machine_type
+                 ~number_of_vms
+                 ~docker_registry
+                 ()
+             in
+             agents
+             |> List.iter (fun agent ->
+                    (* We index the table per address to identify uniquely the agent. *)
+                    let address =
+                      agent |> Agent.runner |> Option.some |> Runner.address
+                    in
+                    Hashtbl.add
+                      agents_info
+                      address
+                      {workspace_name; gcp_name = Agent.name agent}) ;
+             Lwt.return agents)
+    in
+    let agents =
+      order_agents
+        agents_info
+        workspaces_info
+        (List.concat agents)
+        configurations
+    in
+    let* zone = Terraform.VM.zone () in
+    Lwt.return
+      {base_port; ports_per_vm; zone; agents_info; agents; workspaces_info}
+
+  let get_configuration t agent =
+    get_configuration t.agents_info t.workspaces_info agent
+
+  let run_vm_command {agents_info; zone; _} agent cmd args =
+    let address = agent |> Agent.runner |> Option.some |> Runner.address in
+    let {gcp_name = vm_name; _} = Hashtbl.find agents_info address in
     Gcloud.compute_ssh ~zone ~vm_name cmd args
 
-  let get_points t = get_points t.base_port
+  let agents t = t.agents
 
-  let next_port t point =
-    let port = Hashtbl.find t.next_port point in
-    Hashtbl.replace t.next_port point (port + 1) ;
-    port
-
-  let terminate ?exn _t =
+  let terminate ?exn t =
     (match exn with
     | None ->
         Log.report ~color:Log.Color.FG.green "Scenario ended successfully."
@@ -135,7 +224,9 @@ module Remote = struct
           (Printexc.to_string exn)) ;
     if Cli.destroy then (
       Log.report "Destroying VMs, this may take a while..." ;
-      Terraform.VM.destroy ())
+      let workspaces = Hashtbl.to_seq_keys t.workspaces_info |> List.of_seq in
+      let* () = Terraform.VM.destroy workspaces in
+      Terraform.VM.Workspace.destroy ())
     else (
       Log.report
         "No VM destroyed! Don't forget to destroy them when you are done with \
@@ -149,24 +240,27 @@ module Localhost = struct
     processes : Process.t list;
     base_port : int;
     ports_per_vm : int;
-    next_port : (string * int, int) Hashtbl.t;
     names : (string, string) Hashtbl.t;
+    agents : Agent.t list;
   }
 
-  let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~number_of_vms () =
+  let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~configurations () =
     (* We need to intialize the docker registry even on localhost to fetch the
        docker image. *)
     let* () = Terraform.Docker_registry.init () in
     let* docker_registry = Terraform.Docker_registry.get_docker_registry () in
-    let workspace = Lazy.force Env.workspace in
+    let tezt_cloud = Lazy.force Env.tezt_cloud in
     let image_name =
-      Format.asprintf "%s/%s:%s" docker_registry workspace "latest"
+      Format.asprintf "%s/%s:%s" docker_registry tezt_cloud "latest"
     in
     let names = Hashtbl.create 11 in
+    (* The current configuration is actually unused in localhost. Only the
+       number of VMs matters. *)
+    let number_of_vms = List.length configurations in
     let processes =
       Seq.ints 0 |> Seq.take number_of_vms
       |> Seq.map (fun i ->
-             let name = Format.asprintf "%s-%03d" workspace (i + 1) in
+             let name = Format.asprintf "%s-%03d" tezt_cloud (i + 1) in
              let start = base_port + (i * ports_per_vm) |> string_of_int in
              let stop =
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
@@ -200,25 +294,42 @@ module Localhost = struct
       in
       if Cli.monitoring then Monitoring.run ~run_command else Lwt.return_unit
     in
+    let ssh_id = Lazy.force Env.ssh_private_key in
+    let get_point i =
+      let port = base_port + (i * ports_per_vm) in
+      ("localhost", port)
+    in
+    let next_port point =
+      let port = Hashtbl.find next_port point in
+      Hashtbl.replace next_port point (port + 1) ;
+      port
+    in
+    let agents =
+      List.init number_of_vms (fun i ->
+          let name = Format.asprintf "localhost_docker_%d" i in
+          let point = get_point i in
+          Agent.make
+            ~ssh_id
+            ~point
+            ~next_available_port:(fun () -> next_port point)
+            ~name
+            ())
+    in
     Lwt.return
-      {number_of_vms; processes; base_port; ports_per_vm; next_port; names}
+      {number_of_vms; processes; base_port; ports_per_vm; names; agents}
 
-  let run_command _t ~address:_ cmd args =
+  (* Since in [localhost] mode, the VM is the host machine, this comes back
+     to just run a command on the host machine. *)
+  let run_vm_command cmd args =
     let value : Process.t = Process.spawn cmd args in
     let run process = Process.check_and_read_stdout process in
     {value; run}
 
-  let get_points {number_of_vms; base_port; ports_per_vm; _} =
-    Seq.ints 0 |> Seq.take number_of_vms
-    |> Seq.map (fun i ->
-           let port = base_port + (i * ports_per_vm) in
-           ("localhost", port))
-    |> List.of_seq |> Lwt.return
+  let agents t = t.agents
 
-  let next_port t point =
-    let port = Hashtbl.find t.next_port point in
-    Hashtbl.replace t.next_port point (port + 1) ;
-    port
+  let get_configuration _t _agent =
+    (* The configuration is not used in localhost. *)
+    {machine_type = Cli.machine_type}
 
   let terminate ?exn _t =
     (match exn with
@@ -244,31 +355,31 @@ end
 
 type t = Remote of Remote.t | Localhost of Localhost.t
 
-let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~number_of_vms ~localhost
+let deploy ?(base_port = 30_000) ?(ports_per_vm = 50) ~configurations ~localhost
     () =
   if localhost then
     let* localhost =
-      Localhost.deploy ~base_port ~ports_per_vm ~number_of_vms ()
+      Localhost.deploy ~base_port ~ports_per_vm ~configurations ()
     in
     Lwt.return (Localhost localhost)
   else
-    let* remote = Remote.deploy ~base_port ~ports_per_vm ~number_of_vms () in
+    let* remote = Remote.deploy ~base_port ~ports_per_vm ~configurations () in
     Lwt.return (Remote remote)
 
-let run_command t ~address cmd args =
+let run_vm_command t agent cmd args =
   match t with
-  | Remote remote -> Remote.run_command remote ~address cmd args
-  | Localhost localhost -> Localhost.run_command localhost ~address cmd args
+  | Remote remote -> Remote.run_vm_command remote agent cmd args
+  | Localhost _localhost -> Localhost.run_vm_command cmd args
 
-let get_points t =
+let agents t =
   match t with
-  | Remote remote -> Remote.get_points remote
-  | Localhost localhost -> Localhost.get_points localhost
+  | Remote remote -> Remote.agents remote
+  | Localhost localhost -> Localhost.agents localhost
 
-let next_port t point =
+let get_configuration t =
   match t with
-  | Remote remote -> Remote.next_port remote point
-  | Localhost localhost -> Localhost.next_port localhost point
+  | Remote remote -> Remote.get_configuration remote
+  | Localhost localhost -> Localhost.get_configuration localhost
 
 let terminate ?exn t =
   match t with

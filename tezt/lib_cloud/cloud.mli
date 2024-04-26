@@ -5,13 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type vm_configuration = Deployement.configuration = {machine_type : string}
+
+val default_vm_configuration : vm_configuration
+
 type t
 
 (** [register ?vms] is a wrapper around [Test.register]. It
     enables to run a test that can use machines deployed onto the
     cloud. *)
 val register :
-  ?vms:int ->
+  ?vms:vm_configuration list ->
   __FILE__:string ->
   title:string ->
   tags:string list ->
@@ -20,6 +24,8 @@ val register :
   unit
 
 val agents : t -> Agent.t list
+
+val get_configuration : t -> Agent.t -> vm_configuration
 
 val push_metric :
   t -> ?labels:(string * string) list -> name:string -> int -> unit

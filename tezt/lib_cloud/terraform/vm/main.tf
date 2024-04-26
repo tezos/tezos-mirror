@@ -28,6 +28,11 @@ variable "docker_registry_name" {
   default     = "docker-registry"
 }
 
+variable "docker_image_name" {
+  type        = string
+  description = "The docker image name"
+}
+
 variable "base_port" {
   type        = number
   description = "First open port by the firewall"
@@ -75,7 +80,7 @@ provider "google" {
 
 # A service account must be associated with a VM
 resource "google_service_account" "default" {
-  account_id   = "${terraform.workspace}-service-account-id"
+  account_id   = "${terraform.workspace}-id"
   display_name = "${terraform.workspace} service Account"
 }
 
@@ -93,7 +98,7 @@ module "gce-container" {
   source  = "terraform-google-modules/container-vm/google"
   version = "~> 3.0"
 
-  container = { image = "${local.artifact_registry}/${var.project_id}/${var.docker_registry_name}/${terraform.workspace}" }
+  container = { image = "${local.artifact_registry}/${var.project_id}/${var.docker_registry_name}/${var.docker_image_name}" }
 }
 
 # When running a VM, it must be associated with a Virtual Private
@@ -187,6 +192,8 @@ module "instance_template" {
 
   machine_type = var.machine_type
 
+  disk_type = "pd-ssd"
+
   region = var.region
 }
 
@@ -226,5 +233,6 @@ output "zone" {
 
 output "machine_type" {
   description = "Machine type"
-  value       = var.machine_type
+  # All the instances have the same machine type
+  value = module.umig.instances_details[0].machine_type
 }

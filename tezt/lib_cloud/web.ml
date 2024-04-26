@@ -5,7 +5,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {process : Process.t; dir : string}
+type t = {process : Process.t; dir : string; deployement : Deployement.t}
+
+let configuration ~deployement ~agents =
+  let str =
+    agents
+    |> List.map (fun agent ->
+           let configuration =
+             Deployement.get_configuration deployement agent
+           in
+           Format.asprintf
+             "- %s: %s"
+             (Agent.name agent)
+             configuration.machine_type)
+    |> String.concat "\n"
+  in
+  Format.asprintf "# Configurations@.%s\n" str
 
 let monitoring ~agents =
   if Cli.monitoring then
@@ -30,15 +45,16 @@ let prometheus () =
     "# Prometheus\n [Prometheus dashboard](http://localhost:9090)"
   else "Prometheus disabled. Use `--prometheus` to activate it."
 
-let markdown_content ~agents =
-  [monitoring ~agents; prometheus ()] |> String.concat "\n"
+let markdown_content ~deployement ~agents =
+  [configuration ~deployement ~agents; monitoring ~agents; prometheus ()]
+  |> String.concat "\n"
 
 let index dir = dir // "index.md"
 
 let write t ~agents =
   (* The content is formatted in markdown and will be rendered in html via
      pandoc. *)
-  let content = markdown_content ~agents in
+  let content = markdown_content ~deployement:t.deployement ~agents in
   let dir = t.dir in
   let index = index dir in
   Base.with_open_out index (fun oc -> output_string oc content) ;
@@ -56,7 +72,7 @@ let write t ~agents =
       "-s";
     ]
 
-let run ~port =
+let run ~port ~deployement =
   let dir = Temp.dir "website" in
   let index = index dir in
   let process =
@@ -70,10 +86,10 @@ let run ~port =
         Filename.dirname index;
       ]
   in
-  Lwt.return {process; dir}
+  Lwt.return {process; dir; deployement}
 
-let start ~port ~agents =
-  let* t = run ~port in
+let start ~port ~deployement ~agents =
+  let* t = run ~port ~deployement in
   let* () = write t ~agents in
   Lwt.return t
 

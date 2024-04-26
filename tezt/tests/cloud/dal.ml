@@ -37,12 +37,38 @@ module Cli = struct
       stake_typ
       [100]
 
+  let stake_machine_type =
+    let stake_machine_type_typ =
+      let parse string =
+        try string |> String.split_on_char ',' |> Option.some with _ -> None
+      in
+      let show l = l |> String.concat "," in
+      Clap.typ ~name:"stake_machine_type" ~dummy:["foo"] ~parse ~show
+    in
+    Clap.optional
+      ~section
+      ~long:"stake-machine-type"
+      ~placeholder:"<machine_type>,<machine_type>,<machine_type>, ..."
+      ~description:
+        "Specify the machine type used by the stake. The nth machine type will \
+         be assigned to the nth stake specified with [--stake]. If less \
+         machine types are specified, the default one will be used."
+      stake_machine_type_typ
+      ()
+
   let producers =
     Clap.default_int
       ~section
       ~long:"producers"
       ~description:"Specify the number of DAL producers for this test"
       1
+
+  let producer_machine_type =
+    Clap.optional_string
+      ~section
+      ~long:"producer-machine-type"
+      ~description:"Machine type used for the DAL producers"
+      ()
 
   let protocol =
     let protocol_typ =
@@ -76,9 +102,11 @@ end
 
 type configuration = {
   stake : int list;
+  stake_machine_type : string list option;
   dal_node_producer : int;
   protocol : Protocol.t;
   producer_spreading_factor : int;
+  producer_machine_type : string option;
 }
 
 type bootstrap = {node : Node.t; dal_node : Dal_node.t; client : Client.t}
@@ -476,7 +504,6 @@ let get_infos_per_level client ~level =
   in
   let attestations =
     consensus_operations |> List.to_seq
-    |> Seq.filter is_dal_attestation
     |> Seq.map (fun operation ->
            let public_key_hash = get_public_key_hash operation in
            let dal_attestation =
@@ -690,17 +717,17 @@ let init_producer cloud ~bootstrap_node ~dal_bootstrap_node ~number_of_slots
   let is_ready = Dal_node.run ~event_level:`Notice dal_node in
   Lwt.return {client; node; dal_node; account; is_ready}
 
-let init ~configuration cloud next_agent =
+let init ~(configuration : configuration) cloud next_agent =
   let* bootstrap_agent = next_agent ~name:"bootstrap" in
-  let* producers_agents =
-    List.init configuration.dal_node_producer (fun i ->
-        let name = Format.asprintf "producer-%d" i in
-        next_agent ~name)
-    |> Lwt.all
-  in
   let* attesters_agents =
     List.init (List.length configuration.stake) (fun i ->
         let name = Format.asprintf "attester-%d" i in
+        next_agent ~name)
+    |> Lwt.all
+  in
+  let* producers_agents =
+    List.init configuration.dal_node_producer (fun i ->
+        let name = Format.asprintf "producer-%d" i in
         next_agent ~name)
     |> Lwt.all
   in
@@ -822,14 +849,38 @@ let rec loop t level =
 
 let configuration =
   let stake = Cli.stake in
+  let stake_machine_type = Cli.stake_machine_type in
   let dal_node_producer = Cli.producers in
   let protocol = Cli.protocol in
   let producer_spreading_factor = Cli.producer_spreading_factor in
-  {stake; dal_node_producer; protocol; producer_spreading_factor}
+  let producer_machine_type = Cli.producer_machine_type in
+  {
+    stake;
+    stake_machine_type;
+    dal_node_producer;
+    protocol;
+    producer_spreading_factor;
+    producer_machine_type;
+  }
 
 let benchmark () =
   let vms =
     1 + List.length configuration.stake + configuration.dal_node_producer
+  in
+  let vms =
+    List.init vms (fun i ->
+        (* Bootstrap agent *)
+        if i = 0 then Cloud.default_vm_configuration
+        else if i < List.length configuration.stake + 1 then
+          match configuration.stake_machine_type with
+          | None -> Cloud.default_vm_configuration
+          | Some list -> (
+              try {machine_type = List.nth list (i - 1)}
+              with _ -> Cloud.default_vm_configuration)
+        else
+          match configuration.producer_machine_type with
+          | None -> Cloud.default_vm_configuration
+          | Some machine_type -> {machine_type})
   in
   Cloud.register
     ~vms
@@ -846,7 +897,7 @@ let benchmark () =
              explicitely a reduced number of agents and it is not clear how to give
              them proper names. *)
           let set_name agent name =
-            if List.length agents = vms then
+            if List.length agents = List.length vms then
               Cloud.set_agent_name cloud agent name
             else Lwt.return_unit
           in

@@ -8,11 +8,15 @@
 module Cloud : sig
   type t
 
+  type vm_configuration = {machine_type : string}
+
+  val default_vm_configuration : vm_configuration
+
   (** A wrapper around [Test.register] that can be used to register new tests
       using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module. *)
   val register :
-    ?vms:int ->
+    ?vms:vm_configuration list ->
     __FILE__:string ->
     title:string ->
     tags:string list ->
@@ -42,6 +46,8 @@ module Cloud : sig
       points to scrap. Each point can have a name defined by [app_name]. *)
   val add_prometheus_source :
     t -> ?metric_path:string -> job_name:string -> target list -> unit Lwt.t
+
+  val get_configuration : t -> Agent.t -> vm_configuration
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

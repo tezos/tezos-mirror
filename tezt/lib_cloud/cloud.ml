@@ -88,44 +88,32 @@ let rec wait_ssh_server_running runner =
 
 let register ?vms ~__FILE__ ~title ~tags ?seed f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
-  let configuration =
+  let vms =
     (* The Cli arguments by-pass the argument given here. This enable the user
        to always have decide precisely the number of vms to be run. *)
     match (vms, Cli.vms) with
     | None, None -> None
-    | None, Some i | Some _, Some i -> Some i
-    | Some i, None -> Some i
+    | None, Some i | Some _, Some i ->
+        let vms =
+          List.init i (fun _ -> Deployement.{machine_type = Cli.machine_type})
+        in
+        Some vms
+    | Some vms, None -> Some vms
   in
-  match configuration with
+  match vms with
   | None ->
       (* If there is no configuration, it is a similar scenario as if there were not agent. *)
       f {agents = []; website = None; prometheus = None; deployement = None}
-  | Some number_of_vms ->
+  | Some configurations ->
       let ports_per_vm = Cli.ports_per_vm in
       let* deployement =
         Deployement.deploy
           ~ports_per_vm
-          ~number_of_vms
+          ~configurations
           ~localhost:Cli.localhost
           ()
       in
-      let* points = Deployement.get_points deployement in
-      let names =
-        List.init number_of_vms (fun i -> Format.asprintf "vm_%d" i)
-      in
-      let ssh_id = Lazy.force Env.ssh_private_key in
-      let agents =
-        points
-        |> List.map2 (fun left right -> (left, right)) names
-        |> List.map (fun (name, point) ->
-               Agent.make
-                 ~ssh_id
-                 ~point
-                 ~next_available_port:(fun () ->
-                   Deployement.next_port deployement point)
-                 ~name
-                 ())
-      in
+      let agents = Deployement.agents deployement in
       let* () =
         agents
         |> List.map (fun agent -> Agent.runner agent |> wait_ssh_server_running)
@@ -145,7 +133,9 @@ let register ?vms ~__FILE__ ~title ~tags ?seed f =
                  address)) ;
       let* website =
         if Cli.website then
-          let* website = Web.start ~port:Cli.website_port ~agents in
+          let* website =
+            Web.start ~port:Cli.website_port ~deployement ~agents
+          in
           Lwt.return_some website
         else Lwt.return_none
       in
@@ -166,7 +156,7 @@ let register ?vms ~__FILE__ ~title ~tags ?seed f =
           (fun exn -> Lwt.return_some exn)
       in
       (* This part is tricky! We want to catch Ctrl+C so that tezt does not
-         kill all the process directly before tezt-cloud termination tasks are
+         kill all the VMs directly before tezt-cloud termination tasks are
          over. When the signal is caught, tezt-cloud takes over. Processes are
          cleaned up manually via [Process.clean_up ()].
       *)
@@ -181,6 +171,15 @@ let register ?vms ~__FILE__ ~title ~tags ?seed f =
       shutdown ?exn t
 
 let agents t = t.agents
+
+type vm_configuration = Deployement.configuration = {machine_type : string}
+
+let default_vm_configuration = {machine_type = Cli.machine_type}
+
+let get_configuration t agent =
+  match t.deployement with
+  | None -> default_vm_configuration
+  | Some deployement -> Deployement.get_configuration deployement agent
 
 let set_agent_name t agent name =
   Agent.set_name agent name ;

@@ -5,21 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let workspace =
+let tezt_cloud =
   (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
   Lazy.from_fun @@ fun () ->
-  match Sys.getenv_opt "TF_WORKSPACE" with
+  match Sys.getenv_opt "TEZT_CLOUD" with
   | None ->
       Test.fail
-        "The environment variable 'TF_WORKSPACE' is not defined. See README \
-         for more information why this variable must be defined."
+        "The environment variable 'TEZT_CLOUD' is not defined. See README for \
+         more information why this variable must be defined."
   | Some value -> value
 
 let ssh_private_key =
   Lazy.from_fun (fun () ->
       let home = Sys.getenv "HOME" in
-      let workspace = Lazy.force workspace in
-      home // ".ssh" // Format.asprintf "%s-tf" workspace)
+      let tezt_cloud = Lazy.force tezt_cloud in
+      home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud)
 
 let ssh_public_key =
   Lazy.from_fun (fun () ->
@@ -28,5 +28,5 @@ let ssh_public_key =
 
 let dockerfile =
   Lazy.from_fun (fun () ->
-      let workspace = Lazy.force workspace in
-      Path.docker // Format.asprintf "%s.Dockerfile" workspace)
+      let tezt_cloud = Lazy.force tezt_cloud in
+      Path.docker // Format.asprintf "%s.Dockerfile" tezt_cloud)
