@@ -10,8 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "ctypes" { >= "0.18.0" }
-  "ctypes-foreign" { >= "0.18.0" }
+  "octez-l2-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

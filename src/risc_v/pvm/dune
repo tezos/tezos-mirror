@@ -6,32 +6,11 @@
  (public_name octez-risc-v-pvm)
  (instrumentation (backend bisect_ppx))
  (libraries
-  ctypes
-  ctypes.foreign)
+  octez-l2-libs.layer2_store)
  (flags
   (:standard)
-  -w -9-27)
- (ctypes
-  (external_library_name octez_risc_v_pvm)
-  (build_flags_resolver
-   (vendored
-    (c_flags
-     :standard
-     -Wno-discarded-qualifiers
-     -I%{env:INSIDE_DUNE=.}/src/risc_v/pvm)
-    (c_library_flags
-     :standard
-     -loctez_risc_v_pvm
-     -L%{env:INSIDE_DUNE=.}/src/risc_v/pvm)))
-  (headers (include octez_risc_v_pvm.h))
-  (type_description (instance Types) (functor Api_types_desc))
-  (function_description
-   (concurrency unlocked)
-   (instance Functions)
-   (functor Api_funcs_desc))
-  (generated_types Api_types)
-  (generated_entry_point Api)
-  (deps liboctez_risc_v_pvm.a octez_risc_v_pvm.h)))
+  -w -9-27-66)
+ (foreign_archives octez_risc_v_pvm))
 
 (subdir
  helpers/bin
@@ -55,7 +34,7 @@
      helpers)))))
 
 (rule
- (targets liboctez_risc_v_pvm.a octez_risc_v_pvm.h)
+ (targets liboctez_risc_v_pvm.a octez_risc_v_pvm.ml octez_risc_v_pvm.mli)
  (deps
   (file Cargo.toml)
   (file build.rs)
@@ -66,6 +45,7 @@
   (source_tree ../interpreter)
   (file ../sandbox/Cargo.toml)
   (source_tree ../../kernel_sdk/constants)
+  (file ../../kernel_sdk/constants/Cargo.toml)
   (file ../../kernel_sdk/core/Cargo.toml)
   (file ../../kernel_sdk/host/Cargo.toml)
   (file ../../kernel_sdk/encoding/Cargo.toml))
@@ -77,7 +57,7 @@
     (copy ../target/release/liboctez_risc_v_pvm.a liboctez_risc_v_pvm.a)))))
 
 (rule
- (targets liboctez_risc_v_pvm.a octez_risc_v_pvm.h)
+ (targets liboctez_risc_v_pvm.a octez_risc_v_pvm.ml octez_risc_v_pvm.mli)
  (deps
   (file Cargo.toml)
   (file build.rs)
@@ -88,6 +68,7 @@
   (source_tree ../interpreter)
   (file ../sandbox/Cargo.toml)
   (source_tree ../../kernel_sdk/constants)
+  (file ../../kernel_sdk/constants/Cargo.toml)
   (file ../../kernel_sdk/core/Cargo.toml)
   (file ../../kernel_sdk/host/Cargo.toml)
   (file ../../kernel_sdk/encoding/Cargo.toml)
