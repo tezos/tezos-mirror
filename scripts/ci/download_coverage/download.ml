@@ -66,11 +66,24 @@ let fetch_pipeline_coverage_from_jobs pipeline =
     let job_id = JSON.(job |-> "id" |> as_int) in
     let job_name = JSON.(job |-> "name" |> as_string) in
     let job_status = JSON.(job |-> "status" |> as_string) in
+    (* Based on [Utils.slugify] from
+       https://gitlab.com/gitlab-org/gitlab/blob/master/gems/gitlab-utils/lib/gitlab/utils.rb#L58 *)
+    let slugify str =
+      let str =
+        String.map
+          (function
+            | ('a' .. 'z' | 'A' .. 'Z' | '0' .. '9') as c -> c | _ -> '-')
+          str
+      in
+      let str = String.sub str 0 (min (String.length job_name) 63) in
+      Base.replace_string (rex "^-+|-+$") ~by:"" str
+    in
     let artifact_name =
-      Base.replace_string (rex "[\\\\/_ @\\[\\]]+") job_name ~by:"-"
-      ^ ".coverage"
-      (* See for [scripts/ci/merge_coverage.sh] for details on how
-         job_names are mangled into coverage trace artifact paths. *)
+      (* Coverage traces are stored in [${CI_JOB_NAME_SLUG}.coverage]
+         (see [scripts/ci/merge_coverage.sh]) for full details,
+         and see https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+         for the details on CI_JOB_NAME_SLUG. *)
+      slugify job_name ^ ".coverage"
     in
     let artifact_path = coverage_traces_directory // artifact_name in
     if

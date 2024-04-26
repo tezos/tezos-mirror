@@ -622,3 +622,6 @@ let check_files ~remove_extra_files ?(exclude = fun _ -> false) () =
         \  rm %s"
         (error_not_generated |> String_set.elements |> String.concat " ")) ;
   if !Cli.has_error then exit 1
+
+let append_script script tezos_job =
+  map_job tezos_job @@ fun job -> {job with script = job.script @ script}

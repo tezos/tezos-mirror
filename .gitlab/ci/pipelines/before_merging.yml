@@ -7105,7 +7105,7 @@ oc.unit:non-proto-x86_64:
     expire_in: 1 day
     paths:
     - test_results
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: test_results/*.xml
     when: always
@@ -7148,7 +7148,7 @@ oc.unit:other-x86_64:
     expire_in: 1 day
     paths:
     - test_results
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: test_results/*.xml
     when: always
@@ -7191,7 +7191,7 @@ oc.unit:proto-x86_64:
     expire_in: 1 day
     paths:
     - test_results
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: test_results/*.xml
     when: always
@@ -7552,7 +7552,7 @@ tezt:
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
     --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
@@ -7570,7 +7570,7 @@ tezt:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7619,7 +7619,7 @@ tezt-memory-3k:
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
     --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -memory_3k
@@ -7637,7 +7637,7 @@ tezt-memory-3k:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7685,7 +7685,7 @@ tezt-memory-4k:
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
     --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -memory_4k
@@ -7703,7 +7703,7 @@ tezt-memory-4k:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7752,7 +7752,7 @@ tezt-time-sensitive:
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
     --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -time_sensitive
@@ -7770,7 +7770,7 @@ tezt-time-sensitive:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7819,7 +7819,6 @@ tezt-slow:
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
     --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -slow
@@ -7884,7 +7883,7 @@ tezt-flaky:
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
     --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
+  - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -flaky
@@ -7902,7 +7901,7 @@ tezt-flaky:
     - tezt-*.log
     - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
     - $JUNIT
-    - $BISECT_FILE
+    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -7947,7 +7946,6 @@ tezt:static-binaries:
     fail --junit ${JUNIT} --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
     --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
     --retry ${TEZT_RETRY}
-  - if [ -n "${BISECT_FILE:-}" ]; then ./scripts/ci/merge_coverage.sh; fi
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""

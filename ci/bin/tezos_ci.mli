@@ -291,3 +291,6 @@ val add_artifacts :
     [job], unless [allow_overwrite] is true (default is [false]). *)
 val append_variables :
   ?allow_overwrite:bool -> Gitlab_ci.Types.variables -> tezos_job -> tezos_job
+
+(** Append to the [script:] section of a job. *)
+val append_script : string list -> tezos_job -> tezos_job
