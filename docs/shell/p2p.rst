@@ -1,7 +1,7 @@
 The peer-to-peer layer
 ======================
 
-This document explains the inner workings of the peer-to-peer layer of
+This document explains the inner workings of the peer-to-peer (or P2P) layer of
 the Tezos shell. This part is in charge of establishing and
 maintaining network connections with other nodes (gossip).
 
@@ -17,8 +17,8 @@ The P2P layer is comprised of a pool of connections, a set of
 operations on those connections, and a set of workers following the
 worker pattern pervasively used in the codebase.
 
-The P2P layer is packaged in :package-api:`tezos-p2p <octez-shell-libs/Tezos_p2p/index.html>`, which has
-documentation for all modules.
+The P2P layer is packaged in module :package-api:`Tezos-p2p <octez-shell-libs/Tezos_p2p/index.html>`, which has
+documentation for all the constituent modules.
 
 General operation
 -----------------
