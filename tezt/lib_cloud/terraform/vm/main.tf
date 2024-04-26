@@ -192,6 +192,8 @@ module "instance_template" {
 
   machine_type = var.machine_type
 
+  disk_type = "pd-ssd"
+
   region = var.region
 }
 
