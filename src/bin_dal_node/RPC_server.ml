@@ -115,8 +115,7 @@ module Slots_handlers = struct
           return proof
         in
         match proof with
-        | (Ok _ | Error (`Not_found | `Decoding_failed _ | `Other _)) as proof
-          ->
+        | (Ok _ | Error (`Not_found | `Other _)) as proof ->
             Lwt.return proof |> Errors.to_option_tzresult
         | Error
             (( `Fail _ | `Page_index_out_of_range | `Slot_wrong_size _
@@ -202,7 +201,7 @@ module Slots_handlers = struct
         in
         return_some pages
     | Error `Not_found -> return_none
-    | Error (`Decoding_failed _) as res -> Errors.to_tzresult (Lwt.return res)
+    | Error (`Other _) as res -> Errors.to_tzresult (Lwt.return res)
 end
 
 module Profile_handlers = struct
@@ -255,8 +254,7 @@ module Profile_handlers = struct
           let open Errors in
           match r with
           | Error `Not_found -> return_false
-          | Error (#decoding as e) ->
-              fail (e :> [Errors.decoding | Errors.other])
+          | Error (#other as e) -> fail e
           | Ok commitment ->
               Store.Shards.are_shards_available
                 store.shards

@@ -38,7 +38,6 @@ type error +=
     catch and handle them. On the other hand, encoding errors only happen in
     unexpected circumstances (e.g. out of memory) so we don't expect callers to
     catch and handle them. *)
-type decoding = [`Decoding_failed of Types.Store.kind * tztrace]
 
 (** We would like to match [`Not_found] as we would want to return 404 HTTP code
     to clients. *)
@@ -48,7 +47,9 @@ type not_found = [`Not_found]
     polymorphic-variants based monad. *)
 type other = [`Other of tztrace]
 
-val decoding_failed : Types.Store.kind -> tztrace -> [> decoding]
+(** [decoding_failed kind trace] produces the error trace
+    [Decoding_failed kind :: trace] and wraps it with [`Other]. *)
+val decoding_failed : Types.Store.kind -> tztrace -> [> other]
 
 (** [other l] wraps the give tztrace [l] in [`Other]. *)
 val other : tztrace -> [> other]
@@ -82,10 +83,9 @@ val other_lwt_result : 'a tzresult Lwt.t -> ('a, [> other]) result Lwt.t
     Note that an {!Event.decoding_data_failed} is emitted. in case a
     [`Decoding_failed] is encountered. *)
 val to_option_tzresult :
-  ('a, [< decoding | not_found | other]) result Lwt.t ->
-  'a option tzresult Lwt.t
+  ('a, [< not_found | other]) result Lwt.t -> 'a option tzresult Lwt.t
 
 (** [to_tzresult v] is quite similar to {!to_option_tzresult}. Except that the
     [`Not_found] case cannot happen, in which case the use of [option] for the
     non-failing case is not needed. *)
-val to_tzresult : ('a, [< decoding | other]) result Lwt.t -> 'a tzresult Lwt.t
+val to_tzresult : ('a, [< other]) result Lwt.t -> 'a tzresult Lwt.t

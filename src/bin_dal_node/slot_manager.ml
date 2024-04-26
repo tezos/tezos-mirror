@@ -156,7 +156,7 @@ let get_slot cryptobox store commitment =
   in
   match res with
   | Ok (Some slot) -> return slot
-  | Ok None | Error (`Decoding_failed _) ->
+  | Ok None | Error (`Other _) ->
       (* The slot could not be obtained from the slot store, attempt a
          reconstruction. *)
       let minimal_number_of_shards = number_of_shards / redundancy_factor in

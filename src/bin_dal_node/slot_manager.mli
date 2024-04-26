@@ -73,7 +73,7 @@ val add_commitment :
   Store.t ->
   Cryptobox.slot ->
   Cryptobox.t ->
-  (Cryptobox.commitment, [Errors.decoding | Errors.other]) result Lwt.t
+  (Cryptobox.commitment, Errors.other) result Lwt.t
 
 (** [get_slot_content node_store cryptobox slot_id] returns the slot
     content associated with the given [slot_id] in [node_store].
@@ -85,7 +85,7 @@ val get_slot_content :
   Store.t ->
   Cryptobox.t ->
   Types.slot_id ->
-  (slot, [> Errors.decoding | Errors.not_found]) result Lwt.t
+  (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof] registers the shards of the slot whose commitment is
@@ -103,7 +103,7 @@ val add_commitment_shards :
   Cryptobox.t ->
   Cryptobox.commitment ->
   with_proof:bool ->
-  (unit, [Errors.decoding | Errors.not_found | Errors.other]) result Lwt.t
+  (unit, [Errors.not_found | Errors.other]) result Lwt.t
 
 (** This function publishes the given shards and their proofs. *)
 val publish_proved_shards :
@@ -175,7 +175,7 @@ val get_commitment_by_published_level_and_index :
   level:Types.level ->
   slot_index:Types.slot_index ->
   Store.t ->
-  (Cryptobox.commitment, [Errors.decoding | Errors.not_found]) result Lwt.t
+  (Cryptobox.commitment, [Errors.other | Errors.not_found]) result Lwt.t
 
 (** [get_slot_status ~slot_id store] returns the status associated to the
     accepted slot of id [slot_id] or [None] if no status is currently
@@ -184,7 +184,7 @@ val get_commitment_by_published_level_and_index :
 val get_slot_status :
   slot_id:Types.slot_id ->
   Store.t ->
-  (Types.header_status option, Errors.decoding) result Lwt.t
+  (Types.header_status option, Errors.other) result Lwt.t
 
 (** [get_slot_shard store slot_id shard_index] returns the shard at
     index [shard_index] of the slot given by [slot_id].
@@ -193,5 +193,4 @@ val get_slot_shard :
   Store.t ->
   Types.slot_id ->
   Types.shard_index ->
-  (Cryptobox.shard, [Errors.decoding | Errors.other | Errors.not_found]) result
-  Lwt.t
+  (Cryptobox.shard, [Errors.other | Errors.not_found]) result Lwt.t
