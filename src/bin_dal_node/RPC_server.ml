@@ -27,13 +27,14 @@
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-let call_handler1 ctxt handler = handler (Node_context.get_store ctxt)
+let call_handler1 ctxt handler =
+  handler (Node_context.get_store ctxt) |> Errors.to_option_tzresult
 
 let call_handler2 ctxt handler =
   let open Lwt_result_syntax in
   let*? ready_ctxt = Node_context.get_ready ctxt in
   let store = Node_context.get_store ctxt in
-  handler store ready_ctxt
+  handler store ready_ctxt |> Errors.to_option_tzresult
 
 type error +=
   | Cryptobox_error of string * string
@@ -79,8 +80,7 @@ module Slots_handlers = struct
           ~reconstruct_if_missing:true
           store
           cryptobox
-          slot_id
-        |> Errors.to_option_tzresult)
+          slot_id)
 
   (* This function assumes the slot is valid since we already have
      computed a commitment for it. *)
@@ -111,7 +111,7 @@ module Slots_handlers = struct
 
   let get_slot_page_proof ctxt slot_level slot_index page_index () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
-        (let open Lwt_result_syntax in
+        let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         let* content =
           Slot_manager.get_slot_content
@@ -138,14 +138,13 @@ module Slots_handlers = struct
                   Cryptobox.string_of_commit_error commit_error
             in
             fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
-        |> Errors.to_option_tzresult)
 
   let post_slot ctxt query slot =
     call_handler2
       ctxt
       (fun store {cryptobox; shards_proofs_precomputation; proto_parameters; _}
       ->
-        (let open Lwt_result_syntax in
+        let open Lwt_result_syntax in
         let slot_size = proto_parameters.cryptobox_parameters.slot_size in
         let slot_length = String.length slot in
         let*? slot =
@@ -169,24 +168,21 @@ module Slots_handlers = struct
             ~with_proof:true
         in
         return (commitment, commitment_proof))
-        |> Errors.to_option_tzresult)
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_commitment slot_id store
-        |> Errors.to_option_tzresult)
+        Slot_manager.get_slot_commitment slot_id store)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_status ~slot_id store |> Errors.to_option_tzresult)
+        Slot_manager.get_slot_status ~slot_id store)
 
   let get_slot_shard ctxt slot_level slot_index shard_index () () =
     call_handler1 ctxt (fun node_store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_shard node_store slot_id shard_index
-        |> Errors.to_option_tzresult)
+        Slot_manager.get_slot_shard node_store slot_id shard_index)
 
   let get_slot_pages ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun node_store {cryptobox; _} ->
@@ -195,8 +191,7 @@ module Slots_handlers = struct
           ~reconstruct_if_missing:true
           cryptobox
           node_store
-          slot_id
-        |> Errors.to_option_tzresult)
+          slot_id)
 end
 
 module Profile_handlers = struct
@@ -211,7 +206,7 @@ module Profile_handlers = struct
             gs_worker
             operator_profiles
         with
-        | None -> fail Errors.[Profile_incompatibility]
+        | None -> fail @@ Errors.(other [Profile_incompatibility])
         | Some pctxt ->
             let*! () = Node_context.set_profile_ctxt ctxt pctxt in
             return_unit)
@@ -266,7 +261,7 @@ module Profile_handlers = struct
            at [attested_level - 1], because the (DAL) attestations in the blocks
            at level [attested_level] refer to the predecessor level. *)
         let attestation_level = Int32.pred attested_level in
-        (let open Lwt_result_syntax in
+        let open Lwt_result_syntax in
         let* shard_indices =
           Node_context.fetch_assigned_shard_indices
             ctxt
@@ -279,7 +274,6 @@ module Profile_handlers = struct
           store
           proto_parameters
           ~attested_level)
-        |> Errors.to_tzresult)
 end
 
 let version ctxt () () =
@@ -373,7 +367,7 @@ let register :
        Services.get_slot_commitment
        (Slots_handlers.get_slot_commitment ctxt)
   |> add_service
-       Tezos_rpc.Directory.register0
+       Tezos_rpc.Directory.opt_register0
        Services.patch_profiles
        (Profile_handlers.patch_profiles ctxt)
   |> add_service
@@ -389,7 +383,7 @@ let register :
        Services.get_assigned_shard_indices
        (Profile_handlers.get_assigned_shard_indices ctxt)
   |> add_service
-       Tezos_rpc.Directory.register2
+       Tezos_rpc.Directory.opt_register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
   |> add_service
