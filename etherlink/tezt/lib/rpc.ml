@@ -91,6 +91,12 @@ module Request = struct
       method_ = "eth_getBalance";
       parameters = `A [`String address; `String block];
     }
+
+  let get_storage_at ~address ~pos ~block =
+    {
+      method_ = "eth_getStorageAt";
+      parameters = `A [`String address; `String pos; `String block];
+    }
 end
 
 let net_version evm_node =
@@ -259,4 +265,13 @@ let get_balance ~address ?(block = "latest") evm_node =
   @@ decode_or_error
        (fun response ->
          Evm_node.extract_result response |> JSON.as_string |> Wei.of_string)
+       response
+
+let get_storage_at ~address ?(block = "latest") ~pos evm_node =
+  let* response =
+    Evm_node.call_evm_rpc evm_node (Request.get_storage_at ~address ~pos ~block)
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response

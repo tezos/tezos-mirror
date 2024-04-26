@@ -3417,34 +3417,12 @@ let test_rpc_getStorageAt =
   (* set values *)
   let* tx = send_foo_mapping_storage address sender evm_setup in
   let* () = check_tx_succeeded ~endpoint ~tx in
-  let* hex_value =
-    Evm_node.(
-      let* value =
-        call_evm_rpc
-          evm_node
-          {
-            method_ = "eth_getStorageAt";
-            parameters = `A [`String address; `String "0x0"; `String "latest"];
-          }
-      in
-      return JSON.(value |-> "result" |> as_string))
-  in
+  let*@ hex_value = Rpc.get_storage_at ~address ~pos:"0x0" evm_node in
   Check.(
     (Durable_storage_path.no_0x hex_value = hex_256_of expected_value0) string)
     ~error_msg:"Expected %R, but got %L" ;
   let pos = Helpers.mapping_position sender.address 1 in
-  let* hex_value =
-    Evm_node.(
-      let* value =
-        call_evm_rpc
-          evm_node
-          {
-            method_ = "eth_getStorageAt";
-            parameters = `A [`String address; `String pos; `String "latest"];
-          }
-      in
-      return JSON.(value |-> "result" |> as_string))
-  in
+  let*@ hex_value = Rpc.get_storage_at ~address ~pos evm_node in
   Check.(
     (Durable_storage_path.no_0x hex_value = hex_256_of expected_value1) string)
     ~error_msg:"Expected %R, but got %L" ;

@@ -117,3 +117,12 @@ val call :
     defaults to ["latest"].*)
 val get_balance :
   address:string -> ?block:string -> Evm_node.t -> (Wei.t, error) result Lwt.t
+
+(** [get_balance ~address ?Block ~pos evm_node] calls [eth_getStorageAt]. [block]
+    defaults to ["latest"]. *)
+val get_storage_at :
+  address:string ->
+  ?block:string ->
+  pos:string ->
+  Evm_node.t ->
+  (string, error) result Lwt.t
