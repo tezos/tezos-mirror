@@ -37,6 +37,25 @@ module Cli = struct
       stake_typ
       [100]
 
+  let stake_machine_type =
+    let stake_machine_type_typ =
+      let parse string =
+        try string |> String.split_on_char ',' |> Option.some with _ -> None
+      in
+      let show l = l |> String.concat "," in
+      Clap.typ ~name:"stake_machine_type" ~dummy:["foo"] ~parse ~show
+    in
+    Clap.optional
+      ~section
+      ~long:"stake-machine-type"
+      ~placeholder:"<machine_type>,<machine_type>,<machine_type>, ..."
+      ~description:
+        "Specify the machine type used by the stake. The nth machine type will \
+         be assigned to the nth stake specified with [--stake]. If less \
+         machine types are specified, the default one will be used."
+      stake_machine_type_typ
+      ()
+
   let producers =
     Clap.default_int
       ~section
@@ -83,6 +102,7 @@ end
 
 type configuration = {
   stake : int list;
+  stake_machine_type : string list option;
   dal_node_producer : int;
   protocol : Protocol.t;
   producer_spreading_factor : int;
@@ -484,7 +504,6 @@ let get_infos_per_level client ~level =
   in
   let attestations =
     consensus_operations |> List.to_seq
-    |> Seq.filter is_dal_attestation
     |> Seq.map (fun operation ->
            let public_key_hash = get_public_key_hash operation in
            let dal_attestation =
@@ -830,12 +849,14 @@ let rec loop t level =
 
 let configuration =
   let stake = Cli.stake in
+  let stake_machine_type = Cli.stake_machine_type in
   let dal_node_producer = Cli.producers in
   let protocol = Cli.protocol in
   let producer_spreading_factor = Cli.producer_spreading_factor in
   let producer_machine_type = Cli.producer_machine_type in
   {
     stake;
+    stake_machine_type;
     dal_node_producer;
     protocol;
     producer_spreading_factor;
@@ -848,8 +869,14 @@ let benchmark () =
   in
   let vms =
     List.init vms (fun i ->
-        if i < List.length configuration.stake + 1 then
-          Cloud.default_vm_configuration
+        (* Bootstrap agent *)
+        if i = 0 then Cloud.default_vm_configuration
+        else if i < List.length configuration.stake + 1 then
+          match configuration.stake_machine_type with
+          | None -> Cloud.default_vm_configuration
+          | Some list -> (
+              try {machine_type = List.nth list (i - 1)}
+              with _ -> Cloud.default_vm_configuration)
         else
           match configuration.producer_machine_type with
           | None -> Cloud.default_vm_configuration
