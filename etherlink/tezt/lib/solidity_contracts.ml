@@ -200,3 +200,12 @@ let gas_limit_contract =
     abi = kernel_inputs_path ^ "/gas_limit.abi";
     bin = kernel_inputs_path ^ "/gas_limit.bin";
   }
+
+(** The info for the "gas_limit.sol" contract.
+    See [etherlink/kernel_evm/solidity_examples/counter.sol] *)
+let counter =
+  {
+    label = "counter";
+    abi = kernel_inputs_path ^ "/counter.abi";
+    bin = kernel_inputs_path ^ "/counter.bin";
+  }
