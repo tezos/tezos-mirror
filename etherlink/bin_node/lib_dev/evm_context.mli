@@ -64,13 +64,15 @@ val inspect :
   string ->
   bytes option tzresult Lwt.t
 
-(** [execute_and_inspect ~input ctxt] executes [input] using the freshest EVM
-    state, and returns [input.insights_requests].
+(** [execute_and_inspect ~input ?block ctxt] executes [input] using
+    the EVM state of [block] (if [block] is omitted then the freshest
+    state is used), and returns [input.insights_requests].
 
     If [wasm_entrypoint] is omitted, the [kernel_run] function of the kernel is
     executed. *)
 val execute_and_inspect :
   ?wasm_entrypoint:string ->
+  ?block:Ethereum_types.Block_parameter.extended ->
   Simulation.Encodings.simulate_input ->
   bytes option list tzresult Lwt.t
 

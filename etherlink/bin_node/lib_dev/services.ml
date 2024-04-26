@@ -316,8 +316,8 @@ let dispatch_request (config : Configuration.t)
 
         build_with_input ~f module_ parameters
     | Method (Eth_call.Method, module_) ->
-        let f (call, _) =
-          let* call_result = Backend_rpc.simulate_call call in
+        let f (call, block_param) =
+          let* call_result = Backend_rpc.simulate_call call block_param in
           match call_result with
           | Ok (Ok {value = Some value; gas_used = _}) -> rpc_ok value
           | Ok (Ok {value = None; gas_used = _}) -> rpc_ok (hash_of_string "")

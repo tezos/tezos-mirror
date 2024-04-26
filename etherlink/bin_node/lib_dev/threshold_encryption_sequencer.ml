@@ -30,9 +30,9 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module SimulatorBackend = struct
-    let simulate_and_read ~input =
+    let simulate_and_read ?block ~input () =
       let open Lwt_result_syntax in
-      let* raw_insights = Evm_context.execute_and_inspect input in
+      let* raw_insights = Evm_context.execute_and_inspect ?block input in
       match raw_insights with
       | [Some bytes] -> return bytes
       | _ -> Error_monad.failwith "Invalid insights format"
