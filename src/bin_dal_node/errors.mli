@@ -48,6 +48,8 @@ type not_found = [`Not_found]
     polymorphic-variants based monad. *)
 type other = [`Other of tztrace]
 
+val decoding_failed : Types.Store.kind -> tztrace -> [> decoding]
+
 (** [other l] wraps the give tztrace [l] in [`Other]. *)
 val other : tztrace -> [> other]
 
