@@ -106,11 +106,7 @@ let other_lwt_result v =
 
 let error_to_tzresult e =
   let open Lwt_result_syntax in
-  match e with
-  | `Decoding_failed (kind, tztrace) ->
-      let*! () = Event.(emit decoding_data_failed kind) in
-      fail (Decoding_failed kind :: tztrace)
-  | `Other e -> fail e
+  match e with `Other e -> fail e
 
 let to_option_tzresult r =
   let open Lwt_result_syntax in
@@ -118,7 +114,7 @@ let to_option_tzresult r =
   match r with
   | Ok s -> return_some s
   | Error `Not_found -> return_none
-  | Error ((`Decoding_failed _ | `Other _) as err) -> error_to_tzresult err
+  | Error (`Other _ as err) -> error_to_tzresult err
 
 let to_tzresult r =
   let open Lwt_result_syntax in
