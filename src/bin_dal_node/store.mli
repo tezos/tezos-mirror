@@ -186,18 +186,13 @@ module Legacy : sig
     result
     Lwt.t
 
-  (** [get_commitment_headers commitment ?slot_level ?slot_index
-      store] returns all the slot headers (slot identifiers and
-      statuses) associated to the given commitment. The optional
-      arguments can be used for filtering; when set, only the
-      slot headers for the provided level or slot index are
-      considered. *)
-  val get_commitment_headers :
-    commitment ->
-    ?slot_level:int32 ->
-    ?slot_index:int ->
+  (** [get_slot_status ~slot_id store] returns the status associated
+      to the given accepted [slot_id], or [None] if no status is
+      associated to the [slot_id]. *)
+  val get_slot_status :
+    slot_id:Types.slot_id ->
     t ->
-    ( Types.slot_header list,
+    ( Types.header_status option,
       [> `Decoding_failed of Types.Store.kind * tztrace] )
     result
     Lwt.t

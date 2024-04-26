@@ -108,14 +108,14 @@ val get_commitment_by_published_level_and_index :
   ; query : unit >
   service
 
-(** Return the known headers for the slot whose commitment is given. *)
-val get_commitment_headers :
+(** Return the status for the given slot. *)
+val get_slot_status :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.slot_header list
+  ; output : Types.header_status
   ; prefix : unit
-  ; params : unit * Cryptobox.commitment
-  ; query : Types.level option * Types.slot_index option >
+  ; params : (unit * Types.level) * Types.slot_index
+  ; query : unit >
   service
 
 (** Return the known slot headers for the given published level. *)

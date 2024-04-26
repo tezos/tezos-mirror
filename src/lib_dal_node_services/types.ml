@@ -361,19 +361,19 @@ let header_status_encoding : header_status Data_encoding.t =
       case
         ~title:"waiting_attestation"
         (Tag 0)
-        (obj1 (req "status" (constant "waiting_attestation")))
+        (constant "waiting_attestation")
         (function `Waiting_attestation -> Some () | _ -> None)
         (function () -> `Waiting_attestation);
       case
         ~title:"attested"
         (Tag 1)
-        (obj1 (req "status" (constant "attested")))
+        (constant "attested")
         (function `Attested -> Some () | _ -> None)
         (function () -> `Attested);
       case
         ~title:"unattested"
         (Tag 2)
-        (obj1 (req "status" (constant "unattested")))
+        (constant "unattested")
         (function `Unattested -> Some () | _ -> None)
         (function () -> `Unattested);
     ]
@@ -385,9 +385,9 @@ let slot_header_encoding =
     (fun (slot_id, (commitment, status)) -> {slot_id; commitment; status})
     (merge_objs
        slot_id_encoding
-       (merge_objs
-          (obj1 (req "commitment" Cryptobox.Commitment.encoding))
-          header_status_encoding))
+       (obj2
+          (req "commitment" Cryptobox.Commitment.encoding)
+          (req "status" header_status_encoding)))
 
 let profile_encoding =
   let open Data_encoding in
@@ -428,7 +428,7 @@ let with_proof_encoding =
 
 let header_status_arg =
   let destruct s =
-    let s = `O [("status", `String s)] in
+    let s = `String s in
     try Ok (Data_encoding.Json.destruct header_status_encoding s)
     with _ -> Error "Cannot parse header status value"
   in

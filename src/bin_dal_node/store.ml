@@ -293,12 +293,6 @@ let decode_header_status v =
     ~tztrace_of_error:tztrace_of_read_error
   @@ Data_encoding.Binary.of_string Types.header_status_encoding v
 
-let decode_slot_id v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Slot_id
-    ~tztrace_of_error:tztrace_of_read_error
-  @@ Data_encoding.Binary.of_string Types.slot_id_encoding v
-
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4975
 
    DAL/Node: Replace Irmin storage for paths
@@ -310,8 +304,6 @@ module Legacy = struct
     val to_string : ?prefix:string -> t -> string
 
     module Commitment : sig
-      val headers : Cryptobox.commitment -> Irmin.Path.t
-
       val header : Cryptobox.commitment -> Types.slot_id -> Irmin.Path.t
     end
 
@@ -482,21 +474,6 @@ module Legacy = struct
       ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
       commitment_str_opt
 
-  (** Filter the given list of indices according to the values of the given slot
-      level and index. *)
-  let filter_indexes =
-    let keep_field v = function None -> true | Some f -> f = v in
-    fun ?slot_level ?slot_index indexes ->
-      let open Result_syntax in
-      let* indexes =
-        List.map_e (fun (slot_id, _) -> decode_slot_id slot_id) indexes
-      in
-      List.filter
-        (fun {Types.Slot_id.slot_level = l; slot_index = i} ->
-          keep_field l slot_level && keep_field i slot_index)
-        indexes
-      |> return
-
   let get_headers ~skip_commitment slot_ids store accu =
     let open Lwt_result_syntax in
     List.fold_left_es
@@ -526,27 +503,16 @@ module Legacy = struct
       accu
       slot_ids
 
-  let get_headers_of_commitment commitment slot_ids store accu =
-    let encoded_commitment = encode_commitment commitment in
-    let skip_commitment read_commitment =
-      Result_syntax.return
-        (if String.equal read_commitment encoded_commitment then
-         `Keep commitment
-        else `Skip)
-    in
-    get_headers ~skip_commitment slot_ids store accu
-
-  let get_commitment_headers commitment ?slot_level ?slot_index node_store =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/4528
-       Improve the implementation of this handler.
-    *)
+  let get_slot_status ~slot_id node_store =
     let open Lwt_result_syntax in
     let store = node_store.store in
-    (* Get the list of known slot identifiers for [commitment]. *)
-    let*! indexes = Irmin.list store @@ Path.Commitment.headers commitment in
-    (* Filter the list of indices by the values of [slot_level] [slot_index]. *)
-    let*? slot_ids = filter_indexes ?slot_level ?slot_index indexes in
-    get_headers_of_commitment commitment slot_ids store []
+    let status_path = Path.Level.status slot_id in
+    let*! status_opt = Irmin.find store status_path in
+    match status_opt with
+    | None -> return_none
+    | Some status_str ->
+        let*? status = decode_header_status status_str in
+        return_some status
 
   let get_published_level_headers ~published_level ?header_status node_store =
     let open Lwt_result_syntax in

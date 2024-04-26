@@ -427,12 +427,8 @@ let get_commitment_by_published_level_and_index ~level ~slot_index node_store =
     ~slot_index
     node_store
 
-let get_commitment_headers commitment ?slot_level ?slot_index node_store =
-  Store.Legacy.get_commitment_headers
-    commitment
-    ?slot_level
-    ?slot_index
-    node_store
+let get_slot_status ~slot_id node_store =
+  Store.Legacy.get_slot_status ~slot_id node_store
 
 let get_published_level_headers ~published_level ?header_status store =
   Store.Legacy.get_published_level_headers ~published_level ?header_status store

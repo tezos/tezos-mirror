@@ -141,21 +141,21 @@ let get_commitment_by_published_level_and_index :
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slot_indices"
       /: Tezos_rpc.Arg.int / "commitment")
 
-let get_commitment_headers :
+let get_slot_status :
     < meth : [`GET]
     ; input : unit
-    ; output : slot_header list
+    ; output : header_status
     ; prefix : unit
-    ; params : unit * Cryptobox.commitment
-    ; query : level option * slot_index option >
+    ; params : (unit * level) * slot_index
+    ; query : unit >
     service =
   Tezos_rpc.Service.get_service
-    ~description:
-      "Return the known headers for the slot whose commitment is given."
-    ~query:slot_id_query
-    ~output:(Data_encoding.list slot_header_encoding)
+    ~description:"Return the status for the given slot."
+    ~query:Tezos_rpc.Query.empty
+    ~output:header_status_encoding
     Tezos_rpc.Path.(
-      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "headers")
+      open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
+      / "status")
 
 let get_published_level_headers :
     < meth : [`GET]

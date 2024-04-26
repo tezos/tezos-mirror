@@ -274,16 +274,17 @@ module Dal_RPC = struct
   let mk_query_arg ~to_string field v_opt =
     Option.fold ~none:[] ~some:(fun v -> [(field, to_string v)]) v_opt
 
-  let get_commitment_headers ?slot_level ?slot_index commitment =
-    let query_string =
-      mk_query_arg ~to_string:string_of_int "slot_level" slot_level
-      @ mk_query_arg ~to_string:string_of_int "slot_index" slot_index
-    in
+  let get_level_slot_status ~slot_level ~slot_index =
     make
-      ~query_string
       GET
-      ["commitments"; commitment; "headers"]
-      slot_headers_of_json
+      [
+        "levels";
+        string_of_int slot_level;
+        "slots";
+        string_of_int slot_index;
+        "status";
+      ]
+      JSON.as_string
 
   let get_assigned_shard_indices ~level ~pkh =
     make
