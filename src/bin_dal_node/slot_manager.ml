@@ -181,15 +181,20 @@ let get_slot_content_from_shards cryptobox store commitment =
 let get_slot cryptobox store commitment =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
-  let*! res =
+  let*! res_slot_store =
     Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
   in
-  match res with
+  match res_slot_store with
   | Ok slot -> return slot
-  | Error (`Not_found | `Other _) ->
+  | Error _ -> (
       (* The slot could not be obtained from the slot store, attempt a
          reconstruction. *)
-      get_slot_content_from_shards cryptobox store commitment
+      let*! res_shard_store =
+        get_slot_content_from_shards cryptobox store commitment
+      in
+      match res_shard_store with
+      | Ok slot -> return slot
+      | Error _ -> Lwt.return res_slot_store)
 
 (* Used wrapper functions on top of Cryptobox. *)
 
