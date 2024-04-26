@@ -91,8 +91,7 @@ module Slots : sig
     t ->
     Cryptobox.t ->
     commitment ->
-    (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
-    Lwt.t
+    (bytes option, [> Errors.decoding]) result Lwt.t
 
   val remove_slot_by_commitment :
     t -> slot_size:int -> commitment -> unit tzresult Lwt.t
@@ -185,10 +184,7 @@ module Legacy : sig
     level:int32 ->
     slot_index:int ->
     t ->
-    ( commitment,
-      [> `Decoding_failed of Types.Store.kind * tztrace | `Not_found] )
-    result
-    Lwt.t
+    (commitment, [> Errors.decoding | Errors.not_found]) result Lwt.t
 
   (** [get_slot_status ~slot_id store] returns the status associated
       to the given accepted [slot_id], or [None] if no status is
@@ -196,8 +192,5 @@ module Legacy : sig
   val get_slot_status :
     slot_id:Types.slot_id ->
     t ->
-    ( Types.header_status option,
-      [> `Decoding_failed of Types.Store.kind * tztrace] )
-    result
-    Lwt.t
+    (Types.header_status option, [> Errors.decoding]) result Lwt.t
 end
