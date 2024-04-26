@@ -11,6 +11,12 @@ set -eu
 # shellcheck source=./scripts/ci/octez-release.sh
 . ./scripts/ci/octez-release.sh
 
+debian_bookworm_packages="$(find packages/debian/bookworm/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
+ubuntu_focal_packages="$(find packages/ubuntu/focal/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
+ubuntu_jammy_packages="$(find packages/ubuntu/jammy/ -maxdepth 1 -name octez-\*.deb 2> /dev/null || printf '')"
+fedora_packages="$(find packages/fedora/39/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
+rockylinux_packages="$(find packages/rockylinux/9.3/ -maxdepth 1 -name octez-\*.rpm 2> /dev/null || printf '')"
+
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
 gitlab_octez_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_octez_binaries_package_name}/${gitlab_package_version}"
