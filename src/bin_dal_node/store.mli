@@ -192,5 +192,5 @@ module Legacy : sig
   val get_slot_status :
     slot_id:Types.slot_id ->
     t ->
-    (Types.header_status option, [> Errors.other]) result Lwt.t
+    (Types.header_status, [> Errors.other | Errors.not_found]) result Lwt.t
 end

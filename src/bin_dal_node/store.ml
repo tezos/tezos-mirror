@@ -482,8 +482,8 @@ module Legacy = struct
     let status_path = Path.Level.status slot_id in
     let*! status_opt = Irmin.find store status_path in
     match status_opt with
-    | None -> return_none
+    | None -> fail Errors.not_found
     | Some status_str ->
         let*? status = decode_header_status status_str in
-        return_some status
+        return status
 end

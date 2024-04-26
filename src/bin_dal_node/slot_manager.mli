@@ -184,7 +184,7 @@ val get_commitment_by_published_level_and_index :
 val get_slot_status :
   slot_id:Types.slot_id ->
   Store.t ->
-  (Types.header_status option, Errors.other) result Lwt.t
+  (Types.header_status, [Errors.other | Errors.not_found]) result Lwt.t
 
 (** [get_slot_shard store slot_id shard_index] returns the shard at
     index [shard_index] of the slot given by [slot_id].

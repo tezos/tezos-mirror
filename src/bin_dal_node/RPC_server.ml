@@ -176,7 +176,7 @@ module Slots_handlers = struct
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_status ~slot_id store |> Errors.to_tzresult)
+        Slot_manager.get_slot_status ~slot_id store |> Errors.to_option_tzresult)
 
   let get_slot_shard ctxt slot_level slot_index shard_index () () =
     call_handler1 ctxt (fun node_store ->
