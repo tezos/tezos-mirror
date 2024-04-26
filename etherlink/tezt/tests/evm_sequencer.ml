@@ -1415,6 +1415,99 @@ let test_get_balance_block_param =
     ~error_msg:(sf "%s expected to have a balance of %%R but got %%L" address) ;
   unit
 
+let test_extended_block_param =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
+    ~title:"Supports extended block parameter"
+    ~uses
+  @@ fun protocol ->
+  (*
+     In this test we will deploy a counter contract, increments its counter
+     at multiple consecutives blocks, and check the counter using block
+     parameter.
+     As the counter contract has a view, we can test the block parameter
+     both for read only RPCs such as [eth_getStorageAt] and simulation
+     such as [eth_call].
+  *)
+  let* {sequencer; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
+  let* () =
+    Eth_cli.add_abi
+      ~label:Solidity_contracts.counter.label
+      ~abi:Solidity_contracts.counter.abi
+      ()
+  in
+  (* Deploy the contract. *)
+  let* contract, _tx_hash =
+    send_transaction
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:Solidity_contracts.counter.abi
+          ~bin:Solidity_contracts.counter.bin)
+      sequencer
+  in
+  (* Takes the level where it was originated, the counter value will be 0. *)
+  let*@ level = Rpc.block_number sequencer in
+  let level = Int32.to_int level in
+  (* Increments the counter multiple times. *)
+  let* () =
+    repeat 2 (fun _ ->
+        let* _ =
+          send_transaction
+            (Eth_cli.contract_send
+               ~source_private_key:
+                 Eth_account.bootstrap_accounts.(0).private_key
+               ~endpoint:(Evm_node.endpoint sequencer)
+               ~abi_label:Solidity_contracts.counter.label
+               ~address:contract
+               ~method_call:"incrementCounter()")
+            sequencer
+        in
+        unit)
+  in
+
+  let*@ block0 =
+    Rpc.get_block_by_number ~block:(string_of_int level) sequencer
+  in
+  let*@ block1 =
+    Rpc.get_block_by_number ~block:(string_of_int (level + 1)) sequencer
+  in
+  let*@ block2 =
+    Rpc.get_block_by_number ~block:(string_of_int (level + 2)) sequencer
+  in
+
+  let check_counter_value ~(block : Block.t) expected_value =
+    let counter_value ~block =
+      let*@ s =
+        Rpc.get_storage_at ~address:contract ~pos:"0x0" ~block sequencer
+      in
+      return (int_of_string s)
+    in
+    let* counter_via_number =
+      counter_value
+        ~block:
+          (Block_number
+             {number = Int32.to_int block.number; require_canonical = false})
+    in
+    let* counter_via_hash =
+      counter_value
+        ~block:(Block_hash {hash = block.hash; require_canonical = false})
+    in
+    Check.((counter_via_number = expected_value) int)
+      ~error_msg:"Expected counter to be %R but got %L, using {blockNumber}" ;
+    Check.((counter_via_hash = expected_value) int)
+      ~error_msg:"Expected counter to be %R but got %L, using {blockHash}" ;
+    unit
+  in
+
+  let* () = check_counter_value ~block:block0 0 in
+  let* () = check_counter_value ~block:block1 1 in
+  let* () = check_counter_value ~block:block2 2 in
+
+  unit
+
 let test_observer_applies_blueprint_when_sequencer_restarted =
   register_both
     ~time_between_blocks:Nothing
@@ -2970,6 +3063,7 @@ let () =
   test_send_deposit_to_delayed_inbox protocols ;
   test_rpc_produceBlock protocols ;
   test_get_balance_block_param protocols ;
+  test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;
