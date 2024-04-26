@@ -19,6 +19,22 @@ include Inode_intf
 
 exception Max_depth of int
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = [ "brassaia"; "brassaia_pack"; "inode" ]
+
+  let inode_save_values =
+    declare_1 ~section ~level:Debug ~name:"inode_save_values"
+      ~msg:"Inode.save values depth: {depth}"
+      ("depth", Data_encoding.int64)
+
+  let inode_save_tree =
+    declare_1 ~section ~level:Debug ~name:"inode_save_tree"
+      ~msg:"Inode.save tree depth: {depth}"
+      ("depth", Data_encoding.int64)
+end
+
 module Make_internal
     (Conf : Conf.S)
     (H : Brassaia.Hash.S) (Key : sig
@@ -1474,7 +1490,8 @@ struct
       let rec aux ~depth t =
         match t.v with
         | Values _ -> (
-            [%log.debug "Inode.save values depth:%d" depth];
+            Events.(emit__dont_wait__use_with_care inode_save_values)
+              (Int64.of_int depth);
             let unguarded_add hash =
               let value =
                 (* NOTE: the choice of [Bin.mode] is irrelevant (and this
@@ -1491,7 +1508,8 @@ struct
                 if mem key then key else unguarded_add (Key.to_hash key)
             | Hash hash -> unguarded_add (Lazy.force hash))
         | Tree n ->
-            [%log.debug "Inode.save tree depth:%d" depth];
+            Events.(emit__dont_wait__use_with_care inode_save_tree)
+              (Int64.of_int depth);
             let save_dirty t k =
               let key =
                 match Val_ref.inspect t.v_ref with

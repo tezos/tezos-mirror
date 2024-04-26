@@ -1970,6 +1970,7 @@ let brassaia =
     ~path:"brassaia/lib_brassaia"
     ~deps:
       [
+        octez_event_logging |> open_;
         data_encoding;
         brassaia_data;
         astring;
@@ -2000,7 +2001,17 @@ let brassaia_pack =
   octez_lib
     "brassaia_pack"
     ~path:"brassaia/lib_brassaia_pack"
-    ~deps:[data_encoding; fmt; brassaia; brassaia_data; logs; lwt; optint]
+    ~deps:
+      [
+        octez_event_logging |> open_;
+        data_encoding;
+        fmt;
+        brassaia;
+        brassaia_data;
+        logs;
+        lwt;
+        optint;
+      ]
     ~preprocess:[pps ppx_brassaia_internal]
     ~flags:(Flags.standard ~disable_warnings:[66] ())
 
@@ -2017,6 +2028,7 @@ let brassaia_pack_unix =
     ~path:"brassaia/lib_brassaia_pack/unix"
     ~deps:
       [
+        octez_event_logging |> open_;
         fmt;
         index;
         index_unix;
