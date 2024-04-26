@@ -106,13 +106,13 @@ let default_tx_pool_addr_limit = Int64.of_int 4000
 
 let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 
-let default_max_blueprints_lag = 50
-
-let default_max_blueprints_ahead = 100
-
-let default_max_blueprints_catchup = 50
-
-let default_catchup_cooldown = 1
+let default_blueprints_publisher_config =
+  {
+    max_blueprints_lag = 50;
+    max_blueprints_ahead = 100;
+    max_blueprints_catchup = 50;
+    catchup_cooldown = 1;
+  }
 
 let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
     ?time_between_blocks ?max_number_of_chunks ?private_rpc_port ~sequencer
@@ -121,15 +121,21 @@ let sequencer_config_dft ~data_dir ?preimages ?preimages_endpoint
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
-        Option.value ~default:default_max_blueprints_lag max_blueprints_lag;
+        Option.value
+          ~default:default_blueprints_publisher_config.max_blueprints_lag
+          max_blueprints_lag;
       max_blueprints_ahead =
-        Option.value ~default:default_max_blueprints_ahead max_blueprints_ahead;
+        Option.value
+          ~default:default_blueprints_publisher_config.max_blueprints_ahead
+          max_blueprints_ahead;
       max_blueprints_catchup =
         Option.value
-          ~default:default_max_blueprints_catchup
+          ~default:default_blueprints_publisher_config.max_blueprints_catchup
           max_blueprints_catchup;
       catchup_cooldown =
-        Option.value ~default:default_catchup_cooldown catchup_cooldown;
+        Option.value
+          ~default:default_blueprints_publisher_config.catchup_cooldown
+          catchup_cooldown;
     }
   in
   {
@@ -151,15 +157,21 @@ let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
   let blueprints_publisher_config =
     {
       max_blueprints_lag =
-        Option.value ~default:default_max_blueprints_lag max_blueprints_lag;
+        Option.value
+          ~default:default_blueprints_publisher_config.max_blueprints_lag
+          max_blueprints_lag;
       max_blueprints_ahead =
-        Option.value ~default:default_max_blueprints_ahead max_blueprints_ahead;
+        Option.value
+          ~default:default_blueprints_publisher_config.max_blueprints_ahead
+          max_blueprints_ahead;
       max_blueprints_catchup =
         Option.value
-          ~default:default_max_blueprints_catchup
+          ~default:default_blueprints_publisher_config.max_blueprints_catchup
           max_blueprints_catchup;
       catchup_cooldown =
-        Option.value ~default:default_catchup_cooldown catchup_cooldown;
+        Option.value
+          ~default:default_blueprints_publisher_config.catchup_cooldown
+          catchup_cooldown;
     }
   in
   {
@@ -228,10 +240,22 @@ let blueprints_publisher_config_encoding =
         catchup_cooldown;
       })
     (obj4
-       (dft "max_blueprints_lag" int31 default_max_blueprints_lag)
-       (dft "max_blueprints_ahead" int31 default_max_blueprints_ahead)
-       (dft "max_blueprints_catchup" int31 default_max_blueprints_catchup)
-       (dft "catchup_cooldown" int31 default_catchup_cooldown))
+       (dft
+          "max_blueprints_lag"
+          int31
+          default_blueprints_publisher_config.max_blueprints_lag)
+       (dft
+          "max_blueprints_ahead"
+          int31
+          default_blueprints_publisher_config.max_blueprints_ahead)
+       (dft
+          "max_blueprints_catchup"
+          int31
+          default_blueprints_publisher_config.max_blueprints_catchup)
+       (dft
+          "catchup_cooldown"
+          int31
+          default_blueprints_publisher_config.catchup_cooldown))
 
 let sequencer_encoding data_dir =
   let open Data_encoding in
@@ -281,7 +305,10 @@ let sequencer_encoding data_dir =
           ~description:"RPC port for private server"
           uint16)
        (req "sequencer" string)
-       (req "blueprints_publisher_config" blueprints_publisher_config_encoding))
+       (dft
+          "blueprints_publisher_config"
+          blueprints_publisher_config_encoding
+          default_blueprints_publisher_config))
 
 let threshold_encryption_sequencer_encoding = sequencer_encoding
 
@@ -430,7 +457,7 @@ let encoding data_dir : t Data_encoding.t =
              default_tx_pool_tx_per_addr_limit)
           (dft "keep_alive" bool default_keep_alive)
           (req "rollup_node_endpoint" string)
-          (req "verbose" Internal_event.Level.encoding)))
+          (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
