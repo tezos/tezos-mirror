@@ -22,6 +22,32 @@ let pp_error ppf {code; message; data} =
     pp_data
     data
 
+type block_param =
+  | Earliest
+  | Latest
+  | Pending
+  | Number of int
+  | Block_number of {number : int; require_canonical : bool}
+  | Block_hash of {hash : string; require_canonical : bool}
+
+let block_param_to_json = function
+  | Earliest -> `String "earliest"
+  | Latest -> `String "latest"
+  | Pending -> `String "pending"
+  | Number number -> `String (string_of_int number)
+  | Block_number {number; require_canonical} ->
+      `O
+        [
+          ("blockNumber", `String (string_of_int number));
+          ("requireCanonical", `Bool require_canonical);
+        ]
+  | Block_hash {hash; require_canonical} ->
+      `O
+        [
+          ("blockHash", `String hash);
+          ("requireCanonical", `Bool require_canonical);
+        ]
+
 let decode_or_error decode json =
   match JSON.(json |-> "error" |> as_opt) with
   | Some json ->
@@ -72,7 +98,10 @@ module Request = struct
     }
 
   let eth_getCode ~address ~block =
-    {method_ = "eth_getCode"; parameters = `A [`String address; `String block]}
+    {
+      method_ = "eth_getCode";
+      parameters = `A [`String address; block_param_to_json block];
+    }
 
   let net_version = {method_ = "net_version"; parameters = `A []}
 
@@ -89,13 +118,13 @@ module Request = struct
   let get_balance ~address ~block =
     {
       method_ = "eth_getBalance";
-      parameters = `A [`String address; `String block];
+      parameters = `A [`String address; block_param_to_json block];
     }
 
   let get_storage_at ~address ~pos ~block =
     {
       method_ = "eth_getStorageAt";
-      parameters = `A [`String address; `String pos; `String block];
+      parameters = `A [`String address; `String pos; block_param_to_json block];
     }
 end
 
@@ -118,9 +147,7 @@ let get_transaction_by_hash ~transaction_hash evm_node =
 
 let get_code ~address evm_node =
   let* json =
-    Evm_node.call_evm_rpc
-      evm_node
-      (Request.eth_getCode ~address ~block:"latest")
+    Evm_node.call_evm_rpc evm_node (Request.eth_getCode ~address ~block:Latest)
   in
   return
     (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
@@ -257,7 +284,7 @@ let call ~to_ ~data evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
 
-let get_balance ~address ?(block = "latest") evm_node =
+let get_balance ~address ?(block = Latest) evm_node =
   let* response =
     Evm_node.call_evm_rpc evm_node (Request.get_balance ~address ~block)
   in
@@ -267,7 +294,7 @@ let get_balance ~address ?(block = "latest") evm_node =
          Evm_node.extract_result response |> JSON.as_string |> Wei.of_string)
        response
 
-let get_storage_at ~address ?(block = "latest") ~pos evm_node =
+let get_storage_at ~address ?(block = Latest) ~pos evm_node =
   let* response =
     Evm_node.call_evm_rpc evm_node (Request.get_storage_at ~address ~pos ~block)
   in

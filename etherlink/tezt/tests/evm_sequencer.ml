@@ -1342,8 +1342,10 @@ let test_get_balance_block_param =
       sequencer
   in
   (* Check the balance on genesis block and latest block. *)
-  let*@ balance_genesis = Rpc.get_balance ~address ~block:"0" sequencer in
-  let*@ balance_now = Rpc.get_balance ~address ~block:"latest" sequencer in
+  let*@ balance_genesis =
+    Rpc.get_balance ~address ~block:(Number 0) sequencer
+  in
+  let*@ balance_now = Rpc.get_balance ~address ~block:Latest sequencer in
   Check.((balance_genesis = Wei.of_eth_int 0) Wei.typ)
     ~error_msg:(sf "%s should have no funds at genesis, but got %%L" address) ;
   Check.((balance_now = Wei.of_eth_int 10) Wei.typ)
@@ -1399,13 +1401,13 @@ let test_get_balance_block_param =
   in
   (* Observer does not know block 0. *)
   let*@? (_error : Rpc.error) =
-    Rpc.get_balance ~address ~block:"0" observer_partial_history
+    Rpc.get_balance ~address ~block:(Number 0) observer_partial_history
   in
   let*@ balance_earliest =
-    Rpc.get_balance ~address ~block:"earliest" observer_partial_history
+    Rpc.get_balance ~address ~block:Earliest observer_partial_history
   in
   let*@ balance_now =
-    Rpc.get_balance ~address ~block:"latest" observer_partial_history
+    Rpc.get_balance ~address ~block:Latest observer_partial_history
   in
   Check.((balance_earliest = Wei.of_eth_int 10) Wei.typ)
     ~error_msg:(sf "%s expected to have a balance of %%R but got %%L" address) ;
