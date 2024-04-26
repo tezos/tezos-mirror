@@ -84,6 +84,9 @@ pub struct BenchOptions {
     )]
     pub output: String,
 
+    #[arg(long, help = "Pretty print the benchmark results in a table")]
+    pub pretty: bool,
+
     #[command(flatten)]
     pub common: CommonOptions,
 }

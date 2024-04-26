@@ -5,11 +5,8 @@
 
 use crate::{
     cli::{BenchMode, BenchOptions},
-    commands::bench::{
-        data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
-        stats::BenchStats,
-    },
-    posix_exit_mode,
+    commands::bench::data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
+    posix_exit_mode, table,
 };
 use enum_tag::EnumTag;
 use risc_v_interpreter::{
@@ -17,6 +14,8 @@ use risc_v_interpreter::{
     Interpreter, InterpreterResult,
 };
 use std::{error::Error, fs::File};
+
+pub use crate::commands::bench::stats::BenchStats;
 
 mod data;
 mod stats;
@@ -124,6 +123,16 @@ fn bench_iteration(opts: &BenchOptions) -> Result<BenchData, Box<dyn Error>> {
     Ok(data)
 }
 
+fn show_results(stats: &BenchStats, opts: &BenchOptions) {
+    match opts.pretty {
+        false => println!("{stats}"),
+        true => {
+            let table = table::table_from_stats(&stats);
+            println!("{table}")
+        }
+    }
+}
+
 pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
     let stats = match opts.repeat {
         0 | 1 => BenchStats::from_data(bench_iteration(&opts)?)?,
@@ -138,6 +147,6 @@ pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
 
     save_to_file(&stats, &opts)?;
 
-    println!("{stats}");
+    show_results(&stats, &opts);
     Ok(())
 }
