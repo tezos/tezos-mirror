@@ -44,9 +44,10 @@ type t
     protocols will be monitored. *)
 val start :
   name:string ->
+  chain:Tezos_shell_services.Chain_services.chain ->
   reconnection_delay:float ->
   ?protocols:Protocol_hash.t list ->
-  #Client_context.full ->
+  Tezos_rpc.Context.generic ->
   t Lwt.t
 
 (** [create ~name ~reconnection_delay ?protocols cctxt] creates a Layer 1
@@ -55,9 +56,10 @@ val start :
     protocols will be monitored. *)
 val create :
   name:string ->
+  chain:Tezos_shell_services.Chain_services.chain ->
   reconnection_delay:float ->
   ?protocols:Protocol_hash.t list ->
-  #Client_context.full ->
+  Tezos_rpc.Context.generic ->
   t
 
 (** [shutdown t] properly shuts the layer 1 down. This function is to be used on
@@ -145,5 +147,5 @@ module Internal_for_tests : sig
   (** Create a dummy Layer 1 object that does not follow any L1 chain. This
       function is only to be used as a placeholder for unit tests (that do not
       exercise the Layer 1 connection). *)
-  val dummy : #Client_context.full -> t
+  val dummy : Tezos_rpc.Context.generic -> t
 end

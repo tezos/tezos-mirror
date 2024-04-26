@@ -110,9 +110,10 @@ type connection_status =
 
 type t = {
   name : string;
+  chain : Tezos_shell_services.Chain_services.chain;
   protocols : Protocol_hash.t list option;
   reconnection_delay : float;
-  cctxt : Client_context.full;
+  cctxt : Tezos_rpc.Context.generic;
   mutable last_seen : (Block_hash.t * Block_header.t) option;
   mutable status : connection_status;
 }
@@ -123,7 +124,8 @@ let is_running c =
   | Connected _ | Connecting _ -> true
 
 let rec do_connect ~count ~previous_status
-    ({name; protocols; reconnection_delay = delay; cctxt; _} as l1_ctxt) =
+    ({name; protocols; reconnection_delay = delay; cctxt; chain; _} as l1_ctxt)
+    =
   assert (match l1_ctxt.status with Connecting _ -> true | _ -> false) ;
   let open Lwt_syntax in
   let* () =
@@ -143,7 +145,7 @@ let rec do_connect ~count ~previous_status
       Lwt_unix.sleep delay
   in
   let* res =
-    Tezos_shell_services.Monitor_services.heads ?protocols cctxt cctxt#chain
+    Tezos_shell_services.Monitor_services.heads ?protocols cctxt chain
   in
   match res with
   | Ok (heads, stopper) ->
@@ -190,20 +192,21 @@ let connect l1_ctxt =
       Lwt_condition.wait c
   | Disconnected -> do_connect l1_ctxt
 
-let create ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
+let create ~name ~chain ~reconnection_delay ?protocols cctxt =
   {
     name;
-    cctxt = (cctxt :> Client_context.full);
+    chain;
+    cctxt;
     reconnection_delay;
     protocols;
     last_seen = None;
     status = Disconnected;
   }
 
-let start ~name ~reconnection_delay ?protocols (cctxt : #Client_context.full) =
+let start ~name ~chain ~reconnection_delay ?protocols cctxt =
   let open Lwt_syntax in
   let* () = Layer1_event.starting ~name in
-  let l1_ctxt = create ~name ~reconnection_delay ?protocols cctxt in
+  let l1_ctxt = create ~name ~chain ~reconnection_delay ?protocols cctxt in
   let* (_ : connection_info) = connect l1_ctxt in
   return l1_ctxt
 
@@ -415,7 +418,7 @@ let get_predecessor_opt ?(max_read = 8) state (hash, level) =
   if level = 0l then return_none
   else
     let level = Int32.pred level in
-    let+ hash = get_predecessor ~max_read state.cctxt state.cctxt#chain hash in
+    let+ hash = get_predecessor ~max_read state.cctxt state.chain hash in
     Option.map (fun hash -> (hash, level)) hash
 
 let get_predecessor ?max_read state ((hash, _) as head) =
@@ -512,8 +515,9 @@ module Internal_for_tests = struct
   let dummy cctxt =
     {
       name = "dummy_layer_1_for_tests";
+      chain = `Main;
       reconnection_delay = 5.0;
-      cctxt = (cctxt :> Client_context.full);
+      cctxt;
       protocols = None;
       last_seen = None;
       status = Disconnected;
