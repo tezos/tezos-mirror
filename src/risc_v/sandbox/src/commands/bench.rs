@@ -15,7 +15,7 @@ use risc_v_interpreter::{
 };
 use std::{error::Error, fs::File};
 
-pub use crate::commands::bench::stats::BenchStats;
+pub use crate::commands::bench::stats::{BenchStats, NamedStats};
 
 mod data;
 mod stats;
@@ -127,7 +127,7 @@ fn show_results(stats: &BenchStats, opts: &BenchOptions) {
     match opts.pretty {
         false => println!("{stats}"),
         true => {
-            let table = table::table_from_stats(&stats);
+            let table = table::table_from_stats(stats, opts.output.clone());
             println!("{table}")
         }
     }

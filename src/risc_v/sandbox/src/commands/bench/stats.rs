@@ -3,23 +3,22 @@
 // SPDX-License-Identifier: MIT
 
 use super::data::{BenchData, InstructionData};
-use crate::format_status;
+use crate::{format_status, table::utils::thousand_format};
 use core::fmt;
 use itertools::Itertools;
 use meansd::MeanSD;
-use numfmt::Formatter;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Serializable data for instruction-level statistics
 #[derive(Serialize, Deserialize)]
-struct NamedStats {
-    name: String,
-    count: usize,
-    total: Duration,
-    average: Duration,
-    median: Duration,
-    stddev: Duration,
+pub struct NamedStats {
+    pub name: String,
+    pub count: usize,
+    pub total: Duration,
+    pub average: Duration,
+    pub median: Duration,
+    pub stddev: Duration,
 }
 
 impl NamedStats {
@@ -65,10 +64,10 @@ impl fmt::Display for NamedStats {
 /// Serializable stats for a benchmark run.
 #[derive(Serialize, Deserialize)]
 pub struct BenchStats {
-    bench_duration_stats: NamedStats,
-    total_steps: usize,
-    instr_stats: Option<Vec<NamedStats>>,
-    run_result: String,
+    pub bench_duration_stats: NamedStats,
+    pub total_steps: usize,
+    pub instr_stats: Option<Vec<NamedStats>>,
+    pub run_result: String,
 }
 
 impl BenchStats {
@@ -131,28 +130,26 @@ impl BenchStats {
     }
 }
 
-impl fmt::Display for BenchStats {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl BenchStats {
+    pub fn instruction_duration(&self) -> Duration {
         // The time taken for instructions to run, either the whole bench duration,
         // or the added instruction times to account for overhead
-        let instr_duration = match &self.instr_stats {
+        match &self.instr_stats {
             None => self.bench_duration_stats.total,
             Some(counts) => counts.iter().map(|i| i.total).sum::<Duration>(),
-        };
+        }
+    }
+}
+
+impl fmt::Display for BenchStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let instr_duration = self.instruction_duration();
+        let instr_speed =
+            thousand_format(self.total_steps as f64 / instr_duration.as_secs_f64(), 2);
 
         writeln!(f, "Outcome:        {}", self.run_result)?;
         writeln!(f, "Total steps:    {}", self.total_steps)?;
-        let mut fmt = Formatter::new()
-            .separator(',')
-            .unwrap()
-            .precision(numfmt::Precision::Decimals(2))
-            .suffix(" instr / s")
-            .unwrap();
-        writeln!(
-            f,
-            "Speed:          {}",
-            fmt.fmt2(self.total_steps as f64 / instr_duration.as_secs_f64())
-        )?;
+        writeln!(f, "Speed:          {} instr / s", instr_speed)?;
         writeln!(f)?;
         writeln!(f, " Bench stats:\n{}", self.bench_duration_stats)?;
 
