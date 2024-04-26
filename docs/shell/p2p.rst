@@ -43,14 +43,6 @@ granted a fair share of the global allocated bandwidth, but it is
 planned for the individual allocated bandwidth to each peer to be a
 function of the peer's score.
 
-Encryption
-~~~~~~~~~~
-
-The connection between each peer is encrypted using ``NaCl``
-authenticated-encryption `API <http://nacl.cr.yp.to/box.html>`__. This
-is done to provide an additional level of security and tamper-proof
-guarantees in the communication between peers.
-
 Message queues
 ~~~~~~~~~~~~~~
 
@@ -59,6 +51,14 @@ are used to store incoming (resp. outgoing) messages for each
 peer. This further restricts the speed at which communication is
 possible with a peer; when a queue is full, it is not possible to read
 (resp. write) an additional message.
+
+Encryption
+~~~~~~~~~~
+
+The connection between each peer is encrypted using ``NaCl``
+authenticated-encryption `API <http://nacl.cr.yp.to/box.html>`__. This
+is done to provide an additional level of security and tamper-proof
+guarantees in the communication between peers.
 
 Pool of connections
 ~~~~~~~~~~~~~~~~~~~
