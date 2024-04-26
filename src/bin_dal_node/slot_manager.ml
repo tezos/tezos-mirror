@@ -145,11 +145,41 @@ let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
   let*? polynomial = polynomial_from_shards cryptobox shards in
   return polynomial
 
-let get_slot cryptobox store commitment =
+let get_slot_content_from_shards cryptobox store commitment =
   let open Lwt_result_syntax in
   let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
   in
+  let minimal_number_of_shards = number_of_shards / redundancy_factor in
+  let rec loop acc shard_id remaining =
+    if remaining <= 0 then return acc
+    else if shard_id >= number_of_shards then
+      let provided = minimal_number_of_shards - remaining in
+      fail
+        (Errors.other
+           [Missing_shards {provided; required = minimal_number_of_shards}])
+    else
+      let*! res = Store.Shards.read store.Store.shards commitment shard_id in
+      match res with
+      | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
+      | Error _ -> loop acc (shard_id + 1) remaining
+  in
+  let* shards = loop Seq.empty 0 minimal_number_of_shards in
+  let*? polynomial = polynomial_from_shards cryptobox shards in
+  let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
+  (* Store the slot so that next calls don't require a reconstruction. *)
+  let* () =
+    Store.Slots.add_slot_by_commitment
+      store.Store.slots
+      cryptobox
+      slot
+      commitment
+  in
+  let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
+  return slot
+
+let get_slot cryptobox store commitment =
+  let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let*! res =
     Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
@@ -159,37 +189,7 @@ let get_slot cryptobox store commitment =
   | Error (`Not_found | `Other _) ->
       (* The slot could not be obtained from the slot store, attempt a
          reconstruction. *)
-      let minimal_number_of_shards = number_of_shards / redundancy_factor in
-      let rec loop acc shard_id remaining =
-        if remaining <= 0 then return acc
-        else if shard_id >= number_of_shards then
-          let provided = minimal_number_of_shards - remaining in
-          fail
-            (Errors.other
-               [Missing_shards {provided; required = minimal_number_of_shards}])
-        else
-          let*! res =
-            Store.Shards.read store.Store.shards commitment shard_id
-          in
-          match res with
-          | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
-          | Error _ -> loop acc (shard_id + 1) remaining
-      in
-      let* shards = loop Seq.empty 0 minimal_number_of_shards in
-      let*? polynomial = polynomial_from_shards cryptobox shards in
-      let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
-      (* Store the slot so that next calls don't require a reconstruction. *)
-      let* () =
-        Store.Slots.add_slot_by_commitment
-          store.Store.slots
-          cryptobox
-          slot
-          commitment
-      in
-      let*! () =
-        Event.(emit fetched_slot (Bytes.length slot, Seq.length shards))
-      in
-      return slot
+      get_slot_content_from_shards cryptobox store commitment
 
 (* Used wrapper functions on top of Cryptobox. *)
 
