@@ -428,7 +428,7 @@ let check_and_quit_on_irmin_errors errors =
     | _ -> false
   in
   if List.exists (fun error -> is_inode_error error) errors then
-    let* () = Events.(emit stopping_node_missing_irmin_key ()) in
+    let* () = Events.(emit stopping_node_missing_context_key ()) in
     let* _ = Lwt_exit.exit_and_wait 1 in
     return_unit
   else return_unit
