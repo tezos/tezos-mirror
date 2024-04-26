@@ -1071,7 +1071,7 @@ let find_evm_state block =
       return_some evm_state
   | Earliest -> worker_wait_for_request Earliest_state
   | Pending -> failwith "Block parameter pending is not supported"
-  | Hash_param number -> worker_wait_for_request (Evm_state_after {number})
+  | Number number -> worker_wait_for_request (Evm_state_after {number})
 
 let execute_and_inspect ?wasm_entrypoint input =
   let open Lwt_result_syntax in

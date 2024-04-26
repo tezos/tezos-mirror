@@ -63,8 +63,8 @@ let height_from_param (module Rollup_node_rpc : Services_backend_sig.S) from to_
     =
   let open Lwt_result_syntax in
   match (from, to_) with
-  | Hash_param h1, Hash_param h2 -> return (h1, h2)
-  | Hash_param h1, _ ->
+  | Number h1, Number h2 -> return (h1, h2)
+  | Number h1, _ ->
       let+ h2 = Rollup_node_rpc.current_block_number () in
       (h1, h2)
   | _, _ ->

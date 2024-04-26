@@ -81,7 +81,7 @@ let dispatch_service ~path =
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
   match block_param with
-  | Ethereum_types.(Hash_param (Qty n)) ->
+  | Ethereum_types.(Number (Qty n)) ->
       Rollup_node_rpc.nth_block ~full_transaction_object n
   | Latest | Earliest | Pending ->
       Rollup_node_rpc.current_block ~full_transaction_object

@@ -91,10 +91,10 @@ let quantity_encoding =
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
 
 (** Ethereum block params in RPCs. *)
-type block_param = Hash_param of quantity | Earliest | Latest | Pending
+type block_param = Number of quantity | Earliest | Latest | Pending
 
 let pp_block_param fmt = function
-  | Hash_param quantity -> pp_quantity fmt quantity
+  | Number quantity -> pp_quantity fmt quantity
   | Earliest -> Format.pp_print_string fmt "earliest"
   | Latest -> Format.pp_print_string fmt "latest"
   | Pending -> Format.pp_print_string fmt "pending"
@@ -108,8 +108,8 @@ let block_param_encoding =
          ~title:tag
          (Tag 0)
          quantity_encoding
-         (function Hash_param h -> Some h | _ -> None)
-         (fun h -> Hash_param h));
+         (function Number n -> Some n | _ -> None)
+         (fun n -> Number n));
       (let tag = "earliest" in
        case
          ~title:tag
