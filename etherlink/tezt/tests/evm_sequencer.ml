@@ -265,6 +265,16 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
       sc_rollup_node;
     }
 
+let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
+  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+  (* Send the transaction but doesn't wait to be mined. *)
+  let transaction = transaction () in
+  let* _ = wait_for in
+  (* Once the transaction is in the transaction pool the next block will include it. *)
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Resolve the transaction send to make sure it was included. *)
+  transaction
+
 let send_raw_transaction_to_delayed_inbox ?(wait_for_next_level = true)
     ?(amount = Tez.one) ?expect_failure ~sc_rollup_node ~client ~l1_contracts
     ~sc_rollup_address ?(sender = Constant.bootstrap2) raw_tx =
@@ -1320,25 +1330,17 @@ let test_get_balance_block_param =
   let* {sequencer; sc_rollup_node; proxy; client; _} =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
-  let transfer address =
-    let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
-    let transfer =
-      Eth_cli.transaction_send
-        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-        ~to_public_key:address
-        ~value:(Wei.of_eth_int 10)
-        ~endpoint:(Evm_node.endpoint sequencer)
-        ()
-    in
-    let* _tx_hash = wait_for in
-    (* Once the transaction is in the transaction pool the next block will include it. *)
-    let*@ _ = Rpc.produce_block sequencer in
-    (* Resolve the transaction send to make sure it was included. *)
-    transfer
-  in
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
-  let* _tx_hash = transfer address in
+  let* _tx_hash =
+    send_transaction
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
   (* Check the balance on genesis block and latest block. *)
   let*@ balance_genesis = Rpc.get_balance ~address ~block:"0" sequencer in
   let*@ balance_now = Rpc.get_balance ~address ~block:"latest" sequencer in
@@ -1381,7 +1383,15 @@ let test_get_balance_block_param =
   let* () = Evm_node.run observer_partial_history in
   (* Transfer funds again to the address. *)
   let*@ level = Rpc.block_number sequencer in
-  let* _tx_hash = transfer address in
+  let* _tx_hash =
+    send_transaction
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
   let* () =
     Evm_node.wait_for_blueprint_applied
       observer_partial_history
