@@ -23,6 +23,16 @@ documentation for all the constituent modules.
 General operation
 -----------------
 
+The main entry point of the P2P layer is the module :package-api:`P2p
+<octez-shell-libs/Tezos_p2p/P2p/index.html>`.
+
+The high-level
+:package-api:`P2p_socket.t
+<octez-shell-libs/Tezos_p2p/P2p_socket/index.html#type-t>`
+type defined by the P2P layer is basically a UNIX socket upgraded with I/O
+scheduling, peer metadata, cryptographic keys, and two message queues
+operated by dedicated workers which operate on those queues.
+
 I/O Scheduling
 ~~~~~~~~~~~~~~
 
@@ -48,12 +58,7 @@ On top of basic I/O scheduling, two finite-size typed message queues
 are used to store incoming (resp. outgoing) messages for each
 peer. This further restricts the speed at which communication is
 possible with a peer; when a queue is full, it is not possible to read
-(resp. write) an additional message. The high-level
-:package-api:`P2p_socket.t
-<octez-shell-libs/Tezos_p2p/P2p_socket/index.html#type-t>`
-type defined by the P2P layer is basically a UNIX socket upgraded with I/O
-scheduling, peer metadata, cryptographic keys, and two message queues
-operated by dedicated workers which operate on those queues.
+(resp. write) an additional message.
 
 Pool of connections
 ~~~~~~~~~~~~~~~~~~~
@@ -66,8 +71,7 @@ as well as methods to query them, also connections are extended with
 another message queue where lower-level messages (like responses to
 ping) are filtered out and only application-level messages are kept.
 
-The main entry point of the P2P layer is in module :package-api:`P2p
-<octez-shell-libs/Tezos_p2p/P2p/index.html>`. See below
+See below
 for a description of workers acting onto the P2P layer.
 
 Welcome worker & connect handler
