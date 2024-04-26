@@ -233,7 +233,8 @@ module Send_transaction :
 
 module Eth_call :
   METHOD
-    with type input = Ethereum_types.call * Ethereum_types.Block_parameter.t
+    with type input =
+      Ethereum_types.call * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.hash
 
 module Get_estimate_gas :
