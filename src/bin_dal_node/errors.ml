@@ -111,23 +111,14 @@ let error_to_tzresult e =
       let*! () = Event.(emit decoding_data_failed kind) in
       fail (Decoding_failed kind :: tztrace)
   | `Other e -> fail e
-  | `Not_found ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
 
-         Move to a defined Not_found error in #4622?
-         Currently, using something like
-         [tzfail @@ Shard_store.Resource_not_found ""] is
-         not well suited as [Resource_not_found]'s arg is understood as
-         a path.
-      *)
-      failwith "Not_found"
-
-let to_option_tzresult ?(none = fun _e -> false) r =
+let to_option_tzresult r =
   let open Lwt_result_syntax in
   let*! r in
   match r with
   | Ok s -> return_some s
-  | Error err -> if none err then return_none else error_to_tzresult err
+  | Error `Not_found -> return_none
+  | Error ((`Decoding_failed _ | `Other _) as err) -> error_to_tzresult err
 
 let to_tzresult r =
   let open Lwt_result_syntax in

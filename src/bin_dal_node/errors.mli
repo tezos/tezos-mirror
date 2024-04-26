@@ -80,8 +80,7 @@ val other_lwt_result : 'a tzresult Lwt.t -> ('a, [> other]) result Lwt.t
     Note that an {!Event.decoding_data_failed} is emitted. in case a
     [`Decoding_failed] is encountered. *)
 val to_option_tzresult :
-  ?none:(([< decoding | not_found | other] as 'b) -> bool) ->
-  ('a, 'b) result Lwt.t ->
+  ('a, [< decoding | not_found | other]) result Lwt.t ->
   'a option tzresult Lwt.t
 
 (** [to_tzresult v] is quite similar to {!to_option_tzresult}. Except that the

@@ -72,16 +72,11 @@ let () =
     (fun (expected, got) -> Post_slot_too_large {expected; got})
 
 module Slots_handlers = struct
-  let to_option_tzresult r =
-    Errors.to_option_tzresult
-      ~none:(function `Not_found -> true | _ -> false)
-      r
-
   let get_slot_content ctxt slot_level slot_index () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_content store cryptobox slot_id
-        |> to_option_tzresult)
+        |> Errors.to_option_tzresult)
 
   (* This function assumes the slot is valid since we already have
      computed a commitment for it. *)
@@ -122,7 +117,7 @@ module Slots_handlers = struct
         match proof with
         | (Ok _ | Error (`Not_found | `Decoding_failed _ | `Other _)) as proof
           ->
-            Lwt.return proof |> to_option_tzresult
+            Lwt.return proof |> Errors.to_option_tzresult
         | Error
             (( `Fail _ | `Page_index_out_of_range | `Slot_wrong_size _
              | `Invalid_degree_strictly_less_than_expected _
@@ -167,7 +162,7 @@ module Slots_handlers = struct
             cryptobox
             commitment
             ~with_proof:true
-          |> to_option_tzresult
+          |> Errors.to_option_tzresult
         in
         return (commitment, commitment_proof))
 
@@ -177,7 +172,7 @@ module Slots_handlers = struct
           ~level
           ~slot_index
           store
-        |> to_option_tzresult)
+        |> Errors.to_option_tzresult)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
@@ -188,7 +183,7 @@ module Slots_handlers = struct
     call_handler1 ctxt (fun node_store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_shard node_store slot_id shard_index
-        |> to_option_tzresult)
+        |> Errors.to_option_tzresult)
 
   let handle_slot_pages ctxt (((), level), slot_index) () () =
     let open Lwt_result_syntax in
