@@ -155,8 +155,8 @@ let get_slot cryptobox store commitment =
     Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
   in
   match res with
-  | Ok (Some slot) -> return slot
-  | Ok None | Error (`Other _) ->
+  | Ok slot -> return slot
+  | Error (`Not_found | `Other _) ->
       (* The slot could not be obtained from the slot store, attempt a
          reconstruction. *)
       let minimal_number_of_shards = number_of_shards / redundancy_factor in
@@ -252,13 +252,7 @@ let add_commitment node_store slot cryptobox =
   return commitment
 
 let get_commitment_slot node_store cryptobox commitment =
-  let open Lwt_result_syntax in
-  let* slot_opt =
-    Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
-  in
-  match slot_opt with
-  | None -> fail Errors.not_found
-  | Some slot_content -> return slot_content
+  Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof =

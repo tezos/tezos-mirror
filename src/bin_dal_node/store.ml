@@ -222,8 +222,8 @@ module Slots = struct
     let*! res = KVS.read_value t file_layout (commitment, slot_size) () in
     let data_kind = Types.Store.Slot in
     match res with
-    | Ok slot -> return_some slot
-    | Error [KVS.Missing_stored_kvs_data _] -> return_none
+    | Ok slot -> return slot
+    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err -> fail @@ Errors.decoding_failed data_kind err
 
   let remove_slot_by_commitment t ~slot_size commitment =

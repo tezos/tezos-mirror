@@ -85,13 +85,13 @@ module Slots : sig
     t -> Cryptobox.t -> commitment -> (bool, [> Errors.other]) result Lwt.t
 
   (** [find_slot_by_commitment store cryptobox commitment] returns the
-      slot associated to some commitment or [None] if no slot is
-      associated. *)
+      slot associated to some commitment or [Error `Not_found] if no
+      slot is associated. *)
   val find_slot_by_commitment :
     t ->
     Cryptobox.t ->
     commitment ->
-    (bytes option, [> Errors.other]) result Lwt.t
+    (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
 
   val remove_slot_by_commitment :
     t -> slot_size:int -> commitment -> unit tzresult Lwt.t
