@@ -55,3 +55,6 @@ val amplification_random_delay_max : float
    this timeout to send the proved shards, then amplification attempt
    is aborted to avoid keeping a pending promise forever. *)
 val amplification_timeout : float
+
+(** Initial reconnection delay to L1 node from the DAL crawler. *)
+val crawler_l1_reconnection_delay : float
