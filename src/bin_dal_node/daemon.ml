@@ -776,6 +776,14 @@ let run ~data_dir configuration_override =
   in
   let* store = Store.init config in
   let*! metrics_server = Metrics.launch config.metrics_addr in
+  let*! crawler =
+    let open Constants in
+    Crawler.start
+      ~name:"dal_node_crawler"
+      ~chain:`Main
+      ~reconnection_delay:crawler_l1_reconnection_delay
+      cctxt
+  in
   let ctxt =
     Node_context.init
       config
@@ -784,6 +792,7 @@ let run ~data_dir configuration_override =
       transport_layer
       cctxt
       metrics_server
+      crawler
   in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ctxt ;

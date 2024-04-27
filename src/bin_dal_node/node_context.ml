@@ -49,9 +49,10 @@ type t = {
   transport_layer : Gossipsub.Transport_layer.t;
   mutable profile_ctxt : Profile_manager.t;
   metrics_server : Metrics.t;
+  crawler : Crawler.t;
 }
 
-let init config store gs_worker transport_layer cctxt metrics_server =
+let init config store gs_worker transport_layer cctxt metrics_server crawler =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -73,6 +74,7 @@ let init config store gs_worker transport_layer cctxt metrics_server =
     transport_layer;
     profile_ctxt = Profile_manager.empty;
     metrics_server;
+    crawler;
   }
 
 let set_ready ctxt plugin skip_list_cells_store cryptobox
