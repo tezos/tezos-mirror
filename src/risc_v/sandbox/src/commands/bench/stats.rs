@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Serializable data for instruction-level statistics
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct NamedStats {
     pub name: String,
     pub count: usize,
