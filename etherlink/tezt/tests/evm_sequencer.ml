@@ -1495,10 +1495,21 @@ let test_extended_block_param =
       counter_value
         ~block:(Block_hash {hash = block.hash; require_canonical = false})
     in
+    let*@ counter_via_call =
+      Rpc.(
+        call
+          ~block:(Number (Int32.to_int block.number))
+          ~to_:contract
+          ~data:"a87d942c"
+          sequencer)
+    in
+    let counter_via_call = int_of_string counter_via_call in
     Check.((counter_via_number = expected_value) int)
       ~error_msg:"Expected counter to be %R but got %L, using {blockNumber}" ;
     Check.((counter_via_hash = expected_value) int)
       ~error_msg:"Expected counter to be %R but got %L, using {blockHash}" ;
+    Check.((counter_via_call = expected_value) int)
+      ~error_msg:"Expected counter to be %R but got %L, using eth_call" ;
     unit
   in
 

@@ -117,10 +117,14 @@ val tez_kernelVersion : Evm_node.t -> (string, error) result Lwt.t
     kernel root hash. *)
 val tez_kernelRootHash : Evm_node.t -> (string option, error) result Lwt.t
 
-(** [call ~to_ ~data] call [eth_call] with [to] and [data] as argument (on block
-    latest) *)
+(** [call ~to_ ~data ?block evm_node] call [eth_call] with [to] and
+    [data] as argument. [block] defaults to [Latest]. *)
 val call :
-  to_:string -> data:string -> Evm_node.t -> (string, error) result Lwt.t
+  to_:string ->
+  data:string ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (string, error) result Lwt.t
 
 (** [get_balance ~address ?block evm_node] calls [eth_getBalance]. [block]
     defaults to [Latest].*)
