@@ -70,6 +70,10 @@ module Name = struct
 end
 
 module Request = struct
+  type block_request =
+    | Number of Ethereum_types.quantity
+    | Hash of Ethereum_types.block_hash
+
   type (_, _) t =
     | Apply_evm_events : {
         finalized_level : int32 option;
@@ -95,15 +99,34 @@ module Request = struct
     | Last_known_L1_level : (int32 option, tztrace) t
     | New_last_known_L1_level : int32 -> (unit, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
-    | Evm_state_after : {
-        number : Ethereum_types.quantity;
-      }
-        -> (Evm_state.t option, tztrace) t
+    | Evm_state_after : block_request -> (Evm_state.t option, tztrace) t
     | Earliest_state : (Evm_state.t option, tztrace) t
 
   type view = View : _ t -> view
 
   let view req = View req
+
+  let block_request_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"number"
+          (obj2
+             (req "kind" (constant "number"))
+             (req "number" Ethereum_types.quantity_encoding))
+          (function Number number -> Some ((), number) | _ -> None)
+          (fun ((), number) -> Number number);
+        case
+          (Tag 1)
+          ~title:"hash"
+          (obj2
+             (req "kind" (constant "number"))
+             (req "hash" Ethereum_types.block_hash_encoding))
+          (function Hash hash -> Some ((), hash) | _ -> None)
+          (fun ((), hash) -> Hash hash);
+      ]
 
   let encoding =
     let open Data_encoding in
@@ -188,10 +211,11 @@ module Request = struct
           ~title:"Evm_state_after"
           (obj2
              (req "request" (constant "evm_state_after"))
-             (req "number" Ethereum_types.quantity_encoding))
+             (req "payload" block_request_encoding))
           (function
-            | View (Evm_state_after {number}) -> Some ((), number) | _ -> None)
-          (fun ((), number) -> View (Evm_state_after {number}));
+            | View (Evm_state_after block_request) -> Some ((), block_request)
+            | _ -> None)
+          (fun ((), block_request) -> View (Evm_state_after block_request));
         case
           (Tag 10)
           ~title:"Earliest_state"
@@ -682,6 +706,14 @@ module State = struct
         return res
     | _ -> failwith "invalid delayed inbox item"
 
+  let block_number_of_hash evm_state hash =
+    let open Lwt_result_syntax in
+    let*! bytes =
+      Evm_state.inspect evm_state (Durable_storage_path.Block.by_hash hash)
+    in
+    let block = Option.map Ethereum_types.block_from_rlp bytes in
+    return (Option.map (fun block -> block.Ethereum_types.number) block)
+
   let blueprint_with_events ctxt level =
     let open Lwt_result_syntax in
     let* blueprint = Evm_store.Blueprints.find ctxt.store level in
@@ -771,8 +803,21 @@ module Handlers = struct
         let ctxt = Worker.state self in
         let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
         return hashes
-    | Evm_state_after {number} -> (
+    | Evm_state_after block_request -> (
         let ctxt = Worker.state self in
+        let* number =
+          match block_request with
+          | Number number -> return number
+          | Hash hash -> (
+              let* number =
+                State.block_number_of_hash ctxt.session.evm_state hash
+              in
+              match number with
+              | Some number -> return number
+              | None ->
+                  (* To respect EIP-1898 we can return error code -32001. *)
+                  failwith "Block was not found")
+        in
         let* checkpoint = Evm_store.Context_hashes.find ctxt.store number in
         match checkpoint with
         | Some checkpoint ->
@@ -1066,12 +1111,18 @@ let head_info () =
 let find_evm_state block =
   let open Lwt_result_syntax in
   match block with
-  | Ethereum_types.Latest ->
+  | Ethereum_types.Block_parameter.Block_parameter Latest ->
       let*! {evm_state; _} = head_info () in
       return_some evm_state
-  | Earliest -> worker_wait_for_request Earliest_state
-  | Pending -> failwith "Block parameter pending is not supported"
-  | Hash_param number -> worker_wait_for_request (Evm_state_after {number})
+  | Block_parameter Earliest -> worker_wait_for_request Earliest_state
+  | Block_parameter Pending ->
+      failwith "Block parameter pending is not supported"
+  | Block_parameter (Number number) ->
+      worker_wait_for_request (Evm_state_after (Number number))
+  | Block_hash {hash; require_canonical = _} ->
+      let*! {evm_state; current_block_hash; _} = head_info () in
+      if hash = current_block_hash then return_some evm_state
+      else worker_wait_for_request (Evm_state_after (Hash hash))
 
 let execute_and_inspect ?wasm_entrypoint input =
   let open Lwt_result_syntax in
@@ -1084,14 +1135,15 @@ let execute_and_inspect ?wasm_entrypoint input =
     ~input
     evm_state
 
-let inspect ?(block = Ethereum_types.Latest) path =
+let inspect ?(block = Ethereum_types.Block_parameter.(Block_parameter Latest))
+    path =
   let open Lwt_result_syntax in
   let* evm_state = find_evm_state block in
   match evm_state with
   | None ->
       failwith
         "EVM state was not found on block %a"
-        Ethereum_types.pp_block_param
+        Ethereum_types.Block_parameter.pp_extended
         block
   | Some evm_state ->
       let*! res = Evm_state.inspect evm_state path in
@@ -1122,7 +1174,7 @@ let replay ?profile ?(alter_evm_state = Lwt_result_syntax.return)
     (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
   let* evm_state =
-    worker_wait_for_request (Evm_state_after {number = Qty Z.(pred number)})
+    worker_wait_for_request (Evm_state_after (Number (Qty Z.(pred number))))
   in
   match evm_state with
   | Some evm_state ->

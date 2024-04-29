@@ -8,6 +8,8 @@
 - The RPC `eth_getBalance`, `eth_getCode` and `eth_getStorageAt`
   support the default block parameter (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block).
   (!13039, !13056, !13058)
+- Support partially https://eips.ethereum.org/EIPS/eip-1898, the
+  `requireCanonical` field is not yet supported. (!12345)
 
 ### Bug fixes
 

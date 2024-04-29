@@ -9,6 +9,15 @@
 
 type error = {code : int; message : string; data : string option}
 
+type block_param =
+  | Earliest
+  | Latest
+  | Pending
+  | Number of int  (** Put directly the value. *)
+  | Block_number of {number : int; require_canonical : bool}
+      (** Instead of [Number], it uses a JSON object. *)
+  | Block_hash of {hash : string; require_canonical : bool}
+
 module Request : sig
   val eth_blockNumber : Evm_node.request
 
@@ -29,7 +38,7 @@ module Request : sig
 
   val eth_getTransactionByHash : transaction_hash:string -> Evm_node.request
 
-  val eth_getCode : address:string -> block:string -> Evm_node.request
+  val eth_getCode : address:string -> block:block_param -> Evm_node.request
 
   val net_version : Evm_node.request
 end
@@ -114,6 +123,18 @@ val call :
   to_:string -> data:string -> Evm_node.t -> (string, error) result Lwt.t
 
 (** [get_balance ~address ?block evm_node] calls [eth_getBalance]. [block]
-    defaults to ["latest"].*)
+    defaults to [Latest].*)
 val get_balance :
-  address:string -> ?block:string -> Evm_node.t -> (Wei.t, error) result Lwt.t
+  address:string ->
+  ?block:block_param ->
+  Evm_node.t ->
+  (Wei.t, error) result Lwt.t
+
+(** [get_balance ~address ?block ~pos evm_node] calls [eth_getStorageAt]. [block]
+    defaults to [Latest]. *)
+val get_storage_at :
+  address:string ->
+  ?block:block_param ->
+  pos:string ->
+  Evm_node.t ->
+  (string, error) result Lwt.t

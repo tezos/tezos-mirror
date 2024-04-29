@@ -265,6 +265,16 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
       sc_rollup_node;
     }
 
+let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
+  let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
+  (* Send the transaction but doesn't wait to be mined. *)
+  let transaction = transaction () in
+  let* _ = wait_for in
+  (* Once the transaction is in the transaction pool the next block will include it. *)
+  let*@ _ = Rpc.produce_block sequencer in
+  (* Resolve the transaction send to make sure it was included. *)
+  transaction
+
 let send_raw_transaction_to_delayed_inbox ?(wait_for_next_level = true)
     ?(amount = Tez.one) ?expect_failure ~sc_rollup_node ~client ~l1_contracts
     ~sc_rollup_address ?(sender = Constant.bootstrap2) raw_tx =
@@ -1320,28 +1330,22 @@ let test_get_balance_block_param =
   let* {sequencer; sc_rollup_node; proxy; client; _} =
     setup_sequencer ~time_between_blocks:Nothing protocol
   in
-  let transfer address =
-    let wait_for = Evm_node.wait_for_tx_pool_add_transaction sequencer in
-    let transfer =
-      Eth_cli.transaction_send
-        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-        ~to_public_key:address
-        ~value:(Wei.of_eth_int 10)
-        ~endpoint:(Evm_node.endpoint sequencer)
-        ()
-    in
-    let* _tx_hash = wait_for in
-    (* Once the transaction is in the transaction pool the next block will include it. *)
-    let*@ _ = Rpc.produce_block sequencer in
-    (* Resolve the transaction send to make sure it was included. *)
-    transfer
-  in
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
-  let* _tx_hash = transfer address in
+  let* _tx_hash =
+    send_transaction
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
   (* Check the balance on genesis block and latest block. *)
-  let*@ balance_genesis = Rpc.get_balance ~address ~block:"0" sequencer in
-  let*@ balance_now = Rpc.get_balance ~address ~block:"latest" sequencer in
+  let*@ balance_genesis =
+    Rpc.get_balance ~address ~block:(Number 0) sequencer
+  in
+  let*@ balance_now = Rpc.get_balance ~address ~block:Latest sequencer in
   Check.((balance_genesis = Wei.of_eth_int 0) Wei.typ)
     ~error_msg:(sf "%s should have no funds at genesis, but got %%L" address) ;
   Check.((balance_now = Wei.of_eth_int 10) Wei.typ)
@@ -1381,7 +1385,15 @@ let test_get_balance_block_param =
   let* () = Evm_node.run observer_partial_history in
   (* Transfer funds again to the address. *)
   let*@ level = Rpc.block_number sequencer in
-  let* _tx_hash = transfer address in
+  let* _tx_hash =
+    send_transaction
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
   let* () =
     Evm_node.wait_for_blueprint_applied
       observer_partial_history
@@ -1389,18 +1401,111 @@ let test_get_balance_block_param =
   in
   (* Observer does not know block 0. *)
   let*@? (_error : Rpc.error) =
-    Rpc.get_balance ~address ~block:"0" observer_partial_history
+    Rpc.get_balance ~address ~block:(Number 0) observer_partial_history
   in
   let*@ balance_earliest =
-    Rpc.get_balance ~address ~block:"earliest" observer_partial_history
+    Rpc.get_balance ~address ~block:Earliest observer_partial_history
   in
   let*@ balance_now =
-    Rpc.get_balance ~address ~block:"latest" observer_partial_history
+    Rpc.get_balance ~address ~block:Latest observer_partial_history
   in
   Check.((balance_earliest = Wei.of_eth_int 10) Wei.typ)
     ~error_msg:(sf "%s expected to have a balance of %%R but got %%L" address) ;
   Check.((balance_now = Wei.of_eth_int 20) Wei.typ)
     ~error_msg:(sf "%s expected to have a balance of %%R but got %%L" address) ;
+  unit
+
+let test_extended_block_param =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
+    ~title:"Supports extended block parameter"
+    ~uses
+  @@ fun protocol ->
+  (*
+     In this test we will deploy a counter contract, increments its counter
+     at multiple consecutives blocks, and check the counter using block
+     parameter.
+     As the counter contract has a view, we can test the block parameter
+     both for read only RPCs such as [eth_getStorageAt] and simulation
+     such as [eth_call].
+  *)
+  let* {sequencer; _} = setup_sequencer ~time_between_blocks:Nothing protocol in
+  let* () =
+    Eth_cli.add_abi
+      ~label:Solidity_contracts.counter.label
+      ~abi:Solidity_contracts.counter.abi
+      ()
+  in
+  (* Deploy the contract. *)
+  let* contract, _tx_hash =
+    send_transaction
+      (fun () ->
+        Eth_cli.deploy
+          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+          ~endpoint:(Evm_node.endpoint sequencer)
+          ~abi:Solidity_contracts.counter.abi
+          ~bin:Solidity_contracts.counter.bin)
+      sequencer
+  in
+  (* Takes the level where it was originated, the counter value will be 0. *)
+  let*@ level = Rpc.block_number sequencer in
+  let level = Int32.to_int level in
+  (* Increments the counter multiple times. *)
+  let* () =
+    repeat 2 (fun _ ->
+        let* _ =
+          send_transaction
+            (Eth_cli.contract_send
+               ~source_private_key:
+                 Eth_account.bootstrap_accounts.(0).private_key
+               ~endpoint:(Evm_node.endpoint sequencer)
+               ~abi_label:Solidity_contracts.counter.label
+               ~address:contract
+               ~method_call:"incrementCounter()")
+            sequencer
+        in
+        unit)
+  in
+
+  let*@ block0 =
+    Rpc.get_block_by_number ~block:(string_of_int level) sequencer
+  in
+  let*@ block1 =
+    Rpc.get_block_by_number ~block:(string_of_int (level + 1)) sequencer
+  in
+  let*@ block2 =
+    Rpc.get_block_by_number ~block:(string_of_int (level + 2)) sequencer
+  in
+
+  let check_counter_value ~(block : Block.t) expected_value =
+    let counter_value ~block =
+      let*@ s =
+        Rpc.get_storage_at ~address:contract ~pos:"0x0" ~block sequencer
+      in
+      return (int_of_string s)
+    in
+    let* counter_via_number =
+      counter_value
+        ~block:
+          (Block_number
+             {number = Int32.to_int block.number; require_canonical = false})
+    in
+    let* counter_via_hash =
+      counter_value
+        ~block:(Block_hash {hash = block.hash; require_canonical = false})
+    in
+    Check.((counter_via_number = expected_value) int)
+      ~error_msg:"Expected counter to be %R but got %L, using {blockNumber}" ;
+    Check.((counter_via_hash = expected_value) int)
+      ~error_msg:"Expected counter to be %R but got %L, using {blockHash}" ;
+    unit
+  in
+
+  let* () = check_counter_value ~block:block0 0 in
+  let* () = check_counter_value ~block:block1 1 in
+  let* () = check_counter_value ~block:block2 2 in
+
   unit
 
 let test_observer_applies_blueprint_when_sequencer_restarted =
@@ -2958,6 +3063,7 @@ let () =
   test_send_deposit_to_delayed_inbox protocols ;
   test_rpc_produceBlock protocols ;
   test_get_balance_block_param protocols ;
+  test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;
   test_largest_delayed_transfer_is_included protocols ;
