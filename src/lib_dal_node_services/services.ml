@@ -94,21 +94,6 @@ let get_slot_content :
       open_root / "levels" /: Tezos_rpc.Arg.int32 / "slots" /: Tezos_rpc.Arg.int
       / "content")
 
-let get_commitment_proof :
-    < meth : [`GET]
-    ; input : unit
-    ; output : Cryptobox.commitment_proof
-    ; prefix : unit
-    ; params : unit * Cryptobox.commitment
-    ; query : unit >
-    service =
-  Tezos_rpc.Service.get_service
-    ~description:"Compute the proof associated with a commitment."
-    ~query:Tezos_rpc.Query.empty
-    ~output:Cryptobox.Commitment_proof.encoding
-    Tezos_rpc.Path.(
-      open_root / "commitments" /: Cryptobox.Commitment.rpc_arg / "proof")
-
 let get_page_proof :
     < meth : [`POST]
     ; input : Cryptobox.slot
