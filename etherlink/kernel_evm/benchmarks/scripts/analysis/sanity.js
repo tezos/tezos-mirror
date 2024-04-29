@@ -31,7 +31,10 @@ function print_summary(sanity_acc, dirname) {
         console.log("Sanity check: no problem")
     }
     for (datum of sanity_acc) {
-        print(`${datum.name}: ${datum.type} record ->  ${datum.errors.join(', ')}`, filepath)
+        if (typeof datum === 'string' || datum instanceof String)
+            print(datum, filepath);
+        else
+            print(`${datum?.name}: ${datum?.type} record ->  ${datum?.errors.join(', ')}`, filepath);
     }
     print(`-------------------------------------------------------`, filepath)
 }
