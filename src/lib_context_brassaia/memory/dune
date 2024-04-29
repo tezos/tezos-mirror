@@ -8,8 +8,8 @@
  (libraries
   octez-libs.base
   octez-libs.stdlib
-  octez-internal-libs.brassaia_pack
-  octez-internal-libs.brassaia_pack.mem
+  octez-libs.brassaia_pack
+  octez-libs.brassaia_pack.mem
   octez-libs.context.sigs
   octez-libs.tezos-context-brassaia.encoding
   octez-libs.tezos-context-brassaia.helpers)

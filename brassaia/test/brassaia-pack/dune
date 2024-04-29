@@ -7,16 +7,16 @@
  (libraries
   tezt.core
   octez-libs.tezos-context.memory
-  octez-internal-libs.brassaia
-  octez-internal-libs.brassaia_test_helpers
-  octez-internal-libs.brassaia_pack
-  octez-internal-libs.brassaia_pack.unix
-  octez-internal-libs.brassaia_tezos
+  octez-libs.brassaia
+  octez-libs.brassaia_test_helpers
+  octez-libs.brassaia_pack
+  octez-libs.brassaia_pack.unix
+  octez-libs.brassaia_tezos
   octez-libs.test-helpers
   octez-alcotezt
   fpath
   tezt)
- (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
+ (preprocess (pps octez-libs.ppx_brassaia.internal))
  (library_flags (:standard -linkall))
  (flags
   (:standard)

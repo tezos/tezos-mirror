@@ -3,14 +3,14 @@
 
 (library
  (name brassaia_pack_unix)
- (public_name octez-internal-libs.brassaia_pack.unix)
+ (public_name octez-libs.brassaia_pack.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
   fmt
   index
   index.unix
-  octez-internal-libs.brassaia
-  octez-internal-libs.brassaia_pack
+  octez-libs.brassaia
+  octez-libs.brassaia_pack
   logs
   lwt
   lwt.unix
@@ -20,7 +20,7 @@
   checkseum
   checkseum.ocaml
   rusage)
- (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
+ (preprocess (pps octez-libs.ppx_brassaia.internal))
  (flags
   (:standard)
   -w -66-68))

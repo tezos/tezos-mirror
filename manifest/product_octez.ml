@@ -1935,21 +1935,21 @@ let octez_base_test_helpers =
     ~release_status:Released
 
 let ppx_brassaia =
-  octez_internal_lib
+  octez_lib
     "ppx_brassaia"
     ~path:"brassaia/lib_ppx_brassaia"
     ~deps:[ppx_repr_lib]
     ~ppx_kind:Ppx_deriver
 
 let ppx_brassaia_internal_lib =
-  octez_internal_lib
+  octez_lib
     "ppx_brassaia.internal_lib"
     ~path:"brassaia/lib_ppx_brassaia/internal"
     ~modules:["ppx_brassaia_internal_lib"]
     ~deps:[logs]
 
 let ppx_brassaia_internal =
-  octez_internal_lib
+  octez_lib
     "ppx_brassaia.internal"
     ~path:"brassaia/lib_ppx_brassaia/internal"
     ~modules:["ppx_brassaia_internal"]
@@ -1959,13 +1959,13 @@ let ppx_brassaia_internal =
     ~preprocess:[pps ppxlib_metaquot]
 
 let brassaia_data =
-  octez_internal_lib
+  octez_lib
     "brassaia.data"
     ~path:"brassaia/lib_brassaia/data"
     ~deps:[bigstringaf; fmt]
 
 let brassaia =
-  octez_internal_lib
+  octez_lib
     "brassaia"
     ~path:"brassaia/lib_brassaia"
     ~deps:
@@ -1988,7 +1988,7 @@ let brassaia =
     ~preprocess:[pps ~args:["--"; "--lib"; "Type"] ppx_brassaia_internal]
 
 let brassaia_mem =
-  octez_internal_lib
+  octez_lib
     "brassaia.mem"
     ~path:"brassaia/lib_brassaia/mem"
     ~deps:[brassaia; logs; lwt]
@@ -1996,7 +1996,7 @@ let brassaia_mem =
     ~flags:(Flags.standard ~disable_warnings:[68] ())
 
 let brassaia_pack =
-  octez_internal_lib
+  octez_lib
     "brassaia_pack"
     ~path:"brassaia/lib_brassaia_pack"
     ~deps:[fmt; brassaia; brassaia_data; logs; lwt; optint]
@@ -2004,14 +2004,14 @@ let brassaia_pack =
     ~flags:(Flags.standard ~disable_warnings:[66] ())
 
 let brassaia_pack_mem =
-  octez_internal_lib
+  octez_lib
     "brassaia_pack.mem"
     ~path:"brassaia/lib_brassaia_pack/mem"
     ~deps:[brassaia_pack; brassaia_mem; brassaia]
     ~preprocess:[pps ppx_brassaia_internal]
 
 let brassaia_pack_unix =
-  octez_internal_lib
+  octez_lib
     "brassaia_pack.unix"
     ~path:"brassaia/lib_brassaia_pack/unix"
     ~deps:
@@ -2035,14 +2035,14 @@ let brassaia_pack_unix =
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let brassaia_tezos =
-  octez_internal_lib
+  octez_lib
     "brassaia_tezos"
     ~path:"brassaia/lib_brassaia_tezos"
     ~deps:[fmt; zarith; digestif; brassaia; brassaia_pack; brassaia_pack_unix]
     ~preprocess:[pps ppx_brassaia_internal]
 
 let brassaia_test_helpers =
-  octez_internal_lib
+  octez_lib
     "brassaia_test_helpers"
     ~path:"brassaia/test/helpers"
     ~deps:

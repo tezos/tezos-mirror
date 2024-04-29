@@ -3,13 +3,13 @@
 
 (library
  (name brassaia_tezos)
- (public_name octez-internal-libs.brassaia_tezos)
+ (public_name octez-libs.brassaia_tezos)
  (instrumentation (backend bisect_ppx))
  (libraries
   fmt
   zarith
   digestif
-  octez-internal-libs.brassaia
-  octez-internal-libs.brassaia_pack
-  octez-internal-libs.brassaia_pack.unix)
- (preprocess (pps octez-internal-libs.ppx_brassaia.internal)))
+  octez-libs.brassaia
+  octez-libs.brassaia_pack
+  octez-libs.brassaia_pack.unix)
+ (preprocess (pps octez-libs.ppx_brassaia.internal)))
