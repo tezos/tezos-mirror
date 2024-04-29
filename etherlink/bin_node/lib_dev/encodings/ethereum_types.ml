@@ -497,8 +497,8 @@ let transaction_receipt_encoding =
           (req "contractAddress" (option address_encoding))))
 
 type transaction_object = {
-  blockHash : block_hash;
-  blockNumber : quantity;
+  blockHash : block_hash option;
+  blockNumber : quantity option;
   from : address;
   gas : quantity;
   gasPrice : quantity;
@@ -506,8 +506,8 @@ type transaction_object = {
   input : hash;
   nonce : quantity;
   to_ : address option;
-  transactionIndex : quantity;
-      (* It can be null if it's in a pending block, but we don't have a notion of pending. *)
+  transactionIndex : quantity option;
+      (* It can be null if it's in a pending block. *)
   value : quantity;
   v : quantity;
   r : hash;
@@ -548,7 +548,7 @@ let transaction_object_from_rlp block_hash bytes =
       let s = decode_hash s in
       {
         blockHash = block_hash;
-        blockNumber = block_number;
+        blockNumber = Some block_number;
         from;
         gas;
         gasPrice = gas_price;
@@ -556,7 +556,7 @@ let transaction_object_from_rlp block_hash bytes =
         input;
         nonce;
         to_;
-        transactionIndex = index;
+        transactionIndex = Some index;
         value;
         v;
         r;
@@ -623,8 +623,8 @@ let transaction_object_encoding =
       })
     (merge_objs
        (obj10
-          (req "blockHash" block_hash_encoding)
-          (req "blockNumber" quantity_encoding)
+          (req "blockHash" (option block_hash_encoding))
+          (req "blockNumber" (option quantity_encoding))
           (req "from" address_encoding)
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
@@ -632,7 +632,7 @@ let transaction_object_encoding =
           (req "input" hash_encoding)
           (req "nonce" quantity_encoding)
           (req "to" (option address_encoding))
-          (req "transactionIndex" quantity_encoding))
+          (req "transactionIndex" (option quantity_encoding)))
        (obj4
           (req "value" quantity_encoding)
           (req "v" quantity_encoding)
