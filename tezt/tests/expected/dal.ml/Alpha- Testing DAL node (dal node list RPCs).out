@@ -7,17 +7,14 @@ Available services:
       Compute the proof associated with a commitment. 
   - GET /commitments/<DAL_commitment>/slot
       Retrieve the content of the slot associated with the given commitment. 
-  + levels/<int32>/
-    - GET /levels/<int32>/headers
-        Return the known headers for the given published level. 
-    + slots/<int>/
-      - GET /levels/<int32>/slots/<int>/commitment
-          Return the accepted commitment associated to the given slot index
-          and published at the given level. 
-      - GET /levels/<int32>/slots/<int>/pages
-          Fetch slot as list of pages 
-      - GET /levels/<int32>/slots/<int>/status
-          Return the status for the given slot. 
+  + levels/<int32>/slots/<int>/
+    - GET /levels/<int32>/slots/<int>/commitment
+        Return the accepted commitment associated to the given slot index and
+        published at the given level. 
+    - GET /levels/<int32>/slots/<int>/pages
+        Fetch slot as list of pages 
+    - GET /levels/<int32>/slots/<int>/status
+        Return the status for the given slot. 
   + p2p/
     - POST /p2p/connect
         Connect to a new peer. 

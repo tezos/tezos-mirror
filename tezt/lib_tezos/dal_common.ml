@@ -271,9 +271,6 @@ module Dal_RPC = struct
 
   let get_profiles () = make GET ["profiles"] profiles_of_json
 
-  let mk_query_arg ~to_string field v_opt =
-    Option.fold ~none:[] ~some:(fun v -> [(field, to_string v)]) v_opt
-
   let get_level_slot_status ~slot_level ~slot_index =
     make
       GET
@@ -297,14 +294,6 @@ module Dal_RPC = struct
         "assigned_shard_indices";
       ]
       (fun json -> JSON.(json |> as_list |> List.map as_int))
-
-  let get_published_level_headers ?status published_level =
-    let query_string = mk_query_arg ~to_string:(fun s -> s) "status" status in
-    make
-      ~query_string
-      GET
-      ["levels"; string_of_int published_level; "headers"]
-      slot_headers_of_json
 
   type slot_set = bool list
 

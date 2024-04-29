@@ -118,16 +118,6 @@ val get_slot_status :
   ; query : unit >
   service
 
-(** Return the known slot headers for the given published level. *)
-val get_published_level_headers :
-  < meth : [`GET]
-  ; input : unit
-  ; output : Types.slot_header list
-  ; prefix : unit
-  ; params : unit * Types.level
-  ; query : Types.header_status option >
-  service
-
 (** Update the list of profiles tracked by the DAL node.
     Note that it does not take the bootstrap profile as it
     is incompatible with other profiles. *)

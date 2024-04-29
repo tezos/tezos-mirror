@@ -1246,7 +1246,9 @@ let test_dal_node_slot_management _protocol parameters _cryptobox _node client
       string
       ~error_msg:"Wrong slot content: Expected: %L. Got: %R") ;
   let* _ =
-    Dal_RPC.(call dal_node @@ get_published_level_headers published_level)
+    Dal_RPC.(
+      call dal_node
+      @@ get_level_slot_status ~slot_level:published_level ~slot_index)
   in
   let* pages =
     Dal_RPC.(call dal_node @@ level_slot_pages ~published_level ~slot_index)
@@ -1355,12 +1357,24 @@ let get_commitment_succeeds expected_commitment response =
 let get_commitment_not_found _commit r =
   RPC_core.check_string_response ~code:404 r
 
-let check_published_level_headers ~__LOC__ dal_node ~pub_level
+let check_published_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
     ~number_of_headers =
-  let* slot_headers =
-    Dal_RPC.(call dal_node @@ get_published_level_headers pub_level)
+  let* number_of_published_commitments =
+    Lwt_list.fold_left_s
+      (fun accu slot_index ->
+        let* response =
+          Dal_RPC.(
+            call_raw dal_node
+            @@ get_level_index_commitment ~slot_level:pub_level ~slot_index)
+        in
+        match response.code with
+        | 200 -> return (accu + 1)
+        | 404 -> return accu
+        | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code)
+      0
+      (List.init number_of_slots Fun.id)
   in
-  Check.(List.length slot_headers = number_of_headers)
+  Check.(number_of_published_commitments = number_of_headers)
     ~__LOC__
     Check.int
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
@@ -1409,8 +1423,11 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
 
 let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     client dal_node =
-  let check_published_level_headers = check_published_level_headers dal_node in
   let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+  let number_of_slots = parameters.Dal.Parameters.number_of_slots in
+  let check_published_level_headers =
+    check_published_level_headers dal_node ~number_of_slots
+  in
   let* level = Node.get_level node in
   let pub_level = level + 1 in
   let publish ?fee source ~index content =
@@ -1486,13 +1503,28 @@ let test_dal_node_slots_headers_tracking _protocol parameters _cryptobox node
     check_published_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   let* slot_headers =
-    Dal_RPC.(
-      call dal_node
-      @@ get_published_level_headers ~status:"waiting_attestation" pub_level)
-  in
-  let slot_headers =
-    List.map (fun sh -> (sh.Dal_RPC.slot_index, sh.commitment)) slot_headers
-    |> List.fast_sort (fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
+    Lwt_list.filter_map_s
+      (fun slot_index ->
+        let commitment_rpc =
+          Dal_RPC.get_level_index_commitment ~slot_level:pub_level ~slot_index
+        in
+        let* response = Dal_RPC.call_raw dal_node commitment_rpc in
+        match response.code with
+        | 200 ->
+            let commitment =
+              commitment_rpc.decode
+              @@ JSON.parse ~origin:"RPC response" response.body
+            in
+            let* status =
+              Dal_RPC.(
+                call dal_node
+                @@ get_level_slot_status ~slot_level:pub_level ~slot_index)
+            in
+            if status = "waiting_attestation" then some (slot_index, commitment)
+            else none
+        | 404 -> none
+        | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code)
+      (List.init number_of_slots Fun.id)
   in
   Check.(slot_headers = ok)
     Check.(list (tuple2 int string))
@@ -2551,19 +2583,13 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   let rec check_attestations level =
     if level >= max_level then return ()
     else
-      let* slot_headers =
-        Dal_RPC.(call dal_node @@ get_published_level_headers level)
+      let* status =
+        Dal_RPC.(
+          call dal_node
+          @@ get_level_slot_status
+               ~slot_level:level
+               ~slot_index:(slot_idx level))
       in
-      Check.(
-        (1 = List.length slot_headers)
-          int
-          ~error_msg:"Expected a single header (got %R headers)") ;
-      let Dal_RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
-      Check.((level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
-      Check.(
-        (slot_idx level = slot_index)
-          int
-          ~error_msg:"Expected index %L (got %R)") ;
       (* Before [first_not_attested_published_level], it should be [attested],
          and above (and including) [first_not_attested_published_level], it
          should be [unattested]. *)
@@ -2674,19 +2700,13 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   let rec check_attestations level =
     if level > last_checked_level then return ()
     else
-      let* slot_headers =
-        Dal_RPC.(call dal_node @@ get_published_level_headers level)
+      let* status =
+        Dal_RPC.(
+          call dal_node
+          @@ get_level_slot_status
+               ~slot_level:level
+               ~slot_index:(slot_idx level))
       in
-      Check.(
-        (1 = List.length slot_headers)
-          int
-          ~error_msg:"Expected a single header (got %R headers)") ;
-      let Dal_RPC.{slot_level; slot_index; status; _} = List.hd slot_headers in
-      Check.((level = slot_level) int ~error_msg:"Expected level %L (got %R)") ;
-      Check.(
-        (slot_idx level = slot_index)
-          int
-          ~error_msg:"Expected index %L (got %R)") ;
       let expected_status =
         if level <= intermediary_level then "attested" else "unattested"
       in
@@ -4267,7 +4287,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
          all_shard_indices
   in
   let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
-  let* publication_level, commitment =
+  let* publication_level, _commitment =
     publish_store_and_wait_slot
       node
       client
@@ -4289,21 +4309,14 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
       [attester]
   in
 
-  let* slot_headers =
-    Dal_RPC.(call attester @@ get_published_level_headers publication_level)
+  let* status =
+    Dal_RPC.(
+      call attester
+      @@ get_level_slot_status ~slot_level:publication_level ~slot_index:index)
   in
-  let expected_slot_header =
-    Dal_RPC.
-      {
-        slot_level = publication_level;
-        slot_index = index;
-        status = "attested";
-        commitment;
-      }
-  in
-  Check.([expected_slot_header] = slot_headers)
-    Dal.Check.slot_headers_typ
-    ~error_msg:"Expected slot headers %L (got %R)" ;
+  Check.(status = "attested")
+    Check.string
+    ~error_msg:"Expected status %R (got %L)" ;
   Log.info "Slot sucessfully attested" ;
   unit
 

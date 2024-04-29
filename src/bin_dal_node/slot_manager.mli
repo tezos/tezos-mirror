@@ -185,16 +185,3 @@ val get_slot_status :
   slot_id:Types.slot_id ->
   Store.t ->
   (Types.header_status option, Errors.decoding) result Lwt.t
-
-(** [get_published_level_headers ~published_level ?header_status store] returns
-    the list of slot headers {!Types.slot_header} that are published
-    for the given [published_level]. If a header status is given in
-    [?header_status], the list is filtered accordingly.
-
-    The function may return an decoding error in case of failure.
-*)
-val get_published_level_headers :
-  published_level:Types.level ->
-  ?header_status:Types.header_status ->
-  Store.t ->
-  (Types.slot_header list, Errors.decoding) result Lwt.t

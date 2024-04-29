@@ -191,14 +191,6 @@ module Slots_handlers = struct
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_status ~slot_id store |> Errors.to_tzresult)
 
-  let get_published_level_headers ctxt published_level header_status () =
-    call_handler1 ctxt (fun store ->
-        Slot_manager.get_published_level_headers
-          ~published_level
-          ?header_status
-          store
-        |> Errors.to_tzresult)
-
   let get_shard ctxt ((_, commitment), shard_index) () () =
     call_handler1 ctxt (fun {shards; _} ->
         Store.Shards.read shards commitment shard_index)
@@ -419,10 +411,6 @@ let register :
        Tezos_rpc.Directory.register2
        Services.get_assigned_shard_indices
        (Profile_handlers.get_assigned_shard_indices ctxt)
-  |> add_service
-       Tezos_rpc.Directory.register1
-       Services.get_published_level_headers
-       (Slots_handlers.get_published_level_headers ctxt)
   |> add_service
        Tezos_rpc.Directory.register2
        Services.get_attestable_slots
