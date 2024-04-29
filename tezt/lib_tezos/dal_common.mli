@@ -169,9 +169,10 @@ module RPC : sig
         and its proof in case of success. *)
   val post_slot : Helpers.slot -> (commitment * commitment_proof) RPC_core.t
 
-  (** Call RPC "GET /commitments/<commitment>/slot" to retrieve the slot
-        content associated with the given commitment. *)
-  val get_commitment_slot : commitment -> Helpers.slot RPC_core.t
+  (** Call RPC "GET /levels/<slot_level>/slot/<slot_index>/content" to retrieve the slot
+        content associated with the given level and index. *)
+  val get_level_slot_content :
+    slot_level:int -> slot_index:int -> Helpers.slot RPC_core.t
 
   (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
        associated to a commitment. *)

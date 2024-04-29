@@ -47,9 +47,6 @@ let make_unix_cctxt endpoint =
 
 let call (cctxt : #cctxt) = cctxt#call_service
 
-let get_slot cctxt header =
-  call cctxt Services.get_commitment_slot ((), header) () ()
-
 let get_slot_pages cctxt (slot_id : Types.slot_id) =
   call
     cctxt
