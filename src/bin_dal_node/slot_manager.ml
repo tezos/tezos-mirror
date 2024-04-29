@@ -439,3 +439,13 @@ let get_slot_content node_store cryptobox (slot_id : Types.slot_id) =
 
 let get_slot_status ~slot_id node_store =
   Store.Legacy.get_slot_status ~slot_id node_store
+
+let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
+  let open Lwt_result_syntax in
+  let* commitment =
+    get_commitment_by_published_level_and_index
+      ~level:slot_id.slot_level
+      ~slot_index:slot_id.slot_index
+      store
+  in
+  Store.Shards.read store.shards commitment shard_index
