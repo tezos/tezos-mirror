@@ -1,11 +1,23 @@
-(tests
- (names test)
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test)
  (modes native js)
- (js_of_ocaml)
+ (libraries
+  data-encoding
+  zarith
+  zarith_stubs_js
+  alcotest
+  js_of_ocaml-compiler)
+ (js_of_ocaml))
+
+(rule
+ (alias runtest)
  (package data-encoding)
- (libraries data_encoding zarith zarith_stubs_js alcotest))
+ (action (run %{dep:./test.exe})))
 
 (rule
  (alias runtest_js)
- (action
-  (run node %{dep:./test.bc.js})))
+ (package data-encoding)
+ (action (run node %{dep:./test.bc.js})))

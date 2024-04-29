@@ -323,6 +323,22 @@ let zarith_stubs_js =
 
 let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.4.0")
 
+let crowbar = external_lib ~js_compatible:true "crowbar" V.(at_least "0.2")
+
+let js_of_ocaml =
+  external_lib
+    ~js_compatible:true
+    ~main_module:"Js_of_ocaml"
+    "js_of_ocaml"
+    V.(at_least "3.3.0")
+
+let js_of_ocaml_compiler =
+  external_lib ~js_compatible:true "js_of_ocaml-compiler" V.True
+
+let conf_npm = opam_only "conf-npm" V.True
+
+let ppx_hash = external_lib ~js_compatible:true "ppx_hash" V.True
+
 let tezt_lib =
   external_lib
     ~js_compatible:false
