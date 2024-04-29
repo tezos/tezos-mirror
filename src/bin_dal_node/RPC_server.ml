@@ -186,21 +186,15 @@ module Slots_handlers = struct
 
   let handle_slot_pages ctxt (((), level), slot_index) () () =
     call_handler2 ctxt (fun node_store {cryptobox; _} ->
-        let open Lwt_result_syntax in
-        let*! res =
+        (let open Lwt_result_syntax in
+        let* commitment =
           Slot_manager.get_commitment_by_published_level_and_index
             ~level
             ~slot_index
             node_store
         in
-        match res with
-        | Ok commitment ->
-            let* pages =
-              Slot_manager.get_slot_pages cryptobox node_store commitment
-            in
-            return_some pages
-        | Error `Not_found -> return_none
-        | Error (`Other _) as res -> Errors.to_tzresult (Lwt.return res))
+        Slot_manager.get_slot_pages cryptobox node_store commitment)
+        |> Errors.to_option_tzresult)
 end
 
 module Profile_handlers = struct

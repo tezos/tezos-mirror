@@ -46,7 +46,10 @@ type slot = bytes
     length is not a multiple of the page-size specified in the
     [Cryptobox.parameters] argument. *)
 val get_slot_pages :
-  Cryptobox.t -> Store.t -> Cryptobox.commitment -> bytes list tzresult Lwt.t
+  Cryptobox.t ->
+  Store.t ->
+  Cryptobox.commitment ->
+  (bytes list, [> Errors.other]) result Lwt.t
 
 (* Same as [Cryptobox.polynomial_from_shards] but using Lwt +
    result. The argument [number_of_needed_shards] is used to cap the

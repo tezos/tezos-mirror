@@ -194,7 +194,7 @@ let get_slot cryptobox store commitment =
 let get_slot_pages cryptobox store commitment =
   let open Lwt_result_syntax in
   let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot = get_slot cryptobox store commitment |> Errors.to_tzresult in
+  let* slot = get_slot cryptobox store commitment in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
@@ -204,7 +204,7 @@ let get_slot_pages cryptobox store commitment =
     String.chunk_bytes
       dal_parameters.page_size
       slot
-      ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
+      ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
   in
   return @@ List.map (fun page -> String.to_bytes page) pages
 
