@@ -730,16 +730,8 @@ let job_build_bin_package ?dependencies ?rules ~__POS__ ~name
     before_script
       ~source_version:true
       (match target with
-      | Dpkg ->
-          [
-            "export DEBIAN_FRONTEND=noninteractive";
-            "apt update";
-            "apt-get install -y rsync git m4 build-essential patch unzip wget \
-             opam jq bc autoconf cmake libev-dev libffi-dev libgmp-dev \
-             libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev \
-             protobuf-compiler libsqlite3-dev jq";
-          ]
-      | Rpm -> [".gitlab/ci/jobs/build/bin_packages_rpm.sh"])
+      | Dpkg -> [".gitlab/ci/jobs/build/bin_packages_deb_dependencies.sh"]
+      | Rpm -> [".gitlab/ci/jobs/build/bin_packages_rpm_dependencies.sh"])
   in
   job
     ?rules

@@ -92,11 +92,7 @@ oc.build:dpkg:amd64:
   dependencies: []
   before_script:
   - . ./scripts/version.sh
-  - export DEBIAN_FRONTEND=noninteractive
-  - apt update
-  - apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc autoconf
-    cmake libev-dev libffi-dev libgmp-dev libhidapi-dev pkg-config zlib1g-dev libprotobuf-dev
-    protobuf-compiler libsqlite3-dev jq
+  - .gitlab/ci/jobs/build/bin_packages_deb_dependencies.sh
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh
@@ -139,7 +135,7 @@ oc.build:rpm:amd64:
   dependencies: []
   before_script:
   - . ./scripts/version.sh
-  - .gitlab/ci/jobs/build/bin_packages_rpm.sh
+  - .gitlab/ci/jobs/build/bin_packages_rpm_dependencies.sh
   script:
   - wget https://sh.rustup.rs/rustup-init.sh
   - chmod +x rustup-init.sh
