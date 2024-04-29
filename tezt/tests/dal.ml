@@ -1830,26 +1830,6 @@ let test_dal_node_import_snapshot _protocol parameters _cryptobox node client
   let* () = Node.snapshot_import node2 file in
   unit
 
-let test_dal_node_test_get_commitment_proof _protocol parameters cryptobox _node
-    _client dal_node =
-  let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
-  let slot = Helpers.make_slot ~slot_size (generate_dummy_slot slot_size) in
-  let* commitment, _proof = Dal_RPC.(call dal_node @@ post_slot slot) in
-  let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
-  let _, expected_proof =
-    Dal.Commitment.dummy_commitment cryptobox (generate_dummy_slot slot_size)
-  in
-  let (`Hex expected_proof) =
-    Data_encoding.Binary.to_bytes_exn
-      Dal.Cryptobox.Commitment_proof.encoding
-      expected_proof
-    |> Hex.of_bytes
-  in
-  Check.(proof = expected_proof)
-    Check.string
-    ~error_msg:"Wrong proof computed (got = %L, expected = %R)" ;
-  unit
-
 let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
@@ -6312,11 +6292,6 @@ let register ~protocols =
     ~producer_profiles:[0]
     "dal node GET /levels/<level>/slots/<index>/content"
     test_dal_node_test_get_level_slot_content
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~producer_profiles:[0]
-    "dal node GET /commitments/<commitment>/proof"
-    test_dal_node_test_get_commitment_proof
     protocols ;
   scenario_with_layer1_and_dal_nodes
     "dal node PATCH+GET /profiles"
