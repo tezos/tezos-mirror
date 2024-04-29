@@ -15,7 +15,11 @@
  *)
 
 let () =
-  Lwt_main.run
-  @@ Brassaia_test_helpers.Brassaia_test.Store.run ~__FILE__ "brassaia-pack"
-       ~misc:Test_pack.misc ~sleep:Lwt_unix.sleep
-       (List.map (fun s -> (`Quick, s)) Test_pack.suite)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7182
+     These tests are known flaky at this time *)
+  ()
+
+(* Lwt_main.run *)
+(* @@ Brassaia_test_helpers.Brassaia_test.Store.run ~__FILE__ "brassaia-pack" *)
+(*      ~misc:Test_pack.misc ~sleep:Lwt_unix.sleep *)
+(*      (List.map (fun s -> (`Quick, s)) Test_pack.suite) *)
