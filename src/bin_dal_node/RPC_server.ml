@@ -107,21 +107,6 @@ module Slots_handlers = struct
                     node." ))
         | Ok proof -> return proof)
 
-  let get_commitment_proof ctxt commitment () () =
-    call_handler2 ctxt (fun store {cryptobox; _} ->
-        let open Lwt_result_syntax in
-        (* This handler may be costly: We need to recompute the
-           polynomial and then compute the proof. *)
-        let* slot =
-          Slot_manager.get_commitment_slot store cryptobox commitment
-          |> to_option_tzresult
-        in
-        match slot with
-        | None -> return_none
-        | Some slot ->
-            let*? proof = commitment_proof_from_slot cryptobox slot in
-            return_some proof)
-
   let get_page_proof ctxt page_index () slot_data =
     call_handler2 ctxt (fun _store {cryptobox; _} ->
         let open Lwt_result_syntax in
@@ -384,10 +369,6 @@ let register :
        Tezos_rpc.Directory.opt_register2
        Services.get_slot_content
        (Slots_handlers.get_slot_content ctxt)
-  |> add_service
-       Tezos_rpc.Directory.opt_register1
-       Services.get_commitment_proof
-       (Slots_handlers.get_commitment_proof ctxt)
   |> add_service
        Tezos_rpc.Directory.register1
        Services.get_page_proof

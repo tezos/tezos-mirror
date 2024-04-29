@@ -128,16 +128,11 @@ let start_dal_node l1_node ?(producer_profiles = []) ?(attester_profiles = [])
 let store_slot_to_dal_node ~slot_size dal_node =
   let slot = Dal.Helpers.make_slot "someslot" ~slot_size in
   (* Post a commitment of the slot. *)
-  let* commitment, _proof = Dal_RPC.(call dal_node @@ post_slot slot) in
+  let* commitment, proof = Dal_RPC.(call dal_node @@ post_slot slot) in
   let commitment_hash =
     match Dal.Cryptobox.Commitment.of_b58check_opt commitment with
     | None -> Test.fail ~__LOC__ "Decoding commitment failed."
     | Some hash -> hash
-  in
-  (* Compute the proof for the commitment. *)
-  let* proof =
-    let* proof = Dal_RPC.(call dal_node @@ get_commitment_proof commitment) in
-    Dal.Commitment.proof_of_string proof |> return
   in
   return (commitment_hash, proof)
 
@@ -238,7 +233,7 @@ let test_produce_and_propagate_shards ~executors ~protocol =
         ~slot_index
         ~source:Constant.bootstrap2
         ~commitment_hash
-        ~proof
+        ~proof:(Dal.Commitment.proof_of_string proof)
         client2
     in
     Log.info

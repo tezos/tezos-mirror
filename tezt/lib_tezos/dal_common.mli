@@ -174,10 +174,6 @@ module RPC : sig
   val get_level_slot_content :
     slot_level:int -> slot_index:int -> Helpers.slot RPC_core.t
 
-  (** Call RPC "GET /commitments/<commitment>/proof" to get the proof
-       associated to a commitment. *)
-  val get_commitment_proof : commitment -> commitment_proof RPC_core.t
-
   (** Call RPC "GET
         /levels/<published_level>/slot_indices/<slot_index>/commitment" to get
         the commitment associated to the given level and index. *)

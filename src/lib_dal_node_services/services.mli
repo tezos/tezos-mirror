@@ -76,16 +76,6 @@ val get_slot_content :
   ; query : unit >
   service
 
-(** Compute the proof associated to a commitment. *)
-val get_commitment_proof :
-  < meth : [`GET]
-  ; input : unit
-  ; output : Cryptobox.commitment_proof
-  ; prefix : unit
-  ; params : unit * Cryptobox.commitment
-  ; query : unit >
-  service
-
 (** Compute the proof associated to the page whose index is given of the given
     slot. *)
 val get_page_proof :
