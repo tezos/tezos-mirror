@@ -278,7 +278,7 @@ let loading_profiles_failed =
     ~section
     ~name:"loading_profiles_failed"
     ~msg:"loading profiles failed: {error}"
-    ~level:Error
+    ~level:Info
     ("error", Error_monad.trace_encoding)
 
 let saving_profiles_failed =
