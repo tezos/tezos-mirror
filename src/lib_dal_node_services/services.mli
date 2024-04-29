@@ -78,12 +78,12 @@ val get_slot_content :
 
 (** Compute the proof associated to the page whose index is given of the given
     slot. *)
-val get_page_proof :
-  < input : Cryptobox.slot
-  ; meth : [`POST]
+val get_slot_page_proof :
+  < meth : [`GET]
+  ; input : unit
   ; output : Cryptobox.page_proof
-  ; params : unit * Types.page_index
   ; prefix : unit
+  ; params : ((unit * Types.level) * Types.slot_index) * Types.page_index
   ; query : unit >
   service
 

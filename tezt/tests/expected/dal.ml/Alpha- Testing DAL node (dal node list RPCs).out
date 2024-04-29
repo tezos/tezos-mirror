@@ -12,6 +12,8 @@ Available services:
         commitment. 
     - GET /levels/<int32>/slots/<int>/pages
         Fetch slot as list of pages 
+    - GET /levels/<int32>/slots/<int>/pages/<int>/proof
+        Compute the proof associated with a page of a given slot. 
     - GET /levels/<int32>/slots/<int>/status
         Return the status for the given slot. 
   + p2p/
@@ -62,8 +64,6 @@ Available services:
           By default, get the list of known points and their corresponding
           info. When the 'connected' flag is given, then only get the
           connected points. 
-  - POST /pages/<int>/proof
-      Compute the proof associated with a page of a given slot. 
   - /plugin <dynamic>
   - GET /profiles
       Return the list of current profiles tracked by the DAL node. 
@@ -98,11 +98,11 @@ Dynamic parameter description:
   int32
   <pkh>
       A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded) 
-  int
   <point>
       A network point (ipv4:port or [ipv6]:port). 
   <peer_id>
       A cryptographic node identity (Base58Check-encoded) 
+  int
   int
   int32
 

@@ -44,7 +44,10 @@ val make_unix_cctxt : Uri.t -> cctxt
 val get_slot_pages :
   cctxt -> Tezos_dal_node_services.Types.slot_id -> bytes list tzresult Lwt.t
 
-(** [get_page_proof cctxt page_index slot_data] computes and returns the proof
-    of the page whose index and slot are given. *)
-val get_page_proof :
-  cctxt -> int -> bytes -> Cryptobox.page_proof tzresult Lwt.t
+(** [get_slot_page_proof cctxt slot_id page_index] computes and
+    returns the proof of the page whose index and slot are given. *)
+val get_slot_page_proof :
+  cctxt ->
+  Tezos_dal_node_services.Types.slot_id ->
+  int ->
+  Cryptobox.page_proof tzresult Lwt.t
