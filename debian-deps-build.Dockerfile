@@ -5,6 +5,7 @@ FROM ${IMAGE}
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
+ENV BLST_PORTABLE=true
 
 # Build blst used by ocaml-bls12-381 without ADX to support old CPU
 # architectures.
