@@ -373,7 +373,11 @@ let pop_transactions state ~maximum_cumulative_size =
     let*! addr_with_nonces =
       Lwt_list.map_p
         (fun address ->
-          let* nonce = Rollup_node.nonce address in
+          let* nonce =
+            Rollup_node.nonce
+              address
+              Ethereum_types.Block_parameter.(Block_parameter Latest)
+          in
           let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
           let* (Qty balance) =
             Rollup_node.balance
@@ -630,7 +634,11 @@ let nonce pkey =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
   let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
-  let* current_nonce = Rollup_node.nonce pkey in
+  let* current_nonce =
+    Rollup_node.nonce
+      pkey
+      Ethereum_types.Block_parameter.(Block_parameter Latest)
+  in
   let next_nonce =
     match current_nonce with
     | None -> Ethereum_types.Qty Z.zero

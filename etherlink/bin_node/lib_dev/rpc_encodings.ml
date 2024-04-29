@@ -364,11 +364,12 @@ end
 module Get_transaction_count = struct
   open Ethereum_types
 
-  type input = address * Block_parameter.t
+  type input = address * Block_parameter.extended
 
   type output = quantity
 
-  let input_encoding = encoding_with_optional_block_param address_encoding
+  let input_encoding =
+    encoding_with_optional_extended_block_param address_encoding
 
   let output_encoding = quantity_encoding
 
