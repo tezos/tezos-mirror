@@ -164,8 +164,9 @@ let get_slot cryptobox store commitment =
         if remaining <= 0 then return acc
         else if shard_id >= number_of_shards then
           let provided = minimal_number_of_shards - remaining in
-          tzfail
-          @@ Missing_shards {provided; required = minimal_number_of_shards}
+          fail
+            (Errors.other
+               [Missing_shards {provided; required = minimal_number_of_shards}])
         else
           let*! res =
             Store.Shards.read store.Store.shards commitment shard_id
@@ -175,10 +176,7 @@ let get_slot cryptobox store commitment =
           | Error _ -> loop acc (shard_id + 1) remaining
       in
       let* shards = loop Seq.empty 0 minimal_number_of_shards in
-      let* polynomial =
-        polynomial_from_shards cryptobox shards
-        |> Lwt.return |> Errors.to_tzresult
-      in
+      let*? polynomial = polynomial_from_shards cryptobox shards in
       let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
       (* Store the slot so that next calls don't require a reconstruction. *)
       let* () =
@@ -187,7 +185,6 @@ let get_slot cryptobox store commitment =
           cryptobox
           slot
           commitment
-        |> Errors.to_tzresult
       in
       let*! () =
         Event.(emit fetched_slot (Bytes.length slot, Seq.length shards))
@@ -197,7 +194,7 @@ let get_slot cryptobox store commitment =
 let get_slot_pages cryptobox store commitment =
   let open Lwt_result_syntax in
   let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot = get_slot cryptobox store commitment in
+  let* slot = get_slot cryptobox store commitment |> Errors.to_tzresult in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
