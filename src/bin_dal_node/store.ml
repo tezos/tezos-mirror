@@ -151,8 +151,12 @@ module Shards = struct
 
   let read store commitment shard_id =
     let open Lwt_result_syntax in
-    let* share = KVS.read_value store file_layout commitment shard_id in
-    return {Cryptobox.share; index = shard_id}
+    let*! res = KVS.read_value store file_layout commitment shard_id in
+    let data_kind = Types.Store.Shard in
+    match res with
+    | Ok share -> return {Cryptobox.share; index = shard_id}
+    | Error [KVS.Missing_stored_kvs_data _] -> fail `Not_found
+    | Error err -> fail @@ `Decoding_failed (data_kind, err)
 
   let count_values store commitment =
     KVS.count_values store file_layout commitment

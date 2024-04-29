@@ -40,7 +40,11 @@ module Shards : sig
 
   (** [read store commitment shard_id] gets the shard associated to
     [commitment] at the range [shard_id]. *)
-  val read : t -> Cryptobox.commitment -> int -> Cryptobox.shard tzresult Lwt.t
+  val read :
+    t ->
+    Cryptobox.commitment ->
+    int ->
+    (Cryptobox.shard, [> Errors.not_found | Errors.decoding]) result Lwt.t
 
   (** Same as [read_values] but for all possible shards of the given commitment. *)
   val read_all :

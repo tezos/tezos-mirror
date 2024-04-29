@@ -186,7 +186,8 @@ module Slots_handlers = struct
 
   let get_shard ctxt ((_, commitment), shard_index) () () =
     call_handler1 ctxt (fun {shards; _} ->
-        Store.Shards.read shards commitment shard_index)
+        Store.Shards.read shards commitment shard_index
+        |> Errors.to_option_tzresult)
 
   let handle_slot_pages ctxt (((), level), slot_index) () () =
     let open Lwt_result_syntax in
@@ -474,7 +475,7 @@ let register :
        Services.P2P.Peers.patch_peer
        (P2P.patch_peer ctxt)
   |> add_service
-       Tezos_rpc.Directory.register
+       Tezos_rpc.Directory.opt_register
        Services.get_shard
        (Slots_handlers.get_shard ctxt)
 
