@@ -836,7 +836,7 @@ module Make (C : AUTOMATON_CONFIG) :
       let filtered_message_ids =
         List.filter_e
           (fun message_id ->
-            match Message.valid ~message_id () with
+            match Message_id.valid message_id with
             | `Valid -> Ok (should_handle_message_id message_id)
             | `Unknown | `Outdated -> Ok false
             | `Invalid -> Error ())
@@ -1097,7 +1097,19 @@ module Make (C : AUTOMATON_CONFIG) :
    fun {peer; topic; px; backoff} -> Prune.handle peer topic ~px ~backoff
 
   module Receive_message = struct
-    let check_valid sender topic message message_id =
+    let check_message_id_valid sender topic message_id =
+      let open Monad.Syntax in
+      match Message_id.valid message_id with
+      | `Valid -> unit
+      | `Unknown | `Outdated -> fail Unknown_validity
+      | `Invalid ->
+          let* () =
+            update_score sender (fun stats ->
+                Score.invalid_message_delivered stats topic)
+          in
+          fail Invalid_message
+
+    let check_message_valid sender topic message message_id =
       let open Monad.Syntax in
       match Message.valid ~message ~message_id () with
       | `Valid -> unit
@@ -1128,7 +1140,8 @@ module Make (C : AUTOMATON_CONFIG) :
             in
             fail Already_received
       in
-      let*? () = check_valid sender topic message message_id in
+      let*? () = check_message_id_valid sender topic message_id in
+      let*? () = check_message_valid sender topic message message_id in
       let peers = Peer.Set.remove sender peers_in_mesh in
       let* () = put_message_in_cache message_id message topic in
       let* () =

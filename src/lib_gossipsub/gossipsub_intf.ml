@@ -48,6 +48,8 @@ module type AUTOMATON_SUBCONFIG = sig
         id. Message ids should be defined so that this function can be
         implemented. *)
     val get_topic : t -> Topic.t
+
+    val valid : t -> [`Valid | `Unknown | `Outdated | `Invalid]
   end
 
   module Message : sig
