@@ -56,5 +56,8 @@ val amplification_random_delay_max : float
    is aborted to avoid keeping a pending promise forever. *)
 val amplification_timeout : float
 
-(** Initial reconnection delay to L1 node from the DAL crawler. *)
-val crawler_l1_reconnection_delay : float
+(** Initial reconnection delay to L1 node from the DAL crawler in seconds. *)
+val initial_l1_crawler_reconnection_delay : float
+
+(** Controls the size of the blocks cache in the L1 crawler. *)
+val crawler_l1_blocks_cache_size : int
