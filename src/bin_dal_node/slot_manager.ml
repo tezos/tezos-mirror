@@ -117,14 +117,14 @@ let polynomial_from_shards cryptobox shards =
       ( `Not_enough_shards msg
       | `Shard_index_out_of_range msg
       | `Invalid_shard_length msg ) ->
-      Error [Merging_failed msg]
+      Error (Errors.other [Merging_failed msg])
 
 let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
   let open Lwt_result_syntax in
   let*? shards =
     Seq_s.take
       ~when_negative_length:
-        [Invalid_number_of_needed_shards number_of_needed_shards]
+        (Errors.other [Invalid_number_of_needed_shards number_of_needed_shards])
       number_of_needed_shards
       shards
   in
@@ -175,7 +175,10 @@ let get_slot cryptobox store commitment =
           | Error _ -> loop acc (shard_id + 1) remaining
       in
       let* shards = loop Seq.empty 0 minimal_number_of_shards in
-      let*? polynomial = polynomial_from_shards cryptobox shards in
+      let* polynomial =
+        polynomial_from_shards cryptobox shards
+        |> Lwt.return |> Errors.to_tzresult
+      in
       let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
       (* Store the slot so that next calls don't require a reconstruction. *)
       let* () =

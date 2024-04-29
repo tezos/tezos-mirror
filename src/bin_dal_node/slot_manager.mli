@@ -49,13 +49,13 @@ val get_slot_pages :
   Cryptobox.t -> Store.t -> Cryptobox.commitment -> bytes list tzresult Lwt.t
 
 (* Same as [Cryptobox.polynomial_from_shards] but using Lwt +
-   tzresult. The argument [number_of_needed_shards] is used to cap the
+   result. The argument [number_of_needed_shards] is used to cap the
    number of Lwt promises resolved from the shard sequence. *)
 val polynomial_from_shards_lwt :
   Cryptobox.t ->
   Cryptobox.shard Seq_s.t ->
   number_of_needed_shards:int ->
-  Cryptobox.polynomial tzresult Lwt.t
+  (Cryptobox.polynomial, [> Errors.other]) result Lwt.t
 
 type error +=
   | Invalid_slot_size of {provided : int; expected : int}
