@@ -39,28 +39,28 @@ function init_analysis() {
     return empty
 }
 
-function print_analysis(infos) {
+function print_analysis(infos, dir) {
     console.info(`-------------------------------------------------------`)
     console.info(`Fetch Analysis`)
     console.info(`----------------------------------`)
-    let error_fetch = fetch.print_fetch_analysis(infos)
+    let error_fetch = fetch.print_fetch_analysis(infos, dir)
     console.info(`-------------------------------------------------------`)
     console.info(`Block Finalization Analysis`)
     console.info(`----------------------------------`)
-    let error_block_finalization = block_finalization.print_analysis(infos)
+    let error_block_finalization = block_finalization.print_analysis(infos, dir)
     console.info(`-------------------------------------------------------`)
     console.info(`Queue read and storage analysis`)
     console.info(`----------------------------------`)
-    let error_queue = queue.print_analysis(infos)
+    let error_queue = queue.print_analysis(infos, dir)
     console.info(`-------------------------------------------------------`)
     console.info(`Transaction Registering Analysis`)
     console.info(`----------------------------------`)
-    let error_register = tx_register.print_analysis(infos)
+    let error_register = tx_register.print_analysis(infos, dir)
     console.info(`-------------------------------------------------------`)
     console.info(`Transaction Overhead Analysis`)
     console.info(`----------------------------------`)
     // model is known to fall short as an overapproximation
-    let _error_tx_overhead = tx_overhead.print_analysis(infos)
+    let _error_tx_overhead = tx_overhead.print_analysis(infos, dir)
     console.info(`-------------------------------------------------------`)
     console.info(`Kernels infos`)
     console.info(`----------------------------------`)
@@ -151,9 +151,9 @@ function process_execution(record, acc) {
     if (!isNaN(record.sputnik_runtime_ticks)) acc.sputnik_ticks += record.sputnik_runtime_ticks
 }
 
-function check_result(infos) {
+function check_result(infos, dir) {
     const tickPerGas = infos.sputnik_ticks / infos.total_gas
-    let nb_errors = print_analysis(infos)
+    let nb_errors = print_analysis(infos, dir)
     const is_error = nb_errors > 0
     if (is_error) {
         console.info(`-------------------------------------------------------`)
