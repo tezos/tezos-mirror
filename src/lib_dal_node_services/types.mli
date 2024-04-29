@@ -273,7 +273,7 @@ val attestable_slots_encoding : attestable_slots Data_encoding.t
 module Store : sig
   (** [stored_data] is the kind of data being encoded/decoded. This
     datatype is used to get better events UX. *)
-  type kind = Commitment | Header_status | Slot_id | Slot | Profile
+  type kind = Commitment | Header_status | Slot_id | Slot | Shard | Profile
 
   val encoding : kind Data_encoding.t
 

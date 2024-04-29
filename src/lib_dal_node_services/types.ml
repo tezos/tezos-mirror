@@ -497,7 +497,7 @@ let opt_header_status_query =
 
 module Store = struct
   (** Data kind stored in DAL. *)
-  type kind = Commitment | Header_status | Slot_id | Slot | Profile
+  type kind = Commitment | Header_status | Slot_id | Slot | Shard | Profile
 
   let encoding : kind Data_encoding.t =
     Data_encoding.string_enum
@@ -506,6 +506,7 @@ module Store = struct
         ("header_status", Header_status);
         ("slot_id", Slot_id);
         ("slot", Slot);
+        ("shard", Shard);
         ("profile", Profile);
       ]
 

@@ -185,3 +185,13 @@ val get_slot_status :
   slot_id:Types.slot_id ->
   Store.t ->
   (Types.header_status option, Errors.decoding) result Lwt.t
+
+(** [get_slot_shard store slot_id shard_index] returns the shard at
+    index [shard_index] of the slot given by [slot_id].
+*)
+val get_slot_shard :
+  Store.t ->
+  Types.slot_id ->
+  Types.shard_index ->
+  (Cryptobox.shard, [Errors.decoding | Errors.other | Errors.not_found]) result
+  Lwt.t

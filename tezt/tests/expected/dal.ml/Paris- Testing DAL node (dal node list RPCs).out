@@ -14,6 +14,8 @@ Available services:
         Fetch slot as list of pages 
     - GET /levels/<int32>/slots/<int>/pages/<int>/proof
         Compute the proof associated with a page of a given slot. 
+    - GET /levels/<int32>/slots/<int>/shards/<int>/content
+        Fetch shard as bytes 
     - GET /levels/<int32>/slots/<int>/status
         Return the status for the given slot. 
   + p2p/
@@ -80,8 +82,6 @@ Available services:
       published at level [l - attestation_lag] and *all* the shards assigned
       at level [l] to the given public key hash are available in the DAL
       node's store. 
-  - GET /shard/<DAL_commitment>/<int>
-      Fetch shard as bytes 
   - POST /slots
       Post a slot to the DAL node, computes its commitment and commitment
       proof, then computes the correspoding shards with their proof. The
@@ -92,9 +92,6 @@ Available services:
 
 Dynamic parameter description:
   
-  int
-  <DAL_commitment>
-      DAL_commitment (Base58Check-encoded) 
   int32
   <pkh>
       A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded) 
@@ -102,6 +99,7 @@ Dynamic parameter description:
       A network point (ipv4:port or [ipv6]:port). 
   <peer_id>
       A cryptographic node identity (Base58Check-encoded) 
+  int
   int
   int
   int32

@@ -246,8 +246,9 @@ module RPC : sig
   val get_plugin_commitments_history_hash :
     hash:string -> unit -> JSON.t RPC_core.t
 
-  (** Call /shard/<hash>/<shard-id> *)
-  val get_shard : slot_header:string -> shard_id:int -> string RPC_core.t
+  (** Call /levels/<slot_level>/slots/<slot_index>/shards/<shard_index>/content *)
+  val get_level_slot_shard_content :
+    slot_level:int -> slot_index:int -> shard_index:int -> string RPC_core.t
 
   module Local : RPC_core.CALLERS with type uri_provider := local_uri_provider
 
