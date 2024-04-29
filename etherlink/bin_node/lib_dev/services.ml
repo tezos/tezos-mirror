@@ -220,9 +220,17 @@ let dispatch_request (config : Configuration.t)
         in
         build ~f module_ parameters
     | Method (Get_transaction_count.Method, module_) ->
-        let f (address, _) =
-          let* nonce = Tx_pool.nonce address in
-          rpc_ok nonce
+        let f (address, block_param) =
+          match block_param with
+          | Ethereum_types.Block_parameter.(Block_parameter Latest) ->
+              let* nonce = Tx_pool.nonce address in
+              rpc_ok nonce
+          | _ ->
+              let* nonce = Backend_rpc.nonce address block_param in
+              let nonce =
+                Option.value ~default:(Ethereum_types.Qty Z.zero) nonce
+              in
+              rpc_ok nonce
         in
         build_with_input ~f module_ parameters
     | Method (Get_block_transaction_count_by_hash.Method, module_) ->

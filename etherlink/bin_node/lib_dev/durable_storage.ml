@@ -37,9 +37,11 @@ module Make (Reader : READER) = struct
         Bytes.to_string bytes |> Z.of_bits |> Ethereum_types.quantity_of_z
     | None -> Ethereum_types.Qty Z.zero
 
-  let nonce address =
+  let nonce address block =
     let open Lwt_result_syntax in
-    let+ answer = Reader.read (Durable_storage_path.Accounts.nonce address) in
+    let+ answer =
+      Reader.read ~block (Durable_storage_path.Accounts.nonce address)
+    in
     answer
     |> Option.map (fun bytes ->
            bytes |> Bytes.to_string |> Z.of_bits |> Ethereum_types.quantity_of_z)

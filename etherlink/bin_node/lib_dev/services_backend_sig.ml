@@ -15,9 +15,12 @@ module type S = sig
     Ethereum_types.Block_parameter.extended ->
     Ethereum_types.quantity tzresult Lwt.t
 
-  (** [nonce address] returns the [address]'s nonce. *)
+  (** [nonce address block_param] returns the [address]'s nonce at
+      block [block_param]. *)
   val nonce :
-    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t
+    Ethereum_types.address ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity option tzresult Lwt.t
 
   (** [code address block_param] returns the [address]'s code at block
       [block_param]. *)

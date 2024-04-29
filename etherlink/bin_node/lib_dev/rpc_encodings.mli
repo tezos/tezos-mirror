@@ -168,7 +168,8 @@ module Gas_price :
 
 module Get_transaction_count :
   METHOD
-    with type input = Ethereum_types.address * Ethereum_types.Block_parameter.t
+    with type input =
+      Ethereum_types.address * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.quantity
 
 module Get_block_transaction_count_by_hash :
