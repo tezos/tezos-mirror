@@ -216,9 +216,6 @@ module Dal_RPC = struct
 
   type commitment_proof = string
 
-  let get_commitment_proof commitment =
-    make GET ["commitments"; commitment; "proof"] JSON.as_string
-
   let get_level_index_commitment ~slot_level ~slot_index =
     make
       GET
