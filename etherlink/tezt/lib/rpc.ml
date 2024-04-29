@@ -109,10 +109,10 @@ module Request = struct
 
   let tez_kernelRootHash = {method_ = "tez_kernelRootHash"; parameters = `Null}
 
-  let eth_call ~to_ ~data =
+  let eth_call ~block ~to_ ~data =
     {
       method_ = "eth_call";
-      parameters = `A [eth_call_obj ~to_ ~data; `String "latest"];
+      parameters = `A [eth_call_obj ~to_ ~data; block_param_to_json block];
     }
 
   let get_balance ~address ~block =
@@ -275,9 +275,9 @@ let tez_kernelRootHash evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_string_opt)
        response
 
-let call ~to_ ~data evm_node =
+let call ~to_ ~data ?(block = Latest) evm_node =
   let* response =
-    Evm_node.call_evm_rpc evm_node (Request.eth_call ~to_ ~data)
+    Evm_node.call_evm_rpc evm_node (Request.eth_call ~block ~to_ ~data)
   in
   return
   @@ decode_or_error

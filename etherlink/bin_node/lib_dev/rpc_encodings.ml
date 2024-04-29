@@ -574,11 +574,11 @@ end
 module Eth_call = struct
   open Ethereum_types
 
-  type input = call * Block_parameter.t
+  type input = call * Block_parameter.extended
 
   type output = hash
 
-  let input_encoding = encoding_with_optional_block_param call_encoding
+  let input_encoding = encoding_with_optional_extended_block_param call_encoding
 
   let output_encoding = hash_encoding
 
@@ -594,7 +594,7 @@ module Get_estimate_gas = struct
 
   type output = quantity
 
-  let input_encoding = Eth_call.input_encoding
+  let input_encoding = encoding_with_optional_block_param call_encoding
 
   let output_encoding = quantity_encoding
 

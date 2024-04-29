@@ -96,23 +96,30 @@ end) : Services_backend_sig.Backend = struct
   end
 
   module SimulatorBackend = struct
-    let simulate_and_read ~input =
+    let simulate_and_read ?block ~input () =
       let open Lwt_result_syntax in
-      let* json =
-        call_service
-          ~keep_alive:Base.keep_alive
-          ~base:Base.base
-          simulation
-          ()
-          ()
-          input
-      in
-      let eval_result =
-        Data_encoding.Json.destruct Simulation.Encodings.eval_result json
-      in
-      match eval_result.insights with
-      | [data] -> return data
-      | _ -> failwith "Inconsistent simulation results"
+      match block with
+      | Some param
+        when param <> Ethereum_types.Block_parameter.(Block_parameter Latest) ->
+          failwith
+            "The EVM node in proxy mode support state requests only on latest \
+             block."
+      | _ -> (
+          let* json =
+            call_service
+              ~keep_alive:Base.keep_alive
+              ~base:Base.base
+              simulation
+              ()
+              ()
+              input
+          in
+          let eval_result =
+            Data_encoding.Json.destruct Simulation.Encodings.eval_result json
+          in
+          match eval_result.insights with
+          | [data] -> return data
+          | _ -> failwith "Inconsistent simulation results")
   end
 
   let smart_rollup_address = Base.smart_rollup_address

@@ -7,20 +7,24 @@
 
 module type SimulationBackend = sig
   val simulate_and_read :
-    input:Simulation.Encodings.simulate_input -> bytes tzresult Lwt.t
+    ?block:Ethereum_types.Block_parameter.extended ->
+    input:Simulation.Encodings.simulate_input ->
+    unit ->
+    bytes tzresult Lwt.t
 end
 
 (* This value is a hard maximum used by estimateGas. Set at Int64.max_int / 2 *)
 let max_gas_limit = Z.of_int64 0x3FFFFFFFFFFFFFFFL
 
 module Make (SimulationBackend : SimulationBackend) = struct
-  let call_simulation ~log_file ~input_encoder ~input =
+  let call_simulation ?block ~log_file ~input_encoder ~input () =
     let open Lwt_result_syntax in
     let*? messages = input_encoder input in
     let insight_requests =
       [Simulation.Encodings.Durable_storage_key ["evm"; "simulation_result"]]
     in
     SimulationBackend.simulate_and_read
+      ?block
       ~input:
         {
           messages;
@@ -28,14 +32,17 @@ module Make (SimulationBackend : SimulationBackend) = struct
           insight_requests;
           log_kernel_debug_file = Some log_file;
         }
+      ()
 
-  let simulate_call call =
+  let simulate_call call block_param =
     let open Lwt_result_syntax in
     let* bytes =
       call_simulation
+        ~block:block_param
         ~log_file:"simulate_call"
         ~input_encoder:Simulation.encode
         ~input:call
+        ()
     in
     Lwt.return (Simulation.simulation_result bytes)
 
@@ -46,6 +53,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
         ~log_file:"estimate_gas"
         ~input_encoder:Simulation.encode
         ~input:call
+        ()
     in
     Lwt.return (Simulation.gas_estimation bytes)
 
@@ -82,6 +90,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
         ~log_file:"tx_validity"
         ~input_encoder:Simulation.encode_tx
         ~input:tx_raw
+        ()
     in
     Lwt.return (Simulation.is_tx_valid bytes)
 end
