@@ -188,6 +188,40 @@ let profiles_filename = "profiles.json"
    any. *)
 let lock = Lwt_mutex.create ()
 
+type error +=
+  | Failed_to_load_profile of {reason : string}
+  | Failed_to_save_profile of {reason : string}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.failed_to_load_profiles_file"
+    ~title:"Failed to load profiles file"
+    ~description:"Failed to load profiles file"
+    ~pp:(fun ppf reason ->
+      Format.fprintf
+        ppf
+        "Failed to load %s file. Reason: %s"
+        profiles_filename
+        reason)
+    Data_encoding.(obj1 (req "reason" Data_encoding.string))
+    (function Failed_to_load_profile {reason} -> Some reason | _ -> None)
+    (fun reason -> Failed_to_load_profile {reason}) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.failed_to_save_profiles_file"
+    ~title:"Failed to save profiles file"
+    ~description:"Failed to save profiles file"
+    ~pp:(fun ppf reason ->
+      Format.fprintf
+        ppf
+        "Failed to save %s file. Reason: %s"
+        profiles_filename
+        reason)
+    Data_encoding.(obj1 (req "reason" Data_encoding.string))
+    (function Failed_to_save_profile {reason} -> Some reason | _ -> None)
+    (fun reason -> Failed_to_save_profile {reason})
+
 let load_profile_ctxt ~base_dir =
   let open Lwt_result_syntax in
   Lwt_mutex.with_lock lock @@ fun () ->
@@ -198,13 +232,14 @@ let load_profile_ctxt ~base_dir =
       let*! json_str = Lwt_io.read ic in
       let*! () = Lwt_io.close ic in
       match Data_encoding.Json.from_string json_str with
-      | Error _ ->
-          failwith "DAL node. Failed to load profile, error parsing JSON value"
+      | Error err ->
+          fail
+            [
+              Failed_to_load_profile
+                {reason = "error parsing JSON value: " ^ err};
+            ]
       | Ok json -> Data_encoding.Json.destruct encoding json |> return)
-    (fun exn ->
-      failwith
-        "DAL node: failed to load the profile context. Exception: %s"
-        (Printexc.to_string exn))
+    (fun exn -> fail [Failed_to_load_profile {reason = Printexc.to_string exn}])
 
 let save_profile_ctxt ctxt ~base_dir =
   let open Lwt_result_syntax in
@@ -220,7 +255,4 @@ let save_profile_ctxt ctxt ~base_dir =
       let*! () = Lwt_io.write_line oc value in
       let*! () = Lwt_io.close oc in
       return_unit)
-    (fun exn ->
-      failwith
-        "DAL node: failed to save the profile context. Exception: %s"
-        (Printexc.to_string exn))
+    (fun exn -> fail [Failed_to_save_profile {reason = Printexc.to_string exn}])
