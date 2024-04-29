@@ -216,7 +216,7 @@ module Dal_RPC = struct
       [
         "levels";
         string_of_int slot_level;
-        "slot_indices";
+        "slots";
         string_of_int slot_index;
         "commitment";
       ]
