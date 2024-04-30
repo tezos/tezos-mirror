@@ -8,7 +8,7 @@
 
 module Pool = struct
   module Pkey_map = Map.Make (Ethereum_types.Address)
-  module Nonce_map = Map.Make (Z)
+  module Nonce_map = Tezos_base.Sized.MakeSizedMap (Map.Make (Z))
 
   (** Transaction stored in the pool. *)
   type transaction = {
@@ -158,6 +158,8 @@ module Name = struct
   let equal () () = true
 end
 
+type size_info = {number_of_addresses : int; number_of_transactions : int}
+
 module Request = struct
   type ('a, 'b) t =
     | Add_transaction :
@@ -168,6 +170,7 @@ module Request = struct
     | Lock_transactions : (unit, tztrace) t
     | Unlock_transactions : (unit, tztrace) t
     | Is_locked : (bool, tztrace) t
+    | Size_info : (size_info, tztrace) t
 
   type view = View : _ t -> view
 
@@ -242,6 +245,8 @@ module Request = struct
     | Lock_transactions -> Format.fprintf ppf "Locking the transactions"
     | Unlock_transactions -> Format.fprintf ppf "Unlocking the transactions"
     | Is_locked -> Format.fprintf ppf "Checking if the tx pool is locked"
+    | Size_info ->
+        Format.fprintf ppf "Requesting size information about the tx pool"
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
@@ -501,6 +506,18 @@ let unlock_transactions state = state.Types.locked <- false
 
 let is_locked state = state.Types.locked
 
+let size_info (state : Types.state) =
+  let pool = state.pool in
+  let number_of_addresses, number_of_transactions =
+    Pool.Pkey_map.fold
+      (fun _addr transactions (number_of_addresses, number_of_transactions) ->
+        ( number_of_addresses + 1,
+          number_of_transactions + Pool.Nonce_map.cardinal transactions ))
+      pool.transactions
+      (0, 0)
+  in
+  {number_of_addresses; number_of_transactions}
+
 module Handlers = struct
   type self = worker
 
@@ -536,6 +553,7 @@ module Handlers = struct
         protect @@ fun () -> return (lock_transactions state)
     | Request.Unlock_transactions -> return (unlock_transactions state)
     | Request.Is_locked -> protect @@ fun () -> return (is_locked state)
+    | Request.Size_info -> protect @@ fun () -> return (size_info state)
 
   type launch_error = error trace
 
@@ -684,4 +702,10 @@ let is_locked () =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait worker Request.Is_locked
+  |> handle_request_error
+
+let size_info () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait worker Request.Size_info
   |> handle_request_error
