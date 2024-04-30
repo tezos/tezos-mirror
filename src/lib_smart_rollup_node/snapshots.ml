@@ -42,11 +42,7 @@ let get_head (store : _ Store.t) =
 let check_head (head : Sc_rollup_block.t) context =
   let open Lwt_result_syntax in
   (* Ensure head context is available. *)
-  let*! head_ctxt =
-    Context.checkout
-      context
-      (Smart_rollup_context_hash.to_context_hash head.header.context)
-  in
+  let*! head_ctxt = Context.checkout context head.header.context in
   let*? () =
     error_when (Option.is_none head_ctxt)
     @@ error_of_fmt "Head context cannot be checkouted, won't produce snapshot."
@@ -131,11 +127,7 @@ let check_block_data_and_get_content (store : _ Store.t) context hash =
         return_some commitment
   in
   (* Ensure head context is available. *)
-  let*! head_ctxt =
-    Context.checkout
-      context
-      (Smart_rollup_context_hash.to_context_hash header.context)
-  in
+  let*! head_ctxt = Context.checkout context header.context in
   let*? head_ctxt = check_some hash "context" head_ctxt in
   return (header, inbox, commitment, head_ctxt)
 
@@ -369,9 +361,7 @@ let reconstruct_level_context rollup_ctxt ~predecessor
       (inbox, messages)
   in
   let*! context_hash = Context.commit ctxt in
-  assert (
-    Smart_rollup_context_hash.(
-      of_context_hash context_hash = block.header.context)) ;
+  assert (Smart_rollup_context_hash.(context_hash = block.header.context)) ;
   return (block, ctxt)
 
 let reconstruct_context_from_first_available_level
@@ -431,11 +421,7 @@ let maybe_reconstruct_context cctxt ~data_dir =
   let* context =
     Context.load (module C) ~cache_size:100 Read_write context_dir
   in
-  let*! head_ctxt =
-    Context.checkout
-      context
-      (Smart_rollup_context_hash.to_context_hash head.header.context)
-  in
+  let*! head_ctxt = Context.checkout context head.header.context in
   match head_ctxt with
   | Some _ -> return_unit
   | None ->
@@ -677,10 +663,7 @@ let export_compact ~compression ~data_dir ~dest ~filename =
   let _, first_block = WithExceptions.Option.get first_block ~loc:__LOC__ in
   Format.eprintf "Exporting context snapshot with first level %ld@." first_level ;
   let* () =
-    Context.export_snapshot
-      context
-      (Smart_rollup_context_hash.to_context_hash first_block.context)
-      ~path:tmp_context_dir
+    Context.export_snapshot context first_block.context ~path:tmp_context_dir
   in
   let ( // ) = Filename.concat in
   let copy_dir a =

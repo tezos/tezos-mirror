@@ -26,7 +26,7 @@
 
 (** [starting_context_gc hash] emits an event which indicates that a GC run
     was launched for [hash]. *)
-val starting_context_gc : Context_hash.t -> unit Lwt.t
+val starting_context_gc : Smart_rollup_context_hash.t -> unit Lwt.t
 
 (** [context_gc_already_launched ()] emits an event which indicates that a GC
     launch was attempted but resulted in no action because a GC run is already

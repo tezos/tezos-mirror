@@ -1031,8 +1031,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   let* checkpoint =
     match final_l2_block with
     | Some Sc_rollup_block.(_, {context; _}) ->
-        Smart_rollup_context_hash.to_bytes context
-        |> Context_hash.of_bytes_exn |> return
+        Irmin_context.hash_of_context_hash context |> return
     | None ->
         failwith
           "Rollup node has no l2 blocks for the l1 block hash %a"

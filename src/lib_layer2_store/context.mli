@@ -67,7 +67,9 @@ val equiv :
   'c Equality_witness.t * 'd Equality_witness.t ->
   ('a, 'c) Equality_witness.eq option * ('b, 'd) Equality_witness.eq option
 
-type hash = Context_hash.t
+module Hash = Smart_rollup_context_hash
+
+type hash = Hash.t
 
 (** [load cache_size path] initializes from disk a context from
     [path]. [cache_size] allows to change size of the Context Backend

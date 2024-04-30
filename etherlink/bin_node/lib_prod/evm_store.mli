@@ -42,13 +42,13 @@ end
 
 module Context_hashes : sig
   val store :
-    t -> Ethereum_types.quantity -> Context_hash.t -> unit tzresult Lwt.t
+    t -> Ethereum_types.quantity -> Irmin_context.hash -> unit tzresult Lwt.t
 
   val find :
-    t -> Ethereum_types.quantity -> Context_hash.t option tzresult Lwt.t
+    t -> Ethereum_types.quantity -> Irmin_context.hash option tzresult Lwt.t
 
   val find_latest :
-    t -> (Ethereum_types.quantity * Context_hash.t) option tzresult Lwt.t
+    t -> (Ethereum_types.quantity * Irmin_context.hash) option tzresult Lwt.t
 
   val clear_after : t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
