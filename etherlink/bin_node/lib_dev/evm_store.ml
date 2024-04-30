@@ -116,6 +116,17 @@ module Q = struct
              bytes)
       string
 
+  let smart_rollup_address =
+    custom
+      ~encode:(fun smart_rollup_address ->
+        Ok
+          (Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+             smart_rollup_address))
+      ~decode:(fun bytes ->
+        Option.to_result ~none:"Not a valid smart rollup address"
+        @@ Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt bytes)
+      string
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -152,7 +163,7 @@ module Q = struct
         - Run [etherlink/scripts/check_evm_store_migrations.sh promote]
         - Increment [version]
     *)
-    let version = 6
+    let version = 7
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
@@ -252,6 +263,16 @@ module Q = struct
     let clear_after =
       (level ->. unit)
       @@ {|DELETE FROM l1_latest_level_with_l2_level WHERE l2_level > ?|}
+  end
+
+  module Metadata = struct
+    let insert =
+      (smart_rollup_address ->. unit)
+      @@ {|INSERT INTO metadata (smart_rollup_address) VALUES (?)|}
+
+    let get =
+      (unit ->! smart_rollup_address)
+      @@ {|SELECT smart_rollup_address from metadata|}
   end
 end
 
@@ -460,6 +481,18 @@ module L1_latest_known_level = struct
   let clear_after store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.L1_latest_level.clear_after l2_level
+end
+
+module Metadata = struct
+  let store store smart_rollup_address =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Metadata.insert smart_rollup_address
+
+  let get store =
+    with_connection store @@ fun conn -> Db.find conn Q.Metadata.get ()
+
+  let find store =
+    with_connection store @@ fun conn -> Db.find_opt conn Q.Metadata.get ()
 end
 
 let reset store ~l2_level =

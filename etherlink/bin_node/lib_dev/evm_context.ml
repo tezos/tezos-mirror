@@ -18,7 +18,7 @@ type parameters = {
   data_dir : string;
   preimages : string;
   preimages_endpoint : Uri.t option;
-  smart_rollup_address : string;
+  smart_rollup_address : string option;
   fail_on_missing_blueprint : bool;
 }
 
@@ -595,8 +595,47 @@ module State = struct
     in
     return_unit
 
+  type error +=
+    | Invalid_rollup_node of {
+        smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+        rollup_node_smart_rollup_address :
+          Tezos_crypto.Hashed.Smart_rollup_address.t;
+      }
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"evm_node_dev_invalid_rollup_node"
+      ~title:"Invalid rollup node"
+      ~description:"The rollup node has a different smart rollup address."
+      ~pp:(fun ppf (smart_rollup_address, rollup_node_smart_rollup_address) ->
+        Format.fprintf
+          ppf
+          "The EVM node follows the smart rollup address %a but the rollup \
+           node has the address %a, please change the rollup node endpoint."
+          Tezos_crypto.Hashed.Smart_rollup_address.pp
+          smart_rollup_address
+          Tezos_crypto.Hashed.Smart_rollup_address.pp
+          rollup_node_smart_rollup_address)
+      Data_encoding.(
+        obj2
+          (req
+             "smart_rollup_address"
+             Tezos_crypto.Hashed.Smart_rollup_address.encoding)
+          (req
+             "rollup_node_smart_rollup_address"
+             Tezos_crypto.Hashed.Smart_rollup_address.encoding))
+      (function
+        | Invalid_rollup_node
+            {smart_rollup_address; rollup_node_smart_rollup_address} ->
+            Some (smart_rollup_address, rollup_node_smart_rollup_address)
+        | _ -> None)
+      (fun (smart_rollup_address, rollup_node_smart_rollup_address) ->
+        Invalid_rollup_node
+          {smart_rollup_address; rollup_node_smart_rollup_address})
+
   let init ?kernel_path ~fail_on_missing_blueprint ~data_dir ~preimages
-      ~preimages_endpoint ~smart_rollup_address () =
+      ~preimages_endpoint ?smart_rollup_address () =
     let open Lwt_result_syntax in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
@@ -605,10 +644,6 @@ module State = struct
     let* index =
       Irmin_context.load ~cache_size:100_000 Read_write (store_path ~data_dir)
     in
-    let destination =
-      Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
-        smart_rollup_address
-    in
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
       load ~data_dir index
@@ -616,7 +651,37 @@ module State = struct
     let* pending_upgrade =
       Evm_store.Kernel_upgrades.find_latest_pending store
     in
-
+    let smart_rollup_address =
+      Option.map
+        Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn
+        smart_rollup_address
+    in
+    let* smart_rollup_address =
+      let* found_smart_rollup_address = Evm_store.Metadata.find store in
+      match (found_smart_rollup_address, smart_rollup_address) with
+      | Some found_smart_rollup_address, Some smart_rollup_address ->
+          let* () =
+            fail_unless
+              (Tezos_crypto.Hashed.Smart_rollup_address.equal
+                 smart_rollup_address
+                 found_smart_rollup_address)
+              (Invalid_rollup_node
+                 {
+                   smart_rollup_address = found_smart_rollup_address;
+                   rollup_node_smart_rollup_address = smart_rollup_address;
+                 })
+          in
+          return smart_rollup_address
+      | None, Some smart_rollup_address ->
+          let* () = Evm_store.Metadata.store store smart_rollup_address in
+          return smart_rollup_address
+      | Some found_smart_rollup_address, None ->
+          return found_smart_rollup_address
+      | None, None ->
+          failwith
+            "Internal error: the smart rollup address is not provided nor \
+             found in the storage."
+    in
     let* evm_state, context =
       match kernel_path with
       | Some kernel ->
@@ -645,7 +710,7 @@ module State = struct
         data_dir;
         preimages;
         preimages_endpoint;
-        smart_rollup_address = destination;
+        smart_rollup_address;
         session =
           {
             context;
@@ -760,7 +825,7 @@ module Handlers = struct
         data_dir : string;
         preimages : string;
         preimages_endpoint : Uri.t option;
-        smart_rollup_address : string;
+        smart_rollup_address : string option;
         fail_on_missing_blueprint;
       } =
     let open Lwt_result_syntax in
@@ -770,7 +835,7 @@ module Handlers = struct
         ~data_dir
         ~preimages
         ~preimages_endpoint
-        ~smart_rollup_address
+        ?smart_rollup_address
         ~fail_on_missing_blueprint
         ()
     in
@@ -916,7 +981,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ?kernel_path ~data_dir ~preimages ~preimages_endpoint
-    ~smart_rollup_address ~fail_on_missing_blueprint () =
+    ?smart_rollup_address ~fail_on_missing_blueprint () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -1093,7 +1158,6 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
   let* evm_events =
     get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state
   in
-  let* () = init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context in
   let* smart_rollup_address =
     let* metadata =
       Metadata.Versioned.read_metadata_file ~dir:rollup_node_data_dir
@@ -1103,6 +1167,7 @@ let init_from_rollup_node ~omit_delayed_tx_events ~data_dir
     | Some (V0 {rollup_address; _}) | Some (V1 {rollup_address; _}) ->
         return @@ Address.to_string rollup_address
   in
+  let* () = init_store_from_rollup_node ~data_dir ~evm_state ~irmin_context in
   let* _loaded =
     start
       ~data_dir
