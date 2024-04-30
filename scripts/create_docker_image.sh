@@ -1,15 +1,4 @@
 #!/bin/sh
-# Script used to create all docker images
-# Invocation: source ./scripts/version.sh; ./scripts/create_docker_image.sh
-#
-# Notes on the parameters:
-# - commit_short_sha: is used to tag, can be chosen arbitrarily
-# - rust_toolchain_image_tag:
-#   Can be obtained using following line:
-#   ./images/image_tag.sh images/rust-toolchain
-#   if the result does not correspond to an image in registry, the
-#   rust-toolchain needs to be rebuilt. See ./images/README.md and
-#   ./images/create_rust_toolchain_image.sh for more information.
 
 set -e
 
@@ -19,6 +8,19 @@ cd "$src_dir"
 
 # shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
+
+# defaults
+image_name="tezos-"
+image_version="latest"
+build_deps_image_name="registry.gitlab.com/tezos/opam-repository"
+build_deps_image_version=$opam_repository_tag
+executables=$(cat script-inputs/released-executables)
+commit_short_sha=$(git rev-parse --short HEAD)
+docker_target="without-evm-artifacts"
+rust_toolchain_image="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
+rust_toolchain_image_tag="master"
+commit_datetime=$(git show -s --pretty=format:%ci HEAD)
+commit_tag=$(git describe --tags --always)
 
 # usage and help
 usage() {
@@ -35,46 +37,98 @@ Usage:  $(basename "$0") [-h|--help]
   [--commit-short-sha <COMMIT_SHA> ]
   [--commit-datetime <DATETIME> ]
   [--commit-tag <COMMIT_TAG> ]
+
+DESCRIPTION
+    Builds the Octez Docker distribution.
+
+    The distribution is built in three variants, built under the names:
+     - IMAGE_NAME:IMAGE_TAG
+     - IMAGE_NAME-debug:IMAGE_TAG
+     - IMAGE_NAME-bare:IMAGE_TAG
+    For the default value of IMAGE_NAME, IMAGE_TAG and the other
+    parameters, see below. The difference between the three variants
+    of the distribution are documented at
+    https://hub.docker.com/r/tezos/tezos.
+
+    The build uses following images from the build-deps suite:
+     - BUILD_DEPS_IMAGE_NAME/runtime-dependencies:BUILD_DEPS_IMAGE_TAG
+     - BUILD_DEPS_IMAGE_NAME/runtime-build-dependencies:BUILD_DEPS_IMAGE_TAG
+    The build-deps images are built in the
+    https://gitlab.com/tezos/opam-repository project,
+    and by default, BUILD_DEPS_IMAGE_NAME refers to the images from
+    this repository and BUILD_DEPS_IMAGE_TAG equals 'opam_repository_tag'
+    from 'scripts/version.sh'.
+
+    If TARGET is 'with-evm-artifacts' then EVM artifacts are
+    included. The image rust-toolchain is used to build these
+    artifacts, and is pulled from
+    RUST_TOOLCHAIN_IMAGE:RUST_TOOLCHAIN_IMAGE_TAG. By default,
+    RUST_TOOLCHAIN_IMAGE:RUST_TOOLCHAIN_IMAGE_TAG points to a
+    rust-toolchain image built from the latest commit on master. To
+    rebuild the rust-toolchain image locally, see ./images/README.md
+    and ./images/create_rust_toolchain_image.sh.
+
+    The built distribution includes the set of executables defined by
+    EXECUTABLES: for a set of valid values, see
+    script-inputs/{released,experimental,dev}-executables. By default,
+    the distribution contains the released executables.
+
+    The version reported by the built Octez binaries are controlled
+    through the arguments COMMIT_SHA, COMMIT_DATETIME, and COMMIT_TAG.
+
+OPTIONS
+    Image naming
+        --image-name IMAGE_NAME
+            Base for the name of the built images.
+
+        --image-version IMAGE_TAG
+            Tag of built images.
+
+    Base image location
+        --build-deps-image-name BUILD_DEPS_IMAGE_NAME
+            Name of the build-deps image.
+
+        --build-deps-image-version BUILD_DEPS_IMAGE_TAG
+            Version of the build-deps image.
+
+        --rust-toolchain-image RUST_TOOLCHAIN_IMAGE_NAME
+            Name of the rust-toolchain image.
+
+        --rust-toolchain-image-tag RUST_TOOLCHAIN_IMAGE_TAG
+            Tag of the rust-toolchain image.
+
+    Image contents
+        --executables EXECUTABLES
+            Set of executables to include.
+
+        --docker-target TARGET
+            'without-evm-artifacts' (default) or 'with-evm-artifacts'.
+
+    Image metadata
+        --commit-short-sha COMMIT_SHA
+            Git commit short SHA for the Octez version string.
+        --commit-datetime COMMIT_DATETIME
+            Git date time for the Octez version string.
+        --commit-tag COMMIT_TAG
+            Git tags for the Octez version string.
+
+CURRENT VALUES
+    IMAGE_NAME: $image_name
+    IMAGE_VERSION: $image_version
+    BUILD_DEPS_IMAGE_NAME: $build_deps_image_name
+    BUILD_DEPS_IMAGE_VERSION: $build_deps_image_version
+    DOCKER_TARGET: $docker_target
+    RUST_TOOLCHAIN_IMAGE: $rust_toolchain_image
+    RUST_TOOLCHAIN_IMAGE_TAG: $rust_toolchain_image_tag
+    EXECUTABLES: $(echo "$executables" | tr "\n" " ")
+    COMMIT_SHORT_SHA: $commit_short_sha
+    COMMIT_DATETIME: $commit_datetime
+    COMMIT_TAG: $commit_tag
+
+SEE ALSO
+    For more information, see 'images/README.md' and
+    'docs/introduction/howtoget.rst'.
 EOF
-}
-
-# defaults
-image_name="tezos-"
-image_version="latest"
-build_deps_image_name="registry.gitlab.com/tezos/opam-repository"
-build_deps_image_version=$opam_repository_tag
-executables=$(cat script-inputs/released-executables)
-commit_short_sha=$(git rev-parse --short HEAD)
-docker_target="without-evm-artifacts"
-rust_toolchain_image="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
-rust_toolchain_image_tag="master"
-commit_datetime=$(git show -s --pretty=format:%ci HEAD)
-commit_tag=$(git describe --tags --always)
-
-print_parameters() {
-  echo "Current values:"
-  echo "---------------"
-  echo "image_name: $image_name"
-  echo "image_version: $image_version"
-  echo "build_deps_image_name: $build_deps_image_name"
-  echo "build_deps_image_version: $build_deps_image_version"
-  echo "commit_short_sha: $commit_short_sha"
-  echo "docker_target: $docker_target"
-  echo "rust_toolchain_image: $rust_toolchain_image"
-  echo "rust_toolchain_image_tag: $rust_toolchain_image_tag"
-  echo "commit_datetime: $commit_datetime"
-  echo "commit_tag: $commit_tag"
-  echo "executables:"
-  echo "$executables"
-}
-
-print_help() {
-  # display help
-  usage
-  echo ""
-  echo "Creates the Octez docker images." 1>&2
-  echo ""
-  print_parameters
 }
 
 options=$(getopt -o h \
@@ -128,7 +182,7 @@ while true; do
     commit_tag="$1"
     ;;
   -h | --help)
-    print_help
+    usage
     exit 1
     ;;
   --)
