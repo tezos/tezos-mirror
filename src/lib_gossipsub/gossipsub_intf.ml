@@ -484,7 +484,8 @@ module type MESSAGE_CACHE = sig
   (** Add message to the most recent cache slot. If the message already exists
       in the cache, the message is not overridden, instead a duplicate message
       id is stored (the message itself is only stored once). *)
-  val add_message : Message_id.t -> Message.t -> Topic.t -> t -> t
+  val add_message :
+    peer:Peer.t option -> Message_id.t -> Message.t -> Topic.t -> t -> t
 
   (** Get the message associated to the given message id, increase the access
       counter for the peer requesting the message, and also returns the updated

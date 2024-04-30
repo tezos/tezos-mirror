@@ -262,7 +262,7 @@ module Make
         Sliding_message_id_map.make ~window_size:seen_message_slots;
     }
 
-  let add_message message_id message topic t =
+  let add_message ~peer:_ message_id message topic t =
     let messages =
       Sliding_message_id_map.add
         topic
