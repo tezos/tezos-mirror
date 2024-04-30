@@ -5,13 +5,17 @@
 //! More information on SBI specification:
 //!   - https://www.scs.stanford.edu/~zyedidia/docs/riscv/riscv-sbi.pdf
 
-use crate::inbox::Inbox;
-use crate::rvemu_boot::{A0, A1, A2, A3, A6, A7};
+use crate::{
+    inbox::Inbox,
+    rvemu_boot::{A0, A1, A2, A3, A6, A7},
+};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use kernel_loader::Memory;
-use rvemu::cpu::{AccessType, BYTE};
-use rvemu::emulator::Emulator;
-use rvemu::exception::Exception;
+use rvemu::{
+    cpu::{AccessType, BYTE},
+    emulator::Emulator,
+    exception::Exception,
+};
 use std::{
     error::Error,
     io::{self, Write},

@@ -14,8 +14,8 @@ use tezos_smart_rollup_encoding::{
     michelson::MichelsonUnit, public_key_hash::PublicKeyHash, smart_rollup::SmartRollupAddress,
 };
 
-mod bench;
 mod cli;
+mod commands;
 mod debugger;
 mod devicetree;
 mod inbox;
@@ -190,6 +190,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         cli::Mode::Rvemu(opts) => rvemu(opts),
         cli::Mode::Run(opts) => run(opts),
         cli::Mode::Debug(opts) => debug(opts),
-        cli::Mode::Bench(opts) => bench::bench(opts),
+        cli::Mode::Bench(opts) => commands::bench::bench(opts),
     }
 }
