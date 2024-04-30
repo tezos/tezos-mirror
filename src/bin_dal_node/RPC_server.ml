@@ -167,7 +167,7 @@ module Slots_handlers = struct
             cryptobox
             commitment
             ~with_proof:true
-          |> Errors.to_option_tzresult
+          |> to_option_tzresult
         in
         return (commitment, commitment_proof))
 
@@ -188,7 +188,7 @@ module Slots_handlers = struct
     call_handler1 ctxt (fun node_store ->
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         Slot_manager.get_slot_shard node_store slot_id shard_index
-        |> Errors.to_option_tzresult)
+        |> to_option_tzresult)
 
   let handle_slot_pages ctxt (((), level), slot_index) () () =
     let open Lwt_result_syntax in

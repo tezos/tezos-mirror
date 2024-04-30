@@ -5101,7 +5101,7 @@ module Garbage_collection = struct
         call_raw node
         @@ get_level_slot_shard_content ~slot_level ~slot_index ~shard_index:0)
     in
-    Check.(shard_observer_response.code = 500)
+    Check.(shard_observer_response.code = 404)
       ~__LOC__
       Check.int
       ~error_msg:"Unexpected RPC response, expected: %R, actual: %L" ;
