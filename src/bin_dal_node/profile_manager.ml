@@ -228,9 +228,7 @@ let load_profile_ctxt ~base_dir =
   Lwt.catch
     (fun () ->
       let file_path = Filename.concat base_dir profiles_filename in
-      let*! ic = Lwt_io.open_file ~mode:Lwt_io.Input file_path in
-      let*! json_str = Lwt_io.read ic in
-      let*! () = Lwt_io.close ic in
+      let*! json_str = Lwt_utils_unix.read_file file_path in
       match Data_encoding.Json.from_string json_str with
       | Error err ->
           fail
@@ -251,8 +249,6 @@ let save_profile_ctxt ctxt ~base_dir =
         |> Data_encoding.Json.to_string
       in
       let file_path = Filename.concat base_dir profiles_filename in
-      let*! oc = Lwt_io.open_file ~mode:Lwt_io.Output file_path in
-      let*! () = Lwt_io.write_line oc value in
-      let*! () = Lwt_io.close oc in
+      let*! () = Lwt_utils_unix.create_file file_path value in
       return_unit)
     (fun exn -> fail [Failed_to_save_profile {reason = Printexc.to_string exn}])
