@@ -126,6 +126,17 @@ module Block = struct
     {time_processed; transactions}
 end
 
+module Rpc = struct
+  let metrics =
+    Prometheus.Summary.v_labels
+      ~registry
+      ~label_names:["endpoint"; "method"]
+      ~help:"RPC endpoint call counts and sum of execution times."
+      ~namespace
+      ~subsystem
+      "calls"
+end
+
 type t = {chain : Chain.t; block : Block.t}
 
 let metrics =
