@@ -54,7 +54,7 @@ let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint
   in
   let* apply_result = Evm_context.replay ?profile ?alter_evm_state number in
   match apply_result with
-  | Apply_success (_, _, hash) ->
+  | Apply_success {block_hash = hash; _} ->
       Format.printf
         "Replaying blueprint %a led to block %a\n%!"
         Ethereum_types.pp_quantity

@@ -493,13 +493,30 @@ module State = struct
     let*! data_dir, config = execution_config in
     let (Qty next) = ctxt.session.next_blueprint_number in
 
+    let time_processed = ref Ptime.Span.zero in
     let* try_apply =
-      Evm_state.apply_blueprint ~data_dir ~config ctxt.session.evm_state payload
+      Helpers.with_timing
+        (fun time -> Lwt.return (time_processed := time))
+        (fun () ->
+          Evm_state.apply_blueprint
+            ~data_dir
+            ~config
+            ctxt.session.evm_state
+            payload)
     in
 
     match try_apply with
-    | Apply_success (evm_state, Qty blueprint_number, current_block_hash)
+    | Apply_success
+        {
+          evm_state;
+          level = Qty blueprint_number;
+          block_hash = current_block_hash;
+          number_of_transactions;
+        }
       when Z.equal blueprint_number next ->
+        Metrics.set_block
+          ~time_processed:!time_processed
+          ~transactions:number_of_transactions ;
         let* () =
           Evm_store.Blueprints.store
             ctxt.store
