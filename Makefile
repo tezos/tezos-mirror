@@ -335,10 +335,10 @@ build-simulation-scenario:
 	@cp -f _build/default/devtools/testnet_experiment_tools/simulation_scenario.exe $(OCTEZ_BIN_DIR)/simulation-scenario
 	@cp -f _build/default/devtools/testnet_experiment_tools/safety_checker.exe $(OCTEZ_BIN_DIR)/safety-checker
 
-.PHONY: dsn-sequencer
-dsn-sequencer:
+.PHONY: octez-dsn-node
+octez-dsn-node:
 	@cd etherlink/bin_dsn_node; cargo build --release
-	@cp etherlink/bin_dsn_node/target/release/bin_dsn_node octez-dsn-node
+	@cp etherlink/bin_dsn_node/target/release/dsn-node octez-dsn-node
 
 .PHONY: test-tezt
 test-tezt: build-additional-tezt-test-dependency-executables

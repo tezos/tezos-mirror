@@ -13,4 +13,7 @@ pub enum RpcError {
     /// Errors when handling HTTP connections
     #[error("Connection error {0}")]
     ConnectionError(#[from] hyper::http::Error),
+    /// The server cannot bind to the host address
+    #[error("Failed to bind: {0}")]
+    TcpListenerError(#[source] std::io::Error),
 }

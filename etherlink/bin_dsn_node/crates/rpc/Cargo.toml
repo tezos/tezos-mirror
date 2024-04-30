@@ -27,3 +27,5 @@ tokio-stream.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 url.workspace = true
+jsonrpsee-types.workspace = true
+jsonrpsee-core.workspace = true

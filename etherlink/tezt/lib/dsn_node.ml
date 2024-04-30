@@ -27,7 +27,9 @@ let bundler ?runner ?(rpc_addr = Constant.default_host) ?(rpc_port = 3000)
     ~endpoint () =
   let open Tezos_base.TzPervasives.Lwt_syntax in
   let server_addr = Format.asprintf "%s:%d" rpc_addr rpc_port in
-  let arguments = ["bundler"; "--listening-addr"; server_addr; endpoint] in
+  let arguments =
+    ["bundler"; "--rpc-address"; server_addr; "--sequencer-url"; endpoint]
+  in
   let persistent_state =
     Parameters.{arguments; rpc_addr; rpc_port; endpoint; runner}
   in
