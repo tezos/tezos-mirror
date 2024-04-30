@@ -4,9 +4,9 @@
 #
 # Notes on the parameters:
 # - commit_short_sha: is used to tag, can be chosen arbitrarily
-# - rust_toolchain_image_tag: tag "master" doesn't work (FIXME?)
+# - rust_toolchain_image_tag:
 #   Can be obtained using following line:
-#   git ls-files -s -- $(cat images/rust-toolchain/inputs) | git hash-object --stdin
+#   ./images/image_tag.sh images/rust-toolchain
 #   if the result does not correspond to an image in registry, the
 #   rust-toolchain needs to be rebuilt. See ./images/README.md and
 #   ./images/create_rust_toolchain_image.sh for more information.
@@ -46,9 +46,8 @@ build_deps_image_version=$opam_repository_tag
 executables=$(cat script-inputs/released-executables)
 commit_short_sha=$(git rev-parse --short HEAD)
 docker_target="without-evm-artifacts"
-rust_toolchain_image="registry.gitlab.com/tezos/tezos/rust-toolchain"
-# FIXME: "master" doesn't work as a tag
-rust_toolchain_image_tag="latest"
+rust_toolchain_image="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
+rust_toolchain_image_tag="master"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
 commit_tag=$(git describe --tags --always)
 
