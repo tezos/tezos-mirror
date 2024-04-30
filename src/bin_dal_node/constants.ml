@@ -62,3 +62,5 @@ let amplification_random_delay_min = 1.
 let amplification_random_delay_max = 2.
 
 let amplification_timeout = 120.
+
+let crawler_l1_reconnection_delay = 5.

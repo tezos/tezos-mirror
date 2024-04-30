@@ -38,6 +38,7 @@
   octez-internal-libs.irmin
   prometheus-app
   prometheus
+  octez-crawler
   octez-protocol-018-Proxford-libs.dal
   octez-protocol-019-PtParisB-libs.dal
   (select void_for_linking-octez-protocol-alpha-libs-dal from
@@ -67,7 +68,8 @@
   -open Tezos_p2p_services
   -open Tezos_crypto
   -open Tezos_base_p2p_identity_file
-  -open Tezos_shell_services))
+  -open Tezos_shell_services
+  -open Octez_crawler))
 
 (rule
  (action
