@@ -164,27 +164,44 @@ let sequencer_upgrade ~sc_rollup_address ~sequencer_admin
   in
   Client.bake_for_and_wait ~keys:[] client
 
-let bake_until_sync ?(timeout = 30.) ~sc_rollup_node ~proxy ~sequencer ~client
-    () =
-  let open Rpc.Syntax in
+let bake_until ?__LOC__ ?(timeout = 30.) ~bake ~result_f () =
+  let res = ref None in
   let rec go () =
+    let* opt = result_f () in
+    match opt with
+    | Some x ->
+        res := Some x ;
+        unit
+    | None ->
+        let* _ = bake () in
+        go ()
+  in
+  let* () = Lwt.pick [go (); Lwt_unix.sleep timeout] in
+  match !res with
+  | Some x -> return x
+  | None -> Test.fail ?__LOC__ "Bake until failed with a timeout"
+
+let bake_until_sync ?__LOC__ ?timeout ~sc_rollup_node ~proxy ~sequencer ~client
+    () =
+  let bake () =
+    let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+    unit
+  in
+  let result_f () =
+    let open Rpc.Syntax in
     let* proxy_level_opt = Rpc.block_number_opt proxy in
     let*@ sequencer_level = Rpc.block_number sequencer in
     match proxy_level_opt with
-    | Error _ | Ok None ->
-        let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
-        go ()
+    | Error _ | Ok None -> Lwt.return_none
     | Ok (Some proxy_level) ->
         if sequencer_level < proxy_level then
           Test.fail
             ~loc:__LOC__
             "rollup node has more recent block. Not supposed to happened "
-        else if sequencer_level = proxy_level then unit
-        else
-          let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
-          go ()
+        else if sequencer_level = proxy_level then return @@ Some ()
+        else Lwt.return_none
   in
-  Lwt.pick [go (); Lwt_unix.sleep timeout]
+  bake_until ?__LOC__ ?timeout ~bake ~result_f ()
 
 (** [wait_for_transaction_receipt ~evm_node ~transaction_hash] takes an
     transaction_hash and returns only when the receipt is non null, or [count]

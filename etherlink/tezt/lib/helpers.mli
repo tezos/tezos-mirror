@@ -117,11 +117,23 @@ val sequencer_upgrade :
   activation_timestamp:string ->
   unit Lwt.t
 
+(** [bake_until ?__LOC__ ?timeout ~bake ~result_f ()] bakes
+    using function [bake] until the function [result_f] returns a
+    value or fails if it takes more than [timeout]
+    sec, 30. by default. *)
+val bake_until :
+  ?__LOC__:string ->
+  ?timeout:float ->
+  bake:(unit -> 'a Lwt.t) ->
+  result_f:(unit -> 'b option Lwt.t) ->
+  unit ->
+  'b Lwt.t
+
 (** [bake_until_sync ?timeout ~sc_rollup_node ~proxy ~sequencer
     ~client] bakes blocks until the rollup node is synced with
-    evm_node. timeout if it takes more than [timeout] sec, 30. by
-    default. *)
+    evm_node. Uses {!bake_until} *)
 val bake_until_sync :
+  ?__LOC__:string ->
   ?timeout:float ->
   sc_rollup_node:Sc_rollup_node.t ->
   proxy:Evm_node.t ->

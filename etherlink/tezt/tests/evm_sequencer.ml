@@ -556,7 +556,6 @@ let test_resilient_to_rollup_node_disconnect =
   let max_blueprints_catchup = max_blueprints_lag - 3 in
   let catchup_cooldown = 10 in
   let first_batch_blueprints_count = 5 in
-  let ensure_rollup_node_publish = 5 in
   register_both
     ~max_blueprints_lag
     ~max_blueprints_catchup
@@ -581,22 +580,29 @@ let test_resilient_to_rollup_node_disconnect =
         unit)
   in
   let* () =
-    Evm_node.wait_for_blueprint_injected
-      ~timeout:(float_of_int first_batch_blueprints_count)
-      sequencer
-      first_batch_blueprints_count
+    Evm_node.wait_for_blueprint_injected sequencer first_batch_blueprints_count
   in
 
   (* Produce some L1 blocks so that the rollup node publishes the blueprints. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
+  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  Check.(
+    (rollup_node_head.number = Int32.(of_int first_batch_blueprints_count))
+      int32)
+    ~error_msg:
+      "The rollup node should have received the first round of lost blueprints \
+       (rollup node level: %L, expected level %R)" ;
+
   (* Check sequencer and rollup consistency *)
+  let* () = check_head_consistency ~left:sequencer ~right:proxy () in
+
   let* () =
-    check_head_consistency
-      ~error_msg:"The head should be the same before the outage"
-      ~left:sequencer
-      ~right:proxy
-      ()
+    (* bake 2 block so evm_node sees it as finalized in
+       `rollup_node_follower` *)
+    repeat 2 (fun () ->
+        let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
   in
 
   (* Kill the rollup node *)
@@ -613,19 +619,15 @@ let test_resilient_to_rollup_node_disconnect =
   let* () =
     Evm_node.wait_for_blueprint_applied
       sequencer
-      ~timeout:5.
       (first_batch_blueprints_count + (2 * max_blueprints_lag))
   and* () =
     Evm_node.wait_for_blueprint_applied
       observer
-      ~timeout:5.
       (first_batch_blueprints_count + (2 * max_blueprints_lag))
   in
 
-  (* Kill the sequencer node, restart the rollup node, restart the sequencer to
-     reestablish the connection *)
-  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
-  let* () = Sc_rollup_node.wait_for_ready sc_rollup_node
+  (* restart the rollup node to reestablish the connection *)
+  let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address []
   and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired sequencer
   and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired observer
   and* () = Evm_node.wait_for_rollup_node_follower_connection_acquired proxy in
@@ -641,40 +643,38 @@ let test_resilient_to_rollup_node_disconnect =
   let* () =
     Evm_node.wait_for_blueprint_applied
       sequencer
-      ~timeout:5.
       (first_batch_blueprints_count + (2 * max_blueprints_catchup) + 1)
   and* () =
     Evm_node.wait_for_blueprint_applied
       observer
-      ~timeout:5.
       (first_batch_blueprints_count + (2 * max_blueprints_catchup) + 1)
   in
 
   (* Give some time for the sequencer node to inject the first round of
      blueprints *)
   let* _ =
-    repeat ensure_rollup_node_publish (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-        unit)
-  in
+    let expected_level =
+      Int32.of_int @@ (first_batch_blueprints_count + max_blueprints_catchup)
+    in
+    bake_until
+      ~__LOC__
+      ~bake:(fun () ->
+        let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
 
-  let*@ rollup_node_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.(
-    (rollup_node_head.number
-    = Int32.(of_int (first_batch_blueprints_count + max_blueprints_catchup)))
-      int32)
-    ~error_msg:
-      "The rollup node should have received the first round of lost blueprints" ;
+        unit)
+      ~result_f:(fun () ->
+        let*@ rollup_node_head =
+          Rpc.get_block_by_number ~block:"latest" proxy
+        in
+        if rollup_node_head.number = expected_level then return (Some ())
+        else return None)
+      ()
+  in
 
   (* Go through several cooldown periods to let the sequencer sends the rest of
      the blueprints. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
 
-  (* We have unfortunately noticed that the test can be flaky. Sometimes,
-     the following RPC is done before the proxy being initialised, even though
-     we wait for it. The source of flakiness is unknown but happens very rarely,
-     we put a small sleep to make the least flaky possible. *)
-  let* () = Lwt_unix.sleep 2. in
   (* Check the consistency again *)
   check_head_consistency
     ~error_msg:
