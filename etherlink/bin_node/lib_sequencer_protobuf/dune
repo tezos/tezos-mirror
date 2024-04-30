@@ -14,8 +14,8 @@
  (action
   (run
    protoc -I .
-   "--ocaml_out=annot=[@@deriving show { with_path = false }]:."
-   %{proto})))
+   "--ocaml_opt=annot=[@@deriving show { with_path = false }, eq]"
+   --ocaml_out=. %{proto})))
 
 (rule
  (target exporter.ml)
@@ -23,5 +23,5 @@
  (action
   (run
    protoc -I .
-   "--ocaml_out=annot=[@@deriving show { with_path = false }]:."
-   %{proto})))
+   "--ocaml_opt=annot=[@@deriving show { with_path = false }, eq]"
+   --ocaml_out=. %{proto})))
