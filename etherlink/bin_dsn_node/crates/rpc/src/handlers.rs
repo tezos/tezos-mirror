@@ -15,7 +15,7 @@ use hyper::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::{
     errors::RpcError,
@@ -32,7 +32,7 @@ pub type ResponseBody = BoxBody<Bytes, Infallible>;
 pub type Resp = hyper::Response<ResponseBody>;
 
 //TODO: Do we need to handle errors a la Resto?
-fn stream_until_first_error<T: Send + Sync + 'static, E: Send + Sync + Debug + 'static>(
+fn stream_until_first_error<T: Send + Sync + Debug + 'static, E: Send + Sync + Debug + 'static>(
     stream: impl Stream<Item = Result<T, E>> + Send + Sync + 'static,
     on_error: &'static str,
 ) -> impl Stream<Item = T> + Send + Sync + 'static {
@@ -62,7 +62,7 @@ pub fn handle_monitor_request_with_stream<T: Serialize>(
 /// Items are serialized in json format before being streamed in the response body.
 /// This handler returns a [RpcError] in case of connection errors.
 pub async fn handle_monitor_request_with_broadcast_receiver<
-    T: Serialize + Clone + Send + Sync + 'static,
+    T: Serialize + Clone + Send + Sync + Debug + 'static,
 >(
     receiver: tokio::sync::broadcast::Receiver<T>,
 ) -> Result<Resp, RpcError> {
@@ -78,7 +78,7 @@ pub async fn handle_monitor_request_with_broadcast_receiver<
 /// combinator function is serialized in json format and sent as the response body in a single frame.
 /// This handler returns a [RpcError] in case of connection errors.
 pub async fn handle_post_request<
-    T: for<'a> Deserialize<'a>,
+    T: for<'a> Deserialize<'a> + Debug,
     S: Serialize,
     F: FnOnce(
         T,
@@ -94,12 +94,16 @@ pub async fn handle_post_request<
     f: F,
 ) -> Result<Resp, RpcError> {
     // We fail to deserialize the body request. This is likely a
-    let value: T = match serde_json::from_slice(&req.collect().await?.to_bytes()) {
-        Err(_e) => {
+    let body = &req.collect().await?.to_bytes();
+    debug!("Request body: {body:?}");
+    let value: T = match serde_json::from_slice(body) {
+        Err(e) => {
+            debug!("Cannot deserialize received value: {e:?}");
             return bad_request();
         }
         Ok(v) => v,
     };
+    debug!("Received POST request, value deserialized to {:?}", value);
 
     let output = match f(value).await {
         Err(e) => {

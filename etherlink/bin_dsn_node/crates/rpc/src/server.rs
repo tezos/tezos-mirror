@@ -18,7 +18,7 @@ use hyper_util::rt::TokioIo;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::errors::RpcError;
 use crate::handlers::Resp;
@@ -74,7 +74,8 @@ impl<S: Send + Sync + Clone + 'static> RpcServer<S> {
         let router = Arc::new(router);
         loop {
             tokio::select! {
-                Ok((tcp, _)) = listener.accept() => {
+                Ok((tcp, ip_address)) = listener.accept() => {
+                    debug!("Connection from {:?}", ip_address);
                     let io = TokioIo::new(tcp);
                     let service = RpcService {
                         router: router.clone(),

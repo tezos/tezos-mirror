@@ -4,7 +4,7 @@
 
 use dsn_core::types::{Preblock, Proposal};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::{config::SequencerConfig, error::SequencerError};
 
@@ -31,10 +31,11 @@ impl SequencerRunner {
     }
 
     async fn run_inner(&mut self) -> Result<(), SequencerError> {
+        info!("Starting threshold encryption protocol");
         loop {
             tokio::select! {
                 Some(proposal) = self.rx_proposal.recv() => {
-                    info!("Received proposal {proposal:?}");
+                    debug!("Received proposal {proposal:?}");
                     //TODO: Persist preblock once processed. Needed in the case of disconnections and catchup from EVM node is needed.
                     if let Err(e) = self.tx_preblocks.send(Preblock(proposal)) {
                         warn!("Cannot broadcast preblock: is the sequencer shutting down? {e:?}")

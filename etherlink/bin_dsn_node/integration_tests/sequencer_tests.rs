@@ -1,7 +1,10 @@
 extern crate dsn_integration_tests;
 
 use chrono::DateTime;
-use dsn_core::types::{BlockHash, DelayedTransactionHash, Preblock, Proposal, Transaction};
+use dsn_core::{
+    hex_string::HexString,
+    types::{BlockHash, DelayedTransactionHash, Preblock, Proposal, Transaction},
+};
 use dsn_integration_tests::node::RpcNode;
 use futures_util::StreamExt;
 
@@ -13,12 +16,12 @@ fn dummy_proposal() -> Proposal {
             Transaction(vec![3u8; 3]),
         ],
         delayed_transaction_hashes: vec![
-            DelayedTransactionHash(vec![4u8; 32]),
-            DelayedTransactionHash(vec![5u8; 32]),
-            DelayedTransactionHash(vec![6u8; 32]),
+            DelayedTransactionHash(HexString(vec![4u8; 32])),
+            DelayedTransactionHash(HexString(vec![5u8; 32])),
+            DelayedTransactionHash(HexString(vec![6u8; 32])),
         ],
-        previous_block_hash: BlockHash(vec![7u8; 32]),
-        current_blueprint_number: 1,
+        previous_block_hash: BlockHash(HexString(vec![7u8; 32])),
+        current_blueprint_number: HexString(vec![b'1']),
         timestamp: DateTime::from_timestamp_millis(1000000000000).unwrap(),
     }
 }

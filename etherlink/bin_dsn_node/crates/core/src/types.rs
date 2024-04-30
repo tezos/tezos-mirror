@@ -4,27 +4,32 @@
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+
 use std::fmt::Debug;
+
+use crate::hex_string::HexString;
+
+// TODO: Handle serialization and deserialization of hex datatype
+// properly
 
 /// Transaction type: a list of bytes serialized in hex format.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction(#[serde(with = "hex")] pub Vec<u8>);
 
 /// Delayed transaction hash: A list of bytes serialized in hex format.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DelayedTransactionHash(#[serde(with = "hex")] pub Vec<u8>);
+#[derive(Debug, Clone, Serialize, PartialEq, Deserialize)]
+pub struct DelayedTransactionHash(pub HexString);
 
-/// Etherlink block hash: A list of bytes serialized in hex format.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-
-pub struct BlockHash(#[serde(with = "hex")] pub Vec<u8>);
+/// Etherlink block hash: A list of bytes serialized in hex format with '0x' prefix.
+#[derive(Debug, Clone, Serialize, PartialEq, Deserialize)]
+pub struct BlockHash(pub HexString);
 
 /// Proposals received by the sequencer. It contains the
 /// transactions and delayed transaction hashes to be included in the
 /// next [Preblock], together with other metadata such as the
 /// blueprint number, the timestamp, and the [BlockHash] of the latest
 /// Etherlink block.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Serialize, PartialEq, Deserialize)]
 pub struct Proposal {
     pub transactions: Vec<Transaction>,
 
@@ -34,7 +39,9 @@ pub struct Proposal {
 
     pub timestamp: chrono::DateTime<Utc>,
 
-    pub current_blueprint_number: u64,
+    // TODO: https://gitlab.com/tezos/tezos/-/issues/7201
+    // Deserialize String starting with '0x' prefix as u64.
+    pub current_blueprint_number: String,
 }
 
 /// Custom [Debug] implementation for [Proposal].
@@ -58,5 +65,5 @@ impl Debug for Proposal {
 
 /// [Preblock]s are produced by the sequencer as the result of
 /// validating and acknowledging a proposal.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, Deserialize)]
 pub struct Preblock(pub Proposal);

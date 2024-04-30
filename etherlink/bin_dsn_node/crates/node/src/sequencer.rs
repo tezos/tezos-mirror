@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{net::SocketAddr, num::ParseIntError, str::FromStr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use dsn_sequencer::{config::SequencerConfig, rpc::SequencerRpc, sequencer};
 use futures::future::try_join_all;
@@ -12,25 +12,7 @@ use crate::shutdown::Shutdown;
 
 const DEFAULT_RPC_ADDRESS: ([u8; 4], u16) = ([127, 0, 0, 1], 5303);
 
-/// A simple wrapper around the Duration datatype. This wrapper implements
-/// the trait [FromStr], which allows for parsing durations as Cli arguments.
-#[derive(Clone, Debug)]
-pub struct PreblockTime(Duration);
-
-impl FromStr for PreblockTime {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let milliseconds: u64 = s.parse()?;
-        Ok(PreblockTime(Duration::from_millis(milliseconds)))
-    }
-}
-
-impl From<PreblockTime> for Duration {
-    fn from(b: PreblockTime) -> Self {
-        b.0
-    }
-}
+const DEFAULT_PREBLOCK_TIME: u16 = 500;
 
 /// Command line arguments for the `bin_dsn_node` when running in sequencer mode.`
 #[derive(Clone, Debug, clap::Args)]
@@ -40,7 +22,8 @@ pub struct Args {
     pub rpc_address: SocketAddr,
     #[arg(short, long)]
     /// Minimum time, in milliseconds, to produce a preblock.
-    pub preblock_time: PreblockTime,
+    #[arg(short, long, default_value_t = DEFAULT_PREBLOCK_TIME)]
+    pub preblock_time: u16,
 }
 
 pub async fn run(
@@ -55,7 +38,7 @@ pub async fn run(
     let config = SequencerConfig {
         // TODO: either merge args and config or rely on config only
         // and use args for generic purposes (e.g. specify config file path or logging level)
-        min_block_time: preblock_time.into(),
+        min_block_time: Duration::from_millis(preblock_time as u64),
         ..Default::default()
     };
 

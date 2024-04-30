@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HexString(pub Vec<u8>);
 
 impl Serialize for HexString {
