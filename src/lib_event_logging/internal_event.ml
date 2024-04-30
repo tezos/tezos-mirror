@@ -154,7 +154,7 @@ end = struct
         List.fold_left
           (fun prev elt ->
             match prev with
-            | t :: q when String.equal t elt -> q
+            | t :: q when String.equal t elt || String.equal "_" elt -> q
             | _ -> raise Not_found)
           main.path
           prefix.path

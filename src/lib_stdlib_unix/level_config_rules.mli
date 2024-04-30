@@ -28,10 +28,9 @@
     would be written "node.context -> debug". The complete syntax is the
     following
 
-      a pattern is a <string> containing a "*"
-
       <rules> := <rule> ; <rules>
       <rule> := (<pattern> ->)? <level>
+      <pattern> := <string> | * | <pattern>.<pattern>
 
     A value of this form can be found in environment variables TEZOS_LOG and
     LWT_LOG.
