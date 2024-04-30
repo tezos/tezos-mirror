@@ -9,13 +9,13 @@ use std::path::Path;
 #[derive(Debug, Clone, Subcommand)]
 pub enum Mode {
     /// Run a program using the RISC-V interpreter
-    Run(Options),
+    Run(RunOptions),
     /// Launch a program in the debugger
-    Debug(Options),
+    Debug(DebugOptions),
     /// Run a program using rvemu
-    Rvemu(Options),
-    /// Benchmark a binary
-    Bench(Options),
+    Rvemu(RvemuOptions),
+    /// Benchmark a program
+    Bench(BenchOptions),
 }
 
 #[derive(Clone, ValueEnum, Debug)]
@@ -31,24 +31,69 @@ pub struct Cli {
     pub command: Mode,
 }
 
-/// Structure that encodes the CLI options, flags and commands
 #[derive(Debug, Clone, Parser)]
-pub struct Options {
-    /// Path to the input ELF executable
-    #[arg(short, long)]
-    pub input: String,
+pub struct RunOptions {
+    #[command(flatten)]
+    pub common: CommonOptions,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct DebugOptions {
+    #[command(flatten)]
+    pub common: CommonOptions,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct RvemuOptions {
+    #[command(flatten)]
+    pub common: CommonOptions,
 
     /// Path to the initrd
     #[arg(long)]
     pub initrd: Option<String>,
 
-    /// Keep going after the inbox has been drained.
-    #[arg(short, long)]
-    pub keep_going: bool,
-
     /// Support some POSIX-style system calls
     #[arg(long)]
     pub posix: bool,
+}
+
+#[derive(Clone, ValueEnum, Debug)]
+pub enum BenchMode {
+    Simple,
+    Fine,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct BenchOptions {
+    /// Type of benchmark
+    #[arg(long)]
+    pub mode: BenchMode,
+
+    #[command(flatten)]
+    pub common: CommonOptions,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct CommonOptions {
+    /// Path to the input ELF executable
+    #[arg(short, long)]
+    pub input: String,
+
+    #[arg(short = 'm', long, value_enum, default_value_t = ExitMode::User)]
+    pub posix_exit_mode: ExitMode,
+
+    #[arg(long, default_value_t = 1_000_000)]
+    pub max_steps: usize,
+
+    #[command(flatten)]
+    pub inbox: InboxOptions,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct InboxOptions {
+    /// Keep going after the inbox has been drained.
+    #[arg(short, long)]
+    pub keep_going: bool,
 
     /// Rollup address
     #[arg(short, long, default_value = "sr1UNDWPUYVeomgG15wn5jSw689EJ4RNnVQa")]
@@ -58,15 +103,9 @@ pub struct Options {
     #[arg(short = 'l', long, default_value_t = 0)]
     pub origination_level: u64,
 
-    #[arg(short = 'm', long, value_enum, default_value_t = ExitMode::User)]
-    pub posix_exit_mode: ExitMode,
-
     /// Path to the file containing inbox messages
-    #[arg(long)]
-    pub inbox_file: Option<Box<Path>>,
-
-    #[arg(long, default_value_t = 1_000_000)]
-    pub max_steps: usize,
+    #[arg(long = "inbox-file")]
+    pub file: Option<Box<Path>>,
 }
 
 /// Parse the command-line arguments.

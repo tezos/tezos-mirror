@@ -3,8 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::fmt::{self};
-
 use crate::{
     interpreter::float::RoundingMode,
     machine_state::{
@@ -12,6 +10,8 @@ use crate::{
         registers::{FRegister, XRegister},
     },
 };
+use enum_tag::EnumTag;
+use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct RTypeArgs {
@@ -226,7 +226,7 @@ pub struct CSSDTypeArgs {
 /// RISC-V parsed instructions. Along with legal instructions, potentially
 /// illegal instructions are parsed as `Unknown` or `UnknownCompressed`.
 /// These instructions are successfully parsed, but must not be interpreted.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, EnumTag)]
 pub enum Instr {
     // RV64I R-type instructions
     Add(RTypeArgs),
