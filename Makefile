@@ -1,5 +1,5 @@
 PACKAGES_SUBPROJECT:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
-PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find opam -name \*.opam -print)))
+PACKAGES:=$(patsubst %.opam,%,$(notdir $(wildcard opam/*.opam)))
 
 define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
