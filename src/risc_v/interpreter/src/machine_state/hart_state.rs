@@ -1,4 +1,4 @@
-use super::csregisters::values::CSRValue;
+use super::csregisters::xstatus::MStatus;
 use crate::{
     machine_state::{
         bus::Address,
@@ -102,19 +102,18 @@ impl<M: backend::Manager> HartState<M> {
         self.csregisters.write(xtval_reg, trap_source.xtval());
 
         // Configure machine status for the trap handler
-        let mstatus: CSRValue = self.csregisters.read(CSRegister::mstatus);
+        let mstatus: MStatus = self.csregisters.read(CSRegister::mstatus);
         let mstatus = match trap_mode {
             TrapMode::Supervisor => {
                 // Remember whether interupts were enabled before taking the trap
-                let interrupts_enabled = xstatus::get_SIE(mstatus);
-                let mstatus = xstatus::set_SPIE(mstatus, interrupts_enabled);
+                let interrupts_enabled = mstatus.sie();
+                let mstatus = mstatus.with_spie(interrupts_enabled);
 
                 // Disable interrupts for the trap handler
-                let mstatus = xstatus::set_SIE(mstatus, false);
+                let mstatus = mstatus.with_sie(false);
 
                 // Remember the previous privilege mode
-                xstatus::set_SPP(
-                    mstatus,
+                mstatus.with_spp(
                     match current_mode {
                         Mode::User => xstatus::SPPValue::User,
                         Mode::Supervisor => xstatus::SPPValue::Supervisor,
@@ -125,21 +124,18 @@ impl<M: backend::Manager> HartState<M> {
 
             TrapMode::Machine => {
                 // Remember whether interupts were enabled before taking the trap
-                let interrupts_enabled = xstatus::get_MIE(mstatus);
-                let mstatus = xstatus::set_MPIE(mstatus, interrupts_enabled);
+                let interrupts_enabled = mstatus.mie();
+                let mstatus = mstatus.with_mpie(interrupts_enabled);
 
                 // Disable interrupts for the trap handler
-                let mstatus = xstatus::set_MIE(mstatus, false);
+                let mstatus = mstatus.with_mie(false);
 
                 // Remember the previous privilege mode
-                xstatus::set_MPP(
-                    mstatus,
-                    match current_mode {
-                        Mode::User => xstatus::MPPValue::User,
-                        Mode::Supervisor => xstatus::MPPValue::Supervisor,
-                        Mode::Machine => xstatus::MPPValue::Machine,
-                    },
-                )
+                mstatus.with_mpp(match current_mode {
+                    Mode::User => xstatus::MPPValue::User,
+                    Mode::Supervisor => xstatus::MPPValue::Supervisor,
+                    Mode::Machine => xstatus::MPPValue::Machine,
+                })
             }
         };
         self.csregisters.write(CSRegister::mstatus, mstatus);

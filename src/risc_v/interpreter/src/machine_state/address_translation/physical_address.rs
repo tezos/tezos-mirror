@@ -12,9 +12,9 @@
 #![allow(non_snake_case)]
 
 use super::PAGE_OFFSET_WIDTH;
-use crate::{
-    create_field,
-    machine_state::{bus::Address, csregisters::satp::SvLength},
+use crate::machine_state::{
+    bus::Address,
+    csregisters::{ones, satp::SvLength},
 };
 use std::ops::RangeInclusive;
 use twiddle::Twiddle;
@@ -44,12 +44,19 @@ pub(super) fn get_raw_ppn_i_range(
     Some(*bit_range.end()..=*bit_range.start())
 }
 
-// The PPN_i fields are not created with the macro `create_field!` because it is useful
-// to be able to call the i-th physical page number by an argument `i`.
-create_field!(PAGE_OFFSET, u64, 0, PAGE_OFFSET_WIDTH as u64);
+// Get the page offset of a physical address.
+pub const fn get_page_offset(addr: u64) -> u64 {
+    addr & ones(PAGE_OFFSET_WIDTH as u64)
+}
+
+// Get the page offset of a physical address.
+pub fn set_page_offset(addr: u64, page_offset: u64) -> u64 {
+    let mask = ones(PAGE_OFFSET_WIDTH as u64);
+    addr & !mask | page_offset & mask
+}
 
 /// Get `p_addr.PPN[index]` from a physical address specified by `sv_length` Standard.
-pub fn get_PPN_IDX(p_addr: Address, sv_length: &SvLength, index: usize) -> Option<Address> {
+pub fn get_ppn_idx(p_addr: Address, sv_length: &SvLength, index: usize) -> Option<Address> {
     let bit_range = get_raw_ppn_i_range(sv_length, index)?;
     let (start, end) = (
         bit_range.start() + PAGE_OFFSET_WIDTH,
@@ -60,7 +67,7 @@ pub fn get_PPN_IDX(p_addr: Address, sv_length: &SvLength, index: usize) -> Optio
 }
 
 /// Set `p_addr.PPN[index] = ppn_value` specified by `sv_length` Standard.
-pub fn set_PPN_IDX(
+pub fn set_ppn_idx(
     p_addr: Address,
     sv_length: &SvLength,
     index: usize,
@@ -94,14 +101,14 @@ mod tests {
             use crate::machine_state::address_translation::physical_address as pa;
 
             let run_tests = |sv_length, ppn_vals: Vec<CSRRepr>, args| {
-                let mut addr = pa::set_PAGE_OFFSET(0u64, offset);
+                let mut addr = pa::set_page_offset(0u64, offset);
                 for (idx, &ppn_idx) in ppn_vals.iter().enumerate() {
-                    addr = pa::set_PPN_IDX(addr, sv_length, idx, ppn_idx).unwrap();
+                    addr = pa::set_ppn_idx(addr, sv_length, idx, ppn_idx).unwrap();
                 }
                 for (idx, res) in args {
-                    assert_eq!(pa::get_PPN_IDX(addr, sv_length, idx), res);
+                    assert_eq!(pa::get_ppn_idx(addr, sv_length, idx), res);
                 }
-                assert_eq!(pa::get_PAGE_OFFSET(addr), offset);
+                assert_eq!(pa::get_page_offset(addr), offset);
             };
 
             run_tests(&SvLength::Sv39,

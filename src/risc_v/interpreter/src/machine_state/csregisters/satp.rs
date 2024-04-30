@@ -8,7 +8,10 @@
 #![allow(non_snake_case)]
 
 use super::CSRRepr;
-use crate::{bits::Bits64, create_field};
+use crate::{
+    bits::{Bits64, FixedWidthBits},
+    csr,
+};
 
 // allowed `MODE` for `satp` register.
 // Section 4.1.11
@@ -50,9 +53,9 @@ impl TranslationAlgorithm {
     }
 }
 
-/// `None` represents that the value of SATP.mode is reserved or
+/// `Err` represents that the value of SATP.mode is reserved or
 /// that we do not care about it / is irrelevant.
-impl Bits64 for Option<TranslationAlgorithm> {
+impl Bits64 for Result<TranslationAlgorithm, u64> {
     const WIDTH: usize = 4;
 
     fn from_bits(value: u64) -> Self {
@@ -60,34 +63,64 @@ impl Bits64 for Option<TranslationAlgorithm> {
         use TranslationAlgorithm::*;
 
         match value & 0b1111 {
-            MODE_BARE => Some(Bare),
-            MODE_SV39 => Some(Sv(Sv39)),
-            MODE_SV48 => Some(Sv(Sv48)),
-            MODE_SV57 => Some(Sv(Sv57)),
-            1..=7 | 11..=15 => None,
+            MODE_BARE => Ok(Bare),
+            MODE_SV39 => Ok(Sv(Sv39)),
+            MODE_SV48 => Ok(Sv(Sv48)),
+            MODE_SV57 => Ok(Sv(Sv57)),
+            value @ (1..=7 | 11..=15) => {
+                // We need to retain invalid/unknown values so we can re-encode
+                // them correctly later. In other words we want to be loss-less.
+                Err(value)
+            }
             16.. => unreachable!(),
         }
     }
 
     fn to_bits(&self) -> u64 {
         match self {
-            None => 0,
-            Some(algorithm) => algorithm.enc(),
+            Err(code) => *code,
+            Ok(algorithm) => algorithm.enc(),
         }
     }
 }
 
-create_field!(MODE, Option<TranslationAlgorithm>, SATP_MODE_OFFSET, 4);
-create_field!(ASID, u64, 44, 16);
-create_field!(PPN, u64, 0, 44);
+csr! {
+    pub struct Satp {
+        PPN: FixedWidthBits<44>,
+        ASID: FixedWidthBits<16>,
+        MODE: Result<TranslationAlgorithm, u64>,
+    }
+}
+
+impl Default for Satp {
+    fn default() -> Self {
+        Self::from_bits(DEFAULT_VALUE)
+    }
+}
+
+impl Satp {
+    /// Normalise the SATP value.
+    pub fn normalise(self) -> Option<Self> {
+        match self.mode() {
+            Err(_) => None,
+            Ok(TranslationAlgorithm::Bare) => {
+                // When no address translation algo is selected, the other fields
+                // have no meaning and shall therefore be reset.
+                Some(
+                    self.with_ppn(FixedWidthBits::from_bits(0))
+                        .with_asid(FixedWidthBits::from_bits(0)),
+                )
+            }
+            Ok(TranslationAlgorithm::Sv(_)) => Some(self),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use crate::{
         bits::Bits64,
-        machine_state::csregisters::satp::{
-            get_ASID, get_MODE, get_PPN, set_MODE, SvLength, TranslationAlgorithm,
-        },
+        machine_state::csregisters::satp::{Satp, SvLength, TranslationAlgorithm},
     };
 
     #[test]
@@ -95,44 +128,46 @@ mod tests {
         let field = u64::from_bits(0xF0F0_0BC0_AAAA_DEAD);
         assert_eq!(field.to_bits(), 0xF0F0_0BC0_AAAA_DEAD);
 
-        let field = <Option<TranslationAlgorithm>>::from_bits(0x0000);
-        assert_eq!(field, Some(TranslationAlgorithm::Bare));
+        type AlgoField = Result<TranslationAlgorithm, u64>;
+
+        let field = <AlgoField>::from_bits(0x0000);
+        assert_eq!(field, Ok(TranslationAlgorithm::Bare));
 
         // This `FieldValue` looks at only at the 4 least significant bits
-        let field = <Option<TranslationAlgorithm>>::from_bits(0xFFFF_FFF0);
-        assert_eq!(field, Some(TranslationAlgorithm::Bare));
+        let field = <AlgoField>::from_bits(0xFFFF_FFF0);
+        assert_eq!(field, Ok(TranslationAlgorithm::Bare));
 
-        let field = <Option<TranslationAlgorithm>>::from_bits(0x0002);
-        assert_eq!(field, None);
+        let field = <AlgoField>::from_bits(0x0002);
+        assert_eq!(field, Err(0x2));
 
-        let field = <Option<TranslationAlgorithm>>::from_bits(0x0008);
-        assert_eq!(field, Some(TranslationAlgorithm::Sv(SvLength::Sv39)));
+        let field = <AlgoField>::from_bits(0x0008);
+        assert_eq!(field, Ok(TranslationAlgorithm::Sv(SvLength::Sv39)));
 
-        let field = <Option<TranslationAlgorithm>>::from_bits(0x0009);
-        assert_eq!(field, Some(TranslationAlgorithm::Sv(SvLength::Sv48)));
+        let field = <AlgoField>::from_bits(0x0009);
+        assert_eq!(field, Ok(TranslationAlgorithm::Sv(SvLength::Sv48)));
 
-        let field = <Option<TranslationAlgorithm>>::from_bits(0x000A);
-        assert_eq!(field, Some(TranslationAlgorithm::Sv(SvLength::Sv57)));
+        let field = <AlgoField>::from_bits(0x000A);
+        assert_eq!(field, Ok(TranslationAlgorithm::Sv(SvLength::Sv57)));
 
-        let field = <Option<TranslationAlgorithm>>::from_bits(0x000B);
-        assert_eq!(field, None);
+        let field = <AlgoField>::from_bits(0x000B);
+        assert_eq!(field, Err(0xB));
     }
 
     #[test]
     fn test_satp_rw() {
-        let satp = 8u64 << 60 | 0xD07 << 44 | 0xABC_DEAD_0BAD;
-        let mode = get_MODE(satp);
-        let asid = get_ASID(satp);
-        let ppn = get_PPN(satp);
-        assert_eq!(mode, Some(TranslationAlgorithm::Sv(SvLength::Sv39)));
+        let satp = Satp::from_bits(8u64 << 60 | 0xD07 << 44 | 0xABC_DEAD_0BAD);
+        let mode = satp.mode();
+        let asid = satp.asid();
+        let ppn = satp.ppn();
+        assert_eq!(mode, Ok(TranslationAlgorithm::Sv(SvLength::Sv39)));
         assert_eq!(asid.to_bits(), 0xD07);
         assert_eq!(ppn.to_bits(), 0xABC_DEAD_0BAD);
 
-        let satp = set_MODE(satp, Some(TranslationAlgorithm::Bare));
-        let mode = get_MODE(satp);
-        let asid = get_ASID(satp);
-        let ppn = get_PPN(satp);
-        assert_eq!(mode, Some(TranslationAlgorithm::Bare));
+        let satp = satp.with_mode(Ok(TranslationAlgorithm::Bare));
+        let mode = satp.mode();
+        let asid = satp.asid();
+        let ppn = satp.ppn();
+        assert_eq!(mode, Ok(TranslationAlgorithm::Bare));
         assert_eq!(asid.to_bits(), 0xD07);
         assert_eq!(ppn.to_bits(), 0xABC_DEAD_0BAD);
     }

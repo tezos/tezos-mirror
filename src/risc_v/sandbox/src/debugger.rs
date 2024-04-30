@@ -12,14 +12,14 @@ use ratatui::{
     widgets::{block::*, *},
 };
 use risc_v_interpreter::{
+    bits::Bits64,
     machine_state::{
         bus::Address,
         csregisters::{
             self,
-            satp::{self, SvLength, TranslationAlgorithm},
-            values::CSRValue,
-            xstatus::{ExtensionValue, MPPValue, SPPValue},
-            CSRRepr, CSRegister,
+            satp::{Satp, SvLength, TranslationAlgorithm},
+            xstatus::{ExtensionValue, MPPValue, MStatus, SPPValue},
+            CSRegister,
         },
         mode::Mode,
         registers, AccessType,
@@ -94,7 +94,7 @@ impl TranslationState {
         &mut self,
         faulting: bool,
         effective_mode: Option<TranslationAlgorithm>,
-        satp_val: CSRRepr,
+        satp_val: Satp,
     ) {
         self.effective = if faulting {
             EffectiveTranslationState::Faulting
@@ -105,9 +105,9 @@ impl TranslationState {
             }
         };
 
-        self.base = satp::get_PPN(satp_val);
+        self.base = satp_val.ppn().to_bits();
 
-        self.mode = match satp::get_MODE(satp_val) {
+        self.mode = match satp_val.mode().ok() {
             None => SATPModeState::Invalid,
             Some(alg) => match alg {
                 TranslationAlgorithm::Bare => SATPModeState::Bare,
@@ -391,26 +391,26 @@ impl<'a> DebuggerApp<'a> {
         use csregisters::*;
         use CSRegister as CSR;
 
-        let mstatus: CSRValue = self.interpreter.read_csregister(CSR::mstatus);
-        let mbe = xstatus::get_MBE(mstatus);
-        let sbe = xstatus::get_SBE(mstatus);
-        let tvm = xstatus::get_TVM(mstatus);
-        let tsr = xstatus::get_TSR(mstatus);
-        let sum = xstatus::get_SUM(mstatus);
-        let mxr = xstatus::get_MXR(mstatus);
-        let mie = xstatus::get_MIE(mstatus);
-        let sie = xstatus::get_SIE(mstatus);
-        let mpie = xstatus::get_MPIE(mstatus);
-        let spie = xstatus::get_SPIE(mstatus);
-        let mpp = xstatus::get_MPP(mstatus);
-        let spp = xstatus::get_SPP(mstatus);
-        let mprv = xstatus::get_MPRV(mstatus);
-        let tw = xstatus::get_TW(mstatus);
-        let ube = xstatus::get_UBE(mstatus);
-        let sd = xstatus::get_SD(mstatus);
-        let xs = xstatus::get_XS(mstatus);
-        let fs = xstatus::get_FS(mstatus);
-        let vs = xstatus::get_VS(mstatus);
+        let mstatus: MStatus = self.interpreter.read_csregister(CSR::mstatus);
+        let mbe = mstatus.mbe();
+        let sbe = mstatus.sbe();
+        let tvm = mstatus.tvm();
+        let tsr = mstatus.tsr();
+        let sum = mstatus.sum();
+        let mxr = mstatus.mxr();
+        let mie = mstatus.mie();
+        let sie = mstatus.sie();
+        let mpie = mstatus.mpie();
+        let spie = mstatus.spie();
+        let mpp = mstatus.mpp();
+        let spp = mstatus.spp();
+        let mprv = mstatus.mprv();
+        let tw = mstatus.tw();
+        let ube = mstatus.ube();
+        let sd = mstatus.sd();
+        let xs = mstatus.xs();
+        let fs = mstatus.fs();
+        let vs = mstatus.vs();
 
         let bool_field = |name: &'static str, toggled| match toggled {
             false => name.fg(GRAY),

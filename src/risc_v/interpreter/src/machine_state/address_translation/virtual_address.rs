@@ -12,12 +12,9 @@
 //! See sections 5.4, 5.5, 5.6
 
 use super::PAGE_OFFSET_WIDTH;
-use crate::{
-    create_field,
-    machine_state::{
-        bus::Address,
-        csregisters::{satp::SvLength, CSRRepr},
-    },
+use crate::machine_state::{
+    bus::Address,
+    csregisters::{ones, satp::SvLength, CSRRepr},
 };
 use std::ops::RangeInclusive;
 use twiddle::Twiddle;
@@ -40,10 +37,13 @@ fn get_raw_vpn_i_range(sv_length: &SvLength, index: usize) -> Option<RangeInclus
     Some(*bit_range.end()..=*bit_range.start())
 }
 
-create_field!(PAGE_OFFSET, u64, 0, PAGE_OFFSET_WIDTH as u64);
+// Get the page offset of a virtual address.
+pub const fn get_page_offset(addr: u64) -> u64 {
+    addr & ones(PAGE_OFFSET_WIDTH as u64)
+}
 
 /// Obtain VPN[index] from a virtual address specified by `sv_length` Standard.
-pub fn get_VPN_IDX(v_addr: Address, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
+pub fn get_vpn_idx(v_addr: Address, sv_length: &SvLength, index: usize) -> Option<CSRRepr> {
     let bit_range = get_raw_vpn_i_range(sv_length, index)?;
     let (start, end) = (
         bit_range.start() + PAGE_OFFSET_WIDTH,
@@ -74,7 +74,7 @@ mod tests {
 
             let run_tests = |sv_length, args| {
                 for (idx, res) in args {
-                    assert_eq!(virtual_address::get_VPN_IDX(vaddr, sv_length, idx), res);
+                    assert_eq!(virtual_address::get_vpn_idx(vaddr, sv_length, idx), res);
                 }
             };
 

@@ -5,14 +5,17 @@
 use super::{
     bus::{main_memory, Address, Addressable, Bus, OutOfBounds},
     csregisters::{
-        satp::{self, SvLength, TranslationAlgorithm},
-        values::CSRValue,
-        xstatus, CSRRepr, CSRegister,
+        satp::{Satp, SvLength, TranslationAlgorithm},
+        xstatus::MStatus,
+        CSRegister,
     },
     mode::Mode,
     MachineState,
 };
-use crate::{bits::Bits64, state_backend as backend, traps::Exception};
+use crate::{
+    bits::Bits64, machine_state::address_translation::pte::PageTableEntry,
+    state_backend as backend, traps::Exception,
+};
 
 mod physical_address;
 mod pte;
@@ -70,7 +73,7 @@ impl SvLength {
 fn sv_translate_impl<ML, M>(
     bus: &Bus<ML, M>,
     v_addr: Address,
-    satp: CSRRepr,
+    satp: Satp,
     sv_length: SvLength,
     access_type: &AccessType,
 ) -> Result<Address, Exception>
@@ -85,25 +88,26 @@ where
 
     // 1. Let a be satp.ppn × PAGESIZE, and let i = LEVELS − 1.
     let mut i = levels.saturating_sub(1);
-    let mut a: Address = satp::get_PPN(satp) * PAGE_SIZE;
+    let mut a: Address = satp.ppn().to_bits() * PAGE_SIZE;
     // For all translation algorithms the page table entry size is 8 bytes.
-    let mut pte: u64;
+    let mut pte: PageTableEntry;
     loop {
         // 2. Let pte be the value of the PTE at address a + va.vpn[i] × PTESIZE.
         // TODO: If accessing pte violates a PMA or PMP check, raise an access-fault exception corresponding
         // to the original access type.
         let vpn_i =
-            v_addr::get_VPN_IDX(v_addr, &sv_length, i).ok_or(access_type.exception(v_addr))?;
+            v_addr::get_vpn_idx(v_addr, &sv_length, i).ok_or(access_type.exception(v_addr))?;
         let addr = a + vpn_i * pte_size;
-        pte = bus
-            .read(addr)
-            .map_err(|_: OutOfBounds| Exception::LoadAccessFault(addr))?;
+        pte = PageTableEntry::from_bits(
+            bus.read(addr)
+                .map_err(|_: OutOfBounds| Exception::LoadAccessFault(addr))?,
+        );
 
         // 3. If pte.v = 0, or if pte.r = 0 and pte.w = 1, stop and raise a page-fault
         //    exception corresponding to the original access type.
-        let pte_v = pte::get_FLAG_V(pte);
-        let pte_r = pte::get_FLAG_R(pte);
-        let pte_w = pte::get_FLAG_W(pte);
+        let pte_v = pte.v();
+        let pte_r = pte.r();
+        let pte_w = pte.w();
         if !pte_v || (!pte_r && pte_w) {
             return Err(access_type.exception(v_addr));
         }
@@ -113,7 +117,7 @@ where
         //    Let i = i − 1. If i < 0, stop and raise a page-fault exception
         //    corresponding to the original access type. Otherwise,
         //    let a = pte.ppn × PAGESIZE and go to step 2.
-        let pte_x = pte::get_FLAG_X(pte);
+        let pte_x = pte.x();
         if pte_r || pte_x {
             break;
         }
@@ -122,7 +126,7 @@ where
             return Err(access_type.exception(v_addr));
         }
         i -= 1;
-        a = pte::get_PPN(pte).to_bits() * PAGE_SIZE;
+        a = pte.ppn().to_bits() * PAGE_SIZE;
     }
 
     // TODO: implement step 5 (MXR & SUM aware translation)
@@ -134,9 +138,9 @@ where
 
     // 6. If i > 0 and pte.ppn[i−1:0] != 0, this is a misaligned superpage; stop and
     //    raise a page-fault exception corresponding to the original access type.
-    let pte_ppn = pte::get_PPN(pte);
+    let pte_ppn = pte.ppn();
     for idx in (0..i).rev() {
-        if pte_ppn.get_ppn_i(&sv_length, idx) != Some(0) {
+        if pte_ppn.ppn_i(&sv_length, idx) != Some(0) {
             return Err(access_type.exception(v_addr));
         }
     }
@@ -151,8 +155,8 @@ where
     //      – If the values match, set pte.a to 1 and, if the original memory access is a store, also
     //      set pte.d to 1.
     //      – If the comparison fails, return to step 2
-    let pte_a = pte::get_FLAG_A(pte);
-    let pte_d = pte::get_FLAG_D(pte);
+    let pte_a = pte.a();
+    let pte_d = pte.d();
     if !pte_a || (*access_type == AccessType::Store && !pte_d) {
         // Trying first case for now
         return Err(access_type.exception(v_addr));
@@ -164,16 +168,16 @@ where
     //    • If i > 0, then this is a superpage translation and pa.ppn[i−1:0] =
     //    va.vpn[i−1:0].
     //    • pa.ppn[LEVELS−1:i] = pte.ppn[LEVELS−1:i].
-    let va_page_offset = v_addr::get_PAGE_OFFSET(v_addr);
+    let va_page_offset = v_addr::get_page_offset(v_addr);
     let p_addr = (|| {
-        let mut pa = p_addr::set_PAGE_OFFSET(0u64, va_page_offset);
+        let mut pa = p_addr::set_page_offset(0u64, va_page_offset);
         for idx in 0..i {
-            let va_vpn_i = v_addr::get_VPN_IDX(v_addr, &sv_length, idx)?;
-            pa = p_addr::set_PPN_IDX(pa, &sv_length, idx, va_vpn_i)?;
+            let va_vpn_i = v_addr::get_vpn_idx(v_addr, &sv_length, idx)?;
+            pa = p_addr::set_ppn_idx(pa, &sv_length, idx, va_vpn_i)?;
         }
         for idx in i..levels {
-            let pte_ppn_i = pte_ppn.get_ppn_i(&sv_length, idx)?;
-            pa = p_addr::set_PPN_IDX(pa, &sv_length, idx, pte_ppn_i)?;
+            let pte_ppn_i = pte_ppn.ppn_i(&sv_length, idx)?;
+            pa = p_addr::set_ppn_idx(pa, &sv_length, idx, pte_ppn_i)?;
         }
         Some(pa)
     })();
@@ -192,11 +196,10 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// as though the current privilege mode were set to MPP.
     /// Instruction address-translation and protection are unaffected by the setting of MPRV
     pub fn effective_translation_hart_mode(&self, access_type: &AccessType) -> Mode {
-        let mstatus: CSRValue = self.hart.csregisters.read(CSRegister::mstatus);
-        if xstatus::get_MPRV(mstatus)
-            && (access_type == &AccessType::Store || access_type == &AccessType::Load)
+        let mstatus: MStatus = self.hart.csregisters.read(CSRegister::mstatus);
+        if mstatus.mprv() && (access_type == &AccessType::Store || access_type == &AccessType::Load)
         {
-            xstatus::get_MPP(mstatus).into()
+            mstatus.mpp().into()
         } else {
             self.hart.mode.read()
         }
@@ -218,8 +221,8 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
             Mode::User | Mode::Supervisor => (),
             Mode::Machine => return None,
         };
-        let satp: CSRValue = self.hart.csregisters.read(CSRegister::satp);
-        satp::get_MODE(satp)
+        let satp: Satp = self.hart.csregisters.read(CSRegister::satp);
+        satp.mode().ok()
     }
 
     /// Translate a virtual address to a physical address as described in section 5.3.2

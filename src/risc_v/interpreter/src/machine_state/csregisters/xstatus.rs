@@ -12,11 +12,11 @@
 // Allow non snake case for setters & getters
 #![allow(non_snake_case)]
 
-use super::{fields::FieldProps, ones};
+use super::fields::NormaliseFields;
 use crate::{
-    bits::Bits64,
-    create_field,
-    machine_state::{csregisters::CSRRepr, mode::Mode},
+    bits::{Bits64, ConstantBits},
+    csr,
+    machine_state::mode::Mode,
 };
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -118,112 +118,159 @@ impl Bits64 for ExtensionValue {
     }
 }
 
-// MSTATUS & SSTATUS fields
-create_field!(SD, bool, 63, 1);
-create_field!(MBE, bool, 37, 1);
-create_field!(SBE, bool, 36, 1);
-create_field!(SXL, XLenValue, 34, 2);
-create_field!(UXL, XLenValue, 32, 2);
-create_field!(TSR, bool, 22, 1);
-create_field!(TW, bool, 21, 1);
-create_field!(TVM, bool, 20, 1);
-create_field!(MXR, bool, 19, 1);
-create_field!(SUM, bool, 18, 1);
-create_field!(MPRV, bool, 17, 1);
-create_field!(XS, ExtensionValue, 15, 2);
-create_field!(FS, ExtensionValue, 13, 2);
-create_field!(MPP, MPPValue, 11, 2);
-create_field!(VS, ExtensionValue, 9, 2);
-create_field!(SPP, SPPValue, 8, 1);
-create_field!(MPIE, bool, 7, 1);
-create_field!(UBE, bool, 6, 1);
-create_field!(SPIE, bool, 5, 1);
-create_field!(MIE, bool, 3, 1);
-create_field!(SIE, bool, 1, 1);
-
-// MNSTATUS fields (SMRNMI extension)
-// MNPP field behaves similarly as MPP for mstatus
-create_field!(MNPP, MPPValue, 11, 2);
-// Field specifically used in mnstatus, holds previous virtualization mode,
-create_field!(MNPV, bool, 7, 1);
-// NMIE - Non-maskable interrupt enable bit
-// When 0 it disables all interrupts globally (absolutely no interrupts are handled)
-// When 1 - Non-maskable interrupts are enabled (and all other interrupts behave as normal)
-create_field!(NMIE, bool, 3, 1);
-
-const fn field_mask(field_data: FieldProps) -> CSRRepr {
-    ones(field_data.width) << field_data.offset
-}
-
-pub const SSTATUS_FIELDS_MASK: CSRRepr = field_mask(SD)
-    | field_mask(UXL)
-    | field_mask(MXR)
-    | field_mask(SUM)
-    | field_mask(XS)
-    | field_mask(FS)
-    | field_mask(VS)
-    | field_mask(SPP)
-    | field_mask(UBE)
-    | field_mask(SPIE)
-    | field_mask(SIE);
-
-pub const MSTATUS_FIELDS_MASK: CSRRepr = SSTATUS_FIELDS_MASK
-    | field_mask(MBE)
-    | field_mask(SBE)
-    | field_mask(SXL)
-    | field_mask(TSR)
-    | field_mask(TW)
-    | field_mask(TVM)
-    | field_mask(MPRV)
-    | field_mask(MPP)
-    | field_mask(MPIE)
-    | field_mask(MIE);
-
-pub fn apply_warl_mstatus(mstatus: CSRRepr) -> CSRRepr {
-    let mstatus = apply_warl_sstatus(mstatus);
-
-    // set SXL as 64 (our implementation fixes MXL, SXL, UXL as 64)
-    let mstatus = set_SXL(mstatus, XLenValue::MXL64);
-
-    // reset MPP in case new value is invalid
-    let mpp = get_MPP(mstatus);
-    set_MPP(mstatus, mpp)
-}
-
-pub fn apply_warl_sstatus(mut mstatus: CSRRepr) -> CSRRepr {
-    use ExtensionValue::Dirty;
-
-    // set sd = (FS==11) OR (XS==11) OR (VS=11)
-    let xs = get_XS(mstatus);
-    let vs = get_VS(mstatus);
-    let mut fs = get_FS(mstatus);
-
-    if fs != ExtensionValue::Off {
-        fs = Dirty;
-        mstatus = set_FS(mstatus, Dirty);
+csr! {
+    pub struct MStatus {
+        WPRI1: ConstantBits<1>,
+        SIE: bool,
+        WPRI2: ConstantBits<1>,
+        MIE: bool,
+        WPRI3: ConstantBits<1>,
+        SPIE: bool,
+        UBE: bool,
+        MPIE: bool,
+        SPP: SPPValue,
+        VS: ExtensionValue,
+        MPP: MPPValue,
+        FS: ExtensionValue,
+        XS: ExtensionValue,
+        MPRV: bool,
+        SUM: bool,
+        MXR: bool,
+        TVM: bool,
+        TW: bool,
+        TSR: bool,
+        WPRI4: ConstantBits<9>,
+        UXL: XLenValue,
+        SXL: XLenValue,
+        SBE: bool,
+        MBE: bool,
+        WPRI5: ConstantBits<25>,
+        SD: bool,
     }
-
-    let mstatus = set_SD(mstatus, xs == Dirty || fs == Dirty || vs == Dirty);
-
-    // set UXL as 64 (our implementation fixes MXL, SXL, UXL as 64)
-    set_UXL(mstatus, XLenValue::MXL64)
 }
 
-pub fn apply_warl_mnstatus(mnstatus: CSRRepr) -> CSRRepr {
-    // Since we don't support virtualization mode it is read-only 0 WARL
-    let mnstatus = set_MNPV(mnstatus, false);
-
-    // Our interpreter does not have any source of non-maskable interrupts
-    // but we still have other interrupts that need to be handled, so this is read-only 1
-    let mnstatus = set_NMIE(mnstatus, true);
-
-    // Similar to MPP field
-    let mnpp = get_MNPP(mnstatus);
-    set_MNPP(mnstatus, mnpp)
+impl MStatus {
+    pub fn to_sstatus(self) -> SStatus {
+        SStatus::from_bits(self.to_bits())
+    }
 }
 
-pub fn sstatus_from_mstatus(mstatus: u64) -> u64 {
-    mstatus & SSTATUS_FIELDS_MASK
+impl NormaliseFields for MStatus {
+    fn normalise(self) -> Self {
+        SStatus::normalise(self.to_sstatus()).to_mstatus(self)
+    }
+}
+
+impl Default for MStatus {
+    fn default() -> Self {
+        MStatus::from_bits(0u64)
+            // Interrupts are off
+            .with_sie(false)
+            .with_mie(false)
+            // Interrupts were off before
+            .with_spie(false)
+            .with_mpie(false)
+            // Previous privilege mode was supervisor
+            .with_spp(SPPValue::Supervisor)
+            .with_mpp(MPPValue::Supervisor)
+            // Endianness is little-endian
+            .with_ube(false)
+            .with_sbe(false)
+            .with_mbe(false)
+            // Set register dirtiness
+            .with_vs(ExtensionValue::Dirty)
+            .with_fs(ExtensionValue::Dirty)
+            .with_xs(ExtensionValue::Dirty)
+            .with_sd(false)
+            // Registers are also 64-bit wide in user and supervisor mode
+            .with_uxl(XLenValue::MXL64)
+            .with_sxl(XLenValue::MXL64)
+            // Load and stores should use current effective privilege
+            .with_mprv(false)
+            // Supervisor mode shall have access to user page mappings
+            .with_sum(true)
+            // Make instruction loads from executable pages fail
+            .with_mxr(false)
+            // Allow virtual-memory management configuration
+            .with_tvm(false)
+            // WFI instruction works normally
+            .with_tw(false)
+            // Allow SRET to work normally
+            .with_tsr(false)
+    }
+}
+
+csr! {
+    pub struct SStatus {
+        WPRI1: ConstantBits<1>,
+        SIE: bool,
+        WPRI2: ConstantBits<3>,
+        SPIE: bool,
+        UBE: bool,
+        WPRI3: ConstantBits<1>,
+        SPP: SPPValue,
+        VS: ExtensionValue,
+        WPRI4: ConstantBits<2>,
+        FS: ExtensionValue,
+        XS: ExtensionValue,
+        WPRI5: ConstantBits<1>,
+        SUM: bool,
+        MXR: bool,
+        WPRI6: ConstantBits<12>,
+        UXL: XLenValue,
+        WPRI7: ConstantBits<29>,
+        SD: bool,
+    }
+}
+
+impl Default for SStatus {
+    fn default() -> Self {
+        MStatus::default().to_sstatus()
+    }
+}
+
+impl SStatus {
+    pub fn to_mstatus(self, mstatus: MStatus) -> MStatus {
+        mstatus
+            .with_sie(self.sie())
+            .with_spie(self.spie())
+            .with_ube(self.ube())
+            .with_spp(self.spp())
+            .with_vs(self.vs())
+            .with_fs(self.fs())
+            .with_xs(self.xs())
+            .with_sum(self.sum())
+            .with_mxr(self.mxr())
+            .with_uxl(self.uxl())
+            .with_sd(self.sd())
+    }
+}
+
+impl NormaliseFields for SStatus {
+    fn normalise(self) -> Self {
+        let any_dirty = self.fs() == ExtensionValue::Dirty
+            || self.xs() == ExtensionValue::Dirty
+            || self.vs() == ExtensionValue::Dirty;
+        self.with_sd(any_dirty)
+    }
+}
+
+csr! {
+    pub struct MNStatus {
+        WPRI1: ConstantBits<3>,
+        NMIE: ConstantBits<1, 1>,
+        WPRI2: ConstantBits<3>,
+        MNPV: ConstantBits<1, 0>,
+        WPRI3: ConstantBits<3>,
+        MNPP: MPPValue,
+        WPRI4: ConstantBits<51>,
+    }
+}
+
+impl NormaliseFields for MNStatus {
+    fn normalise(self) -> Self {
+        self
+    }
 }
 
 #[cfg(test)]

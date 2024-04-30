@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub(crate) mod bits;
+pub mod bits;
 pub mod devicetree;
 pub mod exec_env;
 mod interpreter;

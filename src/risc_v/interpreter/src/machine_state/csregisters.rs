@@ -10,9 +10,10 @@ pub mod values;
 pub mod xstatus;
 
 use self::{
-    satp::{SvLength, TranslationAlgorithm},
+    fields::NormaliseFields,
+    satp::Satp,
     values::CSRValue,
-    xstatus::ExtensionValue,
+    xstatus::{ExtensionValue, MNStatus, MStatus, SStatus},
 };
 use super::{bus::Address, hart_state::HartState, mode::TrapMode};
 use crate::{
@@ -617,25 +618,10 @@ impl CSRegister {
             CSRegister::mepc | CSRegister::sepc | CSRegister::mnepc => {
                 new_value & CSRegister::WARL_MASK_XEPC
             }
-            CSRegister::satp => {
-                // Implementations are not required to support all MODE settings,
-                // and if satp is written with an unsupported MODE,
-                // the entire write has no effect; no fields in satp are modified.
-                let satp_mode = satp::get_MODE(new_value)?;
-                match satp_mode {
-                    // when address translation for memory address is active, consider the other fields valid
-                    TranslationAlgorithm::Sv(SvLength::Sv39)
-                    | TranslationAlgorithm::Sv(SvLength::Sv48)
-                    | TranslationAlgorithm::Sv(SvLength::Sv57) => new_value,
-                    // The RISC-V spec has UNSPECIFIED behaviour when Bare mode is selected
-                    // and any of the other fields contain non-zero values. (Section 5.1.11)
-                    // Therefore we set all other fields to 0.
-                    satp::TranslationAlgorithm::Bare => satp::DEFAULT_VALUE,
-                }
-            }
-            CSRegister::mstatus => xstatus::apply_warl_mstatus(new_value),
-            CSRegister::sstatus => xstatus::apply_warl_sstatus(new_value),
-            CSRegister::mnstatus => xstatus::apply_warl_mnstatus(new_value),
+            CSRegister::satp => Satp::from_bits(new_value).normalise()?.to_bits(),
+            CSRegister::mstatus => MStatus::from_bits(new_value).normalise().to_bits(),
+            CSRegister::sstatus => SStatus::from_bits(new_value).normalise().to_bits(),
+            CSRegister::mnstatus => MNStatus::from_bits(new_value).normalise().to_bits(),
             _ => new_value,
         };
         Some(write_value)
@@ -708,7 +694,7 @@ impl CSRegister {
         match self {
             CSRegister::mnscratch => 0,
             CSRegister::mnepc => 0,
-            CSRegister::mnstatus => xstatus::apply_warl_mnstatus(0),
+            CSRegister::mnstatus => MNStatus::from_bits(0).normalise().to_bits(),
             CSRegister::mncause => {
                 // The interrupt bit of mncause is always 1
                 ones(1) << 31
@@ -942,58 +928,8 @@ impl CSRegister {
             CSRegister::mscratch | CSRegister::sscratch => 0,
 
             // Project view from mstatus
-            CSRegister::sstatus => {
-                xstatus::sstatus_from_mstatus(CSRegister::mstatus.default_value())
-            }
-
-            CSRegister::mstatus => {
-                let mstatus = 0u64;
-
-                // Interrupts are off
-                let mstatus = xstatus::set_SIE(mstatus, false);
-                let mstatus = xstatus::set_MIE(mstatus, false);
-
-                // Interrupts were off before
-                let mstatus = xstatus::set_SPIE(mstatus, false);
-                let mstatus = xstatus::set_MPIE(mstatus, false);
-
-                // Previous privilege mode was supervisor
-                let mstatus = xstatus::set_SPP(mstatus, xstatus::SPPValue::Supervisor);
-                let mstatus = xstatus::set_MPP(mstatus, xstatus::MPPValue::Supervisor);
-
-                // Endianness is little-endian
-                let mstatus = xstatus::set_UBE(mstatus, false);
-                let mstatus = xstatus::set_SBE(mstatus, false);
-                let mstatus = xstatus::set_MBE(mstatus, false);
-
-                // Set register dirtiness
-                let mstatus = xstatus::set_VS(mstatus, xstatus::ExtensionValue::Dirty);
-                let mstatus = xstatus::set_FS(mstatus, xstatus::ExtensionValue::Dirty);
-                let mstatus = xstatus::set_XS(mstatus, xstatus::ExtensionValue::Dirty);
-                let mstatus = xstatus::set_SD(mstatus, false);
-
-                // Registers are also 64-bit wide in user and supervisor mode
-                let mstatus = xstatus::set_UXL(mstatus, xstatus::XLenValue::MXL64);
-                let mstatus = xstatus::set_SXL(mstatus, xstatus::XLenValue::MXL64);
-
-                // Load and stores should use current effective privilege
-                let mstatus = xstatus::set_MPRV(mstatus, false);
-
-                // Supervisor mode shall have access to user page mappings
-                let mstatus = xstatus::set_SUM(mstatus, true);
-
-                // Make instruction loads from executable pages fail
-                let mstatus = xstatus::set_MXR(mstatus, false);
-
-                // Allow virtual-memory management configuration
-                let mstatus = xstatus::set_TVM(mstatus, false);
-
-                // WFI instruction works normally
-                let mstatus = xstatus::set_TW(mstatus, false);
-
-                // Allow SRET to work normally
-                xstatus::set_TSR(mstatus, false)
-            }
+            CSRegister::sstatus => SStatus::default().to_bits(),
+            CSRegister::mstatus => MStatus::default().to_bits(),
 
             // Trap handling shall not be set up initially
             CSRegister::stvec | CSRegister::mtvec => 0,
@@ -1002,7 +938,7 @@ impl CSRegister {
             CSRegister::sie | CSRegister::mie => 0,
 
             // No address translation initially
-            CSRegister::satp => satp::DEFAULT_VALUE,
+            CSRegister::satp => Satp::default().to_bits(),
 
             // No exception or trap inflight or pending
             CSRegister::scause | CSRegister::mcause => 0,
@@ -1123,10 +1059,10 @@ fn check_fs_access(csr: CSRegister, fs_field: ExtensionValue) -> Result<()> {
 pub fn access_checks(csr: CSRegister, hart_state: &HartState<impl Manager>) -> Result<()> {
     let mode = hart_state.mode.read();
     check_privilege(csr, mode)?;
-    let mstatus: CSRValue = hart_state.csregisters.read(CSRegister::mstatus);
-    let tvm = xstatus::get_TVM(mstatus);
+    let mstatus: MStatus = hart_state.csregisters.read(CSRegister::mstatus);
+    let tvm = mstatus.tvm();
     check_satp_access(csr, tvm)?;
-    let fs = xstatus::get_FS(mstatus);
+    let fs = mstatus.fs();
     check_fs_access(csr, fs)
 }
 
@@ -1150,9 +1086,10 @@ impl<M: backend::Manager> CSRegisters<M> {
         match reg {
             CSRegister::sstatus => {
                 let mstatus = self.registers.read(CSRegister::mstatus as usize);
-                let sstatus_only = xstatus::sstatus_from_mstatus(value);
-                let mstatus_only = mstatus & !xstatus::SSTATUS_FIELDS_MASK;
-                (CSRegister::mstatus, sstatus_only | mstatus_only)
+                let mstatus = MStatus::from_bits(mstatus);
+                let sstatus = SStatus::from_bits(value);
+                let mstatus = sstatus.to_mstatus(mstatus);
+                (CSRegister::mstatus, mstatus.to_bits())
             }
             CSRegister::sip => {
                 let mip = self.registers.read(CSRegister::mip as usize);
@@ -1209,7 +1146,7 @@ impl<M: backend::Manager> CSRegisters<M> {
 
         // modify the value according to the shadowing rules of each register
         match reg {
-            CSRegister::sstatus => xstatus::sstatus_from_mstatus(source_reg_value),
+            CSRegister::sstatus => MStatus::from_bits(source_reg_value).to_sstatus().to_bits(),
             CSRegister::sip => source_reg_value & CSRegister::WARL_MASK_SIP_SIE,
             CSRegister::sie => source_reg_value & CSRegister::WARL_MASK_SIP_SIE,
             CSRegister::fcsr => source_reg_value & CSRegister::FCSR_MASK,
@@ -1294,14 +1231,14 @@ impl<M: backend::Manager> CSRegisters<M> {
         // regardless of the setting of the global yIE
         // bit for the higher-privilege mode."
 
-        let mstatus: CSRValue = self.read(CSRegister::mstatus);
-        let ie_machine = match xstatus::get_MIE(mstatus) {
+        let mstatus: MStatus = self.read(CSRegister::mstatus);
+        let ie_machine = match mstatus.mie() {
             true => self.read(CSRegister::mie),
-            false => 0u64,
+            false => 0,
         };
-        let ie_supervisor = match xstatus::get_SIE(mstatus) {
+        let ie_supervisor = match mstatus.sie() {
             true => self.read(CSRegister::sie),
-            false => 0u64,
+            false => 0,
         };
 
         match current_mode {
@@ -1403,9 +1340,8 @@ impl<M: backend::Manager> CSRegisters<M> {
 
     /// Check whether floating point extension is disabled.
     pub fn floating_disabled(&self) -> bool {
-        let mstatus: CSRValue = self.read(CSRegister::mstatus);
-
-        xstatus::get_FS(mstatus) == ExtensionValue::Off
+        let mstatus: MStatus = self.read(CSRegister::mstatus);
+        mstatus.fs() == ExtensionValue::Off
     }
 }
 
