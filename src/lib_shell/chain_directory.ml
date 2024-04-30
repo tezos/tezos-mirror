@@ -123,6 +123,10 @@ let register0 dir s f =
       (Tezos_rpc.Service.subst0 s)
       (fun chain p q -> f chain p q)
 
+(* This RPC directory must be instantiated by the node itself. Indeed,
+   only the node has access to some particular resources, such as the
+   validator or some store internal values computed at runtime, that
+   are necessary for some RPCs. *)
 let rpc_directory_with_validator dir validator =
   let open Lwt_result_syntax in
   let register1 s f =
@@ -159,6 +163,9 @@ let rpc_directory_with_validator dir validator =
   register1 S.Invalid_blocks.delete (fun chain_store hash () () ->
       Store.Block.unmark_invalid chain_store hash)
 
+(* This RPC directory is agnostic to the node internal
+   resources. However, theses RPCs can access a data subset by reading
+   the store static values. *)
 let rpc_directory_without_validator dir =
   let open Lwt_result_syntax in
   register0 dir S.chain_id (fun chain_store () () ->
@@ -204,6 +211,8 @@ let rpc_directory validator =
     Block_directory.build_rpc_directory_with_validator ;
   !dir
 
+(* This RPC directory instantiates only a subset of the chain RPCs as
+   it is agnostic to the node internal resources. *)
 let rpc_directory_without_validator () =
   let dir : Store.chain_store Tezos_rpc.Directory.t ref =
     ref Tezos_rpc.Directory.empty
