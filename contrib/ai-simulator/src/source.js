@@ -820,7 +820,10 @@ export class Delegate {
       ? bigInt.zero
       : stake_diff.negate();
 
-    const available_staked = stake_diff.isPositive() ? stake_diff : bigInt.zero;
+    const available_staked =
+      this.simulator.is_ai_activated(cycle) && stake_diff.isPositive()
+        ? stake_diff
+        : bigInt.zero;
 
     const own_delegated = bigInt(this.#own_spendable_balance(cycle));
     const third_party_delegated = bigInt(
@@ -831,7 +834,7 @@ export class Delegate {
       .add(third_party_delegated)
       .add(over_staked);
 
-    const max_delegated = considered_staked.times(9);
+    const max_delegated = own_staked.times(9);
 
     const delegated_diff = max_delegated.minus(extended_delegated);
 
@@ -890,13 +893,16 @@ export class Delegate {
 
     const ratio_denum = considered_staked.times(2).add(considered_delegated);
 
-    const ratio_for_staking = ratio_denum.isZero()
-      ? bigRat.zero
-      : bigRat(considered_staked.times(2)).divide(ratio_denum);
+    const ratio_for_staking =
+      ratio_denum.isZero() || !this.simulator.is_ai_activated(adjusted_cycle)
+        ? bigRat.zero
+        : bigRat(considered_staked.times(2)).divide(ratio_denum);
 
     const ratio_for_delegating = ratio_denum.isZero()
       ? bigRat.zero
-      : bigRat(considered_delegated).divide(ratio_denum);
+      : !this.simulator.is_ai_activated(adjusted_cycle)
+        ? bigRat.one
+        : bigRat(considered_delegated).divide(ratio_denum);
 
     return { baking_power, ratio_for_staking, ratio_for_delegating };
   }
