@@ -775,17 +775,50 @@ let supported_methods : (module METHOD) list =
 
 let unsupported_methods : string list =
   [
+    (* net *)
     "net_listening";
     "net_peerCount";
+    (* eth *)
     "eth_protocolVersion";
     "eth_syncing";
     "eth_coinbase";
     "eth_mining";
     "eth_hashrate";
-    "eth_accounts";
     "eth_sign";
     "eth_signTransaction";
-    "eth_sendTransaction";
+    "eth_blobBaseFee";
+    "eth_getProof";
+    "eth_createAccessList";
+    "eth_feeHistory";
+    "eth_getBlockReceipts";
+    "eth_getFilterChanges";
+    "eth_getFilterLogs";
+    "eth_newBlockFilter";
+    "eth_newFilter";
+    "eth_newPendingTransactionFilter";
+    "eth_uninstallFilter";
+    (* debug *)
+    "debug_getBadBlocks";
+    "debug_getRawBlock";
+    "debug_getRawHeader";
+    "debug_getRawReceipts";
+    "debug_getRawTransaction";
+    (* engine *)
+    "engine_exchangeCapabilities";
+    "engine_exchangeTransitionConfigurationV1";
+    "engine_forkchoiceUpdatedV1";
+    "engine_forkchoiceUpdatedV2";
+    "engine_forkchoiceUpdatedV3";
+    "engine_getPayloadBodiesByHashV1";
+    "engine_getPayloadBodiesByRangeV1";
+    "engine_getPayloadV1";
+    "engine_getPayloadV2";
+    "engine_getPayloadV3";
+    "engine_getPayloadV4";
+    "engine_newPayloadV1";
+    "engine_newPayloadV2";
+    "engine_newPayloadV3";
+    "engine_newPayloadV4";
   ]
 
 let map_method_name method_name =
