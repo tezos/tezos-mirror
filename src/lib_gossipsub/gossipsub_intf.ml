@@ -502,7 +502,7 @@ module type MESSAGE_CACHE = sig
   (** [get_first_seen_time message_id t] returns the time the message with [message_id]
       was first seen. Returns [None] if the message was not seen during the period
       covered by the sliding window. *)
-  val get_first_seen_time : Message_id.t -> t -> Time.t option
+  val get_first_seen_time : Message_id.t -> t -> (Time.t * Peer.Set.t) option
 
   (** [seen_message message_id t] returns [true] if the message was seen during the
       period covered by the sliding window and returns [false] if otherwise. *)

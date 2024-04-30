@@ -248,7 +248,7 @@ module Make
   type t = {
     gossip_slots : int;
     messages : message_with_access_counter Sliding_message_id_map.t;
-    first_seen_times : Time.t Sliding_message_id_map.t;
+    first_seen_times : (Time.t * Peer.Set.t) Sliding_message_id_map.t;
   }
 
   let create ~history_slots ~gossip_slots ~seen_message_slots =
@@ -262,7 +262,7 @@ module Make
         Sliding_message_id_map.make ~window_size:seen_message_slots;
     }
 
-  let add_message ~peer:_ message_id message topic t =
+  let add_message ~peer message_id message topic t =
     let messages =
       Sliding_message_id_map.add
         topic
@@ -272,12 +272,16 @@ module Make
           | Some m -> Some m)
         t.messages
     in
+    let with_peer set =
+      match peer with None -> set | Some peer -> Peer.Set.add peer set
+    in
     let first_seen_times =
       Sliding_message_id_map.add
         topic
         message_id
         ~update_value:(function
-          | None -> Some (Time.now ()) | Some time -> Some time)
+          | None -> Some (Time.now (), with_peer Peer.Set.empty)
+          | Some (time, peers) -> Some (time, with_peer peers))
         t.first_seen_times
     in
     {t with messages; first_seen_times}

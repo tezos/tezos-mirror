@@ -1136,10 +1136,12 @@ module Make (C : AUTOMATON_CONFIG) :
         let*! message_cache in
         match Message_cache.get_first_seen_time message_id message_cache with
         | None -> unit
-        | Some validated ->
+        | Some (validated, peers) ->
             let* () =
-              update_score sender (fun stats ->
-                  Score.duplicate_message_delivered stats topic validated)
+              if Peer.Set.mem sender peers then fun x -> (x, ())
+              else
+                update_score sender (fun stats ->
+                    Score.duplicate_message_delivered stats topic validated)
             in
             fail Already_received
       in
