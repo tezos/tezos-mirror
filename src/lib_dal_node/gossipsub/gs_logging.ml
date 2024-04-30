@@ -44,6 +44,14 @@ module Events = struct
       ~level:Info
       ()
 
+  let check_unknown_messages =
+    declare_0
+      ~section
+      ~name:(prefix "check_unknown_messages")
+      ~msg:"Process unknown messages"
+      ~level:Info
+      ()
+
   let publish_message =
     declare_2
       ~section
@@ -188,6 +196,7 @@ end
 let event =
   let open Events in
   function
+  | Check_unknown_messages -> emit check_unknown_messages ()
   | Heartbeat -> emit heartbeat ()
   | App_input event -> (
       match event with

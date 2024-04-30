@@ -216,7 +216,55 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type app_output = message_with_header
 
   (** The different kinds of events the Gossipsub worker handles. *)
-  type event = Heartbeat | P2P_input of p2p_input | App_input of app_input
+  type event =
+    | Heartbeat
+    | P2P_input of p2p_input
+    | App_input of app_input
+    | Check_unknown_messages
+
+  module Bounded_message_map = struct
+    (* We maintain the invariant that:
+       1. [size <= capacity]
+       2. [Map.cardinal map = size]
+    *)
+    type t = {
+      capacity : int;
+      size : int;
+      map : GS.receive_message Message_id.Map.t;
+    }
+
+    let make ~capacity =
+      assert (capacity >= 0) ;
+      {capacity; size = 0; map = Message_id.Map.empty}
+
+    let add message t =
+      let key = message.GS.message_id in
+      match Message_id.Map.find_opt key t.map with
+      | Some _ -> t
+      | None ->
+          if t.size < t.capacity then
+            {
+              t with
+              size = t.size + 1;
+              map = Message_id.Map.add key message t.map;
+            }
+          else
+            let map =
+              Message_id.Map.max_binding t.map
+              |> Option.map (fun (key, _) -> Message_id.Map.remove key t.map)
+              |> Option.value ~default:t.map
+            in
+            {t with map = Message_id.Map.add key message map}
+
+    let remove_min t =
+      match Message_id.Map.min_binding_opt t.map with
+      | None -> None
+      | Some (key, value) ->
+          let t =
+            {t with size = t.size - 1; map = Message_id.Map.remove key t.map}
+          in
+          Some (value, t)
+  end
 
   (** The worker's state is made of the gossipsub automaton's state,
       and a stream of events to process. It also has two output streams to
@@ -231,6 +279,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     p2p_output_stream : p2p_output Stream.t;
     app_output_stream : app_output Stream.t;
     events_logging : event -> unit Monad.t;
+    unknown_validity_messages : Bounded_message_map.t;
   }
 
   (** A worker instance is made of its status and state. *)
@@ -300,7 +349,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** From the worker's perspective, handling receiving a message consists in:
       - Sending it to peers returned in [to_route] field of
       [GS.Route_message] output);
-      - Notifying the application layer if it is interesed in it.
+      - Notifying the application layer if it is interested in it.
 
       Note that it's the responsability of the automaton modules to filter out
       peers based on various criteria (bad score, connection expired, ...). *)
@@ -321,6 +370,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         Introspection.update_count_recv_unknown_validity_app_messages
           state.stats
           `Incr ;
+        let unknown_validity_messages =
+          Bounded_message_map.add
+            received_message
+            state.unknown_validity_messages
+        in
+        let state = {state with unknown_validity_messages} in
         state
     | state, GS.Outdated ->
         Introspection.update_count_recv_outdated_app_messages state.stats `Incr ;
@@ -671,6 +726,37 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | In_message {from_peer; p2p_message} ->
         apply_p2p_message state from_peer p2p_message
 
+  let rec check_unknown_messages_id state =
+    match Bounded_message_map.remove_min state.unknown_validity_messages with
+    | None -> state
+    | Some (message, unknown_validity_messages) -> (
+        (* Any message whose validity status of its id is known is processed.
+           The automaton needs to process only valid and invalid messages.
+           Outdated messages are dropped.
+
+           We check the status of the first message to know whether we should
+           process more messages.
+
+           Two messages mey differ just from their sender. The content of the
+           message and the id might be the same. In that case, we may check the
+           validity of the same message id multiple times. This is ok because
+           this check should be almost free. However, the check of the message
+           will be done once since it will be added to the message cache of
+           gossipsub after being validated the first time.
+        *)
+        match GS.Message_id.valid message.message_id with
+        | `Valid | `Invalid ->
+            let state = {state with unknown_validity_messages} in
+            GS.handle_receive_message message state.gossip_state
+            |> update_gossip_state state
+            |> handle_receive_message message
+            |> (* Other messages are processed recursively *)
+            check_unknown_messages_id
+        | `Unknown -> state
+        | `Outdated ->
+            let state = {state with unknown_validity_messages} in
+            check_unknown_messages_id state)
+
   (** This is the main function of the worker. It interacts with the Gossipsub
       automaton given an event. The function possibly sends messages to the P2P
       and application layers and returns the new worker's state. *)
@@ -687,6 +773,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         |> handle_heartheat
     | P2P_input event -> apply_p2p_event state event
     | App_input event -> apply_app_event state event
+    | Check_unknown_messages -> check_unknown_messages_id state
 
   (** A helper function that pushes events in the state *)
   let push e {status = _; state} = Stream.push e state.events_stream
@@ -708,6 +795,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let rec loop () =
       let* () = Monad.sleep heartbeat_span in
       Stream.push Heartbeat stream ;
+      Stream.push Check_unknown_messages stream ;
       if !shutdown then return () else loop ()
     in
     let promise = loop () in
@@ -794,6 +882,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           p2p_output_stream = Stream.empty ();
           app_output_stream = Stream.empty ();
           events_logging;
+          unknown_validity_messages = Bounded_message_map.make ~capacity:10_000;
         };
     }
 
