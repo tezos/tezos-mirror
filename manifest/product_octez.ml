@@ -4509,6 +4509,161 @@ let _octez_embedded_protocol_packer =
     ~linkall:true
     ~modules:["Main_embedded_packer"]
 
+let octez_risc_v =
+  let base_name = "octez_risc_v_api" in
+  let archive_file = Format.sprintf "lib%s.a" base_name in
+  let dyn_archive_file = Format.sprintf "dll%s.so" base_name in
+  let archive_output_file = Format.sprintf "target/release/%s" archive_file in
+
+  let armerge =
+    let open Dune in
+    [
+      S "subdir";
+      S "helpers/bin";
+      [
+        S "rule";
+        [S "target"; S "armerge"];
+        [S "enabled_if"; of_atom_list ["="; "%{system}"; "macosx"]];
+        [
+          S "action";
+          [
+            S "chdir";
+            S "../..";
+            of_atom_list
+              [
+                "run";
+                "cargo";
+                "install";
+                "--locked";
+                "armerge";
+                "--version";
+                "2.0.0";
+                "--bins";
+                "--target-dir";
+                "target";
+                "--root";
+                "helpers";
+              ];
+          ];
+        ];
+      ];
+    ]
+  in
+  let make_rust_foreign_library_rule ?(extra_dep = Dune.E) ~enable_if ~transform
+      ~dyn_archive_output_file () =
+    let open Dune in
+    [
+      S "rule";
+      [S "targets"; S archive_file; S dyn_archive_file];
+      [
+        S "deps";
+        [S "file"; S "Cargo.lock"];
+        [S "file"; S "Cargo.toml"];
+        (* For the local dependent crates, these patterns only include files
+         * directly contained in the crate's directory, as well as the [src]
+         * directory, excluding all other directories in order to avoid
+         * copying any build artifacts. *)
+        [S "source_tree"; S ".cargo"];
+        [S "source_tree"; S "api"];
+        [S "source_tree"; S "pvm"];
+        [S "source_tree"; S "kernel_loader"];
+        [S "source_tree"; S "interpreter"];
+        (* We have to include all the locally mentioned Cargo.toml files
+         * within the workspace (including transitively). *)
+        [S "file"; S "sandbox/Cargo.toml"];
+        [S "source_tree"; S "../kernel_sdk/constants"];
+        [S "file"; S "../kernel_sdk/constants/Cargo.toml"];
+        [S "file"; S "../kernel_sdk/core/Cargo.toml"];
+        [S "file"; S "../kernel_sdk/host/Cargo.toml"];
+        [S "file"; S "../kernel_sdk/encoding/Cargo.toml"];
+        extra_dep;
+      ];
+      [S "enabled_if"; enable_if];
+      [
+        S "action";
+        [
+          S "no-infer";
+          [
+            S "progn";
+            of_atom_list
+              ["run"; "cargo"; "build"; "--release"; "-p"; "octez-risc-v-api"];
+            transform archive_output_file archive_file;
+            of_atom_list ["copy"; dyn_archive_output_file; dyn_archive_file];
+          ];
+        ];
+      ];
+    ]
+  in
+  let rust_foreign_library_darwin =
+    let open Dune in
+    make_rust_foreign_library_rule (* Make sure armerge is built beforehand *)
+      ~extra_dep:(of_atom_list ["file"; "helpers/bin/armerge"])
+      ~enable_if:(of_atom_list ["="; "%{system}"; "macosx"])
+      ~dyn_archive_output_file:
+        (Format.sprintf "target/release/lib%s.dylib" base_name)
+      ~transform:(fun input output ->
+        (* We use armerge to keep only the essential symbols. This resolves
+           issues on Mac where the linker can't resolve duplicate symbols
+           when the resulting static library is linked with other static
+           Rust libraries. *)
+        of_atom_list
+          [
+            "run";
+            "helpers/bin/armerge";
+            "--keep-symbols=^_?octez_";
+            input;
+            "--output";
+            output;
+          ])
+      ()
+  in
+  let rust_foreign_library =
+    let open Dune in
+    make_rust_foreign_library_rule
+      ~enable_if:(of_atom_list ["<>"; "%{system}"; "macosx"])
+      ~transform:(fun input output -> of_atom_list ["copy"; input; output])
+      ~dyn_archive_output_file:
+        (Format.sprintf "target/release/lib%s.so" base_name)
+      ()
+  in
+  public_lib
+    "octez-risc-v"
+    ~path:"src/risc_v"
+    ~synopsis:"OCaml API of the RISC-V Rust components"
+    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
+    ~foreign_archives:[base_name]
+    ~dune:
+      Dune.
+        [
+          [
+            S "dirs";
+            S ":standard";
+            (* We need this stanza to ensure .cargo can be used as a
+               dependency via source_tree. *)
+            S ".cargo";
+          ];
+          armerge;
+          rust_foreign_library;
+          rust_foreign_library_darwin;
+        ]
+
+let octez_risc_v_api =
+  public_lib
+    "octez-risc-v-api"
+    ~path:"src/lib_risc_v/api"
+    ~synopsis:"OCaml API of the RISC-V Rust components"
+    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
+    ~deps:[octez_risc_v]
+    ~dune:Dune.[[S "copy_files"; S "../../risc_v/api/octez_risc_v_api.*"]]
+
+let _octez_risc_v_api_test =
+  tezt
+    ["test_main"]
+    ~path:"src/lib_risc_v/api/test"
+    ~opam:"octez-risc-v-api-test"
+    ~synopsis:"Tests for RISC-V OCaml API"
+    ~deps:[alcotezt; octez_risc_v_api]
+
 let octez_layer2_store =
   octez_l2_lib
     "layer2_store"
@@ -4673,137 +4828,6 @@ let _octez_dac_lib_tests =
         octez_dac_lib |> open_;
         alcotezt;
       ]
-
-let octez_risc_v_pvm =
-  let base_name = "octez_risc_v_pvm" in
-  let archive_file = Format.sprintf "lib%s.a" base_name in
-  let archive_output_file =
-    Format.sprintf "../target/release/%s" archive_file
-  in
-  let ml_file = Format.sprintf "%s.ml" base_name in
-  let mli_file = Format.sprintf "%s.mli" base_name in
-  let armerge =
-    let open Dune in
-    [
-      S "subdir";
-      S "helpers/bin";
-      [
-        S "rule";
-        [S "target"; S "armerge"];
-        [S "enabled_if"; of_atom_list ["="; "%{system}"; "macosx"]];
-        [
-          S "action";
-          [
-            S "chdir";
-            S "../..";
-            of_atom_list
-              [
-                "run";
-                "cargo";
-                "install";
-                "--locked";
-                "armerge";
-                "--version";
-                "2.0.0";
-                "--bins";
-                "--target-dir";
-                "target";
-                "--root";
-                "helpers";
-              ];
-          ];
-        ];
-      ];
-    ]
-  in
-  let make_rust_foreign_library_rule ?(extra_dep = Dune.E) ~enable_if ~transform
-      () =
-    let open Dune in
-    [
-      S "rule";
-      [S "targets"; S archive_file; S ml_file; S mli_file];
-      [
-        S "deps";
-        [S "file"; S "Cargo.toml"];
-        [S "file"; S "build.rs"];
-        [S "source_tree"; S "src"];
-        [S "file"; S "../Cargo.lock"];
-        [S "file"; S "../Cargo.toml"];
-        (* For the local dependent crates, these patterns only include files
-         * directly contained in the crate's directory, as well as the [src]
-         * directory, excluding all other directories in order to avoid
-         * copying any build artifacts. *)
-        [S "source_tree"; S "../kernel_loader"];
-        [S "source_tree"; S "../interpreter"];
-        (* We have to include all the locally mentioned Cargo.toml files
-         * within the workspace (including transitively). *)
-        [S "file"; S "../sandbox/Cargo.toml"];
-        [S "source_tree"; S "../../kernel_sdk/constants"];
-        [S "file"; S "../../kernel_sdk/constants/Cargo.toml"];
-        [S "file"; S "../../kernel_sdk/core/Cargo.toml"];
-        [S "file"; S "../../kernel_sdk/host/Cargo.toml"];
-        [S "file"; S "../../kernel_sdk/encoding/Cargo.toml"];
-        extra_dep;
-      ];
-      [S "enabled_if"; enable_if];
-      [
-        S "action";
-        [
-          S "no-infer";
-          [
-            S "progn";
-            of_atom_list
-              ["run"; "cargo"; "build"; "--release"; "-p"; "octez-risc-v-pvm"];
-            transform archive_output_file archive_file;
-          ];
-        ];
-      ];
-    ]
-  in
-  let rust_foreign_library_darwin =
-    let open Dune in
-    make_rust_foreign_library_rule (* Make sure armerge is built beforehand *)
-      ~extra_dep:(of_atom_list ["file"; "helpers/bin/armerge"])
-      ~enable_if:(of_atom_list ["="; "%{system}"; "macosx"])
-      ~transform:(fun input output ->
-        (* We use armerge to keep only the essential symbols. This resolves
-           issues on Mac where the linker can't resolve duplicate symbols
-           when the resulting static library is linked with other static
-           Rust libraries. *)
-        of_atom_list
-          [
-            "run";
-            "helpers/bin/armerge";
-            "--keep-symbols=^_?octez_";
-            input;
-            "--output";
-            output;
-          ])
-      ()
-  in
-  let rust_foreign_library =
-    let open Dune in
-    make_rust_foreign_library_rule
-      ~enable_if:(of_atom_list ["<>"; "%{system}"; "macosx"])
-      ~transform:(fun input output -> of_atom_list ["copy"; input; output])
-      ()
-  in
-  public_lib
-    "octez-risc-v-pvm"
-    ~path:"src/risc_v/pvm"
-    ~synopsis:"Bindings for RISC-V interpreter"
-    ~deps:[octez_layer2_store]
-    ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
-    ~foreign_archives:[base_name]
-    ~dune:Dune.[armerge; rust_foreign_library; rust_foreign_library_darwin]
-
-let _octez_risc_v_pvm_test =
-  tezt
-    ["test_main"]
-    ~path:"src/risc_v/pvm/test"
-    ~opam:"octez-risc-v-pvm-test"
-    ~synopsis:"Tests for RISC-V interpreter bindings"
-    ~deps:[alcotezt; octez_risc_v_pvm]
 
 let octez_node_config =
   public_lib

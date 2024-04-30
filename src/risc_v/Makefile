@@ -21,9 +21,9 @@ build: risc-v-dummy.elf risc-v-sandbox
 # Use this target when building in docker images with no Ocaml.
 # The PVM requires both Ocaml and Rust to build, so it won't build with the
 # Rust only toolchain docker images.
-.PHONY: build-exclude-pvm
-build-exclude-pvm: risc-v-dummy.elf risc-v-sandbox
-	@cargo build --release --exclude octez-risc-v-pvm --workspace $(NATIVE_OPT)
+.PHONY: build-exclude-ocaml-api
+build-exclude-ocaml-api: risc-v-dummy.elf risc-v-sandbox
+	@cargo build --release --exclude octez-risc-v-api --workspace $(NATIVE_OPT)
 	@make -C jstz build
 	@make -C tests build
 
@@ -54,9 +54,9 @@ test: build
 	@make -C dummy_kernel test
 	@make -C jstz test
 
-.PHONY: test-exclude-pvm
-test-no-pvm: build-exclude-pvm
-	@cargo test --exclude octez-risc-v-pvm --workspace
+.PHONY: test-exclude-ocaml-api
+test-no-pvm: build-exclude-ocaml-api
+	@cargo test --exclude octez-risc-v-api --workspace
 	@make -C dummy_kernel test
 	@make -C jstz test
 
@@ -73,11 +73,11 @@ check:
 	# Check format of all crates
 	@exec ../../scripts/check-format-rust.sh
 
-.PHONY: check-exclude-pvm
-check-exclude-pvm:
+.PHONY: check-exclude-ocaml-api
+check-exclude-ocaml-api:
 	@cargo update --workspace --locked
-	@cargo check --exclude octez-risc-v-pvm --workspace --all-targets
-	@cargo clippy --exclude octez-risc-v-pvm --workspace --all-targets -- --deny warnings
+	@cargo check --exclude octez-risc-v-api --workspace --all-targets
+	@cargo clippy --exclude octez-risc-v-api --workspace --all-targets -- --deny warnings
 	@taplo format --check $(shell git ls-files '**/Cargo.toml')
 	@make -C dummy_kernel check
 	@make -C jstz check
