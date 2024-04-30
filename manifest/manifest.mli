@@ -1215,6 +1215,11 @@ end
     product name passed as a functor parameter is used for all the made targets. *)
 module Product (M : sig
   val name : string
+
+  (** The list of the files and folders corresponding to the source of the product.
+
+      The meaning and the content of [source] is product-dependent. *)
+  val source : string list
 end) : sig
   (** Register and return an internal public library.
 

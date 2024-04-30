@@ -2553,6 +2553,8 @@ end
 
 module Product (M : sig
   val name : string
+
+  val source : string list
 end) =
 struct
   let public_lib = Target.public_lib ~product:M.name
