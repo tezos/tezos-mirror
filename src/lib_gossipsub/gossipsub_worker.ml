@@ -311,7 +311,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         if has_joined then emit_app_output state message_with_header ;
         state
     | state, GS.Already_received | state, GS.Not_subscribed -> state
-    | state, GS.Unknown_validity ->
+    | state, (GS.Unknown_validity | GS.Outdated) ->
         Introspection.update_count_recv_unknown_validity_app_messages
           state.stats
           `Incr ;

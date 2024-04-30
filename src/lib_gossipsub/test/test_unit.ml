@@ -599,7 +599,8 @@ let test_receiving_message rng limits parameters =
   in
   let peers_to_route =
     match output with
-    | Already_received | Not_subscribed | Invalid_message | Unknown_validity ->
+    | Already_received | Not_subscribed | Invalid_message | Unknown_validity
+    | Outdated ->
         Test.fail ~__LOC__ "Handling of received message should succeed."
     | Route_message {to_route} -> to_route
   in
@@ -649,7 +650,8 @@ let test_receiving_message_for_unsusbcribed_topic rng limits parameters =
     GS.handle_receive_message {sender; topic; message_id; message} state
   in
   match output with
-  | Already_received | Route_message _ | Invalid_message | Unknown_validity ->
+  | Already_received | Route_message _ | Invalid_message | Unknown_validity
+  | Outdated ->
       Test.fail
         ~__LOC__
         "Handling of received message should fail with [Not_subscribed]."

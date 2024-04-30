@@ -124,6 +124,7 @@ module Make (C : AUTOMATON_CONFIG) :
     | Not_subscribed : [`Receive_message] output
     | Invalid_message : [`Receive_message] output
     | Unknown_validity : [`Receive_message] output
+    | Outdated : [`Receive_message] output
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_joined : [`Leave] output
@@ -2367,6 +2368,7 @@ module Make (C : AUTOMATON_CONFIG) :
           to_publish
     | Already_published -> fprintf fmtr "Already_published"
     | Invalid_message -> fprintf fmtr "Invalid_message"
+    | Outdated -> fprintf fmtr "Outdated_message"
     | Unknown_validity -> fprintf fmtr "Unknown_validity"
     | Route_message {to_route} ->
         fprintf

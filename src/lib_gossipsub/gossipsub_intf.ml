@@ -696,8 +696,10 @@ module type AUTOMATON = sig
         (** Received a message from a remote peer for a topic we are not
             subscribed to (called "unknown topic" in the Go implementation). *)
     | Invalid_message : [`Receive_message] output
-    | Unknown_validity : [`Receive_message] output
         (** Attempting to publish a message that is invalid. *)
+    | Unknown_validity : [`Receive_message] output
+        (** Validity cannot be decided yet. *)
+    | Outdated : [`Receive_message] output  (** The message is outdated. *)
     | Already_joined : [`Join] output
         (** Attempting to join a topic we already joined. *)
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
