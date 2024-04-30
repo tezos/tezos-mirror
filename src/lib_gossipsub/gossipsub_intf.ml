@@ -1229,6 +1229,8 @@ module type WORKER = sig
           (** Count received app messages that are known to be invalid. *)
       mutable count_recv_unknown_validity_app_messages : int64;
           (** Count received app messages we won't validate. *)
+      mutable count_recv_outdated_app_messages : int64;
+          (** Count received app messages that are outdated. *)
       mutable count_recv_grafts : int64;
           (** Count successfully received & processed grafts. *)
       mutable count_recv_prunes : int64;
