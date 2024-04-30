@@ -535,6 +535,8 @@ module type AUTOMATON = sig
 
     (** Computes the topic of the given message id. *)
     val get_topic : t -> Topic.t
+
+    val valid : t -> [`Valid | `Unknown | `Outdated | `Invalid]
   end
 
   (** Module for message *)
