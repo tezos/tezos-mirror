@@ -77,7 +77,7 @@ val add_slot :
   Store.t ->
   Cryptobox.slot ->
   Cryptobox.t ->
-  (Cryptobox.commitment, Errors.other) result Lwt.t
+  (Cryptobox.commitment, [> Errors.other]) result Lwt.t
 
 (** [get_slot_content node_store cryptobox slot_id] returns the slot
     content associated with the given [slot_id] in [node_store].

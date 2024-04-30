@@ -86,7 +86,7 @@ module Slots_handlers = struct
     | Error (`Slot_wrong_size msg) ->
         (* Storage consistency ensures we can always compute the
            polynomial from the slot. But let's returne an errror to be defensive. *)
-        tzfail (Cryptobox_error ("polynomial_from_slot", msg))
+        Error (Errors.other [Cryptobox_error ("polynomial_from_slot", msg)])
     | Ok polynomial -> (
         match Cryptobox.prove_commitment cryptobox polynomial with
         (* [polynomial] was produced with the parameters from
@@ -95,32 +95,29 @@ module Slots_handlers = struct
         | Error
             ( `Invalid_degree_strictly_less_than_expected _
             | `Prover_SRS_not_loaded ) ->
-            tzfail
-              (Cryptobox_error
-                 ( "prove_commitment",
-                   "Unexpected error. Maybe an issue with the SRS from the DAL \
-                    node." ))
+            Error
+              (Errors.other
+                 [
+                   Cryptobox_error
+                     ( "prove_commitment",
+                       "Unexpected error. Maybe an issue with the SRS from the \
+                        DAL node." );
+                 ])
         | Ok proof -> return proof)
 
   let get_slot_page_proof ctxt slot_level slot_index page_index () () =
     call_handler2 ctxt (fun store {cryptobox; _} ->
-        let open Lwt_result_syntax in
+        (let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
+        let* content = Slot_manager.get_slot_content store cryptobox slot_id in
         let*! proof =
-          let* content =
-            Slot_manager.get_slot_content store cryptobox slot_id
-          in
           let*? polynomial = Cryptobox.polynomial_from_slot cryptobox content in
           let*? proof = Cryptobox.prove_page cryptobox polynomial page_index in
           return proof
         in
         match proof with
-        | (Ok _ | Error (`Not_found | `Other _)) as proof ->
-            Lwt.return proof |> Errors.to_option_tzresult
-        | Error
-            (( `Fail _ | `Page_index_out_of_range | `Slot_wrong_size _
-             | `Invalid_degree_strictly_less_than_expected _
-             | `Prover_SRS_not_loaded ) as e) ->
+        | Ok proof -> return proof
+        | Error e ->
             let msg =
               match e with
               | `Fail s -> "Fail " ^ s
@@ -130,40 +127,39 @@ module Slots_handlers = struct
                 | `Prover_SRS_not_loaded ) as commit_error ->
                   Cryptobox.string_of_commit_error commit_error
             in
-            tzfail (Cryptobox_error ("get_slot_page_proof", msg)))
+            fail (Errors.other [Cryptobox_error ("get_slot_page_proof", msg)]))
+        |> Errors.to_option_tzresult)
 
   let post_slot ctxt query slot =
     call_handler2
       ctxt
       (fun store {cryptobox; shards_proofs_precomputation; proto_parameters; _}
       ->
-        let open Lwt_result_syntax in
+        (let open Lwt_result_syntax in
         let slot_size = proto_parameters.cryptobox_parameters.slot_size in
         let slot_length = String.length slot in
         let*? slot =
           if slot_length > slot_size then
-            Result_syntax.tzfail
-              (Post_slot_too_large {expected = slot_size; got = slot_length})
+            Error
+              (Errors.other
+                 [Post_slot_too_large {expected = slot_size; got = slot_length}])
           else if slot_length = slot_size then Ok (Bytes.of_string slot)
           else
             let padding = String.make (slot_size - slot_length) query#padding in
             Ok (Bytes.of_string (slot ^ padding))
         in
-        let* commitment =
-          Slot_manager.add_slot store slot cryptobox |> Errors.to_tzresult
-        in
+        let* commitment = Slot_manager.add_slot store slot cryptobox in
         let*? commitment_proof = commitment_proof_from_slot cryptobox slot in
-        (* Cannot return None *)
-        let* (_ : unit option) =
+        let* () =
           Slot_manager.add_commitment_shards
             ~shards_proofs_precomputation
             store
             cryptobox
             commitment
             ~with_proof:true
-          |> Errors.to_option_tzresult
         in
         return (commitment, commitment_proof))
+        |> Errors.to_option_tzresult)
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
@@ -349,7 +345,7 @@ let register :
  fun ctxt directory ->
   directory
   |> add_service
-       Tezos_rpc.Directory.register0
+       Tezos_rpc.Directory.opt_register0
        Services.post_slot
        (Slots_handlers.post_slot ctxt)
   |> add_service
