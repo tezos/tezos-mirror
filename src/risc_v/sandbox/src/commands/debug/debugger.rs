@@ -28,8 +28,8 @@ use risc_v_interpreter::{
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-mod errors;
-mod tui;
+use super::{errors, tui};
+
 mod updates;
 
 const GREEN: Color = tailwind::GREEN.c400;
@@ -41,12 +41,12 @@ const GRAY: Color = tailwind::GRAY.c500;
 const SELECTED_STYLE_FG: Color = BLUE;
 const NEXT_STYLE_FG: Color = GREEN;
 const MAX_STEPS: usize = 1_000_000;
-const PC_CONTEXT: u64 = 12;
+pub const PC_CONTEXT: u64 = 12;
 
 #[derive(Debug, Clone)]
-struct Instruction {
+pub struct Instruction {
     address: u64,
-    text: String,
+    pub text: String,
     jump: Option<(u64, Option<String>)>,
 }
 
@@ -828,7 +828,7 @@ impl<'a> ProgramView<'a> {
         self.state.select(Some(self.instructions.len() - 1));
     }
 
-    fn partial_update(&mut self, mut new_instructions: Vec<Instruction>) {
+    pub fn partial_update(&mut self, mut new_instructions: Vec<Instruction>) {
         // Update / Insert new_instructions to existing instructions.
         self.instructions.retain(|i| {
             new_instructions

@@ -3,14 +3,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::{error::Error, path::Path};
-
-use cli::{DebugOptions, ExitMode};
+use cli::ExitMode;
 use risc_v_interpreter::{machine_state::mode::Mode, traps::EnvironException, InterpreterResult};
+use std::error::Error;
 
 mod cli;
 mod commands;
-mod debugger;
 mod inbox;
 
 fn format_status(result: &InterpreterResult) -> String {
@@ -28,21 +26,6 @@ fn exception_to_error(exc: &EnvironException) -> Box<dyn Error> {
     format!("{:?}", exc).into()
 }
 
-fn debug(opts: DebugOptions) -> Result<(), Box<dyn Error>> {
-    let path = Path::new(&opts.common.input);
-    let fname = path
-        .file_name()
-        .ok_or("Invalid program path")?
-        .to_str()
-        .ok_or("File name cannot be converted to string")?;
-    let contents = std::fs::read(path)?;
-    Ok(debugger::DebuggerApp::launch(
-        fname,
-        &contents,
-        posix_exit_mode(&opts.common.posix_exit_mode),
-    )?)
-}
-
 fn posix_exit_mode(exit_mode: &ExitMode) -> Mode {
     match exit_mode {
         ExitMode::User => Mode::User,
@@ -56,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match cli.command {
         cli::Mode::Rvemu(opts) => commands::rvemu::rvemu(opts),
         cli::Mode::Run(opts) => commands::run::run(opts),
-        cli::Mode::Debug(opts) => debug(opts),
+        cli::Mode::Debug(opts) => commands::debug::debug(opts),
         cli::Mode::Bench(opts) => commands::bench::bench(opts),
     }
 }

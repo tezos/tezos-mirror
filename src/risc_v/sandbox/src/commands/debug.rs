@@ -1,0 +1,21 @@
+use crate::{cli::DebugOptions, posix_exit_mode};
+use std::{error::Error, path::Path};
+
+mod debugger;
+mod errors;
+mod tui;
+
+pub fn debug(opts: DebugOptions) -> Result<(), Box<dyn Error>> {
+    let path = Path::new(&opts.common.input);
+    let fname = path
+        .file_name()
+        .ok_or("Invalid program path")?
+        .to_str()
+        .ok_or("File name cannot be converted to string")?;
+    let contents = std::fs::read(path)?;
+    Ok(debugger::DebuggerApp::launch(
+        fname,
+        &contents,
+        posix_exit_mode(&opts.common.posix_exit_mode),
+    )?)
+}

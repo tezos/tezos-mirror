@@ -3,8 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::{DebuggerApp, PC_CONTEXT};
-use crate::debugger::Instruction;
+use super::{DebuggerApp, Instruction, PC_CONTEXT};
 use risc_v_interpreter::{
     machine_state::{bus::Address, csregisters::CSRegister, AccessType},
     parser::{instruction::Instr, parse},

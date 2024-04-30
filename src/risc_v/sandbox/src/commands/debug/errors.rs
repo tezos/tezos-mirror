@@ -1,9 +1,10 @@
 // Ratatui boilerplate
 // https://github.com/ratatui-org/ratatui-website/blob/main/code/counter-app-error-handling/src/errors.rs
 
-use crate::debugger::tui;
 use color_eyre::{config::HookBuilder, eyre};
 use std::panic;
+
+use super::tui;
 
 /// This replaces the standard color_eyre panic and error hooks with hooks that
 /// restore the terminal before printing the panic or error.
