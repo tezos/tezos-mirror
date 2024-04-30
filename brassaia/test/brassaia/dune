@@ -8,13 +8,13 @@
   tezt.core
   octez-libs.base
   octez-libs.base.unix
-  octez-internal-libs.brassaia_test_helpers
-  octez-internal-libs.brassaia.mem
+  octez-libs.brassaia_test_helpers
+  octez-libs.brassaia.mem
   octez-alcotezt
   octez-libs.stdlib-unix
   octez-libs.test-helpers
   tezt)
- (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
+ (preprocess (pps octez-libs.ppx_brassaia.internal))
  (library_flags (:standard -linkall))
  (flags
   (:standard)

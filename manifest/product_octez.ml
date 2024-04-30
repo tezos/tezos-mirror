@@ -1610,25 +1610,11 @@ let ppx_irmin =
     ~deps:[ppx_repr_lib]
     ~ppx_kind:Ppx_deriver
 
-let ppx_brassaia =
-  octez_internal_lib
-    "ppx_brassaia"
-    ~path:"brassaia/lib_ppx_brassaia"
-    ~deps:[ppx_repr_lib]
-    ~ppx_kind:Ppx_deriver
-
 let ppx_irmin_internal_lib =
   octez_internal_lib
     "ppx_irmin.internal_lib"
     ~path:"irmin/lib_ppx_irmin/internal"
     ~modules:["ppx_irmin_internal_lib"]
-    ~deps:[logs]
-
-let ppx_brassaia_internal_lib =
-  octez_internal_lib
-    "ppx_brassaia.internal_lib"
-    ~path:"brassaia/lib_ppx_brassaia/internal"
-    ~modules:["ppx_brassaia_internal_lib"]
     ~deps:[logs]
 
 let ppx_irmin_internal =
@@ -1641,26 +1627,10 @@ let ppx_irmin_internal =
     ~ppx_runtime_libraries:[logs; ppx_irmin_internal_lib]
     ~preprocess:[pps ppxlib_metaquot]
 
-let ppx_brassaia_internal =
-  octez_internal_lib
-    "ppx_brassaia.internal"
-    ~path:"brassaia/lib_ppx_brassaia/internal"
-    ~modules:["ppx_brassaia_internal"]
-    ~deps:[ppxlib; ppx_brassaia_internal_lib; ppx_brassaia]
-    ~ppx_kind:Ppx_rewriter
-    ~ppx_runtime_libraries:[logs; ppx_brassaia_internal_lib]
-    ~preprocess:[pps ppxlib_metaquot]
-
 let irmin_data =
   octez_internal_lib
     "irmin.data"
     ~path:"irmin/lib_irmin/data"
-    ~deps:[bigstringaf; fmt]
-
-let brassaia_data =
-  octez_internal_lib
-    "brassaia.data"
-    ~path:"brassaia/lib_brassaia/data"
     ~deps:[bigstringaf; fmt]
 
 let irmin =
@@ -1686,43 +1656,12 @@ let irmin =
       ]
     ~preprocess:[pps ~args:["--"; "--lib"; "Type"] ppx_irmin_internal]
 
-let brassaia =
-  octez_internal_lib
-    "brassaia"
-    ~path:"brassaia/lib_brassaia"
-    ~deps:
-      [
-        brassaia_data;
-        astring;
-        bheap;
-        digestif;
-        fmt;
-        jsonm;
-        logs;
-        logs_fmt;
-        lwt;
-        mtime;
-        ocamlgraph;
-        uri;
-        uutf;
-        re_export repr;
-      ]
-    ~preprocess:[pps ~args:["--"; "--lib"; "Type"] ppx_brassaia_internal]
-
 let irmin_mem =
   octez_internal_lib
     "irmin.mem"
     ~path:"irmin/lib_irmin/mem"
     ~deps:[irmin; logs; lwt]
     ~preprocess:[pps ppx_irmin_internal]
-    ~flags:(Flags.standard ~disable_warnings:[68] ())
-
-let brassaia_mem =
-  octez_internal_lib
-    "brassaia.mem"
-    ~path:"brassaia/lib_brassaia/mem"
-    ~deps:[brassaia; logs; lwt]
-    ~preprocess:[pps ppx_brassaia_internal]
     ~flags:(Flags.standard ~disable_warnings:[68] ())
 
 let irmin_pack =
@@ -1733,27 +1672,12 @@ let irmin_pack =
     ~preprocess:[pps ppx_irmin_internal]
     ~flags:(Flags.standard ~disable_warnings:[66] ())
 
-let brassaia_pack =
-  octez_internal_lib
-    "brassaia_pack"
-    ~path:"brassaia/lib_brassaia_pack"
-    ~deps:[fmt; brassaia; brassaia_data; logs; lwt; optint]
-    ~preprocess:[pps ppx_brassaia_internal]
-    ~flags:(Flags.standard ~disable_warnings:[66] ())
-
 let irmin_pack_mem =
   octez_internal_lib
     "irmin_pack.mem"
     ~path:"irmin/lib_irmin_pack/mem"
     ~deps:[irmin_pack; irmin_mem]
     ~preprocess:[pps ppx_irmin_internal]
-
-let brassaia_pack_mem =
-  octez_internal_lib
-    "brassaia_pack.mem"
-    ~path:"brassaia/lib_brassaia_pack/mem"
-    ~deps:[brassaia_pack; brassaia_mem; brassaia]
-    ~preprocess:[pps ppx_brassaia_internal]
 
 let irmin_pack_unix =
   octez_internal_lib
@@ -1779,43 +1703,12 @@ let irmin_pack_unix =
     ~preprocess:[pps ppx_irmin_internal]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
-let brassaia_pack_unix =
-  octez_internal_lib
-    "brassaia_pack.unix"
-    ~path:"brassaia/lib_brassaia_pack/unix"
-    ~deps:
-      [
-        fmt;
-        index;
-        index_unix;
-        brassaia;
-        brassaia_pack;
-        logs;
-        lwt;
-        lwt_unix;
-        mtime;
-        cmdliner;
-        optint;
-        checkseum;
-        checkseum_ocaml;
-        rusage;
-      ]
-    ~preprocess:[pps ppx_brassaia_internal]
-    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
-
 let irmin_tezos =
   octez_internal_lib
     "irmin_tezos"
     ~path:"irmin/lib_irmin_tezos"
     ~deps:[fmt; zarith; digestif; irmin; irmin_pack; irmin_pack_unix]
     ~preprocess:[pps ppx_irmin_internal]
-
-let brassaia_tezos =
-  octez_internal_lib
-    "brassaia_tezos"
-    ~path:"brassaia/lib_brassaia_tezos"
-    ~deps:[fmt; zarith; digestif; brassaia; brassaia_pack; brassaia_pack_unix]
-    ~preprocess:[pps ppx_brassaia_internal]
 
 let irmin_test_helpers =
   octez_internal_lib
@@ -1824,17 +1717,6 @@ let irmin_test_helpers =
     ~deps:
       [alcotezt; astring; fmt; irmin; jsonm; logs; lwt; mtime; mtime_clock_os]
     ~preprocess:[pps ppx_irmin_internal]
-    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
-
-let brassaia_test_helpers =
-  octez_internal_lib
-    "brassaia_test_helpers"
-    ~path:"brassaia/test/helpers"
-    ~deps:
-      [
-        alcotezt; astring; fmt; brassaia; jsonm; logs; lwt; mtime; mtime_clock_os;
-      ]
-    ~preprocess:[pps ppx_brassaia_internal]
     ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let octez_clic =
@@ -2051,6 +1933,124 @@ let octez_base_test_helpers =
     ~linkall:true
     ~bisect_ppx:No
     ~release_status:Released
+
+let ppx_brassaia =
+  octez_lib
+    "ppx_brassaia"
+    ~path:"brassaia/lib_ppx_brassaia"
+    ~deps:[ppx_repr_lib]
+    ~ppx_kind:Ppx_deriver
+
+let ppx_brassaia_internal_lib =
+  octez_lib
+    "ppx_brassaia.internal_lib"
+    ~path:"brassaia/lib_ppx_brassaia/internal"
+    ~modules:["ppx_brassaia_internal_lib"]
+    ~deps:[logs]
+
+let ppx_brassaia_internal =
+  octez_lib
+    "ppx_brassaia.internal"
+    ~path:"brassaia/lib_ppx_brassaia/internal"
+    ~modules:["ppx_brassaia_internal"]
+    ~deps:[ppxlib; ppx_brassaia_internal_lib; ppx_brassaia]
+    ~ppx_kind:Ppx_rewriter
+    ~ppx_runtime_libraries:[logs; ppx_brassaia_internal_lib]
+    ~preprocess:[pps ppxlib_metaquot]
+
+let brassaia_data =
+  octez_lib
+    "brassaia.data"
+    ~path:"brassaia/lib_brassaia/data"
+    ~deps:[bigstringaf; fmt]
+
+let brassaia =
+  octez_lib
+    "brassaia"
+    ~path:"brassaia/lib_brassaia"
+    ~deps:
+      [
+        brassaia_data;
+        astring;
+        bheap;
+        digestif;
+        fmt;
+        jsonm;
+        logs;
+        logs_fmt;
+        lwt;
+        mtime;
+        ocamlgraph;
+        uri;
+        uutf;
+        re_export repr;
+      ]
+    ~preprocess:[pps ~args:["--"; "--lib"; "Type"] ppx_brassaia_internal]
+
+let brassaia_mem =
+  octez_lib
+    "brassaia.mem"
+    ~path:"brassaia/lib_brassaia/mem"
+    ~deps:[brassaia; logs; lwt]
+    ~preprocess:[pps ppx_brassaia_internal]
+    ~flags:(Flags.standard ~disable_warnings:[68] ())
+
+let brassaia_pack =
+  octez_lib
+    "brassaia_pack"
+    ~path:"brassaia/lib_brassaia_pack"
+    ~deps:[fmt; brassaia; brassaia_data; logs; lwt; optint]
+    ~preprocess:[pps ppx_brassaia_internal]
+    ~flags:(Flags.standard ~disable_warnings:[66] ())
+
+let brassaia_pack_mem =
+  octez_lib
+    "brassaia_pack.mem"
+    ~path:"brassaia/lib_brassaia_pack/mem"
+    ~deps:[brassaia_pack; brassaia_mem; brassaia]
+    ~preprocess:[pps ppx_brassaia_internal]
+
+let brassaia_pack_unix =
+  octez_lib
+    "brassaia_pack.unix"
+    ~path:"brassaia/lib_brassaia_pack/unix"
+    ~deps:
+      [
+        fmt;
+        index;
+        index_unix;
+        brassaia;
+        brassaia_pack;
+        logs;
+        lwt;
+        lwt_unix;
+        mtime;
+        cmdliner;
+        optint;
+        checkseum;
+        checkseum_ocaml;
+        rusage;
+      ]
+    ~preprocess:[pps ppx_brassaia_internal]
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+
+let brassaia_tezos =
+  octez_lib
+    "brassaia_tezos"
+    ~path:"brassaia/lib_brassaia_tezos"
+    ~deps:[fmt; zarith; digestif; brassaia; brassaia_pack; brassaia_pack_unix]
+    ~preprocess:[pps ppx_brassaia_internal]
+
+let brassaia_test_helpers =
+  octez_lib
+    "brassaia_test_helpers"
+    ~path:"brassaia/test/helpers"
+    ~deps:
+      [
+        alcotezt; astring; fmt; brassaia; jsonm; logs; lwt; mtime; mtime_clock_os;
+      ]
+    ~preprocess:[pps ppx_brassaia_internal]
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
 
 let octez_context_sigs =
   octez_lib

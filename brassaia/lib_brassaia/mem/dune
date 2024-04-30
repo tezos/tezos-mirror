@@ -3,13 +3,13 @@
 
 (library
  (name brassaia_mem)
- (public_name octez-internal-libs.brassaia.mem)
+ (public_name octez-libs.brassaia.mem)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-internal-libs.brassaia
+  octez-libs.brassaia
   logs
   lwt)
- (preprocess (pps octez-internal-libs.ppx_brassaia.internal))
+ (preprocess (pps octez-libs.ppx_brassaia.internal))
  (flags
   (:standard)
   -w -68))

@@ -3,10 +3,10 @@
 
 (library
  (name brassaia)
- (public_name octez-internal-libs.brassaia)
+ (public_name octez-libs.brassaia)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-internal-libs.brassaia.data
+  octez-libs.brassaia.data
   astring
   bheap
   digestif
@@ -20,4 +20,4 @@
   uri
   uutf
   (re_export repr))
- (preprocess (pps octez-internal-libs.ppx_brassaia.internal -- --lib Type)))
+ (preprocess (pps octez-libs.ppx_brassaia.internal -- --lib Type)))

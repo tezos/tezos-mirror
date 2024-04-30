@@ -3,7 +3,7 @@
 
 (library
  (name brassaia_data)
- (public_name octez-internal-libs.brassaia.data)
+ (public_name octez-libs.brassaia.data)
  (instrumentation (backend bisect_ppx))
  (libraries
   bigstringaf
