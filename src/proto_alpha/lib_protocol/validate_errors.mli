@@ -183,8 +183,15 @@ module Manager : sig
         source : Signature.Public_key_hash.t;
         conflict : operation_conflict;
       }
-    | Inconsistent_sources
-    | Inconsistent_counters
+    | Inconsistent_sources of {
+        fee_payer : public_key_hash;
+        source : public_key_hash;
+      }
+    | Inconsistent_counters of {
+        source : public_key_hash;
+        previous_counter : Manager_counter.t;
+        counter : Manager_counter.t;
+      }
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize

@@ -1674,6 +1674,8 @@ module Manager_counter : sig
 
   val encoding_for_RPCs : t Data_encoding.t
 
+  val encoding_for_errors : t Data_encoding.t
+
   module Internal_for_injection : sig
     val of_string : string -> t option
   end

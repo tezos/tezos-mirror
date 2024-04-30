@@ -71,6 +71,30 @@ let proto_error_with_info ?(error_info_field = `Title) ~loc v
       let info = info err in
       String.equal info expected_error_info)
 
+let as_proto_error = function
+  | Environment.Ecoproto_error err -> Ok err
+  | err -> Error err
+
+(** Similar to {!proto_error}, except that [errs] is directly an error
+    trace instead of a [tzresult].
+
+    [expect_error ~loc errs] has the right type to be used as the
+    [expect_failure] or [expect_apply_failure] argument of
+    {!Incremental.add_operation}. *)
+let expect_error ~loc errs f =
+  let open Lwt_result_syntax in
+  let proto_errs = List.map_e as_proto_error errs in
+  match proto_errs with
+  | Ok proto_errs when f proto_errs ->
+      List.iter test_error_encodings proto_errs ;
+      return_unit
+  | Ok _ | Error _ ->
+      failwith
+        "%s: expected a specific error, but instead got:@, %a"
+        loc
+        Error_monad.pp_print_trace
+        errs
+
 let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
   let open Lwt_result_syntax in
   if not (cmp a b) then

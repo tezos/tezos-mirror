@@ -1092,8 +1092,15 @@ module Manager = struct
         source : Signature.Public_key_hash.t;
         conflict : operation_conflict;
       }
-    | Inconsistent_sources
-    | Inconsistent_counters
+    | Inconsistent_sources of {
+        fee_payer : public_key_hash;
+        source : public_key_hash;
+      }
+    | Inconsistent_counters of {
+        source : public_key_hash;
+        previous_counter : Manager_counter.t;
+        counter : Manager_counter.t;
+      }
     | Incorrect_reveal_position
     | Insufficient_gas_for_manager
     | Gas_quota_exceeded_init_deserialize
@@ -1132,33 +1139,58 @@ module Manager = struct
         | Manager_restriction {source; conflict} -> Some (source, conflict)
         | _ -> None)
       (fun (source, conflict) -> Manager_restriction {source; conflict}) ;
-    let inconsistent_sources_description =
-      "The operation batch includes operations from different sources."
-    in
     register_error_kind
       `Permanent
       ~id:"validate.operation.inconsistent_sources"
       ~title:"Inconsistent sources in operation batch"
-      ~description:inconsistent_sources_description
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "%s" inconsistent_sources_description)
-      Data_encoding.empty
-      (function Inconsistent_sources -> Some () | _ -> None)
-      (fun () -> Inconsistent_sources) ;
-    let inconsistent_counters_description =
-      "Inconsistent counters in operation. Counters of an operation must be \
-       successive."
-    in
+      ~description:
+        "Unexpected source encountered in a non-guest operation of a batch."
+      ~pp:(fun ppf (first_source, source) ->
+        Format.fprintf
+          ppf
+          "Unexpected source encountered in a non-guest operation. Expected %a \
+           (the source of the very first operation in the batch, who is the \
+           fee payer, a.k.a. the sponsor), but got %a."
+          Signature.Public_key_hash.pp
+          first_source
+          Signature.Public_key_hash.pp
+          source)
+      Data_encoding.(
+        obj2
+          (req "first_source" Signature.Public_key_hash.encoding)
+          (req "unexpected_source" Signature.Public_key_hash.encoding))
+      (function
+        | Inconsistent_sources {fee_payer; source} -> Some (fee_payer, source)
+        | _ -> None)
+      (fun (fee_payer, source) -> Inconsistent_sources {fee_payer; source}) ;
     register_error_kind
       `Permanent
       ~id:"validate.operation.inconsistent_counters"
       ~title:"Inconsistent counters in operation"
-      ~description:inconsistent_counters_description
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "%s" inconsistent_counters_description)
-      Data_encoding.empty
-      (function Inconsistent_counters -> Some () | _ -> None)
-      (fun () -> Inconsistent_counters) ;
+      ~description:
+        "Inconsistent counters in operation batch. Counters for the same \
+         source must be consecutive."
+      ~pp:(fun ppf (source, previous_counter, counter) ->
+        Format.fprintf
+          ppf
+          "Non-consecutive counters for source %a: jumped from %a to %a."
+          Signature.Public_key_hash.pp
+          source
+          Manager_counter.pp
+          previous_counter
+          Manager_counter.pp
+          counter)
+      Data_encoding.(
+        obj3
+          (req "source" Signature.Public_key_hash.encoding)
+          (req "previous_counter" Manager_counter.encoding_for_errors)
+          (req "wrong_counter" Manager_counter.encoding_for_errors))
+      (function
+        | Inconsistent_counters {source; previous_counter; counter} ->
+            Some (source, previous_counter, counter)
+        | _ -> None)
+      (fun (source, previous_counter, counter) ->
+        Inconsistent_counters {source; previous_counter; counter}) ;
     let incorrect_reveal_description =
       "Incorrect reveal operation position in batch: only allowed in first \
        position."

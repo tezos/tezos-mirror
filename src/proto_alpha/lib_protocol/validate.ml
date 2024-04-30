@@ -1840,15 +1840,15 @@ module Manager = struct
       (fun fee_payer ->
         error_unless
           (Signature.Public_key_hash.equal source fee_payer)
-          Inconsistent_sources)
+          (Inconsistent_sources {fee_payer; source}))
       fee_payer
 
-  let check_counter ~previous_counter ~counter =
+  let check_counter ~previous_counter ~counter ~source =
     Option.iter_e
       (fun previous_counter ->
         error_unless
           Manager_counter.(succ previous_counter = counter)
-          Inconsistent_counters)
+          (Inconsistent_counters {source; previous_counter; counter}))
       previous_counter
 
   (** Used in [check_consistency] below. *)
@@ -1975,7 +1975,10 @@ module Manager = struct
       | Host {guest; guest_signature = _} ->
           let* () = check_source_is_fee_payer ~fee_payer ~source in
           let* () =
-            check_counter ~previous_counter:fee_payer_previous_counter ~counter
+            check_counter
+              ~previous_counter:fee_payer_previous_counter
+              ~counter
+              ~source
           in
           let* () =
             error_when
@@ -2006,6 +2009,7 @@ module Manager = struct
                 check_counter
                   ~previous_counter:fee_payer_previous_counter
                   ~counter
+                  ~source
               in
               let* () =
                 match operation with
@@ -2046,6 +2050,7 @@ module Manager = struct
                 check_counter
                   ~previous_counter:current_guest_previous_counter
                   ~counter
+                  ~source
               in
               let* () =
                 match operation with

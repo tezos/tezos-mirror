@@ -13,7 +13,9 @@ open Alpha_context
     Component:    Host operation
     Invocation:   dune exec src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
                    -- --file test_host_operation.ml
-    Subject:      Test the host manager operation.
+
+    Subject:      Test the host manager operation, which allows a manager
+                  operation batch to contain multiple sources.
 *)
 
 (** Injects a standalone [Host] operation (with no guest operations):

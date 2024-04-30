@@ -11,6 +11,9 @@
     Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
                   -- --file test_validation_batch.ml
     Subject:    Validation of batched manager operation.
+
+                There may be overlap with
+                [lib_protocol/test/integration/operations/test_combined_operations.ml].
 *)
 
 open Protocol
@@ -148,22 +151,6 @@ let batch_two_reveals infos kind =
   in
   batch_two_reveals_diagnostic infos [batch]
 
-(** Every manager operation in a batch concerns the same source.*)
-let batch_two_sources_diagnostic (infos : infos) op =
-  let open Lwt_result_syntax in
-  let expect_failure errs =
-    match errs with
-    | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_sources]
-      ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
-  validate_ko_diagnostic infos op expect_failure
-
 let batch_two_sources infos kind1 kind2 =
   let open Lwt_result_syntax in
   let source = contract_of (get_source infos) in
@@ -178,10 +165,10 @@ let batch_two_sources infos kind1 kind2 =
       }
       infos
   in
+  let source2 =
+    match infos.accounts.del with None -> assert false | Some s -> s
+  in
   let infos =
-    let source2 =
-      match infos.accounts.del with None -> assert false | Some s -> s
-    in
     {infos with accounts = {infos.accounts with sources = [source2]}}
   in
   let* operation2 =
@@ -196,7 +183,13 @@ let batch_two_sources infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [operation1; operation2]
   in
-  batch_two_sources_diagnostic infos [batch]
+  let expect_failure =
+    Error_helpers.expect_inconsistent_sources
+      ~loc:__LOC__
+      ~first_source:source
+      ~source:(contract_of source2)
+  in
+  validate_ko_diagnostic infos [batch] expect_failure
 
 (** Counters in a batch should be a sequence from the successor of
    the stored counter associated to source in the initial context. *)
@@ -270,34 +263,54 @@ let batch_incons_counters infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [reveal; op1; op2]
   in
-  let expect_failure errs =
-    match errs with
-    | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_counters]
-      ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          err
-  in
   let* i = Incremental.begin_construction infos.ctxt.block in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_same
+  let test_inconsistent_counters ~__LOC__ ~before_wrong_counter ~wrong_counter
+      op =
+    let expect_failure =
+      (* Remember that [select_op] actually builds an operation
+         using the successor of the counter argument. *)
+      Error_helpers.expect_inconsistent_counters
+        ~loc:__LOC__
+        ~source
+        ~previous_counter:(Manager_counter.succ before_wrong_counter)
+        ~counter:(Manager_counter.succ wrong_counter)
+    in
+    let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
+    return_unit
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_in_the_future
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter
+      ~wrong_counter:counter
+      batch_same
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_missing_one
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter0
+      ~wrong_counter:counter2
+      batch_in_the_future
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_inverse
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter
+      ~wrong_counter:counter3
+      batch_missing_one
   in
-  let* (_ : Incremental.t) =
-    Incremental.add_operation ~expect_failure i batch_in_the_past
+  let* () =
+    test_inconsistent_counters
+      ~__LOC__
+      ~before_wrong_counter:counter0
+      ~wrong_counter:counter2
+      batch_inverse
   in
-  return_unit
+  test_inconsistent_counters
+    ~__LOC__
+    ~before_wrong_counter:counter0
+    ~wrong_counter:counter0
+    batch_in_the_past
 
 (** A batch that consumes all the balance for fees can only face the total
    consumption at the end of the batch. *)
