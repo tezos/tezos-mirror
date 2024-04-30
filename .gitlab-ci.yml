@@ -74,7 +74,6 @@ variables:
   OPAMRETRIES: "5"
   FF_USE_FASTZIP: "true"
   RUNTEZTALIAS: "false"
-  FF_KUBERNETES_HONOR_ENTRYPOINT: "false"
 
 stages:
 - trigger
