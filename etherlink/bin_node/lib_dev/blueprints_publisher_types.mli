@@ -15,7 +15,7 @@ module Request : sig
         payload : [`External of string] list;
       }
         -> (unit, error trace) t  (** Request to publish a blueprint. *)
-    | New_l2_head : {rollup_head : Z.t} -> (unit, error trace) t
+    | New_rollup_node_block : int32 -> (unit, error trace) t
 
   type view = View : _ t -> view
 

@@ -5,42 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let read_from_rollup_node ~keep_alive path level rollup_node_endpoint =
-  let open Rollup_services in
-  call_service
-    ~keep_alive
-    ~base:rollup_node_endpoint
-    durable_state_value
-    ((), Block_id.Level level)
-    {key = path}
-    ()
-
-let advertize_blueprints_publisher ~keep_alive rollup_node_endpoint
-    finalized_level =
-  let open Lwt_result_syntax in
-  let* finalized_current_number =
-    read_from_rollup_node
-      ~keep_alive
-      Durable_storage_path.Block.current_number
-      finalized_level
-      rollup_node_endpoint
-  in
-  match finalized_current_number with
-  | Some bytes ->
-      let (Qty evm_block_number) = Ethereum_types.decode_number bytes in
-      let* () = Blueprints_publisher.new_l2_head evm_block_number in
-      return_unit
-  | None -> return_unit
-
-let process_new_block ~keep_alive ~rollup_node_endpoint ~finalized_level () =
+let process_new_block ~finalized_level () =
   let open Lwt_result_syntax in
   let* () = Evm_events_follower.new_rollup_block finalized_level in
-  let* () =
-    advertize_blueprints_publisher
-      ~keep_alive
-      rollup_node_endpoint
-      finalized_level
-  in
+  let* () = Blueprints_publisher.new_rollup_block finalized_level in
   Tx_pool.pop_and_inject_transactions_lazy ()
 
 type error += Connection_lost | Connection_timeout
@@ -53,11 +21,11 @@ type error += Connection_lost | Connection_timeout
     This is necessary for the very beginning of the rollup life, when
     the evm node is started at the same moment at the origination of
     the rollup, and so `finalized_level` is < origination level. *)
-let process_finalized_level ~keep_alive ~oldest_rollup_node_known_l1_level
-    ~finalized_level ~rollup_node_endpoint () =
+let process_finalized_level ~oldest_rollup_node_known_l1_level ~finalized_level
+    () =
   let open Lwt_result_syntax in
   if oldest_rollup_node_known_l1_level <= finalized_level then
-    process_new_block ~keep_alive ~finalized_level ~rollup_node_endpoint ()
+    process_new_block ~finalized_level ()
   else return_unit
 
 let reconnection_delay = 5.0
@@ -215,9 +183,7 @@ let[@tailrec] rec loop_on_rollup_node_stream ~keep_alive ~catchup_event ~proxy
   let finalized_level = Sc_rollup_block.(Int32.(sub block.header.level 2l)) in
   let* () =
     process_finalized_level
-      ~keep_alive
       ~oldest_rollup_node_known_l1_level
-      ~rollup_node_endpoint:connection.rollup_node_endpoint
       ~finalized_level
       ()
   in

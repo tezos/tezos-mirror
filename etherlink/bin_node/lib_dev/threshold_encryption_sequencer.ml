@@ -212,6 +212,7 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
       ~rollup_node_endpoint
       ~config:threshold_encryption_sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
+      ~keep_alive
       ()
   in
   let* () =
