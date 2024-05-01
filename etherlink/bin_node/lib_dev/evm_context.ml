@@ -449,12 +449,6 @@ module State = struct
     let open Lwt_result_syntax in
     function
     | Some root_hash ->
-        let* () =
-          Evm_store.Kernel_upgrades.record_apply
-            ctxt.store
-            ctxt.session.next_blueprint_number
-        in
-
         let*! bytes =
           Evm_state.inspect evm_state Durable_storage_path.kernel_root_hash
         in
@@ -526,6 +520,13 @@ module State = struct
         let root_hash_candidate = check_pending_upgrade ctxt timestamp in
         let* applied_upgrade =
           check_upgrade ctxt evm_state root_hash_candidate
+        in
+
+        let* () =
+          when_ applied_upgrade @@ fun () ->
+          Evm_store.Kernel_upgrades.record_apply
+            ctxt.store
+            ctxt.session.next_blueprint_number
         in
 
         let* delayed_transactions =

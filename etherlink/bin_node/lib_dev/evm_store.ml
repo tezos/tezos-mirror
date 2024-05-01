@@ -234,7 +234,7 @@ module Q = struct
     let record_apply =
       (level ->. unit)
       @@ {|
-      UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before = NULL
+      UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before IS NULL
     |}
 
     let clear_after =
