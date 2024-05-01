@@ -112,6 +112,7 @@ module Dune = struct
   type foreign_stubs = {
     language : language;
     flags : s_expr;
+    include_dirs : string list;
     names : string list;
   }
 
@@ -325,6 +326,9 @@ module Dune = struct
               S "foreign_stubs";
               [S "language"; (match x.language with C -> S "c")];
               (match x.flags with [] -> E | _ -> [S "flags"; x.flags]);
+              (match x.include_dirs with
+              | [] -> E
+              | dirs -> S "include_dirs" :: of_atom_list dirs);
               S "names" :: of_atom_list x.names;
             ] );
           (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
@@ -1020,7 +1024,7 @@ module Ctypes = struct
   let to_dune desc =
     let open Dune in
     let deps =
-      match desc.deps with [] -> E | deps -> S "deps" :: of_atom_list deps
+      match desc.deps with [] -> E | deps -> Dune.of_atom_list ("deps" :: deps)
     in
     [
       S "ctypes";
@@ -1037,11 +1041,7 @@ module Ctypes = struct
                "-I" ^ desc.extra_search_dir;
              ]
             @ desc.c_flags);
-          of_atom_list
-            (["c_library_flags"; ":standard"]
-            @ desc.c_library_flags
-            @ ["-l" ^ desc.external_library_name; "-L" ^ desc.extra_search_dir]
-            );
+          of_atom_list (["c_library_flags"; ":standard"] @ desc.c_library_flags);
         ];
       ];
       [S "headers"; [S "include"; S desc.include_header]];

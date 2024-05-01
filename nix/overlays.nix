@@ -4,6 +4,7 @@
   libiconv,
   pkg-config,
   darwin,
+  rust-bin,
 }: {
   pick-latest-packages = final: prev:
     prev.repository.select {
@@ -47,5 +48,9 @@
     inotify = null;
   };
 
-  fix-rust-packages = final: prev: {};
+  fix-rust-packages = final: prev: {
+    conf-rust = prev.lib.overrideNativeDepends prev.conf-rust [
+      (rust-bin.fromRustupToolchainFile ../rust-toolchain)
+    ];
+  };
 }

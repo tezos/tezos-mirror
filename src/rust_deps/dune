@@ -1,0 +1,36 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_rust_deps)
+ (public_name octez-rust-deps)
+ (instrumentation (backend bisect_ppx))
+ (js_of_ocaml)
+ (foreign_archives octez_rust_deps))
+
+(dirs :standard .cargo (not target))
+
+(rule
+ (targets liboctez_rust_deps.a dlloctez_rust_deps.so wasmer.h wasm.h)
+ (deps
+  (file Cargo.toml)
+  (file Cargo.lock)
+  (file ../../rust-toolchain)
+  (source_tree .cargo)
+  (source_tree librustzcash)
+  (source_tree wasmer-3.3.0)
+  (source_tree src)
+  (source_tree ../risc_v)
+  (source_tree ../kernel_sdk))
+ (action
+  (no-infer
+   (progn
+    (run rm -f wasmer-3.3.0/lib/c-api/wasmer.h)
+    (run cargo build --release -p octez-rust-deps)
+    (copy target/release/liboctez_rust_deps.a liboctez_rust_deps.a)
+    (bash
+     "test -r target/release/liboctez_rust_deps.so && cp -f target/release/liboctez_rust_deps.so dlloctez_rust_deps.so || true")
+    (bash
+     "test -r target/release/liboctez_rust_deps.dylib && cp -f target/release/liboctez_rust_deps.dylib dlloctez_rust_deps.so || true")
+    (copy wasmer-3.3.0/lib/c-api/wasmer.h wasmer.h)
+    (copy wasmer-3.3.0/lib/c-api/wasm.h wasm.h)))))

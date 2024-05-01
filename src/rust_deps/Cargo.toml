@@ -1,0 +1,18 @@
+[package]
+name = "octez-rust-deps"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies.wasmer-c-api]
+path = "wasmer-3.3.0/lib/c-api"
+default-features = false
+features = ["singlepass", "cranelift", "wat", "middlewares"]
+
+[dependencies.librustzcash]
+path = "librustzcash"
+
+[dependencies.octez-risc-v-api]
+path = "../risc_v/api"

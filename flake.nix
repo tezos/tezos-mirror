@@ -14,6 +14,7 @@
       flake = false;
       url = "gitlab:tezos/opam-repository";
     };
+    rust-overlay.url = "github:oxalica/rust-overlay/b037d65c988421b54024e62691eace4f2fe623bc";
   };
 
   outputs = {
@@ -23,11 +24,15 @@
     opam-nix-integration,
     opam-repository,
     tezos-opam-repository,
+    rust-overlay,
   }:
     flake-utils.lib.eachDefaultSystem (
       system: let
         pkgs = import nixpkgs {
-          overlays = [opam-nix-integration.overlays.default];
+          overlays = [
+            opam-nix-integration.overlays.default
+            rust-overlay.overlays.default
+          ];
           inherit system;
         };
 
