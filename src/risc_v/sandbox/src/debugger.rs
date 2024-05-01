@@ -410,7 +410,6 @@ impl<'a> DebuggerApp<'a> {
         let sd = mstatus.sd();
         let xs = mstatus.xs();
         let fs = mstatus.fs();
-        let vs = mstatus.vs();
 
         let bool_field = |name: &'static str, toggled| match toggled {
             false => name.fg(GRAY),
@@ -456,8 +455,6 @@ impl<'a> DebuggerApp<'a> {
             ]),
             Line::from(vec![
                 // Misc
-                " VS:".fg(GRAY),
-                ext_field(vs),
                 bool_field(" TVM", tvm),
                 bool_field(" SUM", sum),
                 bool_field(" TSR", tsr),
