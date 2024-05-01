@@ -1,0 +1,22 @@
+[package]
+name = "wasmer-middlewares"
+version = "3.3.0"
+authors = ["Wasmer Engineering Team <engineering@wasmer.io>"]
+description = "A collection of various useful middlewares"
+license = "MIT OR Apache-2.0 WITH LLVM-exception"
+categories = ["wasm"]
+keywords = ["webassembly", "wasm"]
+repository = "https://github.com/wasmerio/wasmer"
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
+wasmer = { path = "../api", version = "=3.3.0", default-features = false, features = ["compiler"] }
+wasmer-types = { path = "../types", version = "=3.3.0" }
+wasmer-vm = { path = "../vm", version = "=3.3.0" }
+
+[dev-dependencies]
+wasmer = { path = "../api", version = "=3.3.0", features = ["compiler"] }
+
+[badges]
+maintenance = { status = "actively-developed" }
