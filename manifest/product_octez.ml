@@ -2672,6 +2672,7 @@ let octez_wasmer =
     ~path:"src/lib_wasmer"
     ~synopsis:"Wasmer bindings for SCORU WASM"
     ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; octez_rust_deps]
+    ~dep_globs_rec:["../rust_deps/wasmer-3.3.0/*"]
     ~preprocess:[pps ppx_deriving_show]
     ~flags:(Flags.standard ~disable_warnings:[9; 27] ())
     ~ctypes:
@@ -3263,6 +3264,7 @@ let octez_sapling =
         octez_lwt_result_stdlib;
         octez_rust_deps;
       ]
+    ~dep_globs_rec:["../rust_deps/librustzcash/*"]
     ~js_of_ocaml:[[S "javascript_files"; S "runtime.js"]]
     ~foreign_stubs:
       {
@@ -4622,6 +4624,7 @@ let octez_risc_v_api =
     ~synopsis:"OCaml API of the RISC-V Rust components"
     ~flags:(Flags.standard ~disable_warnings:[9; 27; 66] ())
     ~deps:[octez_rust_deps]
+    ~dep_globs_rec:["../risc_v/*"]
     ~modules:["octez_risc_v_api"]
     ~dune:Dune.[[S "copy_files"; S "../../risc_v/api/octez_risc_v_api.*"]]
 
