@@ -9,24 +9,22 @@
   ctypes
   ctypes.foreign
   lwt
-  lwt.unix)
+  lwt.unix
+  octez-rust-deps)
  (preprocess (pps ppx_deriving.show))
  (flags
   (:standard)
   -w -9-27)
  (ctypes
-  (external_library_name wasmer)
+  (external_library_name octez_rust_deps)
   (build_flags_resolver
    (vendored
     (c_flags
      :standard
      -Wno-discarded-qualifiers
-     -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs
+     -I../rust_deps
      -Wno-incompatible-pointer-types)
-    (c_library_flags
-     :standard
-     -lwasmer
-     -L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs)))
+    (c_library_flags :standard)))
   (headers (include wasmer.h))
   (type_description (instance Types) (functor Api_types_desc))
   (function_description
@@ -34,4 +32,5 @@
    (instance Functions)
    (functor Api_funcs_desc))
   (generated_types Api_types)
-  (generated_entry_point Api)))
+  (generated_entry_point Api)
+  (deps ../rust_deps/wasmer.h ../rust_deps/wasm.h)))

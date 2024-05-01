@@ -16,4 +16,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "OCaml API of the RISC-V Rust components"
+synopsis: "Octez Rust Dependencies"

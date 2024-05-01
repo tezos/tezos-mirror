@@ -6,9 +6,10 @@
  (public_name octez-risc-v-api)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-risc-v)
+  octez-rust-deps)
  (flags
   (:standard)
-  -w -9-27-66))
+  -w -9-27-66)
+ (modules octez_risc_v_api))
 
 (copy_files ../../risc_v/api/octez_risc_v_api.*)
