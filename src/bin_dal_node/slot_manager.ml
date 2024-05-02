@@ -246,6 +246,14 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+  let () =
+    let share_array =
+      shards
+      |> Seq.map (fun Cryptobox.{index = _; share} -> share)
+      |> Array.of_seq
+    in
+    Store.cache_shards node_store commitment share_array
+  in
   let* () = Store.(Shards.write_all node_store.shards commitment shards) in
   if with_proof then
     let*? precomputation =
