@@ -33,6 +33,7 @@ type mode =
       initial_kernel : string;
       preimages_dir : string;
       rollup_node_endpoint : string;
+      devmode : bool;
     }
   | Threshold_encryption_observer of {
       initial_kernel : string;
@@ -589,7 +590,8 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "tx-pool-tx-per-addr-limit"
             string_of_int
             tx_pool_tx_per_addr_limit
-    | Observer {preimages_dir; initial_kernel = _; rollup_node_endpoint} ->
+    | Observer
+        {preimages_dir; initial_kernel = _; rollup_node_endpoint; devmode} ->
         [
           "--evm-node-endpoint";
           evm_node.persistent_state.endpoint;
@@ -598,6 +600,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           "--preimages-dir";
           preimages_dir;
         ]
+        @ Cli_arg.optional_switch "devmode" devmode
     | Threshold_encryption_observer
         {
           preimages_dir;
