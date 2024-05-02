@@ -129,7 +129,7 @@ csr! {
         UBE: bool,
         MPIE: bool,
         SPP: SPPValue,
-        VS: ExtensionValue,
+        VS: ConstantBits<2>,
         MPP: MPPValue,
         FS: ExtensionValue,
         XS: ExtensionValue,
@@ -178,7 +178,6 @@ impl Default for MStatus {
             .with_sbe(false)
             .with_mbe(false)
             // Set register dirtiness
-            .with_vs(ExtensionValue::Dirty)
             .with_fs(ExtensionValue::Dirty)
             .with_xs(ExtensionValue::Dirty)
             .with_sd(false)
@@ -209,7 +208,7 @@ csr! {
         UBE: bool,
         WPRI3: ConstantBits<1>,
         SPP: SPPValue,
-        VS: ExtensionValue,
+        VS: ConstantBits<2>,
         WPRI4: ConstantBits<2>,
         FS: ExtensionValue,
         XS: ExtensionValue,
@@ -248,9 +247,7 @@ impl SStatus {
 
 impl NormaliseFields for SStatus {
     fn normalise(self) -> Self {
-        let any_dirty = self.fs() == ExtensionValue::Dirty
-            || self.xs() == ExtensionValue::Dirty
-            || self.vs() == ExtensionValue::Dirty;
+        let any_dirty = self.fs() == ExtensionValue::Dirty || self.xs() == ExtensionValue::Dirty;
         self.with_sd(any_dirty)
     }
 }

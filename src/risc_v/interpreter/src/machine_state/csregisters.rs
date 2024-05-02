@@ -1518,14 +1518,17 @@ mod tests {
         assert_eq!(check(csreg::mstatus, 0x0), 0x0000_000A_0000_0000);
         // besides uxl & sxl changing, wpri fields get set to 0
         assert_eq!(
-            check(csreg::mstatus, 0xFFFF_FFFF_FFFF_FFFF),
-            0x8000_003A_007F_FFEA
+            check(csreg::mstatus, !0u64),
+            0b1000000000000000000000000011101000000000011111111111100111101010u64
         );
-        // check sd bit set from XS=00, FS=10, VS=11, and MPP gets changed to 0b00 from 0b01,
-        // and fs gets changed to 11 (dirty)
+        // check SD bit set from XS=00, FS=10, VS=00, and MPP gets changed to 0b00 from 0b01,
+        // and FS gets changed to 11 (dirty)
         assert_eq!(
-            check(csreg::mstatus, 0x0FFF_0000_0000_57FF),
-            0x8000_000A_0000_67EA
+            check(
+                csreg::mstatus,
+                0b111111111111000000000000000000000000000000000101011111111111u64
+            ),
+            0b1000000000000000000000000000101000000000000000000110000111101010u64
         );
 
         // sstatus
@@ -1533,13 +1536,16 @@ mod tests {
         assert_eq!(check(csreg::sstatus, 0x0), 0x0000_0002_0000_0000);
         // besides uxl changing, wpri fields get set to 0
         assert_eq!(
-            check(csreg::sstatus, 0xFFFF_FFFF_FFFF_FFFF),
-            0x8000_0002_000D_E762
+            check(csreg::sstatus, !0u64),
+            0b1000000000000000000000000000001000000000000011011110000101100010u64,
         );
         // check sd bit set from XS=00, FS=10, VS=11
         assert_eq!(
-            check(csreg::sstatus, 0x0FFF_0000_0000_57FF),
-            0x8000_0002_0000_6762
+            check(
+                csreg::sstatus,
+                0b111111111111000000000000000000000000000000000101011111111111u64
+            ),
+            0b1000000000000000000000000000001000000000000000000110000101100010u64,
         );
 
         // mnstatus
@@ -1563,10 +1569,10 @@ mod tests {
             <F::Backend<CSRegistersLayout> as BackendManagement>::Manager<'_>,
         > = CSRegisters::bind(backend.allocate(placed));
 
-        // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP (through mstatus)
+        // write to MBE, SXL, UXL, MPP, MPIE, XS, SPP (through mstatus)
         csrs.write(
             CSRegister::mstatus,
-            1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 1 << 8 | 1 << 7,
+            1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 15 | 0b11 << 11 | 1 << 8 | 1 << 7,
         );
         // SXL, UXL should be set to MXL (WARL), SD bit should be 1
         let read_mstatus: CSRValue = csrs.read(CSRegister::mstatus);
@@ -1576,8 +1582,8 @@ mod tests {
                 | 1 << 37
                 | 0b10 << 34
                 | 0b10 << 32
+                | 0b11 << 15
                 | 0b11 << 11
-                | 0b11 << 9
                 | 1 << 8
                 | 1 << 7
         );
@@ -1585,7 +1591,7 @@ mod tests {
         let read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
         assert_eq!(
             read_sstatus.repr(),
-            1u64 << 63 | 0b10 << 32 | 0b11 << 9 | 1 << 8
+            1u64 << 63 | 0b10 << 32 | 0b11 << 15 | 1 << 8
         );
 
         // write to MBE, SXL, UXL, MPP, MPIE, VS, SPP, (through sstatus, M-fields should be ignored, being WPRI)
@@ -1612,7 +1618,7 @@ mod tests {
         // write to MBE, SXL, UXL, MPP, VS, SPP, MPIE (through sstatus)
         let old_sstatus: CSRValue = csrs.replace(
             CSRegister::sstatus,
-            (1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 11 | 0b11 << 9 | 0 << 8 | 0 << 7)
+            (1u64 << 37 | 0b01 << 34 | 0b11 << 32 | 0b11 << 15 | 0b11 << 11 | 0 << 8 | 0 << 7)
                 .into(),
         );
         assert_eq!(old_sstatus, second_read_sstatus);
@@ -1625,8 +1631,8 @@ mod tests {
                 | 1 << 37
                 | 0b10 << 34
                 | 0b10 << 32
+                | 0b11 << 15
                 | 0b11 << 11
-                | 0b11 << 9
                 | 0 << 8
                 | 1 << 7
         );
@@ -1634,7 +1640,7 @@ mod tests {
         let read_sstatus: CSRValue = csrs.read(CSRegister::sstatus);
         assert_eq!(
             read_sstatus.repr(),
-            1u64 << 63 | 0b10 << 32 | 0b11 << 9 | 0 << 8
+            1u64 << 63 | 0b10 << 32 | 0b11 << 15 | 0 << 8
         );
     });
 
