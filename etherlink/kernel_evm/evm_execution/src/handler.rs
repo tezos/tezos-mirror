@@ -14,12 +14,12 @@ use crate::account_storage::{
     CODE_HASH_DEFAULT,
 };
 use crate::storage::blocks::get_block_hash;
-use crate::tick_model_opcodes;
 use crate::transaction::TransactionContext;
 use crate::transaction_layer_data::TransactionLayerData;
 use crate::utilities::create_address_legacy;
 use crate::EthereumError;
 use crate::PrecompileSet;
+use crate::{tick_model_opcodes, TracerConfig};
 use alloc::borrow::Cow;
 use alloc::rc::Rc;
 use core::convert::Infallible;
@@ -266,6 +266,8 @@ pub struct EvmHandler<'a, Host: Runtime> {
     /// Whether warm/cold storage and address access is enabled
     /// If not, all access are considered warm
     pub enable_warm_cold_access: bool,
+    /// Tracer configuration for debugging.
+    tracer: Option<TracerConfig>,
 }
 
 impl<'a, Host: Runtime> EvmHandler<'a, Host> {
@@ -281,6 +283,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
         ticks_allocated: u64,
         effective_gas_price: U256,
         enable_warm_cold_access: bool,
+        tracer: Option<TracerConfig>,
     ) -> Self {
         Self {
             host,
@@ -294,6 +297,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             estimated_ticks_used: 0,
             effective_gas_price,
             enable_warm_cold_access,
+            tracer,
         }
     }
 
@@ -2383,6 +2387,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let result = handler
@@ -2417,6 +2422,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -2459,6 +2465,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let code_hash: H256 = CODE_HASH_DEFAULT;
@@ -2505,6 +2512,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -2566,6 +2574,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(213_u64);
@@ -2659,6 +2668,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let input_value = U256::from(2026_u32);
@@ -2753,6 +2763,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let input_value = U256::from(1025_u32); // transaction depth for contract below is callarg - 1
@@ -2845,6 +2856,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(312);
@@ -2916,6 +2928,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let value = U256::zero();
@@ -2972,6 +2985,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let value = U256::zero();
@@ -3037,6 +3051,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(117);
@@ -3099,6 +3114,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3160,6 +3176,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3230,6 +3247,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let hash_of_unavailable_block = handler.block_hash(U256::zero());
@@ -3257,6 +3275,7 @@ mod test {
             10_000,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3317,6 +3336,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3368,6 +3388,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -3454,6 +3475,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         // { (SELFDESTRUCT 0x10) }
@@ -3502,6 +3524,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
             false,
+            None,
         );
 
         set_balance(&mut handler, &caller, U256::from(10000));
@@ -3545,6 +3568,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -3620,6 +3644,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let hash = handler.code_hash(H160::from_low_u64_le(1));
@@ -3649,6 +3674,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
             false,
+            None,
         );
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
@@ -3691,6 +3717,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -3773,6 +3800,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         let address_1 = H160::from_low_u64_be(210_u64);
@@ -3873,6 +3901,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         let target_destruct =
@@ -3938,6 +3967,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             true,
+            None,
         );
 
         let contrac_addr =
@@ -4008,6 +4038,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::from(21000),
             false,
+            None,
         );
 
         handler
@@ -4068,6 +4099,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 1000,
             gas_price,
             false,
+            None,
         );
 
         let address = H160::from_low_u64_be(210_u64);
@@ -4155,6 +4187,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             gas_price,
             false,
+            None,
         );
 
         let initial_code = [1; 49153]; // MAX_INIT_CODE_SIZE + 1
@@ -4193,6 +4226,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             U256::one(),
             false,
+            None,
         );
 
         set_balance(&mut handler, &caller, U256::from(1000000000));
@@ -4233,6 +4267,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 1000,
             U256::from(21000),
             false,
+            None,
         );
 
         let address1 = H160::from_low_u64_be(210_u64);
@@ -4312,6 +4347,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         // SUICIDE would charge 25,000 gas when the destination is non-existent,
@@ -4383,6 +4419,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 10000,
             gas_price,
             false,
+            None,
         );
 
         // CALL would charge 25,000 gas when the destination is non-existent,

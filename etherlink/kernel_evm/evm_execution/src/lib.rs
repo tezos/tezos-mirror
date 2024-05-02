@@ -180,6 +180,7 @@ where
         allocated_ticks,
         effective_gas_price,
         enable_warm_cold_access,
+        tracer,
     );
 
     if (!pay_for_gas)
