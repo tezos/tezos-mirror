@@ -41,6 +41,7 @@ type mode =
       initial_kernel : string;
       preimages_dir : string;
       rollup_node_endpoint : string;
+      devmode : bool;
     }
   | Threshold_encryption_observer of {
       initial_kernel : string;

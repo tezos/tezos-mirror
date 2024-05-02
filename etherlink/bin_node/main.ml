@@ -835,7 +835,6 @@ let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
     ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?kernel () =
   let open Lwt_result_syntax in
-  let open Evm_node_lib_dev in
   let* config =
     Cli.create_or_read_config
       ~data_dir
@@ -881,7 +880,9 @@ let start_observer ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port
     init ~config ()
   in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
-  Observer.main ?kernel_path:kernel ~data_dir ~config ()
+  if config.devmode then
+    Evm_node_lib_dev.Observer.main ?kernel_path:kernel ~data_dir ~config ()
+  else Evm_node_lib_prod.Observer.main ?kernel_path:kernel ~data_dir ~config ()
 
 let observer_command =
   let open Tezos_clic in

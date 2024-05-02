@@ -245,6 +245,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
              initial_kernel = output;
              preimages_dir;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             devmode;
            })
   in
   let* observer = Evm_node.init ~mode (Evm_node.endpoint sequencer) in
@@ -1369,6 +1370,7 @@ let test_get_balance_block_param =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = "/tmp";
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             devmode = true;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
