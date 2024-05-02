@@ -2552,35 +2552,6 @@ module Sub_lib = struct
       ?with_macos_security_framework
 end
 
-module Product (M : sig
-  val name : string
-
-  val source : string list
-end) =
-struct
-  let public_lib = Target.public_lib ~product:M.name
-
-  let private_lib = Target.private_lib ~product:M.name
-
-  let public_exe = Target.public_exe ~product:M.name
-
-  let public_exes = Target.public_exes ~product:M.name
-
-  let private_exe = Target.private_exe ~product:M.name
-
-  let private_exes = Target.private_exes ~product:M.name
-
-  let test = Target.test ~product:M.name
-
-  let tests = Target.tests ~product:M.name
-
-  module Sub_lib = struct
-    include Sub_lib
-
-    let make_container () = make_container ~product:M.name
-  end
-end
-
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
@@ -2620,6 +2591,35 @@ let write filename f =
       (filename ^ " is generated twice; did you declare the same library twice?") ;
   generated_files := String_set.add filename !generated_files ;
   write_raw filename f
+
+module Product (M : sig
+  val name : string
+
+  val source : string list
+end) =
+struct
+  let public_lib = Target.public_lib ~product:M.name
+
+  let private_lib = Target.private_lib ~product:M.name
+
+  let public_exe = Target.public_exe ~product:M.name
+
+  let public_exes = Target.public_exes ~product:M.name
+
+  let private_exe = Target.private_exe ~product:M.name
+
+  let private_exes = Target.private_exes ~product:M.name
+
+  let test = Target.test ~product:M.name
+
+  let tests = Target.tests ~product:M.name
+
+  module Sub_lib = struct
+    include Sub_lib
+
+    let make_container () = make_container ~product:M.name
+  end
+end
 
 let generate_dune (internal : Target.internal) =
   let libraries, ppx_runtime_libraries, empty_files_to_create =
