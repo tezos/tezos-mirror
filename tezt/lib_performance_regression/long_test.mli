@@ -124,12 +124,13 @@ type category = string
     for all tests cannot exceed 100. Alerts can be sent outside of tests, in which
     case only the global limit applies.
 
-    If an alert for [category] was already sent less than [rate_limit_per_category]
-    seconds ago, the alert will not be sent. See the Configuration section for
-    documentation about [rate_limit_per_category].
+    If an alert for the pair [(category, team)]
+    (where [team] is the argument given to [register])
+    was already sent less than [rate_limit_per_category] seconds ago,
+    the alert will not be sent.
+    See the Configuration section for documentation about [rate_limit_per_category].
 
-    Default [category] is [""].
-*)
+    Default [category] is [""]. *)
 val alert : ?category:category -> ('a, unit, string, unit) format4 -> 'a
 
 (** Same as [alert], but also log an exception.

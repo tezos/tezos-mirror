@@ -51,6 +51,7 @@ let test_tezt_tests_suite_load_time ~executors () =
     ~uses_node:false
     ~uses_admin_client:false
     ~uses_client:false
+    ~team:Team.infrastructure
     ~executors
   @@ fun () ->
   let* () = Process.run "dune" ["build"; "tezt/tests/main.exe"] in

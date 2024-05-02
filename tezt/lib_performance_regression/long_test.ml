@@ -151,6 +151,9 @@ let init () =
     Log.warn
       "Grafana is not configured: Grafana dashboards will not be updated."
 
+(* [?team] argument of the test that is currently running. *)
+let current_team : string option ref = ref None
+
 module Alerts : sig
   type category = string
 
@@ -170,17 +173,26 @@ end = struct
    * and dumped on disc on_exit *)
   let last_messages = ref Map.empty
 
-  let default_alert_category = ""
+  (* Encode a [category, team] pair into a string.
+     Technically, there are cases where two pairs could result in the same category,
+     e.g. ["a", "b_c"] and ["a_b", "c"] both result in ["a_b_c"].
+     In practice it should be fine. *)
+  let full_category category =
+    match (category, !current_team) with
+    | None, None -> "_"
+    | Some s, None -> s ^ "_"
+    | None, Some s -> "_" ^ s
+    | Some c, Some t -> c ^ "_" ^ t
 
   let may_send_rate_limit alert_cfg category =
     let now = Unix.gettimeofday () in
-    let c = Option.value ~default:default_alert_category category in
-    match Map.find_opt c !last_messages with
+    let category = full_category category in
+    match Map.find_opt category !last_messages with
     | None -> true
     | Some t -> now >= t +. alert_cfg.rate_limit_per_category
 
   let add category now =
-    let category = Option.value ~default:default_alert_category category in
+    let category = full_category category in
     last_messages := Map.add category now !last_messages
 
   let encode (c, t) = `O [("category", `String c); ("time", `Float t)]
@@ -906,6 +918,10 @@ let register ~__FILE__ ~title ~tags ?uses ?uses_node ?uses_client
     invalid_arg
       "Long_test.register: long test titles cannot contain newline characters" ;
   let tags = make_tags team executors tags in
+  let body () =
+    current_team := team ;
+    body ()
+  in
   Test.register
     ~__FILE__
     ~title
