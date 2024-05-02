@@ -83,13 +83,13 @@ let () =
 
 (* Specialized errors defined as polymorphic variants. *)
 
-type decoding = [`Decoding_failed of Types.Store.kind * tztrace]
-
 type not_found = [`Not_found]
 
 type other = [`Other of tztrace]
 
 (* Helpers to wrap values and tzresult errors in [`Other]. *)
+
+let decoding_failed kind trace = `Other (Decoding_failed kind :: trace)
 
 let other v = `Other v
 
@@ -106,28 +106,15 @@ let other_lwt_result v =
 
 let error_to_tzresult e =
   let open Lwt_result_syntax in
-  match e with
-  | `Decoding_failed (kind, tztrace) ->
-      let*! () = Event.(emit decoding_data_failed kind) in
-      fail (Decoding_failed kind :: tztrace)
-  | `Other e -> fail e
-  | `Not_found ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4622
+  match e with `Other e -> fail e
 
-         Move to a defined Not_found error in #4622?
-         Currently, using something like
-         [tzfail @@ Shard_store.Resource_not_found ""] is
-         not well suited as [Resource_not_found]'s arg is understood as
-         a path.
-      *)
-      failwith "Not_found"
-
-let to_option_tzresult ?(none = fun _e -> false) r =
+let to_option_tzresult r =
   let open Lwt_result_syntax in
   let*! r in
   match r with
   | Ok s -> return_some s
-  | Error err -> if none err then return_none else error_to_tzresult err
+  | Error `Not_found -> return_none
+  | Error (`Other _ as err) -> error_to_tzresult err
 
 let to_tzresult r =
   let open Lwt_result_syntax in

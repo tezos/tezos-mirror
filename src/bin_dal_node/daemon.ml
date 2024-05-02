@@ -381,7 +381,7 @@ module Handler = struct
           in
           match result with
           | Error `Not_found -> return_none
-          | Error (`Decoding_failed _) ->
+          | Error (`Other _) ->
               let*! () =
                 Event.(emit decoding_data_failed Types.Store.Commitment)
               in

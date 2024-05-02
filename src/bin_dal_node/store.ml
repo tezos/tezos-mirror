@@ -38,7 +38,7 @@ let trace_decoding_error ~data_kind ~tztrace_of_error r =
   | Ok r -> return r
   | Error err ->
       let tztrace = tztrace_of_error err in
-      fail @@ `Decoding_failed (data_kind, tztrace)
+      fail @@ Errors.decoding_failed data_kind tztrace
 
 module Stores_dirs = struct
   let shard = "shard_store"
@@ -156,7 +156,7 @@ module Shards = struct
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
     | Error [KVS.Missing_stored_kvs_data _] -> fail `Not_found
-    | Error err -> fail @@ `Decoding_failed (data_kind, err)
+    | Error err -> fail @@ Errors.decoding_failed data_kind err
 
   let count_values store commitment =
     KVS.count_values store file_layout commitment
@@ -224,7 +224,7 @@ module Slots = struct
     match res with
     | Ok slot -> return_some slot
     | Error [KVS.Missing_stored_kvs_data _] -> return_none
-    | Error err -> fail @@ `Decoding_failed (data_kind, err)
+    | Error err -> fail @@ Errors.decoding_failed data_kind err
 
   let remove_slot_by_commitment t ~slot_size commitment =
     KVS.remove_file t file_layout (commitment, slot_size)

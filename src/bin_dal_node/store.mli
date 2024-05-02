@@ -44,7 +44,7 @@ module Shards : sig
     t ->
     Cryptobox.commitment ->
     int ->
-    (Cryptobox.shard, [> Errors.not_found | Errors.decoding]) result Lwt.t
+    (Cryptobox.shard, [> Errors.not_found | Errors.other]) result Lwt.t
 
   (** Same as [read_values] but for all possible shards of the given commitment. *)
   val read_all :
@@ -82,7 +82,7 @@ module Slots : sig
   (** [exists_slot_by_commitment store cryptobox commitment] returns
       true IFF a slot is associated to the given commitment. *)
   val exists_slot_by_commitment :
-    t -> Cryptobox.t -> commitment -> (bool, [> Errors.decoding]) result Lwt.t
+    t -> Cryptobox.t -> commitment -> (bool, [> Errors.other]) result Lwt.t
 
   (** [find_slot_by_commitment store cryptobox commitment] returns the
       slot associated to some commitment or [None] if no slot is
@@ -91,8 +91,7 @@ module Slots : sig
     t ->
     Cryptobox.t ->
     commitment ->
-    (bytes option, [> `Decoding_failed of Types.Store.kind * tztrace]) result
-    Lwt.t
+    (bytes option, [> Errors.other]) result Lwt.t
 
   val remove_slot_by_commitment :
     t -> slot_size:int -> commitment -> unit tzresult Lwt.t
@@ -185,10 +184,7 @@ module Legacy : sig
     level:int32 ->
     slot_index:int ->
     t ->
-    ( commitment,
-      [> `Decoding_failed of Types.Store.kind * tztrace | `Not_found] )
-    result
-    Lwt.t
+    (commitment, [> Errors.other | Errors.not_found]) result Lwt.t
 
   (** [get_slot_status ~slot_id store] returns the status associated
       to the given accepted [slot_id], or [None] if no status is
@@ -196,8 +192,5 @@ module Legacy : sig
   val get_slot_status :
     slot_id:Types.slot_id ->
     t ->
-    ( Types.header_status option,
-      [> `Decoding_failed of Types.Store.kind * tztrace] )
-    result
-    Lwt.t
+    (Types.header_status option, [> Errors.other]) result Lwt.t
 end
