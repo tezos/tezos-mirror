@@ -245,27 +245,22 @@ module Handler = struct
   let set_profile_context ctxt config proto_parameters =
     let open Lwt_result_syntax in
     let*! pctxt_opt = Node_context.load_profile_ctxt ctxt in
-    let pctxt_opt =
+    let profile =
       match pctxt_opt with
-      | None ->
-          Profile_manager.add_profiles
-            Profile_manager.empty
-            proto_parameters
-            (Node_context.get_gs_worker ctxt)
-            config.Configuration_file.profile
+      | None -> config.Configuration_file.profile
       | Some loaded_profile ->
           (* The profiles from the loaded context are prioritized over the
              profiles provided in the config file. *)
-          let merged_profile =
-            Profile_manager.merge_profiles
-              ~lower_prio:config.Configuration_file.profile
-              ~higher_prio:loaded_profile
-          in
-          Profile_manager.add_profiles
-            Profile_manager.empty
-            proto_parameters
-            (Node_context.get_gs_worker ctxt)
-            merged_profile
+          Profile_manager.merge_profiles
+            ~lower_prio:config.Configuration_file.profile
+            ~higher_prio:loaded_profile
+    in
+    let pctxt_opt =
+      Profile_manager.add_profiles
+        Profile_manager.empty
+        proto_parameters
+        (Node_context.get_gs_worker ctxt)
+        profile
     in
     match pctxt_opt with
     | None -> fail Errors.[Profile_incompatibility]
