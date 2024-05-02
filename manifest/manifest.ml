@@ -2592,6 +2592,10 @@ let write filename f =
   generated_files := String_set.add filename !generated_files ;
   write_raw filename f
 
+let generate_content_input ~product ~source =
+  let filename = Format.sprintf "script-inputs/%s-source-content" product in
+  write_raw filename @@ fun fmt -> List.iter (Format.fprintf fmt "%s\n") source
+
 module Product (M : sig
   val name : string
 
@@ -2613,6 +2617,9 @@ struct
   let test = Target.test ~product:M.name
 
   let tests = Target.tests ~product:M.name
+
+  let generate_content_input () =
+    generate_content_input ~product:M.name ~source:M.source
 
   module Sub_lib = struct
     include Sub_lib

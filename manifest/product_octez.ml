@@ -8661,3 +8661,5 @@ let _docs_doc_gen_errors =
         data_encoding |> open_;
         Protocol.(client_exn alpha) |> open_;
       ]
+
+let () = generate_content_input ()

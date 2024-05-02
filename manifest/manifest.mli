@@ -1299,6 +1299,12 @@ end) : sig
     for a single container package. See
     [https://dune.readthedocs.io/en/stable/concepts/package-spec.html#libraries]
     for the corresponding dune feature. *)
+
+  (** Generates the content of [script-inputs/NAME-source-content] with [NAME = M.name].
+
+      The content of the file is the values of [M.source]. *)
+  val generate_content_input : unit -> unit
+
   module Sub_lib : sig
     (** Create a container *)
     val make_container : unit -> Sub_lib.container
