@@ -252,13 +252,13 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
     Tezos_crypto.Hashed.Smart_rollup_address.of_string_exn smart_rollup_address
   in
 
-  let module Sequencer = Make (struct
+  let module Rollup_rpc = Make (struct
     let smart_rollup_address = smart_rollup_address_typed
   end) in
   let* () =
     Tx_pool.start
       {
-        rollup_node = (module Sequencer);
+        rollup_node = (module Rollup_rpc);
         smart_rollup_address;
         mode = Sequencer;
         tx_timeout_limit = configuration.tx_pool_timeout_limit;
@@ -291,9 +291,11 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
       ~rollup_node_endpoint
       ()
   in
-
+  let module Sequencer_rpc = struct
+    let produce_block = Block_producer.produce_block
+  end in
   let directory =
-    Services.directory configuration ((module Sequencer), smart_rollup_address)
+    Services.directory configuration ((module Rollup_rpc), smart_rollup_address)
   in
   let directory =
     directory |> Evm_services.register smart_rollup_address_typed
@@ -304,8 +306,8 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
         let private_directory =
           Services.private_directory
             configuration
-            ((module Sequencer), smart_rollup_address)
-            ~produce_block:Block_producer.produce_block
+            ((module Rollup_rpc), smart_rollup_address)
+            (module Sequencer_rpc)
         in
         (private_directory, private_rpc_port))
       sequencer_config.private_rpc_port

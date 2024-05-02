@@ -414,9 +414,12 @@ let dispatch_request (config : Configuration.t)
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request
-    (produce_block :
-      force:bool -> timestamp:Time.Protocol.t -> int tzresult Lwt.t)
+module type Sequencer_backend = sig
+  val produce_block :
+    force:bool -> timestamp:Time.Protocol.t -> int tzresult Lwt.t
+end
+
+let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
     (_config : Configuration.t)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -445,7 +448,9 @@ let dispatch_private_request
         let f (timestamp : Time.Protocol.t option) =
           let open Lwt_result_syntax in
           let timestamp = Option.value timestamp ~default:(Helpers.now ()) in
-          let* nb_transactions = produce_block ~force:true ~timestamp in
+          let* nb_transactions =
+            Sequencer_rpc.produce_block ~force:true ~timestamp
+          in
           rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
         in
         build ~f module_ parameters
@@ -479,13 +484,13 @@ let generic_dispatch config ctx dir path dispatch_request =
 let dispatch_public config ctx dir =
   generic_dispatch config ctx dir Path.root dispatch_request
 
-let dispatch_private config ctx ~produce_block dir =
+let dispatch_private config ctx sequencer_rpc dir =
   generic_dispatch
     config
     ctx
     dir
     Path.(add_suffix root "private")
-    (dispatch_private_request produce_block)
+    (dispatch_private_request sequencer_rpc)
 
 let directory config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
@@ -496,9 +501,9 @@ let directory config
 
 let private_directory config
     ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
-    ~produce_block =
+    sequencer_rpc =
   Directory.empty |> version
   |> dispatch_private
        config
        ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
-       ~produce_block
+       sequencer_rpc
