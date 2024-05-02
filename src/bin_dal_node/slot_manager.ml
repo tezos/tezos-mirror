@@ -257,7 +257,7 @@ let get_commitment_slot node_store cryptobox commitment =
     Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
   in
   match slot_opt with
-  | None -> fail `Not_found
+  | None -> fail Errors.not_found
   | Some slot_content -> return slot_content
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox

@@ -155,7 +155,7 @@ module Shards = struct
     let data_kind = Types.Store.Shard in
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
-    | Error [KVS.Missing_stored_kvs_data _] -> fail `Not_found
+    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err -> fail @@ Errors.decoding_failed data_kind err
 
   let count_values store commitment =
@@ -472,7 +472,7 @@ module Legacy = struct
       Irmin.find node_store.store @@ Path.Level.commitment index
     in
     Option.fold
-      ~none:(fail `Not_found)
+      ~none:(fail Errors.not_found)
       ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
       commitment_str_opt
 
