@@ -60,11 +60,6 @@ let variables : variables =
        set to true in the opam jobs where we want to run the tests
        --with-test. *)
     ("RUNTEZTALIAS", "false");
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6764
-       "false" is the GitLab default but we've overridden it in the runner settings.
-       This should be fixed at the runner level but we reset it to the
-       default here in the meantime. *)
-    ("FF_KUBERNETES_HONOR_ENTRYPOINT", "false");
   ]
 
 (* Dummy job.
