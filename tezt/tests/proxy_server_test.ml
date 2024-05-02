@@ -33,6 +33,8 @@
    Dependencies: tezt/tests/proxy.ml
 *)
 
+let team = Tag.layer1
+
 (** Creates a client that uses a [octez-proxy-server] as its endpoint. Also
     returns the node backing the proxy server, and the proxy server itself. *)
 let init ?nodes_args ?parameter_file ~protocol () =
@@ -198,7 +200,7 @@ let test_equivalence =
   Protocol.register_test
     ~__FILE__
     ~title:"(Vanilla, proxy_server endpoint) Compare RPC get"
-    ~tags:(compare_tags alt_mode)
+    ~tags:(team :: compare_tags alt_mode)
     ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _, alternative = init ~protocol () in
@@ -211,7 +213,7 @@ let test_wrong_data_dir =
   Protocol.register_test
     ~__FILE__
     ~title:"proxy_server wrong data_dir"
-    ~tags:["data_dir"]
+    ~tags:[team; "data_dir"]
     ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _client = Client.init_with_protocol `Client ~protocol () in
@@ -232,7 +234,7 @@ let test_proxy_server_serve_unsupported =
   Protocol.register_test
     ~__FILE__
     ~title:"proxy_server serve unsupported curl"
-    ~tags:["redirect"]
+    ~tags:[team; "redirect"]
     ~uses:(fun _protocol -> [Constant.octez_proxy_server])
   @@ fun protocol ->
   let* node, _client = Client.init_with_protocol `Client ~protocol () in
@@ -258,7 +260,7 @@ let test_multi_protocols =
   Protocol.register_test
     ~__FILE__
     ~title:"proxy_server multi protocols"
-    ~tags:["multi_protocols"]
+    ~tags:[team; "multi_protocols"]
     ~uses:(fun _protocol -> [Constant.octez_proxy_server])
     ~supports:Has_predecessor
   @@ Protocol.with_predecessor
@@ -335,7 +337,7 @@ let register ~protocols =
     Protocol.register_test
       ~__FILE__
       ~title:(sf "big_map_perf (%s)" mode_string)
-      ~tags:("bigmapperf" :: mode_tags)
+      ~tags:(team :: "bigmapperf" :: mode_tags)
       ~uses:(fun _protocol -> uses)
       (fun protocol -> big_map_get ~protocol mode ())
       protocols

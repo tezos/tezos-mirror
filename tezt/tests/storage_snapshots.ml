@@ -30,6 +30,8 @@
    Subject: Tests both the snapshot mechanism and the store's behaviour
 *)
 
+let team = Tag.layer1
+
 let node_arguments = Node.[Synchronisation_threshold 0]
 
 let pp_snapshot_export_format fmt v =
@@ -276,7 +278,7 @@ let test_export_import_snapshots =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot export and import"
-    ~tags:["storage"; "snapshot"; "export"; "import"; Tag.memory_4k; Tag.layer1]
+    ~tags:[team; "storage"; "snapshot"; "export"; "import"; Tag.memory_4k]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -349,7 +351,7 @@ let test_drag_after_rolling_import =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot drag after rolling import"
-    ~tags:["storage"; "snapshot"; "drag"; "rolling"; "import"; Tag.layer1]
+    ~tags:[team; "storage"; "snapshot"; "drag"; "rolling"; "import"]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -516,7 +518,7 @@ let test_info_command =
   Protocol.register_test
     ~__FILE__
     ~title:(Format.asprintf "storage snapshot info command")
-    ~tags:["storage"; "snapshot"; "info"; "command"; Tag.layer1]
+    ~tags:[team; "storage"; "snapshot"; "info"; "command"]
   @@ fun protocol ->
   let* node = Node.init ~name:"node" node_arguments in
   let* client = Client.init ~endpoint:(Node node) () in

@@ -33,8 +33,13 @@
                to see the commands that are run.
 *)
 
+let team = Tag.layer1
+
 let forge =
-  Protocol.register_test ~__FILE__ ~title:"forge" ~tags:["forge"; "transfer"]
+  Protocol.register_test
+    ~__FILE__
+    ~title:"forge"
+    ~tags:[team; "forge"; "transfer"]
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
   let* (`OpHash _str) =

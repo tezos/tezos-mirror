@@ -30,11 +30,13 @@
    Subject:      Tests of the [CHAIN_ID] Michelson instruction.
 *)
 
+let team = Tag.layer1
+
 let test_chain_id_opcode =
   Protocol.register_test
     ~__FILE__
     ~title:"Chain ID Opcode"
-    ~tags:["client"; "contract"]
+    ~tags:[team; "client"; "contract"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -58,7 +60,7 @@ let test_chain_id_authentication =
   Protocol.register_test
     ~__FILE__
     ~title:"Chain ID Authentication"
-    ~tags:["client"; "contract"]
+    ~tags:[team; "client"; "contract"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

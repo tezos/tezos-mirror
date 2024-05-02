@@ -29,6 +29,7 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file rpc_process.ml
    Subject:      Tests the resilience of the RPC process
 *)
+let team = Tag.layer1
 
 let wait_for_RPC_process_pid node =
   let filter json = JSON.(json |> as_int_opt) in
@@ -67,7 +68,7 @@ let test_kill =
   Protocol.register_test
     ~__FILE__
     ~title:"RPC process kill"
-    ~tags:["rpc"; "process"; "kill"]
+    ~tags:[team; "rpc"; "process"; "kill"]
   @@ fun protocol ->
   let node = Node.create ~rpc_external:true [] in
   let wait_RPC_process_pid = wait_for_RPC_process_pid node in
@@ -95,7 +96,7 @@ let test_forward =
   Protocol.register_test
     ~__FILE__
     ~title:"RPC process forward"
-    ~tags:["rpc"; "process"; "forward"]
+    ~tags:[team; "rpc"; "process"; "forward"]
   @@ fun protocol ->
   Log.info
     "Test whether some specific RPCs are handled directly by the RPC process \
@@ -228,7 +229,7 @@ let test_local_rpc_server =
   Test.register
     ~__FILE__
     ~title:"RPC local server"
-    ~tags:["rpc"; "process"; "local_server"]
+    ~tags:[team; "rpc"; "process"; "local_server"]
   @@ fun () ->
   let node = Node.create [] in
   (* Register event watchers for local RPC server before the node is running to
@@ -262,7 +263,7 @@ let test_process_rpc_server =
   Test.register
     ~__FILE__
     ~title:"RPC process server"
-    ~tags:["rpc"; "process"; "external_server"]
+    ~tags:[team; "rpc"; "process"; "external_server"]
   @@ fun () ->
   (* By default Node module start a process RPC server. *)
   let node = Node.create ~rpc_external:true [] in
@@ -297,7 +298,7 @@ let test_local_and_process_rpc_servers =
   Test.register
     ~__FILE__
     ~title:"RPC local servers and process servers"
-    ~tags:["rpc"; "process"; "local_server"; "external_server"]
+    ~tags:[team; "rpc"; "process"; "local_server"; "external_server"]
   @@ fun () ->
   (* Generate some ports for additional local RPC servers *)
   let local_rpc_ports = List.init 2 (fun _ -> Port.fresh ()) in

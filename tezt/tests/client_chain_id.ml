@@ -30,11 +30,13 @@
    Subject:      Tests the [compute chain id] commands of octez-client
 *)
 
+let team = Tag.layer1
+
 let test_chain_id () =
   Test.register
     ~__FILE__
     ~title:"Chain id"
-    ~tags:["chain"; "id"]
+    ~tags:[team; "chain"; "id"]
     ~uses_node:false
   @@ fun () ->
   Log.info "Chain id block hash" ;

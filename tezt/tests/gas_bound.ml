@@ -31,6 +31,8 @@
    Subject:      Gas bound
 *)
 
+let team = Tag.layer1
+
 let first_explosion =
   {|
 parameter unit;
@@ -200,7 +202,7 @@ let register ~protocols =
       Protocol.register_test
         ~__FILE__
         ~title
-        ~tags:["client"; "michelson"; "gas_bound"]
+        ~tags:[team; "client"; "michelson"; "gas_bound"]
         ~uses_node:false
         (fun protocol ->
           let* client = Client.init_mockup ~protocol () in

@@ -36,6 +36,8 @@
 open Tezos_crypto
 open Tezos_crypto.Hashed
 
+let team = Tag.layer1
+
 type operation = {shell_header : branch; protocol_data : protocol_data}
 
 and branch = {branch : Block_hash.t}
@@ -451,7 +453,7 @@ let test_ordering =
   Protocol.register_test
     ~__FILE__
     ~title:"baking ordering"
-    ~tags:["baking"; "ordering"]
+    ~tags:[team; "baking"; "ordering"]
   @@ fun protocol ->
   let* state = init ~protocol in
   Log.info "Testing ordering by counter" ;
@@ -488,7 +490,7 @@ let wrong_branch_operation_dismissal =
   Protocol.register_test
     ~__FILE__
     ~title:"wrong branch operation dismissal"
-    ~tags:["baking"; "branch"]
+    ~tags:[team; "baking"; "branch"]
   @@ fun protocol ->
   let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client = Client.init ~endpoint:(Node node) () in
@@ -537,7 +539,7 @@ let baking_operation_exception =
   Protocol.register_test
     ~__FILE__
     ~title:"ensure we can still bake with a faulty operation"
-    ~tags:["baking"; "exception"]
+    ~tags:[team; "baking"; "exception"]
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
@@ -606,7 +608,7 @@ let test_operation_pool_ordering
          "External operations are ordered (%d transfers, max %d operations)"
          n_transfers
          operations)
-    ~tags:["operations_pool"; "baking"]
+    ~tags:[team; "operations_pool"; "baking"]
   @@ fun protocol ->
   let* endpoint, client = init protocol in
   (* Test preparation *)
@@ -718,7 +720,7 @@ let baking_with_given_minimal_timestamp ~minimal_timestamp =
   Protocol.register_test
     ~__FILE__
     ~title:(sf "Baking minimal timestamp (%b)" minimal_timestamp)
-    ~tags:["baking"; "timestamp"]
+    ~tags:[team; "baking"; "timestamp"]
   @@ fun protocol ->
   let* _node, client =
     Client.init_with_protocol

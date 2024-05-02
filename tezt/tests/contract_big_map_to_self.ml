@@ -31,11 +31,13 @@
    Subject:      Tests sending big_map to self
 *)
 
+let team = Tag.layer1
+
 let test_big_map_to_self =
   Protocol.register_test
     ~__FILE__
     ~title:"Test sending big_map to self"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

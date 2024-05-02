@@ -32,6 +32,8 @@
                  failures
 *)
 
+let team = Tag.layer1
+
 let wait_for_external_validator_pid node =
   let filter json = JSON.(json |> as_int_opt) in
   Node.wait_for node "validator_proc_started.v0" filter
@@ -94,7 +96,7 @@ let test_kill =
   Protocol.register_test
     ~__FILE__
     ~title:"external validator kill"
-    ~tags:["node"; "external"; "validator"; "kill"]
+    ~tags:[team; "node"; "external"; "validator"; "kill"]
   @@ fun protocol ->
   let node = Node.create [] in
   let wait_for_validator_pid = wait_for_external_validator_pid node in

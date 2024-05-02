@@ -30,12 +30,13 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file client_simulation_flag.ml
    Subject:      Tests the behavior of the --simulation flag.
 *)
+let team = Tag.layer1
 
 let test_client =
   Protocol.register_test
     ~__FILE__
     ~title:"Test client simulation"
-    ~tags:["client"]
+    ~tags:[team; "client"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

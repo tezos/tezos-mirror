@@ -25,11 +25,13 @@
 
 open Base
 
+let team = Tag.layer1
+
 let change_logging_configuration =
   Protocol.register_test
     ~__FILE__
     ~title:"logging configuration RPCs"
-    ~tags:["rpc"; "node"; "logging"]
+    ~tags:[team; "rpc"; "node"; "logging"]
   @@ fun protocol ->
   let* main_node = Node.init ~name:"main_node" [] in
   let* client = Client.init ~endpoint:(Node main_node) () in

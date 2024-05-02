@@ -30,11 +30,13 @@
    Subject:      Tests origination and calls to manager contracts.
 *)
 
+let team = Tag.layer1
+
 let test_manager_contracts =
   Protocol.register_test
     ~__FILE__
     ~title:"Manager"
-    ~tags:["manager"]
+    ~tags:[team; "manager"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

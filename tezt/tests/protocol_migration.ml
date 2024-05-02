@@ -30,6 +30,8 @@
    Subject:      Checks the migration of protocol alpha
 *)
 
+let team = Tag.layer1
+
 let connect (client_1, node_1) (client_2, node_2) =
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
@@ -159,7 +161,7 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
     Test.register
       ~__FILE__
       ~title:(Printf.sprintf "protocol migration at level %d" migration_level)
-      ~tags:["protocol"; "migration"; "sandbox"]
+      ~tags:[team; "protocol"; "migration"; "sandbox"]
     @@ fun () ->
     let* _client, _node =
       perform_protocol_migration
@@ -196,7 +198,7 @@ let test_migration_with_snapshots ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:(Printf.sprintf "protocol migration with snapshots")
-    ~tags:["protocol"; "migration"; "sandbox"; "snapshot"]
+    ~tags:[team; "protocol"; "migration"; "sandbox"; "snapshot"]
   @@ fun () ->
   let* client0, node0 =
     perform_protocol_migration
@@ -436,6 +438,7 @@ let test_migration_with_bakers ?(migration_level = 4)
          (Protocol.tag migrate_to))
     ~tags:
       [
+        team;
         "protocol";
         "migration";
         "baker";
@@ -534,6 +537,7 @@ let test_forked_migration_manual ?(migration_level = 4)
     ~__FILE__
     ~tags:
       [
+        team;
         "protocol";
         "migration";
         "baker";
@@ -736,6 +740,7 @@ let test_forked_migration_bakers ~migrate_from ~migrate_to =
     ~__FILE__
     ~tags:
       [
+        team;
         "protocol";
         "migration";
         "baker";
@@ -977,7 +982,7 @@ let test_migration_from_oxford_for_whole_cycle ~migrate_from ~migrate_to =
           (Printf.sprintf
              "protocol migration from Oxford at level %d"
              migration_level)
-        ~tags:["protocol"; "migration"; "sandbox"; "baking_rights"]
+        ~tags:[team; "protocol"; "migration"; "sandbox"; "baking_rights"]
       @@ fun () ->
       let* parameter_file =
         let parameters = [(["preserved_cycles"], `Int preserved_cycles)] in
@@ -1051,7 +1056,7 @@ let test_migration_from_oxford_with_denunciations ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:"protocol migration with denunciations"
-    ~tags:["protocol"; "migration"; "double"; "attestation"]
+    ~tags:[team; "protocol"; "migration"; "double"; "attestation"]
   @@ fun () ->
   if not (Protocol.number migrate_from = Protocol.number Protocol.Oxford) then
     Test.fail
@@ -1302,7 +1307,7 @@ let test_migration_deactivation_delays ~migrate_from ~migrate_to =
   Test.register
     ~__FILE__
     ~title:"protocol migration with deactivations"
-    ~tags:["protocol"; "migration"; "deactivation"]
+    ~tags:[team; "protocol"; "migration"; "deactivation"]
   @@ fun () ->
   if not (Protocol.number migrate_from = Protocol.number Protocol.Oxford) then
     Test.fail

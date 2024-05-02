@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let team = Tag.layer1
+
 let is_connected node ~peer_id =
   let* response =
     RPC.get_network_connection peer_id |> Node.RPC.call_raw node
@@ -149,6 +151,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
     ~title:(Format.sprintf "node synchronization (%s / %s)" hmode1s hmode2s)
     ~tags:
       [
+        team;
         "bootstrap";
         "node";
         "sync";
@@ -284,7 +287,7 @@ let check_rpc_force_bootstrapped () =
   Test.register
     ~__FILE__
     ~title:(sf "RPC force bootstrapped")
-    ~tags:["rpc"; "bootstrapped"]
+    ~tags:[team; "rpc"; "bootstrapped"]
   @@ fun () ->
   Log.info "Start a node." ;
   let* node = Node.init [Synchronisation_threshold 255] in

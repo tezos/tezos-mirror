@@ -32,6 +32,7 @@
 
 (** This modules implement tests related to the manager operations replacement
     in the mempool when precheck is activated *)
+let team = Tag.layer1
 
 open Tezt_tezos
 
@@ -198,7 +199,7 @@ let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
   Protocol.register_test
     ~__FILE__
     ~title
-    ~tags:["replace"; "fee"; "manager"]
+    ~tags:[team; "replace"; "fee"; "manager"]
     ~supports:(Protocol.From_protocol 015)
   @@ fun protocol ->
   let* nodes = Helpers.init ~protocol () in

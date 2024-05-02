@@ -30,9 +30,11 @@
    Subject:      Typechecking tests for the address and (contract _) types.
 *)
 
-let tags = ["client"; "contract"; "michelson"; "typechecking"]
+let team = Tag.layer1
 
-(** An address followed by an entrypoint typechecks at type address if 
+let tags = [team; "client"; "contract"; "michelson"; "typechecking"]
+
+(** An address followed by an entrypoint typechecks at type address if
   and only if the entrypoint is not "default". *)
 let check_address client address =
   let address_a = sf {|"%s%%a"|} address in

@@ -31,6 +31,8 @@
    Subject:      Regression tests for Michelson normalization commands.
 *)
 
+let team = Tag.layer1
+
 let hooks = Tezos_regression.hooks
 
 let modes = Client.[None; Some Readable; Some Optimized; Some Optimized_legacy]
@@ -39,7 +41,7 @@ let test_normalize_unparsing_mode =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test normalize in unparsing mode"
-    ~tags:["client"; "normalize"]
+    ~tags:[team; "client"; "normalize"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -57,7 +59,7 @@ let test_normalize_legacy_flag =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test normalize with legacy flag"
-    ~tags:["client"; "normalize"]
+    ~tags:[team; "client"; "normalize"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -77,7 +79,7 @@ let test_normalize_stack =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test Michelson stack normalization"
-    ~tags:["client"; "normalize"]
+    ~tags:[team; "client"; "normalize"]
     ~uses_node:false
     ~supports:(From_protocol 17)
   @@ fun protocol ->
@@ -131,7 +133,7 @@ let test_normalize_script =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test normalize script"
-    ~tags:["client"; "normalize"]
+    ~tags:[team; "client"; "normalize"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -150,7 +152,7 @@ let test_normalize_type =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Test normalize type"
-    ~tags:["client"; "normalize"]
+    ~tags:[team; "client"; "normalize"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

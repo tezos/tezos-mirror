@@ -30,6 +30,8 @@
    Subject:      Check synchronization state and prevalidator status
 *)
 
+let team = Tag.layer1
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4459
    Re-enable the "synchronisation_threshold" tests in the CI once the flakiness has
    been fixed. *)
@@ -77,6 +79,7 @@ let check_node_synchronization_state =
     ~title:"check synchronization state"
     ~tags:
       [
+        team;
         Tag.flaky;
         "synchronisation_threshold";
         "bootstrap";
@@ -170,6 +173,7 @@ let check_prevalidator_start =
     ~title:"Check prevalidator start"
     ~tags:
       [
+        team;
         Tag.flaky;
         "synchronisation_threshold";
         "bootstrap";
@@ -234,7 +238,8 @@ let test_threshold_zero =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold zero"
-    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Setup network" ;
@@ -271,7 +276,7 @@ let test_threshold_one =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold one"
-    ~tags:["bootstrap"; "threshold"]
+    ~tags:[team; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
@@ -308,7 +313,8 @@ let test_threshold_two =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold two"
-    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info "Add a first peer with threshold zero" ;
@@ -375,7 +381,8 @@ let test_threshold_stuck =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold stuck"
-    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let sync_latency = 3 in
@@ -438,7 +445,8 @@ let test_threshold_split_view =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: test threshold split view"
-    ~tags:[Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [team; Tag.flaky; "synchronisation_threshold"; "bootstrap"; "threshold"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   Log.info
@@ -506,7 +514,14 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:["synchronisation_threshold"; "bootstrap"; "threshold"; Tag.memory_4k]
+    ~tags:
+      [
+        team;
+        "synchronisation_threshold";
+        "bootstrap";
+        "threshold";
+        Tag.memory_4k;
+      ]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let num_nodes = 8 in

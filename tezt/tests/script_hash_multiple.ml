@@ -30,13 +30,15 @@
    Subject:      Tests various invocations of the [octez-client hash script]
 *)
 
+let team = Tag.layer1
+
 (* Test octez-client hash script with different number and type of
    arguments *)
 let test_script_hash_multiple =
   Protocol.register_test
     ~__FILE__
     ~title:"Script hash multiple"
-    ~tags:["script"; "hash"; "multiple"]
+    ~tags:[team; "script"; "hash"; "multiple"]
     ~uses_node:false
   @@ fun protocol ->
   let id_script_path =
