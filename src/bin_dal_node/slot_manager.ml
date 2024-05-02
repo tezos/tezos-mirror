@@ -294,9 +294,9 @@ let shards_to_attesters committee =
   let committee = to_array committee in
   fun index -> get_opt committee index
 
-(** This function publishes the shards of a commitment that is waiting for
-    attestion on L1 if this node has those shards on disk and their proofs in
-    memory. *)
+(** This function publishes the shards of a commitment that is waiting
+    for attestion on L1 if this node has those shards and their proofs
+    in memory. *)
 let publish_proved_shards ~published_level ~slot_index ~level_committee
     proto_parameters shards shard_proofs gs_worker =
   let open Lwt_result_syntax in
@@ -355,9 +355,9 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
                    |> app_input gs_worker) ;
                  return_unit))
 
-(** This function publishes the shards of a commitment that is waiting for
-    attestion on L1 if this node has those shards on disk and their proofs in
-    memory. *)
+(** This function publishes the shards of a commitment that is waiting
+    for attestion on L1 if this node has those shards and their proofs
+    in memory. *)
 let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
     cryptobox proto_parameters commitment published_level slot_index =
   let open Lwt_result_syntax in
@@ -382,7 +382,17 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
   | Some shard_proofs ->
       let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
       let shards =
-        Store.Shards.read_all node_store.shards commitment ~number_of_shards
+        match
+          Store.Shard_cache.find_opt
+            node_store.not_yet_published_shards
+            commitment
+        with
+        | Some shards ->
+            shards |> Array.to_seq
+            |> Seq.mapi (fun index share -> (commitment, index, Ok share))
+            |> Seq_s.of_seq
+        | None ->
+            Store.Shards.read_all node_store.shards commitment ~number_of_shards
       in
       publish_proved_shards
         ~published_level
