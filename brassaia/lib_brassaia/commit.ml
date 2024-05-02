@@ -45,11 +45,14 @@ module Maker_generic_key (I : Info.S) = struct
     [@@deriving brassaia]
 
     let encoding =
-      Data_encoding.conv
-        (fun { node; parents; info } -> (node, parents, info))
-        (fun (node, parents, info) -> { node; parents; info })
-        Data_encoding.(
-          tup3 node_key_encoding (list commit_key_encoding) Info.encoding)
+      Data_encoding.(
+        conv
+          (fun { node; parents; info } -> (node, parents, info))
+          (fun (node, parents, info) -> { node; parents; info })
+          (obj3
+             (req "node" node_key_encoding)
+             (req "parents" (list commit_key_encoding))
+             (req "info" Info.encoding)))
 
     type t_not_prefixed = t [@@deriving brassaia]
 
@@ -107,10 +110,13 @@ module Maker_generic_key (I : Info.S) = struct
       let hash_encoding = H.encoding
 
       let encoding =
-        Data_encoding.conv
-          (fun { node; parents; info } -> (node, parents, info))
-          (fun (node, parents, info) -> { node; parents; info })
-          Data_encoding.(tup3 hash_encoding (list hash_encoding) Info.encoding)
+        Data_encoding.(
+          conv
+            (fun { node; parents; info } -> (node, parents, info))
+            (fun (node, parents, info) -> { node; parents; info })
+            (obj3 (req "node" hash_encoding)
+               (req "parents" (list hash_encoding))
+               (req "info" Info.encoding)))
 
       let parents t = t.parents
       let node t = t.node
@@ -716,10 +722,13 @@ module V1 = struct
     type t = { parents : commit_key list; c : Commit.t }
 
     let encoding =
-      Data_encoding.conv
-        (fun { parents; c } -> (parents, c))
-        (fun (parents, c) -> { parents; c })
-        Data_encoding.(tup2 (list commit_key_encoding) Commit.encoding)
+      Data_encoding.(
+        conv
+          (fun { parents; c } -> (parents, c))
+          (fun (parents, c) -> { parents; c })
+          (obj2
+             (req "parents" (list commit_key_encoding))
+             (req "c" Commit.encoding)))
 
     module Info = Info
 

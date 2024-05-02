@@ -23,12 +23,12 @@ module Default = struct
   type t = { date : int64; author : author; message : message }
   [@@deriving brassaia ~equal]
 
-  let encoding : t Data_encoding.t =
+  let encoding =
     Data_encoding.(
       conv
         (fun { date; author; message } -> (date, author, message))
         (fun (date, author, message) -> { date; author; message })
-        (tup3 int64 string string))
+        (obj3 (req "date" int64) (req "author" string) (req "message" string)))
 
   type f = unit -> t
 

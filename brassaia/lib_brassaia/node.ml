@@ -813,10 +813,12 @@ module V1 (N : Generic_key.S with type step = string) = struct
   type t = { n : N.t; entries : (step * value) list }
 
   let encoding =
-    Data_encoding.conv
-      (fun { n; entries } -> (n, entries))
-      (fun (n, entries) -> { n; entries })
-      Data_encoding.(tup2 N.encoding (list (tup2 step_encoding value_encoding)))
+    Data_encoding.(
+      conv
+        (fun { n; entries } -> (n, entries))
+        (fun (n, entries) -> { n; entries })
+        (obj2 (req "n" N.encoding)
+           (req "entries" (list (tup2 step_encoding value_encoding)))))
 
   exception Dangling_hash = N.Dangling_hash
 
