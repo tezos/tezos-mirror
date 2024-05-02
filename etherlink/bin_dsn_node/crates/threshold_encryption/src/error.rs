@@ -12,8 +12,6 @@ pub enum ThresholdEncryptionError {
     CiphertextInvalid(&'static str),
     #[error("Decryption share is invalid: {0}")]
     DecryptionShareInvalid(&'static str),
-    #[error("Signature is invalid: {0}")]
-    SignatureInvalid(libsecp256k1::Error),
     #[error("Decrypted transaction hash {actual} does not match the expected one {expected}")]
     TransactionHashMismatch { expected: H256, actual: H256 },
     #[error(
@@ -28,10 +26,4 @@ pub enum ThresholdEncryptionError {
         "Failed to encrypt transaction: ChaCha cipher has reached the end of a keystream (tx {0})"
     )]
     TransactionEncryptionFailed(H256),
-    #[error("Not enough attestations")]
-    QuorumNotMet,
-    #[error("Unknown signing authority")]
-    AuthorityUnknown,
-    #[error("Same authority attested twice")]
-    AuthorityDoubleAttested,
 }

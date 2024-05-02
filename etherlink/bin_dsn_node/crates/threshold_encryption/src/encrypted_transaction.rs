@@ -2,116 +2,96 @@
 //
 // SPDX-License-Identifier: MIT
 
-//! Encrypted transaction type.
-//!
-//! EIP-2718 compatible format: [ Transaction type | Transaction payload ]
+//! Encrypted transaction.
 
-use rlp::{DecoderError, Encodable, RlpDecodable, RlpEncodable, RlpStream};
+use rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 use crate::{
-    ciphertext::Ciphertext,
     error::ThresholdEncryptionError,
-    helpers::{keccak_256, multi_keccak_256, Bytes32},
-    signature::Signature,
+    helpers::{chacha20_apply, keccak_256, rlp_decode_array, rlp_decode_vec, Bytes32},
 };
 
-/// EIP-2718 encrypted transaction type
-pub const ENCRYPTED_TX_TYPE: u8 = 0x7e;
-
-/// Encrypted envelope containing a common EVM transaction as inner payload.
-/// NOTE: RLP encoding does not append tx type tag, use `to_bytes` method instead.
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
+pub struct EncryptedPayload(pub Vec<EncryptedTransaction>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncryptedTransaction {
-    /// Encrypted payload
-    pub ciphertext: Ciphertext,
-    /// Outer transaction nonce (related to the bundler's account)
-    pub nonce: u64,
-    /// Authentication tag produced by the transaction bundler
-    pub signature: Signature,
+    /// Payload transaction encrypted with symmetric (ChaCha) cipher
+    pub encrypted_tx: Vec<u8>,
+    /// Hash of the unencrypted transaction
+    pub tx_hash: Bytes32,
 }
 
 impl EncryptedTransaction {
-    /// Assemble encrypted transaction from parts and sign with a provided key
-    pub fn create_signed(
-        ciphertext: Ciphertext,
-        nonce: u64,
-        signing_key: &libsecp256k1::SecretKey,
-    ) -> Self {
-        let digest = multi_keccak_256([&ciphertext.rlp_bytes(), nonce.to_be_bytes().as_slice()]);
-        Self {
-            signature: Signature::create(&digest, signing_key),
-            nonce,
-            ciphertext,
+    /// Encrypt transaction bytes using symmetric (ChaCha) key.
+    pub fn encrypt_with_key(
+        tx_bytes: &[u8],
+        key: &Bytes32,
+    ) -> Result<Self, ThresholdEncryptionError> {
+        let tx_hash = keccak_256(tx_bytes);
+        let encrypted_tx = chacha20_apply(tx_bytes, key)
+            .map_err(|_| ThresholdEncryptionError::TransactionEncryptionFailed(tx_hash.into()))?;
+        Ok(Self {
+            encrypted_tx,
+            tx_hash,
+        })
+    }
+
+    /// Decrypt transaction bytes using symmetric (ChaCha) key.
+    ///
+    /// Will fail if the result does not match the known tx hash.
+    pub fn decrypt_checked(&self, key: &Bytes32) -> Result<Vec<u8>, ThresholdEncryptionError> {
+        let tx_bytes = chacha20_apply(&self.encrypted_tx, key).map_err(|_| {
+            ThresholdEncryptionError::TransactionEncryptionFailed(self.tx_hash.into())
+        })?;
+        let tx_hash = keccak_256(&tx_bytes);
+        if tx_hash != self.tx_hash {
+            return Err(ThresholdEncryptionError::TransactionHashMismatch {
+                actual: tx_hash.into(),
+                expected: self.tx_hash.into(),
+            });
         }
+        Ok(tx_bytes)
     }
+}
 
-    /// Verify transaction signature and recover public key
-    pub fn verify_recover(&self) -> Result<libsecp256k1::PublicKey, ThresholdEncryptionError> {
-        let digest = multi_keccak_256([
-            &self.ciphertext.rlp_bytes(),
-            self.nonce.to_be_bytes().as_slice(),
-        ]);
-        self.signature
-            .verify_recover(&digest)
-            .map_err(ThresholdEncryptionError::SignatureInvalid)
+impl Encodable for EncryptedTransaction {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(2)
+            .append_iter(self.encrypted_tx.clone())
+            .append_iter(self.tx_hash);
     }
+}
 
-    /// Compute transaction hash
-    pub fn hash(&self) -> Bytes32 {
-        keccak_256(&self.to_bytes())
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<EncryptedTransaction, DecoderError> {
-        let tx_type = *bytes.first().ok_or(DecoderError::Custom("Empty bytes"))?;
-        if tx_type == ENCRYPTED_TX_TYPE {
-            rlp::decode(&bytes[1..])
-        } else {
-            Err(DecoderError::Custom("Unexpected transaction type"))
-        }
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut stream = RlpStream::new();
-        stream.append_raw(&[ENCRYPTED_TX_TYPE], 1);
-        self.rlp_append(&mut stream);
-        stream.out().to_vec()
-    }
-
-    pub fn from_hex(e: String) -> Result<EncryptedTransaction, DecoderError> {
-        let tx = hex::decode(e).or(Err(DecoderError::Custom("Couldn't parse hex value")))?;
-        Self::from_bytes(&tx)
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.to_bytes())
+impl Decodable for EncryptedTransaction {
+    fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        let mut it = rlp.iter();
+        Ok(Self {
+            encrypted_tx: rlp_decode_vec(it.next().as_ref())?,
+            tx_hash: rlp_decode_array(it.next().as_ref())?,
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use rand::rngs::OsRng;
-
-    use crate::{ciphertext::tests::dummy_ciphertext, encrypted_transaction::ENCRYPTED_TX_TYPE};
-
     use super::EncryptedTransaction;
 
     #[test]
-    fn test_encrypted_transaction_sign_verify() {
-        // Ensure we calculate digest correctly
-        let secret_key = libsecp256k1::SecretKey::random(&mut OsRng);
-        let public_key = libsecp256k1::PublicKey::from_secret_key(&secret_key);
-        let tx = EncryptedTransaction::create_signed(dummy_ciphertext(), 1, &secret_key);
-        let pk = tx.verify_recover().unwrap();
-        assert_eq!(pk, public_key);
+    fn test_decrypt_tx() {
+        let key = [2u8; 32];
+        let tx_bytes = [1u8; 128];
+        let encrypted_tx = EncryptedTransaction::encrypt_with_key(&tx_bytes, &key).unwrap();
+        let res = encrypted_tx.decrypt_checked(&key).unwrap();
+        assert_eq!(tx_bytes.to_vec(), res);
     }
 
     #[test]
-    fn test_encrypted_transaction_codec() {
-        let signing_key = libsecp256k1::SecretKey::random(&mut OsRng);
-        let tx = EncryptedTransaction::create_signed(dummy_ciphertext(), 0, &signing_key);
-        let encoded = tx.to_bytes();
-        assert_eq!(encoded[0], ENCRYPTED_TX_TYPE);
-        let decoded = EncryptedTransaction::from_bytes(&encoded).unwrap();
-        assert_eq!(decoded, tx);
+    fn test_encrypted_tx_codec() {
+        let key = [2u8; 32];
+        let tx_bytes = [1u8; 128];
+        let encrypted_tx = EncryptedTransaction::encrypt_with_key(&tx_bytes, &key).unwrap();
+        let res = encrypted_tx.decrypt_checked(&key).unwrap();
+        assert_eq!(tx_bytes.to_vec(), res);
     }
 }

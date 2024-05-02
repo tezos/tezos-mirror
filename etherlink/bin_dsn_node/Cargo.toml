@@ -12,6 +12,7 @@ members = [
     "crates/rpc",
     "crates/sequencer",
     "crates/bundler",
+    "crates/types",
 ]
 
 [workspace.package]

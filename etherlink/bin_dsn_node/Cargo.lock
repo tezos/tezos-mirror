@@ -963,6 +963,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsn-types"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "libsecp256k1",
+ "primitive-types",
+ "rand",
+ "rlp",
+ "serde",
+ "thiserror",
+ "threshold-encryption",
+]
+
+[[package]]
 name = "dunce"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3965,7 +3979,6 @@ dependencies = [
  "ff",
  "getrandom",
  "hex",
- "libsecp256k1",
  "pairing",
  "primitive-types",
  "rand",

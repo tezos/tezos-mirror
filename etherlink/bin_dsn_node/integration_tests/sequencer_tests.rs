@@ -21,7 +21,7 @@ fn dummy_proposal() -> Proposal {
             DelayedTransactionHash(HexString(vec![6u8; 32])),
         ],
         previous_block_hash: BlockHash(HexString(vec![7u8; 32])),
-        current_blueprint_number: HexString(vec![b'1']),
+        current_blueprint_number: "1".into(),
         timestamp: DateTime::from_timestamp_millis(1000000000000).unwrap(),
     }
 }

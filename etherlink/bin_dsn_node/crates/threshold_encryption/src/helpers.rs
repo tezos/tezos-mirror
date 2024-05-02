@@ -10,7 +10,6 @@ use chacha20::{
     ChaCha20,
 };
 use ff::Field;
-use primitive_types::H160;
 use rlp::DecoderError;
 use sha3::{Digest, Keccak256};
 
@@ -61,12 +60,12 @@ pub fn keccak_256(data: &[u8]) -> Bytes32 {
 /// Calculate Keccak256 hash digest for multiple values
 pub fn multi_keccak_256<I, T>(items: I) -> Bytes32
 where
-    I: AsRef<[T]>,
+    I: Iterator<Item = T>,
     T: AsRef<[u8]>,
 {
     let mut hasher = Keccak256::new();
-    for item in items.as_ref() {
-        hasher.update(item);
+    for item in items {
+        hasher.update(item.as_ref());
     }
     hasher.finalize().into()
 }
@@ -87,20 +86,6 @@ pub fn lagrange_coeff(indices: &[Scalar], j: &Scalar) -> Scalar {
 
     // Mult inverse always exists because our denominator cannot become zero
     num * den.invert().unwrap()
-}
-
-/// Get EVM address from secp256k1 public key
-///
-/// EVM address is last 20 bytes of keccak(X || Y) where X,Y is the coordinates of the EC point
-/// representing public key.
-pub fn public_key_to_h160(public_key: &libsecp256k1::PublicKey) -> H160 {
-    // libsecp256k1 adds extra tag so we need to strip it
-    let pk_bytes = &public_key.serialize()[1..];
-    let pk_digest = Keccak256::digest(pk_bytes);
-    let value: [u8; 20] = pk_digest.as_slice()[12..]
-        .try_into()
-        .expect("Keccak256 output must be 32 bytes");
-    H160(value)
 }
 
 pub fn rlp_decode_vec(decoder: Option<&rlp::Rlp>) -> Result<Vec<u8>, DecoderError> {

@@ -8,13 +8,15 @@
 //! Implements RLP codec for using in the Etherlink kernel.
 
 use libsecp256k1::{Message, RecoveryId};
-
-use crate::helpers::{rlp_decode_array, Bytes32};
+use primitive_types::H160;
+use threshold_encryption::helpers::{keccak_256, rlp_decode_array, Bytes32};
 
 /// Length of a signature in compact form plus one (recovery byte)
-pub const SIGNATURE_SIZE: usize = 1 + libsecp256k1::util::SIGNATURE_SIZE;
+pub const SIGNATURE_SIZE: usize = libsecp256k1::util::SIGNATURE_SIZE + 1;
 
-/// Serialized signature in the compact form with a recovery byte: [ V | R | S ]
+/// Serialized signature in the compact form with a recovery byte: [ R | S | V ]
+/// Compatible with ethers-rs serialized format:
+/// https://github.com/gakonst/ethers-rs/blob/51fe937f6515689b17a3a83b74a05984ad3a7f11/ethers-core/src/types/signature.rs#L240
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature(pub [u8; SIGNATURE_SIZE]);
 
@@ -30,7 +32,7 @@ impl Signature {
     }
 
     /// Verify signature and recover public key
-    pub fn verify_recover(
+    pub fn recover_pubkey(
         &self,
         digest: &Bytes32,
     ) -> Result<libsecp256k1::PublicKey, libsecp256k1::Error> {
@@ -48,6 +50,20 @@ impl Signature {
     pub fn zero() -> Self {
         Self([0u8; SIGNATURE_SIZE])
     }
+}
+
+/// Get EVM address from secp256k1 public key
+///
+/// EVM address is last 20 bytes of keccak(X || Y) where X,Y is the coordinates of the EC point
+/// representing public key.
+pub fn public_key_to_h160(public_key: &libsecp256k1::PublicKey) -> H160 {
+    // libsecp256k1 adds extra tag so we need to strip it
+    let pk_bytes = &public_key.serialize()[1..];
+    let pk_digest = keccak_256(pk_bytes);
+    let value: [u8; 20] = pk_digest.as_slice()[12..]
+        .try_into()
+        .expect("Keccak256 output must be 32 bytes");
+    H160(value)
 }
 
 impl rlp::Encodable for Signature {
@@ -75,7 +91,7 @@ mod tests {
         let public_key = libsecp256k1::PublicKey::from_secret_key(&secret_key);
 
         let sig = Signature::create(&[1u8; 32], &secret_key);
-        let pk = sig.verify_recover(&[1u8; 32]).unwrap();
+        let pk = sig.recover_pubkey(&[1u8; 32]).unwrap();
         assert_eq!(pk, public_key);
     }
 
