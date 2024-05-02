@@ -191,6 +191,8 @@ end
 module Contents = struct
   type t = bytes
 
+  let encoding = Data_encoding.bytes
+
   let ty = Brassaia.Type.(pair (bytes_of `Int64) unit)
 
   let pre_hash_ty = Brassaia.Type.(unstage (pre_hash ty))

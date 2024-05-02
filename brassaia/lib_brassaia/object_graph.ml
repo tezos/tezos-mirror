@@ -45,6 +45,24 @@ struct
       | `Branch of Branch.t ]
     [@@deriving brassaia]
 
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case (Tag 1) ~title:"`Contents" Contents_key.encoding
+            (function `Contents k -> Some k | _ -> None)
+            (fun k -> `Contents k);
+          case (Tag 2) ~title:"`Node" Node_key.encoding
+            (function `Node k -> Some k | _ -> None)
+            (fun k -> `Node k);
+          case (Tag 3) ~title:"`Commit" Commit_key.encoding
+            (function `Commit c -> Some c | _ -> None)
+            (fun c -> `Commit c);
+          case (Tag 4) ~title:"`Branch " Branch.encoding
+            (function `Branch b -> Some b | _ -> None)
+            (fun b -> `Branch b);
+        ]
+
     let equal = Type.(unstage (equal t))
     let compare = Type.(unstage (compare t))
     let hash_contents = Type.(unstage (short_hash Contents_key.t))
@@ -96,22 +114,18 @@ struct
      to save space. *)
   module Dump = struct
     type t = X.t list * (X.t * X.t) list [@@deriving brassaia]
+
+    let encoding =
+      Data_encoding.(tup2 (list X.encoding) (list (tup2 X.encoding X.encoding)))
   end
 
   let vertex g = G.fold_vertex (fun k set -> k :: set) g []
   let edges g = G.fold_edges (fun k1 k2 list -> (k1, k2) :: list) g []
-  let pp_vertices = Fmt.Dump.list (Type.pp X.t)
-  let pp_depth ppf d = if d <> max_int then Fmt.pf ppf "depth=%d,@ " d
 
   type action = Visit of (X.t * int) | Treat of X.t
 
   let iter ?cache_size ?(depth = max_int) ~pred ~min ~max ~node ?edge ~skip ~rev
       () =
-    [%log.debug
-      "@[<2>iter:@ %arev=%b,@ min=%a,@ max=%a@, cache=%a@]" pp_depth depth rev
-        pp_vertices min pp_vertices max
-        Fmt.(Dump.option int)
-        cache_size];
     let marks = Table.create cache_size in
     let mark key level = Table.add marks key level in
     let todo = Stack.create () in

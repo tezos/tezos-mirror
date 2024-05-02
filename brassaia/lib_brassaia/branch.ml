@@ -20,6 +20,7 @@ module String = struct
   type t = string
 
   let t = Type.string
+  let encoding = Data_encoding.string
   let main = "main"
 
   let is_valid s =

@@ -20,6 +20,8 @@ module type S = sig
   type t [@@deriving brassaia]
   (** The type for branches. *)
 
+  val encoding : t Data_encoding.t
+
   val main : t
   (** The name of the main branch. *)
 

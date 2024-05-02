@@ -80,6 +80,8 @@ module Brassaia_hash = Hash
 module Make_core
     (Hash : Hash.S) (Path : sig
       type step [@@deriving brassaia]
+
+      val step_encoding : step Data_encoding.t
     end)
     (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
@@ -88,10 +90,24 @@ struct
   module Metadata = Metadata
 
   type contents_key = Contents_key.t [@@deriving brassaia]
+
+  let contents_key_encoding = Contents_key.encoding
+
   type node_key = Node_key.t [@@deriving brassaia]
+
+  let node_key_encoding = Node_key.encoding
+
   type step = Path.step [@@deriving brassaia]
+
+  let step_encoding = Path.step_encoding
+
   type metadata = Metadata.t [@@deriving brassaia ~equal]
+
+  let metadata_encoding = Metadata.encoding
+
   type hash = Hash.t [@@deriving brassaia]
+
+  let hash_encoding = Hash.encoding
 
   type 'key contents_entry = { name : Path.step; contents : 'key }
   [@@deriving brassaia]
@@ -103,9 +119,13 @@ struct
   }
   [@@deriving brassaia]
 
-  module StepMap = Map.Make (struct
-    type t = Path.step [@@deriving brassaia ~compare]
-  end)
+  module StepMap = struct
+    include Map.Make (struct
+      type t = Path.step [@@deriving brassaia ~compare]
+    end)
+
+    let key_encoding = Path.step_encoding
+  end
 
   type 'h node_entry = { name : Path.step; node : 'h } [@@deriving brassaia]
 
@@ -120,11 +140,51 @@ struct
     | Contents_m_hash of Hash.t contents_m_entry
   [@@deriving brassaia]
 
+  let entry_encoding =
+    Data_encoding.conv
+      Type.(to_string entry_t)
+      Type.(
+        of_string_exn ~path:"lib_brassaia/node.ml/Make_core/entry_encoding"
+          entry_t)
+      Data_encoding.string
+
   type t = entry StepMap.t
-  type value = [ `Contents of contents_key * metadata | `Node of node_key ]
+
+  let encoding =
+    Data_encoding.conv StepMap.bindings
+      (fun l -> List.to_seq l |> StepMap.of_seq)
+      Data_encoding.(list (tup2 StepMap.key_encoding entry_encoding))
+
+  type value = [ `Node of node_key | `Contents of contents_key * metadata ]
+
+  let value_encoding =
+    let open Data_encoding in
+    union
+      [
+        case (Tag 1) ~title:"`Node" node_key_encoding
+          (function `Node k -> Some k | _ -> None)
+          (fun k -> `Node k);
+        case (Tag 2) ~title:"`Contents"
+          (tup2 contents_key_encoding metadata_encoding)
+          (function `Contents k -> Some k | _ -> None)
+          (fun k -> `Contents k);
+      ]
 
   type weak_value = [ `Contents of hash * metadata | `Node of hash ]
   [@@deriving brassaia]
+
+  let weak_value_encoding =
+    let open Data_encoding in
+    union
+      [
+        case (Tag 1) ~title:"`Node" hash_encoding
+          (function `Node k -> Some k | _ -> None)
+          (fun k -> `Node k);
+        case (Tag 2) ~title:"`Contents"
+          (tup2 hash_encoding metadata_encoding)
+          (function `Contents k -> Some k | _ -> None)
+          (fun k -> `Contents k);
+      ]
 
   (* FIXME:  special-case the default metadata in the default signature? *)
   let value_t =
@@ -291,6 +351,8 @@ struct
       (Hash)
       (struct
         type nonrec t = t [@@deriving brassaia]
+
+        let encoding = encoding
       end)
 
   let hash_exn ?force:_ = Ht.hash
@@ -337,6 +399,8 @@ end
 module Make_generic_key
     (Hash : Hash.S) (Path : sig
       type step [@@deriving brassaia]
+
+      val step_encoding : step Data_encoding.t
     end)
     (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
@@ -351,8 +415,16 @@ struct
       include Core
 
       type contents_key = hash [@@deriving brassaia]
+
+      let contents_key_encoding = hash_encoding
+
       type node_key = hash [@@deriving brassaia]
+
+      let node_key_encoding = hash_encoding
+
       type value = weak_value [@@deriving brassaia]
+
+      let value_encoding = weak_value_encoding
 
       let to_entry name = function
         | `Node node -> Node_hash { name; node }
@@ -405,6 +477,8 @@ end
 module Make_generic_key_v2
     (Hash : Hash.S) (Path : sig
       type step [@@deriving brassaia]
+
+      val step_encoding : step Data_encoding.t
     end)
     (Metadata : Metadata.S)
     (Contents_key : Key.S with type hash = Hash.t)
@@ -424,6 +498,8 @@ end
 module Make
     (Hash : Hash.S) (Path : sig
       type step [@@deriving brassaia]
+
+      val step_encoding : step Data_encoding.t
     end)
     (Metadata : Metadata.S) =
 struct
@@ -515,9 +591,21 @@ module Graph (S : Store) = struct
   module Metadata = S.Metadata
 
   type step = Path.step [@@deriving brassaia]
+
+  let _step_encoding = Path.step_encoding
+
   type metadata = Metadata.t [@@deriving brassaia]
+
+  let _metadata_encoding = Metadata.encoding
+
   type contents_key = Contents_key.t [@@deriving brassaia]
+
+  let _contents_key_encoding = Contents_key.encoding
+
   type node_key = S.Key.t [@@deriving brassaia]
+
+  let _node_key_encoding = S.Key.encoding
+
   type path = Path.t [@@deriving brassaia]
   type 'a t = 'a S.t
   type value = [ `Contents of contents_key * metadata | `Node of node_key ]
@@ -530,6 +618,8 @@ module Graph (S : Store) = struct
 
   module U = struct
     type t = unit [@@deriving brassaia]
+
+    let encoding = Data_encoding.unit
   end
 
   module Graph = Object_graph.Make (Contents_key) (S.Key) (U) (U)
@@ -677,29 +767,56 @@ module V1 (N : Generic_key.S with type step = string) = struct
         | Error (`Msg e) -> Fmt.failwith "decode_bin: %s" e
 
     let t = Type.like t ~bin:(encode_bin, decode_bin, size_of)
+    let encoding = H.encoding
   end
 
   module Node_key = K (struct
     type t = N.node_key
 
     let t = N.node_key_t
+    let encoding = N.node_key_encoding
   end)
 
   module Contents_key = K (struct
     type t = N.contents_key
 
     let t = N.contents_key_t
+    let encoding = N.contents_key_encoding
   end)
 
   module Metadata = N.Metadata
 
   type step = N.step
+
+  let step_encoding = N.step_encoding
+
   type node_key = Node_key.t [@@deriving brassaia]
+
+  let node_key_encoding = Node_key.encoding
+
   type contents_key = Contents_key.t [@@deriving brassaia]
+
+  let contents_key_encoding = Contents_key.encoding
+
   type metadata = N.metadata [@@deriving brassaia]
+
+  let metadata_encoding = N.metadata_encoding
+
   type hash = N.hash [@@deriving brassaia]
+
+  let hash_encoding = N.hash_encoding
+
   type value = N.value
+
+  let value_encoding = N.value_encoding
+
   type t = { n : N.t; entries : (step * value) list }
+
+  let encoding =
+    Data_encoding.conv
+      (fun { n; entries } -> (n, entries))
+      (fun (n, entries) -> { n; entries })
+      Data_encoding.(tup2 N.encoding (list (tup2 step_encoding value_encoding)))
 
   exception Dangling_hash = N.Dangling_hash
 

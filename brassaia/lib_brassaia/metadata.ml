@@ -19,6 +19,7 @@ include Metadata_intf
 module None = struct
   type t = unit [@@deriving brassaia]
 
+  let encoding = Data_encoding.unit
   let default = ()
   let merge = Merge.init t (fun ~old:_ () () -> Merge.ok ())
 end

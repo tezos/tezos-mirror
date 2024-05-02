@@ -875,6 +875,7 @@ module Child_ordering = struct
           type nonrec t = t
 
           let t = t
+          let encoding = Schema.Path.step_encoding
         end)
 
     type nonrec hash = Hash.t [@@deriving brassaia ~to_bin_string]

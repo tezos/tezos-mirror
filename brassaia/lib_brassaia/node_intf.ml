@@ -23,25 +23,46 @@ module type Core = sig
   type t [@@deriving brassaia]
   (** The type for node values. *)
 
+  val encoding : t Data_encoding.t
+  (** [encoding] is the data_encoding for {!type-t}. *)
+
   type metadata [@@deriving brassaia]
   (** The type for node metadata. *)
+
+  val metadata_encoding : metadata Data_encoding.t
+  (** [metadata_encoding] is the data_encoding for {!type-metadata}. *)
 
   type contents_key [@@deriving brassaia]
   (** The type for contents keys. *)
 
+  val contents_key_encoding : contents_key Data_encoding.t
+  (** [contents_key_encoding] is the data_encoding for {!type-contents_key}. *)
+
   type node_key [@@deriving brassaia]
   (** The type for node keys. *)
 
+  val node_key_encoding : node_key Data_encoding.t
+  (** [node_key_encoding] is the data_encoding for {!type-node_key}. *)
+
   type step [@@deriving brassaia]
   (** The type for steps between nodes. *)
+
+  val step_encoding : step Data_encoding.t
+  (** [step_encoding] is the data_encoding for {!type-step}. *)
 
   type value = [ `Node of node_key | `Contents of contents_key * metadata ]
   [@@deriving brassaia]
   (** The type for either (node) keys or (contents) keys combined with their
       metadata. *)
 
+  val value_encoding : value Data_encoding.t
+  (** [value_encoding] is the data_encoding for {!type-value}. *)
+
   type hash [@@deriving brassaia]
   (** The type of hashes of values. *)
+
+  val hash_encoding : hash Data_encoding.t
+  (** [hash_encoding] is the data_encoding for {!type-hash}. *)
 
   val of_list : (step * value) list -> t
   (** [of_list l] is the node [n] such that [list n = l]. *)
@@ -217,6 +238,8 @@ module type Maker_generic_key = functor
   (Hash : Hash.S)
   (Path : sig
      type step [@@deriving brassaia]
+
+     val step_encoding : step Data_encoding.t
    end)
   (Metadata : Metadata.S)
   (Contents_key : Key.S with type hash = Hash.t)
@@ -353,6 +376,8 @@ module type Sigs = sig
   module Make
       (Hash : Hash.S) (Path : sig
         type step [@@deriving brassaia]
+
+        val step_encoding : step Data_encoding.t
       end)
       (Metadata : Metadata.S) :
     S

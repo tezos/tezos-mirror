@@ -23,6 +23,8 @@ module Value = struct
   module Of_hash (X : Brassaia.Hash.S) = struct
     type t = X.t [@@deriving brassaia ~of_bin_string]
 
+    let encoding = X.encoding
+
     let null =
       match of_bin_string (String.make X.hash_size '\000') with
       | Ok x -> x

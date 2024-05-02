@@ -20,6 +20,21 @@ open Brassaia
 module Metadata = struct
   type t = Default | Left | Right [@@deriving brassaia]
 
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case (Tag 1) ~title:"Default" empty
+          (function Default -> Some () | _ -> None)
+          (fun () -> Default);
+        case (Tag 2) ~title:"Left" empty
+          (function Left -> Some () | _ -> None)
+          (fun () -> Left);
+        case (Tag 3) ~title:"Right" empty
+          (function Right -> Some () | _ -> None)
+          (fun () -> Right);
+      ]
+
   let merge =
     Merge.init t (fun ~old:_ _ _ -> Merge.conflict "Can't merge metadata")
 
