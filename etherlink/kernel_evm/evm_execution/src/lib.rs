@@ -40,6 +40,7 @@ extern crate tezos_smart_rollup_debug as debug;
 extern crate tezos_smart_rollup_host as host;
 
 use precompiles::PrecompileSet;
+use trace::TracerConfig;
 
 use crate::handler::ExtendedExitReason;
 
@@ -154,6 +155,7 @@ pub fn run_transaction<'a, Host>(
     allocated_ticks: u64,
     retriable: bool,
     enable_warm_cold_access: bool,
+    tracer: Option<TracerConfig>,
 ) -> Result<Option<handler::ExecutionOutcome>, EthereumError>
 where
     Host: Runtime,
@@ -421,6 +423,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -488,6 +491,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -549,6 +553,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -607,6 +612,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let new_address =
@@ -643,6 +649,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
         let result = result2.unwrap();
@@ -673,6 +680,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
         assert!(result3.is_ok(), "execution should have succeeded");
         let result = result3.unwrap();
@@ -702,6 +710,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
         assert!(result2.is_ok(), "execution should have succeeded");
         let result = result2.unwrap();
@@ -758,6 +767,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         assert!(result.is_ok());
@@ -810,6 +820,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -865,6 +876,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000; // base cost
@@ -1013,6 +1025,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000 // base cost
@@ -1078,6 +1091,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000 // base cost
@@ -1142,6 +1156,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         // Assert
@@ -1201,6 +1216,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
@@ -1261,6 +1277,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000 // base cost
@@ -1323,6 +1340,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         // Assert
@@ -1437,6 +1455,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         // Assert
@@ -1517,6 +1536,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000 // base cost
@@ -1612,6 +1632,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000 // base cost
@@ -1729,6 +1750,7 @@ mod test {
             1_000_000_000,
             false,
             false,
+            None,
         );
 
         let log_record1 = Log {
@@ -1843,6 +1865,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let log_record1 = Log {
@@ -1946,6 +1969,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
         let expected_gas = 21000 // base cost
         + 5124; // execution gas cost (taken at face value from tests)
@@ -2066,11 +2090,13 @@ mod test {
             10_000_000_000,
             false,
             false,
+            None,
         );
 
         let expected_result = Ok(Some(ExecutionOutcome {
             gas_used: all_the_gas,
             is_success: false,
+
             reason: ExitReason::Error(ExitError::InvalidCode(Opcode::INVALID)).into(),
             new_address: None,
             logs: vec![],
@@ -2161,6 +2187,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000 // base cost
@@ -2240,6 +2267,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_gas = 21000 // base cost
@@ -2319,6 +2347,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let expected_result = Err(EthereumError::EthereumAccountError(
@@ -2370,6 +2399,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let result = unwrap_outcome!(result);
@@ -2427,6 +2457,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -2494,6 +2525,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         // Assert
@@ -2558,6 +2590,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         // Assert
@@ -2616,6 +2649,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         )
     }
 
@@ -2722,6 +2756,7 @@ mod test {
             10_000_000_000,
             false,
             false,
+            None,
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -2804,6 +2839,7 @@ mod test {
             10_000_000_000,
             false,
             false,
+            None,
         );
 
         let result_init = unwrap_outcome!(&result_init, true);
@@ -2913,6 +2949,7 @@ mod test {
             10_000_000_000,
             false,
             false,
+            None,
         );
 
         let result_init = unwrap_outcome!(&result_init, true);
@@ -2993,6 +3030,7 @@ mod test {
             10_000_000_000,
             false,
             false,
+            None,
         );
 
         let result = unwrap_outcome!(&result, false);
@@ -3040,6 +3078,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let result = unwrap_outcome!(result);
@@ -3096,6 +3135,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         let path = account_path(&caller).unwrap();
@@ -3185,6 +3225,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         // Get info on contract that should not be created
@@ -3283,6 +3324,7 @@ mod test {
             10_000,
             retriable,
             false,
+            None,
         );
 
         (host, result, account, initial_balance, initial_caller_nonce)
@@ -3413,6 +3455,7 @@ mod test {
             u64::MAX,
             false,
             false,
+            None,
         );
 
         unwrap_outcome!(result, true);
@@ -3498,6 +3541,7 @@ mod test {
             u64::MAX,
             false,
             false,
+            None,
         );
 
         unwrap_outcome!(result, false);
@@ -3536,6 +3580,7 @@ mod test {
             u64::MAX,
             false,
             false,
+            None,
         );
 
         let internal_address_nonce =
@@ -3616,6 +3661,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS * 100,
             false,
             false,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -3706,6 +3752,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -3766,6 +3813,7 @@ mod test {
             DUMMY_ALLOCATED_TICKS,
             false,
             false,
+            None,
         );
 
         // The origin address is empty but when you start a transaction the nonce is bump

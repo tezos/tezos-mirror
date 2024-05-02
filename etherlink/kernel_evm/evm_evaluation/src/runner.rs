@@ -241,6 +241,7 @@ fn execute_transaction(
         u64::MAX, // don't account for ticks during the test
         false,
         true,
+        None,
     )
 }
 
