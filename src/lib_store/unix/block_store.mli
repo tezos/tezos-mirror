@@ -164,11 +164,6 @@ type key = Block of (Block_hash.t * int)
 (** The status of the merging thread *)
 type merge_status = Not_running | Running | Merge_failed of tztrace
 
-(** The status of the store *)
-type status = Idle | Merging
-
-val status_encoding : status Data_encoding.t
-
 (** [cemented_block_store block_store] returns the instance of the
     cemented block store for [block_store]. *)
 val cemented_block_store : block_store -> Cemented_block_store.t
@@ -193,9 +188,7 @@ val caboose : block_store -> block_descriptor Lwt.t
 
 val write_caboose : block_store -> block_descriptor -> unit tzresult Lwt.t
 
-val status : block_store -> status Lwt.t
-
-val write_status : block_store -> status -> unit tzresult Lwt.t
+val status : block_store -> Block_store_status.t Lwt.t
 
 val genesis_block : block_store -> Block_repr.t
 
@@ -391,3 +384,6 @@ val v_3_0_upgrade :
   cleanups:(unit -> unit Lwt.t) list ref ->
   finalizers:(unit -> unit Lwt.t) list ref ->
   unit tzresult Lwt.t
+
+(** Upgrade the block_store_status *)
+val v_3_1_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t
