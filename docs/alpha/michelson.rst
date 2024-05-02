@@ -6,7 +6,7 @@ language and a short explanation of how smart contracts are executed
 and interact in the blockchain.
 
 The language is stack-based, with high level data types and primitives,
-and strict static type checking. Its design cherry picks traits from
+and strict static type checking. Its design cherry-picks traits from
 several language families. Vigilant readers will notice direct
 references to Forth, Scheme, ML and Cat.
 
@@ -35,19 +35,26 @@ Semantics of smart contracts and transactions
 ---------------------------------------------
 
 The Tezos ledger currently has two types of accounts that can hold
-tokens (and be the destinations of transactions).
+tokens. Accounts can be used in transactions as senders, to send tokens,
+or as destinations, to receive tokens.
 
 - Implicit account: non-programmable account whose address is
   the public key hash, prefixed by ``tz`` and one digit.
+  A transaction to such an address cannot provide data, except :doc:`tickets <./tickets>`.
 - Smart contract: programmable account associated to some Michelson code,
   whose address is a unique hash, prefixed by ``KT1``.
   A transaction to such
   an address can provide data, and can fail for reasons detailed below.
 
+Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
+<./smart_rollups>`, which cannot hold tokens but can be the destination of transactions.
+
 See :doc:`./accounts` for more details.
 
-Intra-transaction semantics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Smart contract call semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The only way to call a smart contract is to perform a transaction operation whose destination is the address of the smart contract.
 
 Alongside their tokens, smart contracts keep a piece of storage. Both
 are ruled by a specific logic specified by a Michelson program. A
@@ -58,7 +65,7 @@ storage and transfer its tokens.
 The Michelson program receives as input a stack containing a single
 pair whose first element is an input value and second element the
 content of the storage space. It must return a stack containing a
-single pair whose first element is the list of internal operations
+single pair whose first element is the list of operations
 that it wants to emit, and second element is the new contents of the
 storage space. Alternatively, a Michelson program can fail, explicitly
 using a specific opcode, or because something went wrong that could
@@ -71,25 +78,39 @@ and these two components are transformed automatically in a simple and
 deterministic way to an input value. This feature is available both
 for users and from Michelson code. See the dedicated section.
 
-Inter-transaction semantics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Transaction semantics
+~~~~~~~~~~~~~~~~~~~~~
 
-An operation included in the blockchain is a sequence of "external
-operations" signed as a whole by a source address. These operations
-are of three kinds:
+On one hand, a smart call may result from an external operation of kind Transaction.
+External operations are :doc:`blockchain operations <./blocks_ops>` included in a block, signed by an implicit account.
 
-  - Transactions to transfer tokens to implicit accounts or tokens and
-    parameters to a smart contract (or, optionally, to a specified
-    entrypoint of a smart contract).
-  - Originations to create new smart contracts from its Michelson
+On the other hand, a smart contract call may be emitted as an internal operation of kind Transaction, either when executing another smart contract call or when :ref:`triggering the execution of an outbox message from a smart rollup <triggering_execution_outbox_message>`.
+
+This section explains the whole semantics of an external transaction, including the execution of the smart contract called directly by it and the others smart contracts called indirectly via emitted internal operations.
+
+The subset of blockchain operations that can be emitted by Michelson programs as internal operations are of the following kinds:
+
+  - Transaction transferring:
+
+    * tokens and optionally tickets to an implicit account, or
+    * tokens and parameters to a smart contract (or, optionally, to a specified
+      entrypoint of a smart contract), or
+    * parameters to a smart rollup.
+
+  - Origination creating a new smart contract from its Michelson
     source code, an initial amount of tokens transferred from the
-    source, and an initial storage contents.
-  - Delegations to assign the tokens of the source to the stake of
-    another implicit account (without transferring any tokens).
+    source, and an initial storage content.
+  - Delegation assigning the tokens of the sender account to the stake of
+    an implicit account (without transferring any tokens).
+  - :doc:`Contract event <./event>` delivering live information from a smart
+    contract to external applications.
 
-Smart contracts can also emit "internal operations". These are run
-in sequence after the external transaction completes, as in the
-following schema for a sequence of two external operations.
+Internal operations are not included in any block, and are not signed.
+
+Internal operations are run in an atomic sequence with the external operation who generated them, right after it, in depth-first order.
+
+Note that :ref:`manager operations batches <manager_operations_batches_alpha>` contain a sequence of external operations signed as a whole by a source user account, which are executed atomically.
+For example, in case of a batch of two external operations, execution proceeds as follows:
 
 ::
 
@@ -97,10 +118,10 @@ following schema for a sequence of two external operations.
     | op 1 | internal ops 1 |  op 2 | internal ops 2 |
     +------+----------------+-------+----------------+
 
-Smart contracts called by internal transactions can in turn also emit
-internal operation. The interpretation of the internal operations
-of a given external operation uses a stack, as in the following
-example, also with two external operations.
+Smart contracts called by internal operations can in turn also emit
+internal operations. The interpreter
+uses a stack of internal operations to perform them in depth-first order, as in the following more detailed
+example, corresponding to the two external operations above.
 
 ::
 
@@ -143,11 +164,11 @@ External transactions can also fail for these additional reasons:
 
 All these errors cannot happen in internal transactions, as the type
 system catches them at operation creation time. In particular,
-Michelson has two types to talk about other accounts: ``address`` and
+Michelson has two types to talk about other addresses: ``address`` and
 ``contract t``. The ``address`` type merely gives the guarantee that
 the value has the form of a Tezos address. The ``contract t`` type, on
-the other hand, guarantees that the value is indeed a valid, existing
-account whose parameter type is ``t``. To make a transaction from
+the other hand, guarantees that the address is indeed a valid destination of
+transfers whose parameter type is ``t``. To make a transaction from
 Michelson, a value of type ``contract t`` must be provided, and the
 type system checks that the argument to the transaction is indeed of
 type ``t``. Hence, all transactions made from Michelson are well
