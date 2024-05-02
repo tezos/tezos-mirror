@@ -41,6 +41,8 @@ module Request : sig
   val eth_getCode : address:string -> block:block_param -> Evm_node.request
 
   val net_version : Evm_node.request
+
+  val eth_maxPriorityFeePerGas : Evm_node.request
 end
 
 (** [net_version evm_node] calls [net_version]. *)
@@ -142,3 +144,5 @@ val get_storage_at :
   pos:string ->
   Evm_node.t ->
   (string, error) result Lwt.t
+
+val get_max_priority_fee_per_gas : Evm_node.t -> Int32.t Lwt.t

@@ -126,6 +126,9 @@ module Request = struct
       method_ = "eth_getStorageAt";
       parameters = `A [`String address; `String pos; block_param_to_json block];
     }
+
+  let eth_maxPriorityFeePerGas =
+    {method_ = "eth_maxPriorityFeePerGas"; parameters = `Null}
 end
 
 let net_version evm_node =
@@ -302,3 +305,7 @@ let get_storage_at ~address ?(block = Latest) ~pos evm_node =
   @@ decode_or_error
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
+
+let get_max_priority_fee_per_gas evm_node =
+  let* json = Evm_node.call_evm_rpc evm_node Request.eth_maxPriorityFeePerGas in
+  return JSON.(json |-> "result" |> as_int32)

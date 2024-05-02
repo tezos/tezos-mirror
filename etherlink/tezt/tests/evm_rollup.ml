@@ -5565,6 +5565,25 @@ let test_whitelist_is_executed =
       ~error_msg:"found %R expected %L") ;
   unit
 
+let test_rpc_maxPriorityFeePerGas =
+  register_both
+    ~tags:["evm"; "rpc"; "max_priority_fee_per_gas"]
+    ~title:"RPC methods eth_maxPriorityFeePerGas"
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  let expected_max_priority_fee_per_gas = Wei.of_gwei_string "0" in
+  let* max_priority_fee_per_gas =
+    Evm_node.(
+      let* price =
+        call_evm_rpc
+          evm_node
+          {method_ = "eth_maxPriorityFeePerGas"; parameters = `A []}
+      in
+      return JSON.(price |-> "result" |> as_int64 |> Z.of_int64 |> Wei.to_wei_z))
+  in
+  Check.((max_priority_fee_per_gas = expected_max_priority_fee_per_gas) Wei.typ)
+    ~error_msg:"Expected %R, but got %L" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5665,7 +5684,8 @@ let register_evm_node ~protocols =
   test_tx_pool_timeout protocols ;
   test_tx_pool_address_boundaries protocols ;
   test_tx_pool_transaction_size_exceeded protocols ;
-  test_whitelist_is_executed protocols
+  test_whitelist_is_executed protocols ;
+  test_rpc_maxPriorityFeePerGas protocols
 
 let protocols = Protocol.all
 
