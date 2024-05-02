@@ -222,7 +222,8 @@ module GS = struct
   let count_received_invalid_messages =
     metric
       ~name:"count_received_invalid_messages"
-      ~help:"Count the number of receivedvalid application messages by the node"
+      ~help:
+        "Count the number of received invalid application messages by the node"
       (fun () -> Int64.to_float !Stats.gs_stats.count_recv_invalid_app_messages)
 
   let count_received_unknown_validity_messages =
