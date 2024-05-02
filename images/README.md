@@ -57,3 +57,40 @@ require them. `docker build` does not resolve symlinks, but we work
 around this by tarring the image's build context directory, having tar
 resolve symlinks and piping the result to `docker build`. See
 `create_client_libs_dependencies_image.sh` for an example.
+
+# Building the Octez Docker Distribution
+
+To build the Octez Docker distribution locally, use the script
+`./scripts/create_docker_image.sh`. Called without parameters, this
+script will build the Octez Docker Distribution with the *released*
+set of executables (see `scripts-inputs/released-executables`) and
+without EVM artifacts.
+
+Building the Octez Docker distribution requires the
+[tezos/opam-repository](https://gitlab.com/tezos/opam-repository)
+build-deps images as input. By default, build-deps images of version
+`opam_repository_tag` in `scripts/version.sh` is pulled. To use a
+custom version, for instance when building the build-deps images
+locally, see the parameters `--build-deps-image-name` and
+`--build-deps-image-version` of the script
+`./scripts/create_docker_image.sh`.
+
+To build the Octez Docker Distribution with EVM artifacts, pass
+`--docker-target with-evm-artifacts` to
+`./scripts/create_docker_image.sh`. Building the EVM artifacts
+requires the rust-toolchain image as input. By default, the script
+will attempt to re-use the latest version of this image built on the
+`master` branch of the tezos/tezos CI. If you need to use a different
+image for the rust-toolchain image, follow the instructions in
+`./images/README.MD` and `./images/create_rust_toolchain_image.sh` to
+create one. Then specify the `--rust-toolchain-image` and
+`--rust-toolchain-image-tag` parameters to
+`./scripts/create_docker_image.sh` accordingly.
+
+For more info on how to configure:
+ - including naming of the built images in the Octez Docker distribution;
+ - the input images used;
+ - the contents of the distribution, and
+ - the configuration of the version number reported by included executables;
+
+see `./scripts/create_docker_image.sh --help`.
