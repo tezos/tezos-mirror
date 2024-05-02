@@ -12,6 +12,7 @@
   `requireCanonical` field is not yet supported. (!12345)
 - The RPC `eth_call` supports the default block parameter
   (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block). (!13110)
+- Support the RPC `eth_maxPriorityFeePerGas`, which always returns 0 wei. (!13161)
 
 ### Bug fixes
 
