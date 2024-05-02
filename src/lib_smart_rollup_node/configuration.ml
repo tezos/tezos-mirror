@@ -226,12 +226,7 @@ let default_l1_rpc_timeout = 60. (* seconds *)
 let default_loop_retry_delay = 10. (* seconds *)
 
 let default_gc_parameters =
-  {
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/6415
-     * Refine the default GC frequency parameter *)
-    frequency_in_blocks = 100l;
-    context_splitting_period = None;
-  }
+  {frequency_in_blocks = 1000l; context_splitting_period = None}
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/6576
    Set to Full after initial evaluation on testnets. *)
