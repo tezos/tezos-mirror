@@ -30,9 +30,12 @@
 (** A contract is simply an account on the blockchain ledger. There are two
     types of contracts:
     - implicit contracts represent accounts of users of the blockchain;
+    hence, they are commonly called "user accounts" in the documentation;
     - originated are special accounts with a Michelson script attached to
     them. Every time a transaction is sent to an originated account, its
     associated script is run in order to trigger some action in response.
+    These scripted accounts are commonly called "smart contracts" in the
+    documentation.
 
     An implicit account is identified by the hash of the public key which was
     used to create it. The owner of the corresponding private key is the
