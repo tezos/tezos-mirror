@@ -226,6 +226,14 @@ module GS = struct
         "Count the number of received invalid application messages by the node"
       (fun () -> Int64.to_float !Stats.gs_stats.count_recv_invalid_app_messages)
 
+  let count_received_outdated_messages =
+    metric
+      ~name:"count_received_outdated_messages"
+      ~help:
+        "Count the number of received outdated application messages by the node"
+      (fun () ->
+        Int64.to_float !Stats.gs_stats.count_recv_outdated_app_messages)
+
   let count_received_unknown_validity_messages =
     metric
       ~name:"count_received_unknown_validity_messages"
@@ -340,6 +348,7 @@ module GS = struct
       count_received_valid_messages;
       count_received_invalid_messages;
       count_received_unknown_validity_messages;
+      count_received_outdated_messages;
       count_received_grafts;
       count_received_prunes;
       count_received_ihaves;
