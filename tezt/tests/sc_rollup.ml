@@ -420,7 +420,7 @@ let send_message_batcher_aux ?rpc_hooks client sc_node msgs =
   let injected = wait_for_injecting_event ~tags:["add_messages"] sc_node in
   let* ids =
     Sc_rollup_node.RPC.call sc_node ?rpc_hooks
-    @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:msgs
+    @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:msgs ()
   in
   (* New head will trigger injection  *)
   let* () = Client.bake_for_and_wait client in
@@ -729,7 +729,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
   let msg1 = "3 3 + out" in
   let* ids =
     Sc_rollup_node.RPC.call sc_rollup_node
-    @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:[msg1]
+    @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:[msg1] ()
   in
   let msg1_id = match ids with [i] -> i | _ -> assert false in
   let* retrieved_msg1, status_msg1 =
@@ -776,6 +776,7 @@ let sc_rollup_node_batcher sc_rollup_node sc_rollup node client =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.post_local_batcher_injection
          ~messages:(List.init 9 (Fun.const msg2))
+         ()
   in
   let* ids2 =
     send_message_batcher client sc_rollup_node (List.init 9 (Fun.const msg2))
@@ -5374,8 +5375,16 @@ let test_multiple_batcher_key ~kind =
     let* _hashes =
       Lwt.all @@ List.init nb_of_batches
       @@ fun _ ->
+      let batch = batch () in
+      let _hashes =
+        Sc_rollup_node.RPC.call sc_rollup_node
+        @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:batch ()
+      in
       Sc_rollup_node.RPC.call sc_rollup_node
-      @@ Sc_rollup_rpc.post_local_batcher_injection ~messages:(batch ())
+      @@ Sc_rollup_rpc.post_local_batcher_injection
+           ~drop_duplicate:true
+           ~messages:batch
+           ()
     in
     unit
   in
@@ -5511,6 +5520,7 @@ let test_injector_uses_available_keys ~kind =
       Sc_rollup_node.RPC.call rollup_node
       @@ Sc_rollup_rpc.post_local_batcher_injection
            ~messages:(batch ~msg_per_batch ~msg_size)
+           ()
     in
     unit
   in
@@ -5582,6 +5592,175 @@ let test_injector_uses_available_keys ~kind =
   let* _lvl = Client.bake_for_and_wait client
   and* used_pkhs = wait_for_included_and_get_batches_pkhs () in
   check_keys ~received:used_pkhs ~expected:operators_pkh ;
+  unit
+
+let test_batcher_dont_reinject_already_injected_messages ~kind =
+  test_full_scenario
+    ~kind
+    ~mode:Batcher
+    {
+      variant = None;
+      tags = ["batcher"; "drop_duplicate"];
+      description = "batcher don't reinject messages that were already injected";
+    }
+  @@ fun _protocol rollup_node rollup_addr _node client ->
+  Log.info "Batcher setup" ;
+  let inject ~drop_duplicate ~messages =
+    Sc_rollup_node.RPC.call rollup_node
+    @@ Sc_rollup_rpc.post_local_batcher_injection ~drop_duplicate ~messages ()
+  in
+  let check_batcher_queue_size ?__LOC__ ~expected_size () =
+    let* batcher_message =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_local_batcher_queue ()
+    in
+    Check.(
+      (List.length batcher_message = expected_size)
+        ?__LOC__
+        int
+        ~error_msg:
+          "There must be exactly %R messages in the batcher queue, found %L.") ;
+    unit
+  in
+
+  let check_message_injection_status ?__LOC__ ~expected_status ~message_id () =
+    let* _, status =
+      Sc_rollup_node.RPC.call rollup_node
+      @@ Sc_rollup_rpc.get_local_batcher_queue_msg_id ~msg_id:message_id
+    in
+    Check.(
+      (status = expected_status)
+        string
+        ~error_msg:"expected injection status %R, found %L"
+        ?__LOC__) ;
+    unit
+  in
+
+  let messages = ["msg"; "msg"] in
+
+  let bake_inject_check ?__LOC__ ?(inject_msgs = true) ~check_message_id
+      ~expected_status ~expected_size () =
+    let wait_for_total_injected =
+      Sc_rollup_node.wait_for
+        rollup_node
+        "total_injected_ops.v0"
+        (Fun.const (Some ()))
+    in
+    let* () = Client.bake_for_and_wait client
+    and* () = wait_for_total_injected in
+
+    let* () =
+      if inject_msgs then (
+        let* message_ids = inject ~drop_duplicate:true ~messages in
+        let message_id = List.nth message_ids 0 in
+        Check.(
+          (message_id = check_message_id)
+            ?__LOC__
+            string
+            ~error_msg:
+              "messages id when unique is false must be equal (given %L, \
+               expected %R).") ;
+        unit)
+      else unit
+    in
+    let* () =
+      check_message_injection_status
+        ?__LOC__
+        ~expected_status
+        ~message_id:check_message_id
+        ()
+    in
+    let* () = check_batcher_queue_size ?__LOC__ ~expected_size () in
+    unit
+  in
+
+  let* () =
+    Sc_rollup_node.run
+      ~event_level:`Debug
+      rollup_node
+      rollup_addr
+      [Injector_retention_period 1]
+  and* _lvl = Sc_rollup_node.wait_sync rollup_node ~timeout:10. in
+
+  let* messages_id_first = inject ~drop_duplicate:false ~messages in
+  let* () = check_batcher_queue_size ~__LOC__ ~expected_size:2 () in
+  let* messages_id_second = inject ~drop_duplicate:false ~messages in
+  let* () = check_batcher_queue_size ~__LOC__ ~expected_size:4 () in
+  Check.(
+    (messages_id_first <> messages_id_second)
+      ~__LOC__
+      (list string)
+      ~error_msg:"first messages batch id %L must be different than second %R") ;
+
+  let* first_message_ids = inject ~drop_duplicate:true ~messages in
+  let* () = check_batcher_queue_size ~__LOC__ ~expected_size:5 () in
+
+  let check_message_id = List.nth first_message_ids 0 in
+
+  Check.(
+    (check_message_id = List.nth first_message_ids 1)
+      ~__LOC__
+      string
+      ~error_msg:
+        "messages id with check on must be equal (given %L, expected %R).") ;
+
+  Log.info "Resubmiting the same message dont add it to the queue." ;
+  let* second_message_ids = inject ~drop_duplicate:true ~messages in
+  let* () = check_batcher_queue_size ~__LOC__ ~expected_size:5 () in
+  Check.(
+    (first_message_ids = second_message_ids)
+      ~__LOC__
+      (list string)
+      ~error_msg:
+        "Same messages injected with injection check must have same ids \
+         returned (first %L, second %R).") ;
+
+  let* () =
+    check_message_injection_status
+      ~__LOC__
+      ~expected_status:"pending_batch"
+      ~message_id:check_message_id
+      ()
+  in
+
+  let* () =
+    bake_inject_check
+      ~__LOC__
+      ~check_message_id
+      ~expected_status:"injected"
+      ~expected_size:0
+      ()
+  in
+  let* () =
+    repeat
+      3
+      (* 2 blocks for the op to be finalized
+         + 1 block for the retention period.*)
+      (bake_inject_check
+         ~__LOC__
+         ~check_message_id
+         ~expected_status:"included"
+         ~expected_size:0)
+  in
+  let* () =
+    bake_inject_check
+      ~__LOC__
+      ~check_message_id
+      ~inject_msgs:false
+        (* after the retention period is over we have no more info
+           about the op *)
+      ~expected_status:"unknown"
+      ~expected_size:0
+      ()
+  in
+  let* () =
+    bake_inject_check
+      ~__LOC__
+      ~check_message_id
+      ~expected_status:"pending_batch"
+      ~expected_size:1
+      ()
+  in
   unit
 
 let start_rollup_node_with_encrypted_key ~kind =
@@ -5827,6 +6006,7 @@ let register_protocol_independent () =
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_injector_uses_available_keys protocols ~kind ;
+  test_batcher_dont_reinject_already_injected_messages protocols ~kind ;
   test_private_rollup_node_publish_in_whitelist protocols ;
   test_private_rollup_node_publish_not_in_whitelist protocols ;
   test_rollup_node_inbox

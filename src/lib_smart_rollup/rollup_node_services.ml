@@ -740,9 +740,15 @@ module Local = struct
       (path / "gc_info")
 
   let injection =
+    let query_drop_duplicate : bool Tezos_rpc.Query.t =
+      let open Tezos_rpc.Query in
+      query Fun.id
+      |+ field "drop_duplicate" Tezos_rpc.Arg.bool false Fun.id
+      |> seal
+    in
     Tezos_rpc.Service.post_service
       ~description:"Inject messages in the batcher's queue"
-      ~query:Tezos_rpc.Query.empty
+      ~query:query_drop_duplicate
       ~input:
         Data_encoding.(
           def

@@ -66,6 +66,14 @@ Docker Images
 Smart Rollup node
 -----------------
 
+- Updated RPC ``/local/batcher/injection`` with a new query argument
+  possibility. When the rpc contains ``"drop_duplicate": true`` then
+  the batcher will drop the messages that were already injected with a
+  previous RPC call.  If ``"drop_duplicate": false`` then the rollup
+  node defaults to its the previous behavior, where messages are
+  injected again, even if the exact same one was previously
+  injected. By default ``"drop_duplicate": false``. (MR :gl:`!13165`)
+
 - RPC ``/health`` now returns meaningful health related data to asses if the
   rollup node operates correctly. Old ``/health`` RPC is renamed to ``/ping``.
   (MR :gl:`!12940`)

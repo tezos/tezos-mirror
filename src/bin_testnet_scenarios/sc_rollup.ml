@@ -367,13 +367,13 @@ let simple_use_case_rollup ~(testnet : unit -> Testnet.t) () =
     | `Batcher1 ->
         let* _hashes =
           Sc_rollup_node.RPC.call batcher_node1
-          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages
+          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages ()
         in
         unit
     | `Batcher2 ->
         let* _hashes =
           Sc_rollup_node.RPC.call batcher_node2
-          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages
+          @@ Sc_rollup_rpc.post_local_batcher_injection ~messages ()
         in
         unit
     | `Node ->

@@ -154,7 +154,18 @@ let produce_batches state ~only_full =
         to_remove ;
       return_unit
 
-let on_register state (messages : string list) =
+let message_already_added state msg_id =
+  match Batched_messages.find_opt state.batched msg_id with
+  | None -> false
+  | Some {l1_id; _} ->
+      (* If injector know about the operation then it's either
+         pending, injected or included and we don't re-inject the
+         operation. If the injector has no status for that operation,
+         then it's consider too old (more than the injector's
+         `retention_period`) and the user wants to re-inject it. *)
+      Option.is_some @@ Injector.operation_status l1_id
+
+let on_register ~drop_duplicate state (messages : string list) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let max_size_msg =
@@ -168,16 +179,22 @@ let on_register state (messages : string list) =
       (fun i message ->
         if message_size message > max_size_msg then
           error_with "Message %d is too large (max size is %d)" i max_size_msg
-        else Ok (L2_message.make message))
+        else Ok (L2_message.make ~unique:(not drop_duplicate) message))
       messages
   in
   let*! () = Batcher_events.(emit queue) (List.length messages) in
-  let ids =
-    List.map
+  let*! ids =
+    List.map_s
       (fun message ->
         let msg_id = L2_message.id message in
-        Message_queue.replace state.messages msg_id message ;
-        msg_id)
+        let*! () =
+          if drop_duplicate && message_already_added state msg_id then
+            Batcher_events.(emit dropped_msg) msg_id
+          else (
+            Message_queue.replace state.messages msg_id message ;
+            Lwt.return_unit)
+        in
+        Lwt.return msg_id)
       messages
   in
   let+ () = produce_batches state ~only_full:true in
@@ -229,8 +246,8 @@ module Handlers = struct
    fun w request ->
     let state = Worker.state w in
     match request with
-    | Request.Register messages ->
-        protect @@ fun () -> on_register state messages
+    | Request.Register {messages; drop_duplicate} ->
+        protect @@ fun () -> on_register ~drop_duplicate state messages
     | Request.Produce_batches -> protect @@ fun () -> on_new_head state
 
   type launch_error = error trace
@@ -342,10 +359,12 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let register_messages messages =
+let register_messages ~drop_duplicate messages =
   let open Lwt_result_syntax in
   let* w = lwt_map_error TzTrace.make (Lwt.return (Lazy.force worker)) in
-  Worker.Queue.push_request_and_wait w (Request.Register messages)
+  Worker.Queue.push_request_and_wait
+    w
+    (Request.Register {messages; drop_duplicate})
   |> handle_request_error
 
 let produce_batches () =

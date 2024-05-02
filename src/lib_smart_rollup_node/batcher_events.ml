@@ -39,6 +39,16 @@ struct
       ~level:Info
       ("nb_messages", Data_encoding.int31)
 
+  let dropped_msg =
+    declare_1
+      ~section
+      ~name:"dropped_message"
+      ~msg:
+        "Message with {id} was already batched or injected, it is not added to \
+         the batcher queue."
+      ~level:Info
+      ("id", L2_message.Id.encoding)
+
   let batched =
     declare_2
       ~section
