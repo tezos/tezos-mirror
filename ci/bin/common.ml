@@ -630,10 +630,7 @@ let job_docker_rust_toolchain ?(always_rebuild = false) ?rules ?dependencies
       stage, run [on_success] and are not allowed to fail. *)
 type docker_build_type = Experimental | Release | Test | Test_manual
 
-(** Creates a Docker build job of the given [arch] and [docker_build_type].
-
-    If [external_] is set to true (default [false]), then the job is
-    also written to an external file. *)
+(** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
 let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     tezos_job =
   let arch_string = arch_to_string_alt arch in
