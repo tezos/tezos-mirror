@@ -275,7 +275,6 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     Store.cache_shards node_store commitment share_array
   in
   let () = Store.cache_slot node_store commitment slot in
-  let* () = Store.(Shards.write_all node_store.shards commitment shards) in
   if with_proof then
     let*? precomputation =
       match shards_proofs_precomputation with
@@ -399,6 +398,10 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
         | None ->
             Result_syntax.tzfail
             @@ Missing_shards_in_cache {published_level; slot_index}
+      in
+      let* () =
+        Store.(Shards.write_all node_store.shards commitment shards)
+        |> Errors.to_tzresult
       in
       publish_proved_shards
         ~published_level
