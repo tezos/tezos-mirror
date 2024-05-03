@@ -31,6 +31,24 @@ let list_partition_map f t =
   in
   aux [] [] t
 
+module Events = struct
+  (* open Tezos_base.TzPervasives *)
+  include Internal_event.Simple
+
+  let section = [ "brassaia"; "object_graph" ]
+
+  let object_graph_iter =
+    declare_5 ~section ~level:Debug ~name:"inode_save_values"
+      ~msg:
+        "iter: depth: {depth}; rev: {rev}; min: {min}; max: {max}; cache_size: \
+         {cache_size}"
+      ("depth", Data_encoding.int64)
+      ("rev", Data_encoding.bool)
+      ("min", Data_encoding.(list (option string)))
+      ("max", Data_encoding.(list (option string)))
+      ("cache_size", Data_encoding.(option int64))
+end
+
 module Make
     (Contents_key : Type.S)
     (Node_key : Type.S)
@@ -126,6 +144,14 @@ struct
 
   let iter ?cache_size ?(depth = max_int) ~pred ~min ~max ~node ?edge ~skip ~rev
       () =
+    let* () =
+      Events.(emit object_graph_iter)
+        ( Int64.of_int depth,
+          rev,
+          List.map (Data_encoding.Binary.to_string_opt X.encoding) min,
+          List.map (Data_encoding.Binary.to_string_opt X.encoding) max,
+          Option.map Int64.of_int cache_size )
+    in
     let marks = Table.create cache_size in
     let mark key level = Table.add marks key level in
     let todo = Stack.create () in
