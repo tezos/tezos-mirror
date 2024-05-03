@@ -998,7 +998,7 @@ let get_gc_level node_ctxt =
       let+ lcc = last_seen_lcc node_ctxt in
       Some lcc.level
 
-let gc node_ctxt ~(level : int32) =
+let gc ?(wait_finished = false) node_ctxt ~(level : int32) =
   let open Lwt_result_syntax in
   (* [gc_level] is the level corresponding to the hash on which GC will be
      called. *)
@@ -1036,8 +1036,12 @@ let gc node_ctxt ~(level : int32) =
             let* () = Event.gc_finished ~gc_level ~head_level:level in
             Utils.unlock gc_lockfile
           in
-          Lwt.dont_wait gc_waiter (fun _exn -> ()) ;
-          return_unit)
+          if wait_finished then
+            let*! () = gc_waiter () in
+            return_unit
+          else (
+            Lwt.dont_wait gc_waiter (fun _exn -> ()) ;
+            return_unit))
   | _ -> return_unit
 
 let check_level_available node_ctxt accessed_level =

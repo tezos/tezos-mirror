@@ -541,10 +541,13 @@ val save_slot_status :
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4636
    Missing docstrings. *)
 
-(** [gc node_ctxt level] triggers garbage collection for the node in accordance
-    with [node_ctxt.config.gc_parameters]. Upon completion, all data for L2
-    levels lower than [level] will be removed. *)
-val gc : [> `Write] t -> level:int32 -> unit tzresult Lwt.t
+(** [gc ?wait_finished node_ctxt level] triggers garbage collection for the node
+    in accordance with [node_ctxt.config.gc_parameters]. Upon completion, all
+    data for L2 levels lower than [level] will be removed. If [wait_finished] is
+    [true], the call blocks until the GC completes, otherwise it is run
+    asynchronously. *)
+val gc :
+  ?wait_finished:bool -> [> `Write] t -> level:int32 -> unit tzresult Lwt.t
 
 (** [get_gc_levels node_ctxt] returns information about the garbage collected
     levels. *)
