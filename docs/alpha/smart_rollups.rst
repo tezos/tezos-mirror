@@ -8,6 +8,9 @@ documentation, we will generally refer to the rollup under
 consideration as the Layer 2 on top of the Tezos blockchain,
 considered as the Layer 1.
 
+Overview
+^^^^^^^^
+
 Rollups are a permissionless scaling solution for the Tezos
 blockchain.  Indeed, anyone can originate and operate one or more
 rollups, allowing to increase the throughput of the Tezos blockchain,
@@ -24,6 +27,9 @@ trusted. However, a refutation mechanism allows anyone to economically
 punish someone who has published an invalid claim. Therefore, thanks
 to the refutation mechanism, a single honest participant is enough to
 guarantee that the input messages are correctly interpreted.
+
+Kernel
+^^^^^^
 
 In the Tezos protocol, the subsystem of smart rollups is generic with
 respect to the syntax and the semantics of the input messages. More
@@ -49,8 +55,8 @@ use case though: they are fully programmable, hence their names, smart
 optimistic rollups, as they are very close to smart contracts in terms
 of expressiveness.
 
-Overview
---------
+User roles
+^^^^^^^^^^
 
 Just like smart contracts, smart rollups are decentralized software
 components. However, contrary to smart contracts that are processed
@@ -344,7 +350,7 @@ logic, an outbox message can only be executed when the associated
 commitment has been cemented (see :doc:`../shell/smart_rollup_node`).
 
 Glossary
---------
+^^^^^^^^
 
 #. **PVM**: A Proof-generating Virtual Machine is a reference
    implementation for a device on top of which a smart rollup can be
