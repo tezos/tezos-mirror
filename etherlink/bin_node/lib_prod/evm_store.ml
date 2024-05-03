@@ -70,10 +70,19 @@ module Q = struct
 
   let context_hash =
     custom
-      ~encode:(fun hash -> Ok (Context_hash.to_b58check hash))
+      ~encode:(fun hash ->
+        Ok
+          (hash |> Irmin_context.context_hash_of_hash
+         |> Smart_rollup_context_hash.to_context_hash
+         |> Context_hash.to_b58check))
       ~decode:(fun bytes ->
-        Option.to_result ~none:"Not a valid b58check encoded hash"
-        @@ Context_hash.of_b58check_opt bytes)
+        let open Result_syntax in
+        let+ hash =
+          Option.to_result ~none:"Not a valid b58check encoded hash"
+          @@ Context_hash.of_b58check_opt bytes
+        in
+        hash |> Smart_rollup_context_hash.of_context_hash
+        |> Irmin_context.hash_of_context_hash)
       string
 
   let root_hash =

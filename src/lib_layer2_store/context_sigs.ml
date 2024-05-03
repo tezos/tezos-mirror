@@ -78,6 +78,8 @@ module type S = sig
 
   type repo
 
+  type hash
+
   type nonrec 'a index = ('a, repo) index
 
   val impl_name : string
@@ -85,8 +87,6 @@ module type S = sig
   val equality_witness : (repo, tree) equality_witness
 
   type nonrec 'a t = ('a, repo, tree) t
-
-  type hash = Context_hash.t
 
   (** [load cache_size path] initializes from disk a context from
     [path]. [cache_size] allows to change size of the Context Backend
@@ -138,6 +138,10 @@ module type S = sig
       corresponding to [context_hash], if found in [index], into the given
       folder path. *)
   val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
+
+  val context_hash_of_hash : hash -> Smart_rollup_context_hash.t
+
+  val hash_of_context_hash : Smart_rollup_context_hash.t -> hash
 
   (** State of the PVM that this rollup node deals with *)
   module PVMState : sig

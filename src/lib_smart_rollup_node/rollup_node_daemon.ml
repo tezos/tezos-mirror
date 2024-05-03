@@ -172,7 +172,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         predecessor = predecessor.hash;
         commitment_hash;
         previous_commitment_hash;
-        context = Smart_rollup_context_hash.of_context_hash context_hash;
+        context = context_hash;
         inbox_witness;
         inbox_hash;
       }
@@ -681,7 +681,7 @@ module Internal_for_tests = struct
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
-          context = Smart_rollup_context_hash.of_context_hash context_hash;
+          context = context_hash;
           inbox_witness;
           inbox_hash;
         }

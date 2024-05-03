@@ -61,7 +61,7 @@ module Tree :
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!type:commit} hash. *)
-type hash = Context_hash.t
+type hash
 
 (** The type of commits for the context. *)
 type commit
@@ -134,6 +134,10 @@ val wait_gc_completion : [> `Write] index -> unit Lwt.t
     Note: there is no associated [import_snapshot] function as the import
     consist in copying the exported Irmin store. *)
 val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
+
+val context_hash_of_hash : hash -> Smart_rollup_context_hash.t
+
+val hash_of_context_hash : Smart_rollup_context_hash.t -> hash
 
 (** Module for generating and verifying proofs for a context *)
 module Proof (Hash : sig

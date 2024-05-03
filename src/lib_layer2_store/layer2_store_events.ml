@@ -35,8 +35,8 @@ module Simple = struct
       ~name:"starting_context_gc"
       ~level:Info
       ~msg:"Starting context garbage collection for commit {context_hash}"
-      ("context_hash", Context_hash.encoding)
-      ~pp1:Context_hash.pp
+      ("context_hash", Smart_rollup_context_hash.encoding)
+      ~pp1:Smart_rollup_context_hash.pp
 
   let context_gc_already_launched =
     declare_0
