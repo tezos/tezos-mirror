@@ -40,7 +40,7 @@
           };
         };
       in {
-        packages.default = import ./shell.nix {inherit sources;};
+        packages.default = import ./default.nix {inherit sources;};
 
         devShells.default = import ./shell.nix {inherit sources;};
 
