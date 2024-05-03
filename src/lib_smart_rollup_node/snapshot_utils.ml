@@ -306,12 +306,12 @@ let extract (module Reader : READER) (module Writer : WRITER) metadata_check
   Lwt.finalize
     (fun () ->
       let metadata = read_snapshot_metadata reader_input in
-      let* () = metadata_check metadata in
+      let* check_result = metadata_check metadata in
       let spinner = Progress_bar.spinner ~message:"Extracting snapshot" in
       Progress_bar.with_reporter spinner @@ fun count_progress ->
       Writer.count_progress := count_progress ;
       Archive_reader.Archive.extract_gen out_channel_of_header in_chan ;
-      return metadata)
+      return (metadata, check_result))
     (fun () ->
       Reader.close_in in_chan ;
       Lwt.return_unit)
