@@ -379,7 +379,7 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
 let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
-    _cryptobox proto_parameters commitment published_level slot_index =
+    proto_parameters commitment published_level slot_index =
   let open Lwt_result_syntax in
   match
     Store.Shard_proofs_cache.find_opt

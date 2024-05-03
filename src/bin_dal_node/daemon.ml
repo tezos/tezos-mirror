@@ -406,7 +406,7 @@ module Handler = struct
       || Profile_manager.is_attester_only_profile profile)
 
   let process_block ctxt cctxt (module Plugin : Dal_plugin.T) plugin_proto
-      proto_parameters cryptobox skip_list_cells_store head_level block_level =
+      proto_parameters skip_list_cells_store head_level block_level =
     let open Lwt_result_syntax in
     let block = `Level block_level in
     let* block_info = Plugin.block_info cctxt ~block ~metadata:`Always in
@@ -477,7 +477,6 @@ module Handler = struct
                 ~level_committee:(Node_context.fetch_committee ctxt)
                 (Node_context.get_store ctxt)
                 (Node_context.get_gs_worker ctxt)
-                cryptobox
                 proto_parameters
                 commitment
                 published_level
@@ -565,7 +564,6 @@ module Handler = struct
               (module Plugin)
               plugin_proto
               proto_parameters
-              cryptobox
               skip_list_cells_store
               head_level
           in
