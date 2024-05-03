@@ -81,6 +81,7 @@ type sequencer_setup = {
   sequencer : Evm_node.t;
   proxy : Evm_node.t;
   l1_contracts : l1_contracts;
+  boot_sector : string;
 }
 
 let setup_l1_contracts ?(dictator = Constant.bootstrap2) client =
@@ -153,7 +154,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
     ?(kernel = Constant.WASM.evm_kernel) ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?(threshold_encryption = false) ?(wal_sqlite_journal_mode = true)
-    ?(drop_duplicate_when_injection = true) protocol =
+    ?(drop_duplicate_when_injection = true) ?history_mode protocol =
   let* node, client = setup_l1 ?timestamp:genesis_timestamp protocol in
   let* l1_contracts = setup_l1_contracts client in
   let sc_rollup_node =
@@ -162,6 +163,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
       Batcher
       node
       ~base_dir:(Client.base_dir client)
+      ?history_mode
   in
   let preimages_dir =
     Option.value
@@ -312,6 +314,7 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
       l1_contracts;
       sc_rollup_address;
       sc_rollup_node;
+      boot_sector = output;
     }
 
 let send_transaction (transaction : unit -> 'a Lwt.t) sequencer : 'a Lwt.t =
@@ -370,7 +373,7 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?(threshold_encryption = false) ?(uses = uses) body =
+    ?(threshold_encryption = false) ?(uses = uses) ?history_mode body =
   let uses =
     if threshold_encryption then fun p -> Constant.octez_dsn_node :: uses p
     else uses
@@ -398,6 +401,7 @@ let register_test ?devmode ?genesis_timestamp ?time_between_blocks
         ?maximum_allowed_ticks
         ?maximum_gas_per_transaction
         ~threshold_encryption
+        ?history_mode
         protocol
     in
     body sequencer_setup protocol
@@ -413,8 +417,8 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
     ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
     ?kernel ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?uses ~title ~tags body
-    protocols =
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction ?history_mode ?uses
+    ~title ~tags body protocols =
   let register ~threshold_encryption =
     register_test
       ?devmode
@@ -438,6 +442,7 @@ let register_both ?devmode ?genesis_timestamp ?time_between_blocks
       ?maximum_gas_per_transaction
       ?uses
       ~threshold_encryption
+      ?history_mode
       body
       protocols
   in
@@ -1206,14 +1211,14 @@ let test_delayed_deposit_from_init_rollup_node =
     ~error_msg:"Expected a bigger balance" ;
   unit
 
-(** test to initialise a sequencer data dir based on a rollup node
-        data dir *)
+(** test to initialise a sequencer data dir based on a rollup node data dir *)
 let test_init_from_rollup_node_data_dir =
   register_both
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "rollup_node"; "init"]
+    ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
     ~title:"Init evm node sequencer data dir from a rollup node data dir"
-  @@ fun {sc_rollup_node; sequencer; proxy; client; _} _protocol ->
+    ~history_mode:Archive
+  @@ fun {sc_rollup_node; sequencer; proxy; client; boot_sector; _} _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -1239,6 +1244,7 @@ let test_init_from_rollup_node_data_dir =
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~devmode:true
+      ~reconstruct:boot_sector
       evm_node'
       sc_rollup_node
   in
@@ -1252,6 +1258,21 @@ let test_init_from_rollup_node_data_dir =
   in
 
   let* () = check_head_consistency ~left:evm_node' ~right:proxy () in
+
+  let*@ head = Rpc.block_number evm_node' in
+
+  (* If the sequencer history has been reconstructed during the init, you can
+     make requests in the past. *)
+  let* () =
+    fold (Int32.to_int head) () (fun l () ->
+        let*@ _ =
+          Rpc.get_balance
+            ~address:"0xB7A97043983f24991398E5a82f63F4C58a417185"
+            ~block:(Number l)
+            evm_node'
+        in
+        unit)
+  in
 
   unit
 
@@ -1962,6 +1983,7 @@ let test_delayed_transfer_timeout =
            sequencer;
            proxy;
            observer = _;
+           boot_sector = _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -2021,6 +2043,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
            sequencer;
            proxy;
            observer = _;
+           boot_sector = _;
          }
              _protocol ->
   (* Kill the sequencer *)
@@ -2274,6 +2297,7 @@ let test_delayed_inbox_flushing =
            sequencer;
            proxy;
            observer = _;
+           boot_sector = _;
          }
              _protocol ->
   (* Kill the sequencer *)
