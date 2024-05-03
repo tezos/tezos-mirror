@@ -356,9 +356,8 @@ let dispatch_request (config : Configuration.t)
         build_with_input ~f module_ parameters
     | Method (Txpool_content.Method, module_) ->
         let f (_ : unit option) =
-          rpc_ok
-            Ethereum_types.
-              {pending = AddressMap.empty; queued = AddressMap.empty}
+          let* txpool_content = Tx_pool.get_tx_pool_content () in
+          rpc_ok txpool_content
         in
         build ~f module_ parameters
     | Method (Web3_clientVersion.Method, module_) ->

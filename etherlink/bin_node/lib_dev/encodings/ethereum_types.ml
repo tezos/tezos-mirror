@@ -251,6 +251,10 @@ let encode_u16_le (Qty n) =
   let bits = Z.to_bits n |> Bytes.of_string in
   pad_to_n_bytes_le bits 2
 
+let hash_raw_tx str =
+  str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+  |> Bytes.to_string
+
 type transaction_log = {
   address : address;
   topics : hash list;
@@ -514,26 +518,29 @@ type transaction_object = {
   s : hash;
 }
 
-let transaction_object_from_rlp block_hash bytes =
-  match Rlp.decode bytes with
-  | Ok
-      (Rlp.List
-        [
-          Value block_number;
-          Value from;
-          Value gas_used;
-          Value gas_price;
-          Value hash;
-          Value input;
-          Value nonce;
-          Value to_;
-          Value index;
-          Value value;
-          Value v;
-          Value r;
-          Value s;
-        ]) ->
-      let block_number = decode_number block_number in
+let transaction_object_from_rlp_item block_hash rlp_item =
+  let decode_optional_number bytes =
+    if block_hash == None then None else Some (decode_number bytes)
+  in
+
+  match rlp_item with
+  | Rlp.List
+      [
+        Value block_number;
+        Value from;
+        Value gas_used;
+        Value gas_price;
+        Value hash;
+        Value input;
+        Value nonce;
+        Value to_;
+        Value index;
+        Value value;
+        Value v;
+        Value r;
+        Value s;
+      ] ->
+      let block_number = decode_optional_number block_number in
       let from = decode_address from in
       let gas = decode_number gas_used in
       let gas_price = decode_number gas_price in
@@ -541,14 +548,17 @@ let transaction_object_from_rlp block_hash bytes =
       let input = decode_hash input in
       let nonce = decode_number nonce in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
-      let index = decode_number index in
+      let index = decode_optional_number index in
       let value = decode_number value in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
+          v is currently incorrectly encoded as big-endian by the kernel,
+          causing the decoded value to be incorrect *)
       let v = decode_number v in
       let r = decode_hash r in
       let s = decode_hash s in
       {
         blockHash = block_hash;
-        blockNumber = Some block_number;
+        blockNumber = block_number;
         from;
         gas;
         gasPrice = gas_price;
@@ -556,12 +566,17 @@ let transaction_object_from_rlp block_hash bytes =
         input;
         nonce;
         to_;
-        transactionIndex = Some index;
+        transactionIndex = index;
         value;
         v;
         r;
         s;
       }
+  | _ -> raise (Invalid_argument "Expected a List of 13 elements")
+
+let transaction_object_from_rlp block_hash bytes =
+  match Rlp.decode bytes with
+  | Ok rlp_item -> transaction_object_from_rlp_item block_hash rlp_item
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
 let transaction_object_encoding =
@@ -1063,10 +1078,6 @@ let txpool_encoding =
     (fun {pending; queued} -> (pending, queued))
     (fun (pending, queued) -> {pending; queued})
     (obj2 (req "pending" field_encoding) (req "queued" field_encoding))
-
-let hash_raw_tx str =
-  str |> Bytes.of_string |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
-  |> Bytes.to_string
 
 (** [transaction_nonce bytes] returns the nonce of a given raw transaction. *)
 let transaction_nonce bytes =
