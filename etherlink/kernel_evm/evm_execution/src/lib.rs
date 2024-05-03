@@ -12,6 +12,7 @@ use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
 use evm::executor::stack::PrecompileFailure;
 use evm::ExitReason;
+use handler::EvmHandler;
 use host::runtime::Runtime;
 use primitive_types::{H160, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -42,7 +43,7 @@ extern crate tezos_smart_rollup_host as host;
 use precompiles::PrecompileSet;
 use trace::TracerConfig;
 
-use crate::handler::ExtendedExitReason;
+use crate::{handler::ExtendedExitReason, storage::tracer};
 
 #[derive(Error, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DurableStorageError {
@@ -124,6 +125,25 @@ pub enum EthereumError {
     GasToFeesUnderflow,
 }
 
+fn trace_outcome<Host: Runtime>(
+    handler: EvmHandler<Host>,
+    tracing: bool,
+    failure: u8,
+    result: &Option<Vec<u8>>,
+) -> Result<(), StorageError> {
+    if tracing {
+        tracer::store_trace_failed(handler.host, failure)
+            .map_err(StorageError::RuntimeError)?;
+        tracer::store_trace_gas(handler.host, handler.gas_used())
+            .map_err(StorageError::RuntimeError)?;
+        if let Some(return_value) = result {
+            tracer::store_return_value(handler.host, return_value)
+                .map_err(StorageError::RuntimeError)?;
+        }
+    }
+    Ok(())
+}
+
 /// Execute an Ethereum Transaction
 ///
 /// The function returns `Err` only if something is wrong with the kernel and/or the
@@ -169,6 +189,8 @@ where
     }
 
     log!(host, Info, "Going to run an Ethereum transaction\n  - from address: {}\n  - to address: {:?}", caller, address);
+
+    let tracing = tracer.is_some();
 
     let mut handler = handler::EvmHandler::<'_, Host>::new(
         host,
@@ -221,9 +243,14 @@ where
                     }
                 }
 
+                trace_outcome(handler, tracing, 0, &result.result)?;
+
                 Ok(Some(result))
             }
-            Err(e) => Err(e),
+            Err(e) => {
+                trace_outcome(handler, tracing, 1, &None)?;
+                Err(e)
+            }
         }
     } else {
         // caller was unable to pay for the gas limit
