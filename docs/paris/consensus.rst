@@ -146,7 +146,7 @@ Validator selection: staking balance and active stake
 Validator selection is based on the staking balance of a delegate, as in Emmy*.
 Let us first (re)define these and related concepts.
 
-- The *consensus balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
+- The *overall balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
   balances of all accounts that have delegated to it.
   It must be at least ``MINIMAL_STAKE`` tez, otherwise the delegate cannot be selected as a validator.
 - The *active stake* of a delegate is the amount of tez with which
@@ -171,7 +171,7 @@ not the other way around.):
 - ``delegated balance`` represents the total amount of tokens delegated or staked by others to a
   given delegate; it excludes the delegate's full balance; it is obtained
   with ``../context/delegates/<pkh>/delegated_balance``
-- ``consensus balance = full balance + delegated balance``; it is obtained with
+- ``overall balance = full balance + delegated balance``; it is obtained with
   ``../context/delegates/<pkh>/staking_balance``
 - ``full balance = spendable balance + staking balance``; it is obtained with
   ``../context/delegates/<pkh>/full_balance``
@@ -205,7 +205,7 @@ before updating the delegates' :ref:`activity status<active_delegate_paris>`.
    block*.
 
 Intuitively, the active stake is set to 10 times the delegate's staking balance,
-without going beyond its consensus balance.
+without going beyond its overall balance.
 More precisely, the active stake is:
 
 - the delegate's staking balance,
@@ -225,7 +225,7 @@ during the last 5 cycles).
    :widths: 20 20 20 20 20
    :header-rows: 1
 
-   * - Consensus balance
+   * - Overall balance
      - Frozen deposit limit
      - Active stake
      - Staking balance
@@ -255,7 +255,7 @@ We note in passing that this new schema basically solves the main
 problem of over-delegation: a delegate will not fail anymore to bake
 and attest because of an insufficient balance to pay the
 deposit. However, a delegate can still be over-delegated, and it will be
-rewarded based on its active stake, not on its consensus balance.
+rewarded based on its active stake, not on its overall balance.
 
 Economic Incentives
 ~~~~~~~~~~~~~~~~~~~
