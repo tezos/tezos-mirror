@@ -178,7 +178,7 @@ let get_slot_content_from_shards cryptobox store commitment =
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot cryptobox store commitment =
+let get_slot ~reconstruct_if_missing cryptobox store commitment =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let*! res_slot_store =
@@ -186,7 +186,7 @@ let get_slot cryptobox store commitment =
   in
   match res_slot_store with
   | Ok slot -> return slot
-  | Error _ -> (
+  | Error _ when reconstruct_if_missing -> (
       (* The slot could not be obtained from the slot store, attempt a
          reconstruction. *)
       let*! res_shard_store =
@@ -195,6 +195,7 @@ let get_slot cryptobox store commitment =
       match res_shard_store with
       | Ok slot -> return slot
       | Error _ -> Lwt.return res_slot_store)
+  | Error _ -> Lwt.return res_slot_store
 
 (* Used wrapper functions on top of Cryptobox. *)
 
@@ -422,10 +423,10 @@ let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   let* commitment = get_slot_commitment slot_id store in
   Store.Shards.read store.shards commitment shard_index
 
-let get_slot_pages cryptobox store commitment =
+let get_slot_pages ~reconstruct_if_missing cryptobox store commitment =
   let open Lwt_result_syntax in
   let dal_parameters = Cryptobox.parameters cryptobox in
-  let* slot = get_slot cryptobox store commitment in
+  let* slot = get_slot ~reconstruct_if_missing cryptobox store commitment in
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)

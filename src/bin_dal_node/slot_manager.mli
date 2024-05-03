@@ -38,14 +38,21 @@
 
 type slot = bytes
 
-(** [get_slot_pages] behaves as [get_slot], except that it also
-    splits the slot into pages before returning them.
+(** [get_slot_pages ~reconstruct_if_missing cryptobox store
+    commitment] fetches from the store the slot corresponding to the
+    given commitment and split it into pages. If the slot is not found
+    in the store and [reconstruct_if_missing] is true, the slot is
+    reconstructed from the stored shards.
 
-    Returns an [Error _] if the length of the slot associated to the
-    [Cryptobox.commitment] is ill-formed. Specifically, when its
-    length is not a multiple of the page-size specified in the
-    [Cryptobox.parameters] argument. *)
+    Returns an [Error _] if:
+    - the slot is not found in the store and [reconstruct_if_missing] is false,
+    - the slot is not found in the store, [reconstruct_if_missing] is
+      true, and too few shards are stored to reconstruct the slot,
+    - the length of the slot associated to the [Cryptobox.commitment]
+      is ill-formed. Specifically, when its length is not a multiple of
+      the page-size specified in the [Cryptobox.parameters] argument. *)
 val get_slot_pages :
+  reconstruct_if_missing:bool ->
   Cryptobox.t ->
   Store.t ->
   Cryptobox.commitment ->

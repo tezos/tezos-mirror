@@ -183,7 +183,11 @@ module Slots_handlers = struct
         (let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
         let* commitment = Slot_manager.get_slot_commitment slot_id node_store in
-        Slot_manager.get_slot_pages cryptobox node_store commitment)
+        Slot_manager.get_slot_pages
+          ~reconstruct_if_missing:true
+          cryptobox
+          node_store
+          commitment)
         |> Errors.to_option_tzresult)
 end
 
