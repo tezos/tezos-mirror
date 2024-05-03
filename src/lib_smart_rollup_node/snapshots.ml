@@ -887,11 +887,20 @@ let maybe_gc_after_import cctxt ~data_dir snapshot_metadata
           node_ctxt.store
           (Some Full)
       in
-      Node_context.gc
-        ~force:true
-        ~wait_finished:true
-        node_ctxt
-        ~level:head.header.level
+      Format.eprintf
+        "Running garbage collection to convert rollup node data to full \
+         mode... %!" ;
+      let start = Time.System.now () in
+      let* () =
+        Node_context.gc
+          ~force:true
+          ~wait_finished:true
+          node_ctxt
+          ~level:head.header.level
+      in
+      let elapsed = Ptime.diff (Time.System.now ()) start in
+      Format.eprintf "Done (%a)@." Ptime.Span.pp elapsed ;
+      return_unit
 
 let import ~no_checks ~force cctxt ~data_dir ~snapshot_file =
   let open Lwt_result_syntax in
