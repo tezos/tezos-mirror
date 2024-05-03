@@ -167,10 +167,8 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
           ~slot_index
           ~level_committee:(Node_context.fetch_committee node_ctxt)
           proto_parameters
-          (shards
-          |> Seq.map (fun Cryptobox.{index; share} ->
-                 (commitment, index, Ok share))
-          |> Seq_s.of_seq)
+          commitment
+          shards
           shard_proofs
           gs_worker
       in

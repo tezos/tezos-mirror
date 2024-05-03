@@ -319,7 +319,7 @@ let shards_to_attesters committee =
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
 let publish_proved_shards ~published_level ~slot_index ~level_committee
-    proto_parameters shards shard_proofs gs_worker =
+    proto_parameters commitment shards shard_proofs gs_worker =
   let open Lwt_result_syntax in
   let attestation_level =
     Int32.(
@@ -331,50 +331,35 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
   let* committee = level_committee ~level:attestation_level in
   let attester_of_shard = shards_to_attesters committee in
   shards
-  |> Seq_s.iter_ep (function
-         | _, _, Error [Stored_data.Missing_stored_data s] ->
-             let*! () =
-               Event.(
-                 emit loading_shard_data_failed ("Missing stored data " ^ s))
+  |> Seq.iter_ep (fun Cryptobox.{index = shard_index; share} ->
+         match
+           (attester_of_shard shard_index, get_opt shard_proofs shard_index)
+         with
+         | None, _ ->
+             failwith
+               "Invariant broken: no attester found for shard %d"
+               shard_index
+         | _, None ->
+             failwith
+               "Invariant broken: no shard proof found for shard %d"
+               shard_index
+         | Some pkh, Some shard_proof ->
+             let message = Types.Message.{share; shard_proof} in
+             let topic = Types.Topic.{slot_index; pkh} in
+             let message_id =
+               Types.Message_id.
+                 {
+                   commitment;
+                   level = published_level;
+                   slot_index;
+                   shard_index;
+                   pkh;
+                 }
              in
-             return_unit
-         | _, _, Error err ->
-             let*! () =
-               Event.(
-                 emit
-                   loading_shard_data_failed
-                   (Format.asprintf "%a" pp_print_trace err))
-             in
-             return_unit
-         | commitment, shard_index, Ok share -> (
-             match
-               (attester_of_shard shard_index, get_opt shard_proofs shard_index)
-             with
-             | None, _ ->
-                 failwith
-                   "Invariant broken: no attester found for shard %d"
-                   shard_index
-             | _, None ->
-                 failwith
-                   "Invariant broken: no shard proof found for shard %d"
-                   shard_index
-             | Some pkh, Some shard_proof ->
-                 let message = Types.Message.{share; shard_proof} in
-                 let topic = Types.Topic.{slot_index; pkh} in
-                 let message_id =
-                   Types.Message_id.
-                     {
-                       commitment;
-                       level = published_level;
-                       slot_index;
-                       shard_index;
-                       pkh;
-                     }
-                 in
-                 Gossipsub.Worker.(
-                   Publish_message {message; topic; message_id}
-                   |> app_input gs_worker) ;
-                 return_unit))
+             Gossipsub.Worker.(
+               Publish_message {message; topic; message_id}
+               |> app_input gs_worker) ;
+             return_unit)
 
 (** This function publishes the shards of a commitment that is waiting
     for attestion on L1 if this node has those shards and their proofs
@@ -409,8 +394,8 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
         with
         | Some shards ->
             shards |> Array.to_seq
-            |> Seq.mapi (fun index share -> (commitment, index, Ok share))
-            |> Seq_s.of_seq |> Result.return
+            |> Seq.mapi (fun index share -> Cryptobox.{index; share})
+            |> Result.return
         | None ->
             Result_syntax.tzfail
             @@ Missing_shards_in_cache {published_level; slot_index}
@@ -420,6 +405,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
         ~slot_index
         ~level_committee
         proto_parameters
+        commitment
         shards
         shard_proofs
         gs_worker

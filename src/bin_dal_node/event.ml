@@ -228,14 +228,6 @@ let decoding_data_failed =
     ~level:Warning
     ("data_kind", Types.Store.encoding)
 
-let loading_shard_data_failed =
-  declare_1
-    ~section
-    ~name:"loading_shard_data_failed"
-    ~msg:"error while reading shard data {message}"
-    ~level:Warning
-    ("message", Data_encoding.string)
-
 let message_validation_error =
   declare_2
     ~section
