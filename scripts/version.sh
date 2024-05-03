@@ -24,17 +24,18 @@ export recommended_node_version=18.18.2
 # `image:`.
 export alpine_version='3.18'
 
-## full_opam_repository is a commit hash of the public OPAM repository, i.e.
+## full_opam_repository is a commit hash of the public opam repository, i.e.
 ## https://github.com/ocaml/opam-repository
 export full_opam_repository_tag=518f55a1ee5da870035b9593f98db03f43ce7f5f
 
-## opam_repository is an additional, tezos-specific opam repository.
-## This value MUST be reflected in the `build_deps_image_version` variable
+## `opam_repository_tag` is a commit hash of the
+## https://gitlab.com/tezos/opam-repository repository. This
+## repository is used to build the build-deps images used by the
+## tezos/tezos CI to run jobs and to produce the Octez Docker
+## distribution.
+## The value of `opam_repository_tag` MUST be reflected in the `build_deps_image_version` variable
 ## of `.gitlab-ci.yml`, which is ensured by running `make -C ci` from the root.
-export opam_repository_url=https://gitlab.com/tezos/opam-repository
 export opam_repository_tag="${OPAM_REPOSITORY_TAG:-07a7c6694aeb8355724a9fad11c3729143523cd9}"
-export opam_repository_git="$opam_repository_url.git"
-export opam_repository="$opam_repository_git"\#"$opam_repository_tag"
 
 # SHA-256 hashes of the DAL SRSs, as used in 'scripts/install_dal_trusted_setup.sh' to verify
 # integrity of downloaded SRS.
