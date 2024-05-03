@@ -167,7 +167,7 @@ module Simple = struct
       ~name:"convert_history_mode"
       ~level:Notice
       ~msg:
-        "Converting the {old_history_mode} rollup node into an \
+        "Converting the {old_history_mode} rollup node into a \
          {new_history_mode} rollup node"
       ("old_history_mode", Configuration.history_mode_encoding)
       ("new_history_mode", Configuration.history_mode_encoding)
