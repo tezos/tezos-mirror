@@ -998,7 +998,7 @@ let get_gc_level node_ctxt =
       let+ lcc = last_seen_lcc node_ctxt in
       Some lcc.level
 
-let gc ?(wait_finished = false) node_ctxt ~(level : int32) =
+let gc ?(wait_finished = false) ?(force = false) node_ctxt ~(level : int32) =
   let open Lwt_result_syntax in
   (* [gc_level] is the level corresponding to the hash on which GC will be
      called. *)
@@ -1009,7 +1009,7 @@ let gc ?(wait_finished = false) node_ctxt ~(level : int32) =
   | None -> return_unit
   | Some gc_level
     when gc_level > first_available_level
-         && Int32.(sub level last_gc_level >= frequency)
+         && (force || Int32.(sub level last_gc_level >= frequency))
          && Context.is_gc_finished node_ctxt.context
          && Store.is_gc_finished node_ctxt.store -> (
       let* hash = hash_of_level node_ctxt gc_level in
