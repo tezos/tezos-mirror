@@ -31,6 +31,7 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
   | No_prover_SRS
+  | Missing_shards_in_cache of {published_level : int32; slot_index : int}
 
 let () =
   register_error_kind
@@ -106,7 +107,26 @@ let () =
          be able to compute proofs.")
     Data_encoding.empty
     (function No_prover_SRS -> Some () | _ -> None)
-    (fun () -> No_prover_SRS)
+    (fun () -> No_prover_SRS) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.missing_shards_in_cache"
+    ~title:"Missing shards in cache"
+    ~description:"Missing shards in cache could not be published"
+    ~pp:(fun ppf (published_level, slot_index) ->
+      Format.fprintf
+        ppf
+        "Could not publish the shards at level %ld for slot index %d because \
+         they were not found in the cache."
+        published_level
+        slot_index)
+    Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
+    (function
+      | Missing_shards_in_cache {published_level; slot_index} ->
+          Some (published_level, slot_index)
+      | _ -> None)
+    (fun (published_level, slot_index) ->
+      Missing_shards_in_cache {published_level; slot_index})
 
 type slot = bytes
 
@@ -359,7 +379,7 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
 let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
-    cryptobox proto_parameters commitment published_level slot_index =
+    _cryptobox proto_parameters commitment published_level slot_index =
   let open Lwt_result_syntax in
   match
     Store.Shard_proofs_cache.find_opt
@@ -380,8 +400,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
           [shards_proofs_cache_size] is set properly. *)
       return_unit
   | Some shard_proofs ->
-      let Cryptobox.{number_of_shards; _} = Cryptobox.parameters cryptobox in
-      let shards =
+      let*? shards =
         match
           Store.Shard_cache.find_opt
             node_store.not_yet_published_shards
@@ -390,9 +409,10 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
         | Some shards ->
             shards |> Array.to_seq
             |> Seq.mapi (fun index share -> (commitment, index, Ok share))
-            |> Seq_s.of_seq
+            |> Seq_s.of_seq |> Result.return
         | None ->
-            Store.Shards.read_all node_store.shards commitment ~number_of_shards
+            Result_syntax.tzfail
+            @@ Missing_shards_in_cache {published_level; slot_index}
       in
       publish_proved_shards
         ~published_level
