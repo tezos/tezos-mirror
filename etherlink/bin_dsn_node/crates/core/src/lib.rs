@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 pub mod bundler;
+pub mod config;
 pub mod error;
 pub mod errors;
 pub mod json_http_rpc;
