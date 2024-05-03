@@ -11,6 +11,24 @@ stages:
 - doc
 - manual
 
+oc.docker:client-libs-dependencies:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: build
+  tags:
+  - gcp
+  dependencies: []
+  before_script: []
+  script:
+  - ./scripts/ci/docker_client_libs_dependencies_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: client_libs_dependencies_image_tag.env
+
 trigger:
   image: alpine:3.19
   stage: start
@@ -122,33 +140,6 @@ oc.docker:rust-toolchain:
   artifacts:
     reports:
       dotenv: rust_toolchain_image_tag.env
-
-oc.docker:client-libs-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - client-libs/*kaitai*/**/*
-    - images/**/*
-    - scripts/ci/**/*
-    - src/**/*
-    when: on_success
-  dependencies: []
-  before_script: []
-  script:
-  - ./scripts/ci/docker_client_libs_dependencies_build.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.6
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: client_libs_dependencies_image_tag.env
 
 oc.build_arm64-released:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}

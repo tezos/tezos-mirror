@@ -499,23 +499,6 @@ let jobs pipeline_type =
       ~dependencies:dependencies_needs_start
       ()
   in
-  let job_docker_client_libs_dependencies =
-    job_docker_authenticated
-      ~__POS__
-      ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
-      ~stage:Stages.build
-      ~name:"oc.docker:client-libs-dependencies"
-        (* These image are not built for external use. *)
-      ~ci_docker_hub:false
-        (* Handle docker initialization, if necessary, in [./scripts/ci/docker_client_libs_dependencies_build.sh]. *)
-      ~skip_docker_initialization:true
-      ["./scripts/ci/docker_client_libs_dependencies_build.sh"]
-      ~artifacts:
-        (artifacts
-           ~reports:
-             (reports ~dotenv:"client_libs_dependencies_image_tag.env" ())
-           [])
-  in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
   (* [job_build_x86_64_release] builds the released executables. *)
@@ -713,7 +696,6 @@ let jobs pipeline_type =
     in
     [
       job_docker_rust_toolchain;
-      job_docker_client_libs_dependencies;
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
       job_static_x86_64_experimental;
@@ -797,12 +779,7 @@ let jobs pipeline_type =
         ~name:"kaitai_e2e_checks"
         ~image:Images.client_libs_dependencies
         ~stage:Stages.test
-        ~dependencies:
-          (Dependent
-             [
-               Artifacts job_docker_client_libs_dependencies;
-               Artifacts job_kaitai_checks;
-             ])
+        ~dependencies:(Dependent [Artifacts job_kaitai_checks])
         ~rules:
           (make_rules ~changes:changeset_kaitai_e2e_files ~dependent:true ())
         ~before_script:
