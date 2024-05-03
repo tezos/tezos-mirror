@@ -1033,11 +1033,26 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
   let rollup_node_4 =
     Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
   in
+  let rollup_node_5 =
+    Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
+  in
   let* () =
     Sc_rollup_node.run rollup_node_2 sc_rollup [History_mode history_mode]
   in
   let* () =
     Sc_rollup_node.run rollup_node_4 other_rollup [History_mode history_mode]
+  in
+  let* () =
+    match history_mode with
+    | Full -> unit
+    | Archive ->
+        (* Run another rollup node in full mode, to check that it can import
+           archive snapshots (it needs to register its mode on disk). *)
+        let* () =
+          Sc_rollup_node.run rollup_node_5 sc_rollup [History_mode Full]
+        in
+        let* (_ : int) = Sc_rollup_node.wait_sync rollup_node_5 ~timeout:3. in
+        Sc_rollup_node.terminate rollup_node_5
   in
   let rollup_node_processing =
     let* () = bake_levels stop_rollup_node_2_levels client in
@@ -1111,6 +1126,19 @@ let test_snapshots ~kind ~challenge_window ~commitment_period ~history_mode
   Log.info "Importing snapshot in late rollup node." ;
   let*! () =
     Sc_rollup_node.import_snapshot ~force:true rollup_node_2 ~snapshot_file
+  in
+  let* () =
+    match history_mode with
+    | Full -> unit
+    | Archive ->
+        Log.info "Import %s snapshot into full node." history_mode_str ;
+        let*! () =
+          Sc_rollup_node.import_snapshot
+            ~force:true
+            rollup_node_5
+            ~snapshot_file
+        in
+        unit
   in
   Log.info "Running rollup nodes with snapshots until they catch up." ;
   let* () =
