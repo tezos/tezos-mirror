@@ -21,6 +21,9 @@
 ### Experimental
 
 - Support for write-ahead log journal mode for the EVM node’s store. (!13192)
+- Add the field `drop_duplicate` for the batcher injection rpc input
+  (rollup node version must support it). The field allows to reduce
+  the cost of operating a rollup batcher node. (!13189)
 
 ### Bug fixes
 

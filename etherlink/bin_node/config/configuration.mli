@@ -51,7 +51,10 @@ val sqlite_journal_mode_encoding : sqlite_journal_mode Data_encoding.t
 
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
-type experimental_features = {sqlite_journal_mode : sqlite_journal_mode}
+type experimental_features = {
+  sqlite_journal_mode : sqlite_journal_mode;
+  drop_duplicate_on_injection : bool;
+}
 
 type sequencer = {
   preimages : string;  (** Path to the preimages directory. *)

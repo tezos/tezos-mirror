@@ -65,7 +65,14 @@ let install_finalizer server =
   let* () = Tx_pool.shutdown () in
   Evm_context.shutdown ()
 
-let main ({keep_alive; rollup_node_endpoint; _} as config : Configuration.t) =
+let main
+    ({
+       keep_alive;
+       rollup_node_endpoint;
+       experimental_features = {drop_duplicate_on_injection; _};
+       _;
+     } as config :
+      Configuration.t) =
   let open Lwt_result_syntax in
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address
@@ -76,6 +83,8 @@ let main ({keep_alive; rollup_node_endpoint; _} as config : Configuration.t) =
     let base = rollup_node_endpoint
 
     let keep_alive = keep_alive
+
+    let drop_duplicate_on_injection = drop_duplicate_on_injection
 
     let smart_rollup_address = smart_rollup_address
   end) in

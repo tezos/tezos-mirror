@@ -33,6 +33,8 @@ module Make : functor
 
      val keep_alive : bool
 
+     val drop_duplicate_on_injection : bool
+
      val smart_rollup_address : string
    end)
   -> Services_backend_sig.S
