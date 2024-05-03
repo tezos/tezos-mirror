@@ -90,6 +90,8 @@ Smart Rollup node
 - Trigger GC every 1000 blocks (instead of 100) by default to reduce CPU
   consumption. (MR :gl:`!13177`)
 
+- Default history mode is now "full". (MR :gl:`!13178`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
