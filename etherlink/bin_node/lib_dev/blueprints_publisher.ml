@@ -9,6 +9,7 @@ type parameters = {
   rollup_node_endpoint : Uri.t;
   latest_level_seen : Z.t;
   config : Configuration.blueprints_publisher_config;
+  keep_alive : bool;
 }
 
 type state = {
@@ -17,6 +18,7 @@ type state = {
   max_blueprints_ahead : Z.t;
   max_blueprints_catchup : Z.t;
   catchup_cooldown : int;
+  keep_alive : bool;
   mutable latest_level_confirmed : Z.t;
       (** The current head of the EVM chain as seen by the rollup node *)
   mutable latest_level_seen : Z.t;
@@ -83,6 +85,8 @@ module Worker = struct
   let set_cooldown worker cooldown = (state worker).cooldown <- cooldown
 
   let catchup_cooldown worker = (state worker).catchup_cooldown
+
+  let keep_alive worker = (state worker).keep_alive
 
   let current_cooldown worker = (state worker).cooldown
 
@@ -156,6 +160,25 @@ module Worker = struct
     (* We give ourselves a cooldown window Tezos blocks to inject everything *)
     set_cooldown worker (catchup_cooldown worker) ;
     return_unit
+
+  let retrieve_and_set_latest_level_confirmed self rollup_block_lvl =
+    let open Lwt_result_syntax in
+    let open Rollup_services in
+    let* finalized_current_number =
+      call_service
+        ~keep_alive:(keep_alive self)
+        ~base:(rollup_node_endpoint self)
+        durable_state_value
+        ((), Block_id.Level rollup_block_lvl)
+        {key = Durable_storage_path.Block.current_number}
+        ()
+    in
+    match finalized_current_number with
+    | Some bytes ->
+        let (Qty evm_block_number) = Ethereum_types.decode_number bytes in
+        set_latest_level_confirmed self evm_block_number ;
+        return_unit
+    | None -> return_unit
 end
 
 type worker = Worker.infinite Worker.queue Worker.t
@@ -178,6 +201,7 @@ module Handlers = struct
              catchup_cooldown;
            };
          latest_level_seen;
+         keep_alive;
        } :
         Types.parameters) =
     let open Lwt_result_syntax in
@@ -194,6 +218,7 @@ module Handlers = struct
         max_blueprints_ahead = Z.of_int max_blueprints_ahead;
         max_blueprints_catchup = Z.of_int max_blueprints_catchup;
         catchup_cooldown;
+        keep_alive;
       }
 
   let on_request :
@@ -205,8 +230,10 @@ module Handlers = struct
     | Publish {level; payload} ->
         let* () = Worker.publish self payload level in
         return_unit
-    | New_l2_head {rollup_head} -> (
-        Worker.set_latest_level_confirmed self rollup_head ;
+    | New_rollup_node_block rollup_block_lvl -> (
+        let* () =
+          Worker.retrieve_and_set_latest_level_confirmed self rollup_block_lvl
+        in
         match Worker.rollup_is_lagging_behind self with
         | (Needs_republish | Needs_lock) when not (Worker.on_cooldown self) ->
             (* The worker needs to republish, it's not in cooldown. *)
@@ -238,13 +265,13 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~rollup_node_endpoint ~config ~latest_level_seen () =
+let start ~rollup_node_endpoint ~config ~latest_level_seen ~keep_alive () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
-      {rollup_node_endpoint; config; latest_level_seen}
+      {rollup_node_endpoint; config; latest_level_seen; keep_alive}
       (module Handlers)
   in
   let*! () = Blueprint_events.publisher_is_ready () in
@@ -279,8 +306,8 @@ let worker_add_request ~request =
 let publish level payload =
   worker_add_request ~request:(Publish {level; payload})
 
-let new_l2_head rollup_head =
-  worker_add_request ~request:(New_l2_head {rollup_head})
+let new_rollup_block rollup_level =
+  worker_add_request ~request:(New_rollup_node_block rollup_level)
 
 let shutdown () =
   let open Lwt_result_syntax in
