@@ -2,6 +2,7 @@
 # Edit file ci/bin/main.ml instead.
 
 stages:
+- images
 - sanity
 - build
 - test
@@ -26,6 +27,24 @@ oc.docker:client-libs-dependencies:
   artifacts:
     reports:
       dotenv: client_libs_dependencies_image_tag.env
+
+oc.docker:rust-toolchain:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  before_script: []
+  script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.6
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
 
 sanity_ci:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
@@ -53,26 +72,6 @@ docker:hadolint-schedule_extended_test:
   script:
   - hadolint build.Dockerfile
   - hadolint Dockerfile
-
-oc.docker:rust-toolchain:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies: []
-  before_script: []
-  script:
-  - ./scripts/ci/docker_rust_toolchain_build.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.6
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: rust_toolchain_image_tag.env
 
 oc.build_arm64-released:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
@@ -234,8 +233,6 @@ oc.build_kernels:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -6943,8 +6940,6 @@ test_kernels:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -6966,8 +6961,6 @@ test_etherlink_kernel:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -6989,8 +6982,6 @@ test_etherlink_firehose:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -7011,8 +7002,6 @@ test_riscv_kernels:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
@@ -7035,8 +7024,6 @@ test_evm_compatibility:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:

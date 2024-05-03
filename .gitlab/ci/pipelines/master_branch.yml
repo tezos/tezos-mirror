@@ -2,6 +2,7 @@
 # Edit file ci/bin/main.ml instead.
 
 stages:
+- images
 - build
 - test_coverage
 - doc
@@ -10,11 +11,9 @@ stages:
 
 oc.docker:rust-toolchain:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: build
+  stage: images
   tags:
   - gcp
-  rules:
-  - when: always
   dependencies: []
   before_script: []
   script:
@@ -135,8 +134,6 @@ oc.docker:amd64:
   - gcp
   rules:
   - when: always
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   before_script:
@@ -159,10 +156,7 @@ oc.docker:arm64:
   - gcp_arm64
   rules:
   - when: always
-  needs:
-  - oc.docker:rust-toolchain
-  dependencies:
-  - oc.docker:rust-toolchain
+  dependencies: []
   before_script:
   - ./scripts/ci/docker_initialize.sh
   script:
@@ -269,8 +263,6 @@ publish_kernel_sdk:
   rules:
   - when: manual
     allow_failure: true
-  needs:
-  - oc.docker:rust-toolchain
   dependencies:
   - oc.docker:rust-toolchain
   cache:
