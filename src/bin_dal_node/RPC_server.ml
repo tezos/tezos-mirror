@@ -239,17 +239,11 @@ module Profile_handlers = struct
           let slot_id : Types.slot_id =
             {slot_level = published_level; slot_index}
           in
-          let*! r = Slot_manager.get_slot_commitment slot_id store in
-          let open Errors in
-          match r with
-          | Error `Not_found -> return_false
-          | Error (#other as e) -> fail e
-          | Ok commitment ->
-              Store.Shards.are_shards_available
-                store.shards
-                commitment
-                shard_indices
-              |> lwt_map_error (fun e -> `Other e)
+          Store.Shards.are_shards_available
+            store.Store.shards
+            slot_id
+            shard_indices
+          |> lwt_map_error (fun e -> `Other e)
         in
         let all_slot_indexes =
           Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))

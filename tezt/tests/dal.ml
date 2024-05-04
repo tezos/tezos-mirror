@@ -487,9 +487,10 @@ let update_known_peers dal_node known_peers =
     dal_node
     (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
 
-let wait_for_stored_slot ?shard_index dal_node commitment =
-  let check_slot_header e =
-    JSON.(e |-> "commitment" |> as_string) = commitment
+let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
+  let check_slot_id e =
+    JSON.(e |-> "published_level" |> as_int) = published_level
+    && JSON.(e |-> "slot_index" |> as_int) = slot_index
   in
   let check_shard_index e =
     match shard_index with
@@ -497,7 +498,7 @@ let wait_for_stored_slot ?shard_index dal_node commitment =
     | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
   in
   Dal_node.wait_for dal_node "stored_slot_shard.v0" (fun e ->
-      if check_slot_header e && check_shard_index e then Some () else None)
+      if check_slot_id e && check_shard_index e then Some () else None)
 
 (* Return the baker at round 0 at the given level. *)
 let baker_for_round_zero node ~level =
@@ -1282,7 +1283,9 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
     slot_producer_dal_node source ~index ~wait_slot
     ~number_of_extra_blocks_to_bake content =
   let* commitment, proof = Helpers.store_slot slot_producer_dal_node content in
-  let p = wait_slot commitment in
+  let* first_level = Client.level client in
+  let published_level = first_level + 1 in
+  let p = wait_slot ~published_level ~slot_index:index in
   let* (`OpHash ophash) =
     publish_commitment
       ?counter
@@ -1296,7 +1299,6 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
   in
   (* Bake a first block to include the operation. *)
   let* () = bake_for client in
-  let* level = Client.level client in
   (* Check that the operation is included. *)
   let* included_manager_operations =
     let manager_operation_pass = 3 in
@@ -1317,7 +1319,7 @@ let publish_store_and_wait_slot ?counter ?force ?(fee = 1_200) node client
   let* () = bake_for ~count:number_of_extra_blocks_to_bake client in
   (* Wait for the shards to be received *)
   let* res = p in
-  return (level, commitment, res)
+  return (published_level, commitment, res)
 
 let publish_store_and_attest_slot ?counter ?force ?fee client node dal_node
     source ~index ~content ~attestation_lag ~number_of_slots =
@@ -4310,11 +4312,15 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   let all_shard_indices =
     Seq.ints 0 |> Seq.take number_of_shards |> List.of_seq
   in
-  let wait_slot commitment =
+  let wait_slot ~published_level ~slot_index =
     Lwt.join
     @@ List.map
          (fun shard_index ->
-           wait_for_stored_slot ~shard_index attester commitment)
+           wait_for_stored_slot
+             ~shard_index
+             attester
+             ~published_level
+             ~slot_index)
          all_shard_indices
   in
   let attester_dal_node_endpoint = Dal_node.rpc_endpoint attester in
@@ -5004,8 +5010,8 @@ module Amplification = struct
       non_banned_attesters ;
 
     (* Wait until the given [dal_node] receives all the shards whose
-       indices are [shards] for the given [commitment]. *)
-    let wait_for_shards ~dal_node ~shards commitment =
+       indices are [shards] for the given published level and slot index. *)
+    let wait_for_shards ~dal_node ~shards ~published_level ~slot_index =
       let nshards = List.length shards in
       let count = ref 0 in
       let* () =
@@ -5013,7 +5019,11 @@ module Amplification = struct
         @@ List.map
              (fun shard_index ->
                let* () =
-                 wait_for_stored_slot ~shard_index dal_node commitment
+                 wait_for_stored_slot
+                   ~shard_index
+                   ~published_level
+                   ~slot_index
+                   dal_node
                in
                let () = incr count in
                let () =
@@ -5033,13 +5043,13 @@ module Amplification = struct
     in
     info "Waiting for shards" ;
 
-    let wait_shards_reach_attesters commitment attesters assigned_shard_indices
-        message =
+    let wait_shards_reach_attesters ~published_level ~slot_index attesters
+        assigned_shard_indices message =
       let* () =
         Lwt.join
         @@ List.map2
              (fun {dal_node; _} shards ->
-               wait_for_shards ~dal_node ~shards commitment)
+               wait_for_shards ~dal_node ~shards ~published_level ~slot_index)
              attesters
              assigned_shard_indices
       in
@@ -5047,13 +5057,17 @@ module Amplification = struct
       unit
     in
 
-    let wait_shards_reach_observer commitment =
+    let wait_shards_reach_observer ~published_level ~slot_index =
       let* () =
         Lwt.join
         @@ List.map2
              (fun attester shards ->
                let* () =
-                 wait_for_shards ~dal_node:observer ~shards commitment
+                 wait_for_shards
+                   ~dal_node:observer
+                   ~shards
+                   ~published_level
+                   ~slot_index
                in
                let () =
                  Log.info
@@ -5071,10 +5085,11 @@ module Amplification = struct
     (* Wait until everyone has reveived the needed shards (first the
        non-banned attesters, then the observer, and finally the banned
        attesters). *)
-    let wait_slot commitment =
+    let wait_slot ~published_level ~slot_index =
       let wait_non_banned_promise =
         wait_shards_reach_attesters
-          commitment
+          ~published_level
+          ~slot_index
           non_banned_attesters
           assigned_shard_indices_non_banned
           "Non-banned attesters have received their shards"
@@ -5082,13 +5097,16 @@ module Amplification = struct
 
       let wait_banned_promise =
         wait_shards_reach_attesters
-          commitment
+          ~published_level
+          ~slot_index
           banned_attesters
           assigned_shard_indices_banned
           "Banned attesters have received their shards"
       in
 
-      let wait_observer_promise = wait_shards_reach_observer commitment in
+      let wait_observer_promise =
+        wait_shards_reach_observer ~published_level ~slot_index
+      in
 
       let* () = wait_non_banned_promise in
       let* () = wait_observer_promise in
@@ -5211,7 +5229,7 @@ module Amplification = struct
     let slot_content = "content" in
     let* before_publication_level = Client.level client in
     let publication_level = 1 + before_publication_level in
-    let wait_slot _commitment =
+    let wait_slot ~published_level:_ ~slot_index:_ =
       Log.info "Waiting for first reconstruction event" ;
       let* () =
         Dal_node.wait_for observer "reconstruct_starting_in.v0" (fun event ->
@@ -5276,16 +5294,27 @@ module Garbage_collection = struct
     Dal_node.wait_for node "removed_slot_shards.v0" (fun event ->
         if commitment = JSON.(event |> as_string) then Some () else None)
 
-  let wait_for_first_shard commitment node =
+  let wait_for_first_shard ~published_level ~slot_index node =
     Dal_node.wait_for node "stored_slot_shard.v0" (fun event ->
-        if commitment = JSON.(event |-> "commitment" |> as_string) then
-          let shard_index = JSON.(event |-> "shard_index" |> as_int) in
-          Some shard_index
+        let actual_published_level =
+          JSON.(event |-> "published_level" |> as_int)
+        in
+        let actual_slot_index = JSON.(event |-> "slot_index" |> as_int) in
+        if published_level = actual_published_level then
+          if slot_index = actual_slot_index then
+            let shard_index = JSON.(event |-> "shard_index" |> as_int) in
+            Some shard_index
+          else (
+            Log.info
+              "bad slot index : received : %d, expected : %d"
+              actual_slot_index
+              slot_index ;
+            None)
         else (
           Log.info
-            "bad commitment : received : %s, expected : %s"
-            JSON.(event |-> "commitment" |> as_string)
-            commitment ;
+            "bad slot level : received : %d, expected : %d"
+            actual_published_level
+            published_level ;
           None))
 
   let get_shard_rpc ~slot_level ~slot_index ~shard_index node =
@@ -5323,7 +5352,7 @@ module Garbage_collection = struct
         slot_producer
         Constant.bootstrap1
         ~index:slot_index
-        ~wait_slot:(fun _commitment -> unit)
+        ~wait_slot:(fun ~published_level:_ ~slot_index:_ -> unit)
         ~number_of_extra_blocks_to_bake:2
       @@ Helpers.make_slot ~slot_size "content"
     in
@@ -5494,16 +5523,16 @@ module Garbage_collection = struct
 
     Log.info "DAL network is ready" ;
 
-    let wait_slot commitment =
+    let wait_slot ~published_level ~slot_index =
       (* We don’t wait for the producer because at this step it already stored
          its shards *)
       let wait_for_first_shard_observer_promise =
         Log.info "Waiting for first shard to be stored by the observer" ;
-        wait_for_first_shard commitment observer
+        wait_for_first_shard ~published_level ~slot_index observer
       in
       let wait_for_first_shard_attester_promise =
         Log.info "Waiting for first shard to be stored by the attester" ;
-        wait_for_first_shard commitment attester
+        wait_for_first_shard ~published_level ~slot_index attester
       in
       let* shard_index_observer = wait_for_first_shard_observer_promise in
       let* shard_index_attester = wait_for_first_shard_attester_promise in

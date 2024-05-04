@@ -165,7 +165,7 @@ let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
   let*? polynomial = polynomial_from_shards cryptobox shards in
   return polynomial
 
-let get_slot_content_from_shards cryptobox store commitment =
+let get_slot_content_from_shards cryptobox store slot_id commitment =
   let open Lwt_result_syntax in
   let {Cryptobox.number_of_shards; redundancy_factor; _} =
     Cryptobox.parameters cryptobox
@@ -179,7 +179,7 @@ let get_slot_content_from_shards cryptobox store commitment =
         (Errors.other
            [Missing_shards {provided; required = minimal_number_of_shards}])
     else
-      let*! res = Store.Shards.read store.Store.shards commitment shard_id in
+      let*! res = Store.Shards.read store.Store.shards slot_id shard_id in
       match res with
       | Ok res -> loop (Seq.cons res acc) (shard_id + 1) (remaining - 1)
       | Error _ -> loop acc (shard_id + 1) remaining
@@ -198,7 +198,7 @@ let get_slot_content_from_shards cryptobox store commitment =
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot ~reconstruct_if_missing cryptobox store commitment =
+let get_slot ~reconstruct_if_missing cryptobox store slot_id commitment =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let*! res_slot_store =
@@ -211,7 +211,7 @@ let get_slot ~reconstruct_if_missing cryptobox store commitment =
         (* The slot could not be obtained from the slot store, attempt a
            reconstruction. *)
         let*! res_shard_store =
-          get_slot_content_from_shards cryptobox store commitment
+          get_slot_content_from_shards cryptobox store slot_id commitment
         in
         match res_shard_store with
         | Ok slot -> return slot
@@ -400,7 +400,7 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
         | None -> Result_syntax.tzfail @@ Missing_shards_in_cache slot_id
       in
       let* () =
-        Store.(Shards.write_all node_store.shards commitment shards)
+        Store.(Shards.write_all node_store.shards slot_id shards)
         |> Errors.to_tzresult
       in
       publish_proved_shards
@@ -438,15 +438,13 @@ let get_slot_content ~reconstruct_if_missing node_store cryptobox
     (slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
   let* commitment = get_slot_commitment slot_id node_store in
-  get_slot ~reconstruct_if_missing cryptobox node_store commitment
+  get_slot ~reconstruct_if_missing cryptobox node_store slot_id commitment
 
 let get_slot_status ~slot_id node_store =
   Store.Legacy.get_slot_status ~slot_id node_store
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
-  let open Lwt_result_syntax in
-  let* commitment = get_slot_commitment slot_id store in
-  Store.Shards.read store.shards commitment shard_index
+  Store.Shards.read store.shards slot_id shard_index
 
 let get_slot_pages ~reconstruct_if_missing cryptobox store slot_id =
   let open Lwt_result_syntax in

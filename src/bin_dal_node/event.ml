@@ -193,13 +193,15 @@ let stored_slot_content =
     ("commitment", Cryptobox.Commitment.encoding)
 
 let stored_slot_shard =
-  declare_2
+  declare_3
     ~section
     ~name:"stored_slot_shard"
-    ~msg:"stored shard {shard_index} for commitment {commitment}"
+    ~msg:
+      "stored shard {shard_index} for level {published_level} and index \
+       {slot_index}"
     ~level:Debug
-    ~pp1:Cryptobox.Commitment.pp_short
-    ("commitment", Cryptobox.Commitment.encoding)
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
     ("shard_index", Data_encoding.int31)
 
 let removed_slot_shards =

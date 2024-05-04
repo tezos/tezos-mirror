@@ -338,16 +338,16 @@ module Handler = struct
                 Event.(emit decoding_data_failed Types.Store.Commitment)
               in
               return_none
-          | Ok commitment -> return_some commitment)
+          | Ok commitment -> return_some (commitment, slot_id))
         (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
     in
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7124
        In case of republication of the same commitment, the shards are removed
        too early *)
     List.iter_es
-      (fun commitment ->
+      (fun (commitment, slot_id) ->
         let*! () = Event.(emit removed_slot_shards commitment) in
-        let* () = Store.Shards.remove store.shards commitment in
+        let* () = Store.Shards.remove store.shards slot_id in
         let*! () = Event.(emit removed_slot commitment) in
         let* () =
           Store.Slots.remove_slot_by_commitment
@@ -607,7 +607,7 @@ let connect_gossipsub_with_p2p gs_worker transport_layer node_store node_ctxt =
       let slot_id : Types.slot_id = {slot_level = level; slot_index} in
       let* () =
         Seq.return {Cryptobox.share; index = shard_index}
-        |> save_and_notify commitment |> Errors.to_tzresult
+        |> save_and_notify slot_id |> Errors.to_tzresult
       in
       match
         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
