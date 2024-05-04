@@ -41,6 +41,9 @@ type not_found = [`Not_found]
     polymorphic-variants based monad. *)
 type other = [`Other of tztrace]
 
+(** [not_found] is an alias for [`Not_found]. *)
+val not_found : [> not_found]
+
 (** [decoding_failed kind trace] produces the error trace
     [Decoding_failed kind :: trace] and wraps it with [`Other]. *)
 val decoding_failed : Types.Store.kind -> tztrace -> [> other]

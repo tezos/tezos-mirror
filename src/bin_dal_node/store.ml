@@ -155,7 +155,7 @@ module Shards = struct
     let data_kind = Types.Store.Shard in
     match res with
     | Ok share -> return {Cryptobox.share; index = shard_id}
-    | Error [KVS.Missing_stored_kvs_data _] -> fail `Not_found
+    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err -> fail @@ Errors.decoding_failed data_kind err
 
   let count_values store commitment =
@@ -222,8 +222,8 @@ module Slots = struct
     let*! res = KVS.read_value t file_layout (commitment, slot_size) () in
     let data_kind = Types.Store.Slot in
     match res with
-    | Ok slot -> return_some slot
-    | Error [KVS.Missing_stored_kvs_data _] -> return_none
+    | Ok slot -> return slot
+    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
     | Error err -> fail @@ Errors.decoding_failed data_kind err
 
   let remove_slot_by_commitment t ~slot_size commitment =
@@ -472,7 +472,7 @@ module Legacy = struct
       Irmin.find node_store.store @@ Path.Level.commitment index
     in
     Option.fold
-      ~none:(fail `Not_found)
+      ~none:(fail Errors.not_found)
       ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
       commitment_str_opt
 
@@ -482,8 +482,8 @@ module Legacy = struct
     let status_path = Path.Level.status slot_id in
     let*! status_opt = Irmin.find store status_path in
     match status_opt with
-    | None -> return_none
+    | None -> fail Errors.not_found
     | Some status_str ->
         let*? status = decode_header_status status_str in
-        return_some status
+        return status
 end

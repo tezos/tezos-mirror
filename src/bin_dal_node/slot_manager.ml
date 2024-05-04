@@ -117,14 +117,14 @@ let polynomial_from_shards cryptobox shards =
       ( `Not_enough_shards msg
       | `Shard_index_out_of_range msg
       | `Invalid_shard_length msg ) ->
-      Error [Merging_failed msg]
+      Error (Errors.other [Merging_failed msg])
 
 let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
   let open Lwt_result_syntax in
   let*? shards =
     Seq_s.take
       ~when_negative_length:
-        [Invalid_number_of_needed_shards number_of_needed_shards]
+        (Errors.other [Invalid_number_of_needed_shards number_of_needed_shards])
       number_of_needed_shards
       shards
   in
@@ -155,8 +155,8 @@ let get_slot cryptobox store commitment =
     Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
   in
   match res with
-  | Ok (Some slot) -> return slot
-  | Ok None | Error (`Other _) ->
+  | Ok slot -> return slot
+  | Error (`Not_found | `Other _) ->
       (* The slot could not be obtained from the slot store, attempt a
          reconstruction. *)
       let minimal_number_of_shards = number_of_shards / redundancy_factor in
@@ -164,8 +164,9 @@ let get_slot cryptobox store commitment =
         if remaining <= 0 then return acc
         else if shard_id >= number_of_shards then
           let provided = minimal_number_of_shards - remaining in
-          tzfail
-          @@ Missing_shards {provided; required = minimal_number_of_shards}
+          fail
+            (Errors.other
+               [Missing_shards {provided; required = minimal_number_of_shards}])
         else
           let*! res =
             Store.Shards.read store.Store.shards commitment shard_id
@@ -184,7 +185,6 @@ let get_slot cryptobox store commitment =
           cryptobox
           slot
           commitment
-        |> Errors.to_tzresult
       in
       let*! () =
         Event.(emit fetched_slot (Bytes.length slot, Seq.length shards))
@@ -204,7 +204,7 @@ let get_slot_pages cryptobox store commitment =
     String.chunk_bytes
       dal_parameters.page_size
       slot
-      ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
+      ~error_on_partial_chunk:(Errors.other @@ TzTrace.make Illformed_pages)
   in
   return @@ List.map (fun page -> String.to_bytes page) pages
 
@@ -252,13 +252,7 @@ let add_commitment node_store slot cryptobox =
   return commitment
 
 let get_commitment_slot node_store cryptobox commitment =
-  let open Lwt_result_syntax in
-  let* slot_opt =
-    Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
-  in
-  match slot_opt with
-  | None -> fail `Not_found
-  | Some slot_content -> return slot_content
+  Store.(Slots.find_slot_by_commitment node_store.slots cryptobox commitment)
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment ~with_proof =

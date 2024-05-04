@@ -46,16 +46,19 @@ type slot = bytes
     length is not a multiple of the page-size specified in the
     [Cryptobox.parameters] argument. *)
 val get_slot_pages :
-  Cryptobox.t -> Store.t -> Cryptobox.commitment -> bytes list tzresult Lwt.t
+  Cryptobox.t ->
+  Store.t ->
+  Cryptobox.commitment ->
+  (bytes list, [> Errors.other]) result Lwt.t
 
 (* Same as [Cryptobox.polynomial_from_shards] but using Lwt +
-   tzresult. The argument [number_of_needed_shards] is used to cap the
+   result. The argument [number_of_needed_shards] is used to cap the
    number of Lwt promises resolved from the shard sequence. *)
 val polynomial_from_shards_lwt :
   Cryptobox.t ->
   Cryptobox.shard Seq_s.t ->
   number_of_needed_shards:int ->
-  Cryptobox.polynomial tzresult Lwt.t
+  (Cryptobox.polynomial, [> Errors.other]) result Lwt.t
 
 type error +=
   | Invalid_slot_size of {provided : int; expected : int}
@@ -184,7 +187,7 @@ val get_commitment_by_published_level_and_index :
 val get_slot_status :
   slot_id:Types.slot_id ->
   Store.t ->
-  (Types.header_status option, Errors.other) result Lwt.t
+  (Types.header_status, [Errors.other | Errors.not_found]) result Lwt.t
 
 (** [get_slot_shard store slot_id shard_index] returns the shard at
     index [shard_index] of the slot given by [slot_id].

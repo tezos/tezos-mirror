@@ -87,6 +87,8 @@ type not_found = [`Not_found]
 
 type other = [`Other of tztrace]
 
+let not_found = `Not_found
+
 (* Helpers to wrap values and tzresult errors in [`Other]. *)
 
 let decoding_failed kind trace = `Other (Decoding_failed kind :: trace)

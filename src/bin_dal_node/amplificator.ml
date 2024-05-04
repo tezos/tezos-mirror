@@ -102,6 +102,7 @@ let amplify node_store node_ctxt cryptobox commitment precomputation
           cryptobox
           shards
           ~number_of_needed_shards
+        |> Errors.to_tzresult
       in
       let shards =
         Cryptobox.shards_from_polynomial cryptobox polynomial |> List.of_seq
