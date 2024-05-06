@@ -20,4 +20,5 @@
 ### Internal
 - Initial DSN node binary. (!12633)
 - Added ConfigProvider trait and DefaultConfigProvider implementation. (!13051)
+- Added network interface abstraction. (!13077)
 
