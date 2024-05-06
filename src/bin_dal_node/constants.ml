@@ -43,18 +43,6 @@ let slots_store_lru_size = 64
    but we cache 50 since each cache entry has quite a small memory footprint. *)
 let committee_cache_size = 50
 
-(* The size of the cache of 1024 entries (one per slot) is chosen such
-   that: if a DAL node stores the shard proofs of 128 slots per level,
-   the cache will be able to store the proofs for 8 levels, which
-   should be quite sufficient with the current attestation lag.
-
-   A shard proof takes 52 bytes with the current encoding (could be improved
-   to 48), so the maximum memory footprint of the cache is dominated by (keys
-   size is negligible):
-
-   1024 (cache size) * 2048 (shards per slot) * 52 bytes = 109 mb *)
-let shards_proofs_cache_size = 1024
-
 (* The size of the shard cache is chosen large enough to enable
    publishing slots on 5 slot indices.  We need to keep shards in
    the cache for at least three levels (if the commitment is published
@@ -62,12 +50,10 @@ let shards_proofs_cache_size = 1024
    finalize it) but a few more levels may be needed if the commitment
    is not published immediately so we consider a cache large enough to
    keep the shards for 5 levels. *)
-let shard_cache_size =
+let cache_size =
   let number_of_levels_to_keep = 5 in
   let number_of_slots = 5 in
   number_of_levels_to_keep * number_of_slots
-
-let slot_cache_size = shard_cache_size
 
 let shards_verification_sampling_frequency = 100
 

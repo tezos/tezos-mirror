@@ -235,35 +235,25 @@ module Commitment_indexed_cache =
       let hash = Hashtbl.hash
     end)
 
-module Shard_proofs_cache = Commitment_indexed_cache
-module Shard_cache = Commitment_indexed_cache
-module Slot_cache = Commitment_indexed_cache
-
 (** Store context *)
 type t = {
   store : irmin;
   shards : Shards.t;
   slots : Slots.t;
-  in_memory_shard_proofs : Cryptobox.shard_proof array Shard_proofs_cache.t;
+  cache :
+    (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
+    Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
-  not_yet_published_shards : Cryptobox.share array Shard_cache.t;
-  not_yet_published_slots : Cryptobox.slot Slot_cache.t;
 }
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
 
    handle with_proof flag -> store proofs on disk? *)
-let cache_shard_proofs node_store commitment shard_proofs =
-  Shard_proofs_cache.replace
-    node_store.in_memory_shard_proofs
+let cache_entry node_store commitment slot shares shard_proofs =
+  Commitment_indexed_cache.replace
+    node_store.cache
     commitment
-    shard_proofs
-
-let cache_shards node_store commitment shards =
-  Shard_cache.replace node_store.not_yet_published_shards commitment shards
-
-let cache_slot node_store commitment slot =
-  Slot_cache.replace node_store.not_yet_published_slots commitment slot
+    (slot, shares, shard_proofs)
 
 (** [init config] inits the store on the filesystem using the
     given [config]. *)
@@ -280,10 +270,7 @@ let init config =
       shards;
       slots;
       store;
-      in_memory_shard_proofs =
-        Shard_proofs_cache.create Constants.shards_proofs_cache_size;
-      not_yet_published_shards = Shard_cache.create Constants.shard_cache_size;
-      not_yet_published_slots = Slot_cache.create Constants.slot_cache_size;
+      cache = Commitment_indexed_cache.create Constants.cache_size;
     }
 
 let tztrace_of_read_error read_err =
