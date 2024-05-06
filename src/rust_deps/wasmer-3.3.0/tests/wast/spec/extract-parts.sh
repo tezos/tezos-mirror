@@ -18,18 +18,18 @@ rm -f invalid/*.wasm
 rm -f malformed/*.wat
 
 for wast in *.wast; do
-    base="${wast##*/}"
-    json="invalid/${base%.wast}.json"
-    "$wabtbin/wast2json" "$wast" -o "$json"
-    rm "$json"
+  base="${wast##*/}"
+  json="invalid/${base%.wast}.json"
+  "$wabtbin/wast2json" "$wast" -o "$json"
+  rm "$json"
 done
 
 mv invalid/*.wat malformed
 
 for wasm in invalid/*.wasm; do
-    if "$wabtbin/wasm2wat" "$wasm" -o invalid/t.wat 2>/dev/null && \
-       "$wabtbin/wat2wasm" invalid/t.wat -o /dev/null 2>/dev/null ; then
-        mv "$wasm" valid
-    fi
+  if "$wabtbin/wasm2wat" "$wasm" -o invalid/t.wat 2> /dev/null &&
+    "$wabtbin/wat2wasm" invalid/t.wat -o /dev/null 2> /dev/null; then
+    mv "$wasm" valid
+  fi
 done
 rm invalid/t.wat
