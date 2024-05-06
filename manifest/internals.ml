@@ -19,7 +19,7 @@ open Externals
 let tezt ~product ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dep_globs_rec ?dep_files ?opam_with_test ?dune_with_test ?synopsis
     ?(with_macos_security_framework = false) ?flags ?dune ?preprocess
-    ?preprocessor_deps l =
+    ?preprocessor_deps ?source l =
   Manifest.tezt
     ~product
     ~with_macos_security_framework
@@ -41,6 +41,7 @@ let tezt ~product ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ?dune
     ?preprocess
     ?preprocessor_deps
+    ?source
     l
 
 module Product (M : sig
@@ -51,5 +52,5 @@ end) =
 struct
   include Manifest.Product (M)
 
-  let tezt = tezt ~product:M.name
+  let tezt = tezt ~product:M.name ~source:M.source
 end

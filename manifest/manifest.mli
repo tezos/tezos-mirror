@@ -998,6 +998,7 @@ val tezt :
   ?dune:Dune.s_expr ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
+  ?source:string list ->
   product:string ->
   string list ->
   target
