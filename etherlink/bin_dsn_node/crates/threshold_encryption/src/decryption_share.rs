@@ -7,7 +7,7 @@
 //! T decryption shares are enough to decrypt the ciphertext, where T is the threshold.
 //! Similarly to ciphertext, two forms are provided: partially and fully deserialized.
 //!
-//! The reason for this redundance is that decompressing EC points is costly (mostly because
+//! The reason for this redundancy is that decompressing EC points is costly (mostly because
 //! of the subgroup checks) and often we can return earlier skipping processing some items,
 //! which can lead to unnecessary computations. It is especially important for the kernel.
 
