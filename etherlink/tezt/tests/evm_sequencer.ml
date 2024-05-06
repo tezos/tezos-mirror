@@ -3094,6 +3094,48 @@ let test_store_smart_rollup_address =
   in
   unit
 
+let test_replay_rpc =
+  register_both
+    ~tags:["evm"; "rpc"; "replay"]
+    ~title:"Sequencer can replay a block"
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  (* Transfer funds to a random address. *)
+  let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
+  let* transaction_hash =
+    send_transaction
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
+  let*@ {Transaction.blockNumber; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash sequencer
+  in
+  (* Block few levels to ensure we are replaying on an old block. *)
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  let*@ original_block =
+    Rpc.get_block_by_number
+      ~full_tx_objects:false
+      ~block:(Int32.to_string blockNumber)
+      sequencer
+  in
+  let*@ replayed_block =
+    Rpc.replay_block (Int32.to_int blockNumber) sequencer
+  in
+  (* Checks the block hash is the same. If so, we can assume they have the same
+     state hash and transactions. *)
+  Check.(
+    (original_block.hash = replayed_block.hash)
+      string
+      ~error_msg:"Replayed block hash is %R, but the original block has %L") ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -3139,4 +3181,5 @@ let () =
   test_blueprint_limit_with_delayed_inbox protocols ;
   test_reset protocols ;
   test_preimages_endpoint protocols ;
-  test_store_smart_rollup_address protocols
+  test_store_smart_rollup_address protocols ;
+  test_replay_rpc protocols

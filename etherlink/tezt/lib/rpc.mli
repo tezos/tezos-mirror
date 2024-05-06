@@ -146,3 +146,7 @@ val get_storage_at :
   (string, error) result Lwt.t
 
 val get_max_priority_fee_per_gas : Evm_node.t -> Int32.t Lwt.t
+
+(** [replay_block number evm_node] replays the block [number] and returns its
+    representation. *)
+val replay_block : int -> Evm_node.t -> (Block.t, error) result Lwt.t
