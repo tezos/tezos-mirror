@@ -353,7 +353,7 @@ module Handler = struct
           Store.Slots.remove_slot
             store.slots
             ~slot_size:proto_parameters.cryptobox_parameters.slot_size
-            commitment
+            slot_id
         in
         return_unit)
       commitments

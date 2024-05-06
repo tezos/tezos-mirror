@@ -64,35 +64,33 @@ module Shards : sig
 end
 
 module Slots : sig
-  (** A store of slots, indexed by slot size and commitment. *)
+  (** A store of slots, indexed by slot id. *)
 
   type t
 
-  (** [add_slot store ~slot_size slot_content commitment]
-      adds a mapping from the given commitment to the given slot
-      content. *)
+  (** [add_slot store ~slot_size slot_content slot_id] adds a mapping from the
+      given slot id to the given slot content. *)
   val add_slot :
     t ->
     slot_size:int ->
     bytes ->
-    commitment ->
+    Types.slot_id ->
     (unit, [> Errors.other]) result Lwt.t
 
-  (** [exists_slot store ~slot_size commitment] returns
-      true IFF a slot is associated to the given commitment. *)
+  (** [exists_slot store ~slot_size slot_id] returns true IFF a slot is
+      associated to the given slot id. *)
   val exists_slot :
-    t -> slot_size:int -> commitment -> (bool, [> Errors.other]) result Lwt.t
+    t -> slot_size:int -> Types.slot_id -> (bool, [> Errors.other]) result Lwt.t
 
-  (** [find_slot store ~slot_size commitment] returns
-      the slot associated to some commitment or [Error `Not_found] if
-      no slot is associated. *)
+  (** [find_slot store ~slot_size slot_id] returns the slot associated to some
+      slot id or [Error `Not_found] if no slot is associated. *)
   val find_slot :
     t ->
     slot_size:int ->
-    commitment ->
+    Types.slot_id ->
     (bytes, [> Errors.other | Errors.not_found]) result Lwt.t
 
-  val remove_slot : t -> slot_size:int -> commitment -> unit tzresult Lwt.t
+  val remove_slot : t -> slot_size:int -> Types.slot_id -> unit tzresult Lwt.t
 end
 
 module Commitment_indexed_cache : sig

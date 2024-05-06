@@ -184,13 +184,13 @@ let configuration_loaded =
     ()
 
 let stored_slot_content =
-  declare_1
+  declare_2
     ~section
     ~name:"stored_slot_content"
-    ~msg:"slot stored: commitment {commitment}"
+    ~msg:"stored slot for level {published_level} and index {slot_index}"
     ~level:Info
-    ~pp1:Cryptobox.Commitment.pp_short
-    ("commitment", Cryptobox.Commitment.encoding)
+    ("published_level", Data_encoding.int32)
+    ("slot_index", Data_encoding.int31)
 
 let stored_slot_shard =
   declare_3
