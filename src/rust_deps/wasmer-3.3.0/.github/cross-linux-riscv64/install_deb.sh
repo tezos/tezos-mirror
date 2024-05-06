@@ -48,7 +48,7 @@ done
 # restore our old sources list
 mv -f /etc/apt/sources.list.bak /etc/apt/sources.list
 if [ -f /etc/dpkg/dpkg.cfg.d/multiarch.bak ]; then
-    mv /etc/dpkg/dpkg.cfg.d/multiarch.bak /etc/dpkg/dpkg.cfg.d/multiarch
+  mv /etc/dpkg/dpkg.cfg.d/multiarch.bak /etc/dpkg/dpkg.cfg.d/multiarch
 fi
 
 # can fail if arch is used (amd64 and/or i386)
