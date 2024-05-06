@@ -272,6 +272,11 @@ module Durable_state_value :
 module Eth_max_priority_fee_per_gas :
   METHOD with type input = unit and type output = Ethereum_types.quantity
 
+module Replay_block :
+  METHOD
+    with type input = Ethereum_types.quantity
+     and type output = Ethereum_types.block
+
 type map_result =
   | Method :
       ('input, 'output) method_

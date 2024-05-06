@@ -65,3 +65,19 @@ let main ?profile ?kernel_path ~data_dir ~preimages ~preimages_endpoint
       return_unit
   | Apply_failure ->
       failwith "Could not replay blueprint %a" Ethereum_types.pp_quantity number
+
+let rpc block_number =
+  let open Lwt_result_syntax in
+  let* apply_result = Evm_context.replay block_number in
+  match apply_result with
+  | Apply_failure ->
+      failwith
+        "Could not replay block %a"
+        Ethereum_types.pp_quantity
+        block_number
+  | Apply_success {block_hash; evm_state; _} -> (
+      let path = Durable_storage_path.Block.by_hash block_hash in
+      let*! bytes = Evm_state.inspect evm_state path in
+      match bytes with
+      | None -> failwith "Replayed block not found in the storage"
+      | Some b -> return @@ Ethereum_types.block_from_rlp b)

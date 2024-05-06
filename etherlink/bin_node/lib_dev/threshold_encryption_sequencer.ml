@@ -283,6 +283,8 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
   in
   let module Sequencer_rpc : Services.Sequencer_backend = struct
     let produce_block = Threshold_encryption_block_producer.produce_block
+
+    let replay_block = Replay.rpc
   end in
   let directory =
     Services.directory configuration ((module Rollup_rpc), smart_rollup_address)

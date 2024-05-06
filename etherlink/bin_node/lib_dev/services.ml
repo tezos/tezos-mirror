@@ -417,6 +417,9 @@ let dispatch_request (config : Configuration.t)
 module type Sequencer_backend = sig
   val produce_block :
     force:bool -> timestamp:Time.Protocol.t -> int tzresult Lwt.t
+
+  val replay_block :
+    Ethereum_types.quantity -> Ethereum_types.block tzresult Lwt.t
 end
 
 let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
@@ -464,6 +467,18 @@ let dispatch_private_request (module Sequencer_rpc : Sequencer_backend)
           in
           let* value = Backend_rpc.Reader.read path in
           rpc_ok value
+        in
+        build ~f module_ parameters
+    | Method (Replay_block.Method, module_) ->
+        let f block_number =
+          let open Lwt_result_syntax in
+          let*? block_number =
+            Option.to_result
+              ~none:[error_of_fmt "missing block number"]
+              block_number
+          in
+          let* block = Sequencer_rpc.replay_block block_number in
+          rpc_ok block
         in
         build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
