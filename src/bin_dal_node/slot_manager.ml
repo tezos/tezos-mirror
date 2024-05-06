@@ -167,7 +167,7 @@ let polynomial_from_shards_lwt cryptobox shards ~number_of_needed_shards =
 
 let get_slot_content_from_shards cryptobox store slot_id commitment =
   let open Lwt_result_syntax in
-  let {Cryptobox.number_of_shards; redundancy_factor; _} =
+  let {Cryptobox.number_of_shards; redundancy_factor; slot_size; _} =
     Cryptobox.parameters cryptobox
   in
   let minimal_number_of_shards = number_of_shards / redundancy_factor in
@@ -191,7 +191,7 @@ let get_slot_content_from_shards cryptobox store slot_id commitment =
   let* () =
     Store.Slots.add_slot_by_commitment
       store.Store.slots
-      cryptobox
+      ~slot_size
       slot
       commitment
   in
@@ -201,8 +201,9 @@ let get_slot_content_from_shards cryptobox store slot_id commitment =
 let get_slot ~reconstruct_if_missing cryptobox store slot_id commitment =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
+  let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let*! res_slot_store =
-    Store.Slots.find_slot_by_commitment store.Store.slots cryptobox commitment
+    Store.Slots.find_slot_by_commitment store.Store.slots ~slot_size commitment
   in
   match res_slot_store with
   | Ok slot -> return slot
@@ -246,16 +247,17 @@ let add_slot node_store slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let*? commitment = commit cryptobox polynomial in
+  let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
   let* exists =
     Store.(
-      Slots.exists_slot_by_commitment node_store.slots cryptobox commitment)
+      Slots.exists_slot_by_commitment node_store.slots ~slot_size commitment)
   in
   let* () =
     if exists then return_unit
     else
       Store.Slots.add_slot_by_commitment
         node_store.slots
-        cryptobox
+        ~slot_size
         slot
         commitment
   in
