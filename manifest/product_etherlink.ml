@@ -14,6 +14,8 @@ open Product_octez
 
 include Product (struct
   let name = "etherlink"
+
+  let source = ["etherlink/"; "src/"]
 end)
 
 let tezt_etherlink =

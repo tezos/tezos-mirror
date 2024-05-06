@@ -2303,6 +2303,7 @@ let register_tezt_targets ~make_tezt_exe =
                     ];
               ]
           ~product:"tezt-tests"
+          ~source:["src/"; "brassaia/"; "etherlink/"; "irmin/"; "tezt/"]
       in
       ()
     in

@@ -45,6 +45,8 @@ let tezt ~product ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
 
 module Product (M : sig
   val name : string
+
+  val source : string list
 end) =
 struct
   include Manifest.Product (M)

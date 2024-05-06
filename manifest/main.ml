@@ -83,6 +83,8 @@ let () =
      so that it can link all of them. *)
   let module GlobalTezt = Internals.Product (struct
     let name = "tezt-tests"
+
+    let source = ["tezt/"]
   end) in
   let tezt_exe_deps =
     [

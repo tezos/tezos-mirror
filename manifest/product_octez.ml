@@ -14,6 +14,26 @@ open Product_data_encoding
 
 include Product (struct
   let name = "octez"
+
+  (** This source will be used to generate the Octez tarball,
+      This should include everything required to run [make octez]. *)
+  let source =
+    [
+      "src/";
+      "tezt/";
+      "Makefile";
+      "dune";
+      "dune-project";
+      "dune-workspace";
+      "CHANGES.rst";
+      "LICENSES";
+      "opam";
+      "script-inputs";
+      "scripts";
+      "irmin/";
+      "brassaia/";
+      "rust-toolchain";
+    ]
 end)
 
 module String_set = Set.Make (String)
