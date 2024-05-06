@@ -31,7 +31,7 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | Invalid_degree of string
   | No_prover_SRS
-  | Missing_shards_in_cache of {published_level : int32; slot_index : int}
+  | Missing_shards_in_cache of Types.slot_id
 
 let () =
   register_error_kind
@@ -122,11 +122,11 @@ let () =
         slot_index)
     Data_encoding.(obj2 (req "published_level" int32) (req "slot_index" int31))
     (function
-      | Missing_shards_in_cache {published_level; slot_index} ->
-          Some (published_level, slot_index)
+      | Missing_shards_in_cache slot_id ->
+          Some (slot_id.slot_level, slot_id.slot_index)
       | _ -> None)
-    (fun (published_level, slot_index) ->
-      Missing_shards_in_cache {published_level; slot_index})
+    (fun (slot_level, slot_index) ->
+      Missing_shards_in_cache {slot_level; slot_index})
 
 type slot = bytes
 
@@ -317,14 +317,14 @@ let shards_to_attesters committee =
 (** This function publishes the shards of a commitment that is waiting
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
-let publish_proved_shards ~published_level ~slot_index ~level_committee
+let publish_proved_shards (slot_id : Types.slot_id) ~level_committee
     proto_parameters commitment shards shard_proofs gs_worker =
   let open Lwt_result_syntax in
   let attestation_level =
     Int32.(
       pred
       @@ add
-           published_level
+           slot_id.slot_level
            (of_int proto_parameters.Dal_plugin.attestation_lag))
   in
   let* committee = level_committee ~level:attestation_level in
@@ -344,13 +344,15 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
                shard_index
          | Some pkh, Some shard_proof ->
              let message = Types.Message.{share; shard_proof} in
-             let topic = Types.Topic.{slot_index; pkh} in
+             let topic : Types.Topic.t =
+               {slot_index = slot_id.slot_index; pkh}
+             in
              let message_id =
                Types.Message_id.
                  {
                    commitment;
-                   level = published_level;
-                   slot_index;
+                   level = slot_id.slot_level;
+                   slot_index = slot_id.slot_index;
                    shard_index;
                    pkh;
                  }
@@ -364,7 +366,7 @@ let publish_proved_shards ~published_level ~slot_index ~level_committee
     for attestion on L1 if this node has those shards and their proofs
     in memory. *)
 let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
-    proto_parameters commitment published_level slot_index =
+    proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
   match
     Store.Shard_proofs_cache.find_opt
@@ -395,17 +397,14 @@ let publish_slot_data ~level_committee (node_store : Store.t) gs_worker
             shards |> Array.to_seq
             |> Seq.mapi (fun index share -> Cryptobox.{index; share})
             |> Result.return
-        | None ->
-            Result_syntax.tzfail
-            @@ Missing_shards_in_cache {published_level; slot_index}
+        | None -> Result_syntax.tzfail @@ Missing_shards_in_cache slot_id
       in
       let* () =
         Store.(Shards.write_all node_store.shards commitment shards)
         |> Errors.to_tzresult
       in
       publish_proved_shards
-        ~published_level
-        ~slot_index
+        slot_id
         ~level_committee
         proto_parameters
         commitment
