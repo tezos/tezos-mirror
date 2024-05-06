@@ -123,7 +123,7 @@ type execution_result = {value : hash option; gas_used : quantity option}
 
 type call_result = (execution_result, hash) result
 
-type validation_result = {address : address}
+type validation_result = transaction_object
 
 type 'a simulation_result = ('a, string) result
 
@@ -233,11 +233,11 @@ module Encodings = struct
     in
     Rlp.decode_result decode_execution_result decode_revert v
 
-  let decode_validation_result =
+  let decode_validation_result bytes =
     let open Result_syntax in
-    function
-    | Rlp.Value address -> return {address = decode_address address}
-    | _ -> error_with "The transaction pool returned an illformed value"
+    try return (transaction_object_from_rlp_item None bytes)
+    with _ ->
+      error_with "The simulation returned an ill-encoded validation result"
 
   let simulation_result_from_rlp decode_payload bytes =
     let open Result_syntax in
