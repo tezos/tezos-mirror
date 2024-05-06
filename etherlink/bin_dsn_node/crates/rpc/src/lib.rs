@@ -4,7 +4,7 @@
 
 pub mod errors;
 pub mod handlers;
+pub mod jsonrpc;
 pub mod responses;
 pub mod router;
-pub mod rpc_encoding;
 pub mod server;

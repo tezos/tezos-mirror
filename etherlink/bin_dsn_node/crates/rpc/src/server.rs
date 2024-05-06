@@ -3,34 +3,28 @@
 // SPDX-License-Identifier: MIT
 
 use std::convert::Infallible;
-use std::error::Error;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use futures::FutureExt;
 use http_body_util::combinators::BoxBody;
 use hyper::body::{Bytes, Incoming};
 use hyper::server::conn::http1;
-use hyper::service::service_fn;
+use hyper::service::Service;
 use hyper::Request;
 use hyper_util::rt::TokioIo;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::errors::RpcError;
+use crate::handlers::Resp;
 use crate::router::Router;
 
 pub type Response = hyper::Response<BoxBody<Bytes, Infallible>>;
-
-pub type Service = dyn Fn(
-        Request<Incoming>,
-    ) -> Pin<Box<dyn Future<Output = Result<Response, RpcError>> + Send + Sync + 'static>>
-    + Send
-    + Sync
-    + 'static;
 
 /// A singleton for spawning main RPC server thread.
 #[derive(Debug)]
@@ -38,9 +32,7 @@ pub struct RpcServer<S> {
     /// RPC server configuration.
     config: RpcConfig,
     /// Shutdown receiver.
-    rx_shutdown: broadcast::Receiver<Arc<dyn Error + Send + Sync>>,
-    /// Shutdown sender.
-    tx_shutdown: broadcast::Sender<Arc<dyn Error + Send + Sync>>,
+    rx_shutdown: broadcast::Receiver<()>,
     state: Arc<S>,
 }
 
@@ -52,11 +44,15 @@ pub struct RpcConfig {
     socket_addr: SocketAddr,
 }
 
+struct RpcService<S> {
+    router: Arc<Router<S>>,
+    state: Arc<S>,
+}
+
 impl<S: Send + Sync + Clone + 'static> RpcServer<S> {
     pub fn new(
         listening_addr: SocketAddr,
-        rx_shutdown: broadcast::Receiver<Arc<dyn Error + Send + Sync>>,
-        tx_shutdown: broadcast::Sender<Arc<dyn Error + Send + Sync>>,
+        rx_shutdown: broadcast::Receiver<()>,
         state: S,
     ) -> RpcServer<S> {
         RpcServer {
@@ -66,47 +62,49 @@ impl<S: Send + Sync + Clone + 'static> RpcServer<S> {
                 socket_addr: listening_addr,
             },
             rx_shutdown,
-            tx_shutdown,
             state: Arc::new(state),
         }
     }
 
-    pub async fn serve(&mut self, app: Router<S>) -> Result<(), RpcError> {
-        let listener = TcpListener::bind(self.config.socket_addr).await;
-        match listener {
-            Err(e) => {
-                if self.tx_shutdown.send(Arc::new(e)).is_err() {
-                    error!(
-                        "Server failed to bind for address {}",
-                        self.config.socket_addr
-                    );
-                }
-                Ok(())
-            }
-            Ok(listener) => {
-                info!("Listening on http://{}", self.config.socket_addr);
-                let app = Arc::new(app);
-                loop {
-                    tokio::select! {
-                        Ok((tcp, _)) = listener.accept() => {
-                            let io = TokioIo::new(tcp);
-                            let app = app.clone();
-                            let state = self.state.clone();
-                            tokio::task::spawn(async move {
-                                if let Err(err) = http1::Builder::new()
-                                    .serve_connection(io, service_fn(|req| app.handle_request(state.clone(), req)))
-                                    .await
-                                {
-                                    warn!("Error serving connection: {:?}", err);
-                                }
-                            });
-                        },
-                        _ = self.rx_shutdown.recv() => {
-                            return Ok(())
-                        },
-                    }
-                }
+    pub async fn serve(&mut self, router: Router<S>) -> Result<(), RpcError> {
+        let listener = TcpListener::bind(self.config.socket_addr)
+            .await
+            .map_err(RpcError::TcpListenerError)?;
+        info!("Listening on http://{}", self.config.socket_addr);
+        let router = Arc::new(router);
+        loop {
+            tokio::select! {
+                Ok((tcp, _)) = listener.accept() => {
+                    let io = TokioIo::new(tcp);
+                    let service = RpcService {
+                        router: router.clone(),
+                        state: self.state.clone(),
+                    };
+                    tokio::task::spawn(async move {
+                        if let Err(err) = http1::Builder::new()
+                            .serve_connection(io, service)
+                            .await
+                        {
+                            warn!("Error serving connection: {:?}", err);
+                        }
+                    });
+                },
+                _ = self.rx_shutdown.recv() => {
+                    return Ok(())
+                },
             }
         }
+    }
+}
+
+impl<S: Send + Sync + Clone + 'static> Service<Request<Incoming>> for RpcService<S> {
+    type Response = Resp;
+    type Error = RpcError;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn call(&self, req: Request<Incoming>) -> Self::Future {
+        let router = self.router.clone();
+        let state = self.state.clone();
+        async move { router.handle_request(state, req).await }.boxed()
     }
 }

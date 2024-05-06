@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-//TODO: Move to separate types crate
-
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -22,7 +20,7 @@ pub struct DelayedTransactionHash(#[serde(with = "hex")] pub Vec<u8>);
 pub struct BlockHash(#[serde(with = "hex")] pub Vec<u8>);
 
 /// Proposals received by the sequencer. It contains the
-/// transactions and delayed tranaction hashes to be included in the
+/// transactions and delayed transaction hashes to be included in the
 /// next [Preblock], together with other metadata such as the
 /// blueprint number, the timestamp, and the [BlockHash] of the latest
 /// Etherlink block.

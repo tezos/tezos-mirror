@@ -47,6 +47,8 @@ pub fn bad_request() -> Result<Resp, RpcError> {
 
 /// Simple handler for bad requests. It returns a response with status code `500 (Internal server error)`.
 /// This handler returns a [RpcError] in case of connection errors.
+///
+/// TODO: add custom error message
 pub fn internal_server_error() -> Result<Resp, RpcError> {
     let response_body: ResponseBody = Full::new("Internal server error".into()).boxed();
     let response = Response::builder()
