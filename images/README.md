@@ -36,6 +36,16 @@ labels of an image's manifest:
 These labels can be extracted from a locally pulled image using
 `docker image inspect`.
 
+## Usage in the Tezos CI
+
+If you modify the definition of these images above, then the Tezos CI
+will automatically rebuild it and the new image will be used in
+subsequent jobs of the pipeline. This works by tagging each image with
+its input hash, and putting this tag as a variable in a [dotenv report
+artifact](https://docs.gitlab.com/ee/ci/yaml/artifacts_reports.html#artifactsreportsdotenv).
+Jobs that use the image refer to this variable in their `image:`
+field and thus reuse the image directly.
+
 # `rust-toolchain` image
 
 The `rust-toolchain` image is used in the CI to build and test
