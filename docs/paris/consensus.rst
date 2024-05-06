@@ -383,7 +383,7 @@ for double baking is a fixed percentage of the frozen deposit
 ``PERCENTAGE_OF_FROZEN_DEPOSITS_SLASHED_PER_DOUBLE_BAKING``. For
 double (pre)attestations, the formula is more complex, as it depends
 on the number of attestation slots that participated in the
-misbehavior; see :ref:`adaptive_slashing` for more details.
+misbehavior; see :doc:`adaptive_slashing` for more details.
 The payload producer that includes the misbehavior evidence will be rewarded a
 seventh of the slashed amount, which corresponds to ``1 /
 (GLOBAL_LIMIT_OF_STAKING_OVER_BAKING + 2)``.
