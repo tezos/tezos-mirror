@@ -14,7 +14,7 @@
 //! If you want configuration provider to fall back to defaults in case some fields
 //! are missing, specify that using serde attributes:
 //!
-//! ```rust
+//! ```ignore
 //! #[derive(Serialize, Deserialize)]
 //! struct MyConfig {
 //!     pub non_default_field: u64,

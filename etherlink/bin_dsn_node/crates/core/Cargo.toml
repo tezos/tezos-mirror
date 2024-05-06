@@ -14,7 +14,9 @@ version.workspace = true
 path = "../rpc"
 
 [dependencies]
+async-trait.workspace = true
 anyhow.workspace = true
+bcs.workspace = true
 chrono.workspace = true
 clap.workspace = true
 futures.workspace = true
@@ -23,6 +25,7 @@ http-body.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
+parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -32,3 +35,6 @@ tokio-stream.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 url.workspace = true
+
+[dev-dependencies]
+itertools.workspace = true
