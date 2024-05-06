@@ -510,6 +510,7 @@ module Handler = struct
                   shards_proofs_precomputation = _;
                   skip_list_cells_store;
                   ongoing_amplifications = _;
+                  slots_under_reconstruction = _;
                 } =
             ready_ctxt
           in
