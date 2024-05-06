@@ -30,6 +30,8 @@
    Subject:      Check the validation of blocks.
 *)
 
+let team = Tag.layer1
+
 open Lwt.Infix
 
 type state = Validated | Applied
@@ -62,7 +64,7 @@ let validate_block =
   Protocol.register_test
     ~__FILE__
     ~title:"validate block"
-    ~tags:["node"; "validate"]
+    ~tags:[team; "node"; "validate"]
   @@ fun protocol ->
   (* Expected topology is :
                N3
@@ -163,7 +165,7 @@ let propagate_validateable_bad_block =
   Protocol.register_test
     ~__FILE__
     ~title:"forge fake block"
-    ~tags:["validate"; "fake_block"; "propagation"; Tag.memory_3k]
+    ~tags:[team; "validate"; "fake_block"; "propagation"; Tag.memory_3k]
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
@@ -277,7 +279,8 @@ let propagate_validateable_bad_block_payload =
   Protocol.register_test
     ~__FILE__
     ~title:"forge block with wrong payload"
-    ~tags:["validate"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
+    ~tags:
+      [team; "validate"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :

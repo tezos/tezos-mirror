@@ -30,6 +30,8 @@
    Subject:      Run the baker and signer while performing transfers
 *)
 
+let team = Tag.layer1
+
 (* same as `baker_test`, `baker_test.ml` but using the signer *)
 let signer_test protocol ~keys =
   (* init the signer and import all the bootstrap_keys *)
@@ -71,7 +73,7 @@ let signer_simple_test =
   Protocol.register_test
     ~__FILE__
     ~title:"signer test"
-    ~tags:["node"; "baker"; "tz1"]
+    ~tags:[team; "node"; "baker"; "tz1"]
     ~uses:(fun protocol -> [Constant.octez_signer; Protocol.baker protocol])
   @@ fun protocol ->
   let* _ =
@@ -83,7 +85,7 @@ let signer_magic_bytes_test =
   Protocol.register_test
     ~__FILE__
     ~title:"signer magic-bytes test"
-    ~tags:["signer"; "magicbytes"]
+    ~tags:[team; "signer"; "magicbytes"]
     ~uses:(fun _ -> [Constant.octez_signer])
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol ~protocol `Client () in
@@ -113,7 +115,7 @@ let signer_bls_test =
   Protocol.register_test
     ~__FILE__
     ~title:"BLS signer test"
-    ~tags:["node"; "baker"; "bls"]
+    ~tags:[team; "node"; "baker"; "bls"]
     ~uses:(fun _ -> [Constant.octez_signer])
   @@ fun protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in

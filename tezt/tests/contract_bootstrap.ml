@@ -29,12 +29,13 @@
    Invocation:   dune exec tezt/tests/main.exe -- --file contract_bootstrap.ml
    Subject:      Tests that bootstrap contracts existence.
 *)
+let team = Tag.layer1
 
 let test_bootstrap_contract_with_given_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"Bootstrap contract with given hash"
-    ~tags:["bootstrap"; "contract"; "michelson"]
+    ~tags:[team; "bootstrap"; "contract"; "michelson"]
     ~supports:(Protocol.From_protocol 018)
     (fun protocol ->
       let address = "KT1KqcpWDCy8A3MSAPcxDFkg3LSSgFokTb12" in

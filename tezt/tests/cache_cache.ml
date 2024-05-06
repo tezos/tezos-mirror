@@ -30,12 +30,14 @@
    Subject:      Check cache('s cache) consistency.
 *)
 
+let team = Tag.layer1
+
 (* Check that annotations in contracts do not break cache consistency. *)
 let cache_annotation_consistency =
   Protocol.register_test
     ~__FILE__
     ~title:"cache annotation consistency"
-    ~tags:["protocol_cache"; "cache"; "node"; "baker"]
+    ~tags:[team; "protocol_cache"; "cache"; "node"; "baker"]
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
@@ -88,7 +90,7 @@ let singleprocess_reorg =
   Protocol.register_test
     ~__FILE__
     ~title:"cache consistency on singleprocess reorg"
-    ~tags:["protocol_cache"; "singleprocess"; "reorg"]
+    ~tags:[team; "protocol_cache"; "singleprocess"; "reorg"]
   @@ fun protocol ->
   let minimal_block_delay = 5 in
   let* parameter_file =

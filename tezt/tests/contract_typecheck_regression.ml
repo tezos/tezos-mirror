@@ -31,6 +31,8 @@
    Subject: Regression testing of Michelson typechecking
 *)
 
+let team = Tag.layer1
+
 (* Using the lighter hook that only scrubs the clients [--base-dir] *)
 let hooks =
   Tezos_regression.hooks_custom
@@ -42,7 +44,7 @@ let test_typecheck_contract protocol scripts =
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "Tc scripts")
-    ~tags:["client"; "michelson"; "typechecking"]
+    ~tags:[team; "client"; "michelson"; "typechecking"]
     ~uses_node:false
     (fun _protocol ->
       let* client = Client.init_mockup ~protocol () in

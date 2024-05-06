@@ -30,6 +30,8 @@
    Subject: Tests the multiple tranfers function of the client
 *)
 
+let team = Tag.layer1
+
 (* Originate and return the alias of a manager script *)
 let manager client ~protocol =
   let manager = Constant.bootstrap2.public_key_hash in
@@ -63,7 +65,7 @@ let test_empty =
   Protocol.register_test
     ~__FILE__
     ~title:"Test Empty"
-    ~tags:["client"; "michelson"; "multiple"; "transfers"]
+    ~tags:[team; "client"; "michelson"; "multiple"; "transfers"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -79,7 +81,7 @@ let test_transfer_json_to_entrypoint_with_args =
   Protocol.register_test
     ~__FILE__
     ~title:"Test transfer JSON to entrypoint with args"
-    ~tags:["client"; "michelson"; "multiple"; "transfers"; "args"]
+    ~tags:[team; "client"; "michelson"; "multiple"; "transfers"; "args"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
@@ -130,7 +132,7 @@ let test_multiple_transfer =
   Protocol.register_test
     ~__FILE__
     ~title:"Test multiple transfers"
-    ~tags:["client"; "michelson"; "multiple"; "transfers"]
+    ~tags:[team; "client"; "michelson"; "multiple"; "transfers"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

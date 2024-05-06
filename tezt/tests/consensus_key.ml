@@ -32,6 +32,8 @@
                  on the baker.
 *)
 
+let team = Tag.layer1
+
 let hooks = Tezos_regression.hooks
 
 let blocks_per_cycle = 4
@@ -90,7 +92,7 @@ let test_update_consensus_key =
   Protocol.register_test
     ~__FILE__
     ~title:"update consensus key"
-    ~tags:["consensus_key"]
+    ~tags:[team; "consensus_key"]
   @@ fun protocol ->
   let manual_staking = manual_staking protocol in
   let parameters =
@@ -633,7 +635,7 @@ let register ?(regression = true) title test =
   Protocol.(if regression then register_regression_test else register_test)
     ~__FILE__
     ~title
-    ~tags:["consensus_key"]
+    ~tags:[team; "consensus_key"]
   @@ fun protocol ->
   let parameters =
     (* we update paramaters for faster testing: no need to wait

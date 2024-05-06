@@ -30,6 +30,8 @@
    Subject:      Tests injection of nonce revelations
 *)
 
+let team = Tag.layer1
+
 let first_protocol_block = 1
 
 let minimal_block_delay = 1
@@ -54,7 +56,7 @@ let test_nonce_seed_revelation =
   Protocol.register_test
     ~__FILE__
     ~title:"Nonce seed revelation"
-    ~tags:["nonce"; "seed"; "revelation"; Tag.memory_3k]
+    ~tags:[team; "nonce"; "seed"; "revelation"; Tag.memory_3k]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   (* Run a node and a baker.

@@ -30,6 +30,8 @@
    Subject:      Create a fork and assert its resolution
 *)
 
+let team = Tag.layer1
+
 (* Copy-pasted from tenderbake.ml. *)
 let baker_at_round_n ?level round client =
   let* json =
@@ -65,7 +67,7 @@ let wait_for_branch_switch node level =
    disconnected nodes. When connecting the nodes, checks that the
    highest fitness head is the chosen branch. *)
 let test_fork =
-  Protocol.register_test ~__FILE__ ~title:"fork" ~tags:["fork"]
+  Protocol.register_test ~__FILE__ ~title:"fork" ~tags:[team; "fork"]
   @@ fun protocol ->
   let nodes_arguments = Node.[Synchronisation_threshold 0] in
   let restart node =

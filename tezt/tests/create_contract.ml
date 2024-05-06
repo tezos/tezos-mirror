@@ -31,13 +31,15 @@
    Subject:      Regression tests for contract that creates a contract
 *)
 
+let team = Tag.layer1
+
 let hooks = Tezos_regression.hooks
 
 let test_call_contract_that_creates_contract =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Create contract"
-    ~tags:["client"; "michelson"]
+    ~tags:[team; "client"; "michelson"]
     ~uses_node:false
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in

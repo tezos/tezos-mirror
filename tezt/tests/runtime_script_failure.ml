@@ -31,11 +31,13 @@
             to include an invalid operation in a block
 *)
 
+let team = Tag.layer1
+
 let check_client_force =
   Protocol.register_test
     ~__FILE__
     ~title:"Runtime Script Failure: client force"
-    ~tags:["runtime_script_failure"]
+    ~tags:[team; "runtime_script_failure"]
   @@ fun protocol ->
   let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
   let* client = Client.init ~endpoint:(Node node) () in

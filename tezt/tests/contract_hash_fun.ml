@@ -30,6 +30,8 @@
    Subject:      Test Michelson hashing functions
 *)
 
+let team = Tag.layer1
+
 let random_iterations = 50
 
 let bytes_length = 32
@@ -43,7 +45,7 @@ let test_contract_hash_fun hash_fun_name (hash_fun : bytes -> bytes) =
     ~title:("Test contract hash function: " ^ hash_fun_name)
     ~supports:(Protocol.From_protocol 10)
       (* Instructions SHA3 and KECCAK are both available since protocol 10 *)
-    ~tags:["michelson"; "crypto"; "contract"; "hash"; hash_fun_name]
+    ~tags:[team; "michelson"; "crypto"; "contract"; "hash"; hash_fun_name]
     ~uses_node:false
     (fun protocol ->
       let state = Random.State.make [||] in

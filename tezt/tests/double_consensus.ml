@@ -30,6 +30,8 @@
    Subject:      Detect double (pre)attestation through the accuser.
 *)
 
+let team = Tag.layer1
+
 let use_legacy_attestation_name protocol = Protocol.number protocol < 18
 
 let get_consensus_operation_name protocol =

@@ -30,11 +30,13 @@
    Subject:      Tests handling oversized contract call arguments
 *)
 
+let team = Tag.layer1
+
 let test_operation_size =
   Protocol.register_test
     ~__FILE__
     ~title:"operation size munch and bytes contract"
-    ~tags:["operation"; "script"; "size"; "munch"; "bytes"]
+    ~tags:[team; "operation"; "script"; "size"; "munch"; "bytes"]
   @@ fun protocol ->
   let repeat_s n s =
     let buf = Buffer.create (n * String.length s) in

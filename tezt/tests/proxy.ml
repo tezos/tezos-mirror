@@ -30,6 +30,8 @@
    Subject: Tests of the client's --mode proxy.
 *)
 
+let team = Tag.layer1
+
 let ( >|= ) = Lwt.( >|= )
 
 (** [matches re s] checks if [s] matches [re]. Note in particular that this supports multiline strings. *)
@@ -57,7 +59,7 @@ let test_cache_at_most_once ?supports ?query_string path =
       (sf
          "(Proxy) (%s) Cache at most once"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:[Tag.layer1; "proxy"; "rpc"; "get"]
+    ~tags:[team; "proxy"; "rpc"; "get"]
     ?supports
   @@ fun protocol ->
   let* _, client = init ~protocol () in
@@ -202,7 +204,7 @@ let test_context_suffix_no_rpc ?query_string path =
       (sf
          "(Proxy) (%s) No useless RPC call"
          (Client.rpc_path_query_to_string ?query_string path))
-    ~tags:[Tag.layer1; "proxy"; "rpc"; "get"]
+    ~tags:[team; "proxy"; "rpc"; "get"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let env = String_map.singleton "TEZOS_LOG" "proxy_rpc->debug" in
@@ -324,7 +326,7 @@ let test_wrong_proto =
   Protocol.register_test
     ~__FILE__
     ~title:"(Proxy) Wrong proto"
-    ~tags:[Tag.layer1; "proxy"; "initialization"]
+    ~tags:[team; "proxy"; "initialization"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   wrong_proto protocol client
@@ -336,7 +338,7 @@ let test_bake =
   Protocol.register_test
     ~__FILE__
     ~title:"(Proxy) Bake"
-    ~tags:[Tag.layer1; "proxy"; "bake"]
+    ~tags:[team; "proxy"; "bake"]
   @@ fun protocol ->
   let* node = Node.init [] in
   let* client = Client.init ~endpoint:(Node node) () in
@@ -356,7 +358,7 @@ let test_transfer =
   Protocol.register_test
     ~__FILE__
     ~title:"(Proxy) Transfer"
-    ~tags:[Tag.layer1; "proxy"; "transfer"]
+    ~tags:[team; "proxy"; "transfer"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let* () =
@@ -505,7 +507,7 @@ module Location = struct
     Protocol.register_test
       ~__FILE__
       ~title:"(Proxy) RPC get's location"
-      ~tags:(locations_tags alt_mode)
+      ~tags:(team :: locations_tags alt_mode)
     @@ fun protocol ->
     let* _, client = init ~protocol () in
     check_locations alt_mode client
@@ -623,7 +625,7 @@ module Location = struct
     Protocol.register_test
       ~__FILE__
       ~title:"(Proxy) Compare RPC get"
-      ~tags:(compare_tags alt_mode)
+      ~tags:(team :: compare_tags alt_mode)
     @@ fun protocol ->
     let* node, alternative = init ~protocol () in
     let* vanilla = Client.init ~endpoint:(Node node) () in
@@ -661,7 +663,7 @@ let test_supported_protocols_like_mockup (mode : [< `Proxy | `Light]) =
       (sf
          "%s supported protocols are the same as the mockup protocols"
          mode_str)
-    ~tags:[Tag.layer1; "client"; mode_str; "list"; "protocols"]
+    ~tags:[team; "client"; mode_str; "list"; "protocols"]
     ~uses_node:false
   @@ fun () ->
   let client = Client.create () in
@@ -700,7 +702,7 @@ let test_split_key_heuristic =
   Protocol.register_test
     ~__FILE__
     ~title:"(Proxy) split_key heuristic"
-    ~tags:[Tag.layer1; "proxy"; "rpc"; "get"]
+    ~tags:[team; "proxy"; "rpc"; "get"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let test_one (path, query_string) =

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let team = Tag.layer1
+
 (** Tests originating a large contract
     with no constants. This serves for
     comparison with the case where we originate a
@@ -31,7 +33,7 @@ let test_large_flat_contract =
   Protocol.register_test
     ~__FILE__
     ~title:"Originate a large, flat contract"
-    ~tags:["global_constant"]
+    ~tags:[team; "global_constant"]
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let* _ =
@@ -60,7 +62,7 @@ let test_billion_laughs_contract =
   Protocol.register_test
     ~__FILE__
     ~title:"Global constants billion laughs attack"
-    ~tags:["billion_laughs"; "global_constant"]
+    ~tags:[team; "billion_laughs"; "global_constant"]
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   let repeat_n_times n str start finish =
@@ -128,7 +130,7 @@ let test_entrypoint_expansion =
   Protocol.register_test
     ~__FILE__
     ~title:"Global constants are expanded on entrypoints RPC"
-    ~tags:["global_constant"; "rpc"]
+    ~tags:[team; "global_constant"; "rpc"]
   @@ fun protocol ->
   let* _, client = Client.init_with_protocol ~protocol `Client () in
   (* Register the expression *)

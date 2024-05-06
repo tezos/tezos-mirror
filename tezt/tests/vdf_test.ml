@@ -33,6 +33,8 @@
                  status as expected throughout the cycle.
 *)
 
+let team = Tag.layer1
+
 (* Stripped down version of [Seed_storage.seed_computation_status] *)
 type seed_computation_status =
   | Nonce_revelation_stage
@@ -240,7 +242,7 @@ let vdf_cycles : Protocol.t list -> unit =
   Protocol.register_test
     ~__FILE__
     ~title:"VDF daemon"
-    ~tags:["vdf"]
+    ~tags:[team; "vdf"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let n_cycles = 2 in
@@ -340,7 +342,7 @@ let vdf_cancel : Protocol.t list -> unit =
   Protocol.register_test
     ~__FILE__
     ~title:"Cancelling VDF computation"
-    ~tags:["vdf"]
+    ~tags:[team; "vdf"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   (* Override the `vdf_difficulty` constant in order ensure that

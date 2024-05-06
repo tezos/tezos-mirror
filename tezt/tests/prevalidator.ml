@@ -30,6 +30,8 @@
    Subject:      .
 *)
 
+let team = Tag.layer1
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1657
 
    Some refactorisation is needed. All new tests should be in the Revamped
@@ -133,7 +135,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Flush mempool"
-      ~tags:["mempool"; "flush"]
+      ~tags:[team; "mempool"; "flush"]
     @@ fun protocol ->
     log_step
       1
@@ -245,7 +247,7 @@ module Revamped = struct
       ~title:
         "Ensure that branch_refused operation is not recycled when we \
          increment our head"
-      ~tags:["mempool"; "recycle"; "branch_refused"]
+      ~tags:[team; "mempool"; "recycle"; "branch_refused"]
     @@ fun protocol ->
     log_step 1 "Connect and initialise two nodes." ;
     let* node1 =
@@ -413,7 +415,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"ban_operation_branch_delayed_reevaluated"
-      ~tags:["mempool"; "ban"; "branch_delayed"]
+      ~tags:[team; "mempool"; "ban"; "branch_delayed"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -476,7 +478,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Manager_restriction_injection"
-      ~tags:["mempool"; "manager_restriction"; "injection"]
+      ~tags:[team; "mempool"; "manager_restriction"; "injection"]
     @@ fun protocol ->
     log_step 1 "Initialize two nodes and connect them." ;
     let* node1, client1 =
@@ -550,7 +552,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Manager_restriction_propagation"
-      ~tags:["mempool"; "manager_restriction"; "propagation"]
+      ~tags:[team; "mempool"; "manager_restriction"; "propagation"]
     @@ fun protocol ->
     log_step 1 "Initialize three nodes with the protocol." ;
     let* node1, client1 =
@@ -626,7 +628,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Manager_restriction_flush"
-      ~tags:["mempool"; "manager_restriction"; "flush"]
+      ~tags:[team; "mempool"; "manager_restriction"; "flush"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* node, client =
@@ -744,7 +746,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Manager_restriction_inject_isolated_node"
-      ~tags:["mempool"; "manager_restriction"; "inject"; "isolated_node"]
+      ~tags:[team; "mempool"; "manager_restriction"; "inject"; "isolated_node"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* _node, client =
@@ -857,7 +859,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Manager_restriction_ban"
-      ~tags:["mempool"; "manager_restriction"; "ban"]
+      ~tags:[team; "mempool"; "manager_restriction"; "ban"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* node, client =
@@ -937,7 +939,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Manager_restriction_flush_on_ban"
-      ~tags:["mempool"; "manager_restriction"; "flush"; "ban"]
+      ~tags:[team; "mempool"; "manager_restriction"; "flush"; "ban"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* node, client =
@@ -1175,7 +1177,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Max refused operations branch_delayed"
-      ~tags:["mempool"; "refused"; "max"; "branch_delayed"]
+      ~tags:[team; "mempool"; "refused"; "max"; "branch_delayed"]
     @@ fun protocol -> max_refused_operations ~protocol `Branch_delayed
 
   (** This test checks max_refused_operations for branch_refused
@@ -1184,7 +1186,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Max refused operations branch_refused"
-      ~tags:["mempool"; "refused"; "max"; "branch_refused"]
+      ~tags:[team; "mempool"; "refused"; "max"; "branch_refused"]
     @@ fun protocol -> max_refused_operations ~protocol `Branch_refused
 
   (** This test checks max_refused_operations for refused classification. *)
@@ -1192,7 +1194,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Max refused operations refused"
-      ~tags:["mempool"; "refused"; "max"]
+      ~tags:[team; "mempool"; "refused"; "max"]
     @@ fun protocol -> max_refused_operations ~protocol `Refused
 
   (** This test checks max_refused_operations for outdated classification. *)
@@ -1201,7 +1203,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Max refused operations outdated"
-      ~tags:["mempool"; "refused"; "max"; "outdated"]
+      ~tags:[team; "mempool"; "refused"; "max"; "outdated"]
     @@ fun protocol ->
     log_step
       1
@@ -1268,7 +1270,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"mempool ban operation"
-      ~tags:["mempool"; "node"; "ban"]
+      ~tags:[team; "mempool"; "node"; "ban"]
     @@ fun protocol ->
     log_step
       1
@@ -1362,7 +1364,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"mempool unban operation and reinject"
-      ~tags:["mempool"; "node"; "ban"; "reinject"]
+      ~tags:[team; "mempool"; "node"; "ban"; "reinject"]
     @@ fun protocol ->
     log_step 1 "Start a single node and activate the protocol." ;
     let* node1, client1 =
@@ -1479,7 +1481,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"mempool unban all operations"
-      ~tags:["mempool"; "node"; "ban"]
+      ~tags:[team; "mempool"; "node"; "ban"]
     @@ fun protocol ->
     log_step 1 "Start two nodes, connect them, activate the protocol." ;
     let* node1, client1 =
@@ -1559,7 +1561,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"test full mempool propagation"
-      ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"]
+      ~tags:[team; "mempool"; "gc"; "limit"; "bounding"; "full"]
     @@ fun protocol ->
     Log.info
       "Test the bound on operation count in the mempool, the propagation of \
@@ -1729,7 +1731,10 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"test full mempool and replace same manager"
-      ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"; "replace"; "remove"]
+      ~tags:
+        [
+          team; "mempool"; "gc"; "limit"; "bounding"; "full"; "replace"; "remove";
+        ]
     @@ fun protocol ->
     Log.info
       "Test the interaction between the mempool operation bound and \
@@ -1830,7 +1835,16 @@ module Revamped = struct
       ~__FILE__
       ~title:"test full mempool attestation vs manager"
       ~tags:
-        ["mempool"; "gc"; "limit"; "bounding"; "full"; "attestation"; "manager"]
+        [
+          team;
+          "mempool";
+          "gc";
+          "limit";
+          "bounding";
+          "full";
+          "attestation";
+          "manager";
+        ]
     @@ fun protocol ->
     Log.info
       "Test the bound on operation count in the mempool with both manager and \
@@ -1947,7 +1961,8 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"test full mempool max_total_bytes"
-      ~tags:["mempool"; "gc"; "limit"; "bounding"; "full"; "max_total_bytes"]
+      ~tags:
+        [team; "mempool"; "gc"; "limit"; "bounding"; "full"; "max_total_bytes"]
     @@ fun protocol ->
     Log.info "Test the bound on total operation size in the mempool." ;
     (* The test checks that the following sizes are correct; update
@@ -2214,7 +2229,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Precheck refused an operation which empties a balance"
-      ~tags:["mempool"; "precheck"; "empty"; "balance"]
+      ~tags:[team; "mempool"; "precheck"; "empty"; "balance"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
     let* balance =
@@ -2233,7 +2248,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Test private/injection/operations RPC"
-      ~tags:["mempool"; "injection"; "operations"; "rpc"]
+      ~tags:[team; "mempool"; "injection"; "operations"; "rpc"]
     @@ fun protocol ->
     log_step 1 "Init a node and client with a fresh account" ;
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
@@ -2312,7 +2327,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Inject manager batch"
-      ~tags:["mempool"; "manager"; "batch"; "injection"; "validated"]
+      ~tags:[team; "mempool"; "manager"; "batch"; "injection"; "validated"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* _node, client =
@@ -2366,7 +2381,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Filter mempool operations by sources"
-      ~tags:["mempool"; "source"]
+      ~tags:[team; "mempool"; "source"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* node, client =
@@ -2464,7 +2479,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Filter mempool operations by consensus key"
-      ~tags:["mempool"; "source"; "consensus_key"]
+      ~tags:[team; "mempool"; "source"; "consensus_key"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
 
@@ -2595,7 +2610,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Mempool disabled"
-      ~tags:["mempool"; "disabled"; "injection"]
+      ~tags:[team; "mempool"; "disabled"; "injection"]
     @@ fun protocol ->
     log_step
       1
@@ -2684,7 +2699,7 @@ module Revamped = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Ensure that future attestations are propagated"
-      ~tags:["attestation"; "mempool"; "branch_delayed"]
+      ~tags:[team; "attestation"; "mempool"; "branch_delayed"]
     @@ fun protocol ->
     log_step 1 "Initialize 3 nodes, connect them, and activate the protocol." ;
     let nodes_args = Node.[Synchronisation_threshold 0; Private_mode] in
@@ -2837,6 +2852,7 @@ module Revamped = struct
       ~title:"mempool config operation filtering"
       ~tags:
         [
+          team;
           "node";
           "mempool";
           "config";
@@ -3155,7 +3171,7 @@ let forge_pre_filtered_operation =
   Protocol.register_test
     ~__FILE__
     ~title:"Forge pre-filtered operation and check mempool"
-    ~tags:["forge"; "mempool"; "pre_filtered"]
+    ~tags:[team; "forge"; "mempool"; "pre_filtered"]
   @@ fun protocol ->
   (* Step 1 *)
   (* Two Nodes are started and we activate the protocol and wait the nodes to be synced *)
@@ -3261,7 +3277,7 @@ let refetch_failed_operation =
   Protocol.register_test
     ~__FILE__
     ~title:"Fetch failed operation"
-    ~tags:["fetch"; "mempool"]
+    ~tags:[team; "fetch"; "mempool"]
   @@ fun protocol ->
   (* Step 1 *)
   (* initialise both nodes and activate protocol
@@ -3457,7 +3473,7 @@ let ban_operation_and_check_validated =
   Protocol.register_test
     ~__FILE__
     ~title:"mempool ban operation and check validated"
-    ~tags:["mempool"; "node"]
+    ~tags:[team; "mempool"; "node"]
   @@ fun protocol ->
   Log.info "Step 1: Start two nodes, connect them, activate the protocol." ;
   let* node_1 =
@@ -3697,7 +3713,7 @@ let test_do_not_reclassify =
   Protocol.register_test
     ~__FILE__
     ~title:"mempool do not reclassify"
-    ~tags:["mempool"; "node"; "filter"; "refused"; "validated"]
+    ~tags:[team; "mempool"; "node"; "filter"; "refused"; "validated"]
   @@ fun protocol ->
   let step_color = Log.Color.BG.blue in
   Log.info
@@ -3830,7 +3846,7 @@ let force_operation_injection =
   Protocol.register_test
     ~__FILE__
     ~title:"force invalid operation injection"
-    ~tags:["force"; "mempool"]
+    ~tags:[team; "force"; "mempool"]
   @@ fun protocol ->
   Log.info "%s" step1_msg ;
   let node1 = Node.create ~allow_all_rpc:false [] in
@@ -3943,7 +3959,7 @@ let injecting_old_operation_fails =
   Protocol.register_test
     ~__FILE__
     ~title:"Injecting old operation fails"
-    ~tags:["mempool"; "injection"]
+    ~tags:[team; "mempool"; "injection"]
   @@ fun protocol ->
   log_step 1 step1 ;
   let* node =
@@ -4015,7 +4031,7 @@ let test_request_operations_peer =
   Protocol.register_test
     ~__FILE__
     ~title:"Test request_operations rpc"
-    ~tags:["mempool"; "request_operations"]
+    ~tags:[team; "mempool"; "request_operations"]
   @@ fun protocol ->
   Log.info "%s" step1_msg ;
   let init_node () =

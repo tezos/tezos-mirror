@@ -30,13 +30,15 @@
    Subject:      Run the baker while performing a lot of transfers
 *)
 
+let team = Tag.layer1
+
 let hooks = Tezos_regression.hooks
 
 let baker_reward_test =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Baker rewards"
-    ~tags:["baker"; "rewards"]
+    ~tags:[team; "baker"; "rewards"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
     (fun protocol ->
       let* parameter_file =
@@ -93,7 +95,7 @@ let baker_simple_test =
   Protocol.register_test
     ~__FILE__
     ~title:"baker test"
-    ~tags:["node"; "baker"]
+    ~tags:[team; "node"; "baker"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* _ =
@@ -105,7 +107,7 @@ let baker_stresstest =
   Protocol.register_test
     ~__FILE__
     ~title:"baker stresstest"
-    ~tags:["node"; "baker"; "stresstest"]
+    ~tags:[team; "node"; "baker"; "stresstest"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* node, client =
@@ -122,7 +124,7 @@ let baker_stresstest_apply =
   Protocol.register_test
     ~__FILE__
     ~title:"baker stresstest with forced application"
-    ~tags:["node"; "baker"; "stresstest"; "apply"]
+    ~tags:[team; "node"; "baker"; "stresstest"; "apply"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* node, client =
@@ -138,7 +140,7 @@ let baker_bls_test =
   Protocol.register_test
     ~__FILE__
     ~title:"No BLS baker test"
-    ~tags:["node"; "baker"; "bls"]
+    ~tags:[team; "node"; "baker"; "bls"]
   @@ fun protocol ->
   let* client0 = Client.init_mockup ~protocol () in
   Log.info "Generate BLS keys for client" ;
@@ -176,7 +178,7 @@ let baker_remote_test =
   Protocol.register_test
     ~__FILE__
     ~title:"Baker in RPC-only mode"
-    ~tags:["baker"; "remote"]
+    ~tags:[team; "baker"; "remote"]
     ~uses:(fun protocol -> [Protocol.baker protocol])
   @@ fun protocol ->
   let* node, client =
