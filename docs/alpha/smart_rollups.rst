@@ -373,10 +373,18 @@ Glossary
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
+#. **Commitment**: a claim that the interpretation of all inbox messages
+   published during a given period, and applied on the state of
+   a parent commitment, led to a given new state by performing a given
+   number of execution steps of the PVM.
+
 #. **Commitment period**: A period of roughly 15 minutes (currently 112 blocks) during which all inbox
    messages must be processed by the rollup node state to compute a
    commitment. A commitment must be published for each commitment
    period.
+
+#. **Rollup node**: a daemon required for deploying and operating smart rollups.
+   The rollup node is responsible for making the rollup progress by publishing commitments and by playing refutation games.
 
 #. **Refutation period**: When the first commitment for a commitment period is published, a refutation
    period of two weeks starts to allow this commitment to be challenged.
