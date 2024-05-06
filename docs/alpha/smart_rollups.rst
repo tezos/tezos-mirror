@@ -11,7 +11,7 @@ considered as the Layer 1.
 Overview
 ^^^^^^^^
 
-Rollups are a permissionless scaling solution for the Tezos
+Smart rollups are a permissionless scaling solution for the Tezos
 blockchain.  Indeed, anyone can originate and operate one or more
 rollups, allowing to increase the throughput of the Tezos blockchain,
 (almost) arbitrarily.
@@ -28,8 +28,8 @@ punish someone who has published an invalid claim. Therefore, thanks
 to the refutation mechanism, a single honest participant is enough to
 guarantee that the input messages are correctly interpreted.
 
-Kernel
-^^^^^^
+Rollup kernel
+^^^^^^^^^^^^^
 
 In the Tezos protocol, the subsystem of smart rollups is generic with
 respect to the syntax and the semantics of the input messages. More
@@ -235,10 +235,10 @@ commitments are published for the same commitment period, one of them
 must be wrong.
 
 An operator publishing a commitment is called a **committer**.
-Notice that, to publish a commitment, the operator must provide a
+Notice that, in order to publish a commitment, the operator must freeze a
 deposit of 10,000 tez. For this reason, the committer is sometimes called a
-(smart rollup) *staker*. However, to avoid confusion with the notion of
-:ref:`staker <new_staking_alpha>` in Layer 1, we will prefer using the term "committer" in this documentation.
+(smart rollup) *staker*. However, in order to avoid confusion with the
+:ref:`staker <new_staking_alpha>` role in Tezos Layer 1's Proof-of-Stake mechanism, we prefer to use the term "committer" throughout this documentation.
 
 Several committers can publish (and thus stake on) the same commitment. When a
 committer *C* publishes a new commitment based on a commitment that *C*
@@ -352,45 +352,3 @@ own access control list logic to add and remove addresses.
 Also, it is important to remember that because of the refutation
 logic, an outbox message can only be executed when the associated
 commitment has been cemented (see :doc:`../shell/smart_rollup_node`).
-
-Glossary
-^^^^^^^^
-
-#. **PVM**: A Proof-generating Virtual Machine is a reference
-   implementation for a device on top of which a smart rollup can be
-   executed. This reference implementation is part of the Tezos
-   protocol and is the unique source of truth regarding the semantics
-   of rollups. The PVM is able to produce proofs enforcing this truth.
-   This ability is used during the final step of refutation games.
-
-#. **Rollup Inbox**: A sequence of messages from the Layer 1 to smart rollups.
-   The contents of the inbox are determined by the consensus of the
-   Tezos protocol.
-
-#. **Rollup Outbox**: A sequence of messages from a smart rollup to the Layer 1.
-   Messages are smart contract calls, potentially containing tickets.
-   These calls can be triggered only when the related rollup commitment is
-   cemented (hence, at least two weeks after the actual execution of
-   the operation).
-
-#. **Rollup Commitment**: a claim that the interpretation of all rollup inbox messages
-   published during a given period, and applied on the state of
-   a parent rollup commitment, led to a given new state by performing a given
-   number of execution steps of the PVM.
-
-#. **Commitment period**: A period of roughly 15 minutes (currently 112 blocks) during which all rollup inbox
-   messages must be processed by the rollup node state to compute a
-   rollup commitment. A commitment must be published for each commitment
-   period.
-
-#. **Rollup node**: a daemon required for deploying and operating smart rollups.
-   The rollup node is responsible for making the rollup progress by publishing commitments and by playing refutation games.
-
-#. **Refutation period**: When the first rollup commitment for a commitment period is published, a refutation
-   period of two weeks starts to allow this commitment to be challenged.
-
-#. **Rollup Committer**: A user account that has published and has made a deposit on a
-   commitment.
-
-#. **Refutation game**: A process by which the Tezos protocol solves
-   a conflict between two rollup committers.
