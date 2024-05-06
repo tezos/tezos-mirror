@@ -397,6 +397,9 @@ let dispatch_request (config : Configuration.t)
           rpc_ok kernel_root_hash
         in
         build ~f module_ parameters
+    | Method (Eth_max_priority_fee_per_gas.Method, module_) ->
+        let f (_ : unit option) = rpc_ok @@ Qty Z.zero in
+        build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
   Lwt.return JSONRPC.{value; id}

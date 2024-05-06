@@ -694,6 +694,22 @@ module Durable_state_value = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Eth_max_priority_fee_per_gas = struct
+  open Ethereum_types
+
+  type input = unit
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "eth_maxPriorityFeePerGas"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -737,6 +753,7 @@ let supported_methods : (module METHOD) list =
     (module Web3_sha3);
     (module Produce_block);
     (module Durable_state_value);
+    (module Eth_max_priority_fee_per_gas);
   ]
 
 let unsupported_methods : string list =
