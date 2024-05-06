@@ -71,17 +71,13 @@ type error +=
   | Invalid_slot_size of {provided : int; expected : int}
   | No_prover_SRS
 
-(** [add_slot node_store slot cryptobox] computes the given [slot]'s
-    commitment and adds the association "commitment -> slot" in the
-    DAL's [node_store] if the commitment is not already bound to some
-    data.
+(** [add_slot slot cryptobox] computes the given [slot]'s commitment.
 
     In addition to decoding errors, the function returns an error
     {!ref:Invalid_slot_size} if the [slot]'s size doesn't match the expected
     slots' size given in [cryptobox], or the [slot]'s commitment otherwise.
 *)
 val add_slot :
-  Store.t ->
   Cryptobox.slot ->
   Cryptobox.t ->
   (Cryptobox.commitment, [> Errors.other]) result Lwt.t
