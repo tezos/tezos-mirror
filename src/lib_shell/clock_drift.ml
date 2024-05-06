@@ -22,7 +22,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let max_timestamp_drift : Ptime.span = Ptime.Span.of_int_s 5
+let max_timestamp_drift : Ptime.span = Ptime.Span.of_int_s 1
 
 let soon : unit -> Time.Protocol.t =
  fun () ->
