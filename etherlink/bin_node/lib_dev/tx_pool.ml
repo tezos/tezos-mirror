@@ -184,7 +184,7 @@ module Pool = struct
       transactions
 end
 
-type mode = Proxy | Sequencer | Observer
+type mode = Proxy | Sequencer | Relay
 
 type parameters = {
   rollup_node : (module Services_backend_sig.S);
@@ -644,11 +644,11 @@ let find state tx_hash =
 module Handlers = struct
   type self = worker
 
-  let observer_self_inject_request w =
+  let relay_self_inject_request w =
     let open Lwt_result_syntax in
     let state = Worker.state w in
     match state.mode with
-    | Observer ->
+    | Relay ->
         let*! _ =
           Worker.Queue.push_request w Request.Pop_and_inject_transactions
         in
@@ -666,7 +666,7 @@ module Handlers = struct
     | Request.Add_transaction (transaction_object, txn) ->
         protect @@ fun () ->
         let* res = on_normal_transaction state transaction_object txn in
-        let* () = observer_self_inject_request w in
+        let* () = relay_self_inject_request w in
         return res
     | Request.Pop_transactions maximum_cumulative_size ->
         protect @@ fun () -> pop_transactions state ~maximum_cumulative_size
@@ -811,7 +811,7 @@ let pop_and_inject_transactions () =
       (* the sequencer injects blueprint in a rollup node, not
          transaction. *)
       return_unit
-  | Proxy | Observer ->
+  | Proxy | Relay ->
       Worker.Queue.push_request_and_wait
         worker
         Request.Pop_and_inject_transactions
@@ -826,7 +826,7 @@ let pop_and_inject_transactions_lazy () =
       (* the sequencer injects blueprint in a rollup node, not
          transaction. *)
       return_unit
-  | Proxy | Observer ->
+  | Proxy | Relay ->
       let*! (_pushed : bool) =
         Worker.Queue.push_request w Request.Pop_and_inject_transactions
       in

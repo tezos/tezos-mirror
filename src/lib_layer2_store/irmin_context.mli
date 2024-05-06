@@ -75,6 +75,8 @@ val equality_witness : (repo, tree) Context_sigs.equality_witness
     (100_000 by default at irmin-pack/config.ml *)
 val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
 
+val reload : ro_index -> unit
+
 (** [index context] is the repository of the context [context]. *)
 val index : 'a t -> 'a index
 

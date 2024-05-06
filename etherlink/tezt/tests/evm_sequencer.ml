@@ -5073,6 +5073,87 @@ let test_sequencer_sandbox () =
   let*@! _receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
   unit
 
+let test_rpc_mode_while_block_are_produced =
+  register_all
+    ~title:"rpc node can respond to rpcs without disturbing the sequencer."
+    ~tags:["rpc_mode"]
+    ~time_between_blocks:Nothing
+  @@ fun {observer; sequencer; _} _protocol ->
+  (* The goal of this test is to prove that a RPC node running alongside a
+     read-write node like a sequencer works as expected. To that end, we
+     simulate calling various RPCs while blocks are being produced by the
+     sequencer.
+
+     In the very first versions of the RPC node, when the EVM node was not
+     ready at all to accept concurrent read-only access to the SQLite and Irmin
+     stores, the test was failing, demonstrating that it was capturing the
+     expected behavior. *)
+  let* rpc_node =
+    let rpc_node =
+      Evm_node.create
+        ~data_dir:(Evm_node.data_dir sequencer)
+        ~mode:Rpc
+        (Evm_node.endpoint sequencer)
+    in
+    let* observer_config =
+      let* config = Evm_node.Config_file.read observer in
+      return @@ JSON.get "observer" config
+    in
+    let put_observer_config = JSON.put ("observer", observer_config) in
+    let* () = Evm_node.Config_file.update rpc_node put_observer_config in
+    let* () = Evm_node.run rpc_node in
+    return rpc_node
+  in
+
+  let latest_block_number = ref 0l in
+
+  let* () =
+    repeat 5 @@ fun () ->
+    let* _ =
+      Lwt.all
+        [
+          (* The idea is to show that we can create a block (in our case, with
+             one transaction) while we do a bunch of read-only RPCs calls. *)
+          (let* _tx_hash =
+             send_transaction
+               (Eth_cli.transaction_send
+                  ~source_private_key:
+                    Eth_account.bootstrap_accounts.(0).private_key
+                  ~to_public_key:Eth_account.bootstrap_accounts.(1).address
+                  ~value:(Wei.of_eth_int 10)
+                  ~endpoint:(Evm_node.endpoint sequencer))
+               sequencer
+           in
+           unit);
+          (* For instance, we show it is possible to read the current kernel
+             version (simple read in the EVM state of the head). *)
+          ( repeat 5 @@ fun () ->
+            let*@ _kernel_version = Rpc.tez_kernelVersion rpc_node in
+            Lwt_unix.sleep 0.1 );
+          (* Similarly, we fetch the block number of the current head several
+             time. *)
+          ( repeat 5 @@ fun () ->
+            let*@ block_number = Rpc.block_number rpc_node in
+            latest_block_number := block_number ;
+            Lwt_unix.sleep 0.1 );
+          (* And fetch the contents of the block before the head. *)
+          ( repeat 5 @@ fun () ->
+            let requested_block =
+              Int32.max 0l (Int32.sub !latest_block_number 1l)
+            in
+            let*@ _ =
+              Rpc.get_block_by_number
+                ~full_tx_objects:true
+                ~block:(Int32.to_string requested_block)
+                rpc_node
+            in
+            Lwt_unix.sleep 0.1 );
+        ]
+    in
+    unit
+  in
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -5142,4 +5223,5 @@ let () =
   test_finalized_block_param protocols ;
   test_regression_block_hash_gen protocols ;
   test_invalid_kernel protocols ;
-  test_sequencer_sandbox ()
+  test_sequencer_sandbox () ;
+  test_rpc_mode_while_block_are_produced protocols

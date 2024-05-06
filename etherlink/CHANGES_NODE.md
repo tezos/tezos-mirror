@@ -41,6 +41,9 @@
 
 ### Experimental
 
+- Introduce a new “RPC mode” which exposes a new RPC server for an existing
+  data-dir. (!13208)
+
 ### Internal
 
 - Limit the number of parallel execution of Etherlink’s kernel to answer RPC,
@@ -110,6 +113,8 @@
   when configuring the node, or when running the observer, to forward
   transactions to the DSN node bundler sidecar. The bundler is used
   for threshold encryption.
+- Add a new experimental mode to run a JSON RPC API endpoint reusing the
+  data-dir of a sequencer or observer EVM node. (!13208)
 
 ### Bug fixes
 

@@ -102,3 +102,7 @@ val flag_local_exec : t -> t Lwt.t
 val clear_delayed_inbox : t -> t Lwt.t
 
 val wasm_pvm_version : t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
+
+(** [irmin_store_path ~data_dir] returns the path wherein the Irmin store is
+    expected to be located, relatively to the data directory. *)
+val irmin_store_path : data_dir:string -> string

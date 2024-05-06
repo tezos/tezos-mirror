@@ -123,6 +123,7 @@ type mode =
       finalized_view : bool;
           (** Expose the latest final block of the rollup instead of its current head *)
     }
+  | Rpc
 
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
