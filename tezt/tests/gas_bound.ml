@@ -32,43 +32,43 @@
 *)
 
 let first_explosion =
-  {| 
-parameter unit; 
-storage unit; 
-code{ 
-      DROP; PUSH nat 0 ; 
-      DUP ; PAIR ; DUP ; 
-      PAIR ; DUP ; PAIR ; 
-      DUP ; PAIR ; DUP ; 
-      PAIR ; DUP ; PAIR ; 
-      DUP ; PAIR ; DUP ; 
-      PAIR ; DROP ; UNIT ; 
-      NIL operation ; PAIR}; 
+  {|
+parameter unit;
+storage unit;
+code{
+      DROP; PUSH nat 0 ;
+      DUP ; PAIR ; DUP ;
+      PAIR ; DUP ; PAIR ;
+      DUP ; PAIR ; DUP ;
+      PAIR ; DUP ; PAIR ;
+      DUP ; PAIR ; DUP ;
+      PAIR ; DROP ; UNIT ;
+      NIL operation ; PAIR};
 |}
 
 let first_explosion_bigtype =
-  {| 
-parameter unit; 
-storage unit; 
-code{ 
-      DROP; PUSH nat 0 ; DUP ; 
-      PAIR ; DUP ; PAIR ; DUP ; 
-      PAIR ; DUP ; PAIR ; DUP ; 
-      PAIR ; DUP ; PAIR ; DUP ; 
-      PAIR ; DUP ; PAIR ; DUP ; 
-      PAIR ; DUP ; PAIR ; DROP ; 
-      UNIT ; NIL operation ; PAIR}; 
+  {|
+parameter unit;
+storage unit;
+code{
+      DROP; PUSH nat 0 ; DUP ;
+      PAIR ; DUP ; PAIR ; DUP ;
+      PAIR ; DUP ; PAIR ; DUP ;
+      PAIR ; DUP ; PAIR ; DUP ;
+      PAIR ; DUP ; PAIR ; DUP ;
+      PAIR ; DUP ; PAIR ; DROP ;
+      UNIT ; NIL operation ; PAIR};
 |}
 
 let second_explosion =
-  {| 
+  {|
 parameter (list int) ;
 storage (list (list (list int))) ;
 code { CAR ; DIP { NIL (list int) } ;
        DUP ; ITER { DROP ; DUP ; DIP { CONS } } ;
        DROP ; DIP { NIL (list (list int)) } ;
        DUP ; ITER { DROP ; DUP ; DIP { CONS } } ;
-       DROP ; NIL operation ; PAIR }; 
+       DROP ; NIL operation ; PAIR };
 |}
 
 let test_originate_first_explosion client _protocol () =

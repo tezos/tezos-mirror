@@ -112,7 +112,7 @@ let script contract_annotation contract_type =
     {|
 parameter address;
 storage (option address);
-code { CAR; CONTRACT %s %s; 
+code { CAR; CONTRACT %s %s;
        IF_SOME { ADDRESS; SOME } { NONE address; }; NIL operation; PAIR }
 |}
     contract_annotation
