@@ -171,9 +171,17 @@ module Slots_handlers = struct
         return (commitment, commitment_proof))
 
   let get_slot_commitment ctxt slot_level slot_index () () =
-    call_handler1 ctxt (fun store ->
+    call_handler2 ctxt (fun store {cryptobox; _} ->
+        let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_commitment slot_id store)
+        let* content =
+          Slot_manager.get_slot_content
+            ~reconstruct_if_missing:true
+            store
+            cryptobox
+            slot_id
+        in
+        Slot_manager.commit_slot content cryptobox)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 ctxt (fun store ->
