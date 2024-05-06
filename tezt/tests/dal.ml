@@ -4077,7 +4077,9 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
-    ~migration_level ~scenario ~description () =
+    ~migration_level ~scenario ~description ?producer_profiles ?attestation_lag
+    ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
+    ?consensus_committee_size () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4093,8 +4095,18 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
          (Protocol.name migrate_to)
          description)
   @@ fun () ->
-  let parameters = dal_enable_param (Some true) in
-  let* node, client, _dal_parameters =
+  let parameters =
+    make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
+    @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
+    @ make_int_parameter
+        ["dal_parametric"; "redundancy_factor"]
+        redundancy_factor
+    @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+    @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+  in
+  let* node, client, dal_parameters =
     setup_node ~parameters ~protocol:migrate_from ()
   in
 
@@ -4109,15 +4121,15 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   let* () = Node.wait_for_ready node in
 
   let dal_node = Dal_node.create ~node () in
-  let* () = Dal_node.init_config dal_node in
+  let* () = Dal_node.init_config ?producer_profiles dal_node in
   let* () = Dal_node.run dal_node ~wait_ready:true in
 
-  scenario ~migration_level client node dal_node
+  scenario ~migration_level dal_parameters client node dal_node
 
 let test_migration_plugin ~migrate_from ~migrate_to =
   let tags = ["plugin"]
   and description = "test plugin update"
-  and scenario ~migration_level client node dal_node =
+  and scenario ~migration_level _dal_parameters client node dal_node =
     let* current_level =
       let* json = Node.RPC.(call node @@ get_chain_block_header_shell ()) in
       JSON.(json |-> "level" |> as_int |> return)
@@ -4341,12 +4353,19 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
 
 module History_rpcs = struct
   let scenario ~slot_index ~first_cell_level ~first_dal_level
-      ~last_confirmed_published_level protocol dal_parameters client node
-      dal_node =
+      ~last_confirmed_published_level ~initial_blocks_to_bake protocol
+      dal_parameters client node dal_node =
     Log.info "slot_index = %d" slot_index ;
     let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
 
+    (* [bake_for ~count] doesn't work across the migration block, so we bake in
+       two steps *)
+    let* () =
+      if initial_blocks_to_bake > 0 then
+        bake_for ~count:initial_blocks_to_bake client
+      else unit
+    in
     let* () = bake_for client in
 
     let* dal_parameters = Dal.Parameters.from_client client in
@@ -4515,11 +4534,61 @@ module History_rpcs = struct
       ~first_cell_level:0
       ~first_dal_level:1
       ~last_confirmed_published_level:3
+      ~initial_blocks_to_bake:0
       protocol
       dal_parameters
       client
       node
       dal_node
+
+  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
+    let tags = ["rpc"; "skip_list"; Tag.ci_disabled] in
+    let description = "test commitments history with migration" in
+    let slot_index = 3 in
+    let scenario ~migrate_from ~migrate_to ~migration_level dal_parameters =
+      let lag = dal_parameters.Dal.Parameters.attestation_lag in
+      Check.(
+        (migration_level > lag)
+          int
+          ~error_msg:
+            "The migration level (%L) should be greater than the attestation \
+             lag (%R)") ;
+      (* The first cell level has this value, if the previous protocol
+         doesn't have the DAL activated. *)
+      let first_cell_level =
+        if Protocol.number migrate_from <= 018 then migration_level - lag else 0
+      in
+      let first_dal_level =
+        if Protocol.number migrate_from > 018 then 1 else migration_level
+      in
+      (* We'll have 3 levels with a published and attested slot. *)
+      let last_confirmed_published_level = migration_level + 3 in
+      let initial_blocks_to_bake = migration_level - 1 in
+      scenario
+        ~slot_index
+        ~first_cell_level
+        ~first_dal_level
+        ~last_confirmed_published_level
+        ~initial_blocks_to_bake
+        migrate_to
+        dal_parameters
+    in
+    test_l1_migration_scenario
+      ~migrate_from
+      ~migrate_to
+      ~scenario:(fun ~migration_level dal_parameters ->
+        scenario ~migrate_from ~migrate_to ~migration_level dal_parameters)
+      ~tags
+      ~description
+      ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
+      ~consensus_committee_size:512
+      ~attestation_lag:8
+      ~number_of_slots:32
+      ~number_of_shards:512
+      ~slot_size:126944
+      ~redundancy_factor:8
+      ~page_size:3967
+      ()
 end
 
 module Amplification = struct
@@ -6602,4 +6671,14 @@ let register ~protocols =
   dal_crypto_benchmark ()
 
 let register_migration ~migrate_from ~migrate_to =
-  test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to
+  test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to ;
+  (* This test can be safely removed when Paris is activated (and the Oxford
+     protocol is removed from tezt tests). *)
+  History_rpcs.test_commitments_history_rpcs_with_migration
+    ~migration_level:10
+    ~migrate_from:Oxford
+    ~migrate_to:Paris ;
+  History_rpcs.test_commitments_history_rpcs_with_migration
+    ~migration_level:10
+    ~migrate_from
+    ~migrate_to
