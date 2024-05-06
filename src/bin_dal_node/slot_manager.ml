@@ -192,8 +192,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
   let*! () = Event.(emit fetched_slot (Bytes.length slot, Seq.length shards)) in
   return slot
 
-let get_slot ~reconstruct_if_missing cryptobox (_ : Node_context.ready_ctxt)
-    store slot_id =
+let get_slot ~reconstruct_if_missing cryptobox ctxt store slot_id =
   let open Lwt_result_syntax in
   (* First attempt to get the slot from the slot store. *)
   let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
@@ -207,7 +206,10 @@ let get_slot ~reconstruct_if_missing cryptobox (_ : Node_context.ready_ctxt)
         (* The slot could not be obtained from the slot store, attempt a
            reconstruction. *)
         let*! res_shard_store =
-          get_slot_content_from_shards cryptobox store slot_id
+          Node_context.may_reconstruct
+            ~reconstruct:(get_slot_content_from_shards cryptobox store)
+            slot_id
+            ctxt
         in
         match res_shard_store with
         | Ok slot -> return slot
