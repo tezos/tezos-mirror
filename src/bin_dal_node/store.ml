@@ -308,10 +308,6 @@ module Legacy = struct
 
     val to_string : ?prefix:string -> t -> string
 
-    module Commitment : sig
-      val header : Cryptobox.commitment -> Types.slot_id -> Irmin.Path.t
-    end
-
     module Level : sig
       (**
          Part of the storage for slots' headers where paths are indexed by slots
@@ -332,19 +328,6 @@ module Legacy = struct
     let to_string ?prefix p =
       let s = String.concat "/" p in
       Option.fold ~none:s ~some:(fun pr -> pr ^ s) prefix
-
-    module Commitment = struct
-      let root = ["commitments"]
-
-      let headers commitment =
-        let commitment_repr = Cryptobox.Commitment.to_b58check commitment in
-        root / commitment_repr / "headers"
-
-      let header commitment index =
-        let open Types in
-        let prefix = headers commitment in
-        prefix / Data_encoding.Binary.to_string_exn slot_id_encoding index
-    end
 
     module Level = struct
       let root = ["levels"]
@@ -373,7 +356,7 @@ module Legacy = struct
     let* waiting =
       List.fold_left_es
         (fun waiting (slot_header, status) ->
-          let Dal_plugin.{slot_index; commitment; published_level} =
+          let Dal_plugin.{slot_index; commitment = _; published_level} =
             slot_header
           in
           (* This invariant should hold. *)
@@ -381,16 +364,8 @@ module Legacy = struct
           let index =
             Types.Slot_id.{slot_level = published_level; slot_index}
           in
-          let header_path = Path.Commitment.header commitment index in
           match status with
           | Dal_plugin.Succeeded ->
-              let*! () =
-                set
-                  ~msg:(Path.to_string ~prefix:"add_slot_headers:" header_path)
-                  slots_store
-                  header_path
-                  ""
-              in
               let status_path = Path.Level.status index in
               let*! () =
                 set
