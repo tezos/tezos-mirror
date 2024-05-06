@@ -450,6 +450,7 @@ module Handler = struct
                   in
                   Slot_manager.publish_slot_data
                     ~level_committee:(Node_context.fetch_committee ctxt)
+                    ~slot_size:proto_parameters.cryptobox_parameters.slot_size
                     (Node_context.get_store ctxt)
                     (Node_context.get_gs_worker ctxt)
                     proto_parameters
