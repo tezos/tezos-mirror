@@ -12,6 +12,7 @@ if [ "$deps_opam_repository_tag" != "$opam_repository_tag" ]; then
 fi
 
 BUILDDIR=$(pwd)
+export BLST_PORTABLE=true
 
 # Prepare the building area: copying all files from
 # the dependency image a staging area. This is necessary
