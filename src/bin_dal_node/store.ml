@@ -289,14 +289,6 @@ let init config =
 let tztrace_of_read_error read_err =
   [Exn (Data_encoding.Binary.Read_error read_err)]
 
-let encode_commitment = Cryptobox.Commitment.to_b58check
-
-let decode_commitment v =
-  trace_decoding_error
-    ~data_kind:Types.Store.Commitment
-    ~tztrace_of_error:(fun tztrace -> tztrace)
-  @@ Cryptobox.Commitment.of_b58check v
-
 let encode_header_status =
   Data_encoding.Binary.to_string_exn Types.header_status_encoding
 
@@ -327,8 +319,6 @@ module Legacy = struct
 
          The status associated to a slot header is either
          [`Waiting_attesattion], [`Attested], or [`Unattested]. *)
-
-      val commitment : Types.slot_id -> Irmin.Path.t
 
       val status : Types.slot_id -> Irmin.Path.t
     end
@@ -364,10 +354,6 @@ module Legacy = struct
       let headers index =
         let open Types.Slot_id in
         slots_indices index.slot_level / Int.to_string index.slot_index
-
-      let commitment index =
-        let prefix = headers index in
-        prefix / "commitment"
 
       let status index =
         let prefix = headers index in
@@ -405,17 +391,7 @@ module Legacy = struct
                   header_path
                   ""
               in
-              let commitment_path = Path.Level.commitment index in
               let status_path = Path.Level.status index in
-              let data = encode_commitment commitment in
-              let*! () =
-                set
-                  ~msg:
-                    (Path.to_string ~prefix:"add_slot_headers:" commitment_path)
-                  slots_store
-                  commitment_path
-                  data
-              in
               let*! () =
                 set
                   ~msg:(Path.to_string ~prefix:"add_slot_headers:" status_path)
@@ -472,17 +448,6 @@ module Legacy = struct
       ~number_of_slots
       store
       attested
-
-  let get_slot_commitment ~level ~slot_index node_store =
-    let open Lwt_result_syntax in
-    let index = Types.Slot_id.{slot_level = level; slot_index} in
-    let*! commitment_str_opt =
-      Irmin.find node_store.store @@ Path.Level.commitment index
-    in
-    Option.fold
-      ~none:(fail Errors.not_found)
-      ~some:(fun c_str -> Lwt.return @@ decode_commitment c_str)
-      commitment_str_opt
 
   let get_slot_status ~slot_id node_store =
     let open Lwt_result_syntax in
