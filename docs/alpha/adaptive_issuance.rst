@@ -457,7 +457,7 @@ with the mechanism. It is based on four *pseudo-operations*: ``stake``,
 ``unstake``, ``finalize_unstake``, and ``set_delegate_parameters``.
 Pseudo-operations are self-transfers: a transfer operation where the
 destination matches the source – each involving a special entry-point of
-the same name introduced for :ref:`implicit accounts <def_implicit_account_alpha>`.
+the same name introduced for :ref:`user accounts <def_user_account_alpha>`.
 This approach was chosen to minimize the work required by wallets,
 custodians, exchanges, and other parties to support the functionality.
 
@@ -465,7 +465,7 @@ custodians, exchanges, and other parties to support the functionality.
 activation <feature_activation_alpha>`: only
 *delegates* can stake funds and the relative weight of staked and
 delegated funds remains unchanged. In the current implementation, only
-*implicit accounts* can become stakers. In other words, smart contracts
+user accounts can become stakers. In other words, smart contracts
 cannot stake funds (they can of course still delegate them).
 
 .. _staking_policy_configuration_alpha:

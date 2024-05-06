@@ -200,7 +200,7 @@ handled with dedicated manager operations.
   according to their specific semantics.
 - The ``Smart_rollup_publish`` operation is used to regularly declare
   what is the new state of a given smart rollup in a so-called
-  “commitment”. To publish commitments, an implicit account has to
+  “commitment”. To publish commitments, a user account has to
   own at least ꜩ 10,000, which are frozen as long as at least one of
   their commitments is disputable.
 - The ``Smart_rollup_cement`` operation is used to cement a
@@ -208,9 +208,9 @@ handled with dedicated manager operations.
   published for long enough, and there is no concurrent commitment for
   the same state update. Once a commitment is cemented, it cannot be
   disputed anymore.
-- The ``Smart_rollup_recover_bond`` operation is used by an implicit
+- The ``Smart_rollup_recover_bond`` operation is used by a user
   account to unfreeze their ꜩ 10,000. This operation only succeeds if
-  and only if all the commitments published by the implicit account
+  and only if all the commitments published by the user account
   have been cemented.
 - The ``Smart_rollup_refute`` operation is used to start or pursue a
   dispute. A dispute is resolved on the Tezos blockchain through a

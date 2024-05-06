@@ -118,7 +118,15 @@ _`Account`
     In the context_, each account is associated with a balance (an amount of
     tez available).
 
-    An account can be either an `user account`_ or a `smart contract`_.
+    An account can be either a `user account`_ or a `smart contract`_.
+
+_`Attesting`
+    When a block_ is created and propagated on the network, delegates that have
+    `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
+    Attestation operations are included in the next block_.
+
+_`Attesting rights`
+    See `baking rights`_.
 
 _`Baker`
     When a delegate_ creates a new block_, it is called the baker of this block.
@@ -206,14 +214,6 @@ _`Failing Noop`
     blocks<full_application_alpha>`. This operation allows end-users to
     :ref:`sign arbitrary messages<failing_noop>` which have no
     computational semantics.
-
-_`Attesting`
-    When a block_ is created and propagated on the network, delegates that have
-    `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
-    Attestation operations are included in the next block_.
-
-_`Attesting rights`
-    See `baking rights`_.
 
 .. _def_fee_alpha:
 
@@ -325,7 +325,7 @@ _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
 
-.. _def_implicit_account_alpha:
+.. _def_user_account_alpha:
 
 _`User account`
     An account_ that is linked to a public key. Contrary to a `smart

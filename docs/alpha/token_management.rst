@@ -80,7 +80,7 @@ Container accounts
 Container accounts are regular (user and smart contract) accounts, or convenience accounts that hold tokens temporarily (e.g. when parts of a delegate's funds are frozen).
 The field ``kind`` allows to identify the type of container account, it can have one of the following values:
 
-* ``"contract"`` represents implicit or originated accounts, and comes with the additional field (also called) ``contract`` whose value is the public key hash of the implicit or originated account.
+* ``"contract"`` represents a user account or smart contract, and comes with the additional field (also called) ``contract`` whose value is the public key hash of the user account or the contract hash of the smart contract.
 * ``"freezer"`` represents frozen accounts, and comes with the additional field ``category`` that can have one of the following values:
 
   - ``"deposits"`` represents the accounts of frozen deposits.
@@ -92,7 +92,7 @@ The field ``kind`` allows to identify the type of container account, it can have
       from the deposit,
 
     - just a ``"delegate"`` to designate collectively the deposits of all
-      stakers delegating to the provided implicit account.
+      stakers delegating to the provided user account.
     - a ``"baker_own_stake"`` field to designate the delegate's own deposits received from its own stake rewards.
     - a ``"baker_edge"`` field to designate the delegate's own deposits received from the edge on its staker's rewards.
   - ``"unstaked_deposits"`` represents the accounts of unstaked frozen tokens.
@@ -111,10 +111,10 @@ The field ``kind`` allows to identify the type of container account, it can have
       cycle.
   - ``"bonds"`` represents the accounts of frozen bonds.
     Bonds are like deposits.
-    However, they can be associated to implicit or originated accounts, unlike deposits that only apply to implicit accounts that are also delegates.
+    However, they can be associated to user accounts or smart contracts, unlike deposits that only apply to user accounts that are also delegates.
     Accounts in this category are further identified by the following additional fields:
 
-    - the field ``contract`` contains the public key hash of the implicit account, or the contract hash of the originated account
+    - the field ``contract`` contains the public key hash of the user account, or the contract hash of the smart contract
     - the field ``bond_id`` contains the identifier of the bond (e.g. a rollup hash if the bond is associated to a transaction or a smart contract rollup).
 * ``"accumulator"`` represents accounts used to store tokens for some short period of time.
   This type of account is further identified by the additional field ``category`` whose (only possible) value ``"block fees"`` designates the container account used to collect manager operation fees while block's operations are being applied.
