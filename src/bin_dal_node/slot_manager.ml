@@ -247,7 +247,7 @@ let commit_slot slot cryptobox =
   return commitment
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
-    commitment slot ~with_proof =
+    commitment slot =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
@@ -260,17 +260,15 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     Store.cache_shards node_store commitment share_array
   in
   let () = Store.cache_slot node_store commitment slot in
-  if with_proof then
-    let*? precomputation =
-      match shards_proofs_precomputation with
-      | None -> Error (`Other [No_prover_SRS])
-      | Some precomputation -> Ok precomputation
-    in
-    let shard_proofs =
-      Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
-    in
-    Store.cache_shard_proofs node_store commitment shard_proofs |> return
-  else return_unit
+  let*? precomputation =
+    match shards_proofs_precomputation with
+    | None -> Error (`Other [No_prover_SRS])
+    | Some precomputation -> Ok precomputation
+  in
+  let shard_proofs =
+    Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
+  in
+  Store.cache_shard_proofs node_store commitment shard_proofs |> return
 
 let get_opt array i =
   if i >= 0 && i < Array.length array then Some array.(i) else None

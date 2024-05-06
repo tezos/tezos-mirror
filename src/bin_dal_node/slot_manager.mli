@@ -104,18 +104,17 @@ val get_slot_content :
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
 (** [add_commitment_shards ~shards_proofs_precomputation node_store
-    cryptobox commitment slot ~with_proof] registers the shards of the
-    slot whose commitment is given.
+    cryptobox commitment slot] registers the shards of the slot whose
+    commitment is given.
 
-    If [with_proof] is true, proofs are generated for the computed
-    shards using [shards_proofs_precomputation] and stored in a bounded
-    structure in memory.
+    Proofs are generated for the computed shards using
+    [shards_proofs_precomputation] and stored in a bounded structure
+    in memory.
 
     In addition to storage errors, this function may return the
     following errors:
     - [Invalid_slot_size] if the given slot does not have the expected size,
-    - [No_prover_SRS] if the given [shards_proofs_precomputation] is
-      [None] and [with_proof] is true.
+    - [No_prover_SRS] if the given [shards_proofs_precomputation] is [None].
 *)
 val add_commitment_shards :
   shards_proofs_precomputation:Cryptobox.shards_proofs_precomputation option ->
@@ -123,7 +122,6 @@ val add_commitment_shards :
   Cryptobox.t ->
   Cryptobox.commitment ->
   Cryptobox.slot ->
-  with_proof:bool ->
   (unit, [> Errors.other]) result Lwt.t
 
 (** This function publishes the given shards and their proofs. *)

@@ -168,7 +168,6 @@ module Slots_handlers = struct
             cryptobox
             commitment
             slot
-            ~with_proof:true
         in
         return (commitment, commitment_proof))
 
