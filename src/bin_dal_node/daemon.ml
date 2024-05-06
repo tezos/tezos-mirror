@@ -501,11 +501,6 @@ module Handler = struct
             ready_ctxt
           in
           let head_level = header.shell.level in
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/6036
-             Note that the first processed block is special: in contrast to the
-             general case, as implemented by this function, the plugin was set
-             before processing the block, by [resolve_plugin_and_set_ready], not
-             after processing the block. *)
           let* () =
             Node_context.may_add_plugin
               ctxt
