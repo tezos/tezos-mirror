@@ -243,7 +243,7 @@ let commit cryptobox polynomial =
 
 (* Main functions *)
 
-let add_slot slot cryptobox =
+let commit_slot slot cryptobox =
   let open Lwt_result_syntax in
   let*? polynomial = polynomial_from_slot cryptobox slot in
   let*? commitment = commit cryptobox polynomial in
