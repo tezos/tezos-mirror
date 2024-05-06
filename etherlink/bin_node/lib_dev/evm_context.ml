@@ -102,6 +102,7 @@ module Request = struct
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
     | Evm_state_after : block_request -> (Evm_state.t option, tztrace) t
     | Earliest_state : (Evm_state.t option, tztrace) t
+    | Earliest_number : (Ethereum_types.quantity option, tztrace) t
 
   type view = View : _ t -> view
 
@@ -223,6 +224,12 @@ module Request = struct
           (obj1 (req "request" (constant "earliest_state")))
           (function View Earliest_state -> Some () | _ -> None)
           (fun () -> View Earliest_state);
+        case
+          (Tag 11)
+          ~title:"Earliest_number"
+          (obj1 (req "request" (constant "earliest_number")))
+          (function View Earliest_number -> Some () | _ -> None)
+          (fun () -> View Earliest_number);
       ]
 
   let pp ppf view =
@@ -920,6 +927,12 @@ module Handlers = struct
             let*! evm_state = Irmin_context.PVMState.get context in
             return_some evm_state
         | None -> return_none)
+    | Earliest_number -> (
+        let ctxt = Worker.state self in
+        let* checkpoint = Evm_store.Context_hashes.find_earliest ctxt.store in
+        match checkpoint with
+        | Some (level, _checkpoint) -> return_some level
+        | None -> return_none)
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -1288,6 +1301,34 @@ let replay ?profile ?(alter_evm_state = Lwt_result_syntax.return)
         "Cannot replay blueprint %a: missing context"
         Ethereum_types.pp_quantity
         (Qty number)
+
+let block_param_to_block_number
+    (block_param : Ethereum_types.Block_parameter.extended) =
+  let open Lwt_result_syntax in
+  match block_param with
+  | Block_parameter (Number n) -> return n
+  | Block_parameter Latest ->
+      let*! {next_blueprint_number = Qty next_number; _} = head_info () in
+      return Ethereum_types.(Qty Z.(pred next_number))
+  | Block_parameter Earliest -> (
+      let* res = worker_wait_for_request Earliest_number in
+      match res with
+      | Some res -> return res
+      | None -> failwith "The EVM node does not have any state available")
+  | Block_parameter Pending ->
+      failwith "Pending block parameter is not supported"
+  | Block_hash {hash; _} -> (
+      let*! head_info = head_info () in
+      let*! bytes =
+        Evm_state.inspect
+          head_info.evm_state
+          Durable_storage_path.(Block.by_hash hash)
+      in
+      match bytes with
+      | Some bytes ->
+          let block = Ethereum_types.block_from_rlp bytes in
+          return block.number
+      | None -> failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
 
 let shutdown () =
   let open Lwt_result_syntax in

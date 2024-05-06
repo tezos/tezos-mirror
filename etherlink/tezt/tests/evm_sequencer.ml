@@ -1417,6 +1417,81 @@ let test_get_balance_block_param =
     ~error_msg:(sf "%s expected to have a balance of %%R but got %%L" address) ;
   unit
 
+let test_get_block_by_number_block_param =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
+    ~title:"RPC method getBlockByNumber uses block parameter"
+    ~uses
+  @@ fun protocol ->
+  let observer_offset = 3l in
+  let* {sequencer; observer; sc_rollup_node; proxy; client; _} =
+    setup_sequencer ~time_between_blocks:Nothing protocol
+  in
+  let* () =
+    repeat Int32.(to_int observer_offset) @@ fun () ->
+    next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* _ =
+    repeat 2 (fun _ ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let observer_partial_history =
+    let name = "observer_partial_history" in
+    Evm_node.create
+      ~name
+      ~mode:
+        (Observer
+           {
+             initial_kernel = "evm_kernel.wasm";
+             preimages_dir = "/tmp";
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             devmode = true;
+           })
+      ~data_dir:(Temp.dir name)
+      (Evm_node.endpoint sequencer)
+  in
+  let* () =
+    Process.check @@ Evm_node.spawn_init_config observer_partial_history
+  in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir
+      ~devmode:true
+      observer_partial_history
+      sc_rollup_node
+  in
+  let* () = Evm_node.run observer_partial_history in
+  let* () =
+    repeat 2 @@ fun () ->
+    next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client
+  in
+
+  let*@ earliest_block_sequencer =
+    Rpc.get_block_by_number ~block:"earliest" sequencer
+  in
+  let*@ earliest_block_observer =
+    Rpc.get_block_by_number ~block:"earliest" observer
+  in
+  let*@ earliest_block_observer_partial =
+    Rpc.get_block_by_number ~block:"earliest" observer_partial_history
+  in
+
+  Check.(
+    ((earliest_block_sequencer.number = 0l) int32)
+      ~error_msg:"Earliest block of sequencer is %L instead of %R") ;
+
+  Check.(
+    ((earliest_block_observer.number = 0l) int32)
+      ~error_msg:"Earliest block of observer is %L instead of %R") ;
+
+  Check.(
+    ((earliest_block_observer_partial.number = observer_offset) int32)
+      ~error_msg:"Earliest block of observer started late is %L instead of %R") ;
+
+  unit
+
 let test_extended_block_param =
   Protocol.register_test
     ~__FILE__
@@ -3150,6 +3225,7 @@ let () =
   test_send_deposit_to_delayed_inbox protocols ;
   test_rpc_produceBlock protocols ;
   test_get_balance_block_param protocols ;
+  test_get_block_by_number_block_param protocols ;
   test_extended_block_param protocols ;
   test_delayed_transfer_is_included protocols ;
   test_delayed_deposit_is_included protocols ;

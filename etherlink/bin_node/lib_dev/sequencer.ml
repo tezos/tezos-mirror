@@ -38,6 +38,8 @@ end) : Services_backend_sig.Backend = struct
       | _ -> Error_monad.failwith "Invalid insights format"
   end
 
+  let block_param_to_block_number = Evm_context.block_param_to_block_number
+
   let smart_rollup_address =
     Tezos_crypto.Hashed.Smart_rollup_address.to_string Ctxt.smart_rollup_address
 
