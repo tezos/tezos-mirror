@@ -1871,11 +1871,13 @@ module Target = struct
       then
         invalid_argf
           "A target has the release status %s but is located at %s which is \
-           outside of %s. This is not supported. Move the code to `src/` or \
-           set the release status to %s."
+           outside of the source of %s: %s. This is not supported. Move the \
+           code to the source of %s or set the release status to %s."
           (show_release_status release_status)
           path
+          product
           (String.concat ", " source)
+          product
           (show_release_status Unreleased) ;
     register_internal
       {
