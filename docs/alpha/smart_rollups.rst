@@ -179,7 +179,7 @@ A smart rollup is characterized by:
 - the Michelson type of the entrypoint used by Layer 1 smart contracts
 to send internal messages to it, and
 - an optional list of addresses used as a white-list of allowed
-stakers (see :ref:`private_rollups_alpha`).
+committers (see :ref:`private_rollups_alpha`).
 
 All these characteristics are provided when originating a new smart
 rollup.
@@ -234,11 +234,15 @@ is only one honest commitment. In other words, if two distinct
 commitments are published for the same commitment period, one of them
 must be wrong.
 
-Notice that, to publish a commitment, an operator must provide a
-deposit of 10,000 tez. For this reason, the operator is said to be a
-**staker**. Several users can stake on the same commitment. When a
-staker *S* publishes a new commitment based on a commitment that *S* is staking
-on, *S* does not have to provide a new deposit: the deposit also
+An operator publishing a commitment is called a **committer**.
+Notice that, to publish a commitment, the operator must provide a
+deposit of 10,000 tez. For this reason, the committer is sometimes called a
+(smart rollup) *staker*. However, to avoid confusion with the notion of
+:ref:`staker <new_staking_alpha>` in Layer 1, we will prefer using the term "committer" in this documentation.
+
+Several committers can publish (and thus stake on) the same commitment. When a
+committer *C* publishes a new commitment based on a commitment that *C*
+has published, *C* does not have to provide a new deposit: the deposit also
 applies to this new commitment.
 
 There is no need to synchronize between operators: if two honest
@@ -282,7 +286,7 @@ By construction, only one view of the rollup state is valid (as the
 PVM is deterministic). When two concurrent branches exist in the
 commitment tree, the cementation process is stopped at the first fork
 in the tree. To unfreeze the cementation process, a **refutation
-game** must be started between *two concurrent stakers* of these
+game** must be started between *two concurrent committers* of these
 branches. Refutation games are automatically played by rollup nodes to
 defend their stakes: honest participants are guaranteed to win these
 games. Therefore, an honest participant should not have to worry about
@@ -291,19 +295,19 @@ new commitments to be published on top of the disputed commitments.
 
 A refutation game is decomposed into two main steps: a dissection
 mechanism and a final conflict resolution phase. During the first
-phase, the two stakers exchange hashes about intermediate states of
+phase, the two committers exchange hashes about intermediate states of
 the rollups in a way that allows them to converge to the very first
 tick on which they disagree. The exact number of hashes exchanged at a
-given step is PVM-dependent. During the final phase, the stakers must
+given step is PVM-dependent. During the final phase, the committers must
 provide a proof that they correctly interpreted this conflicting tick.
 
 The Layer 1 PVM then determines whether these proofs are valid. There
-are only two possible outcomes: either one of the stakers, that we dub *S* in the sequel, has provided
-a valid proof, then *S* wins the game, and is rewarded with half of the
-opponent's deposit (the other half being burnt); or, both stakers have
+are only two possible outcomes: either one of the committers, that we dub *C* in the sequel, has provided
+a valid proof, then *C* wins the game, and is rewarded with half of the
+opponent's deposit (the other half being burnt); or, both committers have
 provided an invalid proof and they both lose their deposit. In the
 end, at most one stake will be kept in the commitment tree. When a
-commitment has no more stake on it (because all stakers have lost the
+commitment has no more stake on it (because all committers have lost the
 related refutation games), it is removed from the tree. An honest
 player *H* must therefore play as many refutation games as there are
 stakes on the commitments in conflict with *H*'s own commitment.
@@ -317,7 +321,7 @@ two players can last at most 2 weeks.
 There is no timeout for starting a refutation game after having
 published a concurrent commitment. However, assuming the existence of
 an honest participant *H*, then *H* will start the refutation game with all
-concurrent stakers to avoid the rollup getting stuck.
+concurrent committers to avoid the rollup getting stuck.
 
 .. _private_rollups_alpha:
 
@@ -327,7 +331,7 @@ Private rollups
 A **private** Smart Rollup guarantees that private data cannot be
 leaked by any means, whereas in a public rollup, one can force a
 rollup to leak part of the data by starting a refutation game. This is
-achieved by restricting the set of allowed stakers using a
+achieved by restricting the set of allowed committers using a
 *whitelist*. With that restriction, only addresses on the whitelist
 can publish commitments and therefore participate in a refutation
 game.
@@ -377,8 +381,8 @@ Glossary
 #. **Refutation period**: When the first commitment for a commitment period is published, a refutation
    period of two weeks starts to allow this commitment to be challenged.
 
-#. **Staker**: A user account that has made a deposit on a
+#. **Committer**: A user account that has published and has made a deposit on a
    commitment.
 
 #. **Refutation game**: A process by which the Tezos protocol solves
-   a conflict between two stakers.
+   a conflict between two committers.
