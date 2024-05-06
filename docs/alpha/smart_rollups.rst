@@ -363,34 +363,34 @@ Glossary
    of rollups. The PVM is able to produce proofs enforcing this truth.
    This ability is used during the final step of refutation games.
 
-#. **Inbox**: A sequence of messages from the Layer 1 to smart rollups.
+#. **Rollup Inbox**: A sequence of messages from the Layer 1 to smart rollups.
    The contents of the inbox are determined by the consensus of the
    Tezos protocol.
 
-#. **Outbox**: A sequence of messages from a smart rollup to the Layer 1.
+#. **Rollup Outbox**: A sequence of messages from a smart rollup to the Layer 1.
    Messages are smart contract calls, potentially containing tickets.
-   These calls can be triggered only when the related commitment is
+   These calls can be triggered only when the related rollup commitment is
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
-#. **Commitment**: a claim that the interpretation of all inbox messages
+#. **Rollup Commitment**: a claim that the interpretation of all rollup inbox messages
    published during a given period, and applied on the state of
-   a parent commitment, led to a given new state by performing a given
+   a parent rollup commitment, led to a given new state by performing a given
    number of execution steps of the PVM.
 
-#. **Commitment period**: A period of roughly 15 minutes (currently 112 blocks) during which all inbox
+#. **Commitment period**: A period of roughly 15 minutes (currently 112 blocks) during which all rollup inbox
    messages must be processed by the rollup node state to compute a
-   commitment. A commitment must be published for each commitment
+   rollup commitment. A commitment must be published for each commitment
    period.
 
 #. **Rollup node**: a daemon required for deploying and operating smart rollups.
    The rollup node is responsible for making the rollup progress by publishing commitments and by playing refutation games.
 
-#. **Refutation period**: When the first commitment for a commitment period is published, a refutation
+#. **Refutation period**: When the first rollup commitment for a commitment period is published, a refutation
    period of two weeks starts to allow this commitment to be challenged.
 
-#. **Committer**: A user account that has published and has made a deposit on a
+#. **Rollup Committer**: A user account that has published and has made a deposit on a
    commitment.
 
 #. **Refutation game**: A process by which the Tezos protocol solves
-   a conflict between two committers.
+   a conflict between two rollup committers.
