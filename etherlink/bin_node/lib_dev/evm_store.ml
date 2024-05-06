@@ -136,6 +136,15 @@ module Q = struct
         @@ Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_opt bytes)
       string
 
+  let journal_mode =
+    custom
+      ~encode:(function Configuration.Wal -> Ok "wal" | Delete -> Ok "delete")
+      ~decode:(function
+        | "wal" -> Ok Wal
+        | "delete" -> Ok Delete
+        | _ -> Error "unsupported journal mode")
+      string
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -176,6 +185,18 @@ module Q = struct
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
+  end
+
+  module Journal_mode = struct
+    let get = (unit ->! journal_mode) @@ {|PRAGMA journal_mode|}
+
+    (* It does not appear possible to write a request {|PRAGMA journal_mode=?|}
+       accepted by caqti, sadly. *)
+
+    let set = function
+      | Configuration.Wal ->
+          (unit ->! journal_mode) @@ {|PRAGMA journal_mode=wal|}
+      | Delete -> (unit ->! journal_mode) @@ {|PRAGMA journal_mode=delete|}
   end
 
   module Blueprints = struct
@@ -316,6 +337,17 @@ let with_transaction store k =
   | Some _ ->
       failwith "Internal error: attempting to perform a nested transaction"
 
+module Journal_mode = struct
+  let set_journal_mode store mode =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* current_mode = Db.find conn Q.Journal_mode.get () in
+    when_ (current_mode <> mode) @@ fun () ->
+    let* _wal = Db.find conn (Q.Journal_mode.set mode) () in
+    let*! () = Evm_store_events.journal_mode_updated mode in
+    return_unit
+end
+
 module Migrations = struct
   let create_table store =
     with_connection store @@ fun conn ->
@@ -353,12 +385,18 @@ module Migrations = struct
     Db.exec conn Q.Migrations.register_migration (id, M.name)
 end
 
-let init ~data_dir =
+let init ~data_dir ~sqlite_journal_mode () =
   let open Lwt_result_syntax in
   let path = data_dir // "store.sqlite" in
   let*! exists = Lwt_unix.file_exists path in
   let uri = Uri.of_string Format.(sprintf "sqlite3:%s" path) in
   let store = {db_uri = uri; with_transaction = None} in
+  let* () =
+    match sqlite_journal_mode with
+    | `Force sqlite_journal_mode ->
+        Journal_mode.set_journal_mode store sqlite_journal_mode
+    | `Identity -> return_unit
+  in
   let* () =
     with_transaction store @@ fun store ->
     let* () =

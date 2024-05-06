@@ -39,6 +39,20 @@ type blueprints_publisher_config = {
           again. *)
 }
 
+type sqlite_journal_mode =
+  | Delete
+      (** Default journal mode of SQLite3. Slightly better performances, but not
+          concurrent friendly. *)
+  | Wal
+      (** Write-ahead log. Concurrent friendly way to implement transactions
+          and rollbacks. *)
+
+val sqlite_journal_mode_encoding : sqlite_journal_mode Data_encoding.t
+
+(** Configuration settings for experimental features, with no backward
+    compatibility guarantees. *)
+type experimental_features = {sqlite_journal_mode : sqlite_journal_mode}
+
 type sequencer = {
   preimages : string;  (** Path to the preimages directory. *)
   preimages_endpoint : Uri.t option;
@@ -78,6 +92,7 @@ type t = {
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
   verbose : Internal_event.level;
+  experimental_features : experimental_features;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)

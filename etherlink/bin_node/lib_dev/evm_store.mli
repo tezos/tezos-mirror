@@ -7,11 +7,19 @@
 
 type t
 
-(** [init ~data_dir] returns a handler to the EVM node store located under
+(** [init ~data_dir ()] returns a handler to the EVM node store located under
     [data_dir]. If no store is located in [data_dir], an empty store is
     created. Also returns if the store was created ([true]) or was already
-    existing ([false]). *)
-val init : data_dir:string -> t tzresult Lwt.t
+    existing ([false]).
+
+    If [sqlite_journal_mode] is [`Force mode], then the journal mode of the
+    SQLite database is updated if necessary to match the requested
+    configuration. With [`Identity], the journal mode is left untouched. *)
+val init :
+  data_dir:string ->
+  sqlite_journal_mode:[`Identity | `Force of Configuration.sqlite_journal_mode] ->
+  unit ->
+  t tzresult Lwt.t
 
 (** [with_transaction store k] wraps the accesses to [store] made in the
     continuation [k] within {{:https://www.sqlite.org/lang_transaction.html}a
