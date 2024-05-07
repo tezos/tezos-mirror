@@ -87,6 +87,9 @@ Smart Rollup node
 - Introduce the 5th version of the WASM PVM, which defaults to a higher tick
   limits to delegate refutability to the kernels. (MR :gl:`!12999`)
 
+- Trigger GC every 1000 blocks (instead of 100) by default to reduce CPU
+  consumption. (MR :gl:`!13177`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
