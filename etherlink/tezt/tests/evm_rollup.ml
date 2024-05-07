@@ -1288,6 +1288,9 @@ let ensure_transfer_result_integrity ~transfer_result ~sender ~receiver
   in
   assert (sender_nonce = transfer_result.sender_nonce_after) ;
   let* tx_object = get_tx_object ~endpoint ~tx_hash:transfer_result.tx_hash in
+  (* The prod and dev modes are desynchronized, as the encoding for `v` has
+     changed. It should be fixed after the next freeze. *)
+  let tx_object = {tx_object with v = transfer_result.tx_object.v} in
   assert (tx_object = transfer_result.tx_object) ;
   let*@! tx_receipt =
     Rpc.get_transaction_receipt
@@ -1569,7 +1572,7 @@ let test_rpc_txpool_content =
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
            v is currently incorrectly encoded as big-endian by the kernel,
            causing the decoded value to be incorrect. Should be 0xa96 here *)
-      ~v:"0x960a"
+      ~v:"0xa96"
       ~r:"0x4217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079"
       ~s:"0x23ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592"
   in
@@ -1591,7 +1594,7 @@ let test_rpc_txpool_content =
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
            v is currently incorrectly encoded as big-endian by the kernel,
            causing the decoded value to be incorrect. Should be 0xa95 here *)
-      ~v:"0x950a"
+      ~v:"0xa95"
       ~r:"0x30d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970"
       ~s:"0x45ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
   in
