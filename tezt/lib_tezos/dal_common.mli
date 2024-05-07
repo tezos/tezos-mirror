@@ -242,9 +242,9 @@ module RPC : sig
      known score. *)
   val get_scores : unit -> peer_score list RPC_core.t
 
-  (** Call RPC /plugin/commitments_history/hash/[hash]. *)
+  (** Call RPC /plugin/[proto_hash]/<commitments_history/hash/[hash]. *)
   val get_plugin_commitments_history_hash :
-    hash:string -> unit -> JSON.t RPC_core.t
+    proto_hash:string -> hash:string -> unit -> JSON.t RPC_core.t
 
   (** Call /levels/<slot_level>/slots/<slot_index>/shards/<shard_index>/content *)
   val get_level_slot_shard_content :

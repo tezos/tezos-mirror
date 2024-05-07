@@ -4077,7 +4077,9 @@ let test_peers_reconnection _protocol _parameters _cryptobox node client
 
 (* Adapted from sc_rollup.ml *)
 let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
-    ~migration_level ~scenario ~description () =
+    ~migration_level ~scenario ~description ?producer_profiles ?attestation_lag
+    ?number_of_slots ?number_of_shards ?slot_size ?page_size ?redundancy_factor
+    ?consensus_committee_size () =
   let tags =
     Tag.tezos2 :: "dal" :: Protocol.tag migrate_from :: Protocol.tag migrate_to
     :: "migration" :: tags
@@ -4093,8 +4095,18 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
          (Protocol.name migrate_to)
          description)
   @@ fun () ->
-  let parameters = dal_enable_param (Some true) in
-  let* node, client, _dal_parameters =
+  let parameters =
+    make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
+    @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
+    @ make_int_parameter
+        ["dal_parametric"; "redundancy_factor"]
+        redundancy_factor
+    @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+    @ make_int_parameter ["dal_parametric"; "page_size"] page_size
+  in
+  let* node, client, dal_parameters =
     setup_node ~parameters ~protocol:migrate_from ()
   in
 
@@ -4109,15 +4121,15 @@ let test_l1_migration_scenario ?(tags = []) ~migrate_from ~migrate_to
   let* () = Node.wait_for_ready node in
 
   let dal_node = Dal_node.create ~node () in
-  let* () = Dal_node.init_config dal_node in
+  let* () = Dal_node.init_config ?producer_profiles dal_node in
   let* () = Dal_node.run dal_node ~wait_ready:true in
 
-  scenario ~migration_level client node dal_node
+  scenario ~migration_level dal_parameters client node dal_node
 
 let test_migration_plugin ~migrate_from ~migrate_to =
   let tags = ["plugin"]
   and description = "test plugin update"
-  and scenario ~migration_level client node dal_node =
+  and scenario ~migration_level _dal_parameters client node dal_node =
     let* current_level =
       let* json = Node.RPC.(call node @@ get_chain_block_header_shell ()) in
       JSON.(json |-> "level" |> as_int |> return)
@@ -4339,152 +4351,341 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   Log.info "Slot sucessfully attested" ;
   unit
 
-let test_commitments_history_rpcs _protocol dal_parameters _cryptobox node
-    client dal_node =
-  let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
-  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-  let lag = dal_parameters.attestation_lag in
-  let number_of_slots = dal_parameters.number_of_slots in
-  let index = number_of_slots - 1 in
-  Log.info "attestation_lag = %d, number_of_slots = %d" lag number_of_slots ;
-  let last_confirmed_level = 5 in
-  let max_level = last_confirmed_level + lag + 2 in
-  let wait_for_dal_node =
-    wait_for_layer1_final_block dal_node (last_confirmed_level + lag)
-  in
+module History_rpcs = struct
+  let scenario ~slot_index ~first_cell_level ~first_dal_level
+      ~last_confirmed_published_level ~initial_blocks_to_bake protocol
+      dal_parameters client node dal_node =
+    Log.info "slot_index = %d" slot_index ;
+    let dal_node_endpoint = Dal_node.rpc_endpoint dal_node in
+    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
 
-  let rec publish level commitments =
-    (* Try to publish a slot at each level *)
-    if level >= max_level then return @@ List.rev commitments
-    else
-      let* commitment =
-        Helpers.publish_and_store_slot
-          client
-          dal_node
-          Constant.bootstrap1
-          ~index
-          ~force:true
-        @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
-      in
-      let* () = bake_for client ~dal_node_endpoint in
-      let* _level = Node.wait_for_level node (level + 1) in
-      publish (level + 1) (commitment :: commitments)
-  in
+    (* [bake_for ~count] doesn't work across the migration block, so we bake in
+       two steps *)
+    let* () =
+      if initial_blocks_to_bake > 0 then
+        bake_for ~count:initial_blocks_to_bake client
+      else unit
+    in
+    let* () = bake_for client in
 
-  let* () = bake_for client in
-  let* first_level = Client.level client in
-  Log.info "No slot published at level %d" first_level ;
-  Log.info "Publishing slots and baking up to level %d" max_level ;
-  let* commitments = publish first_level [] in
-  let commitments = Array.of_list commitments in
+    let* dal_parameters = Dal.Parameters.from_client client in
+    let lag = dal_parameters.attestation_lag in
+    let number_of_slots = dal_parameters.number_of_slots in
+    Log.info "attestation_lag = %d, number_of_slots = %d" lag number_of_slots ;
 
-  let module SeenIndexes = Set.Make (struct
-    type t = int
+    let last_attested_level = last_confirmed_published_level + lag in
+    (* The maximum level that needs to be reached (we use +2 to make last
+       attested level final). *)
+    let max_level = last_attested_level + 2 in
 
-    let compare = compare
-  end) in
-  let seen_indexes = ref SeenIndexes.empty in
-  let rec check_history level =
-    (* Try to publish a slot at each level *)
-    if level > max_level then unit
-    else
-      let* cell =
-        Node.RPC.call node
-        @@ RPC.get_chain_block_context_dal_commitments_history
-             ~block:(string_of_int level)
-             ()
-      in
-      let* () = check_cell cell ~check_level:(Some level) in
-      check_history (level + 1)
-  and check_cell cell ~check_level =
-    let skip_list_kind = JSON.(cell |-> "kind" |> as_string) in
-    let expected_skip_list_kind = "dal_skip_list" in
-    Check.(
-      (skip_list_kind = expected_skip_list_kind)
-        string
-        ~error_msg:"Unexpected skip list kind: got %L, expected %R") ;
-    let skip_list = JSON.(cell |-> "skip_list") in
-    let cell_index = JSON.(skip_list |-> "index" |> as_int) in
-    if SeenIndexes.mem cell_index !seen_indexes then unit
-    else (
-      seen_indexes := SeenIndexes.add cell_index !seen_indexes ;
-      let content = JSON.(skip_list |-> "content") in
-      let cell_level = JSON.(content |-> "level" |> as_int) in
-      let published_level =
-        match check_level with
+    let wait_for_dal_node =
+      wait_for_layer1_final_block dal_node last_attested_level
+    in
+
+    let* first_level = Client.level client in
+    Log.info "No slot published at level %d" first_level ;
+    Log.info "Publishing slots and baking up to level %d" max_level ;
+    let rec publish level commitments =
+      (* Try to publish a slot at each level *)
+      if level > max_level then return @@ List.rev commitments
+      else
+        let* commitment =
+          Helpers.publish_and_store_slot
+            client
+            dal_node
+            Constant.bootstrap1
+            ~index:slot_index
+            ~force:true
+          @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
+        in
+        let* () = bake_for client ~dal_node_endpoint in
+        let* _level = Node.wait_for_level node (level + 1) in
+        publish (level + 1) (commitment :: commitments)
+    in
+    let* commitments = publish first_level [] in
+    let commitments = Array.of_list commitments in
+
+    let module SeenIndexes = Set.Make (struct
+      type t = int
+
+      let compare = compare
+    end) in
+    let seen_indexes = ref SeenIndexes.empty in
+    let at_least_one_attested_status = ref false in
+    let rec check_cell cell ~check_level =
+      let skip_list_kind = JSON.(cell |-> "kind" |> as_string) in
+      let expected_skip_list_kind = "dal_skip_list" in
+      Check.(
+        (skip_list_kind = expected_skip_list_kind)
+          string
+          ~error_msg:"Unexpected skip list kind: got %L, expected %R") ;
+      let skip_list = JSON.(cell |-> "skip_list") in
+      let cell_index = JSON.(skip_list |-> "index" |> as_int) in
+      if SeenIndexes.mem cell_index !seen_indexes then unit
+      else (
+        seen_indexes := SeenIndexes.add cell_index !seen_indexes ;
+        let content = JSON.(skip_list |-> "content") in
+        let cell_level = JSON.(content |-> "level" |> as_int) in
+        (match check_level with
         | Some level ->
-            let expected_level = max 0 (level - lag) in
+            assert (level >= first_dal_level) ;
+            let expected_level =
+              if level = first_dal_level then (* the "level" of genesis *) 0
+              else level - lag
+            in
             Check.(
               (cell_level = expected_level)
                 int
-                ~error_msg:"Unexpected cell level: got %L, expected %R") ;
-            level - lag
-        | None -> cell_level
-      in
-      let slot_index = JSON.(content |-> "index" |> as_int) in
-      let () =
-        match check_level with
-        | None -> ()
-        | Some level ->
-            let expected_slot_index =
-              if level < lag then (* the "slot index" of genesis *) 0
-              else number_of_slots - 1
-            in
-            Check.(
-              (slot_index = expected_slot_index)
-                int
-                ~error_msg:"Unexpected slot index: got %L, expected %R")
-      in
-      (if cell_index > 0 then
-       Check.(
-         (cell_index = ((cell_level - 1) * number_of_slots) + slot_index)
-           int
-           ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
-      let cell_kind = JSON.(content |-> "kind" |> as_string) in
-      let expected_kind =
-        if published_level <= first_level || slot_index != index then
-          "unattested"
-        else "attested"
-      in
+                ~error_msg:"Unexpected cell level: got %L, expected %R")
+        | None -> ()) ;
+        let cell_slot_index = JSON.(content |-> "index" |> as_int) in
+        let () =
+          match check_level with
+          | None -> ()
+          | Some level ->
+              let expected_slot_index =
+                if level = first_dal_level then
+                  (* the "slot index" of genesis *)
+                  0
+                else number_of_slots - 1
+              in
+              Check.(
+                (cell_slot_index = expected_slot_index)
+                  int
+                  ~error_msg:"Unexpected slot index: got %L, expected %R")
+        in
+        (if cell_index > 0 then
+         let expected_cell_index =
+           ((cell_level - 1 - first_cell_level) * number_of_slots)
+           + cell_slot_index
+         in
+         Check.(
+           (cell_index = expected_cell_index)
+             int
+             ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
+        let cell_kind = JSON.(content |-> "kind" |> as_string) in
+        let expected_kind =
+          if cell_level <= first_level || cell_slot_index != slot_index then
+            "unattested"
+          else (
+            at_least_one_attested_status := true ;
+            "attested")
+        in
+        Check.(
+          (cell_kind = expected_kind)
+            string
+            ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
+        (if cell_kind = "attested" then
+         let commitment = JSON.(content |-> "commitment" |> as_string) in
+         Check.(
+           (commitment = commitments.(cell_level - (first_level + 1)))
+             string
+             ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
+        let back_pointers =
+          JSON.(skip_list |-> "back_pointers" |> as_list)
+          |> List.map JSON.as_string
+        in
+        let expecting_no_back_pointers = cell_index = 0 in
+        let no_back_pointers = back_pointers = [] in
+        Check.(
+          (no_back_pointers = expecting_no_back_pointers)
+            bool
+            ~error_msg:
+              "Unexpected non-existence of back_pointers: got %L, expected %R") ;
+        if cell_level > first_level then
+          Lwt_list.iter_s
+            (fun hash ->
+              let* cell =
+                Dal_RPC.(
+                  call dal_node
+                  @@ get_plugin_commitments_history_hash
+                       ~proto_hash:(Protocol.hash protocol)
+                       ~hash
+                       ())
+              in
+              check_cell cell ~check_level:None)
+            back_pointers
+        else unit)
+    in
+    let rec check_history level =
+      if level > last_attested_level then unit
+      else
+        let* cell =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_context_dal_commitments_history
+               ~block:(string_of_int level)
+               ()
+        in
+        let* () = check_cell cell ~check_level:(Some level) in
+        check_history (level + 1)
+    in
+    let* () = wait_for_dal_node in
+    let* () = check_history first_dal_level in
+    Check.(
+      (!at_least_one_attested_status = true)
+        bool
+        ~error_msg:"No cell with the 'attested' status has been visited") ;
+    unit
+
+  let test_commitments_history_rpcs protocol dal_parameters _cryptobox node
+      client dal_node =
+    scenario
+      ~slot_index:3
+      ~first_cell_level:0
+      ~first_dal_level:1
+      ~last_confirmed_published_level:3
+      ~initial_blocks_to_bake:0
+      protocol
+      dal_parameters
+      client
+      node
+      dal_node
+
+  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to =
+    let tags = ["rpc"; "skip_list"; Tag.ci_disabled] in
+    let description = "test commitments history with migration" in
+    let slot_index = 3 in
+    let scenario ~migrate_from ~migrate_to ~migration_level dal_parameters =
+      let lag = dal_parameters.Dal.Parameters.attestation_lag in
       Check.(
-        (cell_kind = expected_kind)
-          string
-          ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
-      (if cell_kind = "attested" then
-       let commitment = JSON.(content |-> "commitment" |> as_string) in
-       Check.(
-         (commitment = commitments.(cell_level - (first_level + 1)))
-           string
-           ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
-      let back_pointers =
-        JSON.(skip_list |-> "back_pointers" |> as_list)
-        |> List.map JSON.as_string
-      in
-      let expecting_no_back_pointers =
-        match check_level with
-        | Some level ->
-            level < lag || (level = lag && slot_index = number_of_slots - 1)
-        | None -> cell_index = 0
-      in
-      let no_back_pointers = back_pointers = [] in
-      Check.(
-        (no_back_pointers = expecting_no_back_pointers)
-          bool
+        (migration_level > lag)
+          int
           ~error_msg:
-            "Unexpected non-existence of back_pointers: got %L, expected %R") ;
-      if cell_level > first_level && cell_level <= last_confirmed_level then
-        Lwt_list.iter_s
-          (fun hash ->
-            let* cell =
-              Dal_RPC.(
-                call dal_node @@ get_plugin_commitments_history_hash ~hash ())
-            in
-            check_cell cell ~check_level:None)
-          back_pointers
-      else unit)
+            "The migration level (%L) should be greater than the attestation \
+             lag (%R)") ;
+      (* The first cell level has this value, if the previous protocol
+         doesn't have the DAL activated. *)
+      let first_cell_level =
+        if Protocol.number migrate_from <= 018 then migration_level - lag else 0
+      in
+      let first_dal_level =
+        if Protocol.number migrate_from > 018 then 1 else migration_level
+      in
+      (* We'll have 3 levels with a published and attested slot. *)
+      let last_confirmed_published_level = migration_level + 3 in
+      let initial_blocks_to_bake = migration_level - 1 in
+      scenario
+        ~slot_index
+        ~first_cell_level
+        ~first_dal_level
+        ~last_confirmed_published_level
+        ~initial_blocks_to_bake
+        migrate_to
+        dal_parameters
+    in
+    test_l1_migration_scenario
+      ~migrate_from
+      ~migrate_to
+      ~scenario:(fun ~migration_level dal_parameters ->
+        scenario ~migrate_from ~migrate_to ~migration_level dal_parameters)
+      ~tags
+      ~description
+      ~producer_profiles:[slot_index] (* use the same parameters as Alpha *)
+      ~consensus_committee_size:512
+      ~attestation_lag:8
+      ~number_of_slots:32
+      ~number_of_shards:512
+      ~slot_size:126944
+      ~redundancy_factor:8
+      ~page_size:3967
+      ()
+end
+
+(* This test sets up a migration and starts the DAL around the migration
+   block. It mainly tests that the DAL node uses the right protocol plugins at
+   migration.
+
+   The [offset] says when to start the DAL node wrt to the migration level. It
+   can be negative. *)
+let test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset =
+  Test.register
+    ~__FILE__
+    ~tags:
+      [
+        Tag.tezos2;
+        "dal";
+        Protocol.tag migrate_from;
+        Protocol.tag migrate_to;
+        "migration";
+        "plugin";
+        Tag.ci_disabled;
+      ]
+    ~uses:[Constant.octez_dal_node]
+    ~title:
+      (sf
+         "%s->%s: start the DAL node with offset of %d levels wrt to the \
+          migration level"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to)
+         offset)
+  @@ fun () ->
+  (* be sure to use the same parameters in both protocols *)
+  let consensus_committee_size = Some 512 in
+  let attestation_lag = Some 8 in
+  let number_of_slots = Some 32 in
+  let number_of_shards = Some 512 in
+  let slot_size = Some 126944 in
+  let redundancy_factor = Some 8 in
+  let page_size = Some 3967 in
+  let parameters =
+    make_int_parameter ["consensus_committee_size"] consensus_committee_size
+    @ make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ make_int_parameter ["dal_parametric"; "number_of_slots"] number_of_slots
+    @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
+    @ make_int_parameter
+        ["dal_parametric"; "redundancy_factor"]
+        redundancy_factor
+    @ make_int_parameter ["dal_parametric"; "slot_size"] slot_size
+    @ make_int_parameter ["dal_parametric"; "page_size"] page_size
   in
+  let* node, client, dal_parameters =
+    setup_node ~parameters ~protocol:migrate_from ()
+  in
+
+  (* The [+2] here is a bit arbitrary. We just want to avoid possible corner
+     cases due to a too small migration level, which will not occur in
+     practice. *)
+  let migration_level = dal_parameters.attestation_lag + 2 in
+
+  Log.info "Set user-activated-upgrade at level %d" migration_level ;
+  let* () = Node.terminate node in
+  let patch_config =
+    Node.Config_file.update_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  let nodes_args = Node.[Synchronisation_threshold 0; No_bootstrap_peers] in
+  let* () = Node.run ~patch_config node nodes_args in
+  let* () = Node.wait_for_ready node in
+
+  let* dal_node =
+    if offset >= 0 then (
+      (* [bake_for ~count] does not work across the migration block *)
+      let* () = bake_for ~count:(migration_level - 1) client in
+      let* () = if offset > 0 then bake_for ~count:offset client else unit in
+
+      Log.info "Start the DAL node" ;
+      let dal_node = Dal_node.create ~node () in
+      let* () = Dal_node.init_config dal_node in
+      let* () = Dal_node.run dal_node ~wait_ready:true in
+      return dal_node)
+    else
+      let* () = bake_for ~count:(migration_level - 1 + offset) client in
+
+      Log.info "Start the DAL node" ;
+      let dal_node = Dal_node.create ~node () in
+      let* () = Dal_node.init_config dal_node in
+      let* () = Dal_node.run dal_node ~wait_ready:true in
+
+      (* that is, till the migration level*)
+      let* () = bake_for ~count:(-offset) client in
+      return dal_node
+  in
+  let wait_for_dal_node =
+    wait_for_layer1_final_block dal_node (migration_level + 2)
+  in
+  let* () = bake_for ~count:4 client in
   let* () = wait_for_dal_node in
-  check_history 1
+  unit
 
 module Amplification = struct
   let step_counter = ref 0
@@ -6440,9 +6641,10 @@ let register ~protocols =
     test_attestation_through_p2p
     protocols ;
   scenario_with_layer1_and_dal_nodes
+    ~tags:["rpc"; "skip_list"]
     ~producer_profiles:[15]
     "commitments history RPCs"
-    test_commitments_history_rpcs
+    History_rpcs.test_commitments_history_rpcs
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"]
@@ -6565,4 +6767,27 @@ let register ~protocols =
   dal_crypto_benchmark ()
 
 let register_migration ~migrate_from ~migrate_to =
-  test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to
+  test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to ;
+  (* This test can be safely removed when Paris is activated (and the Oxford
+     protocol is removed from tezt tests). *)
+  History_rpcs.test_commitments_history_rpcs_with_migration
+    ~migration_level:10
+    ~migrate_from:Oxford
+    ~migrate_to:Paris ;
+  History_rpcs.test_commitments_history_rpcs_with_migration
+    ~migration_level:10
+    ~migrate_from
+    ~migrate_to ;
+  (* These tests can be safely removed when Paris is activated (and the Oxford
+     protocol is removed from tezt tests). *)
+  List.iter
+    (fun offset ->
+      test_start_dal_node_around_migration
+        ~migrate_from:Oxford
+        ~migrate_to:Paris
+        ~offset)
+    [-2; -1; 0; 1; 2] ;
+  List.iter
+    (fun offset ->
+      test_start_dal_node_around_migration ~migrate_from ~migrate_to ~offset)
+    [-2; -1; 0; 1; 2]
