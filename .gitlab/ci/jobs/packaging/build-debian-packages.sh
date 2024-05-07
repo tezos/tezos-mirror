@@ -25,4 +25,4 @@ scripts/packaging/build-deb-local.sh
 
 # Move the debian package to be packed as artifacts
 mkdir -p "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
-mv ../*.deb "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
+cp -a scripts/packaging/*.deb "$BUILDDIR/packages/$DISTRIBUTION/$RELEASE"
