@@ -123,6 +123,8 @@ end) : Services_backend_sig.Backend = struct
   end
 
   let smart_rollup_address = Base.smart_rollup_address
+
+  let mode = Services_backend_sig.Proxy
 end
 
 module Make (Base : sig

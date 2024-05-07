@@ -80,17 +80,19 @@ let main ({keep_alive; rollup_node_endpoint; _} as config : Configuration.t) =
     let smart_rollup_address = smart_rollup_address
   end) in
   let* () =
-    Tx_pool.start
-      {
-        rollup_node = (module Rollup_node_rpc);
-        smart_rollup_address;
-        mode = Proxy;
-        tx_timeout_limit = config.tx_pool_timeout_limit;
-        tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit =
-          Int64.to_int config.tx_pool_tx_per_addr_limit;
-        max_number_of_chunks = None;
-      }
+    if config.proxy.read_only then return_unit
+    else
+      Tx_pool.start
+        {
+          rollup_node = (module Rollup_node_rpc);
+          smart_rollup_address;
+          mode = Proxy;
+          tx_timeout_limit = config.tx_pool_timeout_limit;
+          tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit =
+            Int64.to_int config.tx_pool_tx_per_addr_limit;
+          max_number_of_chunks = None;
+        }
   in
   let () =
     Rollup_node_follower.start

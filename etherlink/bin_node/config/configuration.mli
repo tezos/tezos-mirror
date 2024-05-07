@@ -74,6 +74,8 @@ type observer = {
   preimages_endpoint : Uri.t option;
 }
 
+type proxy = {read_only : bool}
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
@@ -84,6 +86,7 @@ type t = {
   sequencer : sequencer option;
   threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
+  proxy : proxy;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
   tx_pool_timeout_limit : int64;
@@ -197,6 +200,7 @@ module Cli : sig
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
+    ?proxy_read_only:bool ->
     unit ->
     t
 
@@ -228,6 +232,7 @@ module Cli : sig
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
+    ?proxy_read_only:bool ->
     unit ->
     t tzresult Lwt.t
 end

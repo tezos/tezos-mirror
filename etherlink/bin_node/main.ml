@@ -428,6 +428,12 @@ let log_filter_chunk_size_arg =
     ~placeholder:"10"
     Params.int
 
+let read_only_arg =
+  Tezos_clic.switch
+    ~doc:"If the flag is set, the node refuses transactions"
+    ~long:"read-only"
+    ()
+
 let common_config_args =
   Tezos_clic.args15
     data_dir_arg
@@ -461,7 +467,7 @@ let assert_rollup_node_endpoint_equal ~arg ~param =
 let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
     ?cors_headers ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
     ?log_filter_chunk_size ?rollup_node_endpoint ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~verbose () =
+    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ~verbose ~read_only () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -480,6 +486,7 @@ let start_proxy ~data_dir ~devmode ~keep_alive ?rpc_addr ?rpc_port ?cors_origins
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
       ~verbose
+      ~proxy_read_only:read_only
       ()
   in
   let*! () =
@@ -502,7 +509,7 @@ let proxy_command =
     ~desc:
       "Start the EVM node in proxy mode. DEPRECATED, please uses the `run \
        proxy` command."
-    common_config_args
+    (merge_options common_config_args (args1 read_only_arg))
     (prefixes ["run"; "proxy"; "with"; "endpoint"]
     @@ param
          ~name:"rollup-node-endpoint"
@@ -511,21 +518,22 @@ let proxy_command =
             will communicate with."
          Params.rollup_node_endpoint
     @@ stop)
-    (fun ( data_dir,
-           rpc_addr,
-           rpc_port,
-           devmode,
-           cors_origins,
-           cors_headers,
-           log_filter_max_nb_blocks,
-           log_filter_max_nb_logs,
-           log_filter_chunk_size,
-           keep_alive,
-           rollup_node_endpoint_from_arg,
-           tx_pool_timeout_limit,
-           tx_pool_addr_limit,
-           tx_pool_tx_per_addr_limit,
-           verbose )
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint_from_arg,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose ),
+           read_only )
          rollup_node_endpoint
          () ->
       let*? () =
@@ -552,6 +560,7 @@ let proxy_command =
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit
         ~verbose
+        ~read_only
         ())
 
 let register_wallet ?password_filename ~wallet_dir () =
@@ -1571,23 +1580,24 @@ let proxy_simple_command =
   let open Tezos_clic in
   command
     ~desc:"Start the EVM node in proxy mode."
-    common_config_args
+    (merge_options common_config_args (args1 read_only_arg))
     (prefixes ["run"; "proxy"] @@ stop)
-    (fun ( data_dir,
-           rpc_addr,
-           rpc_port,
-           devmode,
-           cors_origins,
-           cors_headers,
-           log_filter_max_nb_blocks,
-           log_filter_max_nb_logs,
-           log_filter_chunk_size,
-           keep_alive,
-           rollup_node_endpoint,
-           tx_pool_timeout_limit,
-           tx_pool_addr_limit,
-           tx_pool_tx_per_addr_limit,
-           verbose )
+    (fun ( ( data_dir,
+             rpc_addr,
+             rpc_port,
+             devmode,
+             cors_origins,
+             cors_headers,
+             log_filter_max_nb_blocks,
+             log_filter_max_nb_logs,
+             log_filter_chunk_size,
+             keep_alive,
+             rollup_node_endpoint,
+             tx_pool_timeout_limit,
+             tx_pool_addr_limit,
+             tx_pool_tx_per_addr_limit,
+             verbose ),
+           read_only )
          () ->
       start_proxy
         ~data_dir
@@ -1605,6 +1615,7 @@ let proxy_simple_command =
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit
         ~verbose
+        ~read_only
         ())
 
 let sequencer_config_args =

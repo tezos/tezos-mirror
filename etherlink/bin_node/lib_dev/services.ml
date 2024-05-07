@@ -314,15 +314,25 @@ let dispatch_request (config : Configuration.t)
         in
         build_with_input ~f module_ parameters
     | Method (Send_raw_transaction.Method, module_) ->
-        let f tx_raw =
-          let* tx_hash = Tx_pool.add (Ethereum_types.hex_to_bytes tx_raw) in
-          match tx_hash with
-          | Ok tx_hash -> rpc_ok tx_hash
-          | Error reason ->
-              rpc_error (Rpc_errors.transaction_rejected reason None)
+        let read_only =
+          match Backend_rpc.mode with
+          | Proxy -> config.proxy.read_only
+          | Sequencer | Observer | Threshold_encryption_sequencer -> false
         in
-
-        build_with_input ~f module_ parameters
+        if read_only then
+          Lwt.return_error
+          @@ Rpc_errors.transaction_rejected
+               "the node is in read-only mode, it doesn't accept transactions"
+               None
+        else
+          let f tx_raw =
+            let* tx_hash = Tx_pool.add (Ethereum_types.hex_to_bytes tx_raw) in
+            match tx_hash with
+            | Ok tx_hash -> rpc_ok tx_hash
+            | Error reason ->
+                rpc_error (Rpc_errors.transaction_rejected reason None)
+          in
+          build_with_input ~f module_ parameters
     | Method (Eth_call.Method, module_) ->
         let f (call, block_param) =
           let* call_result = Backend_rpc.simulate_call call block_param in
