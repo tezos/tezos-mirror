@@ -87,6 +87,9 @@ Node
   an ``unlimited`` option to remove the threshold of RPC connections.
   (MR :gl:`!12324`)
 
+- Reduced the maximum allowed timestamp drift to 1 seconds. It is recommended to
+  use NTP to sync the clock of the node. (MR :gl:`!13198`)
+
 Client
 ------
 
