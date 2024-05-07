@@ -8260,9 +8260,6 @@ let _octez_dal_node =
          octez_crypto |> open_;
          octez_base_p2p_identity_file |> open_;
          octez_shell_services |> open_;
-         irmin_pack;
-         irmin_pack_unix;
-         irmin;
          prometheus_app;
          prometheus;
          octez_crawler |> open_;
