@@ -124,6 +124,14 @@ concurrently and selects the best one based on its fitness (see
    process. Thus, an ``octez-validator`` process can appear while
    monitoring the active processes of the machine.
 
+.. warning::
+
+   To ensure the best conditions to run a node, we recommend users to use `NTP
+   <https://en.wikipedia.org/wiki/Network_Time_Protocol>`__ to avoid clock
+   drift. Clock drift may result in not being able to get recent blocks in case
+   of negative lag time, and in not being able to inject new blocks in case of
+   positive lag time.
+
 Node Identity
 ~~~~~~~~~~~~~
 
