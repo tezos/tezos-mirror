@@ -52,6 +52,8 @@ sanity_ci:
   stage: sanity
   tags:
   - gcp
+  needs:
+  - trigger
   dependencies: []
   before_script:
   - ./scripts/ci/take_ownership.sh

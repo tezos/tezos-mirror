@@ -433,6 +433,7 @@ let jobs pipeline_type =
         ~name:"sanity_ci"
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.sanity
+        ~dependencies:dependencies_needs_start
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
         [
           "make -C manifest check";
