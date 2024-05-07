@@ -199,7 +199,6 @@ mod test {
         let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
             Default::default(),
-            U256::zero(),
             VecDeque::new(),
             // estimated ticks in run (ignored)
             0,
