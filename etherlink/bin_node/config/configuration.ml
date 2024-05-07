@@ -21,6 +21,10 @@ type blueprints_publisher_config = {
   catchup_cooldown : int;
 }
 
+type sqlite_journal_mode = Delete | Wal
+
+type experimental_features = {sqlite_journal_mode : sqlite_journal_mode}
+
 type sequencer = {
   preimages : string;
   preimages_endpoint : Uri.t option;
@@ -58,6 +62,7 @@ type t = {
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
   verbose : Internal_event.level;
+  experimental_features : experimental_features;
 }
 
 let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
@@ -66,6 +71,11 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
     max_nb_logs = Option.value ~default:1000 max_nb_logs;
     chunk_size = Option.value ~default:10 chunk_size;
   }
+
+let default_sqlite_journal_mode = Wal
+
+let default_experimental_features =
+  {sqlite_journal_mode = default_sqlite_journal_mode}
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
 
@@ -343,6 +353,17 @@ let observer_encoding data_dir =
           "threshold_encryption_bundler_endpoint"
           Tezos_rpc.Encoding.uri_encoding))
 
+let sqlite_journal_mode_encoding =
+  let open Data_encoding in
+  string_enum [("delete", Delete); ("wal", Wal)]
+
+let experimental_features_encoding =
+  let open Data_encoding in
+  conv
+    (fun {sqlite_journal_mode} -> sqlite_journal_mode)
+    (fun sqlite_journal_mode -> {sqlite_journal_mode})
+    (obj1 (dft "sqlite_journal_mode" sqlite_journal_mode_encoding Delete))
+
 let encoding data_dir : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -363,6 +384,7 @@ let encoding data_dir : t Data_encoding.t =
            keep_alive;
            rollup_node_endpoint;
            verbose;
+           experimental_features;
          } ->
       ( ( rpc_addr,
           rpc_port,
@@ -379,7 +401,8 @@ let encoding data_dir : t Data_encoding.t =
           tx_pool_tx_per_addr_limit,
           keep_alive,
           Uri.to_string rollup_node_endpoint,
-          verbose ) ))
+          verbose,
+          experimental_features ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              devmode,
@@ -395,7 +418,8 @@ let encoding data_dir : t Data_encoding.t =
              tx_pool_tx_per_addr_limit,
              keep_alive,
              rollup_node_endpoint,
-             verbose ) ) ->
+             verbose,
+             experimental_features ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -413,6 +437,7 @@ let encoding data_dir : t Data_encoding.t =
         keep_alive;
         rollup_node_endpoint = Uri.of_string rollup_node_endpoint;
         verbose;
+        experimental_features;
       })
     (merge_objs
        (obj10
@@ -435,7 +460,7 @@ let encoding data_dir : t Data_encoding.t =
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
              default_max_active_connections))
-       (obj6
+       (obj7
           (dft
              "tx-pool-timeout-limit"
              ~description:
@@ -457,7 +482,11 @@ let encoding data_dir : t Data_encoding.t =
              default_tx_pool_tx_per_addr_limit)
           (dft "keep_alive" bool default_keep_alive)
           (req "rollup_node_endpoint" string)
-          (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)))
+          (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
+          (dft
+             "experimental_features"
+             experimental_features_encoding
+             default_experimental_features)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -580,6 +609,7 @@ module Cli = struct
       keep_alive;
       rollup_node_endpoint;
       verbose = (if verbose then Debug else Internal_event.Notice);
+      experimental_features = default_experimental_features;
     }
 
   let patch_configuration_from_args ~data_dir ~devmode ?rpc_addr ?rpc_port
@@ -814,6 +844,7 @@ module Cli = struct
           ~default:configuration.rollup_node_endpoint
           rollup_node_endpoint;
       verbose = (if verbose then Debug else configuration.verbose);
+      experimental_features = configuration.experimental_features;
     }
 
   let create_or_read_config ~data_dir ~devmode ?rpc_addr ?rpc_port ?cors_origins

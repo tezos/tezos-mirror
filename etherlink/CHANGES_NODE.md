@@ -14,6 +14,10 @@
   (https://ethereum.org/en/developers/docs/apis/json-rpc/#default-block). (!13110)
 - Support the RPC `eth_maxPriorityFeePerGas`, which always returns 0 wei. (!13161)
 
+### Experimental
+
+- Support for write-ahead log journal mode for the EVM node’s store. (!13192)
+
 ### Bug fixes
 
 ### Breaking changes
