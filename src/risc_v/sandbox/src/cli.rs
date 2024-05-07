@@ -69,6 +69,13 @@ pub struct BenchOptions {
     #[arg(long)]
     pub mode: BenchMode,
 
+    #[arg(
+        help = "How often to repeat the benchmark run",
+        long = "iter",
+        default_value_t = 1
+    )]
+    pub repeat: usize,
+
     #[command(flatten)]
     pub common: CommonOptions,
 }

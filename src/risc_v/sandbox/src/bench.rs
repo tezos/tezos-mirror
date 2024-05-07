@@ -53,7 +53,7 @@ fn compose(
     }
 }
 
-fn bench_fine(interpreter: &mut Interpreter, opts: BenchOptions) -> BenchData {
+fn bench_fine(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData {
     let mut run_res = InterpreterResult::Running(0);
     let mut bench_data = FineBenchData::new();
     let bench_start = quanta::Instant::now();
@@ -84,7 +84,7 @@ fn bench_fine(interpreter: &mut Interpreter, opts: BenchOptions) -> BenchData {
 
 /// A single run of the given `interpreter`.
 /// Provides basic benchmark data and interpreter result.
-fn bench_simple(interpreter: &mut Interpreter, opts: BenchOptions) -> BenchData {
+fn bench_simple(interpreter: &mut Interpreter, opts: &BenchOptions) -> BenchData {
     let start = quanta::Instant::now();
     let res = interpreter.run(opts.common.max_steps);
     let duration = start.elapsed();
@@ -100,7 +100,7 @@ fn bench_simple(interpreter: &mut Interpreter, opts: BenchOptions) -> BenchData 
     BenchData::from_simple(data, res)
 }
 
-pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
+fn bench_iteration(opts: &BenchOptions) -> Result<BenchData, Box<dyn Error>> {
     let contents = std::fs::read(&opts.common.input)?;
     let mut backend = Interpreter::create_backend();
     let mut interpreter = Interpreter::new(
@@ -114,7 +114,21 @@ pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
         BenchMode::Simple => bench_simple(&mut interpreter, opts),
         BenchMode::Fine => bench_fine(&mut interpreter, opts),
     };
-    let stats = BenchStats::from_data(data)?;
+
+    Ok(data)
+}
+
+pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
+    let stats = match opts.repeat {
+        0 | 1 => BenchStats::from_data(bench_iteration(&opts)?)?,
+        iterations => {
+            let mut data_list = vec![];
+            for _ in 0..iterations {
+                data_list.push(bench_iteration(&opts)?)
+            }
+            BenchStats::from_data_list(data_list)?
+        }
+    };
 
     println!("{stats}");
     Ok(())
