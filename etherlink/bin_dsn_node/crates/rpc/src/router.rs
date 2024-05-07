@@ -12,9 +12,11 @@ use std::sync::Arc;
 
 use http_body_util::combinators::BoxBody;
 use hyper::body::{Bytes, Incoming};
-use hyper::{Method, Request, StatusCode};
+use hyper::{Method, Request};
+use tracing::debug;
 
 use crate::errors::RpcError;
+use crate::responses::not_found;
 
 pub type ResponseBody = BoxBody<Bytes, Infallible>;
 
@@ -86,6 +88,11 @@ impl<S: Clone> Router<S> {
         s: Arc<S>,
         req: Request<Incoming>,
     ) -> Result<Response, RpcError> {
+        debug!(
+            "Received Request {:?} {:?} - Resolving route",
+            req.method(),
+            req.uri().path().to_string()
+        );
         if let Some(handler) = self
             .routes
             .get(&(req.method().clone(), req.uri().path().to_string()))
@@ -93,9 +100,8 @@ impl<S: Clone> Router<S> {
             let state = (*s).clone();
             return handler(state, req).await;
         }
-        Ok(hyper::Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(BoxBody::default())?)
+        debug!("Route not found");
+        not_found()
     }
 
     /// Returns a new [RouterBuilder].
