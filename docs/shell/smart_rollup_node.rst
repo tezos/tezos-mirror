@@ -1670,7 +1670,7 @@ required, and output some information about the run.
     Full execution with padding: 22000000000 ticks
 
 Each cycle is a call of the ``kernel_run`` function.
-For each cycle, the number of _effective_ ticks used is shown (ticks corresponding
+For each cycle, the number of *effective* ticks used is shown (ticks corresponding
 to execution, and not used for padding), along with the duration in seconds.
 
 It is also possible to show the outbox for any given level (``show
