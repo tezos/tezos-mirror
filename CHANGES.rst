@@ -40,6 +40,9 @@ Node
   that returns the consumed output's indexes for the given outbox
   level. (MR :gl:`!12776`)
 
+- Reduced the maximum allowed timestamp drift to 1 seconds. It is recommended to
+  use NTP to sync the clock of the node. (MR :gl:`!13198`)
+
 Client
 ------
 
