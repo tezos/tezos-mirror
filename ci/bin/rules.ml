@@ -48,3 +48,5 @@ let triggered_by_marge_bot =
 
 let has_mr_label label =
   Predefined_vars.ci_merge_request_labels =~ "/(?:^|,)" ^ label ^ "(?:$|,)/"
+
+let never = var "foo" == str "bar" && var "foo" != str "bar"

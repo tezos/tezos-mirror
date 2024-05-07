@@ -70,8 +70,7 @@ let variables : variables =
    For more info, see: https://gitlab.com/gitlab-org/gitlab/-/issues/341693 *)
 let job_dummy : job =
   Util.job
-    ~rules:
-      [job_rule ~if_:If.(var "foo" == str "bar" && var "foo" != str "bar") ()]
+    ~rules:[job_rule ~if_:Rules.never ()]
     ~name:"dummy_job"
     ~script:[{|echo "This job will never execute"|}]
     ()
