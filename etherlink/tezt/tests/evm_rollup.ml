@@ -5587,6 +5587,18 @@ let test_rpc_maxPriorityFeePerGas =
     ~error_msg:"Expected %R, but got %L" ;
   unit
 
+let test_proxy_read_only =
+  register_proxy
+    ~title:"Proxy refuses transactions if read-only flag is set"
+    ~tags:["evm"; "proxy"; "read_only"]
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
+  let* () = Evm_node.terminate evm_node in
+  let* () = Evm_node.run ~extra_arguments:["--read-only"] evm_node in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx:"0xabac" evm_node in
+  Check.(err.message =~ rex "the node is in read-only mode")
+    ~error_msg:"Unexpected error message" ;
+  unit
+
 let register_evm_node ~protocols =
   test_originate_evm_kernel protocols ;
   test_kernel_root_hash_originate_absent protocols ;
@@ -5688,7 +5700,8 @@ let register_evm_node ~protocols =
   test_tx_pool_address_boundaries protocols ;
   test_tx_pool_transaction_size_exceeded protocols ;
   test_whitelist_is_executed protocols ;
-  test_rpc_maxPriorityFeePerGas protocols
+  test_rpc_maxPriorityFeePerGas protocols ;
+  test_proxy_read_only protocols
 
 let protocols = Protocol.all
 
