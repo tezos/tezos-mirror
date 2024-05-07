@@ -231,6 +231,10 @@ let encode_address (Address address) = encode_hex address
 
 let decode_number bytes = Bytes.to_string bytes |> Z.of_bits |> quantity_of_z
 
+let decode_number_be bytes =
+  Bytes.fold_left (fun acc c -> (acc lsl 8) + Char.code c) 0 bytes
+  |> Z.of_int |> quantity_of_z
+
 let encode_number (Qty v) = Z.to_bits v |> Bytes.of_string
 
 let decode_hash bytes = Hash (decode_hex bytes)
@@ -550,10 +554,9 @@ let transaction_object_from_rlp_item block_hash rlp_item =
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
       let index = decode_optional_number index in
       let value = decode_number value in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
-          v is currently incorrectly encoded as big-endian by the kernel,
-          causing the decoded value to be incorrect *)
-      let v = decode_number v in
+      (* The signature is taken from the raw transaction, that is encoded in big
+         endian. *)
+      let v = decode_number_be v in
       let r = decode_hash r in
       let s = decode_hash s in
       {
