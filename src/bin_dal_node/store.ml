@@ -252,7 +252,7 @@ type t = {
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4641
 
    handle with_proof flag -> store proofs on disk? *)
-let save_shard_proofs node_store commitment shard_proofs =
+let cache_shard_proofs node_store commitment shard_proofs =
   Shard_proofs_cache.replace
     node_store.in_memory_shard_proofs
     commitment

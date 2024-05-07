@@ -117,10 +117,10 @@ type t = private {
       (* The length of the array is the number of shards per slot *)
 }
 
-(** [save_shard_proofs store commitment shard_proofs] replaces in
-      the shard proof cache all the shard proofs for the given
-      commitment with the given ones. *)
-val save_shard_proofs : t -> commitment -> shard_proof array -> unit
+(** [cache_shard_proofs store commitment shard_proofs] replaces in the
+    shard proof cache all the shard proofs for the given commitment
+    with the given ones. *)
+val cache_shard_proofs : t -> commitment -> shard_proof array -> unit
 
 val init : Configuration_file.t -> t tzresult Lwt.t
 

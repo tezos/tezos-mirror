@@ -259,7 +259,7 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     let shard_proofs =
       Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
     in
-    Store.save_shard_proofs node_store commitment shard_proofs |> return
+    Store.cache_shard_proofs node_store commitment shard_proofs |> return
   else return_unit
 
 let get_opt array i =
