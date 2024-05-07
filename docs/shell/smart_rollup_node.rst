@@ -1481,9 +1481,9 @@ with the following schema:
 
   [
     [ { "payload" : <Michelson data>,
-        "sender" : <Contract hash of the originated contract for the rollup, optional>,
+        "sender" : <Smart contract sending to the rollup, optional>,
         "source" : <User account sending the message, optional>
-        "destination" : <Smart rollup address> }
+        "destination" : <Smart rollup address, optional> }
       ..
       // or
       { "external" : <hexadecimal payload> }
