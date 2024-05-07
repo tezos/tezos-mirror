@@ -62,19 +62,6 @@ let variables : variables =
     ("RUNTEZTALIAS", "false");
   ]
 
-(* Dummy job.
-
-   This fixes the "configuration must contain at least one
-   visible job" error in GitLab when using includes.
-
-   For more info, see: https://gitlab.com/gitlab-org/gitlab/-/issues/341693 *)
-let job_dummy : job =
-  Util.job
-    ~rules:[job_rule ~if_:Rules.never ()]
-    ~name:"dummy_job"
-    ~script:[{|echo "This job will never execute"|}]
-    ()
-
 (* Register pipelines types. Pipelines types are used to generate
    workflow rules and includes of the files where the jobs of the
    pipeline is defined. *)
@@ -147,22 +134,14 @@ let () =
     schedule_extended_tests
     ~jobs:(Code_verification.jobs Schedule_extended_test)
 
-let config () =
-  (* Split pipelines types into workflow and includes *)
-  let workflow, includes = Pipeline.workflow_includes () in
-  Pipeline.write () ;
-  [
-    Workflow workflow;
-    Default default;
-    Variables variables;
-    Stages (Stage.to_string_list ());
-    Job job_dummy;
-    Include includes;
-  ]
-
 let () =
   (* If argument --verbose is set, then log generation info.
      If argument --inline-source, then print generation info in yml files. *)
   let filename = ".gitlab-ci.yml" in
-  Tezos_ci.to_file ~filename (config ()) ;
+  Pipeline.write
+    ~default
+    ~variables
+    ~stages:(Stage.to_string_list ())
+    ~filename
+    () ;
   Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files ()

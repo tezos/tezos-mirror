@@ -91,9 +91,7 @@ module Pipeline : sig
       [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
 
       The [jobs] of the pipeline are generated to the file
-      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. To
-      construct a configuration using registered pipelines, see
-      {!workflow_includes}. *)
+      [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. *)
   val register :
     ?variables:Gitlab_ci.Types.variables ->
     jobs:tezos_job list ->
@@ -101,18 +99,31 @@ module Pipeline : sig
     Gitlab_ci.If.t ->
     unit
 
-  (** Splits the set of registered pipelines into workflow rules and includes.
-
-      The result of this function is used in the top-level
-      [.gitlab-ci.yml] to filter pipelines (using [workflow:] rules)
-      and to include the select pipeline (using [include:]). *)
-  val workflow_includes :
-    unit -> Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list
-
   (** Writes the set of registered pipelines.
 
+      A top-level configuration is generated to [filename]. It
+      contains a [workflow:] section that enables pipeline execution
+      for each registered pipeline and an [include:] section that
+      includes set of jobs for the given pipeline. If specified,
+      [default:], [variables:], and [stages:] sections are also
+      written to the top-level configuration.
+
+      A [dummy_job] is written to the top-level configuration. This
+      job is never enabled, but it works around a GitLab CI issue that
+      occurs when the top-level configuration contains no visible
+      jobs.
+
+      Then, each registered pipeline is written to
+      [.gitlab/ci/pipelines/NAME.yml].
+
       The string {!header} will be prepended to each written file. *)
-  val write : unit -> unit
+  val write :
+    ?default:Gitlab_ci.Types.default ->
+    ?variables:Gitlab_ci.Types.variables ->
+    stages:string list ->
+    filename:string ->
+    unit ->
+    unit
 end
 
 (** A facility for registering images for [image:] keywords. *)

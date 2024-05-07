@@ -116,7 +116,7 @@ module Pipeline = struct
 
   let pipelines : t list ref = ref []
 
-  let filename : name:string -> string =
+  let path : name:string -> string =
    fun ~name -> sf ".gitlab/ci/pipelines/%s.yml" name
 
   let register ?variables ~jobs name if_ =
@@ -242,27 +242,8 @@ module Pipeline = struct
 
     ()
 
-  let write () =
-    Fun.flip List.iter (all ()) @@ fun ({name; jobs; _} as pipeline) ->
-    if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
-      precheck pipeline ;
-    if jobs = [] then
-      failwith "[Pipeline.write] pipeline '%s' contains no jobs!" name ;
-    let filename = filename ~name in
-    List.iter
-      (fun tezos_job ->
-        let source_file, source_line, _, _ = tezos_job.source_position in
-        Cli.verbose
-          "%s:%d: generates '%s' for pipeline '%s' in %s"
-          source_file
-          source_line
-          tezos_job.job.name
-          name
-          filename)
-      jobs ;
-    let config = List.concat_map tezos_job_to_config_elements jobs in
-    to_file ~filename config
-
+  (* Splits the set of registered non-child pipelines into workflow
+     rules and includes. Used by the function [write]. *)
   let workflow_includes () :
       Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list =
     let workflow_rule_of_pipeline = function
@@ -280,7 +261,7 @@ module Pipeline = struct
              set in the include rule, they are set in the workflow
              rule *)
           let rule = include_rule ~if_ ~when_:Always () in
-          Gitlab_ci.Types.{local = filename ~name; rules = [rule]}
+          Gitlab_ci.Types.{local = path ~name; rules = [rule]}
     in
     let pipelines = all () in
     let workflow =
@@ -289,6 +270,55 @@ module Pipeline = struct
     in
     let includes = List.map include_of_pipeline pipelines in
     (workflow, includes)
+
+  let write ?default ?variables ~stages ~filename () =
+    (* Write all registered the pipelines *)
+    ( Fun.flip List.iter (all ()) @@ fun ({name; jobs; _} as pipeline) ->
+      if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
+        precheck pipeline ;
+      if jobs = [] then
+        failwith "[Pipeline.write] pipeline '%s' contains no jobs!" name ;
+      let filename = path ~name in
+      List.iter
+        (fun tezos_job ->
+          let source_file, source_line, _, _ = tezos_job.source_position in
+          Cli.verbose
+            "%s:%d: generates '%s' for pipeline '%s' in %s"
+            source_file
+            source_line
+            tezos_job.job.name
+            name
+            filename)
+        jobs ;
+      let config = List.concat_map tezos_job_to_config_elements jobs in
+      to_file ~filename config ) ;
+    (* Write top-level configuration. *)
+    let workflow, includes = workflow_includes () in
+    let config =
+      let open Gitlab_ci.Types in
+      (* Dummy job.
+
+         This fixes the "configuration must contain at least one
+         visible job" error in GitLab when using includes.
+
+         For more info, see: https://gitlab.com/gitlab-org/gitlab/-/issues/341693 *)
+      let job_dummy : job =
+        Gitlab_ci.Util.job
+          ~rules:[job_rule ~if_:Rules.never ()]
+          ~name:"dummy_job"
+          ~script:[{|echo "This job will never execute"|}]
+          ()
+      in
+      [Workflow workflow]
+      @ Option.fold ~none:[] ~some:(fun default -> [Default default]) default
+      @ Option.fold
+          ~none:[]
+          ~some:(fun variables -> [Variables variables])
+          variables
+      @ [Stages stages; Job job_dummy; Include includes]
+    in
+    to_file ~filename config ;
+    ()
 end
 
 module Image = struct
