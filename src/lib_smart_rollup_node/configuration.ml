@@ -228,9 +228,7 @@ let default_loop_retry_delay = 10. (* seconds *)
 let default_gc_parameters =
   {frequency_in_blocks = 1000l; context_splitting_period = None}
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/6576
-   Set to Full after initial evaluation on testnets. *)
-let default_history_mode = Archive
+let default_history_mode = Full
 
 let string_of_history_mode = function Archive -> "archive" | Full -> "full"
 
