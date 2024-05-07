@@ -57,7 +57,7 @@ let test_forge_block () : unit =
   Log.info "Test activate proto demo time shifted ok" ;
   let parameter_file = Temp.file (protocol_hash ^ "-parameters.json") in
   Base.write_file parameter_file ~contents:"{}" ;
-  let delta = Ptime.Span.of_int_s (-5) in
+  let delta = Ptime.Span.of_int_s (-1) in
   let* () =
     Client.activate_protocol_and_wait
       ~parameter_file
