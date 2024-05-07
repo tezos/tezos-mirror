@@ -48,6 +48,8 @@ type t = {
   timestamp : int32;
   transactions : transactions;
   uncles : string list;
+  baseFeePerGas : int64;
+  mixHash : string;
 }
 
 let parse_transactions json =
@@ -73,6 +75,11 @@ let of_json json =
     let res = json |-> field in
     if JSON.is_null res then json |-> alternative else res
   in
+
+  let ( ||-> ) json (field, default, decoder) =
+    let res = json |-> field in
+    if JSON.is_null res then default else res |> decoder
+  in
   {
     number = json |-> "number" |> as_int32;
     hash = json |-> "hash" |> as_string;
@@ -94,4 +101,10 @@ let of_json json =
     timestamp = json |-> "timestamp" |> as_int32;
     transactions = json |-> "transactions" |> parse_transactions;
     uncles = json |-> "uncles" |> as_list |> List.map as_string;
+    baseFeePerGas = json ||-> ("baseFeePerGas", 1000000000L, as_int64);
+    mixHash =
+      json
+      ||-> ( "mixHash",
+             "0x0000000000000000000000000000000000000000000000000000000000000000",
+             as_string );
   }

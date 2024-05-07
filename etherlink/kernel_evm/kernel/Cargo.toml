@@ -26,6 +26,8 @@ softfloat.workspace = true
 rlp.workspace = true
 hex.workspace = true
 
+bytes.worspace = true
+
 sha3.workspace = true
 libsecp256k1.workspace = true
 tezos_crypto_rs.workspace = true

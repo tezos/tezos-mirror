@@ -609,6 +609,12 @@ fn parse_inbox<Host: Runtime>(host: &mut Host) -> Result<Message, Error> {
 
 impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String> {
     const VERSION: u8 = SIMULATION_ENCODING_VERSION;
+    fn unversionned_encode(&self) -> bytes::BytesMut {
+        self.rlp_bytes()
+    }
+    fn unversionned_decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        Self::decode(decoder)
+    }
 }
 
 pub fn start_simulation_mode<Host: Runtime>(

@@ -372,8 +372,10 @@ pub fn decode_public_key(decoder: &Rlp<'_>) -> Result<PublicKey, DecoderError> {
     Ok(pk)
 }
 
-pub trait VersionedEncoding: Encodable + Decodable {
+pub trait VersionedEncoding: std::marker::Sized {
     const VERSION: u8;
+    fn unversionned_encode(&self) -> bytes::BytesMut;
+    fn unversionned_decode(decoder: &Rlp) -> Result<Self, DecoderError>;
 
     /// from_bytes is never used outside of tests. If needed, it needs to be
     /// implemented explicitly outside of the trait.
@@ -382,14 +384,14 @@ pub trait VersionedEncoding: Encodable + Decodable {
         let tag = vec[0];
         if tag == Self::VERSION {
             let decoder = Rlp::new(&vec[1..]);
-            Self::decode(&decoder)
+            Self::unversionned_decode(&decoder)
         } else {
             Err(DecoderError::Custom("Decoding on unknown version"))
         }
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes: Vec<u8> = self.rlp_bytes().into();
+        let mut bytes: Vec<u8> = self.unversionned_encode().into();
         bytes.insert(0, Self::VERSION);
         bytes
     }

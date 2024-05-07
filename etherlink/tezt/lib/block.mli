@@ -52,6 +52,8 @@ type t = {
   timestamp : int32;
   transactions : transactions;
   uncles : string list;
+  baseFeePerGas : int64;
+  mixHash : string;
 }
 
 (** Extracts a block {!t} from a JSON. *)

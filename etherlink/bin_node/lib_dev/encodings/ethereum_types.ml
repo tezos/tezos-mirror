@@ -665,6 +665,10 @@ type block = {
   timestamp : quantity;
   transactions : block_transactions;
   uncles : hash list;
+  (* baseFeePerGas and mixHash are set optionnal because old blocks didn't have
+     them*)
+  baseFeePerGas : quantity option;
+  mixHash : block_hash option;
 }
 
 let decode_list decoder list =
@@ -679,7 +683,7 @@ let decode_option ~default decoder bytes =
   (if bytes = Bytes.empty then None else Some (decoder bytes))
   |> Option.value ~default
 
-let block_from_rlp bytes =
+let block_from_rlp_v0 bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
@@ -767,8 +771,114 @@ let block_from_rlp bytes =
         transactions;
         (* Post merge: always empty. *)
         uncles = [];
+        baseFeePerGas = None;
+        mixHash = None;
       }
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
+
+let block_from_rlp_v1 bytes =
+  match Rlp.decode bytes with
+  | Ok
+      (Rlp.List
+        [
+          Value number;
+          Value hash;
+          Value parent_hash;
+          Value logsBloom;
+          Value transactionRoot;
+          Value stateRoot;
+          Value receiptRoot;
+          Value miner;
+          Value extraData;
+          Value gasLimit;
+          List transactions;
+          Value gasUsed;
+          Value timestamp;
+          Value baseFeePerGas;
+          Value mixHash;
+        ]) ->
+      let (Qty number) = decode_number number in
+      let hash = decode_block_hash hash in
+      let parent = decode_block_hash parent_hash in
+      let logsBloom =
+        decode_option ~default:(Hex (String.make 512 'a')) decode_hex logsBloom
+      in
+      (* Post merge: this field is now used for the "fee recipient". We don't
+         have that, potentially this could be the sequencer. *)
+      let miner =
+        decode_option
+          ~default:(Hex "0000000000000000000000000000000000000000")
+          decode_hex
+          miner
+      in
+      let transactionRoot =
+        decode_option
+          ~default:(Hash (Hex (String.make 64 'a')))
+          decode_hash
+          transactionRoot
+      in
+      let stateRoot =
+        decode_option
+          ~default:(Hash (Hex (String.make 64 'a')))
+          decode_hash
+          stateRoot
+      in
+      let receiptRoot =
+        decode_option
+          ~default:(Hash (Hex (String.make 64 'a')))
+          decode_hash
+          receiptRoot
+      in
+      let extraData = decode_option ~default:(Hex "") decode_hex extraData in
+      let gasLimit =
+        decode_option ~default:(Qty Z.zero) decode_number gasLimit
+      in
+      let transactions = TxHash (decode_list decode_hash transactions) in
+      let gasUsed = decode_number gasUsed in
+      let timestamp = decode_number timestamp in
+      let baseFeePerGas = Some (decode_number baseFeePerGas) in
+      let mixHash = Some (decode_block_hash mixHash) in
+      {
+        number = Qty number;
+        hash;
+        parent;
+        (* Post merge: always 0. *)
+        nonce = Hex "0000000000000000";
+        (* Post merge: uncles are always empty, therefore this is the "empty"
+           hash of these uncles. *)
+        sha3Uncles =
+          Hash
+            (Hex
+               "1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
+        logsBloom;
+        transactionRoot;
+        stateRoot;
+        receiptRoot;
+        miner;
+        (* Post merge: always zero. *)
+        difficulty = Qty Z.zero;
+        (* Post merge: sum of difficulty will always be zero because difficulty
+           has and will always be zero. *)
+        totalDifficulty = Qty Z.zero;
+        extraData;
+        size = Qty (Z.of_int (Bytes.length bytes));
+        gasLimit;
+        gasUsed;
+        timestamp;
+        transactions;
+        (* Post merge: always empty. *)
+        uncles = [];
+        baseFeePerGas;
+        mixHash;
+      }
+  | _ -> raise (Invalid_argument "Expected a List of 15 elements")
+
+let block_from_rlp bytes =
+  let first_byte = Bytes.get bytes 0 in
+  if first_byte = Char.chr 1 then
+    let length = Bytes.length bytes in
+    block_from_rlp_v1 (Bytes.sub bytes 1 (length - 1))
+  else block_from_rlp_v0 bytes
 
 let block_encoding =
   let open Data_encoding in
@@ -793,45 +903,51 @@ let block_encoding =
            timestamp;
            transactions;
            uncles;
+           baseFeePerGas;
+           mixHash;
          } ->
-      ( ( number,
-          hash,
-          parent,
-          nonce,
-          sha3Uncles,
-          logsBloom,
-          transactionRoot,
-          stateRoot,
-          receiptRoot,
-          miner ),
-        ( difficulty,
-          totalDifficulty,
-          extraData,
-          size,
-          gasLimit,
-          gasUsed,
-          timestamp,
-          transactions,
-          uncles ) ))
-    (fun ( ( number,
-             hash,
-             parent,
-             nonce,
-             sha3Uncles,
-             logsBloom,
-             transactionRoot,
-             stateRoot,
-             receiptRoot,
-             miner ),
-           ( difficulty,
-             totalDifficulty,
-             extraData,
-             size,
-             gasLimit,
-             gasUsed,
-             timestamp,
-             transactions,
-             uncles ) ) ->
+      ( ( ( number,
+            hash,
+            parent,
+            nonce,
+            sha3Uncles,
+            logsBloom,
+            transactionRoot,
+            stateRoot,
+            receiptRoot,
+            miner ),
+          ( difficulty,
+            totalDifficulty,
+            extraData,
+            size,
+            gasLimit,
+            gasUsed,
+            timestamp,
+            transactions,
+            uncles,
+            baseFeePerGas ) ),
+        mixHash ))
+    (fun ( ( ( number,
+               hash,
+               parent,
+               nonce,
+               sha3Uncles,
+               logsBloom,
+               transactionRoot,
+               stateRoot,
+               receiptRoot,
+               miner ),
+             ( difficulty,
+               totalDifficulty,
+               extraData,
+               size,
+               gasLimit,
+               gasUsed,
+               timestamp,
+               transactions,
+               uncles,
+               baseFeePerGas ) ),
+           mixHash ) ->
       {
         number;
         hash;
@@ -849,32 +965,37 @@ let block_encoding =
         size;
         gasLimit;
         gasUsed;
+        baseFeePerGas;
         timestamp;
         transactions;
         uncles;
+        mixHash;
       })
     (merge_objs
-       (obj10
-          (req "number" quantity_encoding)
-          (req "hash" block_hash_encoding)
-          (req "parentHash" block_hash_encoding)
-          (req "nonce" hex_encoding)
-          (req "sha3Uncles" hash_encoding)
-          (req "logsBloom" hex_encoding)
-          (req "transactionsRoot" hash_encoding)
-          (req "stateRoot" hash_encoding)
-          (req "receiptsRoot" hash_encoding)
-          (req "miner" hex_encoding))
-       (obj9
-          (req "difficulty" quantity_encoding)
-          (req "totalDifficulty" quantity_encoding)
-          (req "extraData" hex_encoding)
-          (req "size" quantity_encoding)
-          (req "gasLimit" quantity_encoding)
-          (req "gasUsed" quantity_encoding)
-          (req "timestamp" quantity_encoding)
-          (req "transactions" block_transactions_encoding)
-          (req "uncles" (list hash_encoding))))
+       (merge_objs
+          (obj10
+             (req "number" quantity_encoding)
+             (req "hash" block_hash_encoding)
+             (req "parentHash" block_hash_encoding)
+             (req "nonce" hex_encoding)
+             (req "sha3Uncles" hash_encoding)
+             (req "logsBloom" hex_encoding)
+             (req "transactionsRoot" hash_encoding)
+             (req "stateRoot" hash_encoding)
+             (req "receiptsRoot" hash_encoding)
+             (req "miner" hex_encoding))
+          (obj10
+             (req "difficulty" quantity_encoding)
+             (req "totalDifficulty" quantity_encoding)
+             (req "extraData" hex_encoding)
+             (req "size" quantity_encoding)
+             (req "gasLimit" quantity_encoding)
+             (req "gasUsed" quantity_encoding)
+             (req "timestamp" quantity_encoding)
+             (req "transactions" block_transactions_encoding)
+             (req "uncles" (list hash_encoding))
+             (opt "baseFeePerGas" quantity_encoding)))
+       (obj1 (opt "mixHash" block_hash_encoding)))
 
 type transaction = {
   from : address;

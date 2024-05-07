@@ -256,8 +256,9 @@ pub fn read_optional_rlp<T: Decodable>(
 pub fn read_current_block<Host: Runtime>(host: &mut Host) -> Result<L2Block, Error> {
     let hash = read_current_block_hash(host)?;
     let block_path = block_path(hash)?;
-    let block = read_rlp(host, &block_path)?;
-    Ok(block)
+    let bytes = &host.store_read_all(&block_path)?;
+    let block_from_bytes = L2Block::from_bytes(bytes)?;
+    Ok(block_from_bytes)
 }
 
 fn store_current_block_number_and_hash<Host: Runtime>(
@@ -282,7 +283,9 @@ fn store_block<Host: Runtime>(
 ) -> Result<(), Error> {
     let mut index = init_blocks_index()?;
     index_block(host, &block.hash, &mut index)?;
-    store_rlp(block, host, block_path)
+    let bytes = block.to_bytes();
+    host.store_write_all(block_path, &bytes)
+        .map_err(Error::from)
 }
 
 pub fn store_block_by_hash<Host: Runtime>(
