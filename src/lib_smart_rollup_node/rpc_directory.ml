@@ -387,7 +387,8 @@ let () =
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.injection
-  @@ fun _node_ctxt () messages -> Batcher.register_messages messages
+  @@ fun _node_ctxt drop_duplicate messages ->
+  Batcher.register_messages ~drop_duplicate messages
 
 let () =
   Local_directory.register0 Rollup_node_services.Local.batcher_queue

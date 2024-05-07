@@ -74,6 +74,7 @@ type argument =
   | Rollup of string
   | Pre_images_endpoint of string
   | Apply_unsafe_patches
+  | Injector_retention_period of int
 
 type event = {name : string; value : JSON.t; timestamp : float}
 

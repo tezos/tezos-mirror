@@ -162,10 +162,11 @@ val get_global_block_durable_state_value :
   unit ->
   'a RPC_core.t
 
-(** RPC: [POST local/batcher/injection] injects the [messages] in the queue the rollup
-    node's batcher and returns the list of message hashes injected. *)
+(** RPC: [POST local/batcher/injection] injects the [messages] in the
+    queue the rollup node's batcher and returns the list of message
+    hashes injected. *)
 val post_local_batcher_injection :
-  messages:string list -> string list RPC_core.t
+  ?drop_duplicate:bool -> messages:string list -> unit -> string list RPC_core.t
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
