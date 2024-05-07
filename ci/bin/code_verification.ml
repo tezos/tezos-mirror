@@ -1815,6 +1815,7 @@ let jobs pipeline_type =
             ~__POS__
             ~arch:Amd64
             ~dependencies:(Dependent [])
+            ~rules:(make_rules ~manual:Yes ())
             Test_manual
         in
         let job_docker_arm64_test_manual : Tezos_ci.tezos_job =
@@ -1822,6 +1823,7 @@ let jobs pipeline_type =
             ~__POS__
             ~arch:Arm64
             ~dependencies:(Dependent [])
+            ~rules:(make_rules ~manual:Yes ())
             Test_manual
         in
         let job_build_dpkg_amd64_manual =

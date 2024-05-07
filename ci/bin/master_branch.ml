@@ -77,7 +77,7 @@ let jobs =
       ~before_script:
         ((* sets COVERAGE_OUTPUT *)
          before_script ~source_version:true [])
-      ~when_:Always
+      ~rules:rules_always
       ~coverage:"/Coverage: ([^%]+%)/"
       [
         (* On the project default branch, we fetch coverage from the last merged MR *)

@@ -494,15 +494,8 @@ let enc_git_strategy = function
 
 let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
     ?interruptible ?(dependencies = Staged []) ?services ?variables ?rules
-    ?timeout ?tags ?git_strategy ?when_ ?coverage ?retry ?parallel ~__POS__
-    ~image ~stage ~name script : tezos_job =
-  (match (rules, when_) with
-  | Some _, Some _ ->
-      failwith
-        "[job] do not use [when_] and [rules] at the same time in job '%s' -- \
-         it's confusing."
-        name
-  | _ -> ()) ;
+    ?timeout ?tags ?git_strategy ?coverage ?retry ?parallel ~__POS__ ~image
+    ~stage ~name script : tezos_job =
   let tags =
     Some
       (match (arch, tags) with
@@ -569,7 +562,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       variables;
       timeout;
       tags;
-      when_;
+      when_ = None;
       coverage;
       retry;
       parallel;
