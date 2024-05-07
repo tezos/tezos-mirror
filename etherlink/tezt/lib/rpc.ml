@@ -137,6 +137,24 @@ module Request = struct
     }
 
   let txpool_content = {method_ = "txpool_content"; parameters = `A []}
+
+  let trace_transaction ~transaction_hash ?tracer ?tracer_config () =
+    let config =
+      match tracer with
+      | Some tracer -> [("tracer", `String tracer)]
+      | None -> []
+    in
+    let config =
+      match tracer_config with
+      | None -> config
+      | Some tracer_config -> ("tracerConfig", `O tracer_config) :: config
+    in
+    let parameters =
+      match config with
+      | [] -> `A [`String transaction_hash]
+      | config -> `A [`String transaction_hash; `O config]
+    in
+    {method_ = "debug_traceTransaction"; parameters}
 end
 
 let net_version evm_node =
@@ -356,4 +374,15 @@ let txpool_content evm_node =
        (fun response ->
          let txpool = Evm_node.extract_result response in
          (parse txpool "pending", parse txpool "queued"))
+       response
+
+let trace_transaction ~transaction_hash ?tracer ?tracer_config evm_node =
+  let* response =
+    Evm_node.call_evm_rpc
+      evm_node
+      (Request.trace_transaction ~transaction_hash ?tracer ?tracer_config ())
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> ignore)
        response

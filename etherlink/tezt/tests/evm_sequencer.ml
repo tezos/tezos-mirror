@@ -3431,6 +3431,79 @@ let test_txpool_content_empty_with_legacy_encoding =
       Test.fail
         "The transaction pool RPC returns more than a single transaction"
 
+let test_trace_transaction =
+  register_both
+    ~tags:["evm"; "rpc"; "trace"]
+    ~title:"Sequencer can run debug_traceTransaction"
+  @@ fun {sc_rollup_node; sequencer; client; proxy; _} _protocol ->
+  (* Transfer funds to a random address. *)
+  let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
+  let* transaction_hash =
+    send_transaction
+      (Eth_cli.transaction_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~to_public_key:address
+         ~value:(Wei.of_eth_int 10)
+         ~endpoint:(Evm_node.endpoint sequencer))
+      sequencer
+  in
+  (* Block few levels to ensure we are replaying on an old block. *)
+  let* () =
+    repeat 2 (fun () ->
+        next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client)
+  in
+  let* () = bake_until_sync ~sequencer ~sc_rollup_node ~proxy ~client () in
+  (* Check tracing without options works *)
+  let* trace_result = Rpc.trace_transaction ~transaction_hash sequencer in
+  (match trace_result with
+  | Ok _ -> Test.fail "debug_traceTransaction should have failed"
+  | Error {message; _} ->
+      Check.(
+        (message = "Method not implemented")
+          string
+          ~error_msg:"debug_traceTransaction is not implemented")) ;
+  (* Check tracing with a tracer without config *)
+  let* trace_result =
+    Rpc.trace_transaction ~transaction_hash ~tracer:"structLogger" sequencer
+  in
+  (match trace_result with
+  | Ok _ -> Test.fail "debug_traceTransaction should have failed"
+  | Error {message; _} ->
+      Check.(
+        (message = "Method not implemented")
+          string
+          ~error_msg:"debug_traceTransaction is not implemented")) ;
+  (* Check tracing with a tracer and a config *)
+  let* trace_result =
+    Rpc.trace_transaction
+      ~transaction_hash
+      ~tracer:"structLogger"
+      ~tracer_config:[("enableMemory", `Bool true)]
+      sequencer
+  in
+  (match trace_result with
+  | Ok _ -> Test.fail "debug_traceTransaction should have failed"
+  | Error {message; _} ->
+      Check.(
+        (message = "Method not implemented")
+          string
+          ~error_msg:"debug_traceTransaction is not implemented")) ;
+  (* Check tracing without a tracer and a config *)
+  let* trace_result =
+    Rpc.trace_transaction
+      ~transaction_hash
+      ~tracer_config:[("enableMemory", `Bool true)]
+      sequencer
+  in
+  (match trace_result with
+  | Ok _ -> Test.fail "debug_traceTransaction should have failed"
+  | Error {message; _} ->
+      Check.(
+        (message = "Method not implemented")
+          string
+          ~error_msg:"debug_traceTransaction is not implemented")) ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -3479,4 +3552,5 @@ let () =
   test_preimages_endpoint protocols ;
   test_store_smart_rollup_address protocols ;
   test_replay_rpc protocols ;
-  test_txpool_content_empty_with_legacy_encoding protocols
+  test_txpool_content_empty_with_legacy_encoding protocols ;
+  test_trace_transaction protocols
