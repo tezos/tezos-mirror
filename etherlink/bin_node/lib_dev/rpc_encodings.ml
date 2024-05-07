@@ -706,6 +706,20 @@ module Replay_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Trace_transaction = struct
+  type input = Tracer_types.input
+
+  type output = unit
+
+  let input_encoding = Tracer_types.input_encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "debug_traceTransaction"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -751,6 +765,7 @@ let supported_methods : (module METHOD) list =
     (module Durable_state_value);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
+    (module Trace_transaction);
   ]
 
 let unsupported_methods : string list =
