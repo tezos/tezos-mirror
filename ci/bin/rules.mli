@@ -54,3 +54,6 @@ val started_by_marge_bot : If.t
 
 (** A rule that is never true. *)
 val never : If.t
+
+(** A rule that is always true. *)
+val always : If.t
