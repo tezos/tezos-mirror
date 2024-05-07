@@ -1832,7 +1832,7 @@ let jobs pipeline_type =
             ~name:"oc.build:dpkg:amd64"
             ~target:Dpkg
             ~arch:Tezos_ci.Amd64
-            ~rules:[job_rule ~when_:Manual ()]
+            ~rules:(make_rules ~manual:Yes ())
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
@@ -1843,7 +1843,7 @@ let jobs pipeline_type =
             ~name:"oc.build:rpm:amd64"
             ~target:Rpm
             ~arch:Tezos_ci.Amd64
-            ~rules:[job_rule ~when_:Manual ()]
+            ~rules:(make_rules ~manual:Yes ())
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
@@ -1852,7 +1852,7 @@ let jobs pipeline_type =
           job_build_homebrew
             ~__POS__
             ~name:"oc.build:homebrew"
-            ~rules:[job_rule ~when_:Manual ()]
+            ~rules:(make_rules ~manual:Yes ())
             ~dependencies:(Dependent [])
             ~stage:Stages.manual
             ()
