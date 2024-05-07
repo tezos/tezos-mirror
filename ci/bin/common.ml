@@ -26,6 +26,9 @@ open Tezos_ci
 module Stages = struct
   let start = Stage.register "start"
 
+  (* All automatic image creation is done in the stage [images]. *)
+  let images = Stage.register "images"
+
   let sanity = Stage.register "sanity"
 
   let build = Stage.register "build"
