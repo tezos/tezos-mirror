@@ -44,6 +44,8 @@ type observer = {
   preimages_endpoint : Uri.t option;
 }
 
+type proxy = {read_only : bool}
+
 type t = {
   rpc_addr : string;
   rpc_port : int;
@@ -54,6 +56,7 @@ type t = {
   sequencer : sequencer option;
   threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
+  proxy : proxy;
   max_active_connections :
     Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.t;
   tx_pool_timeout_limit : int64;
@@ -364,6 +367,15 @@ let experimental_features_encoding =
     (fun sqlite_journal_mode -> {sqlite_journal_mode})
     (obj1 (dft "sqlite_journal_mode" sqlite_journal_mode_encoding Delete))
 
+let proxy_encoding =
+  let open Data_encoding in
+  conv
+    (fun {read_only} -> read_only)
+    (fun read_only -> {read_only})
+    (obj1 (dft "read_only" bool false))
+
+let default_proxy = {read_only = false}
+
 let encoding data_dir : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -377,6 +389,7 @@ let encoding data_dir : t Data_encoding.t =
            sequencer;
            threshold_encryption_sequencer;
            observer;
+           proxy;
            max_active_connections;
            tx_pool_timeout_limit;
            tx_pool_addr_limit;
@@ -402,7 +415,8 @@ let encoding data_dir : t Data_encoding.t =
           keep_alive,
           Uri.to_string rollup_node_endpoint,
           verbose,
-          experimental_features ) ))
+          experimental_features,
+          proxy ) ))
     (fun ( ( rpc_addr,
              rpc_port,
              devmode,
@@ -419,7 +433,8 @@ let encoding data_dir : t Data_encoding.t =
              keep_alive,
              rollup_node_endpoint,
              verbose,
-             experimental_features ) ) ->
+             experimental_features,
+             proxy ) ) ->
       {
         rpc_addr;
         rpc_port;
@@ -430,6 +445,7 @@ let encoding data_dir : t Data_encoding.t =
         sequencer;
         threshold_encryption_sequencer;
         observer;
+        proxy;
         max_active_connections;
         tx_pool_timeout_limit;
         tx_pool_addr_limit;
@@ -460,7 +476,7 @@ let encoding data_dir : t Data_encoding.t =
              Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections
              .encoding
              default_max_active_connections))
-       (obj7
+       (obj8
           (dft
              "tx-pool-timeout-limit"
              ~description:
@@ -486,7 +502,8 @@ let encoding data_dir : t Data_encoding.t =
           (dft
              "experimental_features"
              experimental_features_encoding
-             default_experimental_features)))
+             default_experimental_features)
+          (dft "proxy" proxy_encoding default_proxy)))
 
 let save ~force ~data_dir config =
   let open Lwt_result_syntax in
@@ -529,7 +546,7 @@ module Cli = struct
       ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown () =
+      ?catchup_cooldown ?(proxy_read_only = false) () =
     let sequencer =
       Option.map
         (fun sequencer ->
@@ -578,6 +595,7 @@ module Cli = struct
             ())
         evm_node_endpoint
     in
+    let proxy = {read_only = proxy_read_only} in
     let log_filter =
       default_filter_config
         ?max_nb_blocks:log_filter_max_nb_blocks
@@ -595,6 +613,7 @@ module Cli = struct
       sequencer;
       threshold_encryption_sequencer;
       observer;
+      proxy;
       max_active_connections = default_max_active_connections;
       tx_pool_timeout_limit =
         Option.value
@@ -620,7 +639,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      configuration =
+      ?(proxy_read_only = false) configuration =
     let sequencer =
       let sequencer_config = configuration.sequencer in
       match sequencer_config with
@@ -797,6 +816,9 @@ module Cli = struct
                 ())
             evm_node_endpoint
     in
+    let proxy =
+      {read_only = configuration.proxy.read_only || proxy_read_only}
+    in
     let log_filter =
       {
         max_nb_blocks =
@@ -825,6 +847,7 @@ module Cli = struct
       sequencer;
       threshold_encryption_sequencer;
       observer;
+      proxy;
       max_active_connections = configuration.max_active_connections;
       tx_pool_timeout_limit =
         Option.value
@@ -855,7 +878,7 @@ module Cli = struct
       ?threshold_encryption_bundler_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      () =
+      ?proxy_read_only () =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -905,6 +928,7 @@ module Cli = struct
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
+          ?proxy_read_only
           configuration
       in
       return configuration
@@ -943,6 +967,7 @@ module Cli = struct
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
+          ?proxy_read_only
           ()
       in
       return config
