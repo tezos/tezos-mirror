@@ -11,12 +11,9 @@ use std::collections::HashSet;
 use primitive_types::{H160, H256};
 use rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
+use threshold_encryption::helpers::multi_keccak_256;
 
-use crate::{
-    error::ThresholdEncryptionError,
-    helpers::{multi_keccak_256, public_key_to_h160},
-    signature::Signature,
-};
+use crate::signature::{public_key_to_h160, Signature};
 
 /// Attestation committee is a list of EVM addresses of keyholders (aka authorities)
 /// eligible to produce blueprint attestations. It also contains quorum level -
@@ -55,6 +52,18 @@ pub struct QuorumCertificate {
     pub prev_payload_hash: H256,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum QuorumCertificateError {
+    #[error("Not enough attestations")]
+    QuorumNotMet,
+    #[error("Unknown signing authority")]
+    AuthorityUnknown,
+    #[error("Same authority attested twice")]
+    AuthorityDoubleAttested,
+    #[error("Signature is not valid: {0}")]
+    SignatureInvalid(libsecp256k1::Error),
+}
+
 impl QuorumCertificate {
     /// Verify that:
     ///     - All signatures (attestations) are valid
@@ -63,24 +72,24 @@ impl QuorumCertificate {
     ///
     /// NOTE that content hash and previous payload hash have to be checked
     /// separately to ensure consistency with the application state.
-    pub fn verify(&self, committee: &Committee) -> Result<(), ThresholdEncryptionError> {
+    pub fn verify(&self, committee: &Committee) -> Result<(), QuorumCertificateError> {
         if self.attestations.len() < committee.quorum() {
-            return Err(ThresholdEncryptionError::QuorumNotMet);
+            return Err(QuorumCertificateError::QuorumNotMet);
         }
         let payload_hash = self.payload_hash();
         let mut checked_authorities = HashSet::new();
 
         for signature in self.attestations.iter() {
             let public_key = signature
-                .verify_recover(&payload_hash.0)
-                .map_err(ThresholdEncryptionError::SignatureInvalid)?;
+                .recover_pubkey(&payload_hash.0)
+                .map_err(QuorumCertificateError::SignatureInvalid)?;
             let authority = public_key_to_h160(&public_key);
 
             if checked_authorities.contains(&authority) {
-                return Err(ThresholdEncryptionError::AuthorityDoubleAttested);
+                return Err(QuorumCertificateError::AuthorityDoubleAttested);
             }
             if !committee.authorities.contains(&authority) {
-                return Err(ThresholdEncryptionError::AuthorityUnknown);
+                return Err(QuorumCertificateError::AuthorityUnknown);
             }
             checked_authorities.insert(authority);
         }
@@ -89,7 +98,7 @@ impl QuorumCertificate {
 
     /// Calculate payload hash
     pub fn payload_hash(&self) -> H256 {
-        multi_keccak_256([&self.content_hash, &self.prev_payload_hash]).into()
+        multi_keccak_256([&self.content_hash, &self.prev_payload_hash].iter()).into()
     }
 
     /// Genesis QC
@@ -116,11 +125,9 @@ mod tests {
     use primitive_types::{H160, H256};
     use rand::rngs::OsRng;
     use rlp::Encodable;
+    use threshold_encryption::helpers::multi_keccak_256;
 
-    use crate::{
-        helpers::{multi_keccak_256, public_key_to_h160},
-        signature::Signature,
-    };
+    use crate::signature::{public_key_to_h160, Signature};
 
     use super::{Committee, QuorumCertificate};
 
@@ -134,7 +141,7 @@ mod tests {
         };
 
         let genesis_qc = QuorumCertificate::genesis();
-        let content_hash: H256 = multi_keccak_256([&[0u8], &[1u8], &[2u8]]).into();
+        let content_hash: H256 = multi_keccak_256([&[0u8], &[1u8], &[2u8]].iter()).into();
         let payload_hash = multi_keccak_256([&content_hash, &genesis_qc.prev_payload_hash].iter());
         let signature = Signature::create(&payload_hash, &secret_key);
         let qc = QuorumCertificate {

@@ -6,9 +6,8 @@
 
 pub mod ciphertext;
 pub mod decryption_share;
+pub mod encrypted_payload;
 pub mod encrypted_transaction;
 pub mod error;
 pub mod helpers;
 pub mod key_shares;
-pub mod quorum_certificate;
-pub mod signature;
