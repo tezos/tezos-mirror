@@ -233,12 +233,6 @@ impl TrapContext for Interrupt {
             _ => 0,
         };
 
-        println!(
-            "Trap address: {:x}, {}",
-            xtvec_base + handler_offset,
-            self.exception_code()
-        );
-
         xtvec_base + handler_offset
     }
 

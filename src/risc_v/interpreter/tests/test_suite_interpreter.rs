@@ -171,7 +171,7 @@ test_case!(test_suite_rv64ua_v_lrsc, "rv64ua-v-lrsc");
 // RV64-UC
 test_case!(test_suite_rv64uc_p_rvc, "rv64uc-p-rvc");
 
-test_case!(#[ignore], test_suite_rv64uc_v_rvc, "rv64uc-v-rvc");
+test_case!(test_suite_rv64uc_v_rvc, "rv64uc-v-rvc");
 
 // RV64-UD
 test_case!(test_suite_rv64ud_p_fadd, "rv64ud-p-fadd");

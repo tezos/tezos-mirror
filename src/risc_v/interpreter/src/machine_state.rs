@@ -248,19 +248,27 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     }
 
     /// Fetch instruction from the address given by program counter
-    fn fetch_instr(&self, pc: Address) -> Result<Instr, Exception> {
-        let pc = self.translate(pc, AccessType::Instruction)?;
+    /// The spec stipulates translation is performed for each byte respectively.
+    /// However, we assume the `raw_pc` is 2-byte aligned.
+    fn fetch_instr(&self, raw_pc: Address) -> Result<Instr, Exception> {
+        // procedure to obtain 2 bytes of an instruction, either the first or last 2 bytes
+        let get_half_instr = |raw_pc: Address| {
+            // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
+            // If mtval is written with a nonzero value when a
+            // breakpoint, address-misaligned, access-fault, or page-fault exception
+            // occurs on an instruction fetch, load, or store, then mtval will contain the
+            // faulting virtual address.
+            let translated_pc = self.translate(raw_pc, AccessType::Instruction)?;
+            self.bus
+                .read(translated_pc)
+                .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(raw_pc))
+        };
+
         // The resons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read eagerly all 4 bytes.
-        let fetch_result = (|| {
-            let half_instr = self.bus.read(pc)?;
-            parse(half_instr, || self.bus.read(pc + 2))
-        })();
-
-        // Transform the out of bounds read error into a
-        // RISC-V instruction access fault exception
-        fetch_result.map_err(|_: OutOfBounds| Exception::InstructionAccessFault(pc))
+        let first_half = get_half_instr(raw_pc)?;
+        parse(first_half, || get_half_instr(raw_pc + 2))
     }
 
     /// Advance [`MachineState`] by executing an [`Instr`]
