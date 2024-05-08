@@ -62,7 +62,7 @@ val rpc_metrics_transform_callback :
   RPC_server.callback
 
 (** A Resto middleware that adds Http cache headers to responses of any block 
-    query. These headers can be used to by Caches to invlidate responses. *)
+    query. These headers can be used to by Caches to invalidate responses. *)
 module Http_cache_headers : sig
   val make :
     get_estimated_time_to_next_level:(unit -> Ptime.span option Lwt.t) ->
