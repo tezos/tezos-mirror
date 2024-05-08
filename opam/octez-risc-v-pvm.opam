@@ -10,13 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "tezt" { with-test & >= "4.0.0" & < "5.0.0" }
-  "octez-alcotezt" {with-test}
-  "octez-risc-v-api" {with-test}
+  "octez-libs" { = version }
+  "octez-risc-v-api" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tests for RISC-V OCaml API"
+synopsis: "RISC-V PVM"
