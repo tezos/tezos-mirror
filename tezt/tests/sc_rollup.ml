@@ -5823,12 +5823,13 @@ let start_rollup_node_with_encrypted_key ~kind =
   unit
 
 let register_riscv ~protocols =
-  test_rollup_node_boots_into_initial_state
-    protocols
-    ~supports:Protocol.(From_protocol 019)
-    ~kind:"riscv" ;
+  (* TODO https://app.asana.com/0/0/1206991649221091/f
+   * change this to `Protocol.(From_protocol 019)` once RISC-V storage layer
+   * is implemented *)
+  let supports = Protocol.(Between_protocols (19, 19)) in
+  test_rollup_node_boots_into_initial_state protocols ~supports ~kind:"riscv" ;
   test_commitment_scenario
-    ~supports:Protocol.(From_protocol 019)
+    ~supports
     ~extra_tags:["modes"; "operator"]
     ~variant:"operator_publishes"
     (mode_publish Operator true)

@@ -7,13 +7,14 @@
 
 open Protocol
 open Alpha_context
-module Context = Irmin_context
+module Context = Riscv_context
+module Storage = Octez_risc_v_pvm.Storage
 
 type repo = Context.repo
 
 type tree = Context.tree
 
-module Ctxt_wrapper = Context_wrapper.Irmin
+module Ctxt_wrapper = Context_wrapper.Riscv
 
 module type Serializable_state_S = sig
   type context
@@ -26,10 +27,10 @@ module type Serializable_state_S = sig
 
   val state_encoding : state Data_encoding.t
 
-  val directory : string
+  val path : string
 end
 
-module Embed_into_Irmin
+module Embed
     (P : Sc_rollup.PVM.S)
     (S : Serializable_state_S
            with type context = P.context
@@ -42,31 +43,15 @@ module Embed_into_Irmin
 
   val decode : Context.tree -> P.state Lwt.t
 end = struct
-  (* We need to instantiate this functor to access the underlying Tree module. *)
-  module Irmin_proof_format =
-    Context.Proof
-      (struct
-        include Sc_rollup.State_hash
-
-        let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
-      end)
-      (struct
-        let proof_encoding =
-          Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
-          .tree_proof_encoding
-      end)
-
-  module Tree = Irmin_proof_format.Tree
-
   let decode state =
     let open Lwt_syntax in
-    let* bytes_opt = Tree.find state [S.directory] in
+    let* bytes_opt = Storage.lookup state [S.path] in
     match bytes_opt with
     | None ->
         Format.kasprintf
           Lwt.fail_with
           "Riscv_pvm: could not find state in /%s"
-          S.directory
+          S.path
     | Some bytes ->
         Data_encoding.Binary.of_bytes_exn S.state_encoding bytes |> Lwt.return
 
@@ -82,7 +67,7 @@ end = struct
     let bytes =
       Data_encoding.Binary.to_bytes_exn S.state_encoding internal_state
     in
-    Tree.add state [S.directory] bytes
+    Storage.add state [S.path] bytes
 
   type context = Context.rw_index
 
@@ -111,7 +96,7 @@ end = struct
     let bytes =
       Data_encoding.Binary.to_bytes_exn S.state_encoding empty_state
     in
-    Tree.add empty [S.directory] bytes
+    Storage.add empty [S.path] bytes
 
   let install_boot_sector state boot_sector =
     lift (fun state -> P.install_boot_sector state boot_sector) state
@@ -161,7 +146,7 @@ module Serializable_riscv_state = struct
 
   let empty = Sc_rollup_riscv.make_empty_state
 
-  let directory = "riscv_pvm"
+  let path = "riscv_pvm"
 
   let of_index _index = ()
 
@@ -169,9 +154,7 @@ module Serializable_riscv_state = struct
 end
 
 include
-  Embed_into_Irmin
-    (Sc_rollup.Riscv_PVM.Protocol_implementation)
-    (Serializable_riscv_state)
+  Embed (Sc_rollup.Riscv_PVM.Protocol_implementation) (Serializable_riscv_state)
 
 let kind = Sc_rollup.Kind.Riscv
 
@@ -201,7 +184,7 @@ let eval_many ~reveal_builtins:_ ~write_debug:_ ~is_reveal_enabled
 
 let new_dissection = Game_helpers.default_new_dissection
 
-module State = Context.PVMState
+module State = Riscv_context.PVMState
 
 module Inspect_durable_state = struct
   let lookup _state _keys =
