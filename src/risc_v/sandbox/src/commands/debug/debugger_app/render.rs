@@ -485,6 +485,8 @@ impl<'a> DebuggerApp<'a> {
             "<b>  ".fg(BLUE).bold(),
             " Run ".into(),
             "<r>  ".fg(BLUE).bold(),
+            " Next symbol ".into(),
+            "<n>  ".fg(BLUE).bold(),
             " Quit ".into(),
             "<q> ".fg(BLUE).bold(),
         ])

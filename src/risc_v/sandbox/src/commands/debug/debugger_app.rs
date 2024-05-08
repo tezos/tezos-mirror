@@ -203,6 +203,7 @@ impl<'a> DebuggerApp<'a> {
                         Char('s') => self.step(1),
                         Char('b') => self.program.set_breakpoint(),
                         Char('r') => self.step_until_breakpoint(),
+                        Char('n') => self.step_until_next_symbol(),
                         Char('j') | Down => {
                             self.program.next();
                             self.update_selected_context();
@@ -245,6 +246,26 @@ impl<'a> DebuggerApp<'a> {
                 .translate(raw_pc, AccessType::Instruction)
                 .unwrap_or(raw_pc);
             !self.program.breakpoints.contains(&pc)
+        });
+        self.update_after_step(result);
+    }
+
+    fn step_until_next_symbol(&mut self) {
+        // perform at least a step to progress if already on a breakpoint/symbol
+        let mut stepped = false;
+
+        let result = self.interpreter.step_many(MAX_STEPS, |m| {
+            if !stepped {
+                stepped = true;
+                return true;
+            }
+
+            let raw_pc = m.hart.pc.read();
+            let pc = m
+                .translate(raw_pc, AccessType::Instruction)
+                .unwrap_or(raw_pc);
+
+            !(self.program.breakpoints.contains(&pc) || self.program.symbols.contains_key(&pc))
         });
         self.update_after_step(result);
     }
