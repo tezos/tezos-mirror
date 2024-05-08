@@ -1163,11 +1163,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "octez-risc-v-pvm"
+name = "octez-risc-v-api"
 version = "0.0.0"
 dependencies = [
  "ocaml",
  "ocaml-build",
+ "risc-v-interpreter",
+]
+
+[[package]]
+name = "octez-risc-v-pvm"
+version = "0.0.0"
+dependencies = [
  "risc-v-interpreter",
  "rustc_apfloat",
 ]

@@ -2,12 +2,12 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_risc_v_pvm_test_tezt_lib)
+ (name src_lib_risc_v_api_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   octez-alcotezt
-  octez-risc-v-pvm)
+  octez-risc-v-api)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -20,13 +20,13 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
-  src_risc_v_pvm_test_tezt_lib
+  src_lib_risc_v_api_test_tezt_lib
   tezt)
  (modules main))
 
 (rule
  (alias runtest)
- (package octez-risc-v-pvm-test)
+ (package octez-risc-v-api-test)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe})))
 

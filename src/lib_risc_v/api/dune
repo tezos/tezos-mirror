@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_risc_v_api)
+ (public_name octez-risc-v-api)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-risc-v)
+ (flags
+  (:standard)
+  -w -9-27-66))
+
+(copy_files ../../risc_v/api/octez_risc_v_api.*)

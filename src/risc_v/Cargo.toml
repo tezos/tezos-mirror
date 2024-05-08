@@ -5,6 +5,7 @@ members = [
   "kernel_loader",
   "interpreter",
   "pvm",
+  "api",
   # Executables
   "sandbox",
 ]

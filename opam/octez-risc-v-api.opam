@@ -10,11 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-l2-libs" { = version }
+  "octez-risc-v" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Bindings for RISC-V interpreter"
+synopsis: "OCaml API of the RISC-V Rust components"
