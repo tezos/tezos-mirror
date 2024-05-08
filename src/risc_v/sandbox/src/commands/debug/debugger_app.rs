@@ -239,8 +239,7 @@ impl<'a> DebuggerApp<'a> {
 
     fn step_until_breakpoint(&mut self) {
         // perform at least a step to progress if already on a breakpoint
-        self.step(1);
-        let result = self.interpreter.step_many(MAX_STEPS, |m| {
+        let result = self.interpreter.step_some(MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)
@@ -252,14 +251,7 @@ impl<'a> DebuggerApp<'a> {
 
     fn step_until_next_symbol(&mut self) {
         // perform at least a step to progress if already on a breakpoint/symbol
-        let mut stepped = false;
-
-        let result = self.interpreter.step_many(MAX_STEPS, |m| {
-            if !stepped {
-                stepped = true;
-                return true;
-            }
-
+        let result = self.interpreter.step_some(MAX_STEPS, |m| {
             let raw_pc = m.hart.pc.read();
             let pc = m
                 .translate(raw_pc, AccessType::Instruction)

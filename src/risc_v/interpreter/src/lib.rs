@@ -168,6 +168,14 @@ impl<'a> Interpreter<'a> {
         self.handle_step_result(result, max, should_continue)
     }
 
+    pub fn step_some<F>(&mut self, max: usize, mut should_continue: F) -> InterpreterResult
+    where
+        F: FnMut(&MachineState<M1G, SliceManager<'a>>) -> bool,
+    {
+        let result = self.machine_state.step_some(max, &mut should_continue);
+        self.handle_step_result(result, max, should_continue)
+    }
+
     pub fn effective_translation_alg(
         &self,
         access_type: &AccessType,

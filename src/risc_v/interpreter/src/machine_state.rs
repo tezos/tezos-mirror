@@ -681,6 +681,39 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
         }
     }
 
+    /// Perform at most `max` instructions. Returns the number of retired instructions.
+    /// Will run at least one step.
+    ///
+    /// See `octez_risc_v_pvm::state::Pvm`
+    pub fn step_some<F>(&mut self, max: usize, mut should_continue: F) -> StepManyResult
+    where
+        F: FnMut(&Self) -> bool,
+    {
+        let mut steps_done = 0;
+
+        loop {
+            match self.step() {
+                Ok(_) => {}
+                Err(e) => {
+                    return StepManyResult {
+                        steps: steps_done,
+                        exception: Some(e),
+                    }
+                }
+            };
+            steps_done += 1;
+
+            if !(steps_done < max && should_continue(self)) {
+                break;
+            }
+        }
+
+        StepManyResult {
+            steps: steps_done,
+            exception: None,
+        }
+    }
+
     /// Install a program and set the program counter to its start.
     pub fn setup_boot(
         &mut self,
