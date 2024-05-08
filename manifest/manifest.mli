@@ -695,6 +695,15 @@ type bisect_ppx = No | Yes | With_sigterm
     - [conflicts]: a list of target; all of their packages will be put in the
       [conflicts] section of the [.opam] file.
 
+    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
+      in the [runtest] alias.
+
+    - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
+      in the [dune] file.
+
+    - [dep_globs_rec]: a list of files to add as dependencies using [(deps (glob_files_rec ...))]
+      in the [dune] file.
+
     - [deps]: a list of targets to add as dependencies using [(libraries)]
       in the [dune] file.
 
@@ -850,6 +859,9 @@ type 'a maker =
   ?bisect_ppx:bisect_ppx ->
   ?c_library_flags:string list ->
   ?conflicts:target list ->
+  ?dep_files:string list ->
+  ?dep_globs:string list ->
+  ?dep_globs_rec:string list ->
   ?deps:target list ->
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
@@ -1250,15 +1262,6 @@ end) : sig
       (i.e. [~opam] must also be non-empty). If given, the [enabled_if] and/or [locks]
       clauses are added to this alias.
 
-    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
-      in the [runtest] alias.
-
-    - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
-      in the [dune] file.
-
-    - [dep_globs_rec]: a list of files to add as dependencies using [(deps (glob_files_rec ...))]
-      in the [dune] file.
-
     - [dune_with_test]: Specifies a condition for the test to be run on the dune file.
       If set to [Only_on_64_arch], [%{arch_sixtyfour}] is added to the [enabled_if] clause.
       If set to [Always], nothing is added to the [enabled_if] clause.
@@ -1272,9 +1275,6 @@ end) : sig
     argument of [maker] is the internal name. *)
   val test :
     ?alias:string ->
-    ?dep_files:string list ->
-    ?dep_globs:string list ->
-    ?dep_globs_rec:string list ->
     ?locks:string ->
     ?enabled_if:Dune.s_expr ->
     ?dune_with_test:with_test ->
@@ -1284,9 +1284,6 @@ end) : sig
   (** Same as {!test} but with several names, to define multiple tests at once. *)
   val tests :
     ?alias:string ->
-    ?dep_files:string list ->
-    ?dep_globs:string list ->
-    ?dep_globs_rec:string list ->
     ?locks:string ->
     ?enabled_if:Dune.s_expr ->
     ?lib_deps:target list ->
