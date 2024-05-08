@@ -8,7 +8,7 @@
 use super::rvemu_boot::{A0, A1, A2, A3, A6, A7};
 use crate::inbox::Inbox;
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-use kernel_loader::Memory;
+use risc_v_interpreter::kernel_loader::Memory;
 use rvemu::{
     cpu::{AccessType, BYTE},
     emulator::Emulator,

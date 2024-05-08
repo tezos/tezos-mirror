@@ -37,9 +37,6 @@ features = ["derive"]
 version = "0.4.3"
 features = ["serde"]
 
-[dependencies.kernel-loader]
-path = "../kernel_loader"
-
 [dependencies.risc-v-interpreter]
 path = "../interpreter"
 

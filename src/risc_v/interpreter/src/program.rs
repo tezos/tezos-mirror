@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    kernel_loader,
     machine_state::bus::{self, main_memory::MainMemoryLayout, Address},
     parser::parse_block,
 };
@@ -138,10 +139,10 @@ impl<'a, ML: MainMemoryLayout> Program<'a, ML> {
 #[cfg(test)]
 mod tests {
     use crate::{
+        kernel_loader::{self, Memory},
         machine_state::bus::{main_memory::M1G, start_of_main_memory},
         program::Program,
     };
-    use kernel_loader::Memory;
     use std::{cell::RefCell, collections::BTreeMap, fs, io::Cursor, marker::PhantomData};
 
     #[test]
