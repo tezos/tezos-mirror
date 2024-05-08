@@ -3,7 +3,6 @@ resolver = "2"
 members = [
   # Libraries
   "interpreter",
-  "pvm",
   "api",
   # Executables
   "sandbox",

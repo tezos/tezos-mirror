@@ -11,6 +11,7 @@ pub mod kernel_loader;
 pub mod machine_state;
 pub mod parser;
 pub mod program;
+pub mod pvm;
 pub mod state_backend;
 pub mod traps;
 

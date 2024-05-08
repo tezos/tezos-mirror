@@ -5,7 +5,7 @@
 // Allow dead code while this module contains stubs.
 #![allow(dead_code)]
 
-use risc_v_interpreter::{
+use crate::{
     exec_env::{self, ExecutionEnvironment, ExecutionEnvironmentState},
     machine_state::{self, bus::main_memory, StepManyResult},
     state_backend,
