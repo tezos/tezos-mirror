@@ -16,11 +16,7 @@ use rvemu::{
     emulator::Emulator,
     exception::Exception,
 };
-use std::{
-    error::Error,
-    io::{self, Write},
-    process::exit,
-};
+use std::{error::Error, process::exit};
 use tezos_smart_rollup_constants::riscv::{
     SBI_CONSOLE_PUTCHAR, SBI_FIRMWARE_TEZOS, SBI_SHUTDOWN, SBI_TEZOS_BLAKE2B_HASH256,
     SBI_TEZOS_ED25519_SIGN, SBI_TEZOS_ED25519_VERIFY, SBI_TEZOS_INBOX_NEXT, SBI_TEZOS_META_ADDRESS,
@@ -59,9 +55,9 @@ fn read_memory(emu: &mut Emulator, address: u64, len: u64) -> Result<Vec<u8>, Bo
 }
 
 /// SBI extension ID 0x01
-fn sbi_console_putchar(emu: &mut Emulator) -> SBIResult {
+fn sbi_console_putchar(emu: &mut Emulator, mut console: impl std::io::Write) -> SBIResult {
     let c = emu.cpu.xregs.read(A0) as u8;
-    io::stdout().lock().write_all(&[c])?;
+    console.write_all(&[c])?;
     emu.cpu.xregs.write(A0, 0);
     Ok(())
 }
@@ -184,7 +180,12 @@ fn sbi_tezos_blake2b_hash256(emu: &mut Emulator) -> SBIResult {
 }
 
 /// Handle a system call originating from the user program.
-pub fn handle_sbi(emu: &mut Emulator, meta: &RollupMetadata, inbox: &mut Inbox) -> SBIResult {
+pub fn handle_sbi(
+    emu: &mut Emulator,
+    meta: &RollupMetadata,
+    inbox: &mut Inbox,
+    console: &mut impl std::io::Write,
+) -> SBIResult {
     // TODO: https://gitlab.com/tezos/tezos/-/issues/6767
     // Feed errors back to caller instead of raising them in the sandbox.
     // This means this function most likely should return unit.
@@ -192,7 +193,7 @@ pub fn handle_sbi(emu: &mut Emulator, meta: &RollupMetadata, inbox: &mut Inbox) 
     // SBI extension is contained in a7.
     let sbi_extension = emu.cpu.xregs.read(A7);
     match sbi_extension {
-        SBI_CONSOLE_PUTCHAR => sbi_console_putchar(emu),
+        SBI_CONSOLE_PUTCHAR => sbi_console_putchar(emu, console),
         SBI_SHUTDOWN => sbi_shutdown(),
         SBI_FIRMWARE_TEZOS => {
             let sbi_function = emu.cpu.xregs.read(A6);
