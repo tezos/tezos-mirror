@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
@@ -7,7 +7,7 @@
 // everytime I change code elsewhere.
 #![allow(dead_code)]
 
-use crate::devicetree;
+use super::devicetree;
 use kernel_loader::{LoadResult, Memory};
 use rvemu::{cpu::Mode, emulator::Emulator};
 use std::{error::Error, fs};

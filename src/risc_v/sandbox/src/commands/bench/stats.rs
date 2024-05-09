@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
 use super::data::{BenchData, InstructionData};
 use crate::format_status;
 use core::fmt;

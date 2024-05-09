@@ -51,7 +51,8 @@ let replace_variables string =
       ("/localhost:\\d{4,5}/", "/[HOST]:[PORT]/");
       ("/127.0.0.1:\\d{4,5}/", "/[HOST]:[PORT]/");
       ("/\\[::1\\]:\\d{4,5}/", "/[HOST]:[PORT]/");
-      ("sandbox/src/main.rs:\\d+:\\d+:", "sandbox/src/main.rs:[LOCATION]:");
+      ( "sandbox/src/commands/rvemu.rs:\\d+:\\d+:",
+        "sandbox/src/commands/rvemu.rs:[LOCATION]:" );
     ]
   in
   List.fold_left

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
 // Ratatui boilerplate
 // https://github.com/ratatui-org/ratatui-website/blob/main/code/counter-app-error-handling/src/tui.rs
 

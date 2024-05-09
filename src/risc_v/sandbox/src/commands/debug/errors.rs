@@ -1,7 +1,12 @@
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+//
+// SPDX-License-Identifier: MIT
+
 // Ratatui boilerplate
 // https://github.com/ratatui-org/ratatui-website/blob/main/code/counter-app-error-handling/src/errors.rs
 
-use crate::debugger::tui;
+use super::tui;
 use color_eyre::{config::HookBuilder, eyre};
 use std::panic;
 

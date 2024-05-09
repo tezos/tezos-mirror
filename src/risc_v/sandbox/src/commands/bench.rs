@@ -4,11 +4,11 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    bench::{
+    cli::{BenchMode, BenchOptions},
+    commands::bench::{
         data::{BenchData, FineBenchData, InstrGetError, InstrType, SimpleBenchData},
         stats::BenchStats,
     },
-    cli::{BenchMode, BenchOptions},
     posix_exit_mode,
 };
 use enum_tag::EnumTag;
