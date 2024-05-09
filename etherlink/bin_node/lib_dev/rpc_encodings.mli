@@ -287,6 +287,12 @@ module Trace_transaction :
     with type input = Tracer_types.input
      and type output = Tracer_types.output
 
+module Eth_fee_history :
+  METHOD
+    with type input =
+      Ethereum_types.quantity * Ethereum_types.Block_parameter.t * Float.t list
+     and type output = Ethereum_types.fee_history
+
 type map_result =
   | Method :
       ('input, 'output) method_

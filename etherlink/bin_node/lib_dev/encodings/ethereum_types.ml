@@ -68,6 +68,14 @@ let timestamp_of_bytes timestamp_bytes =
 
 type quantity = Qty of Z.t [@@ocaml.unboxed]
 
+module Qty = struct
+  let pred (Qty z) = Qty (Z.pred z)
+
+  let to_z (Qty z) = z
+
+  let zero = Qty Z.zero
+end
+
 let quantity_of_z z = Qty z
 
 let z_to_hexa = Z.format "#x"
@@ -1369,6 +1377,24 @@ let filter_changes_encoding =
         (function Log f -> Some f | _ -> None)
         (fun f -> Log f);
     ]
+
+type fee_history = {
+  oldest_block : quantity;
+  base_fee_per_gas : quantity list;
+  gas_used_ratio : float list;
+}
+
+let fee_history_encoding =
+  let open Data_encoding in
+  conv
+    (fun {oldest_block; base_fee_per_gas; gas_used_ratio} ->
+      (oldest_block, base_fee_per_gas, gas_used_ratio))
+    (fun (oldest_block, base_fee_per_gas, gas_used_ratio) ->
+      {oldest_block; base_fee_per_gas; gas_used_ratio})
+    (obj3
+       (req "oldestBlock" quantity_encoding)
+       (req "baseFeePerGas" (list quantity_encoding))
+       (req "gasUsedRatio" (list float)))
 
 module Delayed_transaction = struct
   type kind = Transaction | Deposit
