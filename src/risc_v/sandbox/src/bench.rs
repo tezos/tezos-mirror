@@ -16,10 +16,16 @@ use risc_v_interpreter::{
     parser::{instruction::Instr, parse},
     Interpreter, InterpreterResult,
 };
-use std::error::Error;
+use std::{error::Error, fs::File};
 
 mod data;
 mod stats;
+
+fn save_to_file(stats: &BenchStats, opts: &BenchOptions) -> Result<(), Box<dyn Error>> {
+    let mut file = File::create(&opts.output)?;
+    serde_json::to_writer(&mut file, &stats)?;
+    Ok(())
+}
 
 /// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
 fn get_current_instr(interpreter: &Interpreter) -> Result<Instr, InstrGetError> {
@@ -110,7 +116,7 @@ fn bench_iteration(opts: &BenchOptions) -> Result<BenchData, Box<dyn Error>> {
         posix_exit_mode(&opts.common.posix_exit_mode),
     )?;
 
-    let data = match opts.mode {
+    let data = match &opts.mode {
         BenchMode::Simple => bench_simple(&mut interpreter, opts),
         BenchMode::Fine => bench_fine(&mut interpreter, opts),
     };
@@ -129,6 +135,8 @@ pub fn bench(opts: BenchOptions) -> Result<(), Box<dyn Error>> {
             BenchStats::from_data_list(data_list)?
         }
     };
+
+    save_to_file(&stats, &opts)?;
 
     println!("{stats}");
     Ok(())

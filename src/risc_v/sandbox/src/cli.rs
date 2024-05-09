@@ -76,8 +76,25 @@ pub struct BenchOptions {
     )]
     pub repeat: usize,
 
+    #[arg(
+        help = "Name of the file to save the benchmark stats",
+        long,
+        default_value = "benchmark.json",
+        value_parser = validate_output,
+    )]
+    pub output: String,
+
     #[command(flatten)]
     pub common: CommonOptions,
+}
+
+/// Validator for `--output <filename>` option
+pub fn validate_output(output: &str) -> Result<String, &'static str> {
+    if output.is_empty() {
+        Err("Output filename can not be empty")
+    } else {
+        Ok(output.to_string())
+    }
 }
 
 #[derive(Debug, Clone, Parser)]
