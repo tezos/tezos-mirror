@@ -17,8 +17,7 @@
 
 use std::ops::Mul;
 
-use blstrs::{Bls12, G1Affine, G2Affine, Gt, Scalar};
-use ff::Field;
+use blstrs::{Bls12, G1Affine, G2Affine, Gt};
 use pairing_lib::{
     group::{prime::PrimeCurveAffine, Group},
     MillerLoopResult, MultiMillerLoop,
@@ -26,6 +25,7 @@ use pairing_lib::{
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use rlp::{Decodable, Encodable};
 
+use crate::helpers::random_non_zero_scalar;
 use crate::{
     error::ThresholdEncryptionError,
     helpers::{
@@ -72,7 +72,7 @@ impl Ciphertext {
         rng: &mut R,
     ) -> Result<Ciphertext, ThresholdEncryptionError> {
         // Encrypt the key (El Gamal)
-        let r = Scalar::random(rng);
+        let r = random_non_zero_scalar(rng);
         let u_nonce = G1Affine::generator().mul(r).to_compressed();
         let y = mpk.mul(r);
         let encrypted_key = elgamal_apply(key, &y.into());

@@ -11,10 +11,11 @@
 //! of the subgroup checks) and often we can return earlier skipping processing some items,
 //! which can lead to unnecessary computations. It is especially important for the kernel.
 
+use std::ops::Mul;
+
 use blstrs::{Bls12, G1Affine, G1Projective, Gt, Scalar};
 use pairing_lib::{group::Group, MillerLoopResult, MultiMillerLoop};
 use rlp::{Decodable, DecoderError, Encodable};
-use std::ops::Mul;
 
 use crate::{
     ciphertext::UHW,
@@ -140,11 +141,11 @@ mod tests {
     use std::ops::Mul;
 
     use blstrs::{G1Affine, G2Affine, Scalar};
-    use ff::Field;
     use pairing_lib::group::prime::PrimeCurveAffine;
-    use rand::{rngs::OsRng, RngCore};
+    use rand::{rngs::OsRng, CryptoRng, RngCore};
     use rlp::Encodable;
 
+    use crate::helpers::random_non_zero_scalar;
     use crate::{
         ciphertext::UHW,
         decryption_share::{DecryptionShare, DSH},
@@ -155,8 +156,12 @@ mod tests {
         },
     };
 
-    pub fn encrypt_data<R: RngCore>(data: &Bytes32, mpk: &G1Affine, rng: &mut R) -> UHW {
-        let r = Scalar::random(rng);
+    pub fn encrypt_data<R: RngCore + CryptoRng>(
+        data: &Bytes32,
+        mpk: &G1Affine,
+        rng: &mut R,
+    ) -> UHW {
+        let r = random_non_zero_scalar(rng);
         let u: G1Affine = G1Affine::generator().mul(r).into();
         let y = mpk.mul(r);
         let v = elgamal_apply(data, &y.into());
@@ -174,7 +179,7 @@ mod tests {
             secret_key: _,
         } = keygen(7, 4, 1);
 
-        let r = Scalar::random(&mut OsRng);
+        let r = random_non_zero_scalar(&mut OsRng);
         let u_nonce = G1Affine::generator().mul(r).into();
         let y = master_public_key.mul(r).into();
 
