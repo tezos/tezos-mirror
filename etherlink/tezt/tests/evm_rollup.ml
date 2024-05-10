@@ -757,6 +757,7 @@ let test_rpc_getBlockByHash =
   register_both
     ~tags:["evm"; "rpc"; "get_block_by_hash"]
     ~title:"RPC method eth_getBlockByHash"
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
   @@ fun ~protocol:_ ~evm_setup ->
   let evm_node_endpoint = Evm_node.endpoint evm_setup.evm_node in
   let* block = Eth_cli.get_block ~block_id:"0" ~endpoint:evm_node_endpoint in
@@ -804,6 +805,42 @@ let test_rpc_getBlockReceipts =
     |> List.mapi (fun i (_tx, hash) -> (hash, i))
   in
   assert (List.equal ( = ) txs expected_txs) ;
+  unit
+
+let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
+  register_both
+    ~tags:["evm"; "rpc"; "get_block_by_hash"]
+    ~title:"getBlockBy returns base fee per gas and mix hash"
+    ~minimum_base_fee_per_gas:(Wei.to_wei_z @@ Z.of_int 100)
+  @@ fun ~protocol:_ ~evm_setup ->
+  let evm_node_endpoint = Evm_node.endpoint evm_setup.evm_node in
+
+  let* _ =
+    send
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~receiver:Eth_account.bootstrap_accounts.(1)
+      ~value:Wei.one
+      evm_setup
+  in
+  let* block_by_number =
+    Eth_cli.get_block ~block_id:"1" ~endpoint:evm_node_endpoint
+  in
+  Check.((block_by_number.baseFeePerGas = 100L) int64)
+    ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
+  Check.(
+    (block_by_number.mixHash
+   = "0x0000000000000000000000000000000000000000000000000000000000000000")
+      string)
+    ~error_msg:"Unexpected mix hash, should be %%R, but got %%L" ;
+
+  let* block_by_hash = get_block_by_hash evm_setup block_by_number.hash in
+  Check.((block_by_hash.baseFeePerGas = 100L) int64)
+    ~error_msg:"Unexpected block number, should be %%R, but got %%L" ;
+  Check.(
+    (block_by_hash.mixHash
+   = "0x0000000000000000000000000000000000000000000000000000000000000000")
+      string)
+    ~error_msg:"Unexpected mix hash, should be %%R, but got %%L" ;
   unit
 
 let test_l2_block_size_non_zero =
@@ -5804,7 +5841,8 @@ let register_evm_node ~protocols =
   test_rpc_maxPriorityFeePerGas protocols ;
   test_proxy_read_only protocols ;
   test_unsupported_rpc protocols ;
-  test_validation_with_legacy_encoding protocols
+  test_validation_with_legacy_encoding protocols ;
+  test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash protocols
 
 let protocols = Protocol.all
 
