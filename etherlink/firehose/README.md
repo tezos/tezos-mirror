@@ -66,9 +66,9 @@ $ firehose transfer --amount 1.2 gwei --to 0x63Ec92990F469bC0DD03516E0d32Ee9A4D8
 ## Stress-testing
 
 Firehose can perform stress-test scenarios, with the `flood` subcommand. The parameter `--workers` adjusts the number
-of concurrent transfers that will be attempted, and will continue until the program is exited.
+of concurrent transfers that will be attempted, and will continue until the program is exited. `--random-nonce` assigns a random(incorrect) nonce to the transactions
 
-Both `xtz` and `erc20` transfers are currently supported.
+Both `xtz` and `erc20` transfers are currently supported. `large-payload` attachs an 100MB payload to each xtz transfer
 
 *NB* the setup step can be slightly flaky, you may need to re-attempt multiple times to get to the point of the
 stress-test occuring.
