@@ -4,11 +4,13 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
-use ethers::types::H160;
+use ethers::core::rand::{self, Rng};
+use ethers::types::{H160, U256};
 use ethers::utils::{format_units, parse_units, ConversionError, Units};
 use tokio::task::spawn_blocking;
 use tokio::try_join;
 
+use std::path::PathBuf;
 use std::str::FromStr;
 
 mod client;
@@ -58,6 +60,8 @@ enum Commands {
         workers: usize,
         #[arg(long)]
         kind: FloodType,
+        #[arg(short, long, default_value_t = false)]
+        random_nonce: bool,
     },
     #[command(long_about = "Move XTZ funds from any workers back to the controller")]
     Cleanup,
@@ -75,6 +79,7 @@ enum TransferKind {
 enum FloodType {
     Xtz,
     Erc20,
+    LargePayload,
 }
 
 impl TryInto<Units> for TransferKind {
@@ -118,13 +123,11 @@ async fn main() -> Result<()> {
             let amount = amount.parse::<u64>()?.into();
             let to = H160::from_str(&to)?;
 
-            // deploy erc20 if not already done
-            let config = Config::load(&config_path).await?;
-            let config = ensure_erc20_contract(config).await?;
-            config.save(&config_path).await?;
+            let config = create_config(config_path, None, true).await?;
 
             // transfer
             let client = Client::new(&config).await?;
+
             let setup = Setup::new(&config, &client, config.workers().len())?;
 
             setup.mint_and_transfer_erc20(amount, to).await?;
@@ -134,55 +137,71 @@ async fn main() -> Result<()> {
             let to = H160::from_str(&to)?;
 
             let config = Config::load(&config_path).await?;
+
             let client = Client::new(&config).await?;
+
             client.controller_xtz_transfer(to, amount).await?;
         }
         Commands::Flood {
             workers,
             kind: FloodType::Xtz,
+            random_nonce,
         } => {
-            let mut config = Config::load(&config_path).await?;
-            config.generate_workers(workers);
-            config.save(&config_path).await?;
+            let config = create_config(config_path, Some(workers), false).await?;
 
             let client = Client::new(&config).await?;
-            let setup = Setup::new(&config, &client, workers)?;
 
-            setup.fund_workers_xtz(ONE_XTZ_IN_WEI.into()).await?;
-            setup.xtz_transfers().await?;
+            let setup = create_setup(&config, &client, workers, true, false, false).await?;
+
+            if random_nonce {
+                setup.xtz_transfers(get_random_nonce, 0).await?;
+            } else {
+                setup
+                    .xtz_transfers(|address| client.nonce(address), 0)
+                    .await?;
+            }
+        }
+        Commands::Flood {
+            workers,
+            kind: FloodType::LargePayload,
+            random_nonce,
+        } => {
+            let config = create_config(config_path, Some(workers), false).await?;
+
+            let client = Client::new(&config).await?;
+
+            let setup = create_setup(&config, &client, workers, true, false, false).await?;
+
+            if random_nonce {
+                setup.xtz_transfers(get_random_nonce, 100_000_000).await?;
+            } else {
+                setup
+                    .xtz_transfers(|address| client.nonce(address), 100_000_000)
+                    .await?;
+            }
         }
         Commands::Flood {
             workers,
             kind: FloodType::Erc20,
+            random_nonce: _,
         } => {
-            let config = Config::load(&config_path).await?;
-            // deploy erc20 if not already done
-            let mut config = ensure_erc20_contract(config).await?;
-            config.save(&config_path).await?;
-
-            // workers
-            config.generate_workers(workers);
-            config.save(&config_path).await?;
+            let config = create_config(config_path, Some(workers), true).await?;
 
             let client = Client::new(&config).await?;
-            let setup = Setup::new(&config, &client, workers)?;
 
-            // Have to fund workers with xtz
-            setup.fund_workers_xtz(ONE_XTZ_IN_WEI.into()).await?;
-
-            // Now need to mint ERC20 for all workers
-            setup.fund_workers_erc20(ONE_XTZ_IN_WEI.into()).await?;
+            let setup = create_setup(&config, &client, workers, true, true, false).await?;
 
             setup.erc20_transfers().await?;
         }
         Commands::Cleanup => {
             let mut config = Config::load(&config_path).await?;
             let client = Client::new(&config).await?;
-            let setup = Setup::new(&config, &client, config.workers().len())?;
 
-            setup.defund_workers_xtz().await?;
+            let _setup =
+                create_setup(&config, &client, config.workers().len(), false, false, true).await?;
 
             config.cleanup_workers(&client).await?;
+
             config.save(&config_path).await?;
         }
     };
@@ -215,4 +234,47 @@ async fn ensure_erc20_contract(mut config: Config) -> Result<Config> {
         config.erc20 = Some(contract);
     }
     Ok(config)
+}
+
+pub async fn create_config(
+    config_path: PathBuf,
+    workers: Option<usize>,
+    use_erc20: bool,
+) -> Result<Config> {
+    let mut config = Config::load(&config_path).await?;
+    if use_erc20 {
+        config = ensure_erc20_contract(config).await?
+    }
+    match workers {
+        Some(workers) => config.generate_workers(workers),
+        _ => {}
+    }
+    config.save(&config_path).await?;
+    Ok(config)
+}
+
+pub async fn create_setup<'a>(
+    config: &'a Config,
+    client: &'a Client,
+    workers: usize,
+    fund_xtz: bool,
+    fund_erc20: bool,
+    defund: bool,
+) -> Result<Setup<'a>> {
+    let setup = Setup::new(config, client, workers)?;
+    if defund {
+        setup.defund_workers_xtz().await?;
+    } else {
+        if fund_xtz {
+            setup.fund_workers_xtz(ONE_XTZ_IN_WEI.into()).await?;
+        }
+        if fund_erc20 {
+            setup.fund_workers_erc20(ONE_XTZ_IN_WEI.into()).await?;
+        }
+    }
+    Ok(setup)
+}
+
+pub async fn get_random_nonce(_address: H160) -> Result<U256> {
+    Ok(U256::from(rand::thread_rng().gen::<u64>()))
 }

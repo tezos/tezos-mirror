@@ -88,7 +88,11 @@ impl<'a> Setup<'a> {
     /// aiming to match the requested tps.
     ///
     /// Each transfer is only 1 wei, by default.
-    pub async fn xtz_transfers(&self) -> Result<()> {
+    pub async fn xtz_transfers<T: Future<Output = Result<U256>>>(
+        &self,
+        get_nonce: impl Fn(H160) -> T + std::marker::Copy,
+        payload_size: usize,
+    ) -> Result<()> {
         println!(
             "[SCENARIO] xtz transfers with {} workers",
             self.workers.len()
@@ -112,9 +116,13 @@ impl<'a> Setup<'a> {
         macro_rules! queue_transfer {
             ($worker:ident) => {
                 let task = Box::pin(async move {
+                    let size = payload_size;
+                    let mut vec: Vec<u8> = Vec::with_capacity(size);
+                    vec.resize(size, 1);
+                    let payload = Some(Bytes::from(vec));
                     let receipt = self
                         .client
-                        .transfer_xtz(&$worker, to, U256::one())
+                        .send(&$worker, Some(to), Some(U256::one()), payload, get_nonce)
                         .await
                         .map_err(|_| $worker.clone())?;
                     Ok((receipt, $worker))
@@ -253,7 +261,13 @@ impl<'a> Setup<'a> {
 
         let receipt = self
             .client
-            .send(&self.client.controller, None, None, deploy.data().cloned())
+            .send(
+                &self.client.controller,
+                None,
+                None,
+                deploy.data().cloned(),
+                |address| self.client.nonce(address),
+            )
             .await?;
 
         let address = receipt
@@ -296,7 +310,9 @@ impl<'a> Setup<'a> {
 
         let receipt = self
             .client
-            .send(account, Some(contract_address), None, data)
+            .send(account, Some(contract_address), None, data, |address| {
+                self.client.nonce(address)
+            })
             .await?;
 
         let balance = self.balance_erc20(account.address()).await?;
@@ -327,7 +343,9 @@ impl<'a> Setup<'a> {
 
         let receipt = self
             .client
-            .send(account, Some(contract_address), None, data)
+            .send(account, Some(contract_address), None, data, |address| {
+                self.client.nonce(address)
+            })
             .await?;
 
         Ok(receipt)

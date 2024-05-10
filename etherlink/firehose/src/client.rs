@@ -12,6 +12,7 @@ use ethers::prelude::*;
 use ethers::providers::{Http, Middleware, Provider};
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::U256;
+use futures::Future;
 use tokio::try_join;
 
 use std::sync::Arc;
@@ -80,7 +81,9 @@ impl Client {
     }
 
     pub async fn controller_xtz_transfer(&self, to: H160, amount: U256) -> Result<()> {
-        let receipt = self.transfer_xtz(&self.controller, to, amount).await?;
+        let receipt = self
+            .transfer_xtz(&self.controller, to, amount, |address| self.nonce(address))
+            .await?;
         println!(
             "{to} funded with {amount} | hash: {:?}",
             receipt.transaction_hash
@@ -88,13 +91,15 @@ impl Client {
         Ok(())
     }
 
-    pub async fn transfer_xtz(
+    pub async fn transfer_xtz<T: Future<Output = Result<U256>>>(
         &self,
         from_wallet: &LocalWallet,
         to: H160,
         amount: U256,
+        get_nonce: impl Fn(H160) -> T,
     ) -> Result<TransactionReceipt> {
-        self.send(from_wallet, Some(to), Some(amount), None).await
+        self.send(from_wallet, Some(to), Some(amount), None, get_nonce)
+            .await
     }
 
     pub async fn transfer_all_xtz(
@@ -144,16 +149,17 @@ impl Client {
         Ok((receipt, balance - fees))
     }
 
-    pub async fn send(
+    pub async fn send<T: Future<Output = Result<U256>>>(
         &self,
         from_wallet: &LocalWallet,
         to: Option<H160>,
         value: Option<U256>,
         data: Option<Bytes>,
+        get_nonce: impl Fn(H160) -> T,
     ) -> Result<TransactionReceipt> {
         let from = from_wallet.address();
 
-        let (gas_price, nonce) = try_join!(self.gas_price(), self.nonce(from))?;
+        let (gas_price, nonce) = try_join!(self.gas_price(), get_nonce(from))?;
 
         let mut tx: TypedTransaction = TransactionRequest::new()
             .from(from)
