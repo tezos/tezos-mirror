@@ -72,6 +72,8 @@ type observer = {
   threshold_encryption_bundler_endpoint : Uri.t option;
   preimages : string;
   preimages_endpoint : Uri.t option;
+  time_between_blocks : time_between_blocks option;
+      (** See {!time_between_blocks}. *)
 }
 
 type proxy = {read_only : bool}
@@ -168,6 +170,7 @@ val observer_config_dft :
   ?preimages_endpoint:Uri.t ->
   evm_node_endpoint:Uri.t ->
   ?threshold_encryption_bundler_endpoint:Uri.t ->
+  ?time_between_blocks:time_between_blocks ->
   unit ->
   observer
 

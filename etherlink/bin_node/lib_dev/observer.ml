@@ -208,7 +208,19 @@ let install_finalizer_observer server =
   let* () = Evm_events_follower.shutdown () in
   Evm_context.shutdown ()
 
-let[@tailrec] rec main_loop ~first_connection ~evm_node_endpoint =
+type error += Timeout
+
+let timeout_from_tbb = function
+  | Some Configuration.Nothing | None ->
+      let p, _ = Lwt.task () in
+      p
+  | Some (Time_between_blocks tbb) ->
+      let open Lwt_result_syntax in
+      let*! _ = Lwt_unix.sleep (tbb +. 1.) in
+      tzfail Timeout
+
+let[@tailrec] rec main_loop ?time_between_blocks ~first_connection
+    ~evm_node_endpoint () =
   let open Lwt_result_syntax in
   let* () =
     when_ (not first_connection) @@ fun () ->
@@ -232,22 +244,41 @@ let[@tailrec] rec main_loop ~first_connection ~evm_node_endpoint =
         ~evm_node_endpoint
         head.next_blueprint_number
         blueprints_stream
+        ~time_between_blocks
   | Error _ ->
-      (main_loop [@tailcall]) ~first_connection:false ~evm_node_endpoint
+      (main_loop [@tailcall])
+        ?time_between_blocks
+        ~first_connection:false
+        ~evm_node_endpoint
+        ()
 
-and[@tailrec] stream_loop ~evm_node_endpoint (Qty next_blueprint_number) stream
-    =
+and[@tailrec] stream_loop ~time_between_blocks ~evm_node_endpoint
+    (Qty next_blueprint_number) stream =
   let open Lwt_result_syntax in
-  let*! candidate = Lwt_stream.get stream in
+  let*! candidate =
+    Lwt.pick
+      [
+        (let*! res = Lwt_stream.get stream in
+         return res);
+        timeout_from_tbb time_between_blocks;
+      ]
+  in
   match candidate with
-  | Some blueprint ->
+  | Ok (Some blueprint) ->
       let* () = on_new_blueprint (Qty next_blueprint_number) blueprint in
       let* _ = Tx_pool.pop_and_inject_transactions () in
       (stream_loop [@tailcall])
         ~evm_node_endpoint
         (Qty (Z.succ next_blueprint_number))
         stream
-  | None -> (main_loop [@tailcall]) ~first_connection:false ~evm_node_endpoint
+        ~time_between_blocks
+  | Ok None | Error [Timeout] ->
+      (main_loop [@tailcall])
+        ~first_connection:false
+        ~evm_node_endpoint
+        ?time_between_blocks
+        ()
+  | Error err -> fail err
 
 let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
@@ -258,6 +289,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
           threshold_encryption_bundler_endpoint;
           preimages;
           preimages_endpoint;
+          time_between_blocks;
         } =
     Configuration.observer_config_exn config
   in
@@ -333,4 +365,4 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
       ()
   in
 
-  main_loop ~first_connection:true ~evm_node_endpoint
+  main_loop ~first_connection:true ~evm_node_endpoint ?time_between_blocks ()
