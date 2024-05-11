@@ -1522,8 +1522,8 @@ let jobs pipeline_type =
           ~name:"test_risc_v_kernels"
           ~changes:changeset_test_risc_v_kernels
           [
-            "make -C src/risc_v check-exclude-ocaml-api";
-            "make -C src/risc_v test-exclude-ocaml-api";
+            "make -C src/risc_v check";
+            "make -C src/risc_v test";
             "make -C src/risc_v audit";
           ]
       in

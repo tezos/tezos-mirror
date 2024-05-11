@@ -1166,12 +1166,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "octez-risc-v-api"
+name = "octez-risc-v-interpreter"
 version = "0.0.0"
 dependencies = [
+ "derive_more",
+ "enum-tag",
+ "goblin",
+ "hex",
+ "ieee-apsqrt",
+ "lazy_static",
+ "num_enum",
  "ocaml",
  "ocaml-build",
- "risc-v-interpreter",
+ "paste",
+ "proptest",
+ "rand 0.8.5",
+ "rustc_apfloat",
+ "rvemu",
+ "strum 0.26.2",
+ "tezos-smart-rollup-constants",
+ "thiserror",
+ "twiddle",
+ "vm-fdt",
 ]
 
 [[package]]
@@ -1534,29 +1550,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
-name = "risc-v-interpreter"
-version = "0.0.0"
-dependencies = [
- "derive_more",
- "enum-tag",
- "goblin",
- "hex",
- "ieee-apsqrt",
- "lazy_static",
- "num_enum",
- "paste",
- "proptest",
- "rand 0.8.5",
- "rustc_apfloat",
- "rvemu",
- "strum 0.26.2",
- "tezos-smart-rollup-constants",
- "thiserror",
- "twiddle",
- "vm-fdt",
-]
-
-[[package]]
 name = "risc-v-sandbox"
 version = "0.0.0"
 dependencies = [
@@ -1572,9 +1565,9 @@ dependencies = [
  "itertools",
  "meansd",
  "numfmt",
+ "octez-risc-v-interpreter",
  "quanta",
  "ratatui",
- "risc-v-interpreter",
  "rvemu",
  "serde",
  "serde_json",

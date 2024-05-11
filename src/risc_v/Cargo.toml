@@ -3,7 +3,6 @@ resolver = "2"
 members = [
   # Libraries
   "interpreter",
-  "api",
   # Executables
   "sandbox",
 ]
@@ -24,6 +23,8 @@ rustc_apfloat = "0.2.0"
 thiserror = "1.0.57"
 twiddle = "1.1.0"
 vm-fdt = "0.3.0"
+ocaml-build = "^1.0.0-beta"
+ocaml = "^1.0.0-beta"
 
 [workspace.dependencies.rvemu]
 git = "https://github.com/vapourismo/rvemu.git"

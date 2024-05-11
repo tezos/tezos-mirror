@@ -1852,12 +1852,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "octez-risc-v-api"
+name = "octez-risc-v-interpreter"
 version = "0.0.0"
 dependencies = [
+ "derive_more",
+ "enum-tag",
+ "goblin",
+ "ieee-apsqrt",
+ "num_enum",
  "ocaml",
  "ocaml-build",
- "risc-v-interpreter",
+ "paste",
+ "rustc_apfloat",
+ "rvemu",
+ "strum",
+ "tezos-smart-rollup-constants",
+ "thiserror",
+ "twiddle",
+ "vm-fdt",
 ]
 
 [[package]]
@@ -1865,7 +1877,7 @@ name = "octez-rust-deps"
 version = "0.0.0"
 dependencies = [
  "librustzcash",
- "octez-risc-v-api",
+ "octez-risc-v-interpreter",
  "wasmer-c-api",
 ]
 
@@ -2462,25 +2474,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
 dependencies = [
  "digest 0.10.7",
-]
-
-[[package]]
-name = "risc-v-interpreter"
-version = "0.0.0"
-dependencies = [
- "derive_more",
- "enum-tag",
- "goblin",
- "ieee-apsqrt",
- "num_enum",
- "paste",
- "rustc_apfloat",
- "rvemu",
- "strum",
- "tezos-smart-rollup-constants",
- "thiserror",
- "twiddle",
- "vm-fdt",
 ]
 
 [[package]]

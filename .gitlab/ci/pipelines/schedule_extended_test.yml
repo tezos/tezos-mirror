@@ -6895,8 +6895,8 @@ test_risc_v_kernels:
     paths:
     - cargo/
   script:
-  - make -C src/risc_v check-exclude-ocaml-api
-  - make -C src/risc_v test-exclude-ocaml-api
+  - make -C src/risc_v check
+  - make -C src/risc_v test
   - make -C src/risc_v audit
   variables:
     CC: clang

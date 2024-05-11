@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use risc_v_interpreter::{
+use octez_risc_v_interpreter::{
     machine_state::{
         mode::Mode,
         registers::{gp, XRegister, XValue},

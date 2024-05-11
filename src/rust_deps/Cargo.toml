@@ -14,5 +14,6 @@ features = ["singlepass", "cranelift", "wat", "middlewares"]
 [dependencies.librustzcash]
 path = "librustzcash"
 
-[dependencies.octez-risc-v-api]
-path = "../risc_v/api"
+[dependencies.octez-risc-v-interpreter]
+path = "../risc_v/interpreter"
+features = ["ocaml-api"]
