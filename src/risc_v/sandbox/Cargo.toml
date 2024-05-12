@@ -8,45 +8,29 @@ name = "risc-v-sandbox"
 path = "src/main.rs"
 
 [dependencies]
-goblin = "0.7.1"
-derive_more = "0.99.17"
-vm-fdt = "0.3.0"
-tezos_crypto_rs = "0.5.2"
-ed25519-dalek = "2.1.0"
-color-eyre = "0.6.2"
-crossterm = "0.27.0"
-ratatui = "0.26.1"
-serde_json = "1.0.115"
-quanta = "0.12.3"
-strum = "0.26.2"
-enum-tag = "0.3.0"
-meansd = "2.1.0"
-numfmt = "1.1.1"
-itertools = "0.12.1"
-comfy-table = "7.1.1"
-
-[dependencies.clap]
-version = "4.4.6"
-features = ["derive"]
-
-[dependencies.serde]
-version = "1.0.197"
-features = ["derive"]
-
-[dependencies.hex]
-version = "0.4.3"
-features = ["serde"]
+clap.workspace = true
+color-eyre.workspace = true
+comfy-table.workspace = true
+crossterm.workspace = true
+derive_more.workspace = true
+ed25519-dalek.workspace = true
+enum-tag.workspace = true
+goblin.workspace = true
+hex.workspace = true
+itertools.workspace = true
+meansd.workspace = true
+numfmt.workspace = true
+quanta.workspace = true
+ratatui.workspace = true
+rvemu.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+strum.workspace = true
+tezos-smart-rollup-constants.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos_crypto_rs.workspace = true
+vm-fdt.workspace = true
 
 [dependencies.risc-v-interpreter]
 package = "octez-risc-v-interpreter"
 path = "../interpreter"
-
-[dependencies.rvemu]
-git = "https://github.com/vapourismo/rvemu.git"
-branch = "pub-translate"
-
-[dependencies.tezos-smart-rollup-encoding]
-path = "../../kernel_sdk/encoding"
-
-[dependencies.tezos-smart-rollup-constants]
-path = "../../kernel_sdk/constants"

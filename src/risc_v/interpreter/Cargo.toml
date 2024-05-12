@@ -4,21 +4,19 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
+derive_more.workspace = true
 enum-tag.workspace = true
+goblin.workspace = true
+ieee-apsqrt.workspace = true
 num_enum.workspace = true
 paste.workspace = true
+rustc_apfloat.workspace = true
+rvemu.workspace = true
+strum.workspace = true
+tezos-smart-rollup-constants.workspace = true
 thiserror.workspace = true
 twiddle.workspace = true
 vm-fdt.workspace = true
-rustc_apfloat.workspace = true
-ieee-apsqrt.workspace = true
-goblin.workspace = true
-derive_more.workspace = true
-rvemu.workspace = true
-strum.workspace = true
-
-[dependencies.tezos-smart-rollup-constants]
-path = "../../kernel_sdk/constants"
 
 [dependencies.ocaml]
 workspace = true
