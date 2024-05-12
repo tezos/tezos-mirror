@@ -7,13 +7,7 @@ use super::{
     DebuggerApp, Instruction, SATPModeState, TranslationState, BLUE, GRAY, GREEN, NEXT_STYLE_FG,
     ORANGE, RED, SELECTED_STYLE_FG, YELLOW,
 };
-use ratatui::{
-    prelude::*,
-    style::Stylize,
-    symbols::border,
-    widgets::{block::*, *},
-};
-use risc_v_interpreter::{
+use octez_riscv::{
     machine_state::{
         csregisters::{
             self,
@@ -24,6 +18,12 @@ use risc_v_interpreter::{
         registers,
     },
     InterpreterResult,
+};
+use ratatui::{
+    prelude::*,
+    style::Stylize,
+    symbols::border,
+    widgets::{block::*, *},
 };
 
 macro_rules! xregister_line {

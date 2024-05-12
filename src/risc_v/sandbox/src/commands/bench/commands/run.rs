@@ -11,7 +11,7 @@ use crate::{
     posix_exit_mode,
 };
 use enum_tag::EnumTag;
-use risc_v_interpreter::{
+use octez_riscv::{
     machine_state::bus::Address,
     parser::{instruction::Instr, parse},
     Interpreter, InterpreterResult,

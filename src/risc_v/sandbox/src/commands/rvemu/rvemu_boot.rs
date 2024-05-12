@@ -8,7 +8,7 @@
 #![allow(dead_code)]
 
 use super::devicetree;
-use risc_v_interpreter::kernel_loader::{self, LoadResult, Memory};
+use octez_riscv::kernel_loader::{self, LoadResult, Memory};
 use rvemu::{cpu::Mode, emulator::Emulator};
 use std::{error::Error, fs};
 
