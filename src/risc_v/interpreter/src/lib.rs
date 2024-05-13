@@ -7,6 +7,7 @@ pub mod bits;
 pub mod devicetree;
 pub mod exec_env;
 mod interpreter;
+pub mod kernel_loader;
 pub mod machine_state;
 pub mod parser;
 pub mod program;

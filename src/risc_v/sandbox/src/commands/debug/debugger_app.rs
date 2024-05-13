@@ -9,6 +9,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use risc_v_interpreter::{
     bits::Bits64,
+    kernel_loader,
     machine_state::{
         bus::Address,
         csregisters::satp::{Satp, SvLength, TranslationAlgorithm},

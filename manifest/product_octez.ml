@@ -4566,7 +4566,6 @@ let octez_risc_v =
         [S "source_tree"; S ".cargo"];
         [S "source_tree"; S "api"];
         [S "source_tree"; S "pvm"];
-        [S "source_tree"; S "kernel_loader"];
         [S "source_tree"; S "interpreter"];
         (* We have to include all the locally mentioned Cargo.toml files
          * within the workspace (including transitively). *)

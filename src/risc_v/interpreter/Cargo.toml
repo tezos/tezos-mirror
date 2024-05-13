@@ -4,33 +4,24 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-derive_more = "0.99.17"
-enum-tag = "0.3.0"
-num_enum = "0.7.2"
-paste = "1.0.14"
-thiserror = "1.0.57"
-twiddle = "1.1.0"
-vm-fdt = "0.3.0"
-
-[dependencies.strum]
-version = "0.26.1"
-features = ["derive"]
-
-[dependencies.kernel-loader]
-path = "../kernel_loader"
-
-[dependencies.rustc_apfloat]
-workspace = true
-
-[dependencies.ieee-apsqrt]
-workspace = true
+enum-tag.workspace = true
+num_enum.workspace = true
+paste.workspace = true
+thiserror.workspace = true
+twiddle.workspace = true
+vm-fdt.workspace = true
+rustc_apfloat.workspace = true
+ieee-apsqrt.workspace = true
+goblin.workspace = true
+derive_more.workspace = true
+rvemu.workspace = true
+strum.workspace = true
 
 [dev-dependencies]
-goblin = "0.7.1"
-hex = "0.4.3"
-rand = "0.8.5"
-proptest = "1.4.0"
-lazy_static = "1.4.0"
+hex.workspace = true
+rand.workspace = true
+proptest.workspace = true
+lazy_static.workspace = true
 
 [dependencies.tezos-smart-rollup-constants]
 path = "../../kernel_sdk/constants"

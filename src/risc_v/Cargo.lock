@@ -852,15 +852,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel-loader"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "goblin",
- "rvemu",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1547,13 +1538,13 @@ dependencies = [
  "goblin",
  "hex",
  "ieee-apsqrt",
- "kernel-loader",
  "lazy_static",
  "num_enum",
  "paste",
  "proptest",
  "rand 0.8.5",
  "rustc_apfloat",
+ "rvemu",
  "strum 0.26.2",
  "tezos-smart-rollup-constants",
  "thiserror",
@@ -1574,7 +1565,6 @@ dependencies = [
  "goblin",
  "hex",
  "itertools",
- "kernel-loader",
  "meansd",
  "numfmt",
  "quanta",
