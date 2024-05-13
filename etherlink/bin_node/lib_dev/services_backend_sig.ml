@@ -54,6 +54,10 @@ module type S = sig
       stored block number. *)
   val current_block_number : unit -> Ethereum_types.quantity tzresult Lwt.t
 
+  val block_param_to_block_number :
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity tzresult Lwt.t
+
   (** [nth_block_hash n] returns the hash of the [n]th processed and
       stored block. *)
   val nth_block_hash : Z.t -> Ethereum_types.block_hash option tzresult Lwt.t
@@ -145,6 +149,12 @@ module type Backend = sig
 
   module SimulatorBackend : Simulator.SimulationBackend
 
+  (** [block_param_to_block_number block_param] returns the block number of the
+      block identified by [block_param]. *)
+  val block_param_to_block_number :
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.quantity tzresult Lwt.t
+
   val smart_rollup_address : string
 
   val mode : mode
@@ -155,6 +165,8 @@ module Make (Backend : Backend) : S = struct
   include Durable_storage.Make (Backend.Reader)
   include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
   include Simulator.Make (Backend.SimulatorBackend)
+
+  let block_param_to_block_number = Backend.block_param_to_block_number
 
   let smart_rollup_address = Backend.smart_rollup_address
 

@@ -24,6 +24,9 @@
 
 ### Bug fixes
 
+- The RPC `eth_getBlockByNumber` correctly interprets its block parameter
+  argument. (!13201)
+
 ### Breaking changes
 
 ### Internal

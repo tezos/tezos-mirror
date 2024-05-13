@@ -122,6 +122,39 @@ end) : Services_backend_sig.Backend = struct
           | _ -> failwith "Inconsistent simulation results")
   end
 
+  let block_param_to_block_number
+      (block_param : Ethereum_types.Block_parameter.extended) =
+    let open Lwt_result_syntax in
+    match block_param with
+    | Block_parameter (Number n) -> return n
+    | Block_parameter (Earliest | Latest) -> (
+        let* value =
+          Reader.read
+            ~block:(Block_parameter Latest)
+            Durable_storage_path.Block.current_number
+        in
+        match value with
+        | Some value ->
+            return (Ethereum_types.Qty (Bytes.to_string value |> Z.of_bits))
+        | None -> failwith "Cannot read current number")
+    | Block_parameter Pending ->
+        failwith "Pending block parameter is not supported"
+    | Block_hash {hash; _} -> (
+        let* value =
+          Reader.read
+            ~block:(Block_parameter Latest)
+            (Durable_storage_path.Block.by_hash hash)
+        in
+        match value with
+        | Some value ->
+            let block = Ethereum_types.block_from_rlp value in
+            return block.number
+        | None ->
+            failwith
+              "Missing state for block %a"
+              Ethereum_types.pp_block_hash
+              hash)
+
   let smart_rollup_address = Base.smart_rollup_address
 
   let mode = Services_backend_sig.Proxy

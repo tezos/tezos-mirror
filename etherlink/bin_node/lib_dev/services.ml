@@ -80,11 +80,11 @@ let dispatch_service ~path =
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
-  match block_param with
-  | Ethereum_types.(Block_parameter.Number (Qty n)) ->
-      Rollup_node_rpc.nth_block ~full_transaction_object n
-  | Latest | Earliest | Pending ->
-      Rollup_node_rpc.current_block ~full_transaction_object
+  let open Lwt_result_syntax in
+  let* (Ethereum_types.Qty n) =
+    Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
+  in
+  Rollup_node_rpc.nth_block ~full_transaction_object n
 
 let get_transaction_from_index block index
     (module Rollup_node_rpc : Services_backend_sig.S) =

@@ -233,7 +233,8 @@ module Q = struct
 
     let get_earliest =
       (unit ->? t2 level context_hash)
-      @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id ASC LIMIT 1|eos}
+      @@ {|SELECT id, context_hash FROM context_hashes
+           WHERE id >= 0 ORDER BY id ASC LIMIT 1|}
 
     let clear_after =
       (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}

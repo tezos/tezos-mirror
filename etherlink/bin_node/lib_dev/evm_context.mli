@@ -129,3 +129,7 @@ val replay :
   ?alter_evm_state:(Evm_state.t -> Evm_state.t tzresult Lwt.t) ->
   Ethereum_types.quantity ->
   Evm_state.apply_result tzresult Lwt.t
+
+val block_param_to_block_number :
+  Ethereum_types.Block_parameter.extended ->
+  Ethereum_types.quantity tzresult Lwt.t
