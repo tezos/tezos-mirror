@@ -23,13 +23,11 @@ use evm_execution::{account_storage, handler::ExecutionOutcome, precompiles};
 use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
-use sha3::{Digest, Keccak256};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::rlp_helpers::{
     append_option_u64_le, check_list, decode_field, decode_option, decode_option_u64_le,
     next,
 };
-use tezos_ethereum::transaction::TransactionObject;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_smart_rollup_host::runtime::Runtime;
@@ -74,9 +72,9 @@ pub struct ExecutionResult {
 
 type CallResult = SimulationResult<ExecutionResult, Vec<u8>>;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ValidationResult {
-    transaction_object: TransactionObject,
+    address: H160,
 }
 
 impl<T: Encodable, E: Encodable> Encodable for SimulationResult<T, E> {
@@ -129,14 +127,14 @@ impl Decodable for ExecutionResult {
 
 impl Encodable for ValidationResult {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        self.transaction_object.rlp_append(stream);
+        stream.append(&self.address);
     }
 }
 
 impl Decodable for ValidationResult {
     fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
         Ok(ValidationResult {
-            transaction_object: TransactionObject::decode(decoder)?,
+            address: decode_field(decoder, "caller")?,
         })
     }
 }
@@ -407,21 +405,7 @@ impl TxValidation {
                 ..
             })) => Self::to_error(OUT_OF_TICKS_MSG),
             Ok(None) => Self::to_error(CANNOT_PREPAY),
-            _ => Ok(SimulationResult::Ok(ValidationResult {
-                transaction_object: TransactionObject {
-                    block_number: U256::zero(),
-                    from: *caller,
-                    to: transaction.to,
-                    gas_used: transaction.gas_limit_with_fees().into(),
-                    gas_price: transaction.max_fee_per_gas,
-                    hash: Keccak256::digest(transaction.to_bytes()).into(),
-                    input: transaction.data.clone(),
-                    nonce: transaction.nonce,
-                    index: 0,
-                    value: transaction.value,
-                    signature: transaction.signature.clone(),
-                },
-            })),
+            _ => Ok(SimulationResult::Ok(ValidationResult { address: *caller })),
         }
     }
 
@@ -1120,27 +1104,8 @@ mod tests {
     fn test_simulation_result_encoding_roundtrip() {
         let valid: SimulationResult<ValidationResult, String> =
             SimulationResult::Ok(ValidationResult {
-                transaction_object: TransactionObject {
-                    block_number: U256::from(532532),
-                    from: address_of_str("3535353535353535353535353535353535353535")
-                        .unwrap(),
-                    gas_used: U256::from(32523),
-                    gas_price: U256::from(100432432),
-                    hash: [5; 32],
-                    input: vec![],
-                    nonce: 8888,
-                    to: address_of_str("3635353535353535353535353535353535353536"),
-                    index: 15u32,
-                    value: U256::from(0),
-                    signature: Some(
-                        TxSignature::new(
-                            U256::from(1337),
-                            H256::from_low_u64_be(1),
-                            H256::from_low_u64_be(2),
-                        )
-                        .unwrap(),
-                    ),
-                },
+                address: address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9")
+                    .unwrap(),
             });
         let call: SimulationResult<CallResult, String> =
             SimulationResult::Ok(SimulationResult::Ok(ExecutionResult {

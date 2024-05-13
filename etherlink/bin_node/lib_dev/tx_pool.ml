@@ -17,8 +17,7 @@ module Pool = struct
     gas_price : Z.t; (* The maximum price the user can pay for fees. *)
     gas_limit : Z.t; (* The maximum limit the user can reach in terms of gas. *)
     inclusion_timestamp : Time.Protocol.t;
-    (* Time of inclusion in the transaction pool. *)
-    transaction_object : Ethereum_types.transaction_object;
+        (* Time of inclusion in the transaction pool. *)
   }
 
   type t = {
@@ -28,58 +27,8 @@ module Pool = struct
 
   let empty : t = {transactions = Pkey_map.empty; global_index = Int64.zero}
 
-  let get_pool {transactions; global_index = _} addr_balance_nonce_map =
-    let find_balance_and_nonce address =
-      match Ethereum_types.AddressMap.find address addr_balance_nonce_map with
-      | Some nonce -> nonce
-      | None -> (Z.zero, Z.zero)
-    in
-    let is_transaction_pending
-        (transaction_object : Ethereum_types.transaction_object)
-        (address_balance : Z.t) (address_nonce : Z.t) : bool =
-      let (Qty gas_limit) = transaction_object.gas in
-      let (Qty gas_price) = transaction_object.gasPrice in
-      transaction_object.nonce == Ethereum_types.quantity_of_z address_nonce
-      && address_balance >= Z.(gas_limit * gas_price)
-    in
-    let add_transaction_object_to_map nonce transaction_object pending_map
-        queued_map address_balance address_nonce =
-      if is_transaction_pending transaction_object address_balance address_nonce
-      then
-        ( Ethereum_types.NonceMap.add nonce transaction_object pending_map,
-          queued_map )
-      else
-        ( pending_map,
-          Ethereum_types.NonceMap.add nonce transaction_object queued_map )
-    in
-    let add_if_non_empty address nonce_map acc_address_map =
-      if Ethereum_types.NonceMap.cardinal nonce_map == 0 then acc_address_map
-      else Ethereum_types.AddressMap.add address nonce_map acc_address_map
-    in
-    Pkey_map.fold
-      (fun address nonce_tx_map (acc_address_map_pending, acc_address_map_queued)
-           ->
-        let address_balance, address_nonce = find_balance_and_nonce address in
-        let pending, queued =
-          Nonce_map.fold
-            (fun nonce transaction (pending_map, queued_map) ->
-              add_transaction_object_to_map
-                nonce
-                transaction.transaction_object
-                pending_map
-                queued_map
-                address_balance
-                address_nonce)
-            nonce_tx_map
-            (Ethereum_types.NonceMap.empty, Ethereum_types.NonceMap.empty)
-        in
-        ( add_if_non_empty address pending acc_address_map_pending,
-          add_if_non_empty address queued acc_address_map_queued ))
-      transactions
-      (Ethereum_types.AddressMap.empty, Ethereum_types.AddressMap.empty)
-
   (** Add a transaction to the pool. *)
-  let add {transactions; global_index} pkey raw_tx transaction_object =
+  let add {transactions; global_index} pkey raw_tx =
     let open Result_syntax in
     let* nonce = Ethereum_types.transaction_nonce raw_tx in
     let* gas_price = Ethereum_types.transaction_gas_price raw_tx in
@@ -94,7 +43,6 @@ module Pool = struct
           gas_price;
           gas_limit;
           inclusion_timestamp;
-          transaction_object;
         }
       in
       Pkey_map.update
@@ -357,7 +305,6 @@ let on_normal_transaction state tx_raw =
   } =
     state
   in
-
   let* is_valid = Rollup_node.is_tx_valid tx_raw in
   match is_valid with
   | Error err ->
@@ -366,8 +313,7 @@ let on_normal_transaction state tx_raw =
           ~transaction:(Hex.of_string tx_raw |> Hex.show)
       in
       return (Error err)
-  | Ok transaction_object ->
-      let address = transaction_object.from in
+  | Ok {address} ->
       let*? tx_data = Ethereum_types.transaction_data tx_raw in
       if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
         let*! () = Tx_pool_events.tx_data_size_limit_reached () in
@@ -383,15 +329,12 @@ let on_normal_transaction state tx_raw =
         if address_boundaries_are_reached then return @@ Error error_msg
         else
           (* Add the transaction to the pool *)
-          let address = transaction_object.from in
+          let*? pool = Pool.add pool address tx_raw in
           (* Compute the hash *)
           let tx_hash = Ethereum_types.hash_raw_tx tx_raw in
           let hash =
             Ethereum_types.hash_of_string Hex.(of_string tx_hash |> show)
           in
-
-          let*? pool = Pool.add pool address tx_raw transaction_object in
-
           let*! () =
             Tx_pool_events.add_transaction
               ~transaction:(Ethereum_types.hash_to_string hash)
@@ -766,35 +709,3 @@ let size_info () =
   let*? worker = Lazy.force worker in
   Worker.Queue.push_request_and_wait worker Request.Size_info
   |> handle_request_error
-
-let get_tx_pool_content () =
-  let open Lwt_result_syntax in
-  let*? w = Lazy.force worker in
-  let Types.{rollup_node = (module Rollup_node); pool; _} = Worker.state w in
-  let addresses = Pool.addresses pool in
-  let*! addr_with_balance_nonces =
-    Lwt_list.map_p
-      (fun address ->
-        let* nonce =
-          Rollup_node.nonce
-            address
-            Ethereum_types.Block_parameter.(Block_parameter Latest)
-        in
-        let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
-        let* (Qty balance) =
-          Rollup_node.balance
-            address
-            Ethereum_types.Block_parameter.(Block_parameter Latest)
-        in
-        Lwt.return_ok (address, balance, nonce))
-      addresses
-  in
-  let addr_balance_nonce_map =
-    List.fold_left
-      (fun acc (address, balance, nonce) ->
-        Ethereum_types.AddressMap.add address (balance, nonce) acc)
-      Ethereum_types.AddressMap.empty
-      (List.filter_ok addr_with_balance_nonces)
-  in
-  let pending, queued = Pool.get_pool pool addr_balance_nonce_map in
-  return Ethereum_types.{pending; queued}
