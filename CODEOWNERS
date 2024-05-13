@@ -15,9 +15,14 @@
 # Insert code owner declarations here!
 # ************************************
 
-
 /etherlink/bin_dsn_node               @jtcoolen @hantang.sun @m-kus
 /etherlink/tezt                       @jtcoolen @hantang.sun @m-kus
+/brassaia                    @mattiasdrp
+
+/irmin                    @mattiasdrp
+
+/src/lib_context_brassaia    @mattiasdrp
+/src/lib_context             @mattiasdrp
 
 # Octez Merge Team
 #
