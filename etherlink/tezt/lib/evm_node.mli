@@ -76,6 +76,36 @@ type mode =
           (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
               simultaneously inside the pool. *)
     }
+  | Threshold_encryption_sequencer of {
+      initial_kernel : string;
+          (** Path to the initial kernel used by the sequencer. *)
+      preimage_dir : string option;
+          (** Path to the directory with the associated preimages. *)
+      private_rpc_port : int option;  (** Port for private RPC server*)
+      time_between_blocks : time_between_blocks option;
+          (** See {!time_between_blocks}, if the value is not
+              provided, the sequencer uses it default value. *)
+      sequencer : string;  (** Secret key used to sign the blueprints. *)
+      genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
+      max_blueprints_lag : int option;
+      max_blueprints_ahead : int option;
+      max_blueprints_catchup : int option;
+      catchup_cooldown : int option;
+      max_number_of_chunks : int option;
+      devmode : bool;  (** --devmode flag. *)
+      wallet_dir : string option;  (** --wallet-dir: client directory. *)
+      tx_pool_timeout_limit : int option;
+          (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
+      tx_pool_addr_limit : int option;
+          (** --tx-pool-addr-limit: maximum address allowed simultaneously inside
+              the pool. *)
+      tx_pool_tx_per_addr_limit : int option;
+          (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
+              simultaneously inside the pool. *)
+      sequencer_sidecar_endpoint : string;
+          (** --sequencer-sidecar-endpoint: Uri of the sidecar endpoints to which
+              proposals are forwarded, and from where preblocks are fetched. *)
+    }
   | Proxy of {devmode : bool  (** --devmode flag. *)}
 
 (** Returns the mode of the EVM node. *)

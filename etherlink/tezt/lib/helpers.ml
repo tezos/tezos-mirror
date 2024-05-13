@@ -56,7 +56,7 @@ let next_evm_level ~evm_node ~sc_rollup_node ~client =
   | Proxy _ ->
       let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
       unit
-  | Sequencer _ ->
+  | Sequencer _ | Threshold_encryption_sequencer _ ->
       let open Rpc.Syntax in
       let*@ _l2_level = Rpc.produce_block evm_node in
       unit

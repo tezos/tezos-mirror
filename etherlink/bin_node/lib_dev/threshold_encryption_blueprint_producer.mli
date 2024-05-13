@@ -8,7 +8,9 @@
 type parameters = {
   cctxt : Client_context.wallet;
   smart_rollup_address : string;
+  sidecar_endpoint : Uri.t;
   sequencer_key : Client_keys.sk_uri;
+  keep_alive : bool;
 }
 
 (** [start parameters] starts the events follower. *)

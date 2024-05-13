@@ -8,13 +8,22 @@
 type parameters = {
   cctxt : Client_context.wallet;
   smart_rollup_address : string;
+  sidecar_endpoint : Uri.t;
   sequencer_key : Client_keys.sk_uri;
+  keep_alive : bool;
 }
 
 module Types = struct
   type nonrec parameters = parameters
 
-  type state = parameters
+  type state = {
+    cctxt : Client_context.wallet;
+    smart_rollup_address : string;
+    sidecar_endpoint : Uri.t;
+    sequencer_key : Client_keys.sk_uri;
+    preblocks_stream : Threshold_encryption_types.preblock Lwt_stream.t;
+    keep_alive : bool;
+  }
 end
 
 module Name = struct
@@ -84,11 +93,42 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 type worker = Worker.infinite Worker.queue Worker.t
 
 let produce_blueprint ~force ~timestamp ~sequencer_key ~cctxt
-    ~smart_rollup_address transactions delayed_transactions =
+    ~smart_rollup_address ~sidecar_endpoint ~preblocks_stream ~keep_alive
+    transactions delayed_transactions =
   let open Lwt_result_syntax in
   let n = List.length transactions + List.length delayed_transactions in
   if force || n > 0 then
     let*! head_info = Evm_context.head_info () in
+    let proposal : Threshold_encryption_types.proposal =
+      Threshold_encryption_types.
+        {
+          transactions;
+          delayed_transaction_hashes = delayed_transactions;
+          previous_block_hash = head_info.current_block_hash;
+          current_blueprint_number = head_info.next_blueprint_number;
+          timestamp;
+        }
+    in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7189
+       Handle reconnections, timeouts and stream closed on server side. *)
+    let* () =
+      Threshold_encryption_services.submit_proposal
+        ~keep_alive
+        ~sidecar_endpoint
+        proposal
+    in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7191
+       Receiving preblocks should be handled asynchronously from proposal submission. *)
+    let*! Threshold_encryption_types.
+            {
+              transactions;
+              delayed_transaction_hashes;
+              previous_block_hash;
+              current_blueprint_number;
+              timestamp;
+            } =
+      Lwt_stream.next preblocks_stream
+    in
     Helpers.with_timing
       (Blueprint_events.blueprint_production head_info.next_blueprint_number)
     @@ fun () ->
@@ -101,14 +141,16 @@ let produce_blueprint ~force ~timestamp ~sequencer_key ~cctxt
         ~cctxt
         ~timestamp
         ~smart_rollup_address
-        ~transactions
-        ~delayed_transactions
-        ~parent_hash:head_info.current_block_hash
-        ~number:head_info.next_blueprint_number
+        ~transactions:
+          (List.map
+             Threshold_encryption_types.Transaction.to_string
+             transactions)
+        ~delayed_transactions:delayed_transaction_hashes
+        ~parent_hash:previous_block_hash
+        ~number:current_blueprint_number
     in
     let blueprint =
-      Blueprint_types.
-        {payload; timestamp; number = head_info.next_blueprint_number}
+      Blueprint_types.{payload; timestamp; number = current_blueprint_number}
     in
     return @@ Some (blueprint, delayed_transactions, n)
   else return None
@@ -126,20 +168,57 @@ module Handlers = struct
     | Request.Produce_blueprint
         (timestamp, force, transactions, delayed_transactions) ->
         protect @@ fun () ->
-        let {cctxt; smart_rollup_address; sequencer_key} = state in
+        let ({
+               sequencer_key;
+               cctxt;
+               smart_rollup_address;
+               sidecar_endpoint;
+               preblocks_stream;
+               keep_alive;
+             }
+              : Types.state) =
+          state
+        in
         produce_blueprint
+          ~keep_alive
           ~cctxt
           ~smart_rollup_address
           ~sequencer_key
           ~force
           ~timestamp
-          transactions
+          ~sidecar_endpoint
+          ~preblocks_stream
+          (List.map
+             Threshold_encryption_types.Transaction.of_string
+             transactions)
           delayed_transactions
 
   type launch_error = error trace
 
-  let on_launch _w () (parameters : Types.parameters) =
-    Lwt_result_syntax.return parameters
+  let on_launch _w ()
+      ({
+         sequencer_key;
+         cctxt;
+         smart_rollup_address;
+         sidecar_endpoint;
+         keep_alive;
+       } :
+        Types.parameters) =
+    let open Lwt_result_syntax in
+    let* preblocks_stream =
+      Threshold_encryption_services.monitor_preblocks ~sidecar_endpoint ()
+    in
+    let state : Types.state =
+      {
+        sequencer_key;
+        cctxt;
+        smart_rollup_address;
+        sidecar_endpoint;
+        preblocks_stream;
+        keep_alive;
+      }
+    in
+    return state
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
       unit tzresult Lwt.t =

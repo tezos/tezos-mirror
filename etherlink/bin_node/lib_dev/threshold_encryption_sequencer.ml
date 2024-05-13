@@ -156,7 +156,8 @@ let start_server
       return (server, private_server))
     (fun _ -> return (server, private_server))
 
-let loop_sequencer (sequencer_config : Configuration.sequencer) =
+let loop_sequencer
+    (Configuration.Threshold_encryption_sequencer sequencer_config) =
   let open Lwt_result_syntax in
   let time_between_blocks = sequencer_config.time_between_blocks in
   let rec loop last_produced_block =
@@ -195,7 +196,7 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
       ~keep_alive:configuration.keep_alive
       rollup_node_endpoint
   in
-  let*? threshold_encryption_sequencer_config =
+  let*? (Threshold_encryption_sequencer threshold_encryption_sequencer_config) =
     Configuration.threshold_encryption_sequencer_config_exn configuration
   in
   let* status =
@@ -267,6 +268,9 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
         cctxt;
         smart_rollup_address;
         sequencer_key = threshold_encryption_sequencer_config.sequencer;
+        sidecar_endpoint =
+          threshold_encryption_sequencer_config.sidecar_endpoint;
+        keep_alive = configuration.keep_alive;
       }
   in
   let* () =
@@ -312,5 +316,8 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
   let (_ : Lwt_exit.clean_up_callback_id) =
     install_finalizer_seq server private_server
   in
-  let* () = loop_sequencer threshold_encryption_sequencer_config in
+  let* () =
+    loop_sequencer
+    @@ Threshold_encryption_sequencer threshold_encryption_sequencer_config
+  in
   return_unit
