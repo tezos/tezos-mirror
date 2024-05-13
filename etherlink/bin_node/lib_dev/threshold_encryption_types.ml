@@ -65,6 +65,8 @@ let proposal_encoding =
        (req "timestamp" Time.Protocol.rfc_encoding)
        (req "current_blueprint_number" Ethereum_types.quantity_encoding))
 
+(* https://gitlab.com/tezos/tezos/-/issues/7246
+   Distinguish between proposal request and preblock timestamps. *)
 type preblock = proposal
 
 let preblock_encoding = proposal_encoding

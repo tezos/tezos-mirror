@@ -44,6 +44,8 @@ type proposal = {
 (** Encoding for proposals. *)
 val proposal_encoding : proposal Data_encoding.t
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7209
+   Revisit the terminology for preblock. *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7199
    Avoid exposing this type equality. *)
 

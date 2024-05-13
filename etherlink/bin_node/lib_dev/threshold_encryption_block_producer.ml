@@ -5,52 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {maximum_number_of_chunks : int}
-
-(* The size of a delayed transaction is overapproximated to the maximum size
-   of an inbox message, as chunks are not supported in the delayed bridge. *)
-let maximum_delayed_transaction_size = 4096
-
-(*
-   The legacy transactions are as follows:
-  -----------------------------
-  | Nonce    | Up to 32 bytes |
-  -----------------------------
-  | GasPrice | Up to 32 bytes |
-  -----------------------------
-  | GasLimit | Up to 32 bytes |
-  -----------------------------
-  | To       | 20 bytes addr  |
-  -----------------------------
-  | Value    | Up to 32 bytes |
-  -----------------------------
-  | Data     | 0 - unlimited  |
-  -----------------------------
-  | V        | 1 (usually)    |
-  -----------------------------
-  | R        | 32 bytes       |
-  -----------------------------
-  | S        | 32 bytes       |
-  -----------------------------
-
-   where `up to` start at 0, and encoded as the empty byte for the 0 value
-   according to RLP specification.
-*)
-let minimum_ethereum_transaction_size =
-  Rlp.(
-    List
-      [
-        Value Bytes.empty;
-        Value Bytes.empty;
-        Value Bytes.empty;
-        Value (Bytes.make 20 '\000');
-        Value Bytes.empty;
-        Value Bytes.empty;
-        Value Bytes.empty;
-        Value (Bytes.make 32 '\000');
-        Value (Bytes.make 32 '\000');
-      ]
-    |> encode |> Bytes.length)
+type parameters = {
+  cctxt : Client_context.wallet;
+  smart_rollup_address : string;
+  sequencer_key : Client_keys.sk_uri;
+}
 
 module Types = struct
   type nonrec parameters = parameters
@@ -73,7 +32,7 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Produce_block : (Time.Protocol.t * bool) -> (int, tztrace) t
+    | Produce_block : Threshold_encryption_types.preblock -> (int, tztrace) t
 
   type view = View : _ t -> view
 
@@ -86,15 +45,11 @@ module Request = struct
         case
           (Tag 0)
           ~title:"Produce_block"
-          (obj3
+          (obj2
              (req "request" (constant "produce_block"))
-             (req "timestamp" Time.Protocol.encoding)
-             (req "force" bool))
-          (function
-            | View (Produce_block (timestamp, force)) ->
-                Some ((), timestamp, force))
-          (fun ((), timestamp, force) ->
-            View (Produce_block (timestamp, force)));
+             (req "preblock" Threshold_encryption_types.preblock_encoding))
+          (function View (Produce_block preblock) -> Some ((), preblock))
+          (fun ((), preblock) -> View (Produce_block preblock));
       ]
 
   let pp _ppf (View _) = ()
@@ -116,68 +71,45 @@ let get_hashes ~transactions ~delayed_transactions =
   in
   return (delayed_transactions @ hashes)
 
-let take_delayed_transactions maximum_number_of_chunks =
+let produce_block ~sequencer_key ~cctxt ~smart_rollup_address preblock =
   let open Lwt_result_syntax in
-  let maximum_cumulative_size =
-    Sequencer_blueprint.maximum_usable_space_in_blueprint
-      maximum_number_of_chunks
+  let Threshold_encryption_types.
+        {
+          transactions;
+          delayed_transaction_hashes = delayed_transactions;
+          timestamp;
+          previous_block_hash;
+          current_blueprint_number;
+        } =
+    preblock
   in
-  let maximum_delayed_transactions =
-    maximum_cumulative_size / maximum_delayed_transaction_size
+  let n = List.length transactions + List.length delayed_transactions in
+  let transactions =
+    List.map Threshold_encryption_types.Transaction.to_string transactions
   in
-  let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
-  let delayed_transactions =
-    List.take_n maximum_delayed_transactions delayed_transactions
+  let*? hashes = get_hashes ~transactions ~delayed_transactions in
+  let* payload =
+    Sequencer_blueprint.create
+      ~sequencer_key
+      ~cctxt
+      ~timestamp
+      ~smart_rollup_address
+      ~transactions
+      ~delayed_transactions
+      ~parent_hash:previous_block_hash
+      ~number:current_blueprint_number
   in
-  let remaining_cumulative_size =
-    maximum_cumulative_size - (List.length delayed_transactions * 4096)
+  let (Qty number) = current_blueprint_number in
+  let* () =
+    Evm_context.apply_blueprint timestamp payload delayed_transactions
   in
-  return (delayed_transactions, remaining_cumulative_size)
-
-let produce_block ~force ~timestamp ~maximum_number_of_chunks =
-  let open Lwt_result_syntax in
-  let* is_locked = Tx_pool.is_locked () in
-  if is_locked then
-    let*! () = Block_producer_events.production_locked () in
-    return 0
-  else
-    let* delayed_transactions, remaining_cumulative_size =
-      take_delayed_transactions maximum_number_of_chunks
-    in
-    let* transactions =
-      (* Low key optimization to avoid even checking the txpool if there is not
-         enough space for the smallest transaction. *)
-      if remaining_cumulative_size <= minimum_ethereum_transaction_size then
-        return []
-      else
-        Tx_pool.pop_transactions
-          ~maximum_cumulative_size:remaining_cumulative_size
-    in
-    let*? hashes = get_hashes ~transactions ~delayed_transactions in
-
-    let* blueprint_opt =
-      Threshold_encryption_blueprint_producer.produce_blueprint
-        ~force
-        ~timestamp
-        transactions
-        delayed_transactions
-    in
-    match blueprint_opt with
-    | None -> return 0
-    | Some
-        ( Blueprint_types.{payload; timestamp; number = Qty number},
-          delayed_transactions,
-          n ) ->
-        let* () =
-          Evm_context.apply_blueprint timestamp payload delayed_transactions
-        in
-        let* () = Blueprints_publisher.publish number payload in
-        let*! () =
-          List.iter_p
-            (fun hash -> Block_producer_events.transaction_selected ~hash)
-            hashes
-        in
-        return n
+  let* () = Blueprints_publisher.publish number payload in
+  let*! () =
+    List.iter_p
+      (fun hash -> Block_producer_events.transaction_selected ~hash)
+      hashes
+  in
+  return n
 
 module Handlers = struct
   type self = worker
@@ -188,11 +120,12 @@ module Handlers = struct
       =
    fun w request ->
     let state = Worker.state w in
+
     match request with
-    | Request.Produce_block (timestamp, force) ->
+    | Request.Produce_block preblock ->
         protect @@ fun () ->
-        let {maximum_number_of_chunks} = state in
-        produce_block ~force ~timestamp ~maximum_number_of_chunks
+        let {smart_rollup_address; cctxt; sequencer_key} = state in
+        produce_block ~smart_rollup_address ~cctxt ~sequencer_key preblock
 
   type launch_error = error trace
 
@@ -250,10 +183,8 @@ let shutdown () =
       let* () = Block_producer_events.shutdown () in
       Worker.shutdown w
 
-let produce_block ~force ~timestamp =
+let produce_block preblock =
   let open Lwt_result_syntax in
   let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait
-    worker
-    (Request.Produce_block (timestamp, force))
+  Worker.Queue.push_request_and_wait worker (Request.Produce_block preblock)
   |> handle_request_error
