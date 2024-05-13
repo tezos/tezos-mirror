@@ -11,6 +11,9 @@ Added
 - Brassaia:
     - Add pretty printers for `Commit`, `Tree`, `Info`, `Status`, `Branch` when using `utop` (backported from mirage/irmin #1839) (MR :gl:`!12902`)
 
+- Index:
+  - Vendor `mirage/index` (MR :gl:`!13281`)
+
 Changed
 -------
 
