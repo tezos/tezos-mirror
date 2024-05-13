@@ -20,6 +20,8 @@ module type S = sig
 
   type hash
 
+  val encoding : t Data_encoding.t
+  val pp : Format.formatter -> t -> unit
   val to_hash : t -> hash
 end
 

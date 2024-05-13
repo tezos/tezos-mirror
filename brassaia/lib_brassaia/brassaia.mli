@@ -51,7 +51,7 @@ end
 
 (** {2 Schema} *)
 
-module Type = Repr
+module Type = Type
 (** Dynamic types for Brassaia values, supplied by
     {{:https://github.com/mirage/repr} [Repr]}. These values can be derived from
     type definitions via [\[@@deriving brassaia\]] (see the

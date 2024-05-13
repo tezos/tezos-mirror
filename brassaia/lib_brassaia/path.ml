@@ -19,8 +19,12 @@ include Path_intf
 
 module String_list = struct
   type step = string [@@deriving brassaia]
+
+  let step_encoding : step Data_encoding.t = Data_encoding.string
+
   type t = step list
 
+  let encoding = Data_encoding.(list step_encoding)
   let empty = []
   let is_empty l = l = []
   let cons s t = s :: t

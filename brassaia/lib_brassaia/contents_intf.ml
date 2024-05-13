@@ -28,6 +28,9 @@ module type S = sig
       mean that the key does not exists for either the least-common ancestor or
       one of the two merging points. The merge function returns [None] when the
       key's value should be deleted. *)
+
+  val encoding : t Data_encoding.t
+  (** [encoding] is the data_encoding value for {!type-t}. *)
 end
 
 module type Store = sig

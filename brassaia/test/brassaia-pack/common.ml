@@ -77,6 +77,8 @@ module Contents = struct
     match Brassaia.Type.(Size.of_encoding (triple H.t char t)) with
     | Dynamic f -> f
     | _ -> assert false
+
+  let encoding = Data_encoding.string
 end
 
 module I = Brassaia_pack_unix.Index

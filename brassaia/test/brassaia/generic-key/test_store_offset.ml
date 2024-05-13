@@ -45,6 +45,16 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
     type t = Hash.t key [@@deriving brassaia]
     type hash = Hash.t
 
+    let pp ppf kt = Type.(pp t) ppf kt
+
+    let encoding =
+      Data_encoding.conv (Type.to_string t)
+        (Type.of_string_exn
+           ~path:
+             "test/brassaia/generic-key/test_store_offset.ml/Slot_keyed_vector/Key/of_string"
+           t)
+        Data_encoding.string
+
     let to_hash t = t.hash
   end
 
@@ -70,6 +80,15 @@ module Slot_keyed_vector : Indexable.Maker_concrete_key1 = struct
       type hash = Hash.t
 
       let to_hash t = t.hash
+      let pp ppf kt = Type.(pp t) ppf kt
+
+      let encoding =
+        Data_encoding.conv (Type.to_string t)
+          (Type.of_string_exn
+             ~path:
+               "test/brassaia/generic-key/test_store_offset.ml/Make/Key/of_string"
+             t)
+          Data_encoding.string
     end
 
     module Hash = Brassaia.Hash.Typed (Hash) (Value)

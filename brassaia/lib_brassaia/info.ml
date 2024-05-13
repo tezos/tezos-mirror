@@ -23,6 +23,13 @@ module Default = struct
   type t = { date : int64; author : author; message : message }
   [@@deriving brassaia ~equal]
 
+  let encoding : t Data_encoding.t =
+    Data_encoding.(
+      conv
+        (fun { date; author; message } -> (date, author, message))
+        (fun (date, author, message) -> { date; author; message })
+        (tup3 int64 string string))
+
   type f = unit -> t
 
   let empty = { date = 0L; author = ""; message = "" }

@@ -157,6 +157,15 @@ module Make (Hash : Brassaia.Hash.S) = struct
 
   let unfindable_of_hash hash =
     init_direct ~offset:null_offset ~length:null_length hash
+
+  let pp ppf kt = Repr.(pp t) ppf kt
+
+  let encoding =
+    Data_encoding.conv (Repr.to_string t)
+      Brassaia.Type.(
+        of_string_exn ~path:"lib_brassaia_pack/unix/pack_key.ml/Make/of_string"
+          t)
+      Data_encoding.string
 end
 
 module type Store_spec = sig

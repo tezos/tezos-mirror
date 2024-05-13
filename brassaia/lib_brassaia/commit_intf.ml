@@ -22,11 +22,20 @@ module type S_generic_key = sig
   type t [@@deriving brassaia]
   (** The type for commit values. *)
 
+  val encoding : t Data_encoding.t
+  (** [encoding] is the data_encoding for {!type-t}. *)
+
   type node_key [@@deriving brassaia]
   (** Type for node keys. *)
 
+  val node_key_encoding : node_key Data_encoding.t
+  (** [node_key_encoding] is the data_encoding for {!type-node_key}. *)
+
   type commit_key [@@deriving brassaia]
   (** Type for commit keys. *)
+
+  val commit_key_encoding : commit_key Data_encoding.t
+  (** [commit_key_encoding] is the data_encoding for {!type-commit_key}. *)
 
   module Info : Info.S
   (** The type for commit info. *)

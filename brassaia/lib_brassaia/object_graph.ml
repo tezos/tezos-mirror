@@ -31,6 +31,24 @@ let list_partition_map f t =
   in
   aux [] [] t
 
+module Events = struct
+  (* open Tezos_base.TzPervasives *)
+  include Internal_event.Simple
+
+  let section = [ "brassaia"; "object_graph" ]
+
+  let object_graph_iter =
+    declare_5 ~section ~level:Debug ~name:"inode_save_values"
+      ~msg:
+        "iter: depth: {depth}; rev: {rev}; min: {min}; max: {max}; cache_size: \
+         {cache_size}"
+      ("depth", Data_encoding.int64)
+      ("rev", Data_encoding.bool)
+      ("min", Data_encoding.(list (option string)))
+      ("max", Data_encoding.(list (option string)))
+      ("cache_size", Data_encoding.(option int64))
+end
+
 module Make
     (Contents_key : Type.S)
     (Node_key : Type.S)
@@ -44,6 +62,24 @@ struct
       | `Commit of Commit_key.t
       | `Branch of Branch.t ]
     [@@deriving brassaia]
+
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case (Tag 1) ~title:"`Contents" Contents_key.encoding
+            (function `Contents k -> Some k | _ -> None)
+            (fun k -> `Contents k);
+          case (Tag 2) ~title:"`Node" Node_key.encoding
+            (function `Node k -> Some k | _ -> None)
+            (fun k -> `Node k);
+          case (Tag 3) ~title:"`Commit" Commit_key.encoding
+            (function `Commit c -> Some c | _ -> None)
+            (fun c -> `Commit c);
+          case (Tag 4) ~title:"`Branch " Branch.encoding
+            (function `Branch b -> Some b | _ -> None)
+            (fun b -> `Branch b);
+        ]
 
     let equal = Type.(unstage (equal t))
     let compare = Type.(unstage (compare t))
@@ -96,22 +132,26 @@ struct
      to save space. *)
   module Dump = struct
     type t = X.t list * (X.t * X.t) list [@@deriving brassaia]
+
+    let encoding =
+      Data_encoding.(tup2 (list X.encoding) (list (tup2 X.encoding X.encoding)))
   end
 
   let vertex g = G.fold_vertex (fun k set -> k :: set) g []
   let edges g = G.fold_edges (fun k1 k2 list -> (k1, k2) :: list) g []
-  let pp_vertices = Fmt.Dump.list (Type.pp X.t)
-  let pp_depth ppf d = if d <> max_int then Fmt.pf ppf "depth=%d,@ " d
 
   type action = Visit of (X.t * int) | Treat of X.t
 
   let iter ?cache_size ?(depth = max_int) ~pred ~min ~max ~node ?edge ~skip ~rev
       () =
-    [%log.debug
-      "@[<2>iter:@ %arev=%b,@ min=%a,@ max=%a@, cache=%a@]" pp_depth depth rev
-        pp_vertices min pp_vertices max
-        Fmt.(Dump.option int)
-        cache_size];
+    let* () =
+      Events.(emit object_graph_iter)
+        ( Int64.of_int depth,
+          rev,
+          List.map (Data_encoding.Binary.to_string_opt X.encoding) min,
+          List.map (Data_encoding.Binary.to_string_opt X.encoding) max,
+          Option.map Int64.of_int cache_size )
+    in
     let marks = Table.create cache_size in
     let mark key level = Table.add marks key level in
     let todo = Stack.create () in

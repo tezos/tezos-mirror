@@ -54,8 +54,14 @@ module type S = sig
   val t : t Type.t
   (** [t] is the value type for {!type-t}. *)
 
+  val encoding : t Data_encoding.t
+  (** [encoding] is the data_encoding for {!type-t}. *)
+
   val step_t : step Type.t
   (** [step_t] is the value type for {!step}. *)
+
+  val step_encoding : step Data_encoding.t
+  (** [step_encoding] is the data_encoding for {!type-step}. *)
 end
 
 module type Sigs = sig

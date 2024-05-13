@@ -6,6 +6,7 @@
  (public_name octez-libs.brassaia_pack.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
+  octez-libs.event-logging
   fmt
   index
   index.unix
@@ -23,4 +24,5 @@
  (preprocess (pps octez-libs.ppx_brassaia.internal))
  (flags
   (:standard)
-  -w -66-68))
+  -w -66-68
+  -open Tezos_event_logging))

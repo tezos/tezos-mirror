@@ -75,6 +75,33 @@ type json =
   | `A of json list ]
 [@@deriving brassaia]
 
+let json_encoding =
+  let open Data_encoding in
+  mu "json" @@ fun json_encoding ->
+  union
+    [
+      case (Tag 1) ~title:"`Null" empty
+        (function `Null -> Some () | _ -> None)
+        (fun () -> `Null);
+      case (Tag 2) ~title:"`Bool" bool
+        (function `Bool b -> Some b | _ -> None)
+        (fun b -> `Bool b);
+      case (Tag 3) ~title:"`String" string
+        (function `String s -> Some s | _ -> None)
+        (fun s -> `String s);
+      case (Tag 4) ~title:"`Float " float
+        (function `Float f -> Some f | _ -> None)
+        (fun f -> `Float f);
+      case (Tag 5) ~title:"`O "
+        (list (tup2 string (dynamic_size json_encoding)))
+        (function `O l -> Some l | _ -> None)
+        (fun l -> `O l);
+      case (Tag 6) ~title:"`A "
+        (list (dynamic_size json_encoding))
+        (function `A l -> Some l | _ -> None)
+        (fun l -> `A l);
+    ]
+
 module Json_value = struct
   type t = json [@@deriving brassaia]
 
@@ -112,6 +139,7 @@ module Json_value = struct
     | _, _ -> false
 
   let t = Type.like ~equal ~pp ~of_string t
+  let encoding = json_encoding
 
   let rec merge_object ~old x y =
     let open Merge.Infix in
@@ -185,6 +213,7 @@ module Json = struct
 
   let equal a b = Json_value.equal (`O a) (`O b)
   let t = Type.like ~equal ~pp ~of_string t
+  let encoding = Data_encoding.(list (tup2 string json_encoding))
 
   let merge =
     Merge.(option (alist Type.string Json_value.t (fun _ -> Json_value.merge)))
@@ -193,6 +222,7 @@ end
 module String_v2 = struct
   type t = string [@@deriving brassaia]
 
+  let encoding = Data_encoding.string
   let merge = Merge.idempotent Type.(option string)
 end
 
@@ -209,6 +239,7 @@ module String = struct
     pre_hash x f
 
   let t = Type.(like t ~pre_hash:pre_hash_prefixed)
+  let encoding = Data_encoding.string
   let merge = Merge.idempotent Type.(option string)
 end
 

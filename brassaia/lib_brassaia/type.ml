@@ -16,8 +16,19 @@
 
 include Repr
 
+module type S = sig
+  include Repr.S
+
+  val encoding : t Data_encoding.t
+end
+
 module type Defaultable = sig
   include S
 
   val default : t
 end
+
+let of_string_exn ~path t s =
+  match Repr.of_string t s with
+  | Ok hash -> hash
+  | Error (`Msg msg) -> Fmt.failwith "%s failed with msg: '%s'" path msg

@@ -17,8 +17,16 @@
 include module type of Repr
 (** @inline *)
 
+module type S = sig
+  include Repr.S
+
+  val encoding : t Data_encoding.t
+end
+
 module type Defaultable = sig
   include S
 
   val default : t
 end
+
+val of_string_exn : path:string -> 'a t -> string -> 'a

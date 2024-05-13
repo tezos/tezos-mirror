@@ -47,6 +47,13 @@ module Int63 = struct
 
   let t = Brassaia.Type.int63
 
+  let encoding =
+    (* [is_immediate] is [True] if on a 64 bits architecture, [False] on a 32 bits one *)
+    match is_immediate with
+    | True -> Data_encoding.conv to_int64 of_int64 Data_encoding.int64
+    | False ->
+        failwith "Int63.encoding: 32 bits architectures are not supported"
+
   module Syntax = struct
     let ( + ) = add
     let ( - ) = sub
