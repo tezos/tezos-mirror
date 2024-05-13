@@ -10,6 +10,7 @@ use std::error::Error;
 mod cli;
 mod commands;
 mod inbox;
+mod table;
 
 fn format_status(result: &InterpreterResult) -> String {
     use InterpreterResult::*;
