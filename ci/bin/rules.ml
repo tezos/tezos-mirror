@@ -43,7 +43,7 @@ let has_tag_match tag = Predefined_vars.ci_commit_tag =~ tag
 let assigned_to_marge_bot =
   Predefined_vars.ci_merge_request_assignees =~ "/nomadic-margebot/"
 
-let triggered_by_marge_bot =
+let started_by_marge_bot =
   Predefined_vars.gitlab_user_login == str "nomadic-margebot"
 
 let has_mr_label label =
