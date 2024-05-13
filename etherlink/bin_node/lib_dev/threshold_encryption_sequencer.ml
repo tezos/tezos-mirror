@@ -268,6 +268,9 @@ let main ~data_dir ?(genesis_timestamp = Helpers.now ()) ~cctxt
         cctxt;
         smart_rollup_address;
         sequencer_key = threshold_encryption_sequencer_config.sequencer;
+        sidecar_endpoint =
+          threshold_encryption_sequencer_config.sidecar_endpoint;
+        keep_alive = configuration.keep_alive;
       }
   in
   let* () =
