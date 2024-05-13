@@ -16,7 +16,10 @@ pub mod reservation_set;
 #[cfg(test)]
 extern crate proptest;
 
-use self::csregisters::{values::CSRValue, CSRRepr};
+use self::{
+    address_translation::PAGE_SIZE,
+    csregisters::{values::CSRValue, CSRRepr},
+};
 use crate::{
     devicetree,
     machine_state::{
@@ -252,23 +255,40 @@ impl<ML: main_memory::MainMemoryLayout, M: backend::Manager> MachineState<ML, M>
     /// However, we assume the `raw_pc` is 2-byte aligned.
     fn fetch_instr(&self, raw_pc: Address) -> Result<Instr, Exception> {
         // procedure to obtain 2 bytes of an instruction, either the first or last 2 bytes
-        let get_half_instr = |raw_pc: Address| {
+        let get_half_instr = |raw_pc: Address, with_translation: bool| {
             // Chapter: P:S-ISA-1.9 & P:M-ISA-1.16
             // If mtval is written with a nonzero value when a
             // breakpoint, address-misaligned, access-fault, or page-fault exception
             // occurs on an instruction fetch, load, or store, then mtval will contain the
             // faulting virtual address.
-            let translated_pc = self.translate(raw_pc, AccessType::Instruction)?;
-            self.bus
+            let translated_pc = match with_translation {
+                false => raw_pc,
+                true => self.translate(raw_pc, AccessType::Instruction)?,
+            };
+            let half_instr = self
+                .bus
                 .read(translated_pc)
-                .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(raw_pc))
+                .map_err(|_: OutOfBounds| Exception::InstructionAccessFault(raw_pc))?;
+
+            Ok((half_instr, translated_pc))
         };
 
-        // The resons to provide the second half in the lambda is
+        // The reasons to provide the second half in the lambda is
         // because those bytes may be inaccessible or may trigger an exception when read.
         // Hence we can't read eagerly all 4 bytes.
-        let first_half = get_half_instr(raw_pc)?;
-        parse(first_half, || get_half_instr(raw_pc + 2))
+        let (first_half, translated_pc) = get_half_instr(raw_pc, true)?;
+        parse(first_half, || {
+            // Optimization to skip an extra address translation lookup:
+            // If the last 2 bytes of the instruction are in the same page
+            // as the first 2 bytes, then we already know the translated address
+            let (half_instr, _) = if (raw_pc + 2) % PAGE_SIZE == 0 {
+                get_half_instr(raw_pc + 2, true)?
+            } else {
+                get_half_instr(translated_pc + 2, false)?
+            };
+
+            Ok(half_instr)
+        })
     }
 
     /// Advance [`MachineState`] by executing an [`Instr`]
