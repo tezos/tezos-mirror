@@ -133,7 +133,7 @@ pub struct L2Block {
     pub receipts_root: OwnedHash,
     pub miner: Option<OwnedHash>,
     pub extra_data: Option<OwnedHash>,
-    pub gas_limit: Option<u64>,
+    pub gas_limit: u64,
     pub gas_used: U256,
     pub timestamp: Timestamp,
     pub transactions: Vec<TransactionHash>,
@@ -188,7 +188,7 @@ impl L2Block {
             state_root,
             receipts_root,
             gas_used,
-            gas_limit: Some(gas_limit),
+            gas_limit,
             extra_data: None,
             miner: None,
         }
@@ -256,7 +256,7 @@ impl Default for L2Block {
             receipts_root: L2Block::dummy_hash(),
             miner: None,
             extra_data: None,
-            gas_limit: Some(1 << 50),
+            gas_limit: 1 << 50,
             gas_used: U256::zero(),
             timestamp: Timestamp::from(0),
             transactions: Vec::new(),
@@ -276,7 +276,7 @@ impl Encodable for L2Block {
         s.append(&self.receipts_root);
         append_option_explicit(s, &self.miner, RlpStream::append);
         append_option_explicit(s, &self.extra_data, RlpStream::append);
-        append_option_explicit(s, &self.gas_limit, append_u64_le);
+        append_u64_le(s, &self.gas_limit);
         let transactions_bytes: Vec<Vec<u8>> =
             self.transactions.iter().map(|x| x.to_vec()).collect();
         s.append_list::<Vec<u8>, _>(&transactions_bytes);
@@ -304,11 +304,7 @@ impl Decodable for L2Block {
                     decode_option_explicit(&next(&mut it)?, "miner", decode_field)?;
                 let extra_data: Option<OwnedHash> =
                     decode_option_explicit(&next(&mut it)?, "extra_data", decode_field)?;
-                let gas_limit = decode_option_explicit(
-                    &next(&mut it)?,
-                    "gas_limit",
-                    decode_field_u64_le,
-                )?;
+                let gas_limit = decode_field_u64_le(&next(&mut it)?, "gas_limit")?;
                 let transactions: Vec<TransactionHash> =
                     decode_transaction_hash_list(&next(&mut it)?, "transactions")?;
                 let gas_used: U256 = decode_field_u256_le(&next(&mut it)?, "gas_used")?;
