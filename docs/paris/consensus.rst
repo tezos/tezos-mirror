@@ -140,10 +140,10 @@ should be taken at round 0, meaning that the time between blocks would be
 
 .. _active_stake_paris:
 
-Validator selection: staking balance and active stake
+Validator selection: staked balance and active stake
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Validator selection is based on the staking balance of a delegate, as in Emmy*.
+Validator selection is based on the staked balance of a delegate, as in Emmy*.
 Let us first (re)define these and related concepts.
 
 - The *overall balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
@@ -151,17 +151,17 @@ Let us first (re)define these and related concepts.
   It must be at least ``MINIMAL_STAKE`` tez, otherwise the delegate cannot be selected as a validator.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its maximal
-  staking balance. We explain below how it is computed.
-- The *staking balance* represents the delegate's skin in the game: in
-  the case that the delegate behaves badly, its staking balance is
-  partly :ref:`slashed<slashing_paris>`. This staking balance must be
+  staked balance. We explain below how it is computed.
+- The *staked balance* represents the delegate's skin in the game: in
+  the case that the delegate behaves badly, its staked balance is
+  partly :ref:`slashed<slashing_paris>`. This staked balance must be
   at least ``MINIMAL_FROZEN_STAKE`` tez, otherwise the delegate cannot
   be selected as a validator. Note that until the :ref:`activation of
   Adaptive Issuance and Staking<feature_activation_paris>`, the
-  staking balance is automatically updated at the end of each cycle to
+  staked balance is automatically updated at the end of each cycle to
   maximize the active stake.
 - The *spendable balance* of a delegate is its full balance
-  minus its staking balance.
+  minus its staked balance and unstaked frozen balance.
 
 We state next the RPCs which allow to retrieve these types of balances, and also some invariants about them
 (Note that these are just invariants, not definitions; for
@@ -173,12 +173,12 @@ not the other way around.):
   with ``../context/delegates/<pkh>/delegated_balance``
 - ``overall balance = full balance + delegated balance``; it is obtained with
   ``../context/delegates/<pkh>/staking_balance``
-- ``full balance = spendable balance + staking balance``; it is obtained with
+- ``full balance = spendable balance + staked balance + unstaked frozen balance``; it is obtained with
   ``../context/delegates/<pkh>/full_balance``
-- ``staking balance`` is obtained with ``../context/delegates/<pkh>/frozen_deposits``
+- ``staked balance`` is obtained with ``../context/delegates/<pkh>/frozen_deposits``
 - ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
 
-Until Adaptive Issuance, delegates can set an upper limit to their staking balance with the
+Until Adaptive Issuance, delegates can set an upper limit to their staked balance with the
 command ``octez-client set deposits limit for <delegate> to
 <deposit_limit>``, and unset this limit with the command ``octez-client
 unset deposits limit for <delegate>``. These commands are implemented
@@ -204,21 +204,21 @@ before updating the delegates' :ref:`activity status<active_delegate_paris>`.
    block* or *having a preattestation or attestation included in a final
    block*.
 
-Intuitively, the active stake is set to 10 times the delegate's staking balance,
+Intuitively, the active stake is set to 10 times the delegate's staked balance,
 without going beyond its overall balance.
 More precisely, the active stake is:
 
-- the delegate's staking balance,
-- its stakers' staking balance (up to a limit, see
+- the delegate's staked balance,
+- its stakers' staked balance (up to a limit, see
   :ref:`limit_of_staking_over_baking<staking_policy_configuration_paris>`),
-- and the liquid delegated balance + the spendable balance, up to 9 times the delegate's staking balance.
+- and the liquid delegated balance + the spendable balance, up to 9 times the delegate's staked balance.
 
 Before Adaptive Issuance, each part weighs equally when computing the baking and voting rights. After Adaptive Issuance, the frozen balances (non-liquid, non-spendable) are weighed for twice as much per tez as the liquid part.
 
 Let's take some examples. Say that the full balance of a delegate is ``1000`` tez.
 Then, without external staking, its theoretical maximum active stake is
 ``10000`` tez. The following table lists some scenarios before Adaptive Issuance (assuming for
-simplicity no changes in the delegate's full and staking balances
+simplicity no changes in the delegate's full and staked balances
 during the last 5 cycles).
 
 .. list-table::
@@ -228,7 +228,7 @@ during the last 5 cycles).
    * - Overall balance
      - Frozen deposit limit
      - Active stake
-     - Staking balance
+     - Staked balance
      - Spendable balance
    * - 9000
      - --
