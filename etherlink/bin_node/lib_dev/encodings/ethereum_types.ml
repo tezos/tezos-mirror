@@ -156,7 +156,7 @@ module Block_parameter = struct
 
   let pp_extended fmt = function
     | Block_parameter param -> pp fmt param
-    | Block_hash {hash; _} -> Format.printf "blockHash : %a" pp_block_hash hash
+    | Block_hash {hash; _} -> pp_block_hash fmt hash
 
   let extended_encoding =
     let open Data_encoding in
