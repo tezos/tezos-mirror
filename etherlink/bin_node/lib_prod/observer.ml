@@ -246,6 +246,7 @@ let main ?kernel_path ~data_dir ~(config : Configuration.t) () =
           threshold_encryption_bundler_endpoint;
           preimages;
           preimages_endpoint;
+          _;
         } =
     Configuration.observer_config_exn config
   in

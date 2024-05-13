@@ -42,6 +42,7 @@ type observer = {
   threshold_encryption_bundler_endpoint : Uri.t option;
   preimages : string;
   preimages_endpoint : Uri.t option;
+  time_between_blocks : time_between_blocks option;
 }
 
 type proxy = {read_only : bool}
@@ -200,12 +201,14 @@ let threshold_encryption_sequencer_config_dft ~data_dir ?preimages
   }
 
 let observer_config_dft ~data_dir ?preimages ?preimages_endpoint
-    ~evm_node_endpoint ?threshold_encryption_bundler_endpoint () =
+    ~evm_node_endpoint ?threshold_encryption_bundler_endpoint
+    ?time_between_blocks () =
   {
     evm_node_endpoint;
     threshold_encryption_bundler_endpoint;
     preimages = Option.value ~default:(default_preimages data_dir) preimages;
     preimages_endpoint;
+    time_between_blocks;
   }
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
@@ -333,28 +336,33 @@ let observer_encoding data_dir =
            preimages_endpoint;
            evm_node_endpoint;
            threshold_encryption_bundler_endpoint;
+           time_between_blocks;
          } ->
       ( preimages,
         preimages_endpoint,
         Uri.to_string evm_node_endpoint,
-        threshold_encryption_bundler_endpoint ))
+        threshold_encryption_bundler_endpoint,
+        time_between_blocks ))
     (fun ( preimages,
            preimages_endpoint,
            evm_node_endpoint,
-           threshold_encryption_bundler_endpoint ) ->
+           threshold_encryption_bundler_endpoint,
+           time_between_blocks ) ->
       {
         preimages;
         preimages_endpoint;
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
         threshold_encryption_bundler_endpoint;
+        time_between_blocks;
       })
-    (obj4
+    (obj5
        (dft "preimages" string (default_preimages data_dir))
        (opt "preimages_endpoint" Tezos_rpc.Encoding.uri_encoding)
        (req "evm_node_endpoint" string)
        (opt
           "threshold_encryption_bundler_endpoint"
-          Tezos_rpc.Encoding.uri_encoding))
+          Tezos_rpc.Encoding.uri_encoding)
+       (opt "time_between_blocks" encoding_time_between_blocks))
 
 let sqlite_journal_mode_encoding =
   let open Data_encoding in
@@ -803,6 +811,7 @@ module Cli = struct
                 (match threshold_encryption_bundler_endpoint with
                 | None -> observer_config.threshold_encryption_bundler_endpoint
                 | endpoint -> endpoint);
+              time_between_blocks;
             }
       | None ->
           Option.map
