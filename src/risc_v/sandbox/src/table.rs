@@ -93,10 +93,10 @@ fn rows_instr_stats(table: &mut Table, stats: &BenchStats) {
     }
 }
 
-pub fn table_from_stats(stats: &BenchStats, json_file: String) -> Table {
+pub fn table_from_stats(stats: &BenchStats, json_file: &String) -> Table {
     let filename = match json_file.strip_suffix(".json") {
         Some(f) => f,
-        None => &json_file,
+        None => json_file,
     };
     let mut table = Table::new();
     table

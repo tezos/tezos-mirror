@@ -4,6 +4,10 @@
 // SPDX-License-Identifier: MIT
 
 pub mod bench;
-pub mod debug;
-pub mod run;
-pub mod rvemu;
+mod debug;
+mod run;
+mod rvemu;
+
+pub use debug::debug;
+pub use run::run;
+pub use rvemu::rvemu;
