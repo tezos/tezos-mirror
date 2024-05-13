@@ -243,27 +243,25 @@ module Pipeline = struct
     ()
 
   let write () =
-    all ()
-    |> List.iter @@ fun ({name; jobs; _} as pipeline) ->
-       if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
-         precheck pipeline ;
-       match jobs with
-       | [] -> ()
-       | _ :: _ ->
-           let filename = filename ~name in
-           List.iter
-             (fun tezos_job ->
-               let source_file, source_line, _, _ = tezos_job.source_position in
-               Cli.verbose
-                 "%s:%d: generates '%s' for pipeline '%s' in %s"
-                 source_file
-                 source_line
-                 tezos_job.job.name
-                 name
-                 filename)
-             jobs ;
-           let config = List.concat_map tezos_job_to_config_elements jobs in
-           to_file ~filename config
+    Fun.flip List.iter (all ()) @@ fun ({name; jobs; _} as pipeline) ->
+    if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
+      precheck pipeline ;
+    if jobs = [] then
+      failwith "[Pipeline.write] pipeline '%s' contains no jobs!" name ;
+    let filename = filename ~name in
+    List.iter
+      (fun tezos_job ->
+        let source_file, source_line, _, _ = tezos_job.source_position in
+        Cli.verbose
+          "%s:%d: generates '%s' for pipeline '%s' in %s"
+          source_file
+          source_line
+          tezos_job.job.name
+          name
+          filename)
+      jobs ;
+    let config = List.concat_map tezos_job_to_config_elements jobs in
+    to_file ~filename config
 
   let workflow_includes () :
       Gitlab_ci.Types.workflow * Gitlab_ci.Types.include_ list =
