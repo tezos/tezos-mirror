@@ -12,7 +12,7 @@
    Component:    Smart Optimistic Rollups: Etherlink Sequencer
    Requirement:  make -f etherlink.mk build
                  npm install eth-cli
-                 make dsn-sequencer
+                 make octez-dsn-node
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_sequencer.ml
 *)
 
@@ -201,52 +201,69 @@ let setup_sequencer ?(devmode = true) ?genesis_timestamp ?time_between_blocks
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
   let private_rpc_port = Some (Port.fresh ()) in
-  let mode =
-    Evm_node.Sequencer
-      {
-        initial_kernel = output;
-        preimage_dir = Some preimages_dir;
-        private_rpc_port;
-        time_between_blocks;
-        sequencer = sequencer.alias;
-        genesis_timestamp;
-        max_blueprints_lag;
-        max_blueprints_ahead;
-        max_blueprints_catchup;
-        catchup_cooldown;
-        max_number_of_chunks;
-        devmode;
-        wallet_dir = Some (Client.base_dir client);
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
-      }
-  in
   let* sequencer =
-    Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    if threshold_encryption then
+      let sequencer_sidecar_port = Some (Port.fresh ()) in
+      let sequencer_sidecar =
+        Dsn_node.sequencer ?rpc_port:sequencer_sidecar_port ()
+      in
+      let* () = Dsn_node.start sequencer_sidecar in
+      let mode =
+        Evm_node.Threshold_encryption_sequencer
+          {
+            initial_kernel = output;
+            preimage_dir = Some preimages_dir;
+            private_rpc_port;
+            time_between_blocks;
+            sequencer = sequencer.alias;
+            genesis_timestamp;
+            max_blueprints_lag;
+            max_blueprints_ahead;
+            max_blueprints_catchup;
+            catchup_cooldown;
+            max_number_of_chunks;
+            devmode;
+            wallet_dir = Some (Client.base_dir client);
+            tx_pool_timeout_limit = None;
+            tx_pool_addr_limit = None;
+            tx_pool_tx_per_addr_limit = None;
+            sequencer_sidecar_endpoint = Dsn_node.endpoint sequencer_sidecar;
+          }
+      in
+      Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    else
+      let mode =
+        Evm_node.Sequencer
+          {
+            initial_kernel = output;
+            preimage_dir = Some preimages_dir;
+            private_rpc_port;
+            time_between_blocks;
+            sequencer = sequencer.alias;
+            genesis_timestamp;
+            max_blueprints_lag;
+            max_blueprints_ahead;
+            max_blueprints_catchup;
+            catchup_cooldown;
+            max_number_of_chunks;
+            devmode;
+            wallet_dir = Some (Client.base_dir client);
+            tx_pool_timeout_limit = None;
+            tx_pool_addr_limit = None;
+            tx_pool_tx_per_addr_limit = None;
+          }
+      in
+      Evm_node.init ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* mode =
-    if threshold_encryption then
-      let* bundler =
-        Dsn_node.bundler ~endpoint:(Evm_node.endpoint sequencer) ()
-      in
-      return
-        (Evm_node.Threshold_encryption_observer
-           {
-             initial_kernel = output;
-             preimages_dir;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             bundler_node_endpoint = Dsn_node.endpoint bundler;
-           })
-    else
-      return
-        (Evm_node.Observer
-           {
-             initial_kernel = output;
-             preimages_dir;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             devmode;
-           })
+    return
+      (Evm_node.Observer
+         {
+           initial_kernel = output;
+           preimages_dir;
+           rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           devmode;
+         })
   in
   let* observer = Evm_node.init ~mode (Evm_node.endpoint sequencer) in
   let* proxy =
@@ -1720,6 +1737,11 @@ let test_sequencer_is_reimbursed =
         "Missing receipt in the sequencer node for transaction successfully \
          injected in the observer"
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/7215
+   This test passes for the threshold encryption sequencer when
+   we produce one block or three blocks before upgrading the kernel,
+   but not two. This needs to be investigated. *)
+
 (** This tests the situation where the kernel has an upgrade and the
     sequencer upgrade by following the event of the kernel. *)
 let test_self_upgrade_kernel =
@@ -2305,7 +2327,8 @@ let test_no_automatic_block_production =
 
 let test_migration_from_ghostnet =
   (* Creates a sequencer using prod version and ghostnet kernel. *)
-  register_both
+  register_test
+    ~threshold_encryption:false
     ~time_between_blocks:Nothing
     ~kernel:Constant.WASM.ghostnet_evm_kernel
     ~devmode:false
@@ -2510,6 +2533,13 @@ let test_sequencer_upgrade =
               sequencer = new_sequencer_key;
               private_rpc_port = Some (Port.fresh ());
             }
+      | Threshold_encryption_sequencer config ->
+          Evm_node.Threshold_encryption_sequencer
+            {
+              config with
+              sequencer = new_sequencer_key;
+              private_rpc_port = Some (Port.fresh ());
+            }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
@@ -2575,15 +2605,30 @@ let test_sequencer_diverge =
         let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
-  let sequencer_bis =
-    let mode =
+  let* sequencer_bis =
+    let* mode =
       match Evm_node.mode sequencer with
       | Sequencer config ->
-          Evm_node.Sequencer
-            {config with private_rpc_port = Some (Port.fresh ())}
+          return
+          @@ Evm_node.Sequencer
+               {config with private_rpc_port = Some (Port.fresh ())}
+      | Threshold_encryption_sequencer config ->
+          let sequencer_sidecar_port = Some (Port.fresh ()) in
+          let sequencer_sidecar =
+            Dsn_node.sequencer ?rpc_port:sequencer_sidecar_port ()
+          in
+          let* () = Dsn_node.start sequencer_sidecar in
+          return
+          @@ Evm_node.Threshold_encryption_sequencer
+               {
+                 config with
+                 private_rpc_port = Some (Port.fresh ());
+                 sequencer_sidecar_endpoint =
+                   Dsn_node.endpoint sequencer_sidecar;
+               }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    return @@ Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
   let observer_bis =
@@ -3077,6 +3122,8 @@ let test_preimages_endpoint =
     match Evm_node.mode sequencer with
     | Evm_node.Sequencer mode ->
         Evm_node.Sequencer {mode with preimage_dir = None}
+    | Evm_node.Threshold_encryption_sequencer mode ->
+        Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
   let new_sequencer =

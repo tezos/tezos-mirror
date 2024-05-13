@@ -6,11 +6,13 @@
 (*****************************************************************************)
 
 module Parameters = struct
+  type mode = Bundler of {endpoint : string} | Sequencer
+
   type persistent_state = {
     arguments : string list;
     rpc_addr : string;
     rpc_port : int;
-    endpoint : string;
+    mode : mode;
     runner : Runner.t option;
   }
 
@@ -25,22 +27,36 @@ include Daemon.Make (Parameters)
 
 let bundler ?runner ?(rpc_addr = Constant.default_host) ?(rpc_port = 3000)
     ~endpoint () =
-  let open Tezos_base.TzPervasives.Lwt_syntax in
   let server_addr = Format.asprintf "%s:%d" rpc_addr rpc_port in
   let arguments =
     ["bundler"; "--rpc-address"; server_addr; "--sequencer-url"; endpoint]
   in
   let persistent_state =
-    Parameters.{arguments; rpc_addr; rpc_port; endpoint; runner}
+    Parameters.
+      {arguments; rpc_addr; rpc_port; mode = Bundler {endpoint}; runner}
   in
   let bundler =
     create ~path:(Uses.path Constant.octez_dsn_node) persistent_state
   in
-  let* () = run bundler Parameters.{ready = true} arguments in
-  return bundler
+  bundler
+
+let sequencer ?runner ?(rpc_addr = Constant.default_host) ?(rpc_port = 5303) ()
+    =
+  let server_addr = Format.asprintf "%s:%d" rpc_addr rpc_port in
+  let arguments = ["sequencer"; "--rpc-address"; server_addr] in
+  let persistent_state =
+    Parameters.{arguments; rpc_addr; rpc_port; mode = Sequencer; runner}
+  in
+  let sequencer =
+    create ~path:(Uses.path Constant.octez_dsn_node) persistent_state
+  in
+  sequencer
 
 let endpoint (dsn_node : t) =
   Format.sprintf
     "http://%s:%d"
     dsn_node.persistent_state.rpc_addr
     dsn_node.persistent_state.rpc_port
+
+let start daemon =
+  run daemon Parameters.{ready = true} daemon.persistent_state.arguments
