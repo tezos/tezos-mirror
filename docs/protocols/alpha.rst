@@ -57,6 +57,15 @@ Operation receipts
   split into {"staker":{"baker_own_stake": <delegate_pkh>}} and {"staker":{"baker_edge":
   <delegate_pkh>}}. (MR :gl:`!12258`)
 
+Errors
+------
+
+- The ``validate.operation.inconsistent_sources`` and
+  ``validate.operation.inconsistent_counters`` errors have been
+  expanded with information on the problematic sources and
+  counters. The error messages have been updated accordingly, but the
+  error IDs remain unchanged. (MR :gl:`!13138`)
+
 Protocol parameters
 -------------------
 
@@ -106,6 +115,56 @@ following quantities are kept the same:
    * - ``hard_gas_limit_per_block`` (gas unit)
      - ``1733333``
      - ``1386666``
+
+Sponsored Operations
+--------------------
+
+The following changes are under the ``sponsored_operations_enable``
+feature flag. (MR :gl:`!11207`) This feature flag is currently
+disabled, so these changes are purely internal at this time.
+
+- Added a new manager operation kind named ``host`` with two fields: a
+  public key hash ``guest`` and a signature ``guest_signature``. (MR
+  :gl:`!11209`)
+
+- Updated the validation of operations to account for the new ``host``
+  operation:
+
+  - A batch may now contain multiple sources, if it has ``host``
+    operations. (MR :gl:`!13138`) However:
+
+    - All operations in between two ``host`` operations, or after the
+      last ``host`` operation of the batch, must have the ``guest`` of
+      the previous ``host`` operation as their source.
+
+    - The ``host`` operations themselves, and any operations appearing
+      before the first ``host`` operation in the batch, must all share
+      the same source. This source will be the fee payer for the whole
+      batch, also known as the sponsor or host of the batch. Note that
+      if the batch contains no ``host`` operations, this means that
+      all operations must have the same source who will pay the fees,
+      as before the introduction of Sponsored Operations.
+
+    - The same guest must not appear in two separate ``host``
+      operations. Moreover, the fee payer must not appear as guest in
+      a ``host`` operation.
+
+  - The counter of each individual operation in a batch relates to the
+    source of this particular operation. For every source in the
+    batch, all counters associated with that source must be increasing
+    and consecutive. Moreover, the counter of the first operation in
+    the batch, whose source is always the fee payer, must be the next
+    expected counter for the fee payer in the context of the
+    blockchain. There is no such requirement for the first counters of
+    any guest sources. (MR :gl:`!13138`)
+
+- Added the following errors:
+
+  - ``validate.operation.guest_operation_wrong_source`` (MR :gl:`!13138`)
+
+  - ``validate.operation.guest_hosted_twice`` (MR :gl:`!13138`)
+
+  - ``validate.operation.guest_is_sponsor`` (MR :gl:`!13138`)
 
 Bug Fixes
 ---------
