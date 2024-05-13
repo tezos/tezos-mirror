@@ -107,11 +107,12 @@ let layer1_node_new_head =
     ~section
     ~name:"dal_node_layer_1_new_head"
     ~msg:
-      "head of Layer 1 node updated to {hash} at level {level}, round {round}"
+      "head of Layer 1 node updated to {hash} at level {level}, fitness \
+       {fitness}"
     ~level:Info
     ("hash", Block_hash.encoding)
     ("level", Data_encoding.int32)
-    ("round", Data_encoding.int32)
+    ("fitness", Fitness.encoding)
 
 let layer1_node_final_block =
   declare_2

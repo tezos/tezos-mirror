@@ -493,7 +493,7 @@ module Handler = struct
      the publication level of the corresponding slot header. *)
   let new_head ctxt cctxt =
     let open Lwt_result_syntax in
-    let handler _stopper (head_hash, (header : Tezos_base.Block_header.t)) =
+    let handler _stopper (_head_hash, (header : Tezos_base.Block_header.t)) =
       match Node_context.get_status ctxt with
       | Starting -> return_unit
       | Ready ready_ctxt -> (
@@ -523,10 +523,6 @@ module Handler = struct
           let*? head_round = PluginHead.get_round header.shell.fitness in
           Dal_metrics.new_layer1_head ~head_level ;
           Dal_metrics.new_layer1_head_round ~head_round ;
-          let*! () =
-            Event.(
-              emit layer1_node_new_head (head_hash, head_level, head_round))
-          in
           Gossipsub.Worker.Validate_message_hook.set
             (gossipsub_app_messages_validation
                ctxt

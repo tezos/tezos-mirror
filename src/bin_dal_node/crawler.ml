@@ -89,6 +89,12 @@ let finalized_heads_monitor ~name ~last_notified_level crawler_lib cctxt
         ((hash, shell_header) :: acc)
   in
   let process (hash, Block_header.{shell = shell_header; _}) =
+    let*! () =
+      Event.(
+        emit
+          layer1_node_new_head
+          (hash, shell_header.level, shell_header.fitness))
+    in
     cache_shell_header headers_cache hash shell_header ;
     if shell_header.level <= !last_notified_level then return_unit
     else if Int32.equal shell_header.level 1l then (
