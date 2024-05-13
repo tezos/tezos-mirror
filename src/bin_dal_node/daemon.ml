@@ -741,6 +741,12 @@ let run ~data_dir configuration_override =
   in
   let* store = Store.init config in
   let*! metrics_server = Metrics.launch config.metrics_addr in
+  let* last_processed_level_store =
+    Last_processed_level.init ~root_dir:(Configuration_file.store_path config)
+  in
+  let* last_notified_level =
+    Last_processed_level.load_last_processed_level last_processed_level_store
+  in
   let*! crawler =
     let open Constants in
     Crawler.start
@@ -748,6 +754,7 @@ let run ~data_dir configuration_override =
       ~chain:`Main
       ~reconnection_delay:initial_l1_crawler_reconnection_delay
       ~l1_blocks_cache_size:crawler_l1_blocks_cache_size
+      ?last_notified_level
       cctxt
   in
   let ctxt =
@@ -759,6 +766,7 @@ let run ~data_dir configuration_override =
       cctxt
       metrics_server
       crawler
+      last_processed_level_store
   in
   let* rpc_server = RPC_server.(start config ctxt) in
   connect_gossipsub_with_p2p gs_worker transport_layer store ctxt ;

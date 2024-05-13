@@ -55,9 +55,11 @@ type t = {
   mutable profile_ctxt : Profile_manager.t;
   metrics_server : Metrics.t;
   crawler : Crawler.t;
+  last_processed_level_store : Last_processed_level.t;
 }
 
-let init config store gs_worker transport_layer cctxt metrics_server crawler =
+let init config store gs_worker transport_layer cctxt metrics_server crawler
+    last_processed_level_store =
   let neighbors_cctxts =
     List.map
       (fun Configuration_file.{addr; port} ->
@@ -81,6 +83,7 @@ let init config store gs_worker transport_layer cctxt metrics_server crawler =
     profile_ctxt = Profile_manager.empty;
     metrics_server;
     crawler;
+    last_processed_level_store;
   }
 
 type error += Node_not_ready

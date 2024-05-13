@@ -55,10 +55,11 @@ type status = Ready of ready_ctxt | Starting of starting_status
     field are available through accessors *)
 type t
 
-(** [init config store gs_worker transport_layer cctx crawler] creates a [t] with a
-    status set to [Starting] using the given dal node configuration [config],
-    node store [store], gossipsub worker instance [gs_worker], transport layer
-    instance [transport_layer], and tezos node client context [cctx]. *)
+(** [init config store gs_worker transport_layer cctx crawler
+    last_processed_level_store] creates a [t] with a status set to [Starting]
+    using the given dal node configuration [config], node store [store],
+    gossipsub worker instance [gs_worker], transport layer instance
+    [transport_layer], and tezos node client context [cctx]. *)
 val init :
   Configuration_file.t ->
   Store.t ->
@@ -67,6 +68,7 @@ val init :
   Tezos_rpc.Context.generic ->
   Metrics.t ->
   Crawler.t ->
+  Last_processed_level.t ->
   t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
