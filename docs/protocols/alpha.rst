@@ -66,6 +66,10 @@ Errors
   counters. The error messages have been updated accordingly, but the
   error IDs remain unchanged. (MR :gl:`!13138`)
 
+- The message of the ``validate.operation.incorrect_reveal_position``
+  error has been updated to specify that the incorrectly placed
+  revelation concerns the fee payer. (MR :gl:`!13290`)
+
 Protocol parameters
 -------------------
 
@@ -158,6 +162,14 @@ disabled, so these changes are purely internal at this time.
     blockchain. There is no such requirement for the first counters of
     any guest sources. (MR :gl:`!13138`)
 
+  - Before Sponsored Operations, the only allowed position for a
+    ``reveal`` operation was as the very first operation of the
+    batch. Now, a ``reveal`` operation must either be the first
+    operation of the whole batch, or come immediately after a ``host``
+    operation. In other words, a guest operation can be a ``reveal``,
+    provided that it is the guest's first operation in the batch. (MR
+    :gl:`!13290`)
+
 - Added the following errors:
 
   - ``validate.operation.guest_operation_wrong_source`` (MR :gl:`!13138`)
@@ -165,6 +177,9 @@ disabled, so these changes are purely internal at this time.
   - ``validate.operation.guest_hosted_twice`` (MR :gl:`!13138`)
 
   - ``validate.operation.guest_is_sponsor`` (MR :gl:`!13138`)
+
+  - ``validate.operation.guest_incorrect_reveal_position`` (MR
+    :gl:`!13290`)
 
 Bug Fixes
 ---------
