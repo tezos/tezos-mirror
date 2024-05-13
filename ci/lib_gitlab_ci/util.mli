@@ -81,6 +81,16 @@ val job :
   unit ->
   job
 
+(** [trigger_job child_pipeline_path] constructs a {!trigger_job} job. *)
+val trigger_job :
+  ?needs:need list ->
+  ?rules:job_rule list ->
+  ?stage:string ->
+  ?when_:when_trigger_job ->
+  name:string ->
+  string ->
+  trigger_job
+
 (** [artifacts paths] Construct an [artifacts:] clause storing [paths].
 
     - [expire_in:] is omitted if [expire_in] is [None].

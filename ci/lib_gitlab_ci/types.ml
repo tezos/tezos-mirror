@@ -34,6 +34,9 @@ type when_job = Always | On_success | Manual
 (** Represents values of the [when:] field in [workflow:] and [include:] rules. *)
 type when_workflow = Always | Never
 
+(** Represents values of the [when:] field of trigger jobs. *)
+type when_trigger_job = Always | On_success | On_failure
+
 (** Represents values of the [job:allow_failure:] field of rules. *)
 type allow_failure_job = Yes | No | With_exit_codes of int list
 
@@ -170,6 +173,55 @@ type job = {
   parallel : parallel option;
 }
 
+(** Parent-child downstream pipeline trigger.
+
+    {{:https://docs.gitlab.com/ee/ci/pipelines/downstream_pipelines.html#parent-child-pipelines}
+    Parent-child downstream pipelines} execute in the same project as
+    the parent pipeline. They inherit the global variables of the
+    parent pipeline. [trigger_include] should be a path to the
+    definition of the child-pipeline.
+
+    Be aware that the child pipeline must define a workflow that
+    enables the jobs therein. Notably, the default workflow does not
+    enable merge request pipelines, and thus the workflow for a child
+    pipeline spawned by a merge request pipeline must include
+    [workflow:] section with rules that also enables merge request
+    pipelines.
+
+    Note that except [trigger_include], the fields of a trigger job is
+    a subset of those of a normal {!job} and share the same
+    semantics. The fields supported by GitLab for trigger jobs are:
+
+    - [allow_failure].
+    - [extends].
+    - [needs], but not [needs:project].
+    - [only] and [except].
+    - [rules].
+    - [stage].
+    - [trigger].
+    - [variables].
+    - [when] (only with a value of [on_success], [on_failure], or [always]).
+    - [resource_group].
+    - [environment].
+
+    We currently only implement a subset of these, but more can be
+    added as need arises. See
+    {{:https://docs.gitlab.com/ee/ci/yaml/#trigger}CI/CD YAML syntax
+    reference} for more information. *)
+type trigger_job = {
+  name : string;
+  stage : string option;
+  when_ : when_trigger_job option;
+  rules : job_rule list option;
+  needs : need list option;
+  trigger_include : string;
+      (** Path to the child pipeline that the trigger will execute.
+
+          Translates to [trigger:include:]. *)
+}
+
+type generic_job = Job of job | Trigger_job of trigger_job
+
 type workflow = {rules : workflow_rule list; name : string option}
 
 type include_ = {local : string; rules : include_rule list}
@@ -179,7 +231,8 @@ type config_element =
   | Stages of string list  (** Corresponds to a [stages:] key. *)
   | Variables of variables  (** Corresponds to a [variables:] key. *)
   | Default of default  (** Corresponds to a [default:] key. *)
-  | Job of job  (** Corresponds to a job, identified by it's key. *)
+  | Generic_job of generic_job
+      (** Corresponds to a job, identified by it's key. *)
   | Include of include_ list  (** Corresponds to a [include:] key *)
   | Comment of string  (** Corresponds to a top-level YAML comment. *)
 

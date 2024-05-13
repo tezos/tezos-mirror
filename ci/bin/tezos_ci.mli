@@ -284,6 +284,17 @@ val job :
   string list ->
   tezos_job
 
+(** Define a trigger job for a child pipeline.
+
+    The trigger job will be named [trigger:CHILD_PIPELINE_NAME]. *)
+val trigger_job :
+  ?dependencies:dependencies ->
+  ?rules:Gitlab_ci.Types.job_rule list ->
+  __POS__:string * int * int * int ->
+  stage:Stage.t ->
+  Pipeline.child_pipeline ->
+  tezos_job
+
 (** Adds artifacts to a job without overriding, if possible, existing artifacts.
 
     - If the job already has an artifact with [old_name] and [name] is given, then
