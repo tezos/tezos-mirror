@@ -1269,6 +1269,9 @@ module Target = struct
     ctypes : Ctypes.t option;
     with_macos_security_framework : bool;
     product : string;
+    dep_files : string list;
+    dep_globs : string list;
+    dep_globs_rec : string list;
   }
 
   and preprocessor =
@@ -1421,6 +1424,9 @@ module Target = struct
     ?bisect_ppx:bisect_ppx ->
     ?c_library_flags:string list ->
     ?conflicts:t option list ->
+    ?dep_files:string list ->
+    ?dep_globs:string list ->
+    ?dep_globs_rec:string list ->
     ?deps:t option list ->
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
@@ -1930,31 +1936,29 @@ module Target = struct
         with_macos_security_framework;
         tests_deps;
         product;
+        dep_files;
+        dep_globs;
+        dep_globs_rec;
       }
 
   let public_lib ?internal_name =
-    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
-    @@ fun public_name ->
+    internal @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_library {internal_name; public_name}
 
-  let private_lib =
-    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None @@ fun name ->
-    Private_library name
+  let private_lib = internal @@ fun name -> Private_library name
 
   let public_exe ?internal_name =
-    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
-    @@ fun public_name ->
+    internal @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_executable ({internal_name; public_name}, [])
 
   let public_exes ?internal_names =
-    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
-    @@ fun public_names ->
+    internal @@ fun public_names ->
     let names =
       match internal_names with
       | None ->
@@ -1978,18 +1982,16 @@ module Target = struct
     | head :: tail -> Public_executable (head, tail)
 
   let private_exe =
-    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
-    @@ fun internal_name -> Private_executable (internal_name, [])
+    internal @@ fun internal_name -> Private_executable (internal_name, [])
 
   let private_exes =
-    internal ?dep_files:None ?dep_globs:None ?dep_globs_rec:None
-    @@ fun internal_names ->
+    internal @@ fun internal_names ->
     match internal_names with
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
-      ?enabled_if ?(dune_with_test = Always) ?(lib_deps = []) =
+  let test ?(alias = "runtest") ?locks ?enabled_if ?(dune_with_test = Always)
+      ?(lib_deps = []) =
     (match (alias, enabled_if, locks) with
     | "", Some _, _ | "", _, Some _ ->
         invalid_arg
@@ -2012,19 +2014,18 @@ module Target = struct
           | None -> Some enabled_if_dune_with_test)
       | Never -> Some Dune.(S "false")
     in
-    internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_name ->
+    internal @@ fun test_name ->
     Test_executable
       {names = (test_name, []); runtest_alias; locks; enabled_if; lib_deps}
 
-  let tests ?(alias = "runtest") ?dep_files ?dep_globs ?dep_globs_rec ?locks
-      ?enabled_if ?(lib_deps = []) =
+  let tests ?(alias = "runtest") ?locks ?enabled_if ?(lib_deps = []) =
     (match (alias, enabled_if, locks) with
     | "", Some _, _ | "", _, Some _ ->
         invalid_arg
           "Target.tests: cannot specify enabled_if or locks without alias"
     | _ -> ()) ;
     let runtest_alias = if alias = "" then None else Some alias in
-    internal ?dep_files ?dep_globs ?dep_globs_rec @@ fun test_names ->
+    internal @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail ->
@@ -2412,6 +2413,9 @@ module Sub_lib = struct
        ?bisect_ppx
        ?c_library_flags
        ?conflicts
+       ?dep_files
+       ?dep_globs
+       ?dep_globs_rec
        ?deps
        ?dune
        ?flags
@@ -2500,6 +2504,9 @@ module Sub_lib = struct
       ?c_library_flags
       ?conflicts
       ?deps
+      ?dep_files
+      ?dep_globs
+      ?dep_globs_rec
       ?dune
       ?flags
       ?foreign_archives
@@ -4237,6 +4244,20 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
     in
     fun (dir : string) -> String_set.mem dir changed_dirs
   in
+  (* [glob_has_changed] tests if, in a given directory [dir],
+     a [glob] matches files in [changed_files].
+     For now, this is an overapproximation because we do not want to implement
+     the whole glob syntax. Special characters are only special after the last "/",
+     so we can ignore what is after "/" and just check if something changed in
+     the directory. *)
+  let glob_has_changed ~rec_ dir glob =
+    let dir = canonicalize_path (dir // Filename.dirname glob) in
+    if rec_ then directory_has_changed_recursively dir
+    else directory_has_directly_changed dir
+  in
+  (* [file_has_changed] just checks if a [path] is in [changed_files].
+     It does not assume that [path] is canonical, so it has to make it canonical. *)
+  let file_has_changed path = List.mem (canonicalize_path path) changed_files in
   (* [internal_has_changed] tells whether an internal [target]
      is considered to have changed, directly or indirectly.
      A target is considered to have changed:
@@ -4267,15 +4288,33 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
       match String_map.find_opt id !cache with
       | Some result -> result
       | None ->
-          let result =
-            directory_has_directly_changed target.path
-            ||
+          let any_files () =
+            List.exists
+              (fun path -> file_has_changed (target.path // path))
+              target.dep_files
+          in
+          let any_globs () =
+            List.exists
+              (glob_has_changed ~rec_:false target.path)
+              target.dep_globs
+          in
+          let any_globs_rec () =
+            List.exists
+              (glob_has_changed ~rec_:true target.path)
+              target.dep_globs_rec
+          in
+          let any_internal_deps () =
             let internal_deps =
               List.filter_map
                 Target.get_internal
                 (Target.all_internal_deps target)
             in
             List.exists internal_has_changed internal_deps
+          in
+          let result =
+            directory_has_directly_changed target.path
+            || any_files () || any_globs () || any_globs_rec ()
+            || any_internal_deps ()
           in
           cache := String_map.add id result !cache ;
           result
@@ -4354,20 +4393,6 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
           Fun.flip List.iter (Ne_list.to_list names) @@ fun internal_name ->
           add_tag_for_path
             ("_build/default" // target.path // (internal_name ^ ".exe"))) ) ;
-  (* [file_has_changed] just checks if a [path] is in [changed_files].
-     It does not assume that [path] is canonical, so it has to make it canonical. *)
-  let file_has_changed path = List.mem (canonicalize_path path) changed_files in
-  (* [glob_has_changed] tests if, in a given directory [dir],
-     a [glob] matches files in [changed_files].
-     For now, this is an overapproximation because we do not want to implement
-     the whole glob syntax. Special characters are only special after the last "/",
-     so we can ignore what is after "/" and just check if something changed in
-     the directory. *)
-  let glob_has_changed ~rec_ dir glob =
-    let dir = canonicalize_path (dir // Filename.dirname glob) in
-    if rec_ then directory_has_changed_recursively dir
-    else directory_has_directly_changed dir
-  in
   (* Iterate over all Tezt targets to find test files
      that are directly or indirectly changed.
      This does not find test files from tezt/tests,
