@@ -371,7 +371,7 @@ module Migrations = struct
         if applied <= known then return (List.drop_n applied all_migrations)
         else
           let*! () =
-            Evm_store_events.migrations_from_the_future ~applied ~known:0
+            Evm_store_events.migrations_from_the_future ~applied ~known
           in
           failwith
             "Cannot use a store modified by a more up-to-date version of the \
