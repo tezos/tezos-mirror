@@ -20,6 +20,87 @@ include File_manager_intf
 
 let legacy_io_header_size = 16
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = [ "brassaia"; "brassaia_pack"; "unix"; "file_manager" ]
+
+  let flush_suffix_and_its_deps =
+    declare_0 ~section ~level:Warning ~name:"flush_suffix_and_its_deps"
+      ~msg:
+        "Updating the control file to [Used_non_minimal_indexing_strategy]. It \
+         won't be possible to GC this brassaia-pack store anymore."
+      ()
+
+  let reopen_suffix =
+    declare_3 ~section ~level:Debug ~name:"reopen_suffix"
+      ~msg:
+        "reopen_suffix chunk_start_idx: {chunk_start}; chunk_num: {chunk_num}; \
+         appendable_chunk_poff: {appendable_chunk_poff}"
+      ("chunk_start", Data_encoding.int64)
+      ("chunk_num", Data_encoding.int64)
+      ("appendable_chunk_poff", Data_encoding.string)
+
+  let opening_suffix =
+    declare_0 ~section ~level:Debug ~name:"opening_suffix"
+      ~msg:"reload: generation changed, opening suffix" ()
+
+  let cleanup =
+    declare_1 ~section ~level:Debug ~name:"cleanup"
+      ~msg:"Remove residual file {file}"
+      ("file", Data_encoding.string)
+
+  let cleanup_no_removal =
+    declare_2 ~section ~level:Warning ~name:"cleanup_no_removal"
+      ~msg:"Could not remove residual file {file}: {error}"
+      ("file", Data_encoding.string)
+      ("error", Data_encoding.string)
+
+  let add_volume_and_update_control =
+    declare_1 ~section ~level:Debug ~name:"add_volume_and_update_control"
+      ~msg:"add_volume: update control_file volume_num: {volume_num}"
+      ("volume_num", Data_encoding.int64)
+
+  let finish_constructing_rw =
+    declare_2 ~section ~level:Warning ~name:"finish_constructing_rw"
+      ~msg:
+        "{file}: instance was accessed whilst None; this is unexpected during \
+         normal node operation\n\
+         the stack trace is {trace}"
+      ("file", Data_encoding.string)
+      ("trace", Data_encoding.string)
+
+  let swap =
+    declare_5 ~section ~level:Debug ~name:"swap"
+      ~msg:
+        "Gc in main: swap gen: {gen}; suffix start: {suffix}; chunk start idx: \
+         {chunk_start}; chunk num: {chunk_num}; suffix dead bytes: \
+         {suffix_bytes}"
+      ("gen", Data_encoding.int64)
+      ("suffix", Data_encoding.string)
+      ("chunk_start", Data_encoding.int64)
+      ("chunk_num", Data_encoding.int64)
+      ("suffix_bytes", Data_encoding.string)
+
+  let writing_control_file =
+    declare_0 ~section ~level:Debug ~name:"writing_control_file"
+      ~msg:"GC: writing new control_file" ()
+
+  let reopen_file =
+    declare_2 ~section ~level:Debug ~name:"reopen_file"
+      ~msg:"Gc reopen files, update control: {span1}us, {diff}us"
+      ("span1", Data_encoding.float)
+      ("diff", Data_encoding.float)
+
+  let split =
+    declare_2 ~section ~level:Debug ~name:"split"
+      ~msg:
+        "split: update control_file chunk_start_idx: {chunk_start_idx}; \
+         chunk_num: {chunk_num}"
+      ("chunk_start_idx", Data_encoding.int64)
+      ("chunk_num", Data_encoding.int64)
+end
+
 module Make
     (Io : Io.S)
     (Index : Pack_index.S with module Io = Io)
@@ -140,10 +221,9 @@ struct
               if Brassaia_pack.Indexing_strategy.is_minimal t.indexing_strategy
               then pl.status
               else (
-                [%log.warn
-                  "Updating the control file to \
-                   [Used_non_minimal_indexing_strategy]. It won't be possible \
-                   to GC this brassaia-pack store anymore."];
+                Events.(
+                  emit__dont_wait__use_with_care flush_suffix_and_its_deps)
+                  ();
                 Payload.Used_non_minimal_indexing_strategy)
           | Used_non_minimal_indexing_strategy -> pl.status
           | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13
@@ -244,15 +324,16 @@ struct
     (* Invariant: reopen suffix is only called on V3 (and above) suffix files,
        for which dead_header_size is 0. *)
     let dead_header_size = 0 in
-    [%log.debug
-      "reopen_suffix chunk_start_idx:%d chunk_num:%d appendable_chunk_poff:%d"
-        chunk_start_idx chunk_num
-        (Int63.to_int appendable_chunk_poff)];
+    Events.(emit__dont_wait__use_with_care reopen_suffix)
+      ( Int64.of_int chunk_start_idx,
+        Int64.of_int chunk_num,
+        Format.asprintf "%a" Int63.pp appendable_chunk_poff );
+
     let readonly = Suffix.readonly t.suffix in
     let* suffix1 =
       let root = t.root in
       let start_idx = chunk_start_idx in
-      [%log.debug "reload: generation changed, opening suffix"];
+      Events.(emit__dont_wait__use_with_care opening_suffix) ();
       if readonly then
         Suffix.open_ro ~root ~appendable_chunk_poff ~dead_header_size ~start_idx
           ~chunk_num
@@ -288,12 +369,12 @@ struct
              | `Reachable _ | `Sorted _ | `Gc_result _ | `Control_tmp -> true)
       |> List.iter (fun residual ->
              let filename = Filename.concat root residual in
-             [%log.debug "Remove residual file %s" filename];
+             Events.(emit__dont_wait__use_with_care cleanup) filename;
              match Io.unlink filename with
              | Ok () -> ()
              | Error (`Sys_error error) ->
-                 [%log.warn
-                   "Could not remove residual file %s: %s" filename error])
+                 Events.(emit__dont_wait__use_with_care cleanup_no_removal)
+                   (filename, error))
     in
     Option.might (Lower.cleanup ~generation) lower
 
@@ -304,7 +385,8 @@ struct
     (* Step 2. Update control file *)
     let pl = Control.payload control in
     let pl = { pl with volume_num = Lower.volume_num lower } in
-    [%log.debug "add_volume: update control_file volume_num:%d" pl.volume_num];
+    Events.(emit__dont_wait__use_with_care add_volume_and_update_control)
+      (Int64.of_int pl.volume_num);
     Control.set_payload control pl
 
   let finish_constructing_rw config control ~make_dict ~make_suffix ~make_index
@@ -331,13 +413,8 @@ struct
     let get_instance () =
       match !instance with
       | None ->
-          [%log.warn
-            "%s: instance was accessed whilst None; this is unexpected during \
-             normal node operation"
-            __FILE__];
-          [%log.warn
-            "%s: the stack trace is %s" __FILE__
-              Printexc.(get_callstack 20 |> raw_backtrace_to_string)];
+          Events.(emit__dont_wait__use_with_care finish_constructing_rw)
+            (__FILE__, Printexc.(get_callstack 20 |> raw_backtrace_to_string));
           (* get_instance is used by the callback functions below; if we reach this point, a
              callback was invoked whilst instance was None; it should be the case that we
              can ignore the callback *)
@@ -871,11 +948,12 @@ struct
   let swap t ~generation ~mapping_size ~suffix_start_offset ~chunk_start_idx
       ~chunk_num ~suffix_dead_bytes ~latest_gc_target_offset ~volume =
     let open Result_syntax in
-    [%log.debug
-      "Gc in main: swap gen %d; suffix start %a; chunk start idx %d; chunk num \
-       %d; suffix dead bytes %a"
-      generation Int63.pp suffix_start_offset chunk_start_idx chunk_num Int63.pp
-        suffix_dead_bytes];
+    Events.(emit__dont_wait__use_with_care swap)
+      ( Int64.of_int generation,
+        Format.asprintf "%a" Int63.pp suffix_start_offset,
+        Int64.of_int chunk_start_idx,
+        Int64.of_int chunk_num,
+        Format.asprintf "%a" Int63.pp suffix_dead_bytes );
     let c0 = Mtime_clock.counter () in
     let pl = Control.payload t.control in
 
@@ -912,7 +990,7 @@ struct
 
         { pl with status; chunk_start_idx; chunk_num }
       in
-      [%log.debug "GC: writing new control_file"];
+      Events.(emit__dont_wait__use_with_care writing_control_file) ();
       Control.set_payload t.control pl
     in
 
@@ -930,8 +1008,7 @@ struct
     in
 
     let span2 = Mtime_clock.count c0 |> Mtime.span_to_us in
-    [%log.debug
-      "Gc reopen files, update control: %.0fus, %.0fus" span1 (span2 -. span1)];
+    Events.(emit__dont_wait__use_with_care reopen_file) (span1, span2 -. span1);
     Ok ()
 
   let readonly t = Suffix.readonly t.suffix
@@ -993,9 +1070,8 @@ struct
       let appendable_chunk_poff = Int63.zero in
       { pl with chunk_num; appendable_chunk_poff }
     in
-    [%log.debug
-      "split: update control_file chunk_start_idx:%d chunk_num:%d"
-        pl.chunk_start_idx pl.chunk_num];
+    Events.(emit__dont_wait__use_with_care split)
+      (Int64.of_int pl.chunk_start_idx, Int64.of_int pl.chunk_num);
     Control.set_payload t.control pl
 
   let add_volume t =
