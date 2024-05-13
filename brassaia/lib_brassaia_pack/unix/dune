@@ -8,8 +8,8 @@
  (libraries
   octez-libs.event-logging
   fmt
-  index
-  index.unix
+  octez-libs.brassaia.index
+  octez-libs.brassaia.index.unix
   octez-libs.brassaia
   octez-libs.brassaia_pack
   logs

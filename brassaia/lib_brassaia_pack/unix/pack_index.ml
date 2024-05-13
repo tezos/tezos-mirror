@@ -60,6 +60,7 @@ module Make (K : Brassaia.Hash.S) = struct
 
   module Stats = Index.Stats
   module I = Index
+  open Brassaia_index_unix
   module Index = Index_unix.Make (Key) (Val) (Index.Cache.Unbounded)
   include Index
   module Io = Io.Unix

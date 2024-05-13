@@ -2134,6 +2134,21 @@ let brassaia_pack_mem =
     ~deps:[brassaia_pack; brassaia_mem; brassaia]
     ~preprocess:[pps ppx_brassaia_internal]
 
+let brassaia_index =
+  octez_lib
+    "brassaia.index"
+    ~path:"brassaia/index/src/"
+    ~deps:[optint; mtime; fmt; rusage; lwt; progress; cmdliner; repr; lru]
+    ~preprocess:[pps ppx_repr]
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+
+let brassaia_index_unix =
+  octez_lib
+    "brassaia.index.unix"
+    ~path:"brassaia/index/src/unix"
+    ~deps:[optint; mtime; rusage; lwt; lwt_unix; index; semaphore_compat]
+    ~flags:(Flags.standard ~disable_warnings:[66; 68] ())
+
 let brassaia_pack_unix =
   octez_lib
     "brassaia_pack.unix"
@@ -2142,8 +2157,8 @@ let brassaia_pack_unix =
       [
         octez_event_logging |> open_;
         fmt;
-        index;
-        index_unix;
+        brassaia_index;
+        brassaia_index_unix;
         brassaia;
         brassaia_pack;
         logs;
