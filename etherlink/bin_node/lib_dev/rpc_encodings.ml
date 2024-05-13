@@ -710,6 +710,22 @@ module Eth_max_priority_fee_per_gas = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Replay_block = struct
+  open Ethereum_types
+
+  type input = Ethereum_types.quantity
+
+  type output = block
+
+  let input_encoding = quantity_encoding
+
+  let output_encoding = block_encoding
+
+  let method_ = "tez_replayBlock"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -754,6 +770,7 @@ let supported_methods : (module METHOD) list =
     (module Produce_block);
     (module Durable_state_value);
     (module Eth_max_priority_fee_per_gas);
+    (module Replay_block);
   ]
 
 let unsupported_methods : string list =

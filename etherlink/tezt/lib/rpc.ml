@@ -129,6 +129,12 @@ module Request = struct
 
   let eth_maxPriorityFeePerGas =
     {method_ = "eth_maxPriorityFeePerGas"; parameters = `Null}
+
+  let replayBlock blockNumber =
+    {
+      method_ = "tez_replayBlock";
+      parameters = `String (string_of_int blockNumber);
+    }
 end
 
 let net_version evm_node =
@@ -309,3 +315,15 @@ let get_storage_at ~address ?(block = Latest) ~pos evm_node =
 let get_max_priority_fee_per_gas evm_node =
   let* json = Evm_node.call_evm_rpc evm_node Request.eth_maxPriorityFeePerGas in
   return JSON.(json |-> "result" |> as_int32)
+
+let replay_block blockNumber evm_node =
+  let* response =
+    Evm_node.call_evm_rpc
+      ~private_:true
+      evm_node
+      (Request.replayBlock blockNumber)
+  in
+  return
+  @@ decode_or_error
+       (fun response -> Evm_node.extract_result response |> Block.of_json)
+       response
