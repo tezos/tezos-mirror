@@ -12,20 +12,25 @@ use crate::{
 };
 use enum_tag::EnumTag;
 use risc_v_interpreter::{
+    machine_state::bus::Address,
     parser::{instruction::Instr, parse},
     Interpreter, InterpreterResult,
 };
 use std::error::Error;
 
 /// Helper function to look in the [`Interpreter`] to peek for the current [`Instr`]
+/// Assumes the program counter will be a multiple of 2.
 fn get_current_instr(interpreter: &Interpreter) -> Result<Instr, InstrGetError> {
+    let get_half_instr = |raw_pc: Address| -> Result<u16, InstrGetError> {
+        let pc = interpreter
+            .translate_instruction_address(raw_pc)
+            .or(Err(InstrGetError::Translation))?;
+        interpreter.read_bus(pc).or(Err(InstrGetError::Parse))
+    };
     let pc = interpreter.read_pc();
-    let pc = interpreter
-        .translate_instruction_address(pc)
-        .or(Err(InstrGetError::Translation))?;
-    let first = interpreter.read_bus(pc).or(Err(InstrGetError::Parse))?;
-    let second = || interpreter.read_bus(pc);
-    parse(first, second).or(Err(InstrGetError::Parse))
+    let first = get_half_instr(pc)?;
+    let second = || get_half_instr(pc + 2);
+    parse(first, second)
 }
 
 /// Composes "in time" two [`InterpreterResult`] one after another,
