@@ -724,6 +724,7 @@ mod tests {
             U256::from(Timestamp::from(0).as_u64()),
             CHAIN_ID.into(),
             block_fees,
+            crate::block::GAS_LIMIT,
         )
     }
 
