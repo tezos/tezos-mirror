@@ -120,7 +120,7 @@ let start_server
     RPC_server.init_server
       ~acl
       ~cors
-      ~media_types:Media_type.all_media_types
+      ~media_types:Supported_media_types.all
       directory
   in
   let private_info =

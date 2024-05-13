@@ -16,6 +16,7 @@
 - Support for specifying an expected time between blocks for the observer node
   in the configuration file, used to detect when the connection with the
   upstream EVM node endpoint is stalled. (!13265)
+- Support for the `charset` specifier for `Content-Type: application/json`. (!13256)
 
 ### Experimental
 
