@@ -40,11 +40,11 @@ open Common
    unconditional variant [schedule_extended_test]. *)
 type code_verification_pipeline = Before_merging | Schedule_extended_test
 
-(** Manual trigger configuration for [make_rules] *)
+(** Configuration of manual jobs for [make_rules] *)
 type manual =
-  | No  (** Do not add rule for manual trigger. *)
-  | Yes  (** Add rule for manual trigger. *)
-  | On_changes of Changeset.t  (** Add manual trigger on certain [changes:] *)
+  | No  (** Do not add rule for manual start. *)
+  | Yes  (** Add rule for manual start. *)
+  | On_changes of Changeset.t  (** Add manual start on certain [changes:] *)
 
 type opam_package_group = Executable | All
 
@@ -327,22 +327,21 @@ let jobs pipeline_type =
 
      If [label] is set, add rule that selects the job in
      [Before_merging] pipelines for merge requests with the given
-     label. Rules for manual triggers can be configured using
-     [manual].
+     label. Rules for manual start can be configured using [manual].
 
      If [label], [changes] and [manual] are omitted, then rules will
      enable the job [On_success] in the [before_merging] pipeline. This
      is safe, but prefer specifying a [changes] clause if possible.
 
      If [margebot_disable] is set to true (default false), this job is
-     disabled when marge-bot triggers the [before_merging] pipeline. *)
+     disabled when marge-bot starts the [before_merging] pipeline. *)
   let make_rules ?label ?changes ?(manual = No) ?(dependent = false)
       ?(margebot_disable = false) () =
     match pipeline_type with
     | Schedule_extended_test ->
         (* The scheduled pipeline always runs all jobs unconditionally
-           -- unless they are dependent on a previous, non-trigger job, in the
-           pipeline. *)
+           -- unless they are dependent on a previous job (which is
+           not [job_start] defined below), in the pipeline. *)
         [job_rule ~when_:(if dependent then On_success else Always) ()]
     | Before_merging -> (
         (* MR labels can be used to force tests to run. *)
@@ -360,7 +359,7 @@ let jobs pipeline_type =
               [
                 job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
               ])
-        (* For some tests, it can be relevant to have a manual trigger. *)
+        (* It can be relevant to start some jobs manually. *)
         @
         match manual with
         | No -> []
@@ -389,7 +388,7 @@ let jobs pipeline_type =
          ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
   in
   (* Stages *)
-  let trigger_stage, make_dependencies =
+  let start_stage, make_dependencies =
     match pipeline_type with
     | Schedule_extended_test ->
         let make_dependencies ~before_merging:_ ~schedule_extended_test =
@@ -397,18 +396,18 @@ let jobs pipeline_type =
         in
         ([], make_dependencies)
     | Before_merging ->
-        (* Define the [trigger] job
+        (* Define the [start] job
 
            §1: The purpose of this job is to launch the CI manually in certain cases.
            The objective is not to run computing when it is not
            necessary and the decision to do so belongs to the developer
 
            §2: We also perform some fast sanity checks. *)
-        let job_trigger =
+        let job_start =
           job
             ~__POS__
             ~image:Images.alpine
-            ~stage:Stages.trigger
+            ~stage:Stages.start
             ~allow_failure:No
             ~rules:
               [
@@ -432,15 +431,15 @@ let jobs pipeline_type =
             ]
         in
         let make_dependencies ~before_merging ~schedule_extended_test:_ =
-          before_merging job_trigger
+          before_merging job_start
         in
-        ([job_trigger], make_dependencies)
+        ([job_start], make_dependencies)
   in
-  (* Short-cut for jobs that has no dependencies except [job_trigger]
+  (* Short-cut for jobs that has no dependencies except [job_start]
      on [Before_merging] pipelines. *)
-  let dependencies_needs_trigger =
+  let dependencies_needs_start =
     make_dependencies
-      ~before_merging:(fun job_trigger -> Dependent [Job job_trigger])
+      ~before_merging:(fun job_start -> Dependent [Job job_start])
       ~schedule_extended_test:(fun () -> Staged [])
   in
   let sanity =
@@ -513,7 +512,7 @@ let jobs pipeline_type =
     job_docker_rust_toolchain
       ~__POS__
       ~rules:(make_rules ~changes:changeset_octez_or_kernels ~manual:Yes ())
-      ~dependencies:dependencies_needs_trigger
+      ~dependencies:dependencies_needs_start
       ()
   in
   let job_docker_client_libs_dependencies =
@@ -540,7 +539,7 @@ let jobs pipeline_type =
     job_build_dynamic_binaries
       ~__POS__
       ~arch:Amd64
-      ~dependencies:dependencies_needs_trigger
+      ~dependencies:dependencies_needs_start
       ~release:true
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
@@ -552,7 +551,7 @@ let jobs pipeline_type =
     job_build_dynamic_binaries
       ~__POS__
       ~arch:Amd64
-      ~dependencies:dependencies_needs_trigger
+      ~dependencies:dependencies_needs_start
       ~release:false
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
@@ -664,7 +663,7 @@ let jobs pipeline_type =
            of those that do are limiting factors in the total duration
            of pipelines. So we start this job as early as possible,
            without waiting for sanity_ci. *)
-      ~dependencies:dependencies_needs_trigger
+      ~dependencies:dependencies_needs_start
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
   in
@@ -688,7 +687,7 @@ let jobs pipeline_type =
         ~name:"ocaml-check"
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.build
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
         ~before_script:
           (before_script
@@ -750,7 +749,7 @@ let jobs pipeline_type =
         ~name:"opam:prepare"
         ~image:Images.runtime_prebuild_dependencies
         ~stage:Stages.packaging
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~before_script:(before_script ~eval_opam:true [])
         ~artifacts:(artifacts ["_opam-repo-for-release/"])
         ~rules:(opam_rules ~only_marge_bot:false ~batch_index:1 ())
@@ -786,7 +785,7 @@ let jobs pipeline_type =
         job_docker_authenticated
           ~__POS__
           ~name
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules:
             (make_rules ~changes:changeset_debian_dependencies ~manual:Yes ())
           ~stage:Stages.build
@@ -864,14 +863,14 @@ let jobs pipeline_type =
   in
   (* Dependencies for jobs that should run immediately after jobs
      [job_build_x86_64] in [Before_merging] if they are present
-     (otherwise, they run immediately after [job_trigger]). In
+     (otherwise, they run immediately after [job_start]). In
      [Scheduled_extended_test] we are not in a hurry and we let them
      be [Staged []]. *)
   let order_after_build =
     make_dependencies
-      ~before_merging:(fun job_trigger ->
+      ~before_merging:(fun job_start ->
         Dependent
-          (Job job_trigger
+          (Job job_start
           :: [
                Optional job_build_x86_64_release;
                Optional job_build_x86_64_exp_dev_extra;
@@ -886,7 +885,7 @@ let jobs pipeline_type =
         ~name:"kaitai_checks"
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         [
@@ -938,7 +937,7 @@ let jobs pipeline_type =
         ~name:"oc.check_lift_limits_patch"
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_lift_limits_patch ())
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         [
@@ -957,7 +956,7 @@ let jobs pipeline_type =
         ~name:"oc.misc_checks"
         ~image:Images.runtime_build_test_dependencies
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_lint_files ())
         ~before_script:
           (before_script
@@ -985,7 +984,7 @@ let jobs pipeline_type =
         ~name:"oc.python_check"
         ~image:Images.runtime_build_test_dependencies
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_python_files ())
         ~before_script:
           (before_script
@@ -1001,7 +1000,7 @@ let jobs pipeline_type =
         ~name:"oc.ocaml_fmt"
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
         ~before_script:
           (before_script
@@ -1018,7 +1017,7 @@ let jobs pipeline_type =
         ~image:Images.runtime_build_dependencies
         ~stage:Stages.test
         ~retry:2
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_octez ())
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         [
@@ -1032,7 +1031,7 @@ let jobs pipeline_type =
         ~name:"oc.semgrep"
         ~image:Images.semgrep_agent
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_semgrep_files ())
         [
           "echo \"OCaml code linting. For information on how to reproduce \
@@ -1227,7 +1226,7 @@ let jobs pipeline_type =
         ~name:"oc.script:test-gen-genesis"
         ~stage:Stages.test
         ~image:Images.runtime_build_dependencies
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_octez ())
         ~before_script:
           (before_script ~eval_opam:true ["cd scripts/gen-genesis"])
@@ -1279,7 +1278,7 @@ let jobs pipeline_type =
              version used for the tests *)
         ~image:Images.runtime_build_test_dependencies
         ~rules:(make_rules ~changes:changeset_script_b58_prefix ())
-        ~dependencies:dependencies_needs_trigger
+        ~dependencies:dependencies_needs_start
         ~before_script:
           (before_script ~source_version:true ~init_python_venv:true [])
         [
@@ -1334,7 +1333,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name
           ~image:(image_of_distribution distribution)
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules:install_octez_rules
           ~stage:Stages.test
           [script]
@@ -1344,7 +1343,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"oc.install_opam_focal"
           ~image:Images.opam_ubuntu_focal
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
           ~stage:Stages.test
@@ -1359,7 +1358,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name
           ~image
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules:install_octez_rules
           ~stage:Stages.test
           [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
@@ -1555,7 +1554,7 @@ let jobs pipeline_type =
           ~tezt_parallel:1
           ~dependencies
           ~rules:
-            (* This job can only be manually triggered when it's
+            (* This job can only be manually started when it's
                artifact dependencies exists, which they do when
                [changeset_octez] is changed. *)
             (make_rules ~dependent:true ~manual:(On_changes changeset_octez) ())
@@ -1685,7 +1684,7 @@ let jobs pipeline_type =
             ~name:"commit_titles"
             ~image:Images.runtime_prebuild_dependencies
             ~stage:Stages.test
-            ~dependencies:dependencies_needs_trigger
+            ~dependencies:dependencies_needs_start
             (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
                invalid commits titles in situations where that is allowed. *)
             (script_propagate_exit_code "./scripts/ci/check_commit_messages.sh")
@@ -1747,7 +1746,7 @@ let jobs pipeline_type =
           ~name
           ~image
           ~stage:Stages.doc
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules:
             (make_rules
                ~changes:
@@ -1788,7 +1787,7 @@ let jobs pipeline_type =
           ~name:"documentation:odoc"
           ~image:Images.runtime_build_test_dependencies
           ~stage:Stages.doc
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules
           ~before_script:(before_script ~eval_opam:true [])
           ~artifacts:
@@ -1805,7 +1804,7 @@ let jobs pipeline_type =
           ~name:"documentation:manuals"
           ~image:Images.runtime_build_test_dependencies
           ~stage:Stages.doc
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules
           ~before_script:(before_script ~eval_opam:true [])
           ~artifacts:
@@ -1825,7 +1824,7 @@ let jobs pipeline_type =
           ~name:"documentation:docgen"
           ~image:Images.runtime_build_test_dependencies
           ~stage:Stages.doc
-          ~dependencies:dependencies_needs_trigger
+          ~dependencies:dependencies_needs_start
           ~rules
           ~before_script:(before_script ~eval_opam:true [])
           ~artifacts:
@@ -1916,7 +1915,7 @@ let jobs pipeline_type =
            stage) in [Before_merging] pipelines should be [Dependent]
            by default, and in particular [Dependent []] if they have
            no need for artifacts from other jobs. Making these
-           dependent on [job_trigger] is redundant since they are
+           dependent on [job_start] is redundant since they are
            already manual, and what's more, puts the pipeline in a
            confusing "pending state" with a yellow "pause" icon on the
            [manual] stage. *)
@@ -1975,4 +1974,4 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  trigger_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual
+  start_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual

@@ -76,7 +76,7 @@ variables:
   RUNTEZTALIAS: "false"
 
 stages:
-- trigger
+- start
 - sanity
 - build
 - test

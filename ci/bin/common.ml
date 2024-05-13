@@ -24,7 +24,7 @@ open Tezos_ci
    The "manual" stage exists to fix a UI problem that occurs when mixing
    manual and non-manual jobs. *)
 module Stages = struct
-  let trigger = Stage.register "trigger"
+  let start = Stage.register "start"
 
   let sanity = Stage.register "sanity"
 
@@ -137,7 +137,7 @@ module Images = struct
   (* The Alpine version should be kept up to date with the version
      used for the [build_deps_image_name] images and specified in the
      variable [alpine_version] in [scripts/version.sh]. This is
-     checked by the jobs [trigger] and [sanity_ci]. *)
+     checked by the jobs [start] and [sanity_ci]. *)
   let alpine =
     Image.register ~name:"alpine" ~image_path:("alpine:" ^ alpine_version)
 
@@ -362,7 +362,7 @@ let changeset_octez_docker_changes_or_master =
 let changeset_hadolint_docker_files =
   Changeset.make ["build.Dockerfile"; "Dockerfile"]
 
-(** The set of [changes:] that trigger opam jobs.
+(** The set of [changes:] that select opam jobs.
 
     Note: unlike all other changesets, this one does not include {!changeset_base}.
     This is to avoid running these costly jobs too often. *)
@@ -626,7 +626,7 @@ let job_docker_rust_toolchain ?(always_rebuild = false) ?rules ?dependencies
       amd64 builds.
     - [Release] and [Experimental] Docker builds are pushed to Docker hub,
       whereas other types are pushed to the GitLab registry.
-    - [Test_manual] Docker builds are triggered manually, put in the stage
+    - [Test_manual] Docker builds are started manually, put in the stage
       [manual] and their failure is allowed. The other types are in the build
       stage, run [on_success] and are not allowed to fail. *)
 type docker_build_type = Experimental | Release | Test | Test_manual
